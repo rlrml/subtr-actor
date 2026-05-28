@@ -37,10 +37,7 @@ import {
   createReplaySnapshotRenderer,
   type ReplaySnapshotRenderer,
 } from "./replaySnapshotRenderer.ts";
-import {
-  createReplayLoadController,
-  type ReplayLoadController,
-} from "./replayLoadController.ts";
+import type { ReplayLoadController } from "./replayLoadController.ts";
 import { renderScoreboardWindow } from "./scoreboardWindow.ts";
 import type { ModuleRuntimeController } from "./moduleRuntimeController.ts";
 import {
@@ -66,6 +63,7 @@ import { createStandalonePluginController } from "./standalonePlugins.ts";
 import { createAppStatsWindowsManager } from "./appStatsWindowsManager.ts";
 import { createAppEventWindowsManager } from "./appEventWindowsManager.ts";
 import { createAppModuleRuntimeController } from "./appModuleRuntimeController.ts";
+import { createAppReplayLoadController } from "./appReplayLoadController.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -417,66 +415,34 @@ export function mountStatEvaluationPlayer(
     scheduleConfigUrlUpdate,
   });
 
-  replayLoadController = createReplayLoadController({
+  replayLoadController = createAppReplayLoadController({
     defaultCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
-    emptyState: appElements.emptyState,
-    fileInput: appElements.fileInput,
+    elements: appElements,
     replayLoadModal,
-    statusReadout: appElements.statusReadout,
-    viewport: appElements.viewport,
-    getActiveTimelineEventSourceIds() {
-      return moduleRuntimeController.getActiveTimelineEventSourceIds();
-    },
     getInitialConfig() {
       return initialUrlConfig;
-    },
-    getInitialSkipKickoffsEnabled() {
-      return appElements.skipKickoffs.checked;
-    },
-    getInitialSkipPostGoalTransitionsEnabled() {
-      return appElements.skipPostGoalTransitions.checked;
     },
     getReplayPlayer() {
       return replayPlayer;
     },
-    includeBoostPickupAnimationPickup(pickup) {
-      return moduleRuntimeController.includeBoostPickupAnimationPickup(pickup);
+    getModuleRuntimeController() {
+      return moduleRuntimeController;
+    },
+    getEventWindowsManager() {
+      return eventWindowsManager;
+    },
+    getRecordingControls() {
+      return recordingControls;
+    },
+    getCameraControls() {
+      return cameraControls;
     },
     applyConfigToReplayPlayer,
-    clearRenderCaches() {
-      moduleRuntimeController.clearRenderCaches();
-    },
     clearStandalonePlugins,
-    clearTimelineEventSources() {
-      moduleRuntimeController.clearTimelineEventSources();
-    },
-    clearTimelineRangeSources() {
-      moduleRuntimeController.clearTimelineRangeSources();
-    },
-    eventWindowsRenderPlaylistWindow() {
-      eventWindowsManager.renderPlaylistWindow();
-    },
-    eventWindowsRenderTimelineControls() {
-      eventWindowsManager.renderTimelineControls();
-    },
-    eventWindowsResetPlaylistState() {
-      eventWindowsManager.resetPlaylistState();
-    },
-    eventWindowsSyncPlaylistTimeline(state, options) {
-      eventWindowsManager.syncPlaylistTimeline(state, options);
-    },
-    migrateMechanicBackedTimelineEventSelections() {
-      moduleRuntimeController.migrateMechanicBackedTimelineEventSelections();
-    },
-    recordingSync(status) {
-      recordingControls?.sync(status);
-    },
     renderModuleSettings,
     renderScoreboard,
     renderSnapshot,
-    renderTimelineEventCount() {
-      moduleRuntimeController.renderTimelineEventCount();
-    },
+    setTransportEnabled,
     setCanvasRecorder(recorder) {
       canvasRecorder = recorder;
     },
@@ -485,10 +451,6 @@ export function mountStatEvaluationPlayer(
     },
     setLoadedReplayName(name) {
       loadedReplayName = name;
-    },
-    setReplayDetails(playersText, frameCount) {
-      appElements.playersReadout.textContent = playersText;
-      appElements.framesReadout.textContent = `${frameCount}`;
     },
     setReplayPlayer(player) {
       replayPlayer = player;
@@ -505,23 +467,13 @@ export function mountStatEvaluationPlayer(
     setTimelineOverlay(overlay) {
       timelineOverlay = overlay;
     },
-    setTransportEnabled,
     setUnsubscribe(nextUnsubscribe) {
       unsubscribe = nextUnsubscribe;
-    },
-    setupActiveModules() {
-      moduleRuntimeController.setupActiveModules();
     },
     statsWindowsRender(frameIndex) {
       statsWindowManager.render(frameIndex);
     },
     syncBoostPadOverlayPlugin,
-    syncCameraAvailability(state) {
-      cameraControls?.syncAvailability(state);
-    },
-    teardownActiveModules() {
-      moduleRuntimeController.teardownActiveModules();
-    },
     unsubscribeCurrent() {
       unsubscribe?.();
       unsubscribe = null;
