@@ -8940,9 +8940,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   }
   eventPlaylistLastActiveKey = activeEventKey;
   if (playlistEventIndexes.empty()) {
-    ImGui::TextWrapped(
-        selectedSourceCount == 0 ? "No event types selected."
-                                 : "No events match the selected playlist filters.");
+    ImGui::TextDisabled("No event types selected.");
   }
   ImGui::EndChild();
   ImGui::End();

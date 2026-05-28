@@ -1349,6 +1349,18 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        'empty.textContent = "No event types selected.";',
+        "stats evaluation player event playlist no-selection empty state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("No event types selected.");',
+        "plugin event playlist no-selection empty state mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         'allButton.textContent = "All";',
         "stats evaluation player event playlist all action label",
         errors,
@@ -1505,6 +1517,7 @@ def main() -> int:
         'ImGui::TextWrapped("Status: %s", eventPlaylistStatus.c_str());',
         "eventPlaylistStatus",
         '"event_playlist_status"',
+        "No events match the selected playlist filters.",
     ):
         reject_contains(
             plugin_source,
