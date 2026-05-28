@@ -9233,8 +9233,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     const bool active = i == static_cast<size_t>(mechanicsReviewIndex);
     const std::string title = mechanicsReviewItemTitle(event, i);
     const std::string label = std::format(
-        "{}  {}##mechanics-review-item",
-        formatEventPlaylistTime(event.time),
+        "{}##mechanics-review-item",
         title);
     if (ImGui::Selectable(label.c_str(), active)) {
       mechanicsReviewIndex = static_cast<int>(i);

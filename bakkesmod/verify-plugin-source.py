@@ -2192,8 +2192,8 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'std::format(\n        "{}  {}##mechanics-review-item",\n        formatEventPlaylistTime(event.time),\n        title)',
-        "plugin mechanics review rows use web-like title labels",
+        'std::format(\n        "{}##mechanics-review-item",\n        title)',
+        "plugin mechanics review rows use web-like title labels without time prefix",
         errors,
     )
     require_contains(
@@ -2503,6 +2503,12 @@ def main() -> int:
         plugin_source,
         'std::format(\n        "{} {:.2f}s {} ({})",',
         "plugin mechanics review rows use prefix/raw-seconds/status-in-title shape",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'std::format(\n        "{}  {}##mechanics-review-item",\n        formatEventPlaylistTime(event.time),',
+        "plugin mechanics review rows prefix event time before item title",
         errors,
     )
     for plugin_only_mechanics_review_queue_surface in (
