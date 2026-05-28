@@ -1683,6 +1683,18 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        "replayPlayer.setAttachedPlayer(playerId);\n      replayPlayer.setCameraViewMode(\"follow\");\n      lastFreeCameraPreset = null;",
+        "stats evaluation player follows the reviewed player when activating a clip",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "cameraSelectedPlayerIndex = current->player_index;\n      cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);\n      cameraViewMode = 1;\n      cameraFreePreset = -1;",
+        "plugin mechanics review replay follows the reviewed player",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         "mechanicsReviewConfirm.disabled = decisionDisabled;",
         "stats evaluation player mechanics review disables unavailable decisions",
         errors,
