@@ -3296,8 +3296,6 @@ void SubtrActorPlugin::applyUiConfigJson(
           .value_or(eventPlaylistGoalContextEnabled);
   eventPlaylistAutoFollow =
       parseJsonBoolProperty(json, "event_playlist_auto_follow").value_or(eventPlaylistAutoFollow);
-  eventPlaylistStatus =
-      parseJsonStringProperty(json, "event_playlist_status").value_or(eventPlaylistStatus);
   if (const auto overlays = parseJsonObjectProperty(json, "overlays")) {
     const std::vector<std::string> timelineEvents =
         parseJsonStringArrayProperty(*overlays, "timelineEvents");
@@ -3974,7 +3972,6 @@ std::string SubtrActorPlugin::uiConfigJson() {
        << (eventPlaylistGoalContextEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_auto_follow\": "
        << (eventPlaylistAutoFollow ? "true" : "false") << ",\n";
-  file << "  \"event_playlist_status\": \"" << escapeJsonString(eventPlaylistStatus) << "\",\n";
   file << "  \"overlays\": {\n";
   const std::string currentEventFilter = cvarString("subtr_actor_overlay_event_types", "all");
   const std::vector<std::string> currentEventFilterTokens =
@@ -8464,9 +8461,6 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     ImGui::TreePop();
   }
 
-  if (!eventPlaylistStatus.empty()) {
-    ImGui::TextWrapped("Status: %s", eventPlaylistStatus.c_str());
-  }
   ImGui::Separator();
 
   ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
@@ -8514,11 +8508,6 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
       if (hasReplayServer) {
         replayServer.SkipToTime(seekTime);
-        eventPlaylistStatus =
-            std::format("Cued {} at {:.2f}s", event.label, seekTime);
-      } else {
-        eventPlaylistStatus =
-            std::format("Selected {} at {:.2f}s; open a replay to seek", event.label, seekTime);
       }
     }
     std::vector<std::string> metaParts;

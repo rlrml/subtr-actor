@@ -321,7 +321,6 @@ private:
   bool eventPlaylistTeamEventsEnabled = true;
   bool eventPlaylistGoalContextEnabled = true;
   bool eventPlaylistAutoFollow = true;
-  std::string eventPlaylistStatus;
   bool timelineRangeBoostEnabled = false;
   bool timelineRangePossessionEnabled = false;
   bool timelineRangePressureEnabled = false;

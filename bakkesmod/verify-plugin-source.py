@@ -1231,6 +1231,9 @@ def main() -> int:
         'renderModuleSummaryToggle("None", noSourcesEnabled, "event-playlist-sources")',
         'renderModuleSummaryToggle(label.c_str(), source.enabled, "event-playlist-sources")',
         'ImGui::Text("%zu selected / %zu recent", playlistEventIndexes.size(), recentUiEvents.size());',
+        'ImGui::TextWrapped("Status: %s", eventPlaylistStatus.c_str());',
+        "eventPlaylistStatus",
+        '"event_playlist_status"',
     ):
         reject_contains(
             plugin_source,
