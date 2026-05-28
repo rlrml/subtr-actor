@@ -1241,12 +1241,43 @@ def main() -> int:
         "plugin mechanics review rows expose review status",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        "formatMechanicsReviewStatus(candidate.meta?.reviewStatus),\n    ].join(\" · \");",
+        "stats evaluation player mechanics review row meta uses dot separator",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'joinStrings(metaParts, " · ")',
+        "plugin mechanics review row meta uses web-like dot separator",
+        errors,
+    )
     reject_contains(
         plugin_source,
         'std::format(\n        "{} {:.2f}s {} ({})",',
         "plugin mechanics review rows use prefix/raw-seconds/status-in-title shape",
         errors,
     )
+    for plugin_only_mechanics_review_queue_surface in (
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REVIEW QUEUE");',
+        'ImGui::Checkbox("Mechanics", &eventPlaylistMechanicsEnabled)',
+        'ImGui::Checkbox("Team", &eventPlaylistTeamEventsEnabled)',
+        'ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled)',
+        'ImGui::SliderFloat("Clip lead", &mechanicsReviewClipLeadSeconds, 0.0f, 10.0f, "%.1fs")',
+        '"Clip trail", &mechanicsReviewClipTrailSeconds, 0.0f, 10.0f, "%.1fs"',
+        'ImGui::Button("Open events")',
+        'ImGui::Button("Open playlist")',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY");',
+        'ImGui::Text(\n      "Replay annotations: %s",',
+        'joinStrings(metaParts, " / ").c_str());\n    ImGui::PopID();',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_mechanics_review_queue_surface,
+            "plugin mechanics review plugin-only queue/filter surface",
+            errors,
+        )
     require_contains(
         web_player_template_source,
         '<span id="replay-loading-summary">0 replays</span>',

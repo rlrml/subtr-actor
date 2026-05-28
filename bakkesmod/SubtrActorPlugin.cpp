@@ -8578,60 +8578,8 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
         static_cast<int>(candidates.size()) - 1);
   }
 
-  int confirmedCount = 0;
-  int rejectedCount = 0;
-  int uncertainCount = 0;
-  for (const size_t index : candidates) {
-    const auto decision = mechanicsReviewDecisions.find(mechanicsReviewKey(recentUiEvents[index]));
-    if (decision == mechanicsReviewDecisions.end()) {
-      continue;
-    }
-    confirmedCount += decision->second == 1 ? 1 : 0;
-    rejectedCount += decision->second == 2 ? 1 : 0;
-    uncertainCount += decision->second == 3 ? 1 : 0;
-  }
-
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REVIEW QUEUE");
-  ImGui::Text(
-      "%zu candidates | %d confirmed | %d rejected | %d uncertain",
-      candidates.size(),
-      confirmedCount,
-      rejectedCount,
-      uncertainCount);
-  if (ImGui::Checkbox("Mechanics", &eventPlaylistMechanicsEnabled)) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::Checkbox("Team", &eventPlaylistTeamEventsEnabled)) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::Checkbox("Goal context", &eventPlaylistGoalContextEnabled)) {
-    scheduleUiConfigAutosave();
-  }
-
-  renderEventFilterCombo("Event filter");
-  ImGui::SetNextItemWidth(120.0f);
-  if (ImGui::SliderFloat("Clip lead", &mechanicsReviewClipLeadSeconds, 0.0f, 10.0f, "%.1fs")) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(120.0f);
-  if (ImGui::SliderFloat(
-          "Clip trail", &mechanicsReviewClipTrailSeconds, 0.0f, 10.0f, "%.1fs")) {
-    scheduleUiConfigAutosave();
-  }
-
-  ImGui::Separator();
   if (candidates.empty()) {
-    ImGui::TextWrapped("No visible events match the current review filters.");
-    if (ImGui::Button("Open events")) {
-      showSingletonWindow(uiEventsOpen, eventsPlacement);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Open playlist")) {
-      showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
-    }
+    ImGui::TextWrapped("No candidate selected");
     ImGui::End();
     return;
   }
@@ -8723,15 +8671,6 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY");
-  ImGui::Text(
-      "Replay annotations: %s",
-      replayAnnotations ? "loaded" : replayAnnotationLoadFailed ? "failed" : "idle");
-  if (!replayAnnotationPath.empty()) {
-    ImGui::TextWrapped("%s", replayAnnotationPath.c_str());
-  }
-
-  ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYLIST");
   ImGui::BeginChild("mechanics-review-list", ImVec2{0.0f, 150.0f}, true);
   for (size_t i = 0; i < candidates.size(); i += 1) {
@@ -8752,7 +8691,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
       metaParts.push_back(event.type);
     }
     metaParts.push_back(mechanicsReviewDecisionLabel(event));
-    ImGui::TextDisabled("%s", joinStrings(metaParts, " / ").c_str());
+    ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());
     ImGui::PopID();
   }
   ImGui::EndChild();
