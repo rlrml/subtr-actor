@@ -941,6 +941,17 @@ def main() -> int:
         "launcher actions expose replay loading like the web player",
         errors,
     )
+    reject_contains(
+        plugin_source,
+        'if (ImGui::Button("Load Replay...", ImVec2{actionButtonWidth, 0.0f})) {\n'
+        "    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);\n"
+        "    resetReplayAnnotations();\n"
+        "    tickReplayAnnotations();\n"
+        "    hideLauncherWindow();\n"
+        "  }",
+        "plugin launcher closes after Load Replay action",
+        errors,
+    )
     require_contains(
         web_player_main_source,
         'renderModuleSummaryGroup("Timeline visualizations", timelineToggles)',
