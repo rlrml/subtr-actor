@@ -1,23 +1,16 @@
 import "./report.css";
 import { formatReplayLoadProgress, loadReplayBundleInWorker } from "./replayLoader.ts";
-import { createStatRegistry, type StatDefinition, type StatScopeKind } from "./statRegistry.ts";
+import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
 import { createStatsFrameLookup } from "./statsTimeline.ts";
 import { renderBoostPage } from "./reportBoostPage.ts";
 import { el } from "./reportDom.ts";
+import { renderDumpPage } from "./reportDumpPage.ts";
 import { renderGoalsPage, type StatsReportGoalWatchRequest } from "./reportGoalsPage.ts";
 import { renderInvolvementPage } from "./reportInvolvementPage.ts";
-import { createPageIntro } from "./reportLayout.ts";
 import { renderOverviewPage } from "./reportOverviewPage.ts";
 import { renderTerritoryPage } from "./reportTerritoryPage.ts";
-import type {
-  PlayerStatsSnapshot,
-  StatsFrame,
-  StatsFrameLookup,
-  StatsTimeline,
-  TeamStatsSnapshot,
-} from "./statsTimeline.ts";
+import type { StatsFrame, StatsFrameLookup, StatsTimeline } from "./statsTimeline.ts";
 
-type StatsTarget = PlayerStatsSnapshot | TeamStatsSnapshot;
 type ReportPageId = "overview" | "goals" | "boost" | "territory" | "involvement" | "dump";
 
 export type { StatsReportGoalWatchRequest } from "./reportGoalsPage.ts";
@@ -55,17 +48,6 @@ const PAGES: readonly { id: ReportPageId; label: string }[] = [
   { id: "dump", label: "All stats" },
 ];
 
-function targetName(target: StatsTarget, scope: StatScopeKind, index: number): string {
-  if (scope === "player") {
-    return (target as PlayerStatsSnapshot).name || `Player ${index + 1}`;
-  }
-  return index === 0 ? "Blue" : "Orange";
-}
-
-function getTargets(frame: StatsFrame, scope: StatScopeKind): StatsTarget[] {
-  return scope === "player" ? frame.players : [frame.team_zero, frame.team_one];
-}
-
 function getFinalFrame(
   statsTimeline: StatsTimeline,
   statsFrameLookup: StatsFrameLookup,
@@ -74,109 +56,8 @@ function getFinalFrame(
   return finalFrame ? (statsFrameLookup.get(finalFrame.frame_number) ?? null) : null;
 }
 
-function groupDefinitions(definitions: StatDefinition[]): Map<string, StatDefinition[]> {
-  const groups = new Map<string, StatDefinition[]>();
-  for (const definition of definitions) {
-    const key = `${definition.scope}:${definition.category}`;
-    const group = groups.get(key);
-    if (group) {
-      group.push(definition);
-    } else {
-      groups.set(key, [definition]);
-    }
-  }
-  return new Map([...groups].sort(([left], [right]) => left.localeCompare(right)));
-}
-
-function formatSectionTitle(key: string): string {
-  const [scope, category] = key.split(":");
-  const prettyCategory = (category ?? "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-  return `${scope === "player" ? "Player" : "Team"} ${prettyCategory}`;
-}
-
-function sectionId(key: string): string {
-  return `stats-${key.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
-}
-
-function formatStatLabel(definition: StatDefinition): string {
-  return definition.path.slice(1).join(".") || definition.label;
-}
-
 function isStatsReportDefinitionVisible(definition: StatDefinition): boolean {
   return !definition.path.includes("entries");
-}
-
-function renderStatsTable(
-  key: string,
-  definitions: StatDefinition[],
-  finalFrame: StatsFrame,
-): HTMLElement {
-  const scope = definitions[0]?.scope ?? "player";
-  const targets = getTargets(finalFrame, scope);
-  const section = el("section", {
-    className: "stats-report-section",
-    id: sectionId(key),
-  });
-  const header = el("header");
-  header.append(
-    el("h2", { text: formatSectionTitle(key) }),
-    el("span", { text: `${definitions.length} stats` }),
-  );
-
-  const wrap = el("div", { className: "stats-report-table-wrap" });
-  const table = el("table", { className: "stats-report-table" });
-  const thead = el("thead");
-  const headerRow = el("tr");
-  headerRow.append(el("th", { text: "Statistic" }));
-  targets.forEach((target, index) => {
-    headerRow.append(el("th", { text: targetName(target, scope, index) }));
-  });
-  thead.append(headerRow);
-
-  const tbody = el("tbody");
-  definitions.forEach((definition) => {
-    const row = el("tr");
-    row.append(el("td", { text: formatStatLabel(definition) }));
-    targets.forEach((target) => {
-      row.append(el("td", { text: definition.format(definition.read(target)) }));
-    });
-    tbody.append(row);
-  });
-
-  table.append(thead, tbody);
-  wrap.append(table);
-  section.append(header, wrap);
-  return section;
-}
-
-function renderDumpPage(
-  grouped: Map<string, StatDefinition[]>,
-  finalFrame: StatsFrame,
-): HTMLElement {
-  const page = el("div", { className: "stats-report-page" });
-  page.append(
-    createPageIntro(
-      "All stats dump",
-      "Everything emitted by the current stats timeline, including experimental mechanic counters and low-level breakdowns.",
-    ),
-  );
-
-  const nav = el("nav", { className: "stats-report-jump-nav" });
-  for (const key of grouped.keys()) {
-    const link = el("a", { text: formatSectionTitle(key) });
-    link.setAttribute("href", `#${sectionId(key)}`);
-    nav.append(link);
-  }
-  page.append(nav);
-
-  const grid = el("div", { className: "stats-report-grid" });
-  for (const [key, group] of grouped) {
-    grid.append(renderStatsTable(key, group, finalFrame));
-  }
-  page.append(grid);
-  return page;
 }
 
 function getActivePageId(): ReportPageId {
@@ -261,7 +142,6 @@ function renderReport(root: HTMLElement, state: ReportState): void {
   }
 
   const definitions = createStatRegistry(finalFrame).filter(isStatsReportDefinitionVisible);
-  const grouped = groupDefinitions(definitions);
   const activePage = getActivePageId();
   const main = el("main", { className: "stats-report" });
   main.append(createHeader());
@@ -276,7 +156,7 @@ function renderReport(root: HTMLElement, state: ReportState): void {
   } else if (activePage === "involvement") {
     main.append(renderInvolvementPage(finalFrame, definitions));
   } else if (activePage === "dump") {
-    main.append(renderDumpPage(grouped, finalFrame));
+    main.append(renderDumpPage(definitions, finalFrame));
   } else {
     main.append(renderOverviewPage(state, finalFrame, definitions));
   }
