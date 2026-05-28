@@ -1182,15 +1182,22 @@ std::string formatGraphStatNumber(double value) {
 }
 
 std::string formatByteSize(size_t bytes) {
-  constexpr double KIB = 1024.0;
-  constexpr double MIB = KIB * 1024.0;
-  if (bytes >= static_cast<size_t>(MIB)) {
-    return std::format("{:.1f} MiB", static_cast<double>(bytes) / MIB);
+  if (bytes == 0) {
+    return "--";
   }
-  if (bytes >= static_cast<size_t>(KIB)) {
-    return std::format("{:.1f} KiB", static_cast<double>(bytes) / KIB);
+
+  constexpr std::array<const char *, 4> units{{"B", "KB", "MB", "GB"}};
+  double value = static_cast<double>(bytes);
+  size_t unitIndex = 0;
+  while (value >= 1024.0 && unitIndex + 1 < units.size()) {
+    value /= 1024.0;
+    unitIndex += 1;
   }
-  return std::format("{} B", bytes);
+  if (unitIndex == 0) {
+    return std::format("{} {}", bytes, units[unitIndex]);
+  }
+  return value >= 10.0 ? std::format("{:.1f} {}", value, units[unitIndex])
+                       : std::format("{:.2f} {}", value, units[unitIndex]);
 }
 
 bool findJsonPropertyValueOffset(

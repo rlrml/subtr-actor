@@ -1187,6 +1187,18 @@ def main() -> int:
         "plugin recording exposes web-like detail grid",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        'if (bytes <= 0) {\n    return "--";\n  }\n  const units = ["B", "KB", "MB", "GB"];',
+        "stats evaluation player recording size formatter uses dash and decimal units",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'if (bytes == 0) {\n    return "--";\n  }\n\n  constexpr std::array<const char *, 4> units{{"B", "KB", "MB", "GB"}};',
+        "plugin recording size formatter mirrors web dash and decimal units",
+        errors,
+    )
     for plugin_only_recording_surface in (
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "RECORDING");',
         'ImGui::Checkbox("Finalize before dump"',
@@ -1194,6 +1206,9 @@ def main() -> int:
         '"recording_finish_before_dump"',
         'ImGui::Button("Snapshot")',
         'ImGui::Button("Log folder")',
+        'return std::format("{} B", bytes);',
+        'KiB',
+        'MiB',
     ):
         reject_contains(
             plugin_source,
