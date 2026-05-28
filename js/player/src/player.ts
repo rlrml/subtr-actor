@@ -3,20 +3,17 @@ import { createReplayScene, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import {
   clampFrameIndex,
-  computeTimelineSegments,
   getFrameWindow,
   getKickoffCountdownMetadata,
-  getReplayPlaybackEndTime,
   inferKickoffGameState,
   inferLiveGameState,
-  projectReplayTimeToTimeline,
-  projectTimelineTimeToReplay,
 } from "./player-internals/timeline";
 import {
   getActiveDemoEvent,
 } from "./player-render-effects";
 import { renderReplayFrameScene } from "./player-render-frame";
 import { normalizeCustomCameraSettings } from "./player-camera-settings";
+import { ReplayPlayerTimelineCache } from "./player-timeline-cache";
 import { findKickoffSkipTime, findPostGoalTransitionSkipTime } from "./player-skip";
 import {
   getFreeCameraPreset,
@@ -77,9 +74,7 @@ export class ReplayPlayer extends EventTarget {
   private readonly boundWindowResize = () => this.sceneState.resize();
   private readonly liveGameState: number | null;
   private readonly kickoffGameState: number | null;
-  private timelineSegmentsCacheKey: string | null = null;
-  private timelineSegmentsCache: ReplayPlayerTimelineSegment[] = [];
-  private timelineDurationCache = 0;
+  private readonly timelineCache = new ReplayPlayerTimelineCache();
   private resizeObserver: ResizeObserver | null = null;
   private animationFrameId: number | null = null;
   private disposed = false;
@@ -394,49 +389,26 @@ export class ReplayPlayer extends EventTarget {
   }
 
   getTimelineDuration(): number {
-    return this.getTimelineSegments().length === 0
-      ? this.replay.duration
-      : this.timelineDurationCache;
+    return this.timelineCache.getDuration(this.getTimelineOptions());
   }
 
   getTimelineCurrentTime(): number {
-    return this.projectReplayTimeToTimeline(this.currentTime).timelineTime;
+    return this.timelineCache.projectReplayTime(
+      this.getTimelineOptions(),
+      this.currentTime,
+    ).timelineTime;
   }
 
   getTimelineSegments(): ReplayPlayerTimelineSegment[] {
-    const cacheKey = `${this.skipPostGoalTransitionsEnabled}:${this.skipKickoffsEnabled}`;
-    if (this.timelineSegmentsCacheKey === cacheKey) {
-      return this.timelineSegmentsCache;
-    }
-
-    this.timelineSegmentsCacheKey = cacheKey;
-    this.timelineSegmentsCache = this.computeTimelineSegments();
-    this.timelineDurationCache = Math.max(
-      0,
-      this.replay.duration -
-        this.timelineSegmentsCache.reduce(
-          (total, segment) => total + (segment.endTime - segment.startTime),
-          0,
-        ),
-    );
-    return this.timelineSegmentsCache;
+    return this.timelineCache.getSegments(this.getTimelineOptions());
   }
 
   projectReplayTimeToTimeline(replayTime: number): ReplayPlayerTimelineProjection {
-    return projectReplayTimeToTimeline(
-      this.replay.duration,
-      this.getTimelineSegments(),
-      replayTime,
-    );
+    return this.timelineCache.projectReplayTime(this.getTimelineOptions(), replayTime);
   }
 
   projectTimelineTimeToReplay(timelineTime: number): number {
-    return projectTimelineTimeToReplay(
-      this.replay.duration,
-      this.getTimelineDuration(),
-      this.getTimelineSegments(),
-      timelineTime,
-    );
+    return this.timelineCache.projectTimelineTime(this.getTimelineOptions(), timelineTime);
   }
 
   private clampReplayTime(time: number): number {
@@ -444,7 +416,7 @@ export class ReplayPlayer extends EventTarget {
   }
 
   private getPlaybackEndTime(): number {
-    return getReplayPlaybackEndTime(this.replay.duration, this.getTimelineSegments());
+    return this.timelineCache.getPlaybackEndTime(this.getTimelineOptions());
   }
 
   subscribe(listener: ReplayPlayerListener): () => void {
@@ -699,14 +671,14 @@ export class ReplayPlayer extends EventTarget {
     return getKickoffCountdownMetadata(this.replay, frameIndex, currentTime);
   }
 
-  private computeTimelineSegments(): ReplayPlayerTimelineSegment[] {
-    return computeTimelineSegments(
-      this.replay,
-      this.skipPostGoalTransitionsEnabled,
-      this.skipKickoffsEnabled,
-      this.liveGameState,
-      this.kickoffGameState,
-    );
+  private getTimelineOptions() {
+    return {
+      replay: this.replay,
+      skipPostGoalTransitionsEnabled: this.skipPostGoalTransitionsEnabled,
+      skipKickoffsEnabled: this.skipKickoffsEnabled,
+      liveGameState: this.liveGameState,
+      kickoffGameState: this.kickoffGameState,
+    };
   }
 
   private installPlugin(
