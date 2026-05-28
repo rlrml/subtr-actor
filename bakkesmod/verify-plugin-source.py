@@ -385,6 +385,86 @@ def stats_window_kind_controls(source: str) -> list[tuple[str, str, bool]]:
     return controls
 
 
+def stats_window_kind_details(source: str) -> dict[str, tuple[str, bool, bool, bool]]:
+    match = re.search(
+        r"SubtrActorPlugin::statsWindowKindControls\(\)\s+const\s+\{\s+return\s+\{\{"
+        r"(.*?)\}\};\s*\}",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError("missing statsWindowKindControls return block")
+
+    controls: dict[str, tuple[str, bool, bool, bool]] = {}
+    for control in re.finditer(
+        r'\{\s*UiStatsWindowKind::\w+,\s*"(?P<id>[^"]+)",\s*"(?P<label>[^"]+)",'
+        r'\s*"[^"]+",\s*(?:static_cast<[^>]+>\([^)]*\)|[^,]+),\s*'
+        r"(?P<scope_selector>true|false),\s*"
+        r"(?P<stat_picker>true|false),\s*"
+        r"(?P<web>true|false),\s*"
+        r"(?:true|false)\s*\}",
+        match.group(1),
+        re.DOTALL,
+    ):
+        controls[control.group("id")] = (
+            control.group("label"),
+            control.group("scope_selector") == "true",
+            control.group("stat_picker") == "true",
+            control.group("web") == "true",
+        )
+    if not controls:
+        raise AssertionError("could not parse statsWindowKindControls details")
+    return controls
+
+
+def web_stats_window_titles(source: str) -> dict[str, str]:
+    match = re.search(
+        r"function\s+getStatsWindowTitle\([^)]*\):\s*string\s*\{(?P<body>.*?)\n\}",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError("missing getStatsWindowTitle")
+    titles = {
+        item.group("id"): item.group("title")
+        for item in re.finditer(
+            r'case\s+"(?P<id>[^"]+)":\s*return\s+"(?P<title>[^"]+)";',
+            match.group("body"),
+        )
+    }
+    if not titles:
+        raise AssertionError("could not parse getStatsWindowTitle")
+    return titles
+
+
+def web_stats_window_scope_selector_ids(source: str) -> tuple[str, ...]:
+    match = re.search(
+        r"function\s+hasStatsWindowScopeSelector\([^)]*\):\s*boolean\s*\{\s*"
+        r"return\s+(?P<body>.*?);\s*\}",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError("missing hasStatsWindowScopeSelector")
+    return tuple(re.findall(r'kind\s*===\s*"([^"]+)"', match.group("body")))
+
+
+def web_stats_window_stat_picker_ids(source: str, kind_ids: tuple[str, ...]) -> tuple[str, ...]:
+    match = re.search(
+        r"function\s+hasStatsWindowStatPicker\([^)]*\):\s*boolean\s*\{\s*"
+        r"return\s+(?P<body>.*?);\s*\}",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError("missing hasStatsWindowStatPicker")
+    body = match.group("body")
+    excluded = set(re.findall(r'kind\s*!==\s*"([^"]+)"', body))
+    if excluded:
+        return tuple(kind_id for kind_id in kind_ids if kind_id not in excluded)
+    return tuple(re.findall(r'kind\s*===\s*"([^"]+)"', body))
+
+
 def main() -> int:
     rust_source = RUST_SOURCE.read_text(encoding="utf-8")
     plugin_source = PLUGIN_SOURCE.read_text(encoding="utf-8")
@@ -514,6 +594,48 @@ def main() -> int:
         errors.append(
             "web stats window kind order drifted from stats evaluation player: "
             f"expected={web_stats_window_kind_ids!r} actual={plugin_web_stats_window_kind_ids!r}"
+        )
+    plugin_stats_window_details = stats_window_kind_details(plugin_source)
+    web_stats_window_title_by_id = web_stats_window_titles(web_player_main_source)
+    plugin_web_stats_window_titles = tuple(
+        (kind_id, plugin_stats_window_details[kind_id][0])
+        for kind_id in plugin_web_stats_window_kind_ids
+    )
+    web_stats_window_titles_ordered = tuple(
+        (kind_id, web_stats_window_title_by_id[kind_id])
+        for kind_id in web_stats_window_kind_ids
+    )
+    if plugin_web_stats_window_titles != web_stats_window_titles_ordered:
+        errors.append(
+            "web stats window titles drifted from stats evaluation player: "
+            f"expected={web_stats_window_titles_ordered!r} "
+            f"actual={plugin_web_stats_window_titles!r}"
+        )
+    plugin_web_stats_scope_selector_ids = tuple(
+        kind_id
+        for kind_id in plugin_web_stats_window_kind_ids
+        if plugin_stats_window_details[kind_id][1]
+    )
+    web_stats_scope_selector_ids = web_stats_window_scope_selector_ids(web_player_main_source)
+    if plugin_web_stats_scope_selector_ids != web_stats_scope_selector_ids:
+        errors.append(
+            "web stats window scope-selector kinds drifted from stats evaluation player: "
+            f"expected={web_stats_scope_selector_ids!r} "
+            f"actual={plugin_web_stats_scope_selector_ids!r}"
+        )
+    plugin_web_stats_picker_ids = tuple(
+        kind_id
+        for kind_id in plugin_web_stats_window_kind_ids
+        if plugin_stats_window_details[kind_id][2]
+    )
+    web_stats_picker_ids = web_stats_window_stat_picker_ids(
+        web_player_main_source,
+        web_stats_window_kind_ids,
+    )
+    if plugin_web_stats_picker_ids != web_stats_picker_ids:
+        errors.append(
+            "web stats window stat-picker kinds drifted from stats evaluation player: "
+            f"expected={web_stats_picker_ids!r} actual={plugin_web_stats_picker_ids!r}"
         )
     web_launcher_stats_buttons = tuple(
         web_launcher_buttons(web_player_template_source, "data-create-stats-window")
