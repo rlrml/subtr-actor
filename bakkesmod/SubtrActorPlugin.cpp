@@ -9050,7 +9050,11 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
       current == nullptr ? 0.0f : std::max(0.0f, current->time - mechanicsReviewClipLeadSeconds);
   const float clipEnd = current == nullptr ? 0.0f : current->time + mechanicsReviewClipTrailSeconds;
   ImGui::Text("%d / %zu", current == nullptr ? 0 : mechanicsReviewIndex + 1, candidates.size());
-  ImGui::TextWrapped("%s", current == nullptr ? "No candidate selected" : current->label.c_str());
+  const std::string currentTitle =
+      current == nullptr ? "No candidate selected"
+      : current->label.empty() ? eventTypeDisplayLabel(current->type)
+                               : current->label;
+  ImGui::TextWrapped("%s", currentTitle.c_str());
   const std::string statusReadout =
       mechanicsReviewClipActive
           ? std::format(
@@ -9173,7 +9177,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     const UiEventRecord &event = recentUiEvents[candidates[i]];
     ImGui::PushID(static_cast<int>(i));
     const bool active = i == static_cast<size_t>(mechanicsReviewIndex);
-    const std::string title = event.label.empty() ? event.type : event.label;
+    const std::string title = event.label.empty() ? eventTypeDisplayLabel(event.type) : event.label;
     const std::string label = std::format(
         "{}  {}##mechanics-review-item",
         formatEventPlaylistTime(event.time),

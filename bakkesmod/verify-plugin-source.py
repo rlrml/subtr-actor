@@ -2030,6 +2030,37 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        'return item.label ?? item.meta?.mechanicLabel ?? `Review item ${index + 1}`;',
+        "stats evaluation player mechanics review item labels have mechanic fallback",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "current->label.empty() ? eventTypeDisplayLabel(current->type)\n"
+        "                               : current->label;",
+        "plugin mechanics review current title formats unlabeled mechanics",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const std::string title = event.label.empty() ? eventTypeDisplayLabel(event.type) : event.label;",
+        "plugin mechanics review row title formats unlabeled mechanics",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'ImGui::TextWrapped("%s", current == nullptr ? "No candidate selected" : current->label.c_str());',
+        "plugin mechanics review current title can render an empty raw label",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "const std::string title = event.label.empty() ? event.type : event.label;",
+        "plugin mechanics review row title falls back to raw event type",
+        errors,
+    )
+    require_contains(
         web_player_template_source,
         '<dl class="mechanics-review-fields">',
         "stats evaluation player mechanics review current item field grid",
