@@ -65,6 +65,27 @@ float rightAnchoredUiX(float width, float margin = 16.0f) {
   return std::max(16.0f, viewportWidth - width - margin);
 }
 
+std::string formatEventPlaylistTime(float seconds) {
+  if (!std::isfinite(seconds)) {
+    return "--";
+  }
+  const float clampedSeconds = std::max(0.0f, seconds);
+  const int minutes = static_cast<int>(std::floor(clampedSeconds / 60.0f));
+  const float remainingSeconds = clampedSeconds - static_cast<float>(minutes * 60);
+  return std::format("{}:{:04.1f}", minutes, remainingSeconds);
+}
+
+std::string joinStrings(const std::vector<std::string> &parts, std::string_view separator) {
+  std::string joined;
+  for (const std::string &part : parts) {
+    if (!joined.empty()) {
+      joined.append(separator);
+    }
+    joined.append(part);
+  }
+  return joined;
+}
+
 constexpr char FRAME_EVENTS_STATE_NODE[] = "frame_events_state";
 constexpr std::array<const char *, 7> FRAME_EVENTS_STATE_EVENT_FIELDS{
     "active_demos",
@@ -8461,9 +8482,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       (!eventPlaylistMechanicsEnabled && !eventPlaylistTeamEventsEnabled &&
        !eventPlaylistGoalContextEnabled) ||
       selectedSources.empty();
-  ImGui::Text("Filters %zu / %zu", selectedSourceCount, playlistSources.size());
+  ImGui::Text("Filters %zu/%zu", selectedSourceCount, playlistSources.size());
   if (renderModuleSummaryToggle(
-          std::format("All ({})", recentUiEvents.size()).c_str(),
+          "All",
           allSourcesEnabled,
           "event-playlist-sources")) {
     eventPlaylistMechanicsEnabled = true;
@@ -8555,9 +8576,14 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     const ImVec4 color = toImVec4(event.color);
     const bool active = activeEventIndex && *activeEventIndex == index;
     const float seekTime = eventSeekTime(event);
-    const std::string buttonLabel =
-        std::format("{} {:.2f}s##event-playlist-cue", active ? ">" : "Cue", event.time);
-    if (ImGui::SmallButton(buttonLabel.c_str())) {
+    const std::string timeLabel = formatEventPlaylistTime(event.time);
+    const std::string eventLabel = event.label.empty() ? event.type : event.label;
+    const std::string itemLabel =
+        std::format("{}  {}##event-playlist-item", timeLabel, eventLabel);
+    ImGui::PushStyleColor(ImGuiCol_Text, color);
+    const bool selected = ImGui::Selectable(itemLabel.c_str(), active);
+    ImGui::PopStyleColor();
+    if (selected) {
       mechanicsReviewClipActive = false;
       playbackCurrentTime = seekTime;
       playbackSkipPostGoalTransitions = false;
@@ -8572,16 +8598,23 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
             std::format("Selected {} at {:.2f}s; open a replay to seek", event.label, seekTime);
       }
     }
-    ImGui::SameLine();
-    ImGui::TextColored(color, "%.2fs", event.time);
-    ImGui::SameLine();
-    ImGui::TextColored(color, "%s", event.actor.c_str());
-    ImGui::SameLine();
-    ImGui::TextWrapped("%s", event.label.c_str());
+    std::vector<std::string> metaParts;
+    if (!event.actor.empty()) {
+      metaParts.push_back(event.actor);
+    }
+    if (event.frame_number != 0) {
+      metaParts.push_back(std::format("frame {}", event.frame_number));
+    }
+    if (!event.type.empty()) {
+      metaParts.push_back(event.type);
+    }
+    if (!metaParts.empty()) {
+      ImGui::TextDisabled("%s", joinStrings(metaParts, " / ").c_str());
+    }
     if (!event.details.empty()) {
       ImGui::TextDisabled("%s", event.details.c_str());
     }
-    ImGui::TextDisabled("%s / %s", event.category.c_str(), event.type.c_str());
+    ImGui::TextDisabled("%s", event.category.c_str());
     if (active && eventPlaylistAutoFollow) {
       ImGui::SetScrollHereY(0.5f);
     }

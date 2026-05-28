@@ -445,6 +445,60 @@ def main() -> int:
         "launcher actions expose replay loading like the web player",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        "summary.textContent = `Filters ${selectedSourceIds.size}/${sources.length}`;",
+        "stats evaluation player event playlist filter count label",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Text("Filters %zu/%zu", selectedSourceCount, playlistSources.size());',
+        "plugin event playlist filter count label mirrors web spacing",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'allButton.textContent = "All";',
+        "stats evaluation player event playlist all action label",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderModuleSummaryToggle(\n          "All",\n          allSourcesEnabled,\n          "event-playlist-sources")',
+        "plugin event playlist all action label mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'button.className = "event-playlist-item";',
+        "stats evaluation player event playlist rows are clickable items",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Selectable(itemLabel.c_str(), active)',
+        "plugin event playlist rows are selectable items",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "std::string formatEventPlaylistTime(float seconds)",
+        "plugin event playlist uses web-like minute time labels",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'std::format("All ({})", recentUiEvents.size()).c_str()',
+        "plugin event playlist all action includes event count",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'std::format("{} {:.2f}s##event-playlist-cue", active ? ">" : "Cue", event.time)',
+        "plugin event playlist visible cue mini-button",
+        errors,
+    )
     for label, plugin_needle in (
         ("Possession", '"Possession",\n        timelineRangePossessionEnabled'),
         ("Half control", '"Half control",\n        timelineRangePressureEnabled'),
