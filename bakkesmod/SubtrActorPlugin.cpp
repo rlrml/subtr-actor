@@ -9244,6 +9244,9 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     if (!event.type.empty()) {
       metaParts.push_back(eventTypeDisplayLabel(event.type));
     }
+    if (!event.actor.empty()) {
+      metaParts.push_back(event.actor);
+    }
     metaParts.push_back(mechanicsReviewDecisionLabel(event));
     ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());
     ImGui::PopID();

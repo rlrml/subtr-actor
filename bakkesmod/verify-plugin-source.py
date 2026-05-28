@@ -2443,6 +2443,18 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "getMechanicsReviewPlayerName(candidate),",
+        "stats evaluation player mechanics review rows expose player attribution",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (!event.actor.empty()) {\n      metaParts.push_back(event.actor);\n    }",
+        "plugin mechanics review rows expose player attribution",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'metaParts.push_back(mechanicsReviewDecisionLabel(event));',
         "plugin mechanics review rows expose review status",
@@ -2450,7 +2462,10 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "formatMechanicsReviewStatus(candidate.meta?.reviewStatus),\n    ].join(\" · \");",
+        "formatMechanicsReviewStatus(candidate.meta?.reviewStatus),\n"
+        "      ]\n"
+        "        .filter((part) => part && part !== \"--\")\n"
+        "        .join(\" · \") || \"--\";",
         "stats evaluation player mechanics review row meta uses dot separator",
         errors,
     )

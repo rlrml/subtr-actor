@@ -2450,10 +2450,14 @@ function renderMechanicsReviewWindow(): void {
     title.textContent = getMechanicsReviewItemLabel(candidate, index);
 
     const meta = document.createElement("strong");
-    meta.textContent = [
-      getMechanicsReviewMechanicLabel(candidate),
-      formatMechanicsReviewStatus(candidate.meta?.reviewStatus),
-    ].join(" · ");
+    meta.textContent =
+      [
+        getMechanicsReviewMechanicLabel(candidate),
+        getMechanicsReviewPlayerName(candidate),
+        formatMechanicsReviewStatus(candidate.meta?.reviewStatus),
+      ]
+        .filter((part) => part && part !== "--")
+        .join(" · ") || "--";
 
     button.append(title, meta);
     mechanicsReviewList.append(button);
