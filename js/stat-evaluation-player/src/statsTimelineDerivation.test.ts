@@ -155,6 +155,7 @@ test("event-derived stats frame lookup applies converted modules incrementally",
     (applier) => applier.createFrameAccumulator,
   ).map((applier) => applier.id);
   assert.deepEqual(incrementalApplierIds, [
+    "event-counts",
     "boost-ledger",
     "core",
     "possession",
@@ -198,6 +199,8 @@ test("event-derived stats frame lookup applies converted modules incrementally",
 
   assert.equal(lookup.get(0)?.players[0]?.demo.demos_inflicted, 0);
   const frameOne = lookup.get(1);
+  assert.equal(frameOne?.team_zero.event_counts?.dodge_reset, 1);
+  assert.equal(frameOne?.players[0]?.event_counts?.dodge_reset, 1);
   assert.equal(frameOne?.team_zero.demo.demos_inflicted, 1);
   assert.equal(frameOne?.players[0]?.demo.demos_inflicted, 1);
   assert.equal(frameOne?.players[1]?.demo.demos_taken, 1);

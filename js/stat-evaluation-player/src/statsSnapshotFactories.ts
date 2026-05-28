@@ -1,3 +1,4 @@
+import { createEmptyEventCountStats } from "./eventCountDerivation.ts";
 import type { PlayerStatsSnapshot, TeamStatsSnapshot } from "./statsTimeline.ts";
 
 export type DeepPartial<T> = {
@@ -48,6 +49,7 @@ export function createTeamStatsSnapshot(
 ): TeamStatsSnapshot {
   return merge<TeamStatsSnapshot>(
     {
+      event_counts: createEmptyEventCountStats(),
       fifty_fifty: {
         count: 0,
         wins: 0,
@@ -229,6 +231,7 @@ export function createPlayerStatsSnapshot(
 ): PlayerStatsSnapshot {
   return merge<PlayerStatsSnapshot>(
     {
+      event_counts: createEmptyEventCountStats(),
       player_id: { Steam: "test-player" },
       name: "Test Player",
       is_team_0: true,

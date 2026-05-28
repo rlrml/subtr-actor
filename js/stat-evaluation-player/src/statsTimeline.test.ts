@@ -38,6 +38,43 @@ test("stats frame lookup uses replay frame_number instead of array index", () =>
   assert.equal(getStatsFrameForReplayFrame(lookup, 15), statsTimeline.frames[2]);
 });
 
+test("stats frame lookup adds event counts to materialized frames", () => {
+  const player = { Steam: "player-a" };
+  const statsTimeline: StatsTimeline = createStatsTimeline({
+    events: {
+      mechanics: [
+        {
+          id: "flip_reset:1:0",
+          kind: "flip_reset",
+          player_id: player,
+          is_team_0: true,
+          timing: { type: "moment", frame: 1, time: 1 },
+        },
+      ],
+    },
+    frames: [
+      {
+        frame_number: 0,
+        time: 0,
+        dt: 0,
+        players: [{ player_id: player, name: "A", is_team_0: true }],
+      },
+      {
+        frame_number: 1,
+        time: 1,
+        dt: 1,
+        players: [{ player_id: player, name: "A", is_team_0: true }],
+      },
+    ],
+  });
+
+  const lookup = createStatsFrameLookup(statsTimeline);
+
+  assert.equal(getStatsFrameForReplayFrame(lookup, 0)?.players[0]?.event_counts?.flip_reset, 0);
+  assert.equal(getStatsFrameForReplayFrame(lookup, 1)?.players[0]?.event_counts?.flip_reset, 1);
+  assert.equal(getStatsFrameForReplayFrame(lookup, 1)?.team_zero.event_counts?.flip_reset, 1);
+});
+
 test("stats frame lookup materializes compact scaffold frames from events", () => {
   const playerA = { Steam: "player-a" };
   const playerB = { Steam: "player-b" };

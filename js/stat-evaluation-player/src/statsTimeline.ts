@@ -52,6 +52,7 @@ import type { WavedashEvent } from "./generated/WavedashEvent.ts";
 import type { WallAerialEvent } from "./generated/WallAerialEvent.ts";
 import type { WallAerialShotEvent } from "./generated/WallAerialShotEvent.ts";
 import type { WhiffEvent } from "./generated/WhiffEvent.ts";
+import { applyEventCountDerivedStats, type EventCountStats } from "./eventCountDerivation.ts";
 import type { ReplayLoadProgress } from "./replayLoadProgress.ts";
 import { createEventDerivedStatsFrameLookup } from "./statsTimelineDerivation.ts";
 
@@ -61,8 +62,8 @@ export type StatsTimeline = MaterializedStatsTimeline | CompactStatsTimeline;
 export type StatsFrame = ReplayStatsFrame;
 export type StatsFrameScaffold = ReplayStatsFrameScaffold;
 export type StatsEvents = ReplayStatsTimelineEvents;
-export type TeamStatsSnapshot = GeneratedTeamStatsSnapshot;
-export type PlayerStatsSnapshot = GeneratedPlayerStatsSnapshot;
+export type TeamStatsSnapshot = GeneratedTeamStatsSnapshot & { event_counts?: EventCountStats };
+export type PlayerStatsSnapshot = GeneratedPlayerStatsSnapshot & { event_counts?: EventCountStats };
 export type BackboardEvent = BackboardBounceEvent;
 export type RushTimelineEvent = RushEvent;
 export interface StatsFrameLookup {
@@ -147,7 +148,9 @@ export function isCompactStatsTimeline(statsTimeline: StatsTimeline): boolean {
 export function createMaterializedStatsFrameLookup(
   statsTimeline: MaterializedStatsTimeline,
 ): Map<number, StatsFrame> {
-  return new Map(statsTimeline.frames.map((frame) => [frame.frame_number, frame]));
+  return new Map(
+    applyEventCountDerivedStats(statsTimeline).frames.map((frame) => [frame.frame_number, frame]),
+  );
 }
 
 /**

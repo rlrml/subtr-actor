@@ -23,6 +23,10 @@ import {
   createCoreEventDerivedStatsAccumulator,
 } from "./coreEventDerivation.ts";
 import {
+  applyEventCountDerivedStats,
+  createEventCountDerivedStatsAccumulator,
+} from "./eventCountDerivation.ts";
+import {
   applyDodgeResetEventDerivedStats,
   createDodgeResetEventDerivedStatsAccumulator,
 } from "./dodgeResetEventDerivation.ts";
@@ -141,6 +145,13 @@ const DEFAULT_STATS_FRAME_MAX_MATERIALIZATION_CHUNK_SIZE = 1_200;
 const STATS_FRAME_MATERIALIZATION_CHUNK_GROWTH_FACTOR = 2;
 
 export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventDerivedApplier[] = [
+  {
+    id: "event-counts",
+    playerModules: ["event_counts"],
+    teamModules: ["event_counts"],
+    apply: applyEventCountDerivedStats,
+    createFrameAccumulator: createEventCountDerivedStatsAccumulator,
+  },
   {
     id: "boost-ledger",
     playerModules: ["boost"],

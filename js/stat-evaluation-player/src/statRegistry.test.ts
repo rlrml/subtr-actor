@@ -8,7 +8,9 @@ test("stat registry exposes player and team stats before a replay is loaded", ()
 
   assert.ok(ids.has("player:boost.amount_used"));
   assert.ok(ids.has("player:core.goals"));
+  assert.ok(ids.has("player:event_counts.flip_reset"));
   assert.ok(ids.has("team:core.goals"));
+  assert.ok(ids.has("team:event_counts.flip_reset"));
   assert.ok(ids.has("team:possession.possession_time"));
 });
 

@@ -46,3 +46,17 @@ test("stat definition search requires the typed string for each term", () => {
     ["player:boost.amount_used_while_airborne"],
   );
 });
+
+test("stat definition search finds event count stats by event name", () => {
+  const definitions = [
+    stat("player:event_counts.flip_reset", "event_counts.flip_reset", "event_counts"),
+    stat("player:dodge_reset.count", "dodge_reset.count", "dodge_reset"),
+  ];
+
+  assert.deepEqual(
+    getStatDefinitionSearchMatches(definitions, "flip reset count").map(
+      (definition) => definition.id,
+    ),
+    ["player:event_counts.flip_reset"],
+  );
+});
