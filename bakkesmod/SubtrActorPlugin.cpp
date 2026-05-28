@@ -11782,6 +11782,11 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   ImGui::Separator();
 }
 
+void renderStatsWindowEmpty(std::string_view message) {
+  ImGui::Spacing();
+  ImGui::TextDisabled("%s", std::string{message}.c_str());
+}
+
 void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
   if (window.kind == UiStatsWindowKind::StatsModule) {
     renderStatsModuleWindow(window);
@@ -11800,7 +11805,7 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
         return statsWindowSupportsStat(window, entry.stat_id);
       });
   if (!hasSupportedEntries) {
-    ImGui::Text("No stats added.");
+    renderStatsWindowEmpty("No stats added.");
     return;
   }
 
@@ -11814,7 +11819,7 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     break;
   case UiStatsWindowKind::Team:
     if (sampledPlayers.empty() && currentStatsJson().empty()) {
-      ImGui::Text("Load a replay to show stats.");
+      renderStatsWindowEmpty("Load a replay to show stats.");
       break;
     }
     renderTeamStatsTable(window, window.selected_team_is_team_0);
@@ -11824,7 +11829,7 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     break;
   case UiStatsWindowKind::AllTeams:
     if (sampledPlayers.empty() && currentStatsJson().empty()) {
-      ImGui::Text("Load a replay to show stats.");
+      renderStatsWindowEmpty("Load a replay to show stats.");
       break;
     }
     renderAllTeamsStatsTable(window);
@@ -11928,7 +11933,7 @@ void SubtrActorPlugin::renderTeamStatsTable(UiStatsWindow &window, uint8_t isTea
 
 void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
   if (sampledPlayers.empty()) {
-    ImGui::Text("Load a replay to show stats.");
+    renderStatsWindowEmpty("Load a replay to show stats.");
     return;
   }
 
@@ -12078,7 +12083,11 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
     ImGui::PopID();
   }
   if (goalEventIndexes.empty()) {
-    ImGui::Text("No goals loaded.");
+    if (!replayAnnotations && (!gameWrapper || !gameWrapper->IsInReplay())) {
+      renderStatsWindowEmpty("Load a replay to show goal labels.");
+    } else {
+      renderStatsWindowEmpty("No goals loaded.");
+    }
   }
 }
 

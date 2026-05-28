@@ -505,7 +505,7 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::Text("Load a replay to show stats.");',
+        'renderStatsWindowEmpty("Load a replay to show stats.");',
         "plugin stats windows no-data empty state mirrors web",
         errors,
     )
@@ -2231,6 +2231,18 @@ def main() -> int:
         plugin_source,
         "json += \",\\\"name\\\":\";",
         "plugin replay module frame player stats preserve player names for in-game cards",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "renderStatsWindowEmpty(\"No stats added.\");",
+        "plugin stats windows show the web-player no-stats empty state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "renderStatsWindowEmpty(\"Load a replay to show goal labels.\");",
+        "plugin goal-label stats windows show the web-player replay empty state",
         errors,
     )
     reject_contains(
