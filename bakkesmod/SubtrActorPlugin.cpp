@@ -9351,6 +9351,40 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYLIST");
   ImGui::SameLine();
   ImGui::TextDisabled("%zu %s", candidates.size(), candidates.size() == 1 ? "item" : "items");
+  auto renderMechanicsReviewItem = [](const std::string &title,
+                                      const std::string &meta,
+                                      bool active) {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float rowWidth = ImGui::GetContentRegionAvail().x;
+    const float rowHeight = std::max(32.0f, ImGui::GetTextLineHeight() + 14.0f);
+    const bool clicked =
+        ImGui::InvisibleButton("##mechanics-review-item", ImVec2{rowWidth, rowHeight});
+    const bool hovered = ImGui::IsItemHovered();
+    const ImVec2 rowMin = ImGui::GetItemRectMin();
+    const ImVec2 rowMax = ImGui::GetItemRectMax();
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    const ImVec4 bg = (active || hovered) ? ImVec4{0.29f, 0.58f, 1.0f, 0.16f}
+                                          : ImVec4{1.0f, 1.0f, 1.0f, 0.045f};
+    const ImVec4 border = active ? ImVec4{0.29f, 0.58f, 1.0f, 0.42f}
+                                 : ImVec4{1.0f, 1.0f, 1.0f, 0.09f};
+    drawList->AddRectFilled(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(bg), 6.0f);
+    drawList->AddRect(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(border), 6.0f);
+
+    const std::string metaText = meta.empty() ? "--" : meta;
+    const ImVec2 metaSize = ImGui::CalcTextSize(metaText.c_str());
+    const float textY =
+        rowMin.y + std::max(0.0f, (rowMax.y - rowMin.y - ImGui::GetTextLineHeight()) * 0.5f);
+    const float titleX = rowMin.x + style.FramePadding.x;
+    const float metaX = rowMax.x - style.FramePadding.x - metaSize.x;
+    drawList->PushClipRect(
+        ImVec2{titleX, rowMin.y},
+        ImVec2{std::max(titleX, metaX - 10.0f), rowMax.y},
+        true);
+    drawList->AddText(ImVec2{titleX, textY}, IM_COL32(237, 245, 250, 255), title.c_str());
+    drawList->PopClipRect();
+    drawList->AddText(ImVec2{metaX, textY}, IM_COL32(137, 164, 186, 255), metaText.c_str());
+    return clicked;
+  };
   ImGui::BeginChild("mechanics-review-list", ImVec2{0.0f, 150.0f}, true);
   if (candidates.empty()) {
     ImGui::TextDisabled("No review playlist loaded.");
@@ -9360,13 +9394,6 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     ImGui::PushID(static_cast<int>(i));
     const bool active = i == static_cast<size_t>(mechanicsReviewIndex);
     const std::string title = mechanicsReviewItemTitle(event, i);
-    const std::string label = std::format(
-        "{}##mechanics-review-item",
-        title);
-    if (ImGui::Selectable(label.c_str(), active)) {
-      mechanicsReviewIndex = static_cast<int>(i);
-      scheduleUiConfigAutosave();
-    }
     std::vector<std::string> metaParts;
     if (!event.type.empty()) {
       metaParts.push_back(eventTypeDisplayLabel(event.type));
@@ -9375,7 +9402,11 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
       metaParts.push_back(event.actor);
     }
     metaParts.push_back(mechanicsReviewDecisionLabel(event));
-    ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());
+    const std::string meta = joinStrings(metaParts, " · ");
+    if (renderMechanicsReviewItem(title, meta, active)) {
+      mechanicsReviewIndex = static_cast<int>(i);
+      scheduleUiConfigAutosave();
+    }
     ImGui::PopID();
   }
   ImGui::EndChild();

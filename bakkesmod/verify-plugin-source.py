@@ -2802,8 +2802,50 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'std::format(\n        "{}##mechanics-review-item",\n        title)',
-        "plugin mechanics review rows use web-like title labels without time prefix",
+        "auto renderMechanicsReviewItem = [](const std::string &title,\n"
+        "                                      const std::string &meta,\n"
+        "                                      bool active)",
+        "plugin mechanics review rows use a web-like two-column renderer",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::InvisibleButton("##mechanics-review-item", ImVec2{rowWidth, rowHeight})',
+        "plugin mechanics review rows keep full-row button behavior",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "drawList->AddRectFilled(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(bg), 6.0f);\n"
+        "    drawList->AddRect(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(border), 6.0f);",
+        "plugin mechanics review rows draw web-like button chrome",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "drawList->AddText(ImVec2{titleX, textY}, IM_COL32(237, 245, 250, 255), title.c_str());",
+        "plugin mechanics review rows render title in left column",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "drawList->AddText(ImVec2{metaX, textY}, IM_COL32(137, 164, 186, 255), metaText.c_str());",
+        "plugin mechanics review rows render metadata in right column",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const std::string meta = joinStrings(metaParts, \" · \");",
+        "plugin mechanics review rows join metadata before rendering",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (renderMechanicsReviewItem(title, meta, active)) {\n"
+        "      mechanicsReviewIndex = static_cast<int>(i);\n"
+        "      scheduleUiConfigAutosave();\n"
+        "    }",
+        "plugin mechanics review row activation updates selection like web",
         errors,
     )
     require_contains(
@@ -3095,10 +3137,21 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'joinStrings(metaParts, " · ")',
+        'const std::string meta = joinStrings(metaParts, " · ");',
         "plugin mechanics review row meta uses web-like dot separator",
         errors,
     )
+    for plugin_only_mechanics_review_row_surface in (
+        'std::format(\n        "{}##mechanics-review-item",\n        title)',
+        "ImGui::Selectable(label.c_str(), active)",
+        'ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_mechanics_review_row_surface,
+            "plugin mechanics review plugin-only flat row surface",
+            errors,
+        )
     require_contains(
         web_player_main_source,
         "function getStatsPlayerConfigSnapshot(): StatsPlayerConfig",
