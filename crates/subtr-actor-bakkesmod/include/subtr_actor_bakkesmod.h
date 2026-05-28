@@ -170,6 +170,13 @@ typedef struct SaLiveFrame {
   size_t demolish_count;
 } SaLiveFrame;
 
+typedef struct SaReplayScore {
+  int32_t team_zero_score;
+  uint8_t has_team_zero_score;
+  int32_t team_one_score;
+  uint8_t has_team_one_score;
+} SaReplayScore;
+
 typedef enum SaMechanicKind {
   SaMechanicKindSpeedFlip = 1,
   SaMechanicKindHalfFlip = 2,
@@ -280,6 +287,10 @@ size_t subtr_actor_bakkesmod_write_replay_annotation_players(
     const SaReplayAnnotations *annotations,
     SaReplayPlayerInfo *out_players,
     size_t max_players);
+int32_t subtr_actor_bakkesmod_replay_annotation_score_at_time(
+    const SaReplayAnnotations *annotations,
+    float replay_time,
+    SaReplayScore *out_score);
 size_t subtr_actor_bakkesmod_poll_replay_annotations(
     SaReplayAnnotations *annotations,
     float replay_time,

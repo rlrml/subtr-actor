@@ -31,9 +31,9 @@ use subtr_actor::{
     GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, MechanicEvent, MechanicTiming,
     PlayerFrameState, PlayerId, PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind,
     ProcessorView, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
-    RushEvent, ShotEventMetadata, StatsTimelineEventCollector, SubtrActorError,
-    SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent,
-    TouchStateCalculator, WhiffEvent,
+    RushEvent, ShotEventMetadata, StatsTimelineCollector, StatsTimelineEventCollector,
+    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
+    TouchEvent, TouchStateCalculator, WhiffEvent,
 };
 
 #[repr(C)]
@@ -236,6 +236,15 @@ pub struct SaLiveFrame {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SaReplayScore {
+    pub team_zero_score: i32,
+    pub has_team_zero_score: u8,
+    pub team_one_score: i32,
+    pub has_team_one_score: u8,
+}
+
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SaMechanicKind {
     SpeedFlip = 1,
@@ -365,6 +374,7 @@ pub struct SaEngine {
 
 pub struct SaReplayAnnotations {
     events: Vec<SaMechanicEvent>,
+    frames: Vec<ReplayStatsFrame>,
     players: Vec<SaReplayPlayerInfo>,
     _player_names: Vec<CString>,
     cursor: usize,
@@ -2861,10 +2871,12 @@ fn build_replay_annotations(path: &CStr) -> SubtrActorResult<SaReplayAnnotations
         })?;
     let timeline =
         StatsTimelineEventCollector::new().get_replay_stats_timeline_scaffold(&replay)?;
+    let score_timeline = StatsTimelineCollector::new().get_legacy_replay_stats_timeline(&replay)?;
     let events = replay_annotations_from_timeline(&timeline.replay_meta, &timeline.events);
     let (player_names, players) = replay_annotation_players(&timeline.replay_meta);
     Ok(SaReplayAnnotations {
         events,
+        frames: score_timeline.frames,
         players,
         _player_names: player_names,
         cursor: 0,
@@ -2941,6 +2953,41 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_players(
         ptr::copy_nonoverlapping(annotations.players.as_ptr(), out_players, count);
     }
     count
+}
+
+/// Returns the scoreboard value for the latest processed replay frame at or before
+/// `replay_time`.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_score_at_time(
+    annotations: *const SaReplayAnnotations,
+    replay_time: f32,
+    out_score: *mut SaReplayScore,
+) -> i32 {
+    let Some(annotations) = (unsafe { annotations.as_ref() }) else {
+        return -1;
+    };
+    if out_score.is_null() {
+        return -1;
+    }
+    let Some(frame) = annotations
+        .frames
+        .iter()
+        .take_while(|frame| frame.time <= replay_time + f32::EPSILON)
+        .last()
+        .or_else(|| annotations.frames.first())
+    else {
+        return -2;
+    };
+
+    unsafe {
+        *out_score = SaReplayScore {
+            team_zero_score: frame.team_zero.core.goals,
+            has_team_zero_score: 1,
+            team_one_score: frame.team_one.core.goals,
+            has_team_one_score: 1,
+        };
+    }
+    0
 }
 
 /// Drains annotation events whose normal replay-processing timestamp has been
@@ -4352,6 +4399,17 @@ mod tests {
             .iter()
             .any(|player| !player.name.is_null()));
         let final_time = unsafe { (*annotations).events.last().expect("events").time + 1.0 };
+        let mut score = SaReplayScore::default();
+        let score_result = unsafe {
+            subtr_actor_bakkesmod_replay_annotation_score_at_time(
+                annotations,
+                final_time,
+                &mut score,
+            )
+        };
+        assert_eq!(score_result, 0);
+        assert_eq!(score.has_team_zero_score, 1);
+        assert_eq!(score.has_team_one_score, 1);
 
         let mut events = vec![
             SaMechanicEvent {
@@ -4597,6 +4655,15 @@ mod tests {
                 ],
             ),
             (
+                "SaReplayScore",
+                vec![
+                    ("int32_t", "team_zero_score"),
+                    ("uint8_t", "has_team_zero_score"),
+                    ("int32_t", "team_one_score"),
+                    ("uint8_t", "has_team_one_score"),
+                ],
+            ),
+            (
                 "SaMechanicEvent",
                 vec![
                     ("SaMechanicKind", "kind"),
@@ -4836,6 +4903,12 @@ mod tests {
         assert_offset!(SaLiveFrame, player_stat_event_count, 208);
         assert_offset!(SaLiveFrame, demolishes, 216);
         assert_offset!(SaLiveFrame, demolish_count, 224);
+
+        assert_layout!(SaReplayScore, size = 16, align = 4);
+        assert_offset!(SaReplayScore, team_zero_score, 0);
+        assert_offset!(SaReplayScore, has_team_zero_score, 4);
+        assert_offset!(SaReplayScore, team_one_score, 8);
+        assert_offset!(SaReplayScore, has_team_one_score, 12);
 
         assert_layout!(SaMechanicEvent, size = 32, align = 8);
         assert_offset!(SaMechanicEvent, kind, 0);

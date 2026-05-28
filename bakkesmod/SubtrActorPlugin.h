@@ -97,6 +97,8 @@ private:
   using ReplayAnnotationPlayerCount = size_t (*)(const SaReplayAnnotations *);
   using WriteReplayAnnotationPlayers =
       size_t (*)(const SaReplayAnnotations *, SaReplayPlayerInfo *, size_t);
+  using ReplayAnnotationScoreAtTime =
+      int32_t (*)(const SaReplayAnnotations *, float, SaReplayScore *);
   using PollReplayAnnotations =
       size_t (*)(SaReplayAnnotations *, float, SaMechanicEvent *, size_t);
 
@@ -254,6 +256,7 @@ private:
   ReplayAnnotationCount replayAnnotationCount = nullptr;
   ReplayAnnotationPlayerCount replayAnnotationPlayerCount = nullptr;
   WriteReplayAnnotationPlayers writeReplayAnnotationPlayers = nullptr;
+  ReplayAnnotationScoreAtTime replayAnnotationScoreAtTime = nullptr;
   PollReplayAnnotations pollReplayAnnotations = nullptr;
 
   uint64_t frameNumber = 0;
@@ -669,6 +672,7 @@ private:
   void pushTeamEventMessage(const SaTeamEvent &event);
   void pushGoalContextEventMessage(const SaGoalContextEvent &event);
   void pushPlayerStatEventMessage(const SaPlayerStatEvent &event);
+  std::optional<std::pair<int32_t, int32_t>> currentScoreboardScore() const;
   bool overlayCategoryEnabled(std::string_view category);
   bool overlayMechanicEnabled(SaMechanicKind kind);
   std::string playerLabel(uint32_t playerIndex, uint8_t isTeam0) const;

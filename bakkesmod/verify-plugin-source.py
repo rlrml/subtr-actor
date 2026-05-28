@@ -166,6 +166,7 @@ REQUIRED_PLUGIN_ABI_EXPORTS = (
     ("subtr_actor_bakkesmod_replay_annotation_count", "replayAnnotationCount"),
     ("subtr_actor_bakkesmod_replay_annotation_player_count", "replayAnnotationPlayerCount"),
     ("subtr_actor_bakkesmod_write_replay_annotation_players", "writeReplayAnnotationPlayers"),
+    ("subtr_actor_bakkesmod_replay_annotation_score_at_time", "replayAnnotationScoreAtTime"),
     ("subtr_actor_bakkesmod_poll_replay_annotations", "pollReplayAnnotations"),
 )
 
@@ -2116,6 +2117,18 @@ def main() -> int:
         "      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |\n"
         "      ImGuiWindowFlags_NoSavedSettings;",
         "scoreboard opts out of implicit ImGui persistence",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "renderScoreboard(state.frameIndex);",
+        "stats evaluation player scoreboard follows current replay frame",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "replayAnnotationScoreAtTime(replayAnnotations, replayTime, &score)",
+        "plugin scoreboard follows replay annotation score at current playback time",
         errors,
     )
     reject_contains(

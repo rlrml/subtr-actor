@@ -1712,6 +1712,14 @@ static_assert(offsetof(SaLiveFrame, player_stat_event_count) == 208);
 static_assert(offsetof(SaLiveFrame, demolishes) == 216);
 static_assert(offsetof(SaLiveFrame, demolish_count) == 224);
 
+static_assert(std::is_standard_layout_v<SaReplayScore>);
+static_assert(sizeof(SaReplayScore) == 16);
+static_assert(alignof(SaReplayScore) == 4);
+static_assert(offsetof(SaReplayScore, team_zero_score) == 0);
+static_assert(offsetof(SaReplayScore, has_team_zero_score) == 4);
+static_assert(offsetof(SaReplayScore, team_one_score) == 8);
+static_assert(offsetof(SaReplayScore, has_team_one_score) == 12);
+
 static_assert(std::is_standard_layout_v<SaMechanicEvent>);
 static_assert(sizeof(SaMechanicEvent) == 32);
 static_assert(alignof(SaMechanicEvent) == 8);
@@ -3154,6 +3162,8 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotation_player_count"));
   writeReplayAnnotationPlayers = reinterpret_cast<WriteReplayAnnotationPlayers>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_replay_annotation_players"));
+  replayAnnotationScoreAtTime = reinterpret_cast<ReplayAnnotationScoreAtTime>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotation_score_at_time"));
   pollReplayAnnotations = reinterpret_cast<PollReplayAnnotations>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_poll_replay_annotations"));
 
@@ -3170,7 +3180,7 @@ bool SubtrActorPlugin::loadRustLibrary() {
       !drainEvents || !drainTeamEvents || !drainGoalContextEvents ||
       !replayAnnotationsCreate || !replayAnnotationsDestroy || !replayAnnotationCount ||
       !replayAnnotationPlayerCount || !writeReplayAnnotationPlayers ||
-      !pollReplayAnnotations) {
+      !replayAnnotationScoreAtTime || !pollReplayAnnotations) {
     unloadRustLibrary();
     return false;
   }
@@ -3232,6 +3242,7 @@ void SubtrActorPlugin::unloadRustLibrary() {
   replayAnnotationCount = nullptr;
   replayAnnotationPlayerCount = nullptr;
   writeReplayAnnotationPlayers = nullptr;
+  replayAnnotationScoreAtTime = nullptr;
   pollReplayAnnotations = nullptr;
 }
 
@@ -8264,6 +8275,25 @@ void SubtrActorPlugin::renderEmptyStateWindow() {
   ImGui::PopStyleVar(2);
 }
 
+std::optional<std::pair<int32_t, int32_t>> SubtrActorPlugin::currentScoreboardScore() const {
+  if (lastTeamScores) {
+    return lastTeamScores;
+  }
+  if (!replayAnnotations || !replayAnnotationScoreAtTime || !gameWrapper->IsInReplay()) {
+    return std::nullopt;
+  }
+
+  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+  const float replayTime =
+      replayServer.IsNull() ? playbackCurrentTime : replayServer.GetReplayTimeElapsed();
+  SaReplayScore score{};
+  if (replayAnnotationScoreAtTime(replayAnnotations, replayTime, &score) != 0 ||
+      score.has_team_zero_score == 0 || score.has_team_one_score == 0) {
+    return std::nullopt;
+  }
+  return std::make_pair(score.team_zero_score, score.team_one_score);
+}
+
 void SubtrActorPlugin::renderScoreboardWindow() {
   if (!uiScoreboardOpen) {
     return;
@@ -8282,14 +8312,15 @@ void SubtrActorPlugin::renderScoreboardWindow() {
   }
   captureWindowPlacement(scoreboardPlacement);
 
-  if (lastTeamScores) {
+  const auto score = currentScoreboardScore();
+  if (score) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{8.0f, 0.0f});
     ImGui::SetWindowFontScale(1.2f);
-    ImGui::TextColored(ImVec4{0.31f, 0.75f, 1.0f, 1.0f}, "%d", lastTeamScores->first);
+    ImGui::TextColored(ImVec4{0.31f, 0.75f, 1.0f, 1.0f}, "%d", score->first);
     ImGui::SameLine();
     ImGui::TextDisabled("-");
     ImGui::SameLine();
-    ImGui::TextColored(ImVec4{1.0f, 0.69f, 0.31f, 1.0f}, "%d", lastTeamScores->second);
+    ImGui::TextColored(ImVec4{1.0f, 0.69f, 0.31f, 1.0f}, "%d", score->second);
     ImGui::SetWindowFontScale(1.0f);
     ImGui::PopStyleVar();
   } else {
