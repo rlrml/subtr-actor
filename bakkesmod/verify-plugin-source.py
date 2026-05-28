@@ -881,6 +881,12 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "for (const index of tagsByGoalIndex.keys()) {\n    goalIndexes.add(index);\n  }",
+        "stats evaluation player keeps tag-only goals in goal-label overview",
+        errors,
+    )
+    require_contains(
         plugin_source,
         "auto goalTagText = [](const UiEventRecord &event) {",
         "plugin goal-label window formats replay goal tags",
@@ -896,6 +902,12 @@ def main() -> int:
         plugin_source,
         "const bool nearbyTime = std::fabs(candidate.time - goalEvent.time) <= 0.25f;",
         "plugin goal-label tags associate with nearby goal context",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (!hasMatchingGoalEvent) {\n      goalEventIndexes.push_back(index);\n    }",
+        "plugin keeps tag-only goals in goal-label overview",
         errors,
     )
     reject_contains(

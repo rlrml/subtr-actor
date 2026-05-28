@@ -12178,6 +12178,26 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
       goalEventIndexes.push_back(index);
     }
   }
+  for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
+    const UiEventRecord &event = recentUiEvents[index];
+    if (!isGoalTagEvent(event)) {
+      continue;
+    }
+    const bool hasMatchingGoalEvent = std::any_of(
+        goalEventIndexes.begin(),
+        goalEventIndexes.end(),
+        [&](size_t goalIndex) {
+          const UiEventRecord &goalEvent = recentUiEvents[goalIndex];
+          const bool samePlayer = goalEvent.has_player == 0 || event.has_player == 0 ||
+                                  goalEvent.player_index == event.player_index;
+          const bool sameFrame = goalEvent.frame_number == event.frame_number;
+          const bool nearbyTime = std::fabs(goalEvent.time - event.time) <= 0.25f;
+          return samePlayer && (sameFrame || nearbyTime);
+        });
+    if (!hasMatchingGoalEvent) {
+      goalEventIndexes.push_back(index);
+    }
+  }
   std::sort(goalEventIndexes.begin(), goalEventIndexes.end(), [&](size_t left, size_t right) {
     const UiEventRecord &leftEvent = recentUiEvents[left];
     const UiEventRecord &rightEvent = recentUiEvents[right];
