@@ -2024,6 +2024,30 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        'return typeof item.meta?.mechanic === "string" ? formatMechanicKind(item.meta.mechanic) : "--";',
+        "stats evaluation player mechanics review formats mechanic ids",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "std::string eventTypeDisplayLabel(std::string_view value) {",
+        "plugin has web-like event type display labels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "eventTypeDisplayLabel(current->type)",
+        "plugin mechanics review current item formats mechanic ids",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "metaParts.push_back(eventTypeDisplayLabel(event.type));",
+        "plugin mechanics review rows format mechanic ids",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         "mechanicsReviewPrev.disabled = !review || review.loading || review.currentIndex <= 0;",
         "stats evaluation player mechanics review disables unavailable previous action",
         errors,

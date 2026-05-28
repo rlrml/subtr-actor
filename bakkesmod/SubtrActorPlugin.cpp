@@ -2334,6 +2334,45 @@ const char *eventFilterLabel(std::string_view value) {
   return value.empty() ? "All events" : "Custom filter";
 }
 
+std::string eventTypeDisplayLabel(std::string_view value) {
+  const std::string normalized = normalizeEventFilterToken(value);
+  if (normalized == "shot") {
+    return "Shot";
+  }
+  if (normalized == "save") {
+    return "Save";
+  }
+  if (normalized == "assist") {
+    return "Assist";
+  }
+  if (normalized == "core") {
+    return "Core event";
+  }
+  if (normalized == "goal") {
+    return "Goal";
+  }
+  for (const EventFilterOption &option : EVENT_FILTER_OPTIONS) {
+    if (normalized == option.value) {
+      return option.label;
+    }
+  }
+
+  std::string label;
+  label.reserve(normalized.size());
+  bool capitalizeNext = true;
+  for (const char ch : normalized) {
+    if (ch == '_') {
+      label.push_back(' ');
+      capitalizeNext = false;
+      continue;
+    }
+    label.push_back(
+        capitalizeNext ? static_cast<char>(std::toupper(static_cast<unsigned char>(ch))) : ch);
+    capitalizeNext = false;
+  }
+  return label.empty() ? "Event" : label;
+}
+
 std::string eventFilterPreview(std::string_view rawFilter) {
   if (eventPlaylistUsesDefaultSources(rawFilter)) {
     return "Default events";
@@ -9025,7 +9064,9 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
       current == nullptr || current->details.empty() ? "--" : current->details;
   ImGui::Columns(2, "mechanics-review-fields", false);
   ImGui::TextDisabled("Mechanic");
-  ImGui::Text("%s", current == nullptr || current->type.empty() ? "--" : current->type.c_str());
+  const std::string mechanicReadout =
+      current == nullptr || current->type.empty() ? "--" : eventTypeDisplayLabel(current->type);
+  ImGui::Text("%s", mechanicReadout.c_str());
   ImGui::NextColumn();
   ImGui::TextDisabled("Player");
   ImGui::Text("%s", current == nullptr || current->actor.empty() ? "--" : current->actor.c_str());
@@ -9145,7 +9186,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     }
     std::vector<std::string> metaParts;
     if (!event.type.empty()) {
-      metaParts.push_back(event.type);
+      metaParts.push_back(eventTypeDisplayLabel(event.type));
     }
     metaParts.push_back(mechanicsReviewDecisionLabel(event));
     ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());
