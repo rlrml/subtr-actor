@@ -470,15 +470,39 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "if (panels.length === 0) {\n    moduleSettingsEl.hidden = true;",
+        "stats evaluation player hides empty launcher module settings",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (timelineRangePossessionEnabled) {\n    ImGui::Separator();\n    renderModuleSettingsControls(\"launcher-module-settings\", false, true, true);\n  }",
+        "launcher module settings only render active web panels",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'renderModuleSummaryControls("module-controls-summary");',
         "dedicated module controls keep plugin-only module controls",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderModuleSettingsControls("module-controls-settings", true);',
+        "dedicated module controls keep full module settings",
         errors,
     )
     reject_contains(
         plugin_source,
         'renderModuleSummaryControls("launcher-module-summary", false, 0.0f);',
         "launcher module summary includes plugin-only controls",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'renderModuleSettingsControls("launcher-module-settings", false, true);',
+        "launcher module settings render unconditionally",
         errors,
     )
     require_contains(

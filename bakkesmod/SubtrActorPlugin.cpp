@@ -7756,8 +7756,10 @@ void SubtrActorPlugin::renderModuleSummaryControls(
 void SubtrActorPlugin::renderModuleSettingsControls(
     const char *idSuffix,
     bool includeOpenButtons,
-    bool webCardHeaders) {
+    bool webCardHeaders,
+    bool onlyWebActivePanels) {
   ImGui::PushID(idSuffix);
+  bool renderedPanel = false;
 
   auto settingReadout = [](std::initializer_list<std::pair<bool, const char *>> parts,
                            std::string_view separator) {
@@ -7785,39 +7787,44 @@ void SubtrActorPlugin::renderModuleSettingsControls(
     ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", readout.c_str());
   };
 
-  renderSettingsHeader(
-      "Movement breakdown",
-      settingReadout(
-          {{movementBreakdownSpeed, "Speed band"}, {movementBreakdownHeight, "Height band"}},
-          " + "));
-  if (ImGui::Checkbox("Speed band##movement-breakdown", &movementBreakdownSpeed)) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::Checkbox("Height band##movement-breakdown", &movementBreakdownHeight)) {
-    scheduleUiConfigAutosave();
-  }
-  if (includeOpenButtons && ImGui::Button("Open movement stats")) {
-    createStatsModuleWindow("movement", 0);
+  if (!onlyWebActivePanels) {
+    renderSettingsHeader(
+        "Movement breakdown",
+        settingReadout(
+            {{movementBreakdownSpeed, "Speed band"}, {movementBreakdownHeight, "Height band"}},
+            " + "));
+    if (ImGui::Checkbox("Speed band##movement-breakdown", &movementBreakdownSpeed)) {
+      scheduleUiConfigAutosave();
+    }
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Height band##movement-breakdown", &movementBreakdownHeight)) {
+      scheduleUiConfigAutosave();
+    }
+    if (includeOpenButtons && ImGui::Button("Open movement stats")) {
+      createStatsModuleWindow("movement", 0);
+    }
+    renderedPanel = true;
   }
 
-  if (webCardHeaders) {
+  if (webCardHeaders && renderedPanel && (!onlyWebActivePanels || timelineRangePossessionEnabled)) {
     ImGui::Spacing();
   }
-  renderSettingsHeader(
-      "Possession breakdown",
-      settingReadout(
-          {{possessionBreakdownState, "Control"}, {possessionBreakdownThird, "Third"}},
-          " x "));
-  if (ImGui::Checkbox("Control##possession-breakdown", &possessionBreakdownState)) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::Checkbox("Third##possession-breakdown", &possessionBreakdownThird)) {
-    scheduleUiConfigAutosave();
-  }
-  if (includeOpenButtons && ImGui::Button("Open possession stats")) {
-    createStatsModuleWindow("possession", 0);
+  if (!onlyWebActivePanels || timelineRangePossessionEnabled) {
+    renderSettingsHeader(
+        "Possession breakdown",
+        settingReadout(
+            {{possessionBreakdownState, "Control"}, {possessionBreakdownThird, "Third"}},
+            " x "));
+    if (ImGui::Checkbox("Control##possession-breakdown", &possessionBreakdownState)) {
+      scheduleUiConfigAutosave();
+    }
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Third##possession-breakdown", &possessionBreakdownThird)) {
+      scheduleUiConfigAutosave();
+    }
+    if (includeOpenButtons && ImGui::Button("Open possession stats")) {
+      createStatsModuleWindow("possession", 0);
+    }
   }
 
   ImGui::PopID();
@@ -8041,8 +8048,10 @@ void SubtrActorPlugin::renderLauncherWindow() {
   ImGui::Separator();
   renderModuleSummaryControls("launcher-module-summary", false, 0.0f, false);
 
-  ImGui::Separator();
-  renderModuleSettingsControls("launcher-module-settings", false, true);
+  if (timelineRangePossessionEnabled) {
+    ImGui::Separator();
+    renderModuleSettingsControls("launcher-module-settings", false, true, true);
+  }
 
   if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
     const float pluginToolButtonWidth = ImGui::GetContentRegionAvail().x;

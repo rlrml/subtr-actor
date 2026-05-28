@@ -503,7 +503,8 @@ private:
   void renderModuleSettingsControls(
       const char *idSuffix,
       bool includeOpenButtons,
-      bool webCardHeaders = false);
+      bool webCardHeaders = false,
+      bool onlyWebActivePanels = false);
   std::array<SingletonWindowControl, 13> singletonWindowControls();
   std::vector<SingletonWindowControl> webSingletonWindowControls();
   std::array<StatsWindowKindControl, 7> statsWindowKindControls() const;
