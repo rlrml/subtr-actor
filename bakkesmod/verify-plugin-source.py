@@ -440,6 +440,62 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_template_source,
+        '<button id="toggle-playback" disabled>Play</button>',
+        "stats evaluation player playback transport button",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'if (playbackButton(playbackPlaying ? "Pause" : "Play", !transportEnabled))',
+        "plugin playback transport uses web-like play button",
+        errors,
+    )
+    require_contains(
+        web_player_template_source,
+        '<select id="playback-rate" disabled>',
+        "stats evaluation player playback rate select",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::BeginCombo("##playback-rate", playbackRateLabels[playbackRateIndex])',
+        "plugin playback rate uses hidden-label web-like selector",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Checkbox("Skip post-goal resets", &nextSkipPostGoalTransitions)',
+        "plugin playback skip post-goal label mirrors web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Checkbox("Skip kickoff countdowns", &nextSkipKickoffs)',
+        "plugin playback skip kickoff label mirrors web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Columns(2, "playback-detail-grid", false);',
+        "plugin playback exposes web-like detail grid",
+        errors,
+    )
+    for plugin_only_playback_surface in (
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WEB PLAYBACK CONFIG");',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ANALYSIS");',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TIMING");',
+        'playbackButton("Seek", !transportEnabled)',
+        'ImGui::Checkbox("Playing", &nextPlaying)',
+        'ImGui::InputFloat("Current time"',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_playback_surface,
+            "plugin playback window plugin-only surface",
+            errors,
+        )
+    require_contains(
         plugin_source,
         '"Load Replay...", ImVec2{actionButtonWidth, 0.0f}',
         "launcher actions expose replay loading like the web player",

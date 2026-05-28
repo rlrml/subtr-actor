@@ -9768,34 +9768,12 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
     return;
   }
 
-  const bool inReplay = gameWrapper->IsInReplay();
-  const bool inGame = gameWrapper->IsInGame();
   ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
   const bool hasReplayServer = !replayServer.IsNull();
-  const char *mode = inReplay ? "replay"
-                              : inGame ? "live match/freeplay" : "waiting for game";
   if (hasReplayServer) {
     playbackCurrentTime = replayServer.GetReplayTimeElapsed();
   }
 
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYBACK");
-  ImGui::Text("Mode: %s", mode);
-  ImGui::Text("Live frame: %llu", static_cast<unsigned long long>(frameNumber));
-  ImGui::Text("Live time: %.2fs", lastTime);
-  if (hasReplayServer) {
-    ImGui::Text("Replay time: %.2fs", replayServer.GetReplayTimeElapsed());
-  } else {
-    ImGui::TextDisabled("Replay time: --");
-  }
-  if (lastProcessedGameTime) {
-    ImGui::Text("Last sampled: %.2fs", *lastProcessedGameTime);
-  } else {
-    ImGui::TextDisabled("Last sampled: --");
-  }
-  ImGui::Text("Status: %s", playbackStatus.c_str());
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WEB PLAYBACK CONFIG");
   const bool transportEnabled = hasReplayServer;
   auto pushPlaybackDisabledStyle = [](bool disabled) {
     if (disabled) {
@@ -9839,52 +9817,49 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
     scheduleUiConfigAutosave();
   };
 
-  ImGui::SetNextItemWidth(140.0f);
-  float nextPlaybackCurrentTime = playbackCurrentTime;
-  pushPlaybackDisabledStyle(!transportEnabled);
-  const bool currentTimeChanged =
-      ImGui::InputFloat("Current time", &nextPlaybackCurrentTime, 0.25f, 2.0f, "%.2f");
-  popPlaybackDisabledStyle(!transportEnabled);
-  if (transportEnabled && currentTimeChanged) {
-    playbackCurrentTime = nextPlaybackCurrentTime;
-    scheduleUiConfigAutosave();
-  }
   playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
-  ImGui::SetNextItemWidth(140.0f);
-  float nextPlaybackRate = playbackRate;
-  pushPlaybackDisabledStyle(!transportEnabled);
-  const bool rateChanged =
-      ImGui::SliderFloat("Rate", &nextPlaybackRate, 0.25f, 2.0f, "%.2fx");
-  popPlaybackDisabledStyle(!transportEnabled);
-  if (transportEnabled && rateChanged) {
-    playbackRate = nextPlaybackRate;
-    scheduleUiConfigAutosave();
-  }
+
   if (playbackButton(playbackPlaying ? "Pause" : "Play", !transportEnabled)) {
     applyPlaybackState(!playbackPlaying);
   }
   ImGui::SameLine();
-  if (playbackButton("Seek", !transportEnabled)) {
-    applyPlaybackState(false);
+  constexpr std::array<const char *, 5> playbackRateLabels{{"0.25x", "0.5x", "1.0x", "1.5x", "2.0x"}};
+  constexpr std::array<float, 5> playbackRateValues{{0.25f, 0.5f, 1.0f, 1.5f, 2.0f}};
+  size_t playbackRateIndex = 2;
+  float playbackRateDistance = std::numeric_limits<float>::infinity();
+  for (size_t index = 0; index < playbackRateValues.size(); index += 1) {
+    const float distance = std::abs(playbackRate - playbackRateValues[index]);
+    if (distance < playbackRateDistance) {
+      playbackRateDistance = distance;
+      playbackRateIndex = index;
+    }
   }
-  ImGui::SameLine();
-  if (playbackButton("Live replay time", !hasReplayServer)) {
-    playbackCurrentTime = replayServer.GetReplayTimeElapsed();
-    playbackStatus = std::format("Captured {:.2f}s", playbackCurrentTime);
-    scheduleUiConfigAutosave();
-  }
-  bool nextPlaying = playbackPlaying;
   pushPlaybackDisabledStyle(!transportEnabled);
-  const bool playingChanged = ImGui::Checkbox("Playing", &nextPlaying);
-  popPlaybackDisabledStyle(!transportEnabled);
-  if (transportEnabled && playingChanged) {
-    applyPlaybackState(nextPlaying);
+  ImGui::SetNextItemWidth(96.0f);
+  if (ImGui::BeginCombo("##playback-rate", playbackRateLabels[playbackRateIndex])) {
+    if (!transportEnabled) {
+      ImGui::TextDisabled("%s", playbackRateLabels[playbackRateIndex]);
+    } else {
+      for (size_t index = 0; index < playbackRateValues.size(); index += 1) {
+        const bool selected = index == playbackRateIndex;
+        if (ImGui::Selectable(playbackRateLabels[index], selected)) {
+          playbackRate = playbackRateValues[index];
+          playbackRateIndex = index;
+          scheduleUiConfigAutosave();
+        }
+        if (selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+    }
+    ImGui::EndCombo();
   }
-  ImGui::SameLine();
+  popPlaybackDisabledStyle(!transportEnabled);
+
   bool nextSkipPostGoalTransitions = playbackSkipPostGoalTransitions;
   pushPlaybackDisabledStyle(!transportEnabled);
   const bool skipGoalChanged =
-      ImGui::Checkbox("Skip goal transitions", &nextSkipPostGoalTransitions);
+      ImGui::Checkbox("Skip post-goal resets", &nextSkipPostGoalTransitions);
   popPlaybackDisabledStyle(!transportEnabled);
   if (transportEnabled && skipGoalChanged) {
     playbackSkipPostGoalTransitions = nextSkipPostGoalTransitions;
@@ -9892,7 +9867,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   }
   bool nextSkipKickoffs = playbackSkipKickoffs;
   pushPlaybackDisabledStyle(!transportEnabled);
-  const bool skipKickoffsChanged = ImGui::Checkbox("Skip kickoffs", &nextSkipKickoffs);
+  const bool skipKickoffsChanged = ImGui::Checkbox("Skip kickoff countdowns", &nextSkipKickoffs);
   popPlaybackDisabledStyle(!transportEnabled);
   if (transportEnabled && skipKickoffsChanged) {
     playbackSkipKickoffs = nextSkipKickoffs;
@@ -9900,74 +9875,24 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ANALYSIS");
-  auto checkboxCvar = [this](const char *label, const char *name, bool defaultValue) {
-    bool value = cvarBool(name, defaultValue);
-    if (ImGui::Checkbox(label, &value)) {
-      setCvarBool(name, value);
-    }
-  };
-  checkboxCvar("Live analysis graph", "subtr_actor_enabled", false);
-  checkboxCvar("Replay annotations", "subtr_actor_replay_annotations_enabled", true);
-  checkboxCvar("Profile timing", "subtr_actor_profile_enabled", false);
-
-  auto intervalCvar = cvarManager->getCvar("subtr_actor_sample_interval_ms");
-  int intervalMs = static_cast<bool>(intervalCvar) ? intervalCvar.getIntValue() : 8;
-  if (ImGui::SliderInt("Sample interval ms", &intervalMs, 1, 1000) &&
-      static_cast<bool>(intervalCvar)) {
-    intervalCvar.setValue(intervalMs);
-  }
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ANNOTATIONS");
-  ImGui::Text(
-      "Status: %s",
-      replayAnnotations ? "loaded" : replayAnnotationLoadFailed ? "failed" : "idle");
-  if (replayAnnotations && replayAnnotationCount) {
-    ImGui::Text("Replay events: %zu", replayAnnotationCount(replayAnnotations));
-  }
-  if (!replayAnnotationPath.empty()) {
-    ImGui::TextWrapped("Replay: %s", replayAnnotationPath.c_str());
-  }
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TIMING");
-  if (profileSampleCount == 0) {
-    ImGui::TextDisabled("No timing samples yet.");
+  const float durationSeconds = std::max(lastTime, playbackCurrentTime);
+  ImGui::Columns(2, "playback-detail-grid", false);
+  ImGui::TextDisabled("Time");
+  ImGui::Text("%.2fs", playbackCurrentTime);
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Frame");
+  ImGui::Text("%llu", static_cast<unsigned long long>(frameNumber));
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Duration");
+  if (durationSeconds > 0.0f) {
+    ImGui::Text("%.2fs", durationSeconds);
   } else {
-    const double divisor = static_cast<double>(profileSampleCount);
-    ImGui::Text("Samples: %llu", static_cast<unsigned long long>(profileSampleCount));
-    ImGui::Text(
-        "Avg total: %.3fms",
-        (profileSamplingMs + profileProcessingMs + profileDrainMs) / divisor);
-    ImGui::Text(
-        "Sample %.3f / process %.3f / drain %.3fms",
-        profileSamplingMs / divisor,
-        profileProcessingMs / divisor,
-        profileDrainMs / divisor);
+    ImGui::TextDisabled("--");
   }
-
-  ImGui::Separator();
-  if (ImGui::Button("Reset live state")) {
-    if (engine && engineReset) {
-      engineReset(engine);
-    }
-    resetLiveState();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Verify graph")) {
-    verifyGraphRuntime({"subtr_actor_verify_graph"});
-  }
-  if (ImGui::Button("Open status")) {
-    showSingletonWindow(uiStatusOpen, statusPlacement);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Open playlist")) {
-    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
-  }
-  if (ImGui::Button("Open modules")) {
-    showSingletonWindow(uiModuleControlsOpen, moduleControlsPlacement);
-  }
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Status");
+  ImGui::Text("%s", playbackPlaying ? "Playing" : transportEnabled ? "Paused" : "Stopped");
+  ImGui::Columns(1);
 
   ImGui::End();
 }
