@@ -1375,13 +1375,37 @@ def main() -> int:
     )
     require_contains(
         web_player_template_source,
+        "<span>Swivel</span>",
+        "stats evaluation player camera swivel label",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderCustomSlider("Swivel", cameraCustomSwivelSpeed, 1.0f, 10.0f, "%.1f");',
+        "plugin camera swivel label mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_template_source,
+        "<span>Transition</span>",
+        "stats evaluation player camera transition label",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderCustomSlider(\n        "Transition",\n        cameraCustomTransitionSpeed,\n        0.5f,\n        2.0f,\n        "%.2f");',
+        "plugin camera transition label mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_template_source,
         '<input id="ball-cam" type="checkbox" disabled />',
         "stats evaluation player camera ball-cam toggle",
         errors,
     )
     require_contains(
         plugin_source,
-        'renderCustomSlider(\n        "Transition speed",\n        cameraCustomTransitionSpeed,\n        0.5f,\n        2.0f,\n        "%.2f");\n  }\n\n  bool nextBallCamEnabled = cameraBallCamEnabled;\n  pushCameraDisabledStyle(!hasAttachedCamera);\n  const bool ballCamChanged = ImGui::Checkbox("Ball cam", &nextBallCamEnabled);',
+        'renderCustomSlider(\n        "Transition",\n        cameraCustomTransitionSpeed,\n        0.5f,\n        2.0f,\n        "%.2f");\n  }\n\n  bool nextBallCamEnabled = cameraBallCamEnabled;\n  pushCameraDisabledStyle(!hasAttachedCamera);\n  const bool ballCamChanged = ImGui::Checkbox("Ball cam", &nextBallCamEnabled);',
         "plugin camera ball-cam toggle follows custom settings controls like web",
         errors,
     )
@@ -1391,6 +1415,8 @@ def main() -> int:
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "READOUT");',
         'ImGui::Button("Open player stats")',
         'ImGui::Checkbox("Custom settings", &nextCustomSettingsEnabled)',
+        'renderCustomSlider("Swivel speed", cameraCustomSwivelSpeed',
+        'renderCustomSlider(\n        "Transition speed",',
         'ImGui::Text("%.0f", fov);',
         'ImGui::Text("%.0f", height);',
         'ImGui::Text("%.1f", pitch);',

@@ -9850,9 +9850,9 @@ void SubtrActorPlugin::renderCameraWindow() {
     renderCustomSlider("Pitch", cameraCustomPitch, -30.0f, 30.0f, "%.1f");
     renderCustomSlider("Distance", cameraCustomDistance, 100.0f, 500.0f, "%.0f");
     renderCustomSlider("Stiffness", cameraCustomStiffness, 0.0f, 1.0f, "%.2f");
-    renderCustomSlider("Swivel speed", cameraCustomSwivelSpeed, 1.0f, 10.0f, "%.1f");
+    renderCustomSlider("Swivel", cameraCustomSwivelSpeed, 1.0f, 10.0f, "%.1f");
     renderCustomSlider(
-        "Transition speed",
+        "Transition",
         cameraCustomTransitionSpeed,
         0.5f,
         2.0f,
