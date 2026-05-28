@@ -1651,6 +1651,8 @@ std::string replayStatsModuleFrameJson(
   bool firstPlayer = true;
   for (const std::string &player : parseJsonObjectArrayProperty(frameJson, "players")) {
     const auto playerId = parseJsonPropertyValue(player, "player_id");
+    const auto playerName = parseJsonPropertyValue(player, "name");
+    const auto isTeam0 = parseJsonPropertyValue(player, "is_team_0");
     const auto stats = parseJsonObjectProperty(player, moduleName);
     if (!playerId || !stats) {
       continue;
@@ -1661,6 +1663,14 @@ std::string replayStatsModuleFrameJson(
     firstPlayer = false;
     json += "{\"player_id\":";
     json += *playerId;
+    if (playerName) {
+      json += ",\"name\":";
+      json += *playerName;
+    }
+    if (isTeam0) {
+      json += ",\"is_team_0\":";
+      json += *isTeam0;
+    }
     json += ",\"stats\":";
     json += *stats;
     json += "}";
@@ -12110,18 +12120,76 @@ void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
   }
 }
 
-void SubtrActorPlugin::renderJsonSummary(const std::string &json) {
-  auto renderFields = [](const char *tableId, const std::vector<JsonFieldSummary> &fields) {
-    ImGui::Columns(2, tableId, false);
-    for (const JsonFieldSummary &field : fields) {
-      ImGui::TextWrapped("%s", field.label.c_str());
-      ImGui::NextColumn();
-      ImGui::TextWrapped("%s", field.value.c_str());
-      ImGui::NextColumn();
+void renderJsonFieldTable(const char *tableId, const std::vector<JsonFieldSummary> &fields) {
+  ImGui::Columns(2, tableId, false);
+  for (const JsonFieldSummary &field : fields) {
+    ImGui::TextWrapped("%s", field.label.c_str());
+    ImGui::NextColumn();
+    ImGui::TextWrapped("%s", field.value.c_str());
+    ImGui::NextColumn();
+  }
+  ImGui::Columns(1);
+}
+
+void renderStatsModuleFrameOverview(const std::string &json, const std::string &id) {
+  bool renderedAny = false;
+  auto renderSnapshot = [&](const char *heading,
+                            const char *propertyName,
+                            const ImVec4 &color,
+                            size_t maxFields) {
+    const auto object = parseJsonObjectProperty(json, propertyName);
+    if (!object) {
+      return;
     }
-    ImGui::Columns(1);
+    std::vector<JsonFieldSummary> fields;
+    collectJsonFieldSummaries(*object, "", fields, maxFields, 2);
+    if (fields.empty()) {
+      return;
+    }
+    renderedAny = true;
+    ImGui::TextColored(color, "%s", heading);
+    renderJsonFieldTable(std::format("{}-{}-fields", id, propertyName).c_str(), fields);
+    ImGui::Spacing();
   };
 
+  renderSnapshot("Blue team", "team_zero", ImVec4{0.31f, 0.74f, 1.0f, 1.0f}, 14);
+  renderSnapshot("Orange team", "team_one", ImVec4{1.0f, 0.69f, 0.31f, 1.0f}, 14);
+
+  const std::vector<std::string> playerStats = parseJsonObjectArrayProperty(json, "player_stats");
+  if (!playerStats.empty()) {
+    renderedAny = true;
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Players");
+    for (size_t index = 0; index < playerStats.size(); index += 1) {
+      const std::string &player = playerStats[index];
+      const auto stats = parseJsonObjectProperty(player, "stats");
+      if (!stats) {
+        continue;
+      }
+      std::vector<JsonFieldSummary> fields;
+      collectJsonFieldSummaries(*stats, "", fields, 12, 2);
+      if (fields.empty()) {
+        continue;
+      }
+
+      std::string label =
+          parseJsonStringProperty(player, "name").value_or(std::format("Player {}", index + 1));
+      const std::optional<bool> isTeam0 = parseJsonBoolProperty(player, "is_team_0");
+      const ImVec4 color = isTeam0.value_or(true) ? ImVec4{0.31f, 0.74f, 1.0f, 1.0f}
+                                                  : ImVec4{1.0f, 0.69f, 0.31f, 1.0f};
+      ImGui::PushID(static_cast<int>(index));
+      ImGui::TextColored(color, "%s", label.c_str());
+      renderJsonFieldTable("player-module-fields", fields);
+      ImGui::Spacing();
+      ImGui::PopID();
+    }
+  }
+
+  if (!renderedAny) {
+    ImGui::TextWrapped("No team or player module frame fields are available.");
+  }
+}
+
+void SubtrActorPlugin::renderJsonSummary(const std::string &json) {
   bool renderedAny = false;
   auto renderObjectSection = [&](const char *label, const char *propertyName, size_t maxFields) {
     const auto object = parseJsonObjectProperty(json, propertyName);
@@ -12135,7 +12203,7 @@ void SubtrActorPlugin::renderJsonSummary(const std::string &json) {
       if (fields.empty()) {
         ImGui::Text("No scalar fields.");
       } else {
-        renderFields(std::format("{}-fields", propertyName).c_str(), fields);
+        renderJsonFieldTable(std::format("{}-fields", propertyName).c_str(), fields);
       }
       ImGui::TreePop();
     }
@@ -12160,7 +12228,7 @@ void SubtrActorPlugin::renderJsonSummary(const std::string &json) {
   if (!counts.empty()) {
     renderedAny = true;
     if (ImGui::TreeNode("Event collections")) {
-      renderFields("module-event-counts", counts);
+      renderJsonFieldTable("module-event-counts", counts);
       ImGui::TreePop();
     }
   }
@@ -12183,7 +12251,7 @@ void SubtrActorPlugin::renderJsonSummary(const std::string &json) {
           if (stats) {
             std::vector<JsonFieldSummary> fields;
             collectJsonFieldSummaries(*stats, "", fields, 18, 2);
-            renderFields("player-stats-fields", fields);
+            renderJsonFieldTable("player-stats-fields", fields);
           } else {
             ImGui::Text("No stats object.");
           }
@@ -12201,7 +12269,7 @@ void SubtrActorPlugin::renderJsonSummary(const std::string &json) {
     if (fields.empty()) {
       ImGui::TextWrapped("No structured summary is available for this JSON shape.");
     } else {
-      renderFields("module-top-level-fields", fields);
+      renderJsonFieldTable("module-top-level-fields", fields);
     }
   }
 }
@@ -12295,6 +12363,10 @@ void SubtrActorPlugin::renderStatsModuleWindow(UiStatsWindow &window) {
     ImGui::SetClipboardText(json.c_str());
   }
 
+  if (window.module_view == 0) {
+    renderStatsModuleFrameOverview(json, std::format("module-frame-{}", window.id));
+    ImGui::Separator();
+  }
   renderJsonSummary(json);
   ImGui::Separator();
 

@@ -2221,6 +2221,18 @@ def main() -> int:
         "plugin stats module selectors use live and replay module names",
         errors,
     )
+    require_contains(
+        plugin_source,
+        "renderStatsModuleFrameOverview(json, std::format(\"module-frame-{}\", window.id));",
+        "plugin stats module frame windows render structured team and player sections",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "json += \",\\\"name\\\":\";",
+        "plugin replay module frame player stats preserve player names for in-game cards",
+        errors,
+    )
     reject_contains(
         plugin_source,
         "ImGui::SetNextWindowFocus();\n"
