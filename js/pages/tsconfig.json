@@ -10,9 +10,9 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@colonelpanic8/subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
-      "subtr-actor-player": ["../player/src/lib.ts"],
-      "subtr-actor-player/generated/*": ["../player/src/generated/*"],
+      "@rlrml/subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
+      "@rlrml/player": ["../player/src/lib.ts"],
+      "@rlrml/player/generated/*": ["../player/src/generated/*"],
       "three": ["../stat-evaluation-player/node_modules/@types/three/index.d.ts"],
       "three/examples/jsm/*": ["../stat-evaluation-player/node_modules/@types/three/examples/jsm/*"]
     },

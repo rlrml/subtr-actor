@@ -5,9 +5,9 @@ import init, {
   get_legacy_stats_timeline_json,
   get_replay_frames_data_json_with_progress,
   get_stats_timeline_json_parts,
-} from "@colonelpanic8/subtr-actor";
-import { normalizeReplayDataAsync } from "subtr-actor-player";
-import type { RawReplayFramesData } from "subtr-actor-player";
+} from "@rlrml/subtr-actor";
+import { normalizeReplayDataAsync } from "@rlrml/player";
+import type { RawReplayFramesData } from "@rlrml/player";
 import {
   createStatsFrameLookup,
   type MaterializedStatsTimeline,

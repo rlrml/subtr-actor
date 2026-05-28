@@ -1,5 +1,5 @@
 {
-  "name": "subtr-actor-player",
+  "name": "@rlrml/player",
   "version": "0.11.0",
   "description": "Replay player library for subtr-actor Rocket League replay workflows",
   "type": "module",

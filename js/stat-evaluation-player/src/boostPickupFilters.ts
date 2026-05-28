@@ -1,4 +1,4 @@
-import type { BoostPickupAnimationPickup, ReplayModel } from "subtr-actor-player";
+import type { BoostPickupAnimationPickup, ReplayModel } from "@rlrml/player";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";

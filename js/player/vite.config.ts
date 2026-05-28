@@ -16,7 +16,7 @@ export default defineConfig({
   worker: {
     rollupOptions: {
       // The player library keeps the wasm package external so consumers resolve it.
-      external: ["@colonelpanic8/subtr-actor"],
+      external: ["@rlrml/subtr-actor"],
     },
   },
   server: {
@@ -34,7 +34,7 @@ export default defineConfig({
       formats: ["es"],
     },
     rollupOptions: {
-      external: ["@colonelpanic8/subtr-actor", "three"],
+      external: ["@rlrml/subtr-actor", "three"],
     },
   },
 });

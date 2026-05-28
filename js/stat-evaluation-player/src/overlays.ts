@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { FrameRenderInfo, ReplayModel } from "subtr-actor-player";
+import type { FrameRenderInfo, ReplayModel } from "@rlrml/player";
 
 // Must match Rust DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y (approx two car lengths)
 const MOST_BACK_FORWARD_THRESHOLD_Y = 236.0;

@@ -3,7 +3,7 @@ import type {
   CameraSettings,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
-} from "subtr-actor-player";
+} from "@rlrml/player";
 
 export const STATS_PLAYER_CONFIG_VERSION = 1;
 

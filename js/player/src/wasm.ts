@@ -1,4 +1,4 @@
-import * as subtrActor from "@colonelpanic8/subtr-actor";
+import * as subtrActor from "@rlrml/subtr-actor";
 import type {
   RawReplayFramesData,
   ReplayLoadOptions,
