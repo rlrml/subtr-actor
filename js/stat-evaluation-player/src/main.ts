@@ -828,6 +828,12 @@ function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
       timelineRanges: [...activeTimelineRangeModuleIds],
       mechanics: [...activeMechanicTimelineKinds],
       renderEffects: [...activeRenderEffectModuleIds],
+      ...(initialUrlConfig?.overlays.pluginRenderEffects !== undefined
+        ? { pluginRenderEffects: [...initialUrlConfig.overlays.pluginRenderEffects] }
+        : {}),
+      ...(initialUrlConfig?.overlays.pluginHudOverlay !== undefined
+        ? { pluginHudOverlay: initialUrlConfig.overlays.pluginHudOverlay }
+        : {}),
       followedPlayerHud: false,
       boostPads: boostPadOverlayEnabled,
       boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,

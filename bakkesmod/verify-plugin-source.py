@@ -1457,6 +1457,18 @@ def main() -> int:
         "stats evaluation player has an explicit persisted config snapshot",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        "pluginRenderEffects: [...initialUrlConfig.overlays.pluginRenderEffects]",
+        "stats evaluation player preserves plugin-only render effect config",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "pluginHudOverlay: initialUrlConfig.overlays.pluginHudOverlay",
+        "stats evaluation player preserves plugin-only HUD overlay config",
+        errors,
+    )
     reject_contains(
         plugin_source,
         '"mechanics_review_status"',

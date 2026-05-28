@@ -80,6 +80,8 @@ export interface PlayerOverlayConfig {
   readonly timelineRanges: string[];
   readonly mechanics: string[];
   readonly renderEffects: string[];
+  readonly pluginRenderEffects?: string[];
+  readonly pluginHudOverlay?: boolean;
   readonly followedPlayerHud: boolean;
   readonly boostPads: boolean;
   readonly boostPickupAnimation: boolean;
@@ -332,11 +334,19 @@ function normalizeCameraSettings(value: unknown): CameraSettings | null | undefi
 
 function normalizeOverlayConfig(value: unknown): PlayerOverlayConfig {
   const record = isRecord(value) ? value : {};
+  const hasPluginRenderEffects = Object.hasOwn(record, "pluginRenderEffects");
+  const hasPluginHudOverlay = Object.hasOwn(record, "pluginHudOverlay");
   return {
     timelineEvents: stringArray(record.timelineEvents),
     timelineRanges: stringArray(record.timelineRanges),
     mechanics: stringArray(record.mechanics),
     renderEffects: stringArray(record.renderEffects),
+    ...(hasPluginRenderEffects
+      ? { pluginRenderEffects: stringArray(record.pluginRenderEffects) }
+      : {}),
+    ...(hasPluginHudOverlay
+      ? { pluginHudOverlay: booleanValue(record.pluginHudOverlay) ?? false }
+      : {}),
     followedPlayerHud: booleanValue(record.followedPlayerHud) ?? false,
     boostPads: booleanValue(record.boostPads) ?? true,
     boostPickupAnimation: booleanValue(record.boostPickupAnimation) ?? false,
