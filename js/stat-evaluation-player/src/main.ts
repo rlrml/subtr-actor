@@ -54,13 +54,14 @@ import {
 import { createStatsWindowsManager } from "./statsWindows.ts";
 import { createEventWindowsManager, type EventWindowsManager } from "./eventWindows.ts";
 import {
+  getReplayPlayerStatePatchFromConfig,
+  getStatsPlayerConfigSnapshot,
+} from "./appConfigSnapshot.ts";
+import {
   getStatsPlayerConfigParamSnapshot,
   getStatsPlayerConfigFromLocation,
   isStatsPlayerConfigDebugEnabled,
   setStatsPlayerConfigOnUrl,
-  STATS_PLAYER_CONFIG_VERSION,
-  type PlayerCameraConfig,
-  type PlayerPlaybackConfig,
   type SingletonWindowId,
   type StatsPlayerConfig,
 } from "./playerConfig.ts";
@@ -273,39 +274,6 @@ function toggleBoostPadOverlay(): void {
   scheduleConfigUrlUpdate();
 }
 
-function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {
-  const state = replayPlayer?.getState();
-  return {
-    currentTime: state?.currentTime,
-    playing: state?.playing,
-    rate: state?.speed ?? Number(appElements.playbackRate?.value ?? 1),
-    skipPostGoalTransitions: replayPlayer
-      ? state?.skipPostGoalTransitionsEnabled
-      : appElements.skipPostGoalTransitions.checked,
-    skipKickoffs: replayPlayer
-      ? state?.skipKickoffsEnabled
-      : appElements.skipKickoffs.checked,
-  };
-}
-
-function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
-  return {
-    version: STATS_PLAYER_CONFIG_VERSION,
-    playback: getPlaybackConfigSnapshot(),
-    camera: cameraControls?.getConfigSnapshot() ?? {},
-    overlays: {
-      ...moduleRuntimeController.getOverlayConfigSnapshot(),
-      followedPlayerHud: false,
-      boostPads: boostPadOverlayEnabled,
-      boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
-    },
-    recording: recordingControls?.getConfigSnapshot() ?? {},
-    singletonWindows: floatingWindows.getSingletonWindowConfigs(SINGLETON_WINDOW_IDS),
-    statsWindows: statsWindowManager.getConfigs(),
-    moduleConfigs: moduleRuntimeController.getModuleConfigSnapshot(),
-  };
-}
-
 function scheduleConfigUrlUpdate(): void {
   if (isApplyingConfig) {
     return;
@@ -317,7 +285,17 @@ function scheduleConfigUrlUpdate(): void {
     configUrlUpdateTimer = null;
     const nextUrl = setStatsPlayerConfigOnUrl(
       new URL(window.location.href),
-      getStatsPlayerConfigSnapshot(),
+      getStatsPlayerConfigSnapshot({
+        boostPadOverlayEnabled,
+        cameraControls,
+        elements: appElements,
+        floatingWindows,
+        moduleRuntimeController,
+        recordingControls,
+        replayPlayer,
+        singletonWindowIds: SINGLETON_WINDOW_IDS,
+        statsWindowManager,
+      }),
     );
     window.history.replaceState(window.history.state, "", nextUrl);
   }, 150);
@@ -340,26 +318,6 @@ function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   renderModuleSummary();
   renderModuleSettings();
   moduleRuntimeController.renderTimelineEventCount();
-}
-
-function getReplayPlayerStatePatchFromConfig(
-  playback: PlayerPlaybackConfig,
-  camera: PlayerCameraConfig,
-  config: StatsPlayerConfig,
-): Parameters<ReplayPlayer["setState"]>[0] {
-  return {
-    currentTime: playback.currentTime,
-    playing: playback.playing,
-    speed: playback.rate,
-    cameraDistanceScale: camera.distanceScale,
-    customCameraSettings: camera.customSettings,
-    cameraViewMode: camera.mode,
-    attachedPlayerId: camera.attachedPlayerId,
-    ballCamEnabled: camera.ballCam,
-    boostPickupAnimationEnabled: config.overlays.boostPickupAnimation,
-    skipPostGoalTransitionsEnabled: playback.skipPostGoalTransitions,
-    skipKickoffsEnabled: playback.skipKickoffs,
-  };
 }
 
 function watchGoalReplay(time: number, scorerId: string | null): void {
