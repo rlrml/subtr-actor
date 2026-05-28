@@ -8692,30 +8692,10 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
-  if (mechanicsReviewClipActive && ImGui::Button("Stop clip")) {
-    mechanicsReviewClipActive = false;
-    playbackPlaying = false;
-    mechanicsReviewStatus = "Clip stopped";
-    ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
-    if (!replayServer.IsNull()) {
-      ReplayWrapper replay = replayServer.GetReplay();
-      if (!replay.IsNull()) {
-        replay.StopPlayback();
-      }
-    }
-    scheduleUiConfigAutosave();
-  }
-  if (mechanicsReviewClipActive) {
-    ImGui::SameLine();
-  }
   if (ImGui::Button("Next") &&
       mechanicsReviewIndex < static_cast<int>(candidates.size()) - 1) {
     mechanicsReviewIndex += 1;
     scheduleUiConfigAutosave();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Show playlist")) {
-    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
   }
 
   if (ImGui::Button("Confirm")) {
@@ -8728,10 +8708,6 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   ImGui::SameLine();
   if (ImGui::Button("Uncertain")) {
     mechanicsReviewDecisions[currentKey] = 3;
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Clear decision")) {
-    mechanicsReviewDecisions.erase(currentKey);
   }
 
   ImGui::Separator();

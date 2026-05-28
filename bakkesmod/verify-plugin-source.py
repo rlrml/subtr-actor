@@ -1152,6 +1152,17 @@ def main() -> int:
             "plugin mechanics review current item debug-style rows",
             errors,
         )
+    for mechanics_review_plugin_only_action in (
+        'ImGui::Button("Stop clip")',
+        'ImGui::Button("Show playlist")',
+        'ImGui::Button("Clear decision")',
+    ):
+        reject_contains(
+            plugin_source,
+            mechanics_review_plugin_only_action,
+            "plugin mechanics review plugin-only action",
+            errors,
+        )
     require_contains(
         web_player_main_source,
         "formatMechanicsReviewStatus(candidate.meta?.reviewStatus)",
