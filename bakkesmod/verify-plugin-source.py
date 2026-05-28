@@ -1420,9 +1420,36 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_styles_source,
+        ".transport-row {\n"
+        "  display: flex;\n"
+        "  gap: var(--ui-gap-sm);\n"
+        "}\n\n"
+        ".transport-row > * {\n"
+        "  flex: 1 1 auto;\n"
+        "}",
+        "stats evaluation player transport rows distribute controls",
+        errors,
+    )
+    require_contains(
         plugin_source,
-        'if (playbackButton(playbackPlaying ? "Pause" : "Play", !transportEnabled))',
-        "plugin playback transport uses web-like play button",
+        "const float playbackTransportWidth = ImGui::GetContentRegionAvail().x;\n"
+        "  const float playbackTransportGap = ImGui::GetStyle().ItemSpacing.x;\n"
+        "  const float playbackTransportItemWidth =\n"
+        "      std::max(72.0f, (playbackTransportWidth - playbackTransportGap) * 0.5f);",
+        "plugin playback transport row distributes controls like web flex row",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Button(label, ImVec2{width, 0.0f})',
+        "plugin playback transport uses full-row button sizing",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::SameLine(0.0f, playbackTransportGap);",
+        "plugin playback transport uses explicit web-like gap",
         errors,
     )
     require_contains(
@@ -1486,10 +1513,10 @@ def main() -> int:
         plugin_source,
         "const bool playbackRateDisabled = !transportEnabled;\n"
         "  pushPlaybackDisabledStyle(playbackRateDisabled);\n"
-        "  ImGui::SetNextItemWidth(96.0f);\n"
+        "  ImGui::SetNextItemWidth(playbackTransportItemWidth);\n"
         "  const bool playbackRateOpen =\n"
         '      ImGui::BeginCombo("##playback-rate", playbackRateLabels[playbackRateIndex]);',
-        "plugin playback rate selector is disabled with transport",
+        "plugin playback rate selector is disabled and flex-sized with transport",
         errors,
     )
     require_contains(
@@ -1545,8 +1572,18 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_styles_source,
+        ".recording-controls {\n"
+        "  display: grid;\n"
+        "  grid-template-columns: repeat(2, minmax(0, 1fr));\n"
+        "  gap: var(--ui-gap-sm);\n"
+        "}",
+        "stats evaluation player recording controls use two-column grid",
+        errors,
+    )
+    require_contains(
         plugin_source,
-        'ImGui::InputInt(\n      "##recording-fps",',
+        'ImGui::InputInt(\n          "##recording-fps",',
         "plugin recording FPS uses web-like numeric input",
         errors,
     )
@@ -1584,9 +1621,30 @@ def main() -> int:
         plugin_source,
         "const bool recordingPlaybackRateDisabled = recordingSettingsLocked;\n"
         "  pushRecordingDisabledStyle(recordingPlaybackRateDisabled);\n"
-        "  ImGui::SetNextItemWidth(96.0f);\n"
+        "  ImGui::SetNextItemWidth(recordingControlWidth);\n"
         "  const bool recordingPlaybackRateOpen = ImGui::BeginCombo(",
-        "plugin recording playback rate selector is disabled while recording",
+        "plugin recording playback rate selector is disabled and grid-sized while recording",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const float recordingControlWidth =\n"
+        "      std::max(96.0f, (ImGui::GetContentRegionAvail().x - recordingControlGap) * 0.5f);",
+        "plugin recording controls use two-column grid sizing",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const float recordingPrimaryButtonWidth =\n"
+        "      std::max(68.0f, (recordingPrimaryRowWidth - recordingControlGap * 2.0f) / 3.0f);",
+        "plugin recording primary transport row distributes three buttons",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const float recordingSecondaryButtonWidth =\n"
+        "      std::max(88.0f, (recordingSecondaryRowWidth - recordingControlGap) * 0.5f);",
+        "plugin recording secondary transport row distributes two buttons",
         errors,
     )
     require_contains(
@@ -1611,13 +1669,13 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'recordingButton("Start", recordingActive || !loaded || !engine)',
+        'recordingButton(\n          "Start",\n          recordingActive || !loaded || !engine,',
         "plugin recording start waits for analysis engine and idle state",
         errors,
     )
     require_contains(
         plugin_source,
-        'recordingButton("Download", recordingActive || !hasGraphSnapshot)',
+        'recordingButton(\n          "Download",\n          recordingActive || !hasGraphSnapshot,',
         "plugin recording exposes web-like download action",
         errors,
     )

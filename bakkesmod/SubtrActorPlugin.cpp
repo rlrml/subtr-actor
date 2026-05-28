@@ -10055,9 +10055,9 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
       ImGui::PopStyleVar();
     }
   };
-  auto playbackButton = [&](const char *label, bool disabled) {
+  auto playbackButton = [&](const char *label, bool disabled, float width) {
     pushPlaybackDisabledStyle(disabled);
-    const bool clicked = ImGui::Button(label);
+    const bool clicked = ImGui::Button(label, ImVec2{width, 0.0f});
     popPlaybackDisabledStyle(disabled);
     return clicked && !disabled;
   };
@@ -10086,10 +10086,17 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
 
   playbackCurrentTime = std::max(0.0f, playbackCurrentTime);
 
-  if (playbackButton(playbackPlaying ? "Pause" : "Play", !transportEnabled)) {
+  const float playbackTransportWidth = ImGui::GetContentRegionAvail().x;
+  const float playbackTransportGap = ImGui::GetStyle().ItemSpacing.x;
+  const float playbackTransportItemWidth =
+      std::max(72.0f, (playbackTransportWidth - playbackTransportGap) * 0.5f);
+  if (playbackButton(
+          playbackPlaying ? "Pause" : "Play",
+          !transportEnabled,
+          playbackTransportItemWidth)) {
     applyPlaybackState(!playbackPlaying);
   }
-  ImGui::SameLine();
+  ImGui::SameLine(0.0f, playbackTransportGap);
   constexpr std::array<const char *, 5> playbackRateLabels{{"0.25x", "0.5x", "1.0x", "1.5x", "2.0x"}};
   constexpr std::array<float, 5> playbackRateValues{{0.25f, 0.5f, 1.0f, 1.5f, 2.0f}};
   size_t playbackRateIndex = 2;
@@ -10103,7 +10110,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   }
   const bool playbackRateDisabled = !transportEnabled;
   pushPlaybackDisabledStyle(playbackRateDisabled);
-  ImGui::SetNextItemWidth(96.0f);
+  ImGui::SetNextItemWidth(playbackTransportItemWidth);
   const bool playbackRateOpen =
       ImGui::BeginCombo("##playback-rate", playbackRateLabels[playbackRateIndex]);
   popPlaybackDisabledStyle(playbackRateDisabled);
@@ -10235,42 +10242,47 @@ void SubtrActorPlugin::renderRecordingWindow() {
       ImGui::PopStyleVar();
     }
   };
-  auto recordingButton = [](const char *label, bool disabled) {
+  auto recordingButton = [](const char *label, bool disabled, float width) {
     if (disabled) {
       ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
     }
-    const bool clicked = ImGui::Button(label);
+    const bool clicked = ImGui::Button(label, ImVec2{width, 0.0f});
     if (disabled) {
       ImGui::PopStyleVar();
     }
     return clicked && !disabled;
   };
 
-  ImGui::TextDisabled("FPS");
-  ImGui::SameLine();
+  const float recordingControlGap = ImGui::GetStyle().ItemSpacing.x;
+  const float recordingControlWidth =
+      std::max(96.0f, (ImGui::GetContentRegionAvail().x - recordingControlGap) * 0.5f);
   int nextRecordingFps = recordingFps;
+  ImGui::BeginGroup();
+  ImGui::TextDisabled("FPS");
   pushRecordingDisabledStyle(recordingSettingsLocked);
-  ImGui::SetNextItemWidth(88.0f);
-  const bool fpsChanged = ImGui::InputInt(
-      "##recording-fps",
-      &nextRecordingFps,
-      1,
-      10,
-      recordingSettingsLocked ? ImGuiInputTextFlags_ReadOnly : 0);
+  ImGui::SetNextItemWidth(recordingControlWidth);
+  const bool fpsChanged =
+      ImGui::InputInt(
+          "##recording-fps",
+          &nextRecordingFps,
+          1,
+          10,
+          recordingSettingsLocked ? ImGuiInputTextFlags_ReadOnly : 0);
   popRecordingDisabledStyle(recordingSettingsLocked);
+  ImGui::EndGroup();
   if (!recordingSettingsLocked && fpsChanged) {
     recordingFps = std::clamp(nextRecordingFps, 1, 120);
     scheduleUiConfigAutosave();
   }
-  ImGui::SameLine();
+  ImGui::SameLine(0.0f, recordingControlGap);
+  ImGui::BeginGroup();
   ImGui::TextDisabled("Playback rate");
-  ImGui::SameLine();
   const std::array<const char *, 4> rates{{"0.5x", "1.0x", "1.5x", "2.0x"}};
   recordingPlaybackRateIndex = std::clamp(recordingPlaybackRateIndex, 0, 3);
   int nextRecordingPlaybackRateIndex = recordingPlaybackRateIndex;
   const bool recordingPlaybackRateDisabled = recordingSettingsLocked;
   pushRecordingDisabledStyle(recordingPlaybackRateDisabled);
-  ImGui::SetNextItemWidth(96.0f);
+  ImGui::SetNextItemWidth(recordingControlWidth);
   const bool recordingPlaybackRateOpen = ImGui::BeginCombo(
       "##recording-playback-rate",
       rates[static_cast<size_t>(recordingPlaybackRateIndex)]);
@@ -10297,30 +10309,50 @@ void SubtrActorPlugin::renderRecordingWindow() {
     recordingPlaybackRateIndex = nextRecordingPlaybackRateIndex;
     scheduleUiConfigAutosave();
   }
+  ImGui::EndGroup();
+  ImGui::Spacing();
 
-  if (recordingButton("Start", recordingActive || !loaded || !engine)) {
+  const float recordingPrimaryRowWidth = ImGui::GetContentRegionAvail().x;
+  const float recordingPrimaryButtonWidth =
+      std::max(68.0f, (recordingPrimaryRowWidth - recordingControlGap * 2.0f) / 3.0f);
+  if (recordingButton(
+          "Start",
+          recordingActive || !loaded || !engine,
+          recordingPrimaryButtonWidth)) {
     recordingActive = true;
     recordingStartedAt = std::chrono::steady_clock::now();
     recordingStatus = "Recording analysis snapshots";
   }
-  ImGui::SameLine();
-  if (recordingButton("Full replay", recordingActive || !loaded || !engine)) {
+  ImGui::SameLine(0.0f, recordingControlGap);
+  if (recordingButton(
+          "Full replay",
+          recordingActive || !loaded || !engine,
+          recordingPrimaryButtonWidth)) {
     recordingActive = false;
     dumpSnapshot(true);
   }
-  ImGui::SameLine();
-  if (recordingButton("Stop", !recordingActive)) {
+  ImGui::SameLine(0.0f, recordingControlGap);
+  if (recordingButton("Stop", !recordingActive, recordingPrimaryButtonWidth)) {
     recordingActive = false;
     dumpSnapshot(false);
   }
-  if (recordingButton("Download", recordingActive || !hasGraphSnapshot)) {
+  const float recordingSecondaryRowWidth = recordingPrimaryRowWidth;
+  const float recordingSecondaryButtonWidth =
+      std::max(88.0f, (recordingSecondaryRowWidth - recordingControlGap) * 0.5f);
+  if (recordingButton(
+          "Download",
+          recordingActive || !hasGraphSnapshot,
+          recordingSecondaryButtonWidth)) {
     cvarManager->log(std::format(
         "subtr-actor: recording snapshots are written to {}",
         outputDirectory.string()));
     recordingStatus = "Snapshot location logged";
   }
-  ImGui::SameLine();
-  if (recordingButton("Clear", recordingActive || !hasGraphSnapshot)) {
+  ImGui::SameLine(0.0f, recordingControlGap);
+  if (recordingButton(
+          "Clear",
+          recordingActive || !hasGraphSnapshot,
+          recordingSecondaryButtonWidth)) {
     recordingActive = false;
     recordingSnapshotCount = 0;
     recordingLastBytes = 0;
