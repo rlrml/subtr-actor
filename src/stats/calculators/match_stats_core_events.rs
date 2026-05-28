@@ -1,4 +1,4 @@
-use super::match_stats_delta::*;
+use super::match_stats_delta_core::{core_player_stats_delta, core_team_stats_delta};
 use super::*;
 
 impl MatchStatsCalculator {

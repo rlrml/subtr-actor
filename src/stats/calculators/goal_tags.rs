@@ -46,8 +46,6 @@ mod matching_pass;
 mod matching_point;
 #[path = "goal_tags_matching_position.rs"]
 mod matching_position;
-#[path = "goal_tags_mechanics.rs"]
-mod mechanics;
 #[path = "goal_tags_mechanics_air_dribble.rs"]
 mod mechanics_air_dribble;
 #[path = "goal_tags_mechanics_flip_reset.rs"]

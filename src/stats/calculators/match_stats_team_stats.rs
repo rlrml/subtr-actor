@@ -1,4 +1,4 @@
-use super::match_stats_delta::player_id_sort_key;
+use super::match_stats_delta_sort::player_id_sort_key;
 use super::*;
 
 impl MatchStatsCalculator {

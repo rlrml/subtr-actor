@@ -12,8 +12,6 @@ mod match_stats_constants;
 mod match_stats_context;
 #[path = "match_stats_core_events.rs"]
 mod match_stats_core_events;
-#[path = "match_stats_delta.rs"]
-mod match_stats_delta;
 #[path = "match_stats_delta_core.rs"]
 mod match_stats_delta_core;
 #[path = "match_stats_delta_goal.rs"]
