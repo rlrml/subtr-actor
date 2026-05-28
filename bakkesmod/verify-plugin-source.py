@@ -2363,6 +2363,19 @@ def main() -> int:
         errors,
     )
     require_contains(
+        plugin_source,
+        'ImGui::TextWrapped("%s", statusReadout.c_str());\n'
+        '  ImGui::Text("%d / %zu", current == nullptr ? 0 : mechanicsReviewIndex + 1, candidates.size());',
+        "plugin mechanics review status appears before current item like web",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'ImGui::TextWrapped("%s", currentTitle.c_str());\n  const std::string statusReadout =',
+        "plugin mechanics review renders current item before status",
+        errors,
+    )
+    require_contains(
         web_player_main_source,
         "mechanicsReviewPrev.disabled = !review || review.loading || review.currentIndex <= 0;",
         "stats evaluation player mechanics review disables unavailable previous action",

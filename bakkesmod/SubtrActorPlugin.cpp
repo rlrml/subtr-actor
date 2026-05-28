@@ -9088,13 +9088,6 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     }
     return std::format("Review item {}", index + 1);
   };
-  ImGui::Text("%d / %zu", current == nullptr ? 0 : mechanicsReviewIndex + 1, candidates.size());
-  const std::string currentTitle =
-      current == nullptr ? "No candidate selected"
-                         : mechanicsReviewItemTitle(
-                               *current,
-                               static_cast<size_t>(mechanicsReviewIndex));
-  ImGui::TextWrapped("%s", currentTitle.c_str());
   const std::string statusReadout =
       mechanicsReviewClipActive
           ? std::format(
@@ -9105,6 +9098,13 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
       : candidates.empty()             ? "Load a review playlist."
                                        : "Loaded review playlist.";
   ImGui::TextWrapped("%s", statusReadout.c_str());
+  ImGui::Text("%d / %zu", current == nullptr ? 0 : mechanicsReviewIndex + 1, candidates.size());
+  const std::string currentTitle =
+      current == nullptr ? "No candidate selected"
+                         : mechanicsReviewItemTitle(
+                               *current,
+                               static_cast<size_t>(mechanicsReviewIndex));
+  ImGui::TextWrapped("%s", currentTitle.c_str());
   const std::string clipReadout =
       current == nullptr
           ? "--"
