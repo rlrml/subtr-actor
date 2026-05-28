@@ -13,14 +13,10 @@ import {
   getReplayPlayerInitialState,
 } from "./player-initial-state";
 import { ReplayPlayerTimelineCache } from "./player-timeline-cache";
+import { ReplayPlayerPluginHost } from "./player-plugin-host";
 import { findKickoffSkipTime, findPostGoalTransitionSkipTime } from "./player-skip";
-import {
-  getFreeCameraPreset,
-} from "./player-internals/spatial";
-import {
-  renderReplayPlayerFrame,
-  type FreeCameraTransition,
-} from "./player-render-pipeline";
+import { getFreeCameraPreset } from "./player-internals/spatial";
+import { renderReplayPlayerFrame, type FreeCameraTransition } from "./player-render-pipeline";
 import type {
   BeforeRenderCallback,
   CameraSettings,
@@ -31,7 +27,6 @@ import type {
   ReplayPlayerPlugin,
   ReplayPlayerPluginContext,
   ReplayPlayerPluginDefinition,
-  ReplayPlayerPluginStateContext,
   ReplayPlayerTimelineProjection,
   ReplayPlayerTimelineSegment,
   ReplayPlayerOptions,
@@ -41,10 +36,7 @@ import type {
 } from "./types";
 
 type ReplayPlayerListener = (state: ReplayPlayerState) => void;
-type InstalledReplayPlayerPlugin = {
-  definition: ReplayPlayerPluginDefinition;
-  plugin: ReplayPlayerPlugin;
-};
+
 export class ReplayPlayer extends EventTarget {
   readonly container: HTMLElement;
   readonly replay: ReplayModel;
@@ -52,7 +44,7 @@ export class ReplayPlayer extends EventTarget {
 
   readonly sceneState: ReplayScene;
   private readonly beforeRenderCallbacks: BeforeRenderCallback[] = [];
-  private readonly plugins: InstalledReplayPlayerPlugin[] = [];
+  private readonly pluginHost: ReplayPlayerPluginHost;
   private readonly fieldScale: number;
   private readonly desiredCameraPosition = new THREE.Vector3();
   private readonly desiredLookTarget = new THREE.Vector3();
@@ -87,6 +79,11 @@ export class ReplayPlayer extends EventTarget {
     const initialState = getReplayPlayerInitialState(options);
     this.fieldScale = initialState.fieldScale;
     this.sceneState = createReplayScene(container, replay, this.fieldScale);
+    this.pluginHost = new ReplayPlayerPluginHost({
+      createContext: () => this.createPluginContext(),
+      getState: () => this.getState(),
+      render: () => this.render(),
+    });
     this.liveGameState = inferLiveGameState(replay);
     this.kickoffGameState = inferKickoffGameState(replay, this.liveGameState);
     this.speed = initialState.speed;
@@ -104,7 +101,7 @@ export class ReplayPlayer extends EventTarget {
 
     this.installResizeHandling();
     for (const plugin of options.plugins ?? []) {
-      this.installPlugin(plugin, false);
+      this.pluginHost.install(plugin, false);
     }
     this.render();
     this.scheduleAnimationFrame();
@@ -374,10 +371,8 @@ export class ReplayPlayer extends EventTarget {
   }
 
   getTimelineCurrentTime(): number {
-    return this.timelineCache.projectReplayTime(
-      this.getTimelineOptions(),
-      this.currentTime,
-    ).timelineTime;
+    return this.timelineCache.projectReplayTime(this.getTimelineOptions(), this.currentTime)
+      .timelineTime;
   }
 
   getTimelineSegments(): ReplayPlayerTimelineSegment[] {
@@ -422,23 +417,15 @@ export class ReplayPlayer extends EventTarget {
   }
 
   addPlugin(definition: ReplayPlayerPluginDefinition): () => void {
-    return this.installPlugin(definition, true);
+    return this.pluginHost.install(definition, true);
   }
 
   removePlugin(id: string): boolean {
-    const index = this.plugins.findIndex((entry) => entry.plugin.id === id);
-    if (index < 0) {
-      return false;
-    }
-
-    const [entry] = this.plugins.splice(index, 1);
-    entry.plugin.teardown?.(this.createPluginContext());
-    this.render();
-    return true;
+    return this.pluginHost.remove(id);
   }
 
   getPlugins(): ReplayPlayerPlugin[] {
-    return this.plugins.map((entry) => entry.plugin);
+    return this.pluginHost.getPlugins();
   }
 
   destroy(): void {
@@ -456,10 +443,7 @@ export class ReplayPlayer extends EventTarget {
     } else {
       window.removeEventListener("resize", this.boundWindowResize);
     }
-    while (this.plugins.length > 0) {
-      const entry = this.plugins.pop();
-      entry?.plugin.teardown?.(this.createPluginContext());
-    }
+    this.pluginHost.teardownAll();
     this.sceneState.dispose();
   }
 
@@ -551,7 +535,7 @@ export class ReplayPlayer extends EventTarget {
       desiredLookTarget: this.desiredLookTarget,
       freeCameraTransition: this.freeCameraTransition,
       beforeRenderCallbacks: this.beforeRenderCallbacks,
-      plugins: this.plugins.map((entry) => entry.plugin),
+      plugins: this.pluginHost.getPlugins(),
       getState: () => this.getState(),
     });
   }
@@ -617,36 +601,6 @@ export class ReplayPlayer extends EventTarget {
     };
   }
 
-  private installPlugin(
-    definition: ReplayPlayerPluginDefinition,
-    renderAfterSetup: boolean,
-  ): () => void {
-    const plugin = typeof definition === "function" ? definition() : definition;
-
-    if (this.plugins.some((entry) => entry.plugin.id === plugin.id)) {
-      throw new Error(`Replay player plugin "${plugin.id}" is already installed`);
-    }
-
-    const entry = { definition, plugin };
-    this.plugins.push(entry);
-    plugin.setup?.(this.createPluginContext());
-    plugin.onStateChange?.(this.createPluginStateContext(this.getState()));
-
-    if (renderAfterSetup) {
-      this.render();
-    }
-
-    return () => {
-      const index = this.plugins.indexOf(entry);
-      if (index < 0) {
-        return;
-      }
-      this.plugins.splice(index, 1);
-      plugin.teardown?.(this.createPluginContext());
-      this.render();
-    };
-  }
-
   private createPluginContext(): ReplayPlayerPluginContext {
     return {
       player: this,
@@ -657,20 +611,9 @@ export class ReplayPlayer extends EventTarget {
     };
   }
 
-  private createPluginStateContext(state: ReplayPlayerState): ReplayPlayerPluginStateContext {
-    return {
-      ...this.createPluginContext(),
-      state,
-    };
-  }
-
   private emitChange(): void {
     const state = this.getState();
-    const pluginStateContext = this.createPluginStateContext(state);
-    for (const entry of this.plugins) {
-      entry.plugin.onStateChange?.(pluginStateContext);
-    }
+    this.pluginHost.notifyStateChange(state);
     this.dispatchEvent(new CustomEvent<ReplayPlayerState>("change", { detail: state }));
   }
-
 }
