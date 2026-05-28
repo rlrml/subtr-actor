@@ -8463,7 +8463,6 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     ImGui::TreePop();
   }
 
-  ImGui::Text("%zu selected / %zu recent", playlistEventIndexes.size(), recentUiEvents.size());
   if (!eventPlaylistStatus.empty()) {
     ImGui::TextWrapped("Status: %s", eventPlaylistStatus.c_str());
   }
