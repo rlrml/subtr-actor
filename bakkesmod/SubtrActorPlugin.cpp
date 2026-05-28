@@ -9544,12 +9544,13 @@ void SubtrActorPlugin::renderCameraWindow() {
   };
   cameraViewMode = std::clamp(cameraViewMode, 0, static_cast<int>(viewModes.size()) - 1);
 
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "CAMERA PROFILE");
   const std::string selectedLabel =
       targetPlayer == nullptr
           ? "Free camera"
           : playerLabel(targetPlayer->player_index, targetPlayer->is_team_0);
-  if (ImGui::BeginCombo("Target", selectedLabel.c_str())) {
+  ImGui::TextDisabled("Camera profile");
+  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+  if (ImGui::BeginCombo("##attached-player", selectedLabel.c_str())) {
     if (ImGui::Selectable("Free camera", cameraViewMode != 1)) {
       cameraViewMode = 0;
       cameraFreePreset = -1;
@@ -9667,49 +9668,34 @@ void SubtrActorPlugin::renderCameraWindow() {
   const float fov = cameraCustomSettingsEnabled ? cameraCustomFov : 110.0f;
   const float height = cameraCustomSettingsEnabled ? cameraCustomHeight : 100.0f;
   const float pitch = cameraCustomSettingsEnabled ? cameraCustomPitch : -4.0f;
-  const float distance = (cameraCustomSettingsEnabled ? cameraCustomDistance : 270.0f) *
-                         cameraDistanceScale;
+  const float distance = cameraCustomSettingsEnabled ? cameraCustomDistance : 270.0f;
   const float stiffness = cameraCustomSettingsEnabled ? cameraCustomStiffness : 0.0f;
+  const std::string profileReadout = targetPlayer == nullptr
+                                         ? "Free camera"
+                                         : cameraCustomSettingsEnabled
+                                               ? std::format("{} custom", selectedLabel)
+                                               : selectedLabel;
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "READOUT");
-  ImGui::Text("Mode: %s", viewModes[static_cast<size_t>(cameraViewMode)]);
-  ImGui::Text("Target: %s", selectedLabel.c_str());
-  ImGui::Text("FOV %.0f  Height %.0f  Pitch %.1f", fov, height, pitch);
-  ImGui::Text("Distance %.0f  Stiffness %.2f", distance, stiffness);
-  ImGui::Text("Ball cam: %s", cameraBallCamEnabled ? "on" : "off");
-  if (targetPlayer == nullptr) {
-    ImGui::TextDisabled("No player target selected.");
-  } else if (targetPlayer->has_rigid_body == 0) {
-    ImGui::TextDisabled("Selected player has no rigid body sample.");
-  } else {
-    const SaVec3 location = targetPlayer->rigid_body.location;
-    const SaVec3 velocity = targetPlayer->rigid_body.linear_velocity;
-    ImGui::Text(
-        "Location: %.0f, %.0f, %.0f", location.x, location.y, location.z);
-    if (targetPlayer->rigid_body.has_linear_velocity != 0) {
-      ImGui::Text(
-          "Velocity: %.0f, %.0f, %.0f", velocity.x, velocity.y, velocity.z);
-    }
-  }
-
-  ImGui::Separator();
-  if (ImGui::Button("Open playback")) {
-    showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Open recording")) {
-    showSingletonWindow(uiRecordingOpen, recordingPlacement);
-  }
-  if (targetPlayer != nullptr && ImGui::Button("Open player stats")) {
-    createStatsWindow(UiStatsWindowKind::Player, true);
-    if (!uiStatsWindows.empty()) {
-      UiStatsWindow &window = uiStatsWindows.back();
-      window.selected_player_index = targetPlayer->player_index;
-      window.selected_player_id = webPlayerIdForIndex(window.selected_player_index);
-      window.selected_team_is_team_0 = targetPlayer->is_team_0;
-    }
-  }
+  ImGui::Columns(2, "camera-detail-grid", false);
+  ImGui::TextDisabled("Profile");
+  ImGui::Text("%s", profileReadout.c_str());
+  ImGui::NextColumn();
+  ImGui::TextDisabled("FOV");
+  ImGui::Text("%.0f", fov);
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Height");
+  ImGui::Text("%.0f", height);
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Pitch");
+  ImGui::Text("%.1f", pitch);
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Distance");
+  ImGui::Text("%.0f", distance);
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Stiffness");
+  ImGui::Text("%.2f", stiffness);
+  ImGui::Columns(1);
 
   ImGui::End();
 }

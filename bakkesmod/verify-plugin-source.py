@@ -550,6 +550,42 @@ def main() -> int:
             errors,
         )
     require_contains(
+        web_player_template_source,
+        '<span class="label">Camera profile</span>',
+        "stats evaluation player camera profile label",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("Camera profile");\n  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);\n  if (ImGui::BeginCombo("##attached-player", selectedLabel.c_str()))',
+        "plugin camera profile selector mirrors web label and hidden control id",
+        errors,
+    )
+    require_contains(
+        web_player_template_source,
+        '<dl class="detail-grid">',
+        "stats evaluation player camera detail grid",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Columns(2, "camera-detail-grid", false);',
+        "plugin camera uses web-like detail grid",
+        errors,
+    )
+    for plugin_only_camera_surface in (
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "CAMERA PROFILE");',
+        'ImGui::BeginCombo("Target", selectedLabel.c_str())',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "READOUT");',
+        'ImGui::Button("Open player stats")',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_camera_surface,
+            "plugin camera window plugin-only surface",
+            errors,
+        )
+    require_contains(
         plugin_source,
         '"Load Replay...", ImVec2{actionButtonWidth, 0.0f}',
         "launcher actions expose replay loading like the web player",
