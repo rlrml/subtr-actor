@@ -9667,6 +9667,11 @@ void SubtrActorPlugin::renderCameraWindow() {
     cameraFreePreset = 1;
   }
 
+  targetPlayer = cameraViewMode == 1 ? sampledPlayerByIndex(cameraSelectedPlayerIndex) : nullptr;
+  const std::string activeCameraLabel =
+      targetPlayer == nullptr
+          ? "Free camera"
+          : playerLabel(targetPlayer->player_index, targetPlayer->is_team_0);
   const bool hasAttachedCamera = targetPlayer != nullptr;
   float nextDistanceScale = cameraDistanceScale;
   pushCameraDisabledStyle(!hasAttachedCamera);
@@ -9731,8 +9736,8 @@ void SubtrActorPlugin::renderCameraWindow() {
   const std::string profileReadout = targetPlayer == nullptr
                                          ? "Free camera"
                                          : cameraCustomSettingsEnabled
-                                               ? std::format("{} custom", selectedLabel)
-                                               : selectedLabel;
+                                               ? std::format("{} custom", activeCameraLabel)
+                                               : activeCameraLabel;
 
   ImGui::Separator();
   ImGui::Columns(2, "camera-detail-grid", false);

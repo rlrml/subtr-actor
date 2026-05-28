@@ -893,6 +893,18 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "cameraViewSideButton.disabled = !hasReplay;",
+        "stats evaluation player disables side camera without replay",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "cameraDistance.disabled = !hasAttachedCamera;",
+        "stats evaluation player updates camera settings availability from active camera state",
+        errors,
+    )
+    require_contains(
         plugin_source,
         "const bool hasCameraContext = !sampledPlayers.empty();",
         "plugin camera derives replay context for disabled controls",
@@ -908,6 +920,18 @@ def main() -> int:
         plugin_source,
         'cameraViewButton("Overhead##camera-view", 2, !hasCameraContext)',
         "plugin disables preset camera modes without replay context",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'cameraViewButton("Diagonal##camera-view", 3, !hasCameraContext)',
+        "plugin disables side camera mode without replay context",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "targetPlayer = cameraViewMode == 1 ? sampledPlayerByIndex(cameraSelectedPlayerIndex) : nullptr;\n  const std::string activeCameraLabel =\n      targetPlayer == nullptr",
+        "plugin camera settings availability uses updated camera mode",
         errors,
     )
     require_contains(
