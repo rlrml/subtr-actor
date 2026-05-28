@@ -58,11 +58,11 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       alias: useLocalAliases
         ? {
-            "@colonelpanic8/subtr-actor": path.resolve(
+            "@rlrml/subtr-actor": path.resolve(
               import.meta.dirname,
               "../pkg/rl_replay_subtr_actor.js",
             ),
-            "subtr-actor-player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+            "@rlrml/player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
             three: path.resolve(import.meta.dirname, "node_modules/three"),
           }
         : undefined,
@@ -79,11 +79,11 @@ export default defineConfig(({ command, mode }) => {
       rollupOptions: {
         // Site builds need the wasm package bundled into workers, while the
         // published library keeps it external for downstream consumers.
-        external: siteBuild ? [] : ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
+        external: siteBuild ? [] : ["@rlrml/subtr-actor", "@rlrml/player"],
       },
     },
     optimizeDeps: {
-      exclude: ["@colonelpanic8/subtr-actor", "subtr-actor-player"],
+      exclude: ["@rlrml/subtr-actor", "@rlrml/player"],
     },
     build: siteBuild
       ? {
@@ -100,7 +100,7 @@ export default defineConfig(({ command, mode }) => {
             formats: ["es"],
           },
           rollupOptions: {
-            external: ["@colonelpanic8/subtr-actor", "subtr-actor-player", "three"],
+            external: ["@rlrml/subtr-actor", "@rlrml/player", "three"],
           },
         },
   };

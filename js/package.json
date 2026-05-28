@@ -1,5 +1,5 @@
 {
-  "name": "@colonelpanic8/subtr-actor",
+  "name": "@rlrml/subtr-actor",
   "version": "0.11.0",
   "description": "WebAssembly bindings for subtr-actor - Rocket League replay processing and analysis",
   "main": "pkg/rl_replay_subtr_actor.js",
@@ -15,7 +15,7 @@
     "check:style": "npm run format:check && npm run lint",
     "test": "wasm-pack test --headless --firefox",
     "pack": "./scripts/with-clean-npm-env.sh node --run=build && ./scripts/with-clean-npm-env.sh npm pack pkg/",
-    "publish": "./scripts/with-clean-npm-env.sh node --run=build && ./scripts/with-clean-npm-env.sh npm publish pkg/",
+    "publish": "./scripts/with-clean-npm-env.sh node --run=build && ./scripts/with-clean-npm-env.sh npm publish --access public pkg/",
     "prepublishOnly": "./scripts/with-clean-npm-env.sh node --run=build"
   },
   "repository": {

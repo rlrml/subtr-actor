@@ -7,7 +7,7 @@ import {
   createTimelineOverlayPlugin,
   timelineEventSeekTime,
   ReplayPlayer,
-} from "subtr-actor-player";
+} from "@rlrml/player";
 import type {
   BoostPickupAnimationPickup,
   CanvasRecorderPlugin,
@@ -21,7 +21,7 @@ import type {
   ReplayPlayerTrack,
   PlaylistManifestPage,
   TimelineOverlayPlugin,
-} from "subtr-actor-player";
+} from "@rlrml/player";
 import { getAppTemplate } from "./appTemplate.ts";
 import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";

@@ -3,7 +3,7 @@ declare module "*.wasm?url" {
   export default url;
 }
 
-declare module "@colonelpanic8/subtr-actor" {
+declare module "@rlrml/subtr-actor" {
   export function get_replay_frames_data(data: Uint8Array): unknown;
   export function get_replay_frames_data_with_progress(
     data: Uint8Array,

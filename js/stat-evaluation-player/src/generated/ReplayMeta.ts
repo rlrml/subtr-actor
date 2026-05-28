@@ -1,1 +1,1 @@
-export type { ReplayMeta } from "subtr-actor-player/generated/ReplayMeta";
+export type { ReplayMeta } from "@rlrml/player/generated/ReplayMeta";

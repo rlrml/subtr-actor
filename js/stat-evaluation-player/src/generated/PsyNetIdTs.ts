@@ -1,1 +1,1 @@
-export type { PsyNetIdTs } from "subtr-actor-player/generated/PsyNetIdTs";
+export type { PsyNetIdTs } from "@rlrml/player/generated/PsyNetIdTs";

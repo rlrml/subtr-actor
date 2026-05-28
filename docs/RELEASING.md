@@ -9,8 +9,8 @@ The project publishes five packages:
 - **Rust**: `subtr-actor` on [crates.io](https://crates.io/crates/subtr-actor)
 - **Python**: `subtr-actor-py` on [PyPI](https://pypi.org/project/subtr-actor-py/)
 - **JavaScript bindings**: `@rlrml/subtr-actor` on [npm](https://www.npmjs.com/package/@rlrml/subtr-actor)
-- **JavaScript player**: `@rlrml/subtr-actor-player` on [npm](https://www.npmjs.com/package/@rlrml/subtr-actor-player)
-- **JavaScript stats player**: `@rlrml/subtr-actor-stats-player` on [npm](https://www.npmjs.com/package/@rlrml/subtr-actor-stats-player)
+- **JavaScript player**: `@rlrml/player` on [npm](https://www.npmjs.com/package/@rlrml/player)
+- **JavaScript stats player**: `@rlrml/stats-player` on [npm](https://www.npmjs.com/package/@rlrml/stats-player)
 
 ## Automated Releases (GitHub Actions)
 
@@ -104,8 +104,8 @@ git push origin master --tags
   - https://crates.io/crates/subtr-actor
   - https://pypi.org/project/subtr-actor-py/
   - https://www.npmjs.com/package/@rlrml/subtr-actor
-  - https://www.npmjs.com/package/@rlrml/subtr-actor-player
-  - https://www.npmjs.com/package/@rlrml/subtr-actor-stats-player
+  - https://www.npmjs.com/package/@rlrml/player
+  - https://www.npmjs.com/package/@rlrml/stats-player
 
 ## Manual Release (Alternative)
 
@@ -124,7 +124,7 @@ twine upload target/wheels/*
 ```bash
 cd js
 wasm-pack build --target bundler --out-dir pkg
-cd pkg && npm publish
+cd pkg && npm publish --access public
 
 cd ../player
 package_dir="$(npm run --silent prepare:package)"

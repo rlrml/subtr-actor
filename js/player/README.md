@@ -1,15 +1,15 @@
-# subtr-actor-player
+# @rlrml/player
 
-`subtr-actor-player` is the reusable replay player library package for this repository.
+`@rlrml/player` is the reusable replay player library package for this repository.
 
 ## Installation
 
 ```bash
-npm install subtr-actor-player three
+npm install @rlrml/player three
 ```
 
 `three` is a peer dependency. The player also depends on the low-level
-[`@colonelpanic8/subtr-actor`](https://www.npmjs.com/package/@colonelpanic8/subtr-actor) bindings package.
+[`@rlrml/subtr-actor`](https://www.npmjs.com/package/@rlrml/subtr-actor) bindings package.
 
 It provides:
 

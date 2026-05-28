@@ -1,21 +1,21 @@
-# subtr-actor-stats-player
+# @rlrml/stats-player
 
-`subtr-actor-stats-player` packages the stats-focused replay viewer UI
+`@rlrml/stats-player` packages the stats-focused replay viewer UI
 from this repository as a reusable npm library.
 
 ## Installation
 
 ```bash
-npm install subtr-actor-stats-player three
+npm install @rlrml/stats-player three
 ```
 
 `three` is a peer dependency. The published package pulls in the matching
-`@colonelpanic8/subtr-actor` and `subtr-actor-player` versions automatically.
+`@rlrml/subtr-actor` and `@rlrml/player` versions automatically.
 
 ## Usage
 
 ```ts
-import { mountStatEvaluationPlayer } from "subtr-actor-stats-player";
+import { mountStatEvaluationPlayer } from "@rlrml/stats-player";
 
 const root = document.getElementById("app");
 if (!(root instanceof HTMLElement)) {
@@ -69,7 +69,7 @@ import {
   createReplayReviewDataProviderFromLocation,
   mountReplayReview,
   mountStatsReport,
-} from "subtr-actor-stats-player";
+} from "@rlrml/stats-player";
 ```
 
 - `mountStatsReport(root, { initialData })` renders the static report-style
@@ -99,7 +99,7 @@ parameter. This uses raw deflate plus base64url encoding, so it is deterministic
 and does not depend on an external URL shortener:
 
 ```ts
-import { encodeCompressedReplayUrl } from "subtr-actor-stats-player";
+import { encodeCompressedReplayUrl } from "@rlrml/stats-player";
 
 const replayParam = encodeCompressedReplayUrl(
   "https://raw.githubusercontent.com/rlrml/subtr-actor/fix-legacy-rigidbody-normalization/assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay",

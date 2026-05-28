@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { ReplayModel } from "subtr-actor-player";
+import type { ReplayModel } from "@rlrml/player";
 import type { StatsFrame } from "./statsTimeline.ts";
 import { buildTouchMarkers, getLastTouchPlayer, getVisibleTouchMarkers } from "./touchOverlay.ts";
 import {
