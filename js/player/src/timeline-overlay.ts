@@ -8,6 +8,7 @@ import type {
   ReplayTimelineRange,
   ReplayTimelineRangeSource,
 } from "./types";
+import { createTimelineOverlayElements } from "./timeline-overlay-dom";
 import { ensureTimelineOverlayStyles } from "./timeline-overlay-styles";
 import {
   DEFAULT_REPLAY_EVENT_KINDS,
@@ -527,104 +528,22 @@ export function createTimelineOverlayPlugin(
         context.container.style.position = "relative";
       }
 
-      root = document.createElement("div");
-      root.className = "sap-tl-root";
-      shell = document.createElement("div");
-      shell.className = "sap-tl-shell";
-      shell.dataset.scrubbing = "false";
-
-      const topLine = document.createElement("div");
-      topLine.className = "sap-tl-topline";
-
-      const primary = document.createElement("div");
-      primary.className = "sap-tl-primary";
-
-      toggleButton = document.createElement("button");
-      toggleButton.type = "button";
-      toggleButton.className = "sap-tl-toggle sap-tl-track-toggle";
-      toggleButtonIcon = document.createElement("span");
-      toggleButtonIcon.className = "sap-tl-toggle-icon";
-      toggleButtonIcon.setAttribute("aria-hidden", "true");
-      toggleButtonIcon.textContent = ">";
-      toggleButtonLabel = document.createElement("span");
-      toggleButtonLabel.className = "sap-tl-toggle-label";
-      toggleButtonLabel.textContent = "Play";
-      toggleButton.append(toggleButtonIcon, toggleButtonLabel);
-      toggleButton.addEventListener("click", () => {
-        context.player.togglePlayback();
+      const elementRefs = createTimelineOverlayElements(context, {
+        beginScrub,
+        endScrub,
       });
-
-      currentTimeText = document.createElement("span");
-      currentTimeText.className = "sap-tl-current";
-      currentTimeText.textContent = "0:00.00";
-
-      remainingTimeText = document.createElement("span");
-      remainingTimeText.className = "sap-tl-remaining";
-      remainingTimeText.textContent = "-0:00.00";
-
-      primary.append(currentTimeText);
-      topLine.append(primary, remainingTimeText);
-
-      const trackWrap = document.createElement("div");
-      trackWrap.className = "sap-tl-track-wrap";
-
-      rangesRoot = document.createElement("div");
-      rangesRoot.className = "sap-tl-ranges";
-      rangesRoot.hidden = true;
-
-      eventLanesRoot = document.createElement("div");
-      eventLanesRoot.className = "sap-tl-event-lanes";
-      eventLanesRoot.hidden = true;
-
-      const trackRail = document.createElement("div");
-      trackRail.className = "sap-tl-track-rail";
-
-      const mainRail = document.createElement("div");
-      mainRail.className = "sap-tl-main-rail";
-
-      markers = document.createElement("div");
-      markers.className = "sap-tl-markers";
-
-      range = document.createElement("input");
-      range.className = "sap-tl-range";
-      range.type = "range";
-      range.min = "0";
-      range.max = `${context.replay.duration}`;
-      range.step = "0.01";
-      range.value = "0";
-
-      const handlePointerDown = (): void => {
-        beginScrub();
-      };
-      const handleInput = (): void => {
-        if (!range) {
-          return;
-        }
-
-        context.player.seek(context.player.projectTimelineTimeToReplay(Number(range.value)));
-      };
-      const handleWindowPointerUp = (): void => {
-        endScrub();
-      };
-
-      range.addEventListener("pointerdown", handlePointerDown);
-      range.addEventListener("input", handleInput);
-      range.addEventListener("change", handleWindowPointerUp);
-      window.addEventListener("pointerup", handleWindowPointerUp);
-      window.addEventListener("pointercancel", handleWindowPointerUp);
-      removeWindowListeners = (): void => {
-        range?.removeEventListener("pointerdown", handlePointerDown);
-        range?.removeEventListener("input", handleInput);
-        range?.removeEventListener("change", handleWindowPointerUp);
-        window.removeEventListener("pointerup", handleWindowPointerUp);
-        window.removeEventListener("pointercancel", handleWindowPointerUp);
-      };
-
-      trackRail.append(mainRail, markers, range);
-      trackWrap.append(rangesRoot, eventLanesRoot, toggleButton, trackRail);
-      shell.append(topLine, trackWrap);
-      root.append(shell);
-      context.container.append(root);
+      root = elementRefs.root;
+      shell = elementRefs.shell;
+      rangesRoot = elementRefs.rangesRoot;
+      range = elementRefs.range;
+      toggleButton = elementRefs.toggleButton;
+      toggleButtonIcon = elementRefs.toggleButtonIcon;
+      toggleButtonLabel = elementRefs.toggleButtonLabel;
+      currentTimeText = elementRefs.currentTimeText;
+      remainingTimeText = elementRefs.remainingTimeText;
+      eventLanesRoot = elementRefs.eventLanesRoot;
+      markers = elementRefs.markers;
+      removeWindowListeners = elementRefs.removeWindowListeners;
       buildMarkers(context);
       buildRanges(context);
       syncState({
