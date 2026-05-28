@@ -8578,31 +8578,30 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
         static_cast<int>(candidates.size()) - 1);
   }
 
-  if (candidates.empty()) {
-    ImGui::TextWrapped("No candidate selected");
-    ImGui::End();
-    return;
-  }
-
-  UiEventRecord &current = recentUiEvents[candidates[static_cast<size_t>(mechanicsReviewIndex)]];
-  const std::string currentKey = mechanicsReviewKey(current);
-  const float clipStart = std::max(0.0f, current.time - mechanicsReviewClipLeadSeconds);
-  const float clipEnd = current.time + mechanicsReviewClipTrailSeconds;
-  ImGui::Text(
-      "%d / %zu",
-      mechanicsReviewIndex + 1,
-      candidates.size());
-  ImGui::TextWrapped("%s", current.label.c_str());
-  const std::string clipReadout = std::format("{:.2f}s to {:.2f}s", clipStart, clipEnd);
+  const UiEventRecord *current = candidates.empty()
+                                     ? nullptr
+                                     : &recentUiEvents[candidates[static_cast<size_t>(
+                                           mechanicsReviewIndex)]];
+  const std::string currentKey = current == nullptr ? std::string{} : mechanicsReviewKey(*current);
+  const float clipStart =
+      current == nullptr ? 0.0f : std::max(0.0f, current->time - mechanicsReviewClipLeadSeconds);
+  const float clipEnd = current == nullptr ? 0.0f : current->time + mechanicsReviewClipTrailSeconds;
+  ImGui::Text("%d / %zu", current == nullptr ? 0 : mechanicsReviewIndex + 1, candidates.size());
+  ImGui::TextWrapped("%s", current == nullptr ? "No candidate selected" : current->label.c_str());
+  const std::string clipReadout =
+      current == nullptr ? "--" : std::format("{:.2f}s to {:.2f}s", clipStart, clipEnd);
   const std::string eventReadout =
-      std::format("frame {}", static_cast<unsigned long long>(current.frame_number));
-  const std::string reasonReadout = current.details.empty() ? "--" : current.details;
+      current == nullptr
+          ? "--"
+          : std::format("frame {}", static_cast<unsigned long long>(current->frame_number));
+  const std::string reasonReadout =
+      current == nullptr || current->details.empty() ? "--" : current->details;
   ImGui::Columns(2, "mechanics-review-fields", false);
   ImGui::TextDisabled("Mechanic");
-  ImGui::Text("%s", current.type.empty() ? "--" : current.type.c_str());
+  ImGui::Text("%s", current == nullptr || current->type.empty() ? "--" : current->type.c_str());
   ImGui::NextColumn();
   ImGui::TextDisabled("Player");
-  ImGui::Text("%s", current.actor.empty() ? "--" : current.actor.c_str());
+  ImGui::Text("%s", current == nullptr || current->actor.empty() ? "--" : current->actor.c_str());
   ImGui::NextColumn();
   ImGui::TextDisabled("Clip");
   ImGui::Text("%s", clipReadout.c_str());
@@ -8623,12 +8622,12 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     ImGui::TextWrapped("%s", status.c_str());
   }
 
-  if (ImGui::Button("Prev") && mechanicsReviewIndex > 0) {
+  if (ImGui::Button("Prev") && current != nullptr && mechanicsReviewIndex > 0) {
     mechanicsReviewIndex -= 1;
     scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
-  if (ImGui::Button("Replay clip")) {
+  if (ImGui::Button("Replay clip") && current != nullptr) {
     playbackCurrentTime = clipStart;
     playbackPlaying = true;
     playbackSkipPostGoalTransitions = false;
@@ -8653,26 +8652,36 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   }
   ImGui::SameLine();
   if (ImGui::Button("Next") &&
-      mechanicsReviewIndex < static_cast<int>(candidates.size()) - 1) {
+      current != nullptr && mechanicsReviewIndex < static_cast<int>(candidates.size()) - 1) {
     mechanicsReviewIndex += 1;
     scheduleUiConfigAutosave();
   }
 
-  if (ImGui::Button("Confirm")) {
+  if (ImGui::Button("Confirm") && current != nullptr) {
     mechanicsReviewDecisions[currentKey] = 1;
   }
   ImGui::SameLine();
-  if (ImGui::Button("Reject")) {
+  if (ImGui::Button("Reject") && current != nullptr) {
     mechanicsReviewDecisions[currentKey] = 2;
   }
   ImGui::SameLine();
-  if (ImGui::Button("Uncertain")) {
+  if (ImGui::Button("Uncertain") && current != nullptr) {
     mechanicsReviewDecisions[currentKey] = 3;
   }
 
   ImGui::Separator();
+  ImGui::Text("Replays");
+  ImGui::SameLine();
+  ImGui::TextDisabled("%s", replayAnnotations ? "1 replay" : "0 replays");
+
+  ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYLIST");
+  ImGui::SameLine();
+  ImGui::TextDisabled("%zu %s", candidates.size(), candidates.size() == 1 ? "item" : "items");
   ImGui::BeginChild("mechanics-review-list", ImVec2{0.0f, 150.0f}, true);
+  if (candidates.empty()) {
+    ImGui::TextDisabled("No review playlist loaded.");
+  }
   for (size_t i = 0; i < candidates.size(); i += 1) {
     const UiEventRecord &event = recentUiEvents[candidates[i]];
     ImGui::PushID(static_cast<int>(i));

@@ -1208,6 +1208,30 @@ def main() -> int:
         "plugin mechanics review current item uses web-like field grid",
         errors,
     )
+    require_contains(
+        web_player_template_source,
+        '<span id="mechanics-review-replay-load-summary">0 replays</span>',
+        "stats evaluation player mechanics review replay summary",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("%s", replayAnnotations ? "1 replay" : "0 replays");',
+        "plugin mechanics review replay summary mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'empty.textContent = "No review playlist loaded.";',
+        "stats evaluation player mechanics review empty playlist text",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("No review playlist loaded.");',
+        "plugin mechanics review empty playlist text mirrors web",
+        errors,
+    )
     for plugin_only_mechanics_review_current_surface in (
         'ImGui::Text("Decision: %s", mechanicsReviewDecisionLabel(current));',
         'ImGui::Text("Mechanic: %s", current.type.c_str());',
@@ -1215,6 +1239,7 @@ def main() -> int:
         'ImGui::Text("Clip: %.2fs to %.2fs", clipStart, clipEnd);',
         'ImGui::Text("Event: frame %llu", static_cast<unsigned long long>(current.frame_number));',
         'ImGui::TextWrapped("Reason: %s", current.details.c_str());',
+        'ImGui::TextWrapped("No candidate selected");\n    ImGui::End();\n    return;',
     ):
         reject_contains(
             plugin_source,
