@@ -1769,9 +1769,51 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "const panels = activeModules\n"
+        '    .filter((mod) => mod.id !== "boost" && mod.id !== TOUCH_MODULE_ID)\n'
+        "    .map((mod) => mod.renderSettings?.(ctx) ?? null)",
+        "stats evaluation player module settings are active-module panels",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".module-settings-card {\n"
+        "  display: grid;\n"
+        "  gap: 0.75rem;\n"
+        "  padding: 0.85rem 0.9rem;\n"
+        "  border-radius: 1rem;\n"
+        "  border: 1px solid rgba(255, 255, 255, 0.08);\n"
+        "  background: rgba(255, 255, 255, 0.035);",
+        "stats evaluation player module settings render card panels",
+        errors,
+    )
+    require_contains(
         plugin_source,
         "if (timelineRangePossessionEnabled) {\n    ImGui::Separator();\n    renderModuleSettingsControls(\"launcher-module-settings\", false, true, true);\n  }",
         "launcher module settings only render active web panels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::BeginChild(cardId, ImVec2{0.0f, height}, true);',
+        "plugin launcher module settings render web-like card panels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const bool possessionCard = beginModuleSettingsCard(\n'
+        '        "module-settings-card-possession",\n'
+        "        includeOpenButtons ? 116.0f : 84.0f);",
+        "plugin active possession settings use module-settings card",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::SameLine(std::max(\n"
+        "          ImGui::GetCursorPosX(),\n"
+        "          ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(readout.c_str()).x));",
+        "plugin module settings card aligns readout like web header",
         errors,
     )
     require_contains(

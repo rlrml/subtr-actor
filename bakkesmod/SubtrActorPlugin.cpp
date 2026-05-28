@@ -8266,6 +8266,11 @@ void SubtrActorPlugin::renderModuleSettingsControls(
     if (webCardHeaders) {
       ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STAT DISPLAY");
       ImGui::Text("%s", title);
+      ImGui::SameLine(std::max(
+          ImGui::GetCursorPosX(),
+          ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(readout.c_str()).x));
+      ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", readout.c_str());
+      return;
     } else {
       ImGui::TextDisabled("%s", title);
     }
@@ -8273,7 +8278,31 @@ void SubtrActorPlugin::renderModuleSettingsControls(
     ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", readout.c_str());
   };
 
+  auto beginModuleSettingsCard = [&](const char *cardId, float height) {
+    if (!webCardHeaders) {
+      return false;
+    }
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{12.0f, 10.0f});
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4{1.0f, 1.0f, 1.0f, 0.035f});
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{1.0f, 1.0f, 1.0f, 0.08f});
+    ImGui::BeginChild(cardId, ImVec2{0.0f, height}, true);
+    return true;
+  };
+
+  auto endModuleSettingsCard = [&]() {
+    if (!webCardHeaders) {
+      return;
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(2);
+  };
+
   if (!onlyWebActivePanels) {
+    const bool movementCard = beginModuleSettingsCard(
+        "module-settings-card-movement",
+        includeOpenButtons ? 116.0f : 84.0f);
     renderSettingsHeader(
         "Movement breakdown",
         settingReadout(
@@ -8289,6 +8318,9 @@ void SubtrActorPlugin::renderModuleSettingsControls(
     if (includeOpenButtons && ImGui::Button("Open movement stats")) {
       createStatsModuleWindow("movement", 0);
     }
+    if (movementCard) {
+      endModuleSettingsCard();
+    }
     renderedPanel = true;
   }
 
@@ -8296,6 +8328,9 @@ void SubtrActorPlugin::renderModuleSettingsControls(
     ImGui::Spacing();
   }
   if (!onlyWebActivePanels || timelineRangePossessionEnabled) {
+    const bool possessionCard = beginModuleSettingsCard(
+        "module-settings-card-possession",
+        includeOpenButtons ? 116.0f : 84.0f);
     renderSettingsHeader(
         "Possession breakdown",
         settingReadout(
@@ -8311,6 +8346,10 @@ void SubtrActorPlugin::renderModuleSettingsControls(
     if (includeOpenButtons && ImGui::Button("Open possession stats")) {
       createStatsModuleWindow("possession", 0);
     }
+    if (possessionCard) {
+      endModuleSettingsCard();
+    }
+    renderedPanel = true;
   }
 
   ImGui::PopID();
