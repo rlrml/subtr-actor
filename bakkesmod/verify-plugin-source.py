@@ -2185,6 +2185,12 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        "return lastTeamScores;\n}\n\nvoid SubtrActorPlugin::renderScoreboardWindow()",
+        "plugin scoreboard falls back to live scores after replay annotation scores",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         "writeReplayAnnotationFramePlayers(\n        replayAnnotations,\n        replayTime,",
         "plugin replay annotations update sampled players from current replay stats frame",
         errors,

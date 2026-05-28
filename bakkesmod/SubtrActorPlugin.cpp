@@ -8323,22 +8323,17 @@ void SubtrActorPlugin::renderEmptyStateWindow() {
 }
 
 std::optional<std::pair<int32_t, int32_t>> SubtrActorPlugin::currentScoreboardScore() const {
-  if (lastTeamScores) {
-    return lastTeamScores;
+  if (replayAnnotations && replayAnnotationScoreAtTime && gameWrapper->IsInReplay()) {
+    ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+    const float replayTime =
+        replayServer.IsNull() ? playbackCurrentTime : replayServer.GetReplayTimeElapsed();
+    SaReplayScore score{};
+    if (replayAnnotationScoreAtTime(replayAnnotations, replayTime, &score) == 0 &&
+        score.has_team_zero_score != 0 && score.has_team_one_score != 0) {
+      return std::make_pair(score.team_zero_score, score.team_one_score);
+    }
   }
-  if (!replayAnnotations || !replayAnnotationScoreAtTime || !gameWrapper->IsInReplay()) {
-    return std::nullopt;
-  }
-
-  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
-  const float replayTime =
-      replayServer.IsNull() ? playbackCurrentTime : replayServer.GetReplayTimeElapsed();
-  SaReplayScore score{};
-  if (replayAnnotationScoreAtTime(replayAnnotations, replayTime, &score) != 0 ||
-      score.has_team_zero_score == 0 || score.has_team_one_score == 0) {
-    return std::nullopt;
-  }
-  return std::make_pair(score.team_zero_score, score.team_one_score);
+  return lastTeamScores;
 }
 
 void SubtrActorPlugin::renderScoreboardWindow() {
