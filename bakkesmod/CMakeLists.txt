@@ -32,6 +32,9 @@ message(STATUS "BakkesMod SDK: ${BAKKESMOD_SDK_DIR}")
 
 add_library(SubtrActorPlugin SHARED
   SubtrActorPlugin.cpp
+  SubtrActorPluginGraphDump.cpp
+  SubtrActorPluginGraphJson.cpp
+  SubtrActorPluginGraphVerify.cpp
 )
 
 target_include_directories(SubtrActorPlugin PRIVATE

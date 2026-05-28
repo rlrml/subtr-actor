@@ -15,8 +15,8 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RUST_SOURCE = REPO_ROOT / "crates/subtr-actor-bakkesmod/src/lib.rs"
-PLUGIN_SOURCE = REPO_ROOT / "bakkesmod/SubtrActorPlugin.cpp"
+RUST_SOURCE_ROOT = REPO_ROOT / "crates/subtr-actor-bakkesmod/src"
+PLUGIN_SOURCE_ROOT = REPO_ROOT / "bakkesmod"
 PLUGIN_HEADER = REPO_ROOT / "bakkesmod/SubtrActorPlugin.h"
 ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakkesmod.h"
 
@@ -174,8 +174,13 @@ def require_contains(source: str, needle: str, label: str, errors: list[str]) ->
 
 
 def main() -> int:
-    rust_source = RUST_SOURCE.read_text(encoding="utf-8")
-    plugin_source = PLUGIN_SOURCE.read_text(encoding="utf-8")
+    rust_source = "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(RUST_SOURCE_ROOT.glob("*.rs"))
+    )
+    plugin_source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted(PLUGIN_SOURCE_ROOT.glob("SubtrActorPlugin*.cpp"))
+    )
     plugin_header = PLUGIN_HEADER.read_text(encoding="utf-8")
     abi_header = ABI_HEADER.read_text(encoding="utf-8")
     cpp_combined = plugin_header + "\n" + plugin_source
