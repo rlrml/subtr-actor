@@ -9274,11 +9274,22 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   ImGui::TextWrapped("%s", reasonReadout.c_str());
   ImGui::Columns(1);
 
-  auto mechanicsReviewButton = [](const char *label, bool disabled) {
+  auto mechanicsReviewButton = [](const char *label,
+                                  bool disabled,
+                                  float width,
+                                  std::optional<ImVec4> borderColor = std::nullopt) {
     if (disabled) {
       ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
     }
-    const bool clicked = ImGui::Button(label);
+    if (borderColor) {
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+      ImGui::PushStyleColor(ImGuiCol_Border, *borderColor);
+    }
+    const bool clicked = ImGui::Button(label, ImVec2{width, 0.0f});
+    if (borderColor) {
+      ImGui::PopStyleColor();
+      ImGui::PopStyleVar();
+    }
     if (disabled) {
       ImGui::PopStyleVar();
     }
@@ -9289,13 +9300,16 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   const bool nextDisabled =
       current == nullptr || mechanicsReviewIndex >= static_cast<int>(candidates.size()) - 1;
   const bool decisionDisabled = current == nullptr;
+  const float actionGap = ImGui::GetStyle().ItemSpacing.x;
+  const float actionButtonWidth =
+      std::max(72.0f, (ImGui::GetContentRegionAvail().x - actionGap * 2.0f) / 3.0f);
 
-  if (mechanicsReviewButton("Prev", prevDisabled)) {
+  if (mechanicsReviewButton("Prev", prevDisabled, actionButtonWidth)) {
     mechanicsReviewIndex -= 1;
     scheduleUiConfigAutosave();
   }
-  ImGui::SameLine();
-  if (mechanicsReviewButton("Replay clip", replayDisabled)) {
+  ImGui::SameLine(0.0f, actionGap);
+  if (mechanicsReviewButton("Replay clip", replayDisabled, actionButtonWidth)) {
     if (current != nullptr && current->has_player != 0) {
       cameraSelectedPlayerIndex = current->player_index;
       cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);
@@ -9324,21 +9338,29 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     }
     scheduleUiConfigAutosave();
   }
-  ImGui::SameLine();
-  if (mechanicsReviewButton("Next", nextDisabled)) {
+  ImGui::SameLine(0.0f, actionGap);
+  if (mechanicsReviewButton("Next", nextDisabled, actionButtonWidth)) {
     mechanicsReviewIndex += 1;
     scheduleUiConfigAutosave();
   }
 
-  if (mechanicsReviewButton("Confirm", decisionDisabled)) {
+  if (mechanicsReviewButton(
+          "Confirm",
+          decisionDisabled,
+          actionButtonWidth,
+          ImVec4{0.30f, 0.69f, 0.47f, 0.52f})) {
     mechanicsReviewDecisions[currentKey] = 1;
   }
-  ImGui::SameLine();
-  if (mechanicsReviewButton("Reject", decisionDisabled)) {
+  ImGui::SameLine(0.0f, actionGap);
+  if (mechanicsReviewButton(
+          "Reject",
+          decisionDisabled,
+          actionButtonWidth,
+          ImVec4{0.86f, 0.37f, 0.37f, 0.58f})) {
     mechanicsReviewDecisions[currentKey] = 2;
   }
-  ImGui::SameLine();
-  if (mechanicsReviewButton("Uncertain", decisionDisabled)) {
+  ImGui::SameLine(0.0f, actionGap);
+  if (mechanicsReviewButton("Uncertain", decisionDisabled, actionButtonWidth)) {
     mechanicsReviewDecisions[currentKey] = 3;
   }
 

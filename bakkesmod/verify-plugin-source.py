@@ -3017,6 +3017,41 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_styles_source,
+        ".mechanics-review-actions,\n"
+        ".mechanics-review-decision-actions,\n"
+        ".mechanics-review-list-header {\n"
+        "  display: flex;\n"
+        "  align-items: center;\n"
+        "  justify-content: space-between;\n"
+        "  gap: var(--ui-gap-sm);\n"
+        "}",
+        "stats evaluation player mechanics review action rows use flex layout",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".mechanics-review-actions button,\n"
+        ".mechanics-review-decision-actions button {\n"
+        "  flex: 1 1 0;\n"
+        "}",
+        "stats evaluation player mechanics review action buttons distribute equally",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const float actionButtonWidth =\n"
+        "      std::max(72.0f, (ImGui::GetContentRegionAvail().x - actionGap * 2.0f) / 3.0f);",
+        "plugin mechanics review action buttons distribute equally",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::SameLine(0.0f, actionGap);",
+        "plugin mechanics review action rows use explicit web-like gaps",
+        errors,
+    )
+    require_contains(
         web_player_main_source,
         "mechanicsReviewReplay.disabled = !review || review.loading || !review.currentClip;",
         "stats evaluation player mechanics review disables unavailable replay action",
@@ -3047,11 +3082,50 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_styles_source,
+        "#mechanics-review-confirm {\n"
+        "  border-color: rgba(76, 175, 120, 0.52);\n"
+        "}",
+        "stats evaluation player mechanics review confirm action is green-accented",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        "#mechanics-review-reject {\n"
+        "  border-color: rgba(220, 95, 95, 0.58);\n"
+        "}",
+        "stats evaluation player mechanics review reject action is red-accented",
+        errors,
+    )
+    require_contains(
         plugin_source,
         "const bool decisionDisabled = current == nullptr;",
         "plugin mechanics review disables unavailable decisions",
         errors,
     )
+    require_contains(
+        plugin_source,
+        "ImVec4{0.30f, 0.69f, 0.47f, 0.52f}",
+        "plugin mechanics review confirm action uses green border accent",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImVec4{0.86f, 0.37f, 0.37f, 0.58f}",
+        "plugin mechanics review reject action uses red border accent",
+        errors,
+    )
+    for plugin_only_mechanics_review_action_surface in (
+        'const bool clicked = ImGui::Button(label);',
+        'ImGui::SameLine();\n  if (mechanicsReviewButton("Replay clip", replayDisabled))',
+        'ImGui::SameLine();\n  if (mechanicsReviewButton("Reject", decisionDisabled))',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_mechanics_review_action_surface,
+            "plugin mechanics review plugin-only natural-width action surface",
+            errors,
+        )
     require_contains(
         web_player_template_source,
         '<span id="mechanics-review-replay-load-summary">0 replays</span>',
