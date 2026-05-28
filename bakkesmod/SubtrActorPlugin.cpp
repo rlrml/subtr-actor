@@ -7583,44 +7583,13 @@ void SubtrActorPlugin::renderModuleSummaryControls(
     float toggleWidth,
     bool includePluginControls) {
   auto renderTimelineControls = [&]() {
-    renderEventFilterModuleSummaryToggle("Touch", "touch", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix, toggleWidth);
     renderEventFilterModuleSummaryToggle("Backboard", "backboard", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Speed flip", "speed_flip", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Half flip", "half_flip", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Powerslide", "powerslide", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Wavedash", "wavedash", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Ball carry", "ball_carry", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Ceiling shot", "ceiling_shot", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Flip reset", "flip_reset", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Double tap", "double_tap", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("50/50", "fifty_fifty", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Musty flick", "musty_flick", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Whiff", "whiff", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Bump", "bump", idSuffix, toggleWidth);
-    renderEventFilterModuleSummaryToggle("Demo", "demo", idSuffix, toggleWidth);
-    if (includePluginControls) {
-      renderBoolModuleSummaryToggle(
-          "Team event playlist",
-          eventPlaylistTeamEventsEnabled,
-          idSuffix,
-          toggleWidth);
-      renderBoolModuleSummaryToggle(
-          "Goal context playlist",
-          eventPlaylistGoalContextEnabled,
-          idSuffix,
-          toggleWidth);
-    }
-    renderBoolModuleSummaryToggle(
-        "Boost pickup timeline",
-        timelineRangeBoostEnabled,
-        idSuffix,
-        toggleWidth);
     renderBoolModuleSummaryToggle(
         "Possession",
         timelineRangePossessionEnabled,
         idSuffix,
         toggleWidth);
+    renderEventFilterModuleSummaryToggle("50/50", "fifty_fifty", idSuffix, toggleWidth);
     renderBoolModuleSummaryToggle(
         "Half control",
         timelineRangePressureEnabled,
@@ -7632,7 +7601,36 @@ void SubtrActorPlugin::renderModuleSummaryControls(
         timelineRangeAbsolutePositioningEnabled,
         idSuffix,
         toggleWidth);
+    renderEventFilterModuleSummaryToggle("Wavedash", "wavedash", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Touch", "touch", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Whiff", "whiff", idSuffix, toggleWidth);
+    renderBoolModuleSummaryToggle(
+        "Boost pickup timeline",
+        timelineRangeBoostEnabled,
+        idSuffix,
+        toggleWidth);
+    renderEventFilterModuleSummaryToggle("Powerslide", "powerslide", idSuffix, toggleWidth);
+    renderEventFilterModuleSummaryToggle("Bump", "bump", idSuffix, toggleWidth);
     if (includePluginControls) {
+      renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix, toggleWidth);
+      renderEventFilterModuleSummaryToggle("Speed flip", "speed_flip", idSuffix, toggleWidth);
+      renderEventFilterModuleSummaryToggle("Half flip", "half_flip", idSuffix, toggleWidth);
+      renderEventFilterModuleSummaryToggle("Ball carry", "ball_carry", idSuffix, toggleWidth);
+      renderEventFilterModuleSummaryToggle("Ceiling shot", "ceiling_shot", idSuffix, toggleWidth);
+      renderEventFilterModuleSummaryToggle("Flip reset", "flip_reset", idSuffix, toggleWidth);
+      renderEventFilterModuleSummaryToggle("Double tap", "double_tap", idSuffix, toggleWidth);
+      renderEventFilterModuleSummaryToggle("Musty flick", "musty_flick", idSuffix, toggleWidth);
+      renderEventFilterModuleSummaryToggle("Demo", "demo", idSuffix, toggleWidth);
+      renderBoolModuleSummaryToggle(
+          "Team event playlist",
+          eventPlaylistTeamEventsEnabled,
+          idSuffix,
+          toggleWidth);
+      renderBoolModuleSummaryToggle(
+          "Goal context playlist",
+          eventPlaylistGoalContextEnabled,
+          idSuffix,
+          toggleWidth);
       renderBoolModuleSummaryToggle(
           "Playlist follow",
           eventPlaylistAutoFollow,

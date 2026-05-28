@@ -1014,6 +1014,42 @@ def main() -> int:
         errors,
     )
     require_contains(
+        plugin_source,
+        'auto renderTimelineControls = [&]() {\n'
+        '    renderEventFilterModuleSummaryToggle("Backboard", "backboard", idSuffix, toggleWidth);\n'
+        "    renderBoolModuleSummaryToggle(\n"
+        '        "Possession",\n'
+        "        timelineRangePossessionEnabled,\n"
+        "        idSuffix,\n"
+        "        toggleWidth);\n"
+        '    renderEventFilterModuleSummaryToggle("50/50", "fifty_fifty", idSuffix, toggleWidth);',
+        "plugin launcher module summary starts with web timeline capability order",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        '    renderEventFilterModuleSummaryToggle("Whiff", "whiff", idSuffix, toggleWidth);\n'
+        "    renderBoolModuleSummaryToggle(\n"
+        '        "Boost pickup timeline",\n'
+        "        timelineRangeBoostEnabled,\n"
+        "        idSuffix,\n"
+        "        toggleWidth);\n"
+        '    renderEventFilterModuleSummaryToggle("Powerslide", "powerslide", idSuffix, toggleWidth);\n'
+        '    renderEventFilterModuleSummaryToggle("Bump", "bump", idSuffix, toggleWidth);\n'
+        "    if (includePluginControls) {\n"
+        '      renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix, toggleWidth);',
+        "plugin-only timeline shortcuts are outside the web-like launcher summary",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'auto renderTimelineControls = [&]() {\n'
+        '    renderEventFilterModuleSummaryToggle("Touch", "touch", idSuffix, toggleWidth);\n'
+        '    renderEventFilterModuleSummaryToggle("Dodge refresh", "dodge_reset", idSuffix, toggleWidth);',
+        "launcher module summary starts with plugin-only timeline shortcuts",
+        errors,
+    )
+    require_contains(
         web_player_main_source,
         'createStatsWindow(button.dataset.createStatsWindow as StatsWindowKind);',
         "stats evaluation player launcher creates stats windows",
