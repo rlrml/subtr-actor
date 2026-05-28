@@ -9593,7 +9593,7 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
       touchMarkerDecaySeconds);
   ImGui::TextDisabled("Keep each marker visible after the touch");
   if (ImGui::SliderFloat(
-          "Marker decay seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs")) {
+          "##touch-marker-decay-seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs")) {
     scheduleUiConfigAutosave();
   }
 

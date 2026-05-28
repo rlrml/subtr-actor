@@ -1398,6 +1398,7 @@ def main() -> int:
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Touch markers");',
         'ImGui::Text("Touch decay");',
         'ImGui::TextDisabled("Keep each marker visible after the touch");',
+        '"##touch-marker-decay-seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs"',
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Overlay");',
         'ImGui::Text("Touch mode");',
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Stat display");',
@@ -1418,6 +1419,7 @@ def main() -> int:
         'ImGui::Button("Show movement")',
         'ImGui::Button("Open touch stats")',
         'ImGui::Button("Inspect touch nodes")',
+        '"Marker decay seconds", &touchMarkerDecaySeconds',
     ):
         reject_contains(
             plugin_source,
