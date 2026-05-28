@@ -1979,6 +1979,19 @@ bool isMechanicFilterToken(std::string_view token) {
       [token](const char *option) { return token == std::string_view{option}; });
 }
 
+std::string webTimelineEventSourceIdForFilterToken(std::string_view token) {
+  if (token == "goal" || token == "mechanics" || token == "team" || token == "goal_context") {
+    return {};
+  }
+  if (token != "touch" && !isMechanicFilterToken(token)) {
+    return {};
+  }
+
+  std::string id{token};
+  std::replace(id.begin(), id.end(), '_', '-');
+  return id;
+}
+
 void appendUniqueFilterToken(std::vector<std::string> &tokens, std::string_view token) {
   if (token.empty() || token == "all" || containsString(tokens, token)) {
     return;
@@ -4024,30 +4037,34 @@ std::string SubtrActorPlugin::uiConfigJson() {
       selectedEventSourceTokens(currentEventFilter);
   file << "    \"timelineEvents\": [";
   bool wroteOverlayValue = false;
-  auto writeOverlayId = [&](const char *id, bool enabled) {
+  std::unordered_set<std::string> wroteOverlayIds;
+  auto resetOverlayWriter = [&]() {
+    wroteOverlayValue = false;
+    wroteOverlayIds.clear();
+  };
+  auto writeOverlayId = [&](std::string_view id, bool enabled) {
     if (!enabled) {
+      return;
+    }
+    std::string idString{id};
+    if (!wroteOverlayIds.insert(idString).second) {
       return;
     }
     if (wroteOverlayValue) {
       file << ",";
     }
-    file << "\"" << id << "\"";
+    file << "\"" << escapeJsonString(id) << "\"";
     wroteOverlayValue = true;
   };
-  writeOverlayId("team", eventPlaylistTeamEventsEnabled);
-  writeOverlayId("goal_context", eventPlaylistGoalContextEnabled);
-  if (!allEventSourcesSelected(currentEventFilter)) {
-    for (const std::string &token : currentEventFilterTokens) {
-      if (token == "mechanics" || token == "team" || token == "goal_context" ||
-          isMechanicFilterToken(token)) {
-        continue;
-      }
-      writeOverlayId(token.c_str(), true);
+  for (const std::string &token : currentEventFilterTokens) {
+    if (const std::string sourceId = webTimelineEventSourceIdForFilterToken(token);
+        !sourceId.empty()) {
+      writeOverlayId(sourceId, true);
     }
   }
   file << "],\n";
   file << "    \"timelineRanges\": [";
-  wroteOverlayValue = false;
+  resetOverlayWriter();
   writeOverlayId("boost", timelineRangeBoostEnabled);
   writeOverlayId("possession", timelineRangePossessionEnabled);
   writeOverlayId("pressure", timelineRangePressureEnabled);
@@ -4081,7 +4098,7 @@ std::string SubtrActorPlugin::uiConfigJson() {
   }
   file << "],\n";
   file << "    \"renderEffects\": [";
-  wroteOverlayValue = false;
+  resetOverlayWriter();
   const bool hudOverlayEnabled = cvarBool("subtr_actor_overlay_enabled", true);
   writeOverlayId("ceiling-shot", hudOverlayEnabled && renderEffectCeilingShotEnabled);
   writeOverlayId("fifty-fifty", hudOverlayEnabled && renderEffectFiftyFiftyEnabled);
@@ -4096,7 +4113,7 @@ std::string SubtrActorPlugin::uiConfigJson() {
   writeOverlayId("touch", hudOverlayEnabled && renderEffectTouchEnabled);
   file << "],\n";
   file << "    \"pluginRenderEffects\": [";
-  wroteOverlayValue = false;
+  resetOverlayWriter();
   writeOverlayId(
       "mechanics",
       cvarBool("subtr_actor_overlay_mechanics_enabled", true));

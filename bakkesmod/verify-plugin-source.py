@@ -1812,6 +1812,24 @@ def main() -> int:
         "web timelineEvents exports plugin-only broad mechanics id",
         errors,
     )
+    reject_contains(
+        plugin_source,
+        'writeOverlayId("team", eventPlaylistTeamEventsEnabled);',
+        "web timelineEvents exports plugin-only broad team id",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'writeOverlayId("goal_context", eventPlaylistGoalContextEnabled);',
+        "web timelineEvents exports plugin-only broad goal-context id",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "webTimelineEventSourceIdForFilterToken(token)",
+        "web timelineEvents exports normalized web source ids from plugin filters",
+        errors,
+    )
     require_contains(
         plugin_source,
         "for (const char *token : MECHANIC_FILTER_TOKENS) {\n"
