@@ -2,11 +2,23 @@ import type { ReplayPlayer } from "@rlrml/player";
 import type {
   StatsWindowConfig,
   StatsWindowKind,
-  TeamScope,
   WindowPlacementConfig,
 } from "./playerConfig.ts";
-import type { StatDefinition, StatScopeKind } from "./statRegistry.ts";
+import type { StatDefinition } from "./statRegistry.ts";
 import { getTeamClass } from "./statModules.ts";
+import {
+  appendGroupedPlayerOptions,
+  getDefaultAdHocTargetId,
+  getStatTargetTeamClass,
+  getStatsWindowAllowedScope,
+  getStatsWindowTitle,
+  getTeamLabel,
+  getTeamScopeClass,
+  getTeamSnapshot,
+  hasStatsWindowScopeSelector,
+  hasStatsWindowStatPicker,
+  renderStatsWindowScope,
+} from "./statsWindowScope.ts";
 import {
   renderStatsWindowAddControl,
   renderStatsWindowPicker,
@@ -52,110 +64,6 @@ export function createStatsWindowsManager(deps: StatsWindowsManagerDeps): StatsW
 
   function getStatById(statId: string): StatDefinition | null {
     return deps.getStatRegistry().find((definition) => definition.id === statId) ?? null;
-  }
-
-  function getTeamSnapshot(frame: StatsFrame, team: TeamScope): TeamStatsSnapshot | null {
-    return team === "blue" ? (frame.team_zero ?? null) : (frame.team_one ?? null);
-  }
-
-  function getTeamLabel(team: TeamScope): string {
-    return team === "blue" ? "Blue" : "Orange";
-  }
-
-  function getPlayerTeamClass(playerId: string | null | undefined): string | null {
-    const player = deps.getReplayPlayer()?.replay.players.find((candidate) => candidate.id === playerId);
-    return player ? getTeamClass(player.isTeamZero) : null;
-  }
-
-  function getTeamScopeClass(team: TeamScope): string {
-    return getTeamClass(team === "blue");
-  }
-
-  function appendGroupedPlayerOptions(
-    select: HTMLSelectElement,
-    selectedPlayerId: string | null | undefined,
-  ): void {
-    const players = deps.getReplayPlayer()?.replay.players ?? [];
-    for (const team of ["blue", "orange"] as const) {
-      const teamPlayers = players.filter((player) => player.isTeamZero === (team === "blue"));
-      if (teamPlayers.length === 0) {
-        continue;
-      }
-
-      const group = document.createElement("optgroup");
-      group.label = `${getTeamLabel(team)} team`;
-      for (const player of teamPlayers) {
-        group.append(
-          new Option(
-            player.name,
-            player.id,
-            player.id === selectedPlayerId,
-            player.id === selectedPlayerId,
-          ),
-        );
-      }
-      select.append(group);
-    }
-  }
-
-  function getStatsWindowScopeTeamClass(statsWindow: StatsWindowState): string | null {
-    if (statsWindow.kind === "player") {
-      return getPlayerTeamClass(statsWindow.playerId);
-    }
-    if (statsWindow.kind === "team") {
-      return getTeamScopeClass(statsWindow.team ?? "blue");
-    }
-    return null;
-  }
-
-  function getStatTargetTeamClass(
-    definition: StatDefinition,
-    targetId: string | undefined,
-  ): string | null {
-    if (definition.scope === "player") {
-      return getPlayerTeamClass(targetId);
-    }
-    return getTeamScopeClass(targetId === "orange" ? "orange" : "blue");
-  }
-
-  function getStatsWindowTitle(kind: StatsWindowKind): string {
-    switch (kind) {
-      case "player":
-        return "Player stats";
-      case "team":
-        return "Team stats";
-      case "all-players":
-        return "All players stats";
-      case "all-teams":
-        return "All teams stats";
-      case "goals-overview":
-        return "Goal labels";
-      case "ad-hoc":
-        return "Ad hoc stats";
-    }
-  }
-
-  function hasStatsWindowScopeSelector(kind: StatsWindowKind): boolean {
-    return kind === "player" || kind === "team";
-  }
-
-  function hasStatsWindowStatPicker(kind: StatsWindowKind): boolean {
-    return kind !== "goals-overview";
-  }
-
-  function getStatsWindowAllowedScope(kind: StatsWindowKind): StatScopeKind | null {
-    switch (kind) {
-      case "player":
-      case "all-players":
-        return "player";
-      case "team":
-      case "all-teams":
-        return "team";
-      case "goals-overview":
-        return null;
-      case "ad-hoc":
-        return null;
-    }
   }
 
   function getStatsWindowDefaultPosition(): { x: number; y: number } {
@@ -293,11 +201,16 @@ export function createStatsWindowsManager(deps: StatsWindowsManagerDeps): StatsW
 
     statsWindow.body.replaceChildren();
 
-    renderStatsWindowScope(statsWindow);
+    renderStatsWindowScope(statsWindow, {
+      getReplayPlayer: deps.getReplayPlayer,
+      renderStatsWindow,
+      scheduleConfigUrlUpdate: deps.scheduleConfigUrlUpdate,
+    });
     if (hasStatsWindowStatPicker(statsWindow.kind)) {
       renderStatsWindowAddControl(statsWindow, {
         getAllowedScope: getStatsWindowAllowedScope,
-        getDefaultAdHocTargetId,
+        getDefaultAdHocTargetId: (definition) =>
+          getDefaultAdHocTargetId(deps.getReplayPlayer(), definition),
         getStatRegistry: deps.getStatRegistry,
         hasScopeSelector: hasStatsWindowScopeSelector,
         renderStatsWindow,
@@ -305,7 +218,8 @@ export function createStatsWindowsManager(deps: StatsWindowsManagerDeps): StatsW
       });
       renderStatsWindowPicker(statsWindow, {
         getAllowedScope: getStatsWindowAllowedScope,
-        getDefaultAdHocTargetId,
+        getDefaultAdHocTargetId: (definition) =>
+          getDefaultAdHocTargetId(deps.getReplayPlayer(), definition),
         getStatRegistry: deps.getStatRegistry,
         hasScopeSelector: hasStatsWindowScopeSelector,
         renderStatsWindow,
@@ -327,61 +241,6 @@ export function createStatsWindowsManager(deps: StatsWindowsManagerDeps): StatsW
         );
       }
     }
-  }
-
-  function renderStatsWindowScope(statsWindow: StatsWindowState): void {
-    if (statsWindow.kind !== "player" && statsWindow.kind !== "team") {
-      return;
-    }
-
-    const row = document.createElement("div");
-    row.className = "stats-window-scope-row";
-
-    const select = document.createElement("select");
-    select.className = "stats-window-scope-select";
-    const teamClass = getStatsWindowScopeTeamClass(statsWindow);
-    if (teamClass) {
-      select.classList.add(teamClass);
-    }
-    select.setAttribute(
-      "aria-label",
-      statsWindow.kind === "player" ? "Player stats target" : "Team stats target",
-    );
-    if (statsWindow.kind === "player") {
-      appendGroupedPlayerOptions(select, statsWindow.playerId);
-      select.value = statsWindow.playerId ?? "";
-      select.addEventListener("change", () => {
-        statsWindow.playerId = select.value || null;
-        renderStatsWindow(statsWindow);
-        deps.scheduleConfigUrlUpdate();
-      });
-    } else {
-      select.append(
-        new Option("Blue", "blue", statsWindow.team === "blue", statsWindow.team === "blue"),
-        new Option(
-          "Orange",
-          "orange",
-          statsWindow.team === "orange",
-          statsWindow.team === "orange",
-        ),
-      );
-      select.value = statsWindow.team ?? "blue";
-      select.addEventListener("change", () => {
-        statsWindow.team = select.value === "orange" ? "orange" : "blue";
-        renderStatsWindow(statsWindow);
-        deps.scheduleConfigUrlUpdate();
-      });
-    }
-
-    row.append(select);
-    statsWindow.body.append(row);
-  }
-
-  function getDefaultAdHocTargetId(definition: StatDefinition): string {
-    if (definition.scope === "player") {
-      return deps.getReplayPlayer()?.replay.players[0]?.id ?? "";
-    }
-    return "blue";
   }
 
   function removeStatFromWindow(statsWindow: StatsWindowState, entryKey: string): void {
@@ -613,12 +472,16 @@ export function createStatsWindowsManager(deps: StatsWindowsManagerDeps): StatsW
     if (statsWindow.kind === "ad-hoc") {
       const targetSelect = document.createElement("select");
       targetSelect.className = "stats-window-stat-target";
-      const teamClass = getStatTargetTeamClass(definition, entry.targetId);
+      const teamClass = getStatTargetTeamClass(
+        deps.getReplayPlayer(),
+        definition,
+        entry.targetId,
+      );
       if (teamClass) {
         targetSelect.classList.add(teamClass);
       }
       if (definition.scope === "player") {
-        appendGroupedPlayerOptions(targetSelect, entry.targetId);
+        appendGroupedPlayerOptions(deps.getReplayPlayer(), targetSelect, entry.targetId);
       } else {
         targetSelect.append(
           new Option("Blue", "blue", entry.targetId === "blue", entry.targetId === "blue"),
