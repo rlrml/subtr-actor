@@ -1,9 +1,7 @@
 import { ReplayPlayer } from "./player";
-import { findFrameIndexAtTime } from "./replay-data";
 import type {
   CameraSettings,
   LoadedReplay,
-  PlaybackBound,
   PlaylistAdvanceMode,
   PlaylistEndMode,
   PlaylistItem,
@@ -12,13 +10,11 @@ import type {
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
   ReplayPreloadPolicy,
-  ReplayModel,
   ReplayPlaylistPlayerOptions,
   ReplayPlaylistPlayerSnapshot,
   ReplayPlaylistPlayerState,
   ReplaySource,
   ReplayPlayerState,
-  ResolvedPlaybackBound,
   ResolvedPlaylistItem,
 } from "./types";
 import { createFullReplayPlaylistItem, createStaticReplaySource } from "./playlist-sources";
@@ -32,6 +28,7 @@ import {
   resolvePolicySources,
   uniqueSourcesFromItems,
 } from "./playlist-policy";
+import { END_TIME_EPSILON, resolvePlaylistItem } from "./playlist-item-resolution";
 import {
   createInitialPreferences,
   normalizeCustomCameraSettings,
@@ -52,8 +49,7 @@ export {
   timeBound,
 } from "./playlist-sources";
 export type { FullReplayPlaylistItemOptions } from "./playlist-sources";
-
-const END_TIME_EPSILON = 0.0001;
+export { resolvePlaylistItem } from "./playlist-item-resolution";
 
 type ReplayPlaylistPlayerListener = (state: ReplayPlaylistPlayerState) => void;
 
@@ -61,59 +57,6 @@ export interface ReplayPlaylistPlayerSingleReplayOptions extends ReplayPlaylistP
   replayId?: string;
   itemLabel?: string;
   itemMeta?: Record<string, unknown>;
-}
-
-function clampFrameIndex(replay: ReplayModel, value: number): number {
-  if (replay.frames.length === 0) {
-    return 0;
-  }
-
-  const maxFrameIndex = replay.frames.length - 1;
-  return clamp(Math.round(value), 0, maxFrameIndex);
-}
-
-function resolvePlaybackBound(replay: ReplayModel, bound: PlaybackBound): ResolvedPlaybackBound {
-  if (bound.kind === "frame") {
-    const frameIndex = clampFrameIndex(replay, bound.value);
-    return {
-      frameIndex,
-      time: replay.frames[frameIndex]?.time ?? 0,
-    };
-  }
-
-  const time = clamp(bound.value, 0, replay.duration);
-  return {
-    frameIndex: findFrameIndexAtTime(replay, time),
-    time,
-  };
-}
-
-function validateResolvedBounds(
-  item: PlaylistItem,
-  start: ResolvedPlaybackBound,
-  end: ResolvedPlaybackBound,
-): void {
-  if (end.time < start.time) {
-    const label = item.label ? ` "${item.label}"` : "";
-    throw new Error(`Playlist item${label} ends before it starts`);
-  }
-}
-
-export function resolvePlaylistItem(
-  item: PlaylistItem,
-  replay: LoadedReplay,
-): ResolvedPlaylistItem {
-  const start = resolvePlaybackBound(replay.replay, item.start);
-  const end = resolvePlaybackBound(replay.replay, item.end);
-  validateResolvedBounds(item, start, end);
-
-  return {
-    source: item,
-    replay,
-    start,
-    end,
-    duration: Math.max(0, end.time - start.time),
-  };
 }
 
 export class ReplayPlaylistPlayer extends EventTarget {
