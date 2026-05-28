@@ -10048,11 +10048,7 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   ImGui::Text("%llu", static_cast<unsigned long long>(frameNumber));
   ImGui::NextColumn();
   ImGui::TextDisabled("Duration");
-  if (durationSeconds > 0.0f) {
-    ImGui::Text("%.2fs", durationSeconds);
-  } else {
-    ImGui::TextDisabled("--");
-  }
+  ImGui::Text("%.2fs", durationSeconds);
   ImGui::NextColumn();
   ImGui::TextDisabled("Status");
   ImGui::Text("%s", playbackPlaying ? "Playing" : transportEnabled ? "Paused" : "Stopped");

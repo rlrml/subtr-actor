@@ -1016,6 +1016,18 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_template_source,
+        '<dd id="duration-readout">0.00s</dd>',
+        "stats evaluation player playback duration starts with a numeric readout",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("Duration");\n  ImGui::Text("%.2fs", durationSeconds);',
+        "plugin playback duration always renders a numeric readout",
+        errors,
+    )
+    require_contains(
         web_player_main_source,
         "function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {\n"
         "  const state = replayPlayer?.getState();\n"
@@ -1080,6 +1092,12 @@ def main() -> int:
             "plugin playback window plugin-only surface",
             errors,
         )
+    reject_contains(
+        plugin_source,
+        'ImGui::TextDisabled("Duration");\n  if (durationSeconds > 0.0f) {',
+        "plugin playback duration renders a dash fallback",
+        errors,
+    )
     require_contains(
         web_player_template_source,
         '<input id="recording-fps" type="number" min="1" max="120" step="1" value="60" />',
