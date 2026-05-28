@@ -10042,13 +10042,17 @@ void SubtrActorPlugin::renderRecordingWindow() {
   const std::array<const char *, 4> rates{{"0.5x", "1.0x", "1.5x", "2.0x"}};
   recordingPlaybackRateIndex = std::clamp(recordingPlaybackRateIndex, 0, 3);
   int nextRecordingPlaybackRateIndex = recordingPlaybackRateIndex;
-  pushRecordingDisabledStyle(recordingSettingsLocked);
+  const bool recordingPlaybackRateDisabled = recordingSettingsLocked;
+  pushRecordingDisabledStyle(recordingPlaybackRateDisabled);
   ImGui::SetNextItemWidth(96.0f);
-  if (ImGui::BeginCombo(
-          "##recording-playback-rate",
-          rates[static_cast<size_t>(recordingPlaybackRateIndex)])) {
-    if (recordingSettingsLocked) {
-      ImGui::TextDisabled("%s", rates[static_cast<size_t>(recordingPlaybackRateIndex)]);
+  const bool recordingPlaybackRateOpen = ImGui::BeginCombo(
+      "##recording-playback-rate",
+      rates[static_cast<size_t>(recordingPlaybackRateIndex)]);
+  popRecordingDisabledStyle(recordingPlaybackRateDisabled);
+  if (recordingPlaybackRateOpen) {
+    if (recordingPlaybackRateDisabled) {
+      ImGui::CloseCurrentPopup();
+      ImGui::EndCombo();
     } else {
       for (int index = 0; index < static_cast<int>(rates.size()); index += 1) {
         const bool selected = index == recordingPlaybackRateIndex;
@@ -10059,11 +10063,11 @@ void SubtrActorPlugin::renderRecordingWindow() {
           ImGui::SetItemDefaultFocus();
         }
       }
+      ImGui::EndCombo();
     }
-    ImGui::EndCombo();
   }
-  popRecordingDisabledStyle(recordingSettingsLocked);
-  if (!recordingSettingsLocked && nextRecordingPlaybackRateIndex != recordingPlaybackRateIndex) {
+  if (!recordingPlaybackRateDisabled &&
+      nextRecordingPlaybackRateIndex != recordingPlaybackRateIndex) {
     recordingPlaybackRateIndex = nextRecordingPlaybackRateIndex;
     scheduleUiConfigAutosave();
   }

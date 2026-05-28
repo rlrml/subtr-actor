@@ -838,8 +838,31 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::BeginCombo(\n          "##recording-playback-rate",',
+        'const bool recordingPlaybackRateOpen = ImGui::BeginCombo(\n      "##recording-playback-rate",',
         "plugin recording playback rate uses hidden-label web-like selector",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "recordingPlaybackRate.disabled = isRecording;",
+        "stats evaluation player disables recording playback rate while recording",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool recordingPlaybackRateDisabled = recordingSettingsLocked;\n"
+        "  pushRecordingDisabledStyle(recordingPlaybackRateDisabled);\n"
+        "  ImGui::SetNextItemWidth(96.0f);\n"
+        "  const bool recordingPlaybackRateOpen = ImGui::BeginCombo(",
+        "plugin recording playback rate selector is disabled while recording",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (recordingPlaybackRateDisabled) {\n"
+        "      ImGui::CloseCurrentPopup();\n"
+        "      ImGui::EndCombo();",
+        "plugin recording playback rate disabled selector cannot remain open",
         errors,
     )
     require_contains(
