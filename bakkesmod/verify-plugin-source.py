@@ -1337,6 +1337,24 @@ def main() -> int:
             "plugin event playlist filter module-summary button surface",
             errors,
         )
+    require_contains(
+        plugin_source,
+        "const std::string currentFilter = eventPlaylistSourceFilter;",
+        "plugin event playlist uses independent filter state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "eventPlaylistSourceFilter = eventFilterFromSelectedSources(selectedSources);",
+        "plugin event playlist filter changes do not mutate overlay event filters",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'setCvarString(\n            "subtr_actor_overlay_event_types",\n            eventFilterFromSelectedSources(selectedSources));',
+        "plugin event playlist filter mutates overlay event filters",
+        errors,
+    )
     reject_contains(
         plugin_source,
         'std::format("{} {:.2f}s##event-playlist-cue", active ? ">" : "Cue", event.time)',

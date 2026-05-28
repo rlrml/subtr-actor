@@ -3362,6 +3362,9 @@ void SubtrActorPlugin::applyUiConfigJson(
           .value_or(eventPlaylistGoalContextEnabled);
   eventPlaylistAutoFollow =
       parseJsonBoolProperty(json, "event_playlist_auto_follow").value_or(eventPlaylistAutoFollow);
+  eventPlaylistSourceFilter =
+      parseJsonStringProperty(json, "event_playlist_source_filter")
+          .value_or(eventPlaylistSourceFilter);
   if (const auto overlays = parseJsonObjectProperty(json, "overlays")) {
     const std::vector<std::string> timelineEvents =
         parseJsonStringArrayProperty(*overlays, "timelineEvents");
@@ -4058,6 +4061,8 @@ std::string SubtrActorPlugin::uiConfigJson() {
        << (eventPlaylistGoalContextEnabled ? "true" : "false") << ",\n";
   file << "  \"event_playlist_auto_follow\": "
        << (eventPlaylistAutoFollow ? "true" : "false") << ",\n";
+  file << "  \"event_playlist_source_filter\": \""
+       << escapeJsonString(eventPlaylistSourceFilter) << "\",\n";
   file << "  \"overlays\": {\n";
   const std::string currentEventFilter = cvarString("subtr_actor_overlay_event_types", "all");
   const std::vector<std::string> currentEventFilterTokens =
@@ -8355,16 +8360,7 @@ void SubtrActorPlugin::renderEventSourceControls() {
 }
 
 bool SubtrActorPlugin::eventPlaylistSourceEnabled(const UiEventRecord &event) const {
-  if (event.category == "mechanics") {
-    return eventPlaylistMechanicsEnabled;
-  }
-  if (event.category == "team") {
-    return eventPlaylistTeamEventsEnabled;
-  }
-  if (event.category == "goal_context" || event.type == "goal") {
-    return eventPlaylistGoalContextEnabled;
-  }
-  return true;
+  return eventFilterAllows(eventPlaylistSourceFilter, event.category, event.type);
 }
 
 std::string SubtrActorPlugin::mechanicsReviewKey(const UiEventRecord &event) const {
@@ -8412,7 +8408,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     return;
   }
 
-  const std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
+  const std::string currentFilter = eventPlaylistSourceFilter;
   const bool allEventSourcesEnabled = allEventSourcesSelected(currentFilter);
   std::vector<std::string> selectedSources = selectedEventSourceTokens(currentFilter);
 
@@ -8424,20 +8420,6 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       }
     }
     return false;
-  };
-  auto enableMatchingPlaylistGroups = [&](std::string_view source) {
-    for (const UiEventRecord &event : recentUiEvents) {
-      if (!eventFilterAllows(source, event.category, event.type)) {
-        continue;
-      }
-      if (event.category == "mechanics") {
-        eventPlaylistMechanicsEnabled = true;
-      } else if (event.category == "team") {
-        eventPlaylistTeamEventsEnabled = true;
-      } else if (event.category == "goal_context" || event.type == "goal") {
-        eventPlaylistGoalContextEnabled = true;
-      }
-    }
   };
 
   struct PlaylistSource {
@@ -8475,7 +8457,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   playlistEventIndexes.reserve(recentUiEvents.size());
   for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
     const UiEventRecord &event = recentUiEvents[index];
-    if (eventPlaylistSourceEnabled(event) && uiEventVisible(event)) {
+    if (eventPlaylistSourceEnabled(event)) {
       playlistEventIndexes.push_back(index);
     }
   }
@@ -8514,17 +8496,13 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
 
   if (filtersOpen) {
     if (ImGui::Button("All##event-playlist-sources-all")) {
-      eventPlaylistMechanicsEnabled = true;
-      eventPlaylistTeamEventsEnabled = true;
-      eventPlaylistGoalContextEnabled = true;
-      setCvarString("subtr_actor_overlay_event_types", "all");
+      eventPlaylistSourceFilter = "all";
+      scheduleUiConfigAutosave();
     }
     ImGui::SameLine();
     if (ImGui::Button("None##event-playlist-sources-none")) {
-      eventPlaylistMechanicsEnabled = false;
-      eventPlaylistTeamEventsEnabled = false;
-      eventPlaylistGoalContextEnabled = false;
-      setCvarString("subtr_actor_overlay_event_types", "none");
+      eventPlaylistSourceFilter = "none";
+      scheduleUiConfigAutosave();
     }
 
     ImGui::BeginChild("event-playlist-source-list", ImVec2{0.0f, 170.0f}, true);
@@ -8550,11 +8528,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
               selectedSources.end());
         } else {
           appendUniqueFilterToken(selectedSources, option.value);
-          enableMatchingPlaylistGroups(option.value);
         }
-        setCvarString(
-            "subtr_actor_overlay_event_types",
-            eventFilterFromSelectedSources(selectedSources));
+        eventPlaylistSourceFilter = eventFilterFromSelectedSources(selectedSources);
+        scheduleUiConfigAutosave();
       }
       ImGui::PopID();
     }
@@ -10416,6 +10392,7 @@ void SubtrActorPlugin::applyReplayReviewUiWorkspace() {
   eventPlaylistTeamEventsEnabled = true;
   eventPlaylistGoalContextEnabled = true;
   eventPlaylistAutoFollow = true;
+  eventPlaylistSourceFilter = "all";
   resetWindowPlacements();
   mechanicsReviewPlacement.pending_focus = true;
   replayLoadingPlacement.pending_focus = true;
