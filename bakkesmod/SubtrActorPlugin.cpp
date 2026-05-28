@@ -9979,24 +9979,39 @@ void SubtrActorPlugin::renderRecordingWindow() {
     return clicked && !disabled;
   };
 
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "RECORDING");
+  ImGui::TextDisabled("FPS");
+  ImGui::SameLine();
   int nextRecordingFps = recordingFps;
   pushRecordingDisabledStyle(recordingSettingsLocked);
-  const bool fpsChanged = ImGui::SliderInt("FPS", &nextRecordingFps, 1, 120);
+  ImGui::SetNextItemWidth(88.0f);
+  const bool fpsChanged = ImGui::InputInt("##recording-fps", &nextRecordingFps, 1, 10);
   popRecordingDisabledStyle(recordingSettingsLocked);
   if (!recordingSettingsLocked && fpsChanged) {
-    recordingFps = nextRecordingFps;
+    recordingFps = std::clamp(nextRecordingFps, 1, 120);
     scheduleUiConfigAutosave();
   }
+  ImGui::SameLine();
+  ImGui::TextDisabled("Playback rate");
+  ImGui::SameLine();
   const std::array<const char *, 4> rates{{"0.5x", "1.0x", "1.5x", "2.0x"}};
   recordingPlaybackRateIndex = std::clamp(recordingPlaybackRateIndex, 0, 3);
   int nextRecordingPlaybackRateIndex = recordingPlaybackRateIndex;
   pushRecordingDisabledStyle(recordingSettingsLocked);
-  if (ImGui::BeginCombo("Playback rate", rates[static_cast<size_t>(recordingPlaybackRateIndex)])) {
-    for (int index = 0; index < static_cast<int>(rates.size()); index += 1) {
-      const bool selected = index == recordingPlaybackRateIndex;
-      if (ImGui::Selectable(rates[static_cast<size_t>(index)], selected)) {
-        nextRecordingPlaybackRateIndex = index;
+  ImGui::SetNextItemWidth(96.0f);
+  if (ImGui::BeginCombo(
+          "##recording-playback-rate",
+          rates[static_cast<size_t>(recordingPlaybackRateIndex)])) {
+    if (recordingSettingsLocked) {
+      ImGui::TextDisabled("%s", rates[static_cast<size_t>(recordingPlaybackRateIndex)]);
+    } else {
+      for (int index = 0; index < static_cast<int>(rates.size()); index += 1) {
+        const bool selected = index == recordingPlaybackRateIndex;
+        if (ImGui::Selectable(rates[static_cast<size_t>(index)], selected)) {
+          nextRecordingPlaybackRateIndex = index;
+        }
+        if (selected) {
+          ImGui::SetItemDefaultFocus();
+        }
       }
     }
     ImGui::EndCombo();
@@ -10006,17 +10021,7 @@ void SubtrActorPlugin::renderRecordingWindow() {
     recordingPlaybackRateIndex = nextRecordingPlaybackRateIndex;
     scheduleUiConfigAutosave();
   }
-  bool nextFinishBeforeDump = recordingFinishBeforeDump;
-  pushRecordingDisabledStyle(recordingSettingsLocked);
-  const bool finishBeforeDumpChanged =
-      ImGui::Checkbox("Finalize before dump", &nextFinishBeforeDump);
-  popRecordingDisabledStyle(recordingSettingsLocked);
-  if (!recordingSettingsLocked && finishBeforeDumpChanged) {
-    recordingFinishBeforeDump = nextFinishBeforeDump;
-    scheduleUiConfigAutosave();
-  }
 
-  ImGui::Separator();
   if (recordingButton("Start", recordingActive)) {
     recordingActive = true;
     recordingStartedAt = std::chrono::steady_clock::now();
@@ -10032,14 +10037,11 @@ void SubtrActorPlugin::renderRecordingWindow() {
     recordingActive = false;
     dumpSnapshot(recordingFinishBeforeDump);
   }
-  if (ImGui::Button("Snapshot")) {
-    dumpSnapshot(false);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Log folder")) {
+  if (recordingButton("Download", recordingActive || !hasGraphSnapshot)) {
     cvarManager->log(std::format(
         "subtr-actor: recording snapshots are written to {}",
         outputDirectory.string()));
+    recordingStatus = "Snapshot location logged";
   }
   ImGui::SameLine();
   if (recordingButton("Clear", recordingActive || !hasGraphSnapshot)) {
@@ -10050,21 +10052,19 @@ void SubtrActorPlugin::renderRecordingWindow() {
   }
 
   ImGui::Separator();
-  ImGui::Text("Status: %s", recordingStatus.c_str());
-  ImGui::Text("Elapsed: %.1fs", elapsedSeconds);
-  ImGui::Text("Size: %s", formatByteSize(recordingLastBytes).c_str());
-  ImGui::Text("Type: JSON snapshots");
-  ImGui::Text("Snapshots: %d", recordingSnapshotCount);
-  ImGui::TextWrapped("Folder: %s", outputDirectory.string().c_str());
-
-  ImGui::Separator();
-  if (ImGui::Button("Open graph inspector")) {
-    showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Open replay loading")) {
-    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
-  }
+  ImGui::Columns(2, "recording-detail-grid", false);
+  ImGui::TextDisabled("Status");
+  ImGui::Text("%s", recordingStatus.c_str());
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Elapsed");
+  ImGui::Text("%.1fs", elapsedSeconds);
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Size");
+  ImGui::Text("%s", formatByteSize(recordingLastBytes).c_str());
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Type");
+  ImGui::Text("JSON snapshots");
+  ImGui::Columns(1);
 
   ImGui::End();
 }

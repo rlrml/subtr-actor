@@ -496,6 +496,60 @@ def main() -> int:
             errors,
         )
     require_contains(
+        web_player_template_source,
+        '<input id="recording-fps" type="number" min="1" max="120" step="1" value="60" />',
+        "stats evaluation player recording FPS input",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::InputInt("##recording-fps", &nextRecordingFps, 1, 10)',
+        "plugin recording FPS uses web-like numeric input",
+        errors,
+    )
+    require_contains(
+        web_player_template_source,
+        '<select id="recording-playback-rate">',
+        "stats evaluation player recording playback rate selector",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::BeginCombo(\n          "##recording-playback-rate",',
+        "plugin recording playback rate uses hidden-label web-like selector",
+        errors,
+    )
+    require_contains(
+        web_player_template_source,
+        '<button id="recording-download" type="button" disabled>Download</button>',
+        "stats evaluation player recording download action",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'recordingButton("Download", recordingActive || !hasGraphSnapshot)',
+        "plugin recording exposes web-like download action",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Columns(2, "recording-detail-grid", false);',
+        "plugin recording exposes web-like detail grid",
+        errors,
+    )
+    for plugin_only_recording_surface in (
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "RECORDING");',
+        'ImGui::Checkbox("Finalize before dump"',
+        'ImGui::Button("Snapshot")',
+        'ImGui::Button("Log folder")',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_recording_surface,
+            "plugin recording window plugin-only surface",
+            errors,
+        )
+    require_contains(
         plugin_source,
         '"Load Replay...", ImVec2{actionButtonWidth, 0.0f}',
         "launcher actions expose replay loading like the web player",
