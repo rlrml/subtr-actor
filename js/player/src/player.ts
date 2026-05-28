@@ -3,15 +3,10 @@ import { createReplayScene, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import {
   clampFrameIndex,
-  getFrameWindow,
   getKickoffCountdownMetadata,
   inferKickoffGameState,
   inferLiveGameState,
 } from "./player-internals/timeline";
-import {
-  getActiveDemoEvent,
-} from "./player-render-effects";
-import { renderReplayFrameScene } from "./player-render-frame";
 import { normalizeCustomCameraSettings } from "./player-camera-settings";
 import {
   DEFAULT_REPLAY_CAMERA_VIEW_MODE,
@@ -21,13 +16,14 @@ import { ReplayPlayerTimelineCache } from "./player-timeline-cache";
 import { findKickoffSkipTime, findPostGoalTransitionSkipTime } from "./player-skip";
 import {
   getFreeCameraPreset,
-  updateFreeCameraTransition,
-  updateAttachedCamera,
 } from "./player-internals/spatial";
+import {
+  renderReplayPlayerFrame,
+  type FreeCameraTransition,
+} from "./player-render-pipeline";
 import type {
   BeforeRenderCallback,
   CameraSettings,
-  FrameRenderInfo,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
   ReplayPlayerActiveMetadata,
@@ -36,16 +32,12 @@ import type {
   ReplayPlayerPluginContext,
   ReplayPlayerPluginDefinition,
   ReplayPlayerPluginStateContext,
-  ReplayPlayerRenderContext,
-  ReplayPlayerRenderTrackContext,
   ReplayPlayerTimelineProjection,
   ReplayPlayerTimelineSegment,
   ReplayPlayerOptions,
   ReplayPlayerSnapshot,
   ReplayPlayerState,
   ReplayPlayerStatePatch,
-  ReplayTimelineEvent,
-  Vec3,
 } from "./types";
 
 type ReplayPlayerListener = (state: ReplayPlayerState) => void;
@@ -53,13 +45,6 @@ type InstalledReplayPlayerPlugin = {
   definition: ReplayPlayerPluginDefinition;
   plugin: ReplayPlayerPlugin;
 };
-type FreeCameraTransition = {
-  position: THREE.Vector3;
-  target: THREE.Vector3;
-  up: THREE.Vector3;
-  fov: number;
-};
-
 export class ReplayPlayer extends EventTarget {
   readonly container: HTMLElement;
   readonly replay: ReplayModel;
@@ -548,72 +533,27 @@ export class ReplayPlayer extends EventTarget {
   };
 
   private render(): void {
-    const frameWindow = getFrameWindow(this.replay, this.currentTime);
-    const frameIndex = frameWindow.frameIndex;
-    const {
-      ballFrame,
-      nextBallFrame,
-      ballPosition,
-      ballWorldPosition,
-      players: renderPlayers,
-    } =
-      renderReplayFrameScene({
-        replay: this.replay,
-        sceneState: this.sceneState,
-        frameWindow,
-        fieldScale: this.fieldScale,
-        currentTime: this.currentTime,
-        boostMeterEnabled: this.boostMeterEnabled,
-      });
-
-    updateAttachedCamera({
-      sceneState: this.sceneState,
+    this.freeCameraTransition = renderReplayPlayerFrame({
+      player: this,
+      container: this.container,
       replay: this.replay,
+      playerOptions: this.options,
+      sceneState: this.sceneState,
       fieldScale: this.fieldScale,
       cameraViewMode: this.cameraViewMode,
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
       cameraDistanceScale: this.cameraDistanceScale,
       customCameraSettings: this.customCameraSettings,
-      frameIndex,
-      attachedPlayerUnavailable:
-        this.attachedPlayerId !== null &&
-        getActiveDemoEvent(this.replay, this.attachedPlayerId, this.currentTime) !== null,
-      ballPosition: ballWorldPosition,
+      currentTime: this.currentTime,
+      boostMeterEnabled: this.boostMeterEnabled,
       desiredCameraPosition: this.desiredCameraPosition,
       desiredLookTarget: this.desiredLookTarget,
+      freeCameraTransition: this.freeCameraTransition,
+      beforeRenderCallbacks: this.beforeRenderCallbacks,
+      plugins: this.plugins.map((entry) => entry.plugin),
+      getState: () => this.getState(),
     });
-    if (this.cameraViewMode === "free" && this.freeCameraTransition) {
-      const completed = updateFreeCameraTransition({
-        sceneState: this.sceneState,
-        ...this.freeCameraTransition,
-      });
-      if (completed) {
-        this.freeCameraTransition = null;
-      }
-    }
-    this.sceneState.controls.update();
-    this.sceneState.updateWallVisibility();
-    const renderInfo: FrameRenderInfo = {
-      frameIndex: frameWindow.frameIndex,
-      nextFrameIndex: frameWindow.nextFrameIndex,
-      alpha: frameWindow.alpha,
-      currentTime: this.currentTime,
-    };
-    for (const callback of this.beforeRenderCallbacks) {
-      callback(renderInfo);
-    }
-    const renderContext = this.createRenderContext(
-      renderInfo,
-      ballFrame,
-      nextBallFrame,
-      ballPosition,
-      renderPlayers,
-    );
-    for (const entry of this.plugins) {
-      entry.plugin.beforeRender?.(renderContext);
-    }
-    this.sceneState.renderer.render(this.sceneState.scene, this.sceneState.camera);
   }
 
   private skipPastKickoffIfNeeded(now?: number): boolean {
@@ -721,25 +661,6 @@ export class ReplayPlayer extends EventTarget {
     return {
       ...this.createPluginContext(),
       state,
-    };
-  }
-
-  private createRenderContext(
-    renderInfo: FrameRenderInfo,
-    ballFrame: ReplayModel["ballFrames"][number] | null,
-    nextBallFrame: ReplayModel["ballFrames"][number] | null,
-    ballPosition: Vec3 | null,
-    players: ReplayPlayerRenderTrackContext[],
-  ): ReplayPlayerRenderContext {
-    return {
-      ...this.createPluginStateContext(this.getState()),
-      ...renderInfo,
-      frame: this.replay.frames[renderInfo.frameIndex] ?? null,
-      nextFrame: this.replay.frames[renderInfo.nextFrameIndex] ?? null,
-      ballFrame,
-      nextBallFrame,
-      ballPosition,
-      players,
     };
   }
 
