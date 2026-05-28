@@ -1355,6 +1355,18 @@ def main() -> int:
         "plugin mechanics review row meta uses web-like dot separator",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        "function getStatsPlayerConfigSnapshot(): StatsPlayerConfig",
+        "stats evaluation player has an explicit persisted config snapshot",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        '"mechanics_review_status"',
+        "plugin persists transient mechanics review status",
+        errors,
+    )
     reject_contains(
         plugin_source,
         'std::format(\n        "{} {:.2f}s {} ({})",',

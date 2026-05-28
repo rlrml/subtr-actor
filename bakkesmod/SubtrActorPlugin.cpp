@@ -3670,8 +3670,6 @@ void SubtrActorPlugin::applyUiConfigJson(
           .value_or(mechanicsReviewClipTrailSeconds),
       0.0,
       10.0));
-  mechanicsReviewStatus =
-      parseJsonStringProperty(json, "mechanics_review_status").value_or(mechanicsReviewStatus);
   selectedGraphOutput = parseJsonStringProperty(json, "selected_graph_output").value_or("");
   selectedAnalysisNode = parseJsonStringProperty(json, "selected_analysis_node").value_or("");
   graphInspectorNodeQuery =
@@ -4220,8 +4218,6 @@ std::string SubtrActorPlugin::uiConfigJson() {
   file << "  \"mechanics_review_index\": " << mechanicsReviewIndex << ",\n";
   file << "  \"mechanics_review_clip_lead_seconds\": " << mechanicsReviewClipLeadSeconds << ",\n";
   file << "  \"mechanics_review_clip_trail_seconds\": " << mechanicsReviewClipTrailSeconds << ",\n";
-  file << "  \"mechanics_review_status\": \"" << escapeJsonString(mechanicsReviewStatus)
-       << "\",\n";
   file << "  \"selected_graph_output\": \"" << escapeJsonString(selectedGraphOutput)
        << "\",\n";
   file << "  \"selected_analysis_node\": \"" << escapeJsonString(selectedAnalysisNode)
