@@ -608,6 +608,7 @@ private:
       std::string_view lhsTargetId,
       std::string_view rhsTargetId) const;
   const std::vector<std::string> &statsModuleNames();
+  std::vector<std::string> availableStatsModuleNames();
   std::string playerStatValue(const SaPlayerFrame &player, std::string_view statId) const;
   std::string teamStatValue(uint8_t isTeam0, std::string_view statId) const;
   const std::string &currentStatsJson() const;

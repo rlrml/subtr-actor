@@ -1600,6 +1600,36 @@ std::vector<UiStatDefinitionCandidate> graphStatDefinitionsFromReplayFrameJson(
   return definitions;
 }
 
+std::vector<std::string> replayStatsModuleNamesFromFrameJson(const std::string &frameJson) {
+  std::vector<std::string> names;
+  std::unordered_set<std::string> seen;
+  auto appendName = [&](const std::string &moduleName) {
+    if (moduleName == "player_id" || moduleName == "name" || moduleName == "is_team_0") {
+      return;
+    }
+    if (seen.insert(moduleName).second) {
+      names.push_back(moduleName);
+    }
+  };
+
+  if (const auto teamZero = parseJsonObjectProperty(frameJson, "team_zero")) {
+    for (const std::string &moduleName : parseJsonObjectKeys(*teamZero)) {
+      appendName(moduleName);
+    }
+  }
+  if (const auto teamOne = parseJsonObjectProperty(frameJson, "team_one")) {
+    for (const std::string &moduleName : parseJsonObjectKeys(*teamOne)) {
+      appendName(moduleName);
+    }
+  }
+  for (const std::string &player : parseJsonObjectArrayProperty(frameJson, "players")) {
+    for (const std::string &moduleName : parseJsonObjectKeys(player)) {
+      appendName(moduleName);
+    }
+  }
+  return names;
+}
+
 std::string replayStatsModuleFrameJson(
     const std::string &frameJson,
     const std::string &moduleName) {
@@ -9180,9 +9210,9 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
 
   ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
-  const std::vector<std::string> &moduleNames = statsModuleNames();
+  const std::vector<std::string> moduleNames = availableStatsModuleNames();
   if (moduleNames.empty()) {
-    ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
+    ImGui::TextWrapped("Start live analysis or load replay annotations to list graph-backed stats modules.");
   } else {
     ImGui::BeginChild("module-controls-module-list", ImVec2{0.0f, 170.0f}, true);
     for (const std::string &moduleName : moduleNames) {
@@ -10687,7 +10717,7 @@ void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initialize
   window.kind = kind;
   initializeStatsWindowPlacement(window);
   if (kind == UiStatsWindowKind::StatsModule) {
-    const std::vector<std::string> &moduleNames = statsModuleNames();
+    const std::vector<std::string> moduleNames = availableStatsModuleNames();
     if (!moduleNames.empty()) {
       window.module_name = moduleNames.front();
     }
@@ -11061,6 +11091,21 @@ const std::vector<std::string> &SubtrActorPlugin::statsModuleNames() {
     cachedStatsModuleNames = std::move(names);
   }
   return cachedStatsModuleNames;
+}
+
+std::vector<std::string> SubtrActorPlugin::availableStatsModuleNames() {
+  std::vector<std::string> names = statsModuleNames();
+  std::unordered_set<std::string> seen(names.begin(), names.end());
+  auto appendName = [&](const std::string &moduleName) {
+    if (seen.insert(moduleName).second) {
+      names.push_back(moduleName);
+    }
+  };
+  for (const std::string &moduleName :
+       replayStatsModuleNamesFromFrameJson(currentReplayFrameJson())) {
+    appendName(moduleName);
+  }
+  return names;
 }
 
 const std::string &SubtrActorPlugin::currentStatsJson() const {
@@ -11524,7 +11569,7 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
   }
 
   if (window.kind == UiStatsWindowKind::StatsModule) {
-    const std::vector<std::string> &moduleNames = statsModuleNames();
+    const std::vector<std::string> moduleNames = availableStatsModuleNames();
     const char *selectedModule =
         window.module_name.empty() ? "Select module" : window.module_name.c_str();
     if (ImGui::BeginCombo("Module", selectedModule)) {
@@ -12198,7 +12243,7 @@ void SubtrActorPlugin::renderStatsModuleWindow(UiStatsWindow &window) {
     return;
   }
 
-  const std::vector<std::string> &moduleNames = statsModuleNames();
+  const std::vector<std::string> moduleNames = availableStatsModuleNames();
   if (window.module_name.empty() && !moduleNames.empty()) {
     window.module_name = moduleNames.front();
   }

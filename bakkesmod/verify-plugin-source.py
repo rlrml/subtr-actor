@@ -2209,6 +2209,18 @@ def main() -> int:
         "replay annotation frame players expose core goals to plugin stats windows",
         errors,
     )
+    require_contains(
+        plugin_source,
+        "replayStatsModuleNamesFromFrameJson(currentReplayFrameJson())",
+        "plugin stats module controls can discover modules from replay frame JSON",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const std::vector<std::string> moduleNames = availableStatsModuleNames();",
+        "plugin stats module selectors use live and replay module names",
+        errors,
+    )
     reject_contains(
         plugin_source,
         "ImGui::SetNextWindowFocus();\n"
