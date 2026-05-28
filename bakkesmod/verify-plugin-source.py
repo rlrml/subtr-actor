@@ -2074,6 +2074,42 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        'parts.push(`${Math.max(0, clipEnd - clipStart).toFixed(1)}s clip`);',
+        "stats evaluation player mechanics review clip field includes duration",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        '"{:.2f}s to {:.2f}s · {:.1f}s clip · {:.1f}s preroll · {:.1f}s postroll"',
+        "plugin mechanics review clip field includes duration and padding details",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "return [time, frame].filter((part) => part && part !== \"--\").join(\" · \") || \"--\";",
+        "stats evaluation player mechanics review event field combines time and frame",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        '"{:.2f}s · frame {}"',
+        "plugin mechanics review event field combines time and frame",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'const std::string clipReadout =\n      current == nullptr ? "--" : std::format("{:.2f}s to {:.2f}s", clipStart, clipEnd);',
+        "plugin mechanics review clip field omits web-like duration details",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'std::format("frame {}", static_cast<unsigned long long>(current->frame_number))',
+        "plugin mechanics review event field omits event time",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         'return typeof item.meta?.mechanic === "string" ? formatMechanicKind(item.meta.mechanic) : "--";',
         "stats evaluation player mechanics review formats mechanic ids",
         errors,

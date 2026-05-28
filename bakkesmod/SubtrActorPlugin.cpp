@@ -9066,11 +9066,27 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
                                        : "Loaded review playlist.";
   ImGui::TextWrapped("%s", statusReadout.c_str());
   const std::string clipReadout =
-      current == nullptr ? "--" : std::format("{:.2f}s to {:.2f}s", clipStart, clipEnd);
-  const std::string eventReadout =
       current == nullptr
           ? "--"
-          : std::format("frame {}", static_cast<unsigned long long>(current->frame_number));
+          : std::format(
+                "{:.2f}s to {:.2f}s · {:.1f}s clip · {:.1f}s preroll · {:.1f}s postroll",
+                clipStart,
+                clipEnd,
+                std::max(0.0f, clipEnd - clipStart),
+                std::max(0.0f, current->time - clipStart),
+                std::max(0.0f, clipEnd - current->time));
+  const std::string eventReadout = [&]() {
+    if (current == nullptr) {
+      return std::string{"--"};
+    }
+    if (current->frame_number == 0) {
+      return std::format("{:.2f}s", current->time);
+    }
+    return std::format(
+        "{:.2f}s · frame {}",
+        current->time,
+        static_cast<unsigned long long>(current->frame_number));
+  }();
   const std::string reasonReadout =
       current == nullptr || current->details.empty() ? "--" : current->details;
   ImGui::Columns(2, "mechanics-review-fields", false);
