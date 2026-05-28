@@ -484,12 +484,25 @@ def main() -> int:
         "plugin stats picker stat row mirrors web label/scope layout",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        'empty.textContent = statRegistry.length === 0 ? "No stats available." : "No matching stats.";',
+        "stats evaluation player stats picker no-results empty state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderStatsWindowEmpty("No matching stats.");',
+        "plugin stats picker no-results empty state mirrors web",
+        errors,
+    )
     for plugin_only_stats_picker_surface in (
         'std::format("Search stats##{}", window.id).c_str()',
         'ImGui::SmallButton(std::format("Clear##stat-search-{}", window.id).c_str())',
         'std::format("Add all {} ({})##{}-{}", category, count, window.id, category)',
         'std::format(\n        "{}  [{}]##{}-{}",',
         'ImGui::TextDisabled(\n          "%s  [%s selected]",',
+        'ImGui::Text("No matching stats.");',
     ):
         reject_contains(
             plugin_source,

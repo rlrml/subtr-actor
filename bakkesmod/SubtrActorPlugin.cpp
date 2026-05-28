@@ -11596,6 +11596,11 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
   }
 }
 
+void renderStatsWindowEmpty(std::string_view message) {
+  ImGui::Spacing();
+  ImGui::TextDisabled("%s", std::string{message}.c_str());
+}
+
 void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   if (window.kind == UiStatsWindowKind::StatsModule) {
     if (ImGui::RadioButton(
@@ -11743,7 +11748,7 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   }
 
   if (matches.empty()) {
-    ImGui::Text("No matching stats.");
+    renderStatsWindowEmpty("No matching stats.");
     ImGui::EndChild();
     ImGui::Separator();
     return;
@@ -11780,11 +11785,6 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   }
   ImGui::EndChild();
   ImGui::Separator();
-}
-
-void renderStatsWindowEmpty(std::string_view message) {
-  ImGui::Spacing();
-  ImGui::TextDisabled("%s", std::string{message}.c_str());
 }
 
 void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
