@@ -8396,23 +8396,15 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
         return left < right;
       });
 
-  const bool allSourcesEnabled = eventPlaylistMechanicsEnabled && eventPlaylistTeamEventsEnabled &&
-                                 eventPlaylistGoalContextEnabled && allEventSourcesEnabled;
-  const bool noSourcesEnabled =
-      (!eventPlaylistMechanicsEnabled && !eventPlaylistTeamEventsEnabled &&
-       !eventPlaylistGoalContextEnabled) ||
-      selectedSources.empty();
   ImGui::Text("Filters %zu/%zu", selectedSourceCount, playlistSources.size());
-  if (renderModuleSummaryToggle(
-          "All",
-          allSourcesEnabled,
-          "event-playlist-sources")) {
+  if (ImGui::Button("All##event-playlist-sources-all")) {
     eventPlaylistMechanicsEnabled = true;
     eventPlaylistTeamEventsEnabled = true;
     eventPlaylistGoalContextEnabled = true;
     setCvarString("subtr_actor_overlay_event_types", "all");
   }
-  if (renderModuleSummaryToggle("None", noSourcesEnabled, "event-playlist-sources")) {
+  ImGui::SameLine();
+  if (ImGui::Button("None##event-playlist-sources-none")) {
     eventPlaylistMechanicsEnabled = false;
     eventPlaylistTeamEventsEnabled = false;
     eventPlaylistGoalContextEnabled = false;
@@ -8442,8 +8434,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
 
       ImGui::PushID(option.value);
       const std::string label = std::format("{} ({})", option.label, source.count);
-      if (renderModuleSummaryToggle(label.c_str(), source.enabled, "event-playlist-sources")) {
-        if (source.enabled) {
+      bool enabled = source.enabled;
+      if (ImGui::Checkbox(label.c_str(), &enabled)) {
+        if (!enabled) {
           selectedSources.erase(
               std::remove(selectedSources.begin(), selectedSources.end(), std::string{option.value}),
               selectedSources.end());
@@ -8543,8 +8536,8 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   }
   if (playlistEventIndexes.empty()) {
     ImGui::TextWrapped(
-        noSourcesEnabled ? "No event types selected."
-                         : "No events match the selected playlist filters.");
+        selectedSourceCount == 0 ? "No event types selected."
+                                 : "No events match the selected playlist filters.");
   }
   ImGui::EndChild();
   ImGui::End();

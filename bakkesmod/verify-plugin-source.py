@@ -1089,8 +1089,32 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'renderModuleSummaryToggle(\n          "All",\n          allSourcesEnabled,\n          "event-playlist-sources")',
+        'ImGui::Button("All##event-playlist-sources-all")',
         "plugin event playlist all action label mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'noneButton.textContent = "None";',
+        "stats evaluation player event playlist none action label",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Button("None##event-playlist-sources-none")',
+        "plugin event playlist none action label mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'label.className = "toggle event-playlist-filter-option";',
+        "stats evaluation player event playlist filter options are checkbox toggles",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Checkbox(label.c_str(), &enabled)',
+        "plugin event playlist filter options are checkbox toggles",
         errors,
     )
     require_contains(
@@ -1117,6 +1141,17 @@ def main() -> int:
         "plugin event playlist all action includes event count",
         errors,
     )
+    for plugin_only_event_playlist_filter_surface in (
+        'renderModuleSummaryToggle(\n          "All",\n          allSourcesEnabled,\n          "event-playlist-sources")',
+        'renderModuleSummaryToggle("None", noSourcesEnabled, "event-playlist-sources")',
+        'renderModuleSummaryToggle(label.c_str(), source.enabled, "event-playlist-sources")',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_event_playlist_filter_surface,
+            "plugin event playlist filter module-summary button surface",
+            errors,
+        )
     reject_contains(
         plugin_source,
         'std::format("{} {:.2f}s##event-playlist-cue", active ? ">" : "Cue", event.time)',
