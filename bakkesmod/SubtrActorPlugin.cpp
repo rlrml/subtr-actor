@@ -8603,6 +8603,12 @@ void SubtrActorPlugin::renderEventSourceControls() {
     }
     displaySources.push_back(DisplaySource{&option, count, enabled});
   }
+  std::sort(
+      displaySources.begin(),
+      displaySources.end(),
+      [](const DisplaySource &left, const DisplaySource &right) {
+        return std::string_view{left.option->label} < std::string_view{right.option->label};
+      });
 
   if (displaySources.empty()) {
     ImGui::TextDisabled("No events loaded.");
@@ -8758,6 +8764,23 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     playlistSources.push_back(
         PlaylistSource{&option, count, selected && sourceHasEnabledPlaylistGroup(option.value)});
   }
+  auto playlistSourceRank = [](const EventFilterOption &option) {
+    const std::string_view group{option.group};
+    const int groupRank = group == "Replay"     ? 0
+                          : group == "Mechanics" ? 1
+                          : group == "Stats"     ? 2
+                                                  : 3;
+    if (group == "Replay" && std::string_view{option.value} == "goal") {
+      return std::tuple{groupRank, 0, std::string_view{option.label}};
+    }
+    return std::tuple{groupRank, 1, std::string_view{option.label}};
+  };
+  std::sort(
+      playlistSources.begin(),
+      playlistSources.end(),
+      [&](const PlaylistSource &left, const PlaylistSource &right) {
+        return playlistSourceRank(*left.option) < playlistSourceRank(*right.option);
+      });
 
   const size_t selectedSourceCount = static_cast<size_t>(std::count_if(
       playlistSources.begin(),

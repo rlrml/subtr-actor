@@ -1622,9 +1622,21 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "return sources.sort((left, right) => left.label.localeCompare(right.label));",
+        "stats evaluation player Events window sorts source rows by label",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'std::format(\n        "{}   {} {}##event-sources-{}",\n        option.label,\n        enabled ? "On" : "Off",\n        count,\n        option.value)',
         "plugin Events window source rows expose web-like state count readout",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "std::sort(\n      displaySources.begin(),\n      displaySources.end(),\n      [](const DisplaySource &left, const DisplaySource &right) {\n        return std::string_view{left.option->label} < std::string_view{right.option->label};\n      });",
+        "plugin Events window sorts source rows by label like web",
         errors,
     )
     require_contains(
@@ -1670,6 +1682,12 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "return [...getEventPlaylistReplaySources(ctx), ...eventSources];",
+        "stats evaluation player event playlist keeps replay goal source before event sources",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'eventPlaylistSourceFilter = "default";',
         "plugin replay review playlist starts from web-like default source selection",
@@ -1692,6 +1710,14 @@ def main() -> int:
         plugin_source,
         '{"demo", "Demos", "Replay"}',
         "plugin event playlist demo source label mirrors web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'if (group == "Replay" && std::string_view{option.value} == "goal") {\n'
+        "      return std::tuple{groupRank, 0, std::string_view{option.label}};\n"
+        "    }",
+        "plugin event playlist keeps replay goal source before other event sources",
         errors,
     )
     require_contains(
