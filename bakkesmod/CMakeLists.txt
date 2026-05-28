@@ -35,6 +35,7 @@ add_library(SubtrActorPlugin SHARED
   SubtrActorPluginGraphDump.cpp
   SubtrActorPluginGraphJson.cpp
   SubtrActorPluginGraphVerify.cpp
+  SubtrActorPluginLive.cpp
 )
 
 target_include_directories(SubtrActorPlugin PRIVATE
