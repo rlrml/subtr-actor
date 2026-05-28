@@ -445,6 +445,36 @@ def main() -> int:
         "launcher actions expose replay loading like the web player",
         errors,
     )
+    for label, plugin_needle in (
+        ("Possession", '"Possession",\n        timelineRangePossessionEnabled'),
+        ("Half control", '"Half control",\n        timelineRangePressureEnabled'),
+        ("Rush", '"Rush", timelineRangeRushEnabled'),
+        ("Position zones", '"Position zones",\n        timelineRangeAbsolutePositioningEnabled'),
+    ):
+        require_contains(
+            web_player_main_source,
+            f'"{label}"',
+            f"stats evaluation player module summary label {label}",
+            errors,
+        )
+        require_contains(
+            plugin_source,
+            plugin_needle,
+            f"plugin module summary label {label}",
+            errors,
+        )
+    for stale_label in (
+        '"Possession timeline"',
+        '"Half control timeline"',
+        '"Rush timeline"',
+        '"Position zones timeline"',
+    ):
+        reject_contains(
+            plugin_source,
+            stale_label,
+            "plugin module summary stale timeline suffix label",
+            errors,
+        )
     require_contains(
         plugin_source,
         '"Live analysis graph",\n            liveAnalysis,\n            "launcher-plugin-tools"',

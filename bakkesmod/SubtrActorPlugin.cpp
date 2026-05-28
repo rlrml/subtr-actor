@@ -7605,18 +7605,18 @@ void SubtrActorPlugin::renderModuleSummaryControls(
         idSuffix,
         toggleWidth);
     renderBoolModuleSummaryToggle(
-        "Possession timeline",
+        "Possession",
         timelineRangePossessionEnabled,
         idSuffix,
         toggleWidth);
     renderBoolModuleSummaryToggle(
-        "Half control timeline",
+        "Half control",
         timelineRangePressureEnabled,
         idSuffix,
         toggleWidth);
-    renderBoolModuleSummaryToggle("Rush timeline", timelineRangeRushEnabled, idSuffix, toggleWidth);
+    renderBoolModuleSummaryToggle("Rush", timelineRangeRushEnabled, idSuffix, toggleWidth);
     renderBoolModuleSummaryToggle(
-        "Position zones timeline",
+        "Position zones",
         timelineRangeAbsolutePositioningEnabled,
         idSuffix,
         toggleWidth);
