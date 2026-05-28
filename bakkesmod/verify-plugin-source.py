@@ -842,9 +842,36 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        'empty.className = "stat-window-empty";',
+        "stats evaluation player stats empty state class",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".stat-window-empty {\n"
+        "  margin: 0;\n"
+        "  color: #9eb4c6;\n"
+        "  font-size: 0.88rem;\n"
+        "}",
+        "stats evaluation player stats empty state styling",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'renderStatsWindowEmpty("No matching stats.");',
         "plugin stats picker no-results empty state mirrors web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "void renderStatsWindowEmpty(std::string_view message) {\n"
+        "  const std::string messageString{message};\n"
+        "  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{0.62f, 0.71f, 0.78f, 1.0f});\n"
+        "  ImGui::TextWrapped(\"%s\", messageString.c_str());\n"
+        "  ImGui::PopStyleColor();\n"
+        "}",
+        "plugin stats empty state uses web-like muted body text",
         errors,
     )
     for plugin_only_stats_picker_surface in (
@@ -854,6 +881,7 @@ def main() -> int:
         'std::format(\n        "{}  [{}]##{}-{}",',
         'ImGui::TextDisabled(\n          "%s  [%s selected]",',
         'ImGui::Text("No matching stats.");',
+        'void renderStatsWindowEmpty(std::string_view message) {\n  ImGui::Spacing();\n  ImGui::TextDisabled("%s", std::string{message}.c_str());\n}',
     ):
         reject_contains(
             plugin_source,

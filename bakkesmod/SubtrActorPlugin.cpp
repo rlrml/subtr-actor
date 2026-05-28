@@ -11987,8 +11987,10 @@ void SubtrActorPlugin::renderStatsWindowScopeSelector(UiStatsWindow &window) {
 }
 
 void renderStatsWindowEmpty(std::string_view message) {
-  ImGui::Spacing();
-  ImGui::TextDisabled("%s", std::string{message}.c_str());
+  const std::string messageString{message};
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{0.62f, 0.71f, 0.78f, 1.0f});
+  ImGui::TextWrapped("%s", messageString.c_str());
+  ImGui::PopStyleColor();
 }
 
 void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
