@@ -688,6 +688,63 @@ def main() -> int:
         )
     require_contains(
         web_player_main_source,
+        'select.className = "stats-window-scope-select";',
+        "stats evaluation player scope selector class",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "const teamClass = getStatsWindowScopeTeamClass(statsWindow);\n"
+        "  if (teamClass) {\n"
+        "    select.classList.add(teamClass);\n"
+        "  }",
+        "stats evaluation player scope selector applies team accent class",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".stats-window-scope-select.team-blue,\n"
+        ".stats-window-scope-select.team-orange,\n"
+        ".stats-window-stat-target.team-blue,\n"
+        ".stats-window-stat-target.team-orange {\n"
+        "  border-color: var(--team-accent);\n"
+        "  box-shadow: inset 0.22rem 0 0 var(--team-accent);",
+        "stats evaluation player scope selector team accent",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "auto pushStatsScopeSelectorStyle = [](std::optional<LinearColor> teamColor) {\n"
+        "    ImGui::SetNextItemWidth(std::min(208.0f, ImGui::GetContentRegionAvail().x));",
+        "plugin stats scope selector uses bounded web-like width",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PushStyleColor(ImGuiCol_Border, accent);\n"
+        "    ImGui::PushStyleColor(\n"
+        "        ImGuiCol_FrameBg,\n"
+        "        ImVec4{accent.x * 0.18f, accent.y * 0.18f, accent.z * 0.18f, 0.58f});",
+        "plugin stats scope selector applies team accent frame",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const std::optional<LinearColor> selectedColor =\n"
+        "        selected ? std::make_optional(selected->is_team_0 != 0 ? LinearColor{80, 190, 255, 255}",
+        "plugin player stats scope selector derives selected team accent",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const int selectorStyleColors = pushStatsScopeSelectorStyle(selectedColor);\n"
+        "    const bool comboOpen = ImGui::BeginCombo(\n"
+        "        std::format(\"##stats-window-team-scope-{}\", window.id).c_str(),",
+        "plugin team stats scope selector wraps combo in team accent style",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         'queryInput.placeholder = "Search stats";',
         "stats evaluation player stats picker search placeholder",
         errors,
