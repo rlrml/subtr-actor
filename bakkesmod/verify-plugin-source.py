@@ -705,6 +705,56 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_styles_source,
+        ".stats-window-toolbar {\n  justify-content: end;\n}",
+        "stats evaluation player right-aligns non-scoped stats add toolbar",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const float addButtonX =\n"
+        "        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - addButtonSize);\n"
+        "    ImGui::SetCursorPosX(addButtonX);",
+        "plugin right-aligns non-scoped stats add toolbar",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".stats-window-add-button {\n"
+        "  width: var(--ui-control-height);\n"
+        "  min-width: var(--ui-control-height);\n"
+        "  padding: 0;",
+        "stats evaluation player stats add button is a square control",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const float addButtonSize = ImGui::GetFrameHeight();",
+        "plugin stats add button uses square control sizing",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".stats-window-picker {\n"
+        "  display: grid;\n"
+        "  gap: var(--ui-gap-sm);\n"
+        "  padding: var(--ui-panel-padding);\n"
+        "  border-radius: var(--ui-radius-md);\n"
+        "  border: 1px solid rgba(255, 255, 255, 0.08);\n"
+        "  background: rgba(255, 255, 255, 0.04);",
+        "stats evaluation player stats picker is a bordered panel",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);\n"
+        "  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{12.0f, 10.0f});\n"
+        "  ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4{1.0f, 1.0f, 1.0f, 0.04f});\n"
+        "  ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{1.0f, 1.0f, 1.0f, 0.08f});",
+        "plugin stats picker uses web-like bordered panel chrome",
+        errors,
+    )
+    require_contains(
         web_player_main_source,
         'addGroup.innerHTML = `<span>Add all ${category}</span><strong>${group.length}</strong>`;',
         "stats evaluation player stats picker category row",

@@ -11948,10 +11948,28 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   }
 
   const std::string addButton = std::format("+##add-stat-{}", window.id);
-  if (statsWindowKindHasScopeSelector(window.kind)) {
+  const bool hasScopeSelector = statsWindowKindHasScopeSelector(window.kind);
+  const float addButtonSize = ImGui::GetFrameHeight();
+  auto renderAddButton = [&]() {
+    if (window.picker_open) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{1.0f, 1.0f, 1.0f, 0.10f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{1.0f, 1.0f, 1.0f, 0.14f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{1.0f, 1.0f, 1.0f, 0.18f});
+    }
+    const bool clicked = ImGui::Button(addButton.c_str(), ImVec2{addButtonSize, 0.0f});
+    if (window.picker_open) {
+      ImGui::PopStyleColor(3);
+    }
+    return clicked;
+  };
+  if (hasScopeSelector) {
     ImGui::SameLine();
+  } else {
+    const float addButtonX =
+        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - addButtonSize);
+    ImGui::SetCursorPosX(addButtonX);
   }
-  if (ImGui::Button(addButton.c_str())) {
+  if (renderAddButton()) {
     window.picker_open = !window.picker_open;
   }
   if (ImGui::IsItemHovered()) {
@@ -11963,10 +11981,19 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     return;
   }
 
+  ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{12.0f, 10.0f});
+  ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4{1.0f, 1.0f, 1.0f, 0.04f});
+  ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{1.0f, 1.0f, 1.0f, 0.08f});
   ImGui::BeginChild(
       std::format("stat-picker-{}", window.id).c_str(),
       ImVec2{0.0f, 190.0f},
       true);
+  auto endStatsPickerPanel = [&]() {
+    ImGui::EndChild();
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(2);
+  };
 
   std::array<char, 128> queryBuffer{};
   const size_t querySize = std::min(window.picker_query.size(), queryBuffer.size() - 1);
@@ -12064,7 +12091,7 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
 
   if (matches.empty()) {
     renderStatsWindowEmpty("No matching stats.");
-    ImGui::EndChild();
+    endStatsPickerPanel();
     ImGui::Separator();
     return;
   }
@@ -12098,7 +12125,7 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
       }
     }
   }
-  ImGui::EndChild();
+  endStatsPickerPanel();
   ImGui::Separator();
 }
 
