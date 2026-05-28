@@ -5,10 +5,14 @@ import type {
   ReplayTimelineEvent,
   ReplayTimelineEventKind,
   ReplayTimelineEventSource,
-  ReplayTimelineRange,
   ReplayTimelineRangeSource,
 } from "./types";
 import { createTimelineOverlayElements } from "./timeline-overlay-dom";
+import {
+  renderTimelineRangeLanes,
+  type TimelineRangeLanePlayhead,
+  type TimelineRangeRecord,
+} from "./timeline-overlay-ranges";
 import { ensureTimelineOverlayStyles } from "./timeline-overlay-styles";
 import {
   DEFAULT_REPLAY_EVENT_KINDS,
@@ -17,18 +21,13 @@ import {
   eventBadgeText,
   formatPlaybackTime,
   groupEvents,
-  groupRanges,
   markerLeftPercent,
-  projectedRangeTimelineBounds,
-  rangeAccent,
   resolveCustomEvents,
   resolveEventSources,
-  resolveRangeSources,
   timelineEventSeekTime,
   type TimelineEventBucket,
   type TimelineEventLane,
   type TimelineEventSourceRecord,
-  type TimelineRangeLane,
 } from "./timeline-overlay-model";
 
 export { projectedRangeTimelineBounds, timelineEventSeekTime } from "./timeline-overlay-model";
@@ -59,17 +58,6 @@ export interface TimelineOverlayPlugin extends ReplayPlayerPlugin {
   addRangeSource(source: ReplayTimelineRangeSource): () => void;
   removeRangeSource(source: ReplayTimelineRangeSource): boolean;
   refreshRanges(): void;
-}
-
-interface TimelineRangeRecord {
-  range: ReplayTimelineRange;
-  element: HTMLDivElement;
-  startTimelineTime: number;
-  endTimelineTime: number;
-}
-
-interface TimelineRangeLanePlayhead {
-  element: HTMLDivElement;
 }
 
 interface TimelineEventLanePlayhead {
@@ -147,11 +135,10 @@ export function createTimelineOverlayPlugin(
   let resumePlaybackAfterScrub = false;
   let playerContext: ReplayPlayerPluginContext | null = null;
   let eventLanes: TimelineEventLane[] = [];
-  let rangeLanes: TimelineRangeLane[] = [];
   let projectionCacheKey: string | null = null;
   const markerElements = new Map<string, TimelineMarkerRecord>();
-  const rangeElements: TimelineRangeRecord[] = [];
-  const rangeLanePlayheads: TimelineRangeLanePlayhead[] = [];
+  let rangeElements: TimelineRangeRecord[] = [];
+  let rangeLanePlayheads: TimelineRangeLanePlayhead[] = [];
   const eventLanePlayheads: TimelineEventLanePlayhead[] = [];
 
   function refreshMarkers(): void {
@@ -361,80 +348,11 @@ export function createTimelineOverlayPlugin(
       return;
     }
 
-    rangesRoot.replaceChildren();
-    rangeElements.splice(0, rangeElements.length);
-    rangeLanePlayheads.splice(0, rangeLanePlayheads.length);
-
-    const customRanges = resolveRangeSources(extraRangeSources, context).filter(
-      (range) =>
-        Number.isFinite(range.startTime) &&
-        Number.isFinite(range.endTime) &&
-        range.endTime > range.startTime,
-    );
-    rangeLanes = groupRanges(customRanges);
-    const duration = Math.max(context.player.getTimelineDuration(), 0.0001);
-
-    if (rangeLanes.length === 0) {
-      rangesRoot.hidden = true;
-      return;
-    }
-
-    rangesRoot.hidden = false;
-
-    for (const lane of rangeLanes) {
-      const laneEl = document.createElement("div");
-      laneEl.className = "sap-tl-range-lane";
-
-      const track = document.createElement("div");
-      track.className = "sap-tl-range-lane-track";
-
-      if (lane.label) {
-        laneEl.dataset.label = lane.label;
-        const label = document.createElement("span");
-        label.className = "sap-tl-range-lane-label";
-        label.textContent = lane.label;
-        label.setAttribute("aria-label", lane.label);
-        laneEl.append(label);
-      }
-
-      for (const range of lane.ranges) {
-        const startProjection = context.player.projectReplayTimeToTimeline(range.startTime);
-        const endProjection = context.player.projectReplayTimeToTimeline(range.endTime);
-        const { startTimelineTime, endTimelineTime } = projectedRangeTimelineBounds(
-          startProjection,
-          endProjection,
-          duration,
-        );
-        const segment = document.createElement("div");
-        segment.className = "sap-tl-range-segment";
-        if (range.className) {
-          segment.classList.add(range.className);
-        }
-        segment.style.background = rangeAccent(range);
-        segment.title = range.label ?? lane.label;
-        segment.dataset.active = "false";
-        segment.style.left = markerLeftPercent(startTimelineTime, duration);
-        segment.style.width = markerLeftPercent(
-          Math.max(0, endTimelineTime - startTimelineTime),
-          duration,
-        );
-        track.append(segment);
-        rangeElements.push({
-          range,
-          element: segment,
-          startTimelineTime,
-          endTimelineTime,
-        });
-      }
-
-      const playhead = document.createElement("div");
-      playhead.className = "sap-tl-range-playhead";
-      track.append(playhead);
-      rangeLanePlayheads.push({ element: playhead });
-
-      laneEl.append(track);
-      rangesRoot.append(laneEl);
-    }
+    ({ rangeElements, rangeLanePlayheads } = renderTimelineRangeLanes(
+      rangesRoot,
+      extraRangeSources,
+      context,
+    ));
   }
 
   function endScrub(): void {
@@ -573,11 +491,10 @@ export function createTimelineOverlayPlugin(
       markers = null;
       playerContext = null;
       eventLanes = [];
-      rangeLanes = [];
       projectionCacheKey = null;
       markerElements.clear();
-      rangeElements.splice(0, rangeElements.length);
-      rangeLanePlayheads.splice(0, rangeLanePlayheads.length);
+      rangeElements = [];
+      rangeLanePlayheads = [];
       eventLanePlayheads.splice(0, eventLanePlayheads.length);
       if (changedContainerPosition) {
         context.container.style.position = originalContainerPosition;
