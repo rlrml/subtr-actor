@@ -12282,6 +12282,7 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
   auto renderTeamGroup = [&](uint8_t isTeam0) {
     const LinearColor color =
         isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
+    const ImVec4 teamColor = toImVec4(color);
     const size_t playerCount = static_cast<size_t>(std::count_if(
         sampledPlayers.begin(),
         sampledPlayers.end(),
@@ -12290,9 +12291,19 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
       return false;
     }
 
-    ImGui::TextColored(toImVec4(color), "%s team", teamLabel(isTeam0).c_str());
-    ImGui::SameLine();
-    ImGui::TextDisabled("%zu player%s", playerCount, playerCount == 1 ? "" : "s");
+    ImGui::Spacing();
+    const std::string teamTitle = std::format("{} team", teamLabel(isTeam0));
+    const std::string teamMeta =
+        std::format("{} player{}", playerCount, playerCount == 1 ? "" : "s");
+    ImGui::TextColored(teamColor, "%s", teamTitle.c_str());
+    const float metaX = std::max(
+        ImGui::GetCursorPosX(),
+        ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(teamMeta.c_str()).x);
+    ImGui::SameLine(metaX);
+    ImGui::TextColored(teamColor, "%s", teamMeta.c_str());
+    ImGui::PushStyleColor(ImGuiCol_Separator, teamColor);
+    ImGui::Separator();
+    ImGui::PopStyleColor();
     for (const SaPlayerFrame &player : sampledPlayers) {
       if (player.is_team_0 != isTeam0) {
         continue;
@@ -12300,7 +12311,14 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
 
       ImGui::PushID(static_cast<int>(player.player_index));
       const std::string playerName = playerLabel(player.player_index, player.is_team_0);
-      ImGui::TextColored(toImVec4(color), "%s", playerName.c_str());
+      ImDrawList *drawList = ImGui::GetWindowDrawList();
+      const ImVec2 entityStart = ImGui::GetCursorScreenPos();
+      drawList->AddRectFilled(
+          ImVec2{entityStart.x, entityStart.y + 2.0f},
+          ImVec2{entityStart.x + 2.0f, entityStart.y + ImGui::GetTextLineHeight() + 2.0f},
+          ImGui::GetColorU32(teamColor));
+      ImGui::Indent(8.0f);
+      ImGui::TextColored(teamColor, "%s", playerName.c_str());
       for (size_t i = 0; i < window.entries.size();) {
         const std::string &statId = window.entries[i].stat_id;
         if (!statsWindowSupportsStat(window, statId)) {
@@ -12311,11 +12329,13 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
         const std::string statValue = playerStatValue(player, statId);
         if (renderStatsWindowValueRow(
                 window, i, statLabel, statValue, std::format("player-{}", player.player_index))) {
+          ImGui::Unindent(8.0f);
           ImGui::PopID();
           return true;
         }
         ++i;
       }
+      ImGui::Unindent(8.0f);
       ImGui::Spacing();
       ImGui::PopID();
     }
@@ -12334,7 +12354,15 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
   for (const uint8_t isTeam0 : {static_cast<uint8_t>(1), static_cast<uint8_t>(0)}) {
     const LinearColor color =
         isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
-    ImGui::TextColored(toImVec4(color), "%s", teamLabel(isTeam0).c_str());
+    const ImVec4 teamColor = toImVec4(color);
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    const ImVec2 entityStart = ImGui::GetCursorScreenPos();
+    drawList->AddRectFilled(
+        ImVec2{entityStart.x, entityStart.y + 2.0f},
+        ImVec2{entityStart.x + 2.0f, entityStart.y + ImGui::GetTextLineHeight() + 2.0f},
+        ImGui::GetColorU32(teamColor));
+    ImGui::Indent(8.0f);
+    ImGui::TextColored(teamColor, "%s", teamLabel(isTeam0).c_str());
     for (size_t i = 0; i < window.entries.size();) {
       const std::string &statId = window.entries[i].stat_id;
       if (!statsWindowSupportsStat(window, statId)) {
@@ -12345,10 +12373,12 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
       const std::string statValue = teamStatValue(isTeam0, statId);
       if (renderStatsWindowValueRow(
               window, i, statLabel, statValue, std::format("team-{}", isTeam0))) {
+        ImGui::Unindent(8.0f);
         return;
       }
       ++i;
     }
+    ImGui::Unindent(8.0f);
     ImGui::Spacing();
   }
 }

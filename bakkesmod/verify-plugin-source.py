@@ -896,8 +896,60 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        'teamHeader.className = "stats-window-team-header";',
+        "stats evaluation player all-player stats team headers",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".stats-window-team-header {\n"
+        "  display: flex;\n"
+        "  align-items: center;\n"
+        "  justify-content: space-between;",
+        "stats evaluation player all-player stats header layout",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const std::string teamTitle = std::format("{} team", teamLabel(isTeam0));\n'
+        "    const std::string teamMeta =\n"
+        '        std::format("{} player{}", playerCount, playerCount == 1 ? "" : "s");',
+        "plugin all-player stats team header title/meta mirrors web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::SameLine(metaX);\n"
+        "    ImGui::TextColored(teamColor, \"%s\", teamMeta.c_str());\n"
+        "    ImGui::PushStyleColor(ImGuiCol_Separator, teamColor);\n"
+        "    ImGui::Separator();",
+        "plugin all-player stats team header aligns meta and divider",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         'section.className = `stats-window-entity ${getTeamClass(player.is_team_0)}`;',
         "stats evaluation player all-player stats entity sections",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".stats-window-entity {\n"
+        "  display: grid;\n"
+        "  gap: var(--ui-gap-xs);\n"
+        "  padding-left: 0.5rem;\n"
+        "  border-left: 2px solid rgba(255, 255, 255, 0.12);",
+        "stats evaluation player grouped stats entity accent rail",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "drawList->AddRectFilled(\n"
+        "          ImVec2{entityStart.x, entityStart.y + 2.0f},\n"
+        "          ImVec2{entityStart.x + 2.0f, entityStart.y + ImGui::GetTextLineHeight() + 2.0f},\n"
+        "          ImGui::GetColorU32(teamColor));\n"
+        "      ImGui::Indent(8.0f);",
+        "plugin all-player entity rows use web-like accent rail",
         errors,
     )
     require_contains(
