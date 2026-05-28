@@ -29,59 +29,27 @@ jobs:
           git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
           git checkout --detach refs/github/checkout
 
-      - name: Install Rust
+      - name: Install Nix
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
-          rustup default stable
 
-      - name: Install Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: |
-            js/player/package-lock.json
-            js/stat-evaluation-player/package-lock.json
-            js/pages/package-lock.json
+          curl --fail --silent --show-error --location https://nixos.org/nix/install \
+            | sh -s -- --daemon --yes
+          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          mkdir -p ~/.config/nix
+          echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
-
-      - name: Install player dependencies
-        working-directory: js/player
-        run: npm ci
-
-      - name: Install stats player dependencies
-        working-directory: js/stat-evaluation-player
-        run: npm ci
-
-      - name: Install stats pages dependencies
-        working-directory: js/pages
-        run: npm ci
 
       - name: Build stats player site
         shell: bash
         run: |
           set -euo pipefail
-          pushd js/stat-evaluation-player
-          npm run build:site
-          popd
-
-          pushd js/pages
-          npm run build
-          popd
-
-          mkdir -p result
-          cp -r js/stat-evaluation-player/dist/. result/
-          mkdir -p result/stats
-          cp -r js/pages/dist/. result/stats/
-          mkdir -p result/review
-          cp -r js/stat-evaluation-player/dist/. result/review/
+          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+          nix build .#js-stats-player-pages --print-build-logs --fallback
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5

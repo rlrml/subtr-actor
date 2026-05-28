@@ -118,7 +118,22 @@
           pname = "subtr-actor-js-web-wasm";
           version = projectVersion;
           src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
+          cargoDeps =
+            let
+              vendorDir = rustPlatform.importCargoLock {
+                lockFile = ./Cargo.lock;
+                extraRegistries = {
+                  "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
+                };
+              };
+            in
+            pkgs.runCommand "cargo-vendor-dir" { } ''
+              cp -R ${vendorDir}/. "$out"
+              chmod u+w "$out/.cargo" "$out/.cargo/config.toml"
+              # Cargo rejects this alias as a duplicate definition of crates-io.
+              sed -i '/^\[source\."https:\/\/github.com\/rust-lang\/crates.io-index"\]$/,+2d' \
+                "$out/.cargo/config.toml"
+            '';
           nativeBuildInputs = [
             pkgs.writableTmpDirAsHomeHook
             pkgs.wasm-pack
