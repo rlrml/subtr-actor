@@ -1256,6 +1256,18 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        'isCorePlayerStat ? "core" : "mechanics"',
+        "plugin replay/live drained shot-save-assist events use core playlist source",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'if (isCorePlayerStat) {\n    return;\n  }\n  if (!overlayMechanicEnabled(event.kind))',
+        "plugin core replay annotations do not route through mechanic overlay filters",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         'std::format(\n'
         '      "Filters {}/{}##event-playlist-filter",\n'
         "      selectedSourceCount,\n"

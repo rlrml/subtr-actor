@@ -1951,6 +1951,11 @@ std::string mechanicLabel(SaMechanicKind kind) {
   }
 }
 
+bool corePlayerStatMechanicKind(SaMechanicKind kind) {
+  return kind == SaMechanicKindShot || kind == SaMechanicKindSave ||
+         kind == SaMechanicKindAssist;
+}
+
 std::string normalizeEventFilterToken(std::string_view token) {
   std::string normalized;
   normalized.reserve(token.size());
@@ -7047,6 +7052,7 @@ void SubtrActorPlugin::pushGoalEventMessage(const SaGoalEvent &event) {
 
 void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
   const bool isBlue = event.is_team_0 != 0;
+  const bool isCorePlayerStat = corePlayerStatMechanicKind(event.kind);
   const std::string action = event.confidence < 0.999f
                                  ? std::format(
                                        "{} ({:.0f}%)",
@@ -7056,17 +7062,23 @@ void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
   const std::string label =
       std::format("{}: {}", playerLabel(event.player_index, event.is_team_0), action);
   appendUiEvent(UiEventRecord{
-      "mechanics",
+      isCorePlayerStat ? "core" : "mechanics",
       mechanicToken(event.kind),
       playerLabel(event.player_index, event.is_team_0),
       mechanicLabel(event.kind),
-      event.confidence < 0.999f ? std::format("{:.0f}% confidence", event.confidence * 100.0f)
-                                : "high confidence",
+      isCorePlayerStat
+          ? "Shots, saves, assists"
+          : event.confidence < 0.999f
+                ? std::format("{:.0f}% confidence", event.confidence * 100.0f)
+                : "high confidence",
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       event.frame_number,
       event.time,
   });
 
+  if (isCorePlayerStat) {
+    return;
+  }
   if (!overlayMechanicEnabled(event.kind)) {
     return;
   }
