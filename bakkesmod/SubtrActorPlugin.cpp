@@ -9491,14 +9491,6 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
                           : replayAnnotationLoadFailed
                               ? ImVec4{0.95f, 0.45f, 0.45f, 1.0f}
                               : ImVec4{0.72f, 0.78f, 0.86f, 1.0f};
-    const float statusWidth = ImGui::CalcTextSize(status).x;
-    const float statusX =
-        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - statusWidth);
-    ImGui::PushTextWrapPos(std::max(ImGui::GetCursorPosX(), statusX - 12.0f));
-    ImGui::TextUnformatted(title.c_str());
-    ImGui::PopTextWrapPos();
-    ImGui::SameLine(statusX);
-    ImGui::TextColored(statusColor, "%s", status);
     std::vector<std::string> replayMeta;
     if (!rawReplayPath.empty()) {
       replayMeta.push_back(std::format("raw: {}", rawReplayPath));
@@ -9512,10 +9504,67 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
     if (!annotationPlayers.empty()) {
       replayMeta.push_back(std::format("{} players", annotationPlayers.size()));
     }
-    if (!replayMeta.empty()) {
-      ImGui::TextDisabled("%s", joinStrings(replayMeta, " · ").c_str());
+    const std::string meta = joinStrings(replayMeta, " · ");
+    const float rowWidth = ImGui::GetContentRegionAvail().x;
+    const float rowHeight = 62.0f;
+    ImGui::Dummy(ImVec2{rowWidth, rowHeight});
+    const ImVec2 rowMin = ImGui::GetItemRectMin();
+    const ImVec2 rowMax = ImGui::GetItemRectMax();
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    const ImVec4 rowBorder =
+        replayAnnotations ? ImVec4{0.30f, 0.69f, 0.47f, 0.42f}
+                          : replayAnnotationLoadFailed
+                              ? ImVec4{0.86f, 0.37f, 0.37f, 0.58f}
+                              : ImVec4{1.0f, 1.0f, 1.0f, 0.08f};
+    drawList->AddRectFilled(
+        rowMin,
+        rowMax,
+        ImGui::ColorConvertFloat4ToU32(ImVec4{1.0f, 1.0f, 1.0f, 0.035f}),
+        6.0f);
+    drawList->AddRect(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(rowBorder), 6.0f);
+
+    constexpr float rowPadding = 8.0f;
+    const float statusWidth = ImGui::CalcTextSize(status).x;
+    const float statusX = rowMax.x - rowPadding - statusWidth;
+    const float titleY = rowMin.y + rowPadding;
+    const float metaY = titleY + ImGui::GetTextLineHeight() + 3.0f;
+    drawList->PushClipRect(
+        ImVec2{rowMin.x + rowPadding, rowMin.y},
+        ImVec2{std::max(rowMin.x + rowPadding, statusX - 10.0f), rowMax.y},
+        true);
+    drawList->AddText(
+        ImVec2{rowMin.x + rowPadding, titleY},
+        IM_COL32(237, 245, 250, 255),
+        title.c_str());
+    if (!meta.empty()) {
+      drawList->AddText(
+          ImVec2{rowMin.x + rowPadding, metaY},
+          IM_COL32(137, 164, 186, 255),
+          meta.c_str());
     }
-    ImGui::ProgressBar(replayLoadProgress, ImVec2{-1.0f, 0.0f}, "");
+    drawList->PopClipRect();
+    drawList->AddText(
+        ImVec2{statusX, titleY},
+        ImGui::ColorConvertFloat4ToU32(statusColor),
+        status);
+
+    const float progressMinX = rowMin.x + rowPadding;
+    const float progressMaxX = rowMax.x - rowPadding;
+    const float progressY = rowMax.y - rowPadding - 4.0f;
+    drawList->AddRectFilled(
+        ImVec2{progressMinX, progressY},
+        ImVec2{progressMaxX, progressY + 4.0f},
+        IM_COL32(255, 255, 255, 20),
+        999.0f);
+    drawList->AddRectFilled(
+        ImVec2{progressMinX, progressY},
+        ImVec2{progressMinX + (progressMaxX - progressMinX) * replayLoadProgress, progressY + 4.0f},
+        ImGui::ColorConvertFloat4ToU32(
+            replayAnnotations ? ImVec4{0.30f, 0.69f, 0.47f, 1.0f}
+                              : replayAnnotationLoadFailed
+                                  ? ImVec4{0.86f, 0.37f, 0.37f, 1.0f}
+                                  : ImVec4{0.47f, 0.66f, 1.0f, 1.0f}),
+        999.0f);
   }
   ImGui::EndChild();
 

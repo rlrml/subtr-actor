@@ -3294,19 +3294,35 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        "const float statusX =\n        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - statusWidth);",
-        "plugin replay loading aligns status with row title",
+        "ImGui::Dummy(ImVec2{rowWidth, rowHeight});\n"
+        "    const ImVec2 rowMin = ImGui::GetItemRectMin();\n"
+        "    const ImVec2 rowMax = ImGui::GetItemRectMax();",
+        "plugin replay loading row reserves a web-like source card",
         errors,
     )
     require_contains(
         plugin_source,
-        'ImGui::SameLine(statusX);\n    ImGui::TextColored(statusColor, "%s", status);',
-        "plugin replay loading renders status on title row",
+        "drawList->AddRectFilled(\n"
+        "        rowMin,\n"
+        "        rowMax,\n"
+        "        ImGui::ColorConvertFloat4ToU32(ImVec4{1.0f, 1.0f, 1.0f, 0.035f}),\n"
+        "        6.0f);\n"
+        "    drawList->AddRect(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(rowBorder), 6.0f);",
+        "plugin replay loading row draws web-like card chrome",
         errors,
     )
     require_contains(
         plugin_source,
-        'joinStrings(replayMeta, " · ")',
+        "drawList->AddText(\n"
+        "        ImVec2{statusX, titleY},\n"
+        "        ImGui::ColorConvertFloat4ToU32(statusColor),\n"
+        "        status);",
+        "plugin replay loading renders status on the title row",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const std::string meta = joinStrings(replayMeta, " · ");',
         "plugin replay loading source row uses web-like dot-separated metadata",
         errors,
     )
@@ -3318,8 +3334,10 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::ProgressBar(replayLoadProgress, ImVec2{-1.0f, 0.0f}, "");',
-        "plugin replay loading source row includes web-like progress bar",
+        "drawList->AddRectFilled(\n"
+        "        ImVec2{progressMinX, progressY},\n"
+        "        ImVec2{progressMinX + (progressMaxX - progressMinX) * replayLoadProgress, progressY + 4.0f},",
+        "plugin replay loading source row draws web-like embedded progress bar",
         errors,
     )
     reject_contains(
@@ -3358,6 +3376,17 @@ def main() -> int:
         "plugin replay loading stacks title before status",
         errors,
     )
+    for plugin_only_replay_loading_row_surface in (
+        "const float statusX =\n        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - statusWidth);",
+        'ImGui::SameLine(statusX);\n    ImGui::TextColored(statusColor, "%s", status);',
+        'ImGui::ProgressBar(replayLoadProgress, ImVec2{-1.0f, 0.0f}, "");',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_replay_loading_row_surface,
+            "plugin replay loading plugin-only stacked row surface",
+            errors,
+        )
     for plugin_only_replay_loading_surface in (
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "REPLAY LOADING");',
         'ImGui::Text("In replay: %s", inReplay ? "yes" : "no");',
