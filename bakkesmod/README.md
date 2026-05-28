@@ -74,6 +74,8 @@ evaluation player.
 Paste accepts raw layout JSON, that raw JSON `cfg` fragment, or a full URL
 containing either a raw JSON `cfg` value or the compressed base64url `cfg`
 value emitted by the web stats evaluation player.
+The same inputs can be applied from the BakkesMod console with
+`subtr_actor_apply_ui_config <json|cfg|url>`.
 
 ## Windows build outline
 

@@ -18,6 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RUST_SOURCE = REPO_ROOT / "crates/subtr-actor-bakkesmod/src/lib.rs"
 PLUGIN_SOURCE = REPO_ROOT / "bakkesmod/SubtrActorPlugin.cpp"
 PLUGIN_HEADER = REPO_ROOT / "bakkesmod/SubtrActorPlugin.h"
+PLUGIN_README = REPO_ROOT / "bakkesmod/README.md"
 ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakkesmod.h"
 WEB_PLAYER_CONFIG_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/playerConfig.ts"
 WEB_PLAYER_MAIN_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/main.ts"
@@ -330,6 +331,7 @@ def main() -> int:
     rust_source = RUST_SOURCE.read_text(encoding="utf-8")
     plugin_source = PLUGIN_SOURCE.read_text(encoding="utf-8")
     plugin_header = PLUGIN_HEADER.read_text(encoding="utf-8")
+    plugin_readme_source = PLUGIN_README.read_text(encoding="utf-8")
     abi_header = ABI_HEADER.read_text(encoding="utf-8")
     web_player_config_source = WEB_PLAYER_CONFIG_SOURCE.read_text(encoding="utf-8")
     web_player_main_source = WEB_PLAYER_MAIN_SOURCE.read_text(encoding="utf-8")
@@ -1964,6 +1966,24 @@ def main() -> int:
         "    window.z_index = nextUiWindowZIndex++;\n"
         "    window.pending_focus = false;",
         "stats pending-focus render path bumps z-index",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'cvarManager->registerNotifier(\n      "subtr_actor_apply_ui_config",',
+        "plugin exposes console UI config import",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "statsPlayerCfgJsonFromClipboard(configText)",
+        "console UI config import accepts stats-player cfg values",
+        errors,
+    )
+    require_contains(
+        plugin_readme_source,
+        "`subtr_actor_apply_ui_config <json|cfg|url>`",
+        "BakkesMod README documents console UI config import",
         errors,
     )
 

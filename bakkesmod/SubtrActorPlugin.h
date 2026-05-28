@@ -623,6 +623,7 @@ private:
   std::string uiConfigJson();
   std::optional<std::string> statsPlayerCfgFromJson(const std::string &json);
   std::optional<std::string> statsPlayerCfgJsonFromClipboard(std::string_view clipboardText);
+  void applyUiConfigParams(std::vector<std::string> params);
   void applyUiConfigJson(const std::string &json, std::string_view sourceLabel);
   void loadUiConfig();
   void saveUiConfig();

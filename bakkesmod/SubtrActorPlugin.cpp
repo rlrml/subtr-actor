@@ -2861,6 +2861,11 @@ void SubtrActorPlugin::onLoad() {
       },
       "Toggles the subtr-actor in-game launcher window.",
       PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "subtr_actor_apply_ui_config",
+      [this](std::vector<std::string> params) { applyUiConfigParams(std::move(params)); },
+      "Applies a subtr-actor UI config. Usage: subtr_actor_apply_ui_config <json|cfg|url>",
+      PERMISSION_ALL);
   hookGameEvents();
 
   cvarManager->log("subtr-actor: mechanic overlay loaded");
@@ -3235,6 +3240,27 @@ void SubtrActorPlugin::loadUiConfig() {
 
   const std::string json((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   applyUiConfigJson(json, path.string());
+}
+
+void SubtrActorPlugin::applyUiConfigParams(std::vector<std::string> params) {
+  if (params.size() < 2) {
+    cvarManager->log(
+        "subtr-actor: usage: subtr_actor_apply_ui_config <json|cfg|stats-player-url>");
+    return;
+  }
+
+  std::vector<std::string> configParts(params.begin() + 1, params.end());
+  const std::string configText = joinStrings(configParts, " ");
+  if (const std::optional<std::string> configJson =
+          statsPlayerCfgJsonFromClipboard(configText)) {
+    applyUiConfigJson(*configJson, "console");
+    saveUiConfig();
+    cvarManager->log("subtr-actor: applied UI config from console");
+    return;
+  }
+
+  cvarManager->log(
+      "subtr-actor: console argument does not contain UI config JSON or a stats-player cfg value");
 }
 
 void SubtrActorPlugin::applyUiConfigJson(
