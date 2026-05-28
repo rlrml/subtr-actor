@@ -9447,6 +9447,15 @@ void SubtrActorPlugin::renderCameraWindow() {
         "%.2f");
   }
 
+  bool nextBallCamEnabled = cameraBallCamEnabled;
+  pushCameraDisabledStyle(!hasAttachedCamera);
+  const bool ballCamChanged = ImGui::Checkbox("Ball cam", &nextBallCamEnabled);
+  popCameraDisabledStyle(!hasAttachedCamera);
+  if (hasAttachedCamera && ballCamChanged) {
+    cameraBallCamEnabled = nextBallCamEnabled;
+    scheduleUiConfigAutosave();
+  }
+
   const float fov = cameraCustomSettingsEnabled ? cameraCustomFov : 110.0f;
   const float height = cameraCustomSettingsEnabled ? cameraCustomHeight : 100.0f;
   const float pitch = cameraCustomSettingsEnabled ? cameraCustomPitch : -4.0f;

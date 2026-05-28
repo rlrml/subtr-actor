@@ -825,12 +825,23 @@ def main() -> int:
         "plugin camera custom settings toggle mirrors web label",
         errors,
     )
+    require_contains(
+        web_player_template_source,
+        '<input id="ball-cam" type="checkbox" disabled />',
+        "stats evaluation player camera ball-cam toggle",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderCustomSlider(\n        "Transition speed",\n        cameraCustomTransitionSpeed,\n        0.5f,\n        2.0f,\n        "%.2f");\n  }\n\n  bool nextBallCamEnabled = cameraBallCamEnabled;\n  pushCameraDisabledStyle(!hasAttachedCamera);\n  const bool ballCamChanged = ImGui::Checkbox("Ball cam", &nextBallCamEnabled);',
+        "plugin camera ball-cam toggle follows custom settings controls like web",
+        errors,
+    )
     for plugin_only_camera_surface in (
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "CAMERA PROFILE");',
         'ImGui::BeginCombo("Target", selectedLabel.c_str())',
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "READOUT");',
         'ImGui::Button("Open player stats")',
-        'ImGui::Checkbox("Ball cam", &nextBallCamEnabled)',
         'ImGui::Checkbox("Custom settings", &nextCustomSettingsEnabled)',
     ):
         reject_contains(
