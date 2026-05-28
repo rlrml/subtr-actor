@@ -59,14 +59,11 @@ import {
   getStatsPlayerConfigSnapshot,
 } from "./appConfigSnapshot.ts";
 import {
-  getStatsPlayerConfigParamSnapshot,
-  getStatsPlayerConfigFromLocation,
-  isStatsPlayerConfigDebugEnabled,
   setStatsPlayerConfigOnUrl,
   type SingletonWindowId,
   type StatsPlayerConfig,
 } from "./playerConfig.ts";
-import { logStatsPlayerConfigLoadDebug } from "./playerConfigDebug.ts";
+import { loadInitialStatsPlayerConfig } from "./appInitialConfig.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -627,25 +624,13 @@ export function mountStatEvaluationPlayer(
     },
   });
 
-  const configParamSnapshot = getStatsPlayerConfigParamSnapshot(window.location);
-  const configDebugEnabled = isStatsPlayerConfigDebugEnabled(window.location);
-  let configLoadError: unknown = null;
-  if (options.initialConfig !== undefined) {
-    initialUrlConfig = options.initialConfig;
-  } else {
-    try {
-      initialUrlConfig = getStatsPlayerConfigFromLocation(window.location);
-    } catch (error) {
-      configLoadError = error;
-      console.error("Invalid stats player config:", error);
-      appElements.statusReadout.textContent =
-        error instanceof Error ? error.message : "Invalid stats player config";
-      initialUrlConfig = null;
-    }
-    if (configDebugEnabled) {
-      logStatsPlayerConfigLoadDebug(configParamSnapshot, initialUrlConfig, configLoadError);
-    }
-  }
+  initialUrlConfig = loadInitialStatsPlayerConfig({
+    initialConfig: options.initialConfig,
+    location: window.location,
+    setStatus(message) {
+      appElements.statusReadout.textContent = message;
+    },
+  });
 
   const listeners = new AbortController();
   floatingWindows.installDragging(appElements.floatingWindowLayer, listeners.signal);
