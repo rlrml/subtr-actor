@@ -3391,9 +3391,22 @@ void SubtrActorPlugin::applyUiConfigJson(
       renderEffectSpeedFlipEnabled = containsString(renderEffects, "speed-flip");
       renderEffectTouchEnabled = containsString(renderEffects, "touch");
       setCvarBool("subtr_actor_overlay_enabled", anyRenderEffect);
+    }
+    const bool hasPluginRenderEffects = jsonPropertyExists(*overlays, "pluginRenderEffects");
+    std::vector<std::string> pluginRenderEffects =
+        parseJsonStringArrayProperty(*overlays, "pluginRenderEffects");
+    const bool hasRenderEffects = jsonPropertyExists(*overlays, "renderEffects");
+    if (!hasPluginRenderEffects && hasRenderEffects) {
+      for (const char *id : {"mechanics", "team", "goal_context"}) {
+        if (containsString(renderEffects, id)) {
+          pluginRenderEffects.emplace_back(id);
+        }
+      }
+    }
+    if (hasPluginRenderEffects || hasRenderEffects) {
       setCvarBool(
           "subtr_actor_overlay_mechanics_enabled",
-          containsString(renderEffects, "mechanics") ||
+          containsString(pluginRenderEffects, "mechanics") ||
               renderEffectCeilingShotEnabled ||
               renderEffectFiftyFiftyEnabled ||
               renderEffectRelativePositioningEnabled ||
@@ -3402,10 +3415,10 @@ void SubtrActorPlugin::applyUiConfigJson(
               renderEffectTouchEnabled);
       setCvarBool(
           "subtr_actor_overlay_team_events_enabled",
-          containsString(renderEffects, "team") || renderEffectPressureEnabled);
+          containsString(pluginRenderEffects, "team") || renderEffectPressureEnabled);
       setCvarBool(
           "subtr_actor_overlay_goal_context_enabled",
-          containsString(renderEffects, "goal_context"));
+          containsString(pluginRenderEffects, "goal_context"));
     }
 
     const std::optional<bool> boostPads = parseJsonBoolProperty(*overlays, "boostPads");
@@ -4063,15 +4076,6 @@ std::string SubtrActorPlugin::uiConfigJson() {
   file << "    \"renderEffects\": [";
   wroteOverlayValue = false;
   const bool hudOverlayEnabled = cvarBool("subtr_actor_overlay_enabled", true);
-  writeOverlayId(
-      "mechanics",
-      hudOverlayEnabled && cvarBool("subtr_actor_overlay_mechanics_enabled", true));
-  writeOverlayId(
-      "team",
-      hudOverlayEnabled && cvarBool("subtr_actor_overlay_team_events_enabled", true));
-  writeOverlayId(
-      "goal_context",
-      hudOverlayEnabled && cvarBool("subtr_actor_overlay_goal_context_enabled", true));
   writeOverlayId("ceiling-shot", hudOverlayEnabled && renderEffectCeilingShotEnabled);
   writeOverlayId("fifty-fifty", hudOverlayEnabled && renderEffectFiftyFiftyEnabled);
   writeOverlayId("pressure", hudOverlayEnabled && renderEffectPressureEnabled);
@@ -4083,6 +4087,14 @@ std::string SubtrActorPlugin::uiConfigJson() {
       hudOverlayEnabled && renderEffectAbsolutePositioningEnabled);
   writeOverlayId("speed-flip", hudOverlayEnabled && renderEffectSpeedFlipEnabled);
   writeOverlayId("touch", hudOverlayEnabled && renderEffectTouchEnabled);
+  file << "],\n";
+  file << "    \"pluginRenderEffects\": [";
+  wroteOverlayValue = false;
+  writeOverlayId(
+      "mechanics",
+      cvarBool("subtr_actor_overlay_mechanics_enabled", true));
+  writeOverlayId("team", cvarBool("subtr_actor_overlay_team_events_enabled", true));
+  writeOverlayId("goal_context", cvarBool("subtr_actor_overlay_goal_context_enabled", true));
   file << "],\n";
   file << "    \"followedPlayerHud\": false,\n";
   file << "    \"boostPads\": "

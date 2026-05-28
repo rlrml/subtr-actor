@@ -1758,6 +1758,12 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        'jsonPropertyExists(*overlays, "pluginRenderEffects")',
+        "plugin-only render effects import uses separate plugin config field",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         'if (jsonPropertyExists(*boostConfig, "playerIds")) {',
         "web boost playerIds import uses JSON parser",
         errors,
@@ -1806,6 +1812,30 @@ def main() -> int:
         "      writeMechanicFilterId(token);\n"
         "    }",
         "web mechanics config exports concrete mechanic filters for all-mechanics selection",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'writeOverlayId(\n      "mechanics",\n      hudOverlayEnabled && cvarBool("subtr_actor_overlay_mechanics_enabled", true));',
+        "web renderEffects exports plugin-only broad mechanics id",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'writeOverlayId(\n      "team",\n      hudOverlayEnabled && cvarBool("subtr_actor_overlay_team_events_enabled", true));',
+        "web renderEffects exports plugin-only broad team id",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'writeOverlayId(\n      "goal_context",\n      hudOverlayEnabled && cvarBool("subtr_actor_overlay_goal_context_enabled", true));',
+        "web renderEffects exports plugin-only broad goal-context id",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'file << "    \\"pluginRenderEffects\\": [";',
+        "plugin-only render effects export uses separate plugin config field",
         errors,
     )
     require_contains(
