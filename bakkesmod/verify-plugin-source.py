@@ -1601,6 +1601,18 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        'appendUiEvent(UiEventRecord{\n      "goal",\n      "goal",',
+        "plugin sends goals to the web replay goal event source",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "pushGoalEventMessage(event);\n  pendingGoals.push_back(event);",
+        "plugin surfaces raw goal events before graph submission",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         'pushPlayerStatEventMessage(event);\n      pendingPlayerStatEvents.push_back(event);',
         "plugin surfaces inferred player stat events before graph submission",
         errors,

@@ -5282,6 +5282,7 @@ void SubtrActorPlugin::recordGoal(
     return;
   }
   rememberTeamScores(event);
+  pushGoalEventMessage(event);
   pendingGoals.push_back(event);
 
   recordExplicitPlayerStat(priForScoreIndex(server, assistIndex), SaPlayerStatEventKindAssist);
@@ -6974,6 +6975,27 @@ bool SubtrActorPlugin::uiEventVisible(const UiEventRecord &event) {
     return false;
   }
   return eventFilterAllows(cvarString("subtr_actor_overlay_event_types", "all"), event.category, event.type);
+}
+
+void SubtrActorPlugin::pushGoalEventMessage(const SaGoalEvent &event) {
+  const bool isBlue = event.scoring_team_is_team_0 != 0;
+  const std::string actor =
+      event.has_player != 0 ? playerLabel(event.player_index, event.scoring_team_is_team_0)
+                            : teamLabel(event.scoring_team_is_team_0);
+  std::string details = teamLabel(event.scoring_team_is_team_0);
+  if (event.has_team_zero_score != 0 && event.has_team_one_score != 0) {
+    details = std::format("Blue {} - {} Orange", event.team_zero_score, event.team_one_score);
+  }
+  appendUiEvent(UiEventRecord{
+      "goal",
+      "goal",
+      actor,
+      std::format("{} goal", actor),
+      details,
+      isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
+      event.timing.frame_number,
+      event.timing.time,
+  });
 }
 
 void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
