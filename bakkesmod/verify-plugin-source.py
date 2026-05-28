@@ -1936,6 +1936,12 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        "return eventTypeDisplayLabel(event.type);",
+        "plugin event playlist fallback source labels use web-like event display labels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
         "std::string formatEventPlaylistTime(float seconds)",
         "plugin event playlist uses web-like minute time labels",
         errors,
@@ -1991,6 +1997,7 @@ def main() -> int:
         'ImGui::TextDisabled("%s", event.category.c_str());',
         "playerLabel(event.player_index, event.is_team_0),\n      mechanicLabel(event.kind),",
         "teamEventLabel(event),\n      std::format",
+        'if (!event.details.empty()) {\n      ImGui::TextDisabled("%s", event.details.c_str());',
     ):
         reject_contains(
             plugin_source,

@@ -8947,7 +8947,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
         return source.option->label;
       }
     }
-    return event.type;
+    return eventTypeDisplayLabel(event.type);
   };
 
   ImGui::BeginChild("event-playlist-list", ImVec2{0.0f, 0.0f}, true);
@@ -8990,9 +8990,6 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     }
     if (!metaParts.empty()) {
       ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());
-    }
-    if (!event.details.empty()) {
-      ImGui::TextDisabled("%s", event.details.c_str());
     }
     if (active && eventPlaylistAutoFollow && activeEventKey != eventPlaylistLastActiveKey) {
       ImGui::SetScrollHereY(0.5f);
