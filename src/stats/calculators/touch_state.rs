@@ -142,6 +142,7 @@ impl TouchStateCalculator {
                     team_is_team_0: player.is_team_0,
                     player: Some(player.player_id.clone()),
                     closest_approach_distance: Some(collision_distance),
+                    dodge_contact: player.dodge_active,
                 })
             })
             .collect::<Vec<_>>();
@@ -220,6 +221,7 @@ impl TouchStateCalculator {
             closest_approach_distance: event
                 .closest_approach_distance
                 .or(candidate.closest_approach_distance),
+            dodge_contact: event.dodge_contact || candidate.dodge_contact,
             ..event.clone()
         }
     }

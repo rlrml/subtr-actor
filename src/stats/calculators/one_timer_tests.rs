@@ -37,6 +37,7 @@ fn touch(frame_number: usize, time: f32, player_id: PlayerId, is_team_0: bool) -
         team_is_team_0: is_team_0,
         player: Some(player_id),
         closest_approach_distance: Some(0.0),
+        dodge_contact: false,
     }
 }
 

@@ -111,6 +111,7 @@ fn explicit_touch_events_feed_touch_state_without_velocity_candidate() {
             team_is_team_0: true,
             player: Some(player_id.clone()),
             closest_approach_distance: None,
+            dodge_contact: false,
         }],
         ..FrameEventsState::default()
     };
@@ -145,6 +146,7 @@ fn explicit_touch_events_are_enriched_with_proximity_distance() {
             team_is_team_0: true,
             player: Some(player_id),
             closest_approach_distance: None,
+            dodge_contact: false,
         }],
         ..FrameEventsState::default()
     };

@@ -42,6 +42,7 @@ fn touch(
         team_is_team_0: is_team_0,
         player: player_id,
         closest_approach_distance: Some(0.0),
+        dodge_contact: false,
     }
 }
 

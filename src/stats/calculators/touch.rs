@@ -429,8 +429,9 @@ impl TouchCalculator {
             let height_band = Self::height_band_for_touch(vertical_state.sample(player_id));
             let surface =
                 Self::surface_for_touch(Self::player_position(players, player_id), height_band);
-            let dodge_state =
-                TouchDodgeState::from_dodge_active(Self::player_dodge_active(players, player_id));
+            let dodge_state = TouchDodgeState::from_dodge_active(
+                touch_event.dodge_contact || Self::player_dodge_active(players, player_id),
+            );
             let controlled_touch_kind = Self::controlled_touch_kind(ball, players, player_id);
             let classification = Self::classify_touch(
                 height_band,

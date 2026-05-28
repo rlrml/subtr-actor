@@ -19,6 +19,12 @@ test("fifty-fifty event derivation can populate compacted player and team stats"
           is_kickoff: true,
           team_zero_player: bluePlayer,
           team_one_player: orangePlayer,
+          team_zero_touch_time: 1,
+          team_zero_touch_frame: 10,
+          team_zero_dodge_contact: true,
+          team_one_touch_time: 1,
+          team_one_touch_frame: 10,
+          team_one_dodge_contact: false,
           team_zero_position: [0, -100, 0],
           team_one_position: [0, 100, 0],
           midpoint: [0, 0, 0],
@@ -34,6 +40,12 @@ test("fifty-fifty event derivation can populate compacted player and team stats"
           is_kickoff: false,
           team_zero_player: bluePlayer,
           team_one_player: orangePlayer,
+          team_zero_touch_time: 3,
+          team_zero_touch_frame: 30,
+          team_zero_dodge_contact: false,
+          team_one_touch_time: 3,
+          team_one_touch_frame: 30,
+          team_one_dodge_contact: true,
           team_zero_position: [0, -100, 0],
           team_one_position: [0, 100, 0],
           midpoint: [0, 0, 0],
@@ -101,6 +113,18 @@ test("fifty-fifty event derivation can populate compacted player and team stats"
   assert.equal(
     (timeline.frames[2]?.players[0]?.fifty_fifty as { labeled_event_counts?: unknown })
       .labeled_event_counts != null,
+    true,
+  );
+  assert.equal(
+    timeline.frames[1]?.players[0]?.fifty_fifty.labeled_event_counts?.entries.some((entry) =>
+      entry.labels.some((label) => label.key === "dodge_state" && label.value === "dodge"),
+    ),
+    true,
+  );
+  assert.equal(
+    timeline.frames[2]?.players[1]?.fifty_fifty.labeled_event_counts?.entries.some((entry) =>
+      entry.labels.some((label) => label.key === "dodge_state" && label.value === "dodge"),
+    ),
     true,
   );
 });

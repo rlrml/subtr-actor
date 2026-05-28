@@ -2951,6 +2951,14 @@ fn parse_fifty_fifty_event(value: &Value) -> SubtrActorResult<FiftyFiftyEvent> {
         is_kickoff: json_required_bool(object, "is_kickoff")?,
         team_zero_player: json_optional_remote_id(object.get("team_zero_player"))?,
         team_one_player: json_optional_remote_id(object.get("team_one_player"))?,
+        team_zero_touch_time: json_optional_f32(object.get("team_zero_touch_time"))?,
+        team_zero_touch_frame: json_optional_usize(object.get("team_zero_touch_frame"))?,
+        team_zero_dodge_contact: json_optional_bool(object.get("team_zero_dodge_contact"))
+            .unwrap_or(false),
+        team_one_touch_time: json_optional_f32(object.get("team_one_touch_time"))?,
+        team_one_touch_frame: json_optional_usize(object.get("team_one_touch_frame"))?,
+        team_one_dodge_contact: json_optional_bool(object.get("team_one_dodge_contact"))
+            .unwrap_or(false),
         team_zero_position: json_required_vec3(object, "team_zero_position")?,
         team_one_position: json_required_vec3(object, "team_one_position")?,
         midpoint: json_required_vec3(object, "midpoint")?,

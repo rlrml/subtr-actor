@@ -1190,6 +1190,7 @@ fn explicit_touch_events(frame: &FrameInfo, events: &[SaTouchEvent]) -> Vec<Touc
             player,
             closest_approach_distance: (event.has_closest_approach_distance != 0)
                 .then_some(event.closest_approach_distance),
+            dodge_contact: false,
         });
     }
     accepted
@@ -4708,6 +4709,12 @@ mod tests {
             is_kickoff: false,
             team_zero_player: Some(RemoteId::SplitScreen(0)),
             team_one_player: Some(RemoteId::SplitScreen(1)),
+            team_zero_touch_time: None,
+            team_zero_touch_frame: None,
+            team_zero_dodge_contact: false,
+            team_one_touch_time: None,
+            team_one_touch_frame: None,
+            team_one_dodge_contact: false,
             team_zero_position: [0.0, 0.0, 0.0],
             team_one_position: [100.0, 0.0, 0.0],
             midpoint: [50.0, 0.0, 0.0],
@@ -9877,6 +9884,7 @@ mod tests {
             player: Some(RemoteId::SplitScreen(2)),
             team_is_team_0: true,
             closest_approach_distance: Some(8.0),
+            dodge_contact: false,
         }];
         let dodge_refreshed_events = vec![DodgeRefreshedEvent {
             time: frame.time,
@@ -10149,6 +10157,7 @@ mod tests {
                     team_is_team_0: true,
                     player: Some(RemoteId::SplitScreen(0)),
                     closest_approach_distance: Some(12.0),
+                    dodge_contact: false,
                 }],
                 dodge_refreshed_events: vec![DodgeRefreshedEvent {
                     time,

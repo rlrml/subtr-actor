@@ -42,6 +42,7 @@ fn touch(
         team_is_team_0: is_team_0,
         player: player_id,
         closest_approach_distance: Some(0.0),
+        dodge_contact: false,
     }
 }
 
@@ -117,6 +118,12 @@ fn active_fifty_fifty(
             is_kickoff: false,
             team_zero_player: Some(team_zero_player),
             team_one_player: Some(team_one_player),
+            team_zero_touch_time: Some(time),
+            team_zero_touch_frame: Some(frame_number),
+            team_zero_dodge_contact: false,
+            team_one_touch_time: Some(time),
+            team_one_touch_frame: Some(frame_number),
+            team_one_dodge_contact: false,
             team_zero_position: [0.0, 0.0, 0.0],
             team_one_position: [100.0, 0.0, 0.0],
             midpoint: [50.0, 0.0, 0.0],

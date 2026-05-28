@@ -55,6 +55,23 @@ fn touch_state(frame_number: usize, player_id: &PlayerId) -> TouchState {
             team_is_team_0: true,
             player: Some(player_id.clone()),
             closest_approach_distance: None,
+            dodge_contact: false,
+        }],
+        last_touch_player: Some(player_id.clone()),
+        last_touch_team_is_team_0: Some(true),
+        ..TouchState::default()
+    }
+}
+
+fn dodge_contact_touch_state(frame_number: usize, player_id: &PlayerId) -> TouchState {
+    TouchState {
+        touch_events: vec![TouchEvent {
+            time: frame_number as f32 * 0.1,
+            frame: frame_number,
+            team_is_team_0: true,
+            player: Some(player_id.clone()),
+            closest_approach_distance: None,
+            dodge_contact: true,
         }],
         last_touch_player: Some(player_id.clone()),
         last_touch_team_is_team_0: Some(true),
@@ -228,6 +245,42 @@ fn dodge_active_hit_counts_as_dodge_hit() {
         ]),
         1
     );
+}
+
+#[test]
+fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+
+    calculator
+        .update(
+            &frame(0),
+            &ball(0.0, 0.0),
+            &PlayerFrameState::default(),
+            &PlayerVerticalState::default(),
+            &TouchState::default(),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            true,
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(1),
+            &ball_with_velocity(0.0, 0.0, glam::Vec3::new(0.0, 500.0, 0.0)),
+            &player_frame_state_with_dodge_active(&player_id, glam::Vec3::ZERO, false),
+            &vertical_state(&player_id, 0.0),
+            &dodge_contact_touch_state(1, &player_id),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            true,
+        )
+        .unwrap();
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.dodge_touch_count(), 1);
+    assert_eq!(stats.dodge_hit_count(), 1);
+    assert_eq!(calculator.events()[0].dodge_state, "dodge");
 }
 
 #[test]
@@ -424,6 +477,12 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
         is_kickoff: false,
         team_zero_player: Some(blue_player.clone()),
         team_one_player: Some(orange_player.clone()),
+        team_zero_touch_time: Some(0.1),
+        team_zero_touch_frame: Some(1),
+        team_zero_dodge_contact: false,
+        team_one_touch_time: Some(0.1),
+        team_one_touch_frame: Some(1),
+        team_one_dodge_contact: false,
         team_zero_position: [0.0, -100.0, 0.0],
         team_one_position: [0.0, 100.0, 0.0],
         midpoint: [0.0, 0.0, 0.0],
@@ -437,6 +496,12 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
         is_kickoff: false,
         team_zero_player: active_fifty.team_zero_player.clone(),
         team_one_player: active_fifty.team_one_player.clone(),
+        team_zero_touch_time: active_fifty.team_zero_touch_time,
+        team_zero_touch_frame: active_fifty.team_zero_touch_frame,
+        team_zero_dodge_contact: active_fifty.team_zero_dodge_contact,
+        team_one_touch_time: active_fifty.team_one_touch_time,
+        team_one_touch_frame: active_fifty.team_one_touch_frame,
+        team_one_dodge_contact: active_fifty.team_one_dodge_contact,
         team_zero_position: active_fifty.team_zero_position,
         team_one_position: active_fifty.team_one_position,
         midpoint: active_fifty.midpoint,
