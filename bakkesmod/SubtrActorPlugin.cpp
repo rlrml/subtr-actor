@@ -11719,6 +11719,26 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
     return;
   }
 
+  auto pushAdHocTargetSelectorStyle = [](std::optional<LinearColor> teamColor) {
+    ImGui::SetNextItemWidth(std::min(112.0f, ImGui::GetContentRegionAvail().x));
+    if (!teamColor) {
+      return 0;
+    }
+
+    const ImVec4 accent = toImVec4(*teamColor);
+    ImGui::PushStyleColor(ImGuiCol_Border, accent);
+    ImGui::PushStyleColor(
+        ImGuiCol_FrameBg,
+        ImVec4{accent.x * 0.18f, accent.y * 0.18f, accent.z * 0.18f, 0.58f});
+    ImGui::PushStyleColor(
+        ImGuiCol_FrameBgHovered,
+        ImVec4{accent.x * 0.24f, accent.y * 0.24f, accent.z * 0.24f, 0.74f});
+    ImGui::PushStyleColor(
+        ImGuiCol_FrameBgActive,
+        ImVec4{accent.x * 0.30f, accent.y * 0.30f, accent.z * 0.30f, 0.88f});
+    return 4;
+  };
+
   if (playerScoped) {
     const SaPlayerFrame *selected = nullptr;
     if (const std::optional<uint32_t> selectedPlayerIndex =
@@ -11727,8 +11747,18 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
     }
     const std::string selectedLabel =
         selected ? playerLabel(selected->player_index, selected->is_team_0) : "Select player";
-    if (ImGui::BeginCombo(std::format("##ad-hoc-target-{}-{}", window.id, index).c_str(),
-                          selectedLabel.c_str())) {
+    const std::optional<LinearColor> selectedColor =
+        selected ? std::make_optional(selected->is_team_0 != 0 ? LinearColor{80, 190, 255, 255}
+                                                              : LinearColor{255, 175, 80, 255})
+                 : std::nullopt;
+    const int selectorStyleColors = pushAdHocTargetSelectorStyle(selectedColor);
+    const bool comboOpen = ImGui::BeginCombo(
+        std::format("##ad-hoc-target-{}-{}", window.id, index).c_str(),
+        selectedLabel.c_str());
+    if (selectorStyleColors > 0) {
+      ImGui::PopStyleColor(selectorStyleColors);
+    }
+    if (comboOpen) {
       for (uint8_t isTeam0 : {uint8_t{1}, uint8_t{0}}) {
         const bool hasTeamPlayers = std::any_of(
             sampledPlayers.begin(),
@@ -11765,9 +11795,17 @@ void SubtrActorPlugin::renderAdHocTargetSelector(
   }
 
   const char *selectedTeam = entry.target_id == "orange" ? "Orange" : "Blue";
-  if (ImGui::BeginCombo(
-          std::format("##ad-hoc-target-{}-{}", window.id, index).c_str(),
-          selectedTeam)) {
+  const std::optional<LinearColor> selectedColor =
+      entry.target_id == "orange" ? std::make_optional(LinearColor{255, 175, 80, 255})
+                                  : std::make_optional(LinearColor{80, 190, 255, 255});
+  const int selectorStyleColors = pushAdHocTargetSelectorStyle(selectedColor);
+  const bool comboOpen = ImGui::BeginCombo(
+      std::format("##ad-hoc-target-{}-{}", window.id, index).c_str(),
+      selectedTeam);
+  if (selectorStyleColors > 0) {
+    ImGui::PopStyleColor(selectorStyleColors);
+  }
+  if (comboOpen) {
     for (const auto &[label, targetId, isTeam0] : {
              std::tuple<const char *, const char *, uint8_t>{"Blue", "blue", uint8_t{1}},
              std::tuple<const char *, const char *, uint8_t>{"Orange", "orange", uint8_t{0}},

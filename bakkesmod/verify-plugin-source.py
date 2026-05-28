@@ -917,6 +917,26 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "const teamClass = getStatTargetTeamClass(definition, entry.targetId);\n"
+        "    if (teamClass) {\n"
+        "      targetSelect.classList.add(teamClass);\n"
+        "    }",
+        "stats evaluation player ad-hoc target selector applies team accent class",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".stats-window-stat-target {\n"
+        "  max-width: 7rem;\n"
+        "  margin-left: 0.35rem;\n"
+        "  padding: 0.16rem 0.3rem;\n"
+        "  border-radius: var(--ui-radius-sm);\n"
+        "  font-size: 0.7rem;",
+        "stats evaluation player ad-hoc target selector compact sizing",
+        errors,
+    )
+    require_contains(
         plugin_source,
         "void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window)",
         "plugin ad-hoc stats renderer",
@@ -926,6 +946,30 @@ def main() -> int:
         plugin_source,
         "renderAdHocTargetSelector(window, entry, statId, i);",
         "plugin ad-hoc rows expose target selector",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "auto pushAdHocTargetSelectorStyle = [](std::optional<LinearColor> teamColor) {\n"
+        "    ImGui::SetNextItemWidth(std::min(112.0f, ImGui::GetContentRegionAvail().x));",
+        "plugin ad-hoc target selector uses compact web-like width",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const int selectorStyleColors = pushAdHocTargetSelectorStyle(selectedColor);\n"
+        "    const bool comboOpen = ImGui::BeginCombo(\n"
+        "        std::format(\"##ad-hoc-target-{}-{}\", window.id, index).c_str(),",
+        "plugin ad-hoc target selector wraps combo in team accent style",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PushStyleColor(ImGuiCol_Border, accent);\n"
+        "    ImGui::PushStyleColor(\n"
+        "        ImGuiCol_FrameBg,\n"
+        "        ImVec4{accent.x * 0.18f, accent.y * 0.18f, accent.z * 0.18f, 0.58f});",
+        "plugin ad-hoc target selector applies team accent frame",
         errors,
     )
     require_contains(
