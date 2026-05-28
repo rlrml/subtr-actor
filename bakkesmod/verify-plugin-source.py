@@ -1130,6 +1130,18 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        '.join(" · ");',
+        "stats evaluation player event playlist row meta uses dot separator",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'joinStrings(metaParts, " · ")',
+        "plugin event playlist row meta uses web-like dot separator",
+        errors,
+    )
+    require_contains(
         plugin_source,
         "std::string formatEventPlaylistTime(float seconds)",
         "plugin event playlist uses web-like minute time labels",
@@ -1158,6 +1170,16 @@ def main() -> int:
         "plugin event playlist visible cue mini-button",
         errors,
     )
+    for plugin_only_event_playlist_row_meta in (
+        'joinStrings(metaParts, " / ").c_str());\n    }\n    if (!event.details.empty())',
+        'ImGui::TextDisabled("%s", event.category.c_str());',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_event_playlist_row_meta,
+            "plugin event playlist row plugin-only metadata surface",
+            errors,
+        )
     require_contains(
         web_player_main_source,
         'button.className = "mechanics-review-item";',

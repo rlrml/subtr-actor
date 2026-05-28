@@ -8522,12 +8522,11 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       metaParts.push_back(event.type);
     }
     if (!metaParts.empty()) {
-      ImGui::TextDisabled("%s", joinStrings(metaParts, " / ").c_str());
+      ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());
     }
     if (!event.details.empty()) {
       ImGui::TextDisabled("%s", event.details.c_str());
     }
-    ImGui::TextDisabled("%s", event.category.c_str());
     if (active && eventPlaylistAutoFollow) {
       ImGui::SetScrollHereY(0.5f);
     }
