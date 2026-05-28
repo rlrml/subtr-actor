@@ -2544,8 +2544,35 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::Selectable(itemLabel.c_str(), active)',
-        "plugin event playlist rows are selectable items",
+        "auto renderEventPlaylistItem = [&](const std::string &timeLabel,\n"
+        "                                     const std::string &eventLabel,\n"
+        "                                     const std::string &metaLabel,\n"
+        "                                     const ImVec4 &eventColor,\n"
+        "                                     bool active)",
+        "plugin event playlist rows use a web-like card renderer",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const bool clicked = ImGui::InvisibleButton(buttonId.c_str(), ImVec2{rowWidth, rowHeight});',
+        "plugin event playlist card rows keep button click behavior",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "drawList->AddRectFilled(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(rowBg), 6.0f);\n"
+        "    drawList->AddRect(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(border), 6.0f);",
+        "plugin event playlist rows draw bordered card chrome",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "drawList->AddRectFilled(\n"
+        "        rowMin,\n"
+        "        ImVec2{rowMin.x + colorRailWidth, rowMax.y},\n"
+        "        eventColorU32,\n"
+        "        6.0f);",
+        "plugin event playlist rows draw the web-like colored left rail",
         errors,
     )
     require_contains(
@@ -2586,20 +2613,29 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'const std::string itemLabel = std::format("{}##event-playlist-item", eventLabel);',
-        "plugin event playlist row title excludes time like web title column",
+        "const std::string metaLabel = joinStrings(metaParts, \" · \");",
+        "plugin event playlist row metadata mirrors web joined meta text",
         errors,
     )
     require_contains(
         plugin_source,
-        'ImGui::TextDisabled("%s", timeLabel.c_str());\n    ImGui::SameLine(64.0f);',
-        "plugin event playlist renders time as a separate column",
+        "drawList->AddText(\n"
+        "        ImVec2{timeX, titleY},\n"
+        "        IM_COL32(137, 164, 186, 255),\n"
+        "        timeLabel.c_str());",
+        "plugin event playlist renders time as a separate muted column",
         errors,
     )
     require_contains(
         plugin_source,
-        'ImGui::SetCursorPosX(64.0f);\n      ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());',
-        "plugin event playlist metadata aligns under title column",
+        "drawList->AddText(ImVec2{mainX, titleY}, IM_COL32(237, 245, 250, 255), eventLabel.c_str());",
+        "plugin event playlist title draws in the main title column",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "drawList->AddText(ImVec2{mainX, metaY}, IM_COL32(137, 164, 186, 255), metaLabel.c_str());",
+        "plugin event playlist metadata draws below the title column",
         errors,
     )
     reject_contains(
@@ -2608,6 +2644,19 @@ def main() -> int:
         "plugin event playlist row title falls back to raw event type",
         errors,
     )
+    for plugin_only_event_playlist_row_surface in (
+        'ImGui::Selectable(itemLabel.c_str(), active)',
+        'const std::string itemLabel = std::format("{}##event-playlist-item", eventLabel);',
+        'ImGui::TextDisabled("%s", timeLabel.c_str());\n    ImGui::SameLine(64.0f);',
+        'ImGui::SetCursorPosX(64.0f);\n      ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());',
+        "ImGui::Separator();\n    ImGui::PopID();",
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_event_playlist_row_surface,
+            "plugin event playlist plugin-only flat row surface",
+            errors,
+        )
     require_contains(
         web_player_timeline_markers_source,
         'label: `${playerName} speed flip ${qualityPercent}%`,',

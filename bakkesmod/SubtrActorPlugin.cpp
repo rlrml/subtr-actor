@@ -9058,6 +9058,58 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     }
     return eventTypeDisplayLabel(event.type);
   };
+  auto renderEventPlaylistItem = [&](const std::string &timeLabel,
+                                     const std::string &eventLabel,
+                                     const std::string &metaLabel,
+                                     const ImVec4 &eventColor,
+                                     bool active) {
+    constexpr float timeColumnWidth = 54.0f;
+    constexpr float rowPaddingX = 10.0f;
+    constexpr float rowPaddingY = 8.0f;
+    constexpr float colorRailWidth = 4.0f;
+    constexpr float columnGap = 10.0f;
+    const float rowWidth = ImGui::GetContentRegionAvail().x;
+    const float rowHeight = ImGui::GetTextLineHeight() * 2.0f + rowPaddingY * 2.0f + 2.0f;
+    const std::string buttonId = std::format("##event-playlist-item-{}", eventLabel);
+    const bool clicked = ImGui::InvisibleButton(buttonId.c_str(), ImVec2{rowWidth, rowHeight});
+    const bool hovered = ImGui::IsItemHovered();
+    const ImVec2 rowMin = ImGui::GetItemRectMin();
+    const ImVec2 rowMax = ImGui::GetItemRectMax();
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    const ImU32 eventColorU32 = ImGui::ColorConvertFloat4ToU32(eventColor);
+    const ImVec4 rowBg = (active || hovered)
+                             ? ImVec4{eventColor.x, eventColor.y, eventColor.z, 0.15f}
+                             : ImVec4{1.0f, 1.0f, 1.0f, 0.035f};
+    const ImVec4 border = (active || hovered)
+                              ? ImVec4{eventColor.x, eventColor.y, eventColor.z, 0.48f}
+                              : ImVec4{1.0f, 1.0f, 1.0f, 0.09f};
+    drawList->AddRectFilled(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(rowBg), 6.0f);
+    drawList->AddRect(rowMin, rowMax, ImGui::ColorConvertFloat4ToU32(border), 6.0f);
+    drawList->AddRectFilled(
+        rowMin,
+        ImVec2{rowMin.x + colorRailWidth, rowMax.y},
+        eventColorU32,
+        6.0f);
+
+    const float timeX = rowMin.x + rowPaddingX + colorRailWidth;
+    const float mainX = timeX + timeColumnWidth + columnGap;
+    const float titleY = rowMin.y + rowPaddingY;
+    const float metaY = titleY + ImGui::GetTextLineHeight() + 3.0f;
+    drawList->AddText(
+        ImVec2{timeX, titleY},
+        IM_COL32(137, 164, 186, 255),
+        timeLabel.c_str());
+    drawList->PushClipRect(
+        ImVec2{mainX, rowMin.y},
+        ImVec2{rowMax.x - rowPaddingX, rowMax.y},
+        true);
+    drawList->AddText(ImVec2{mainX, titleY}, IM_COL32(237, 245, 250, 255), eventLabel.c_str());
+    if (!metaLabel.empty()) {
+      drawList->AddText(ImVec2{mainX, metaY}, IM_COL32(137, 164, 186, 255), metaLabel.c_str());
+    }
+    drawList->PopClipRect();
+    return clicked;
+  };
 
   ImGui::BeginChild("event-playlist-list", ImVec2{0.0f, 0.0f}, true);
   for (const size_t index : playlistEventIndexes) {
@@ -9072,22 +9124,6 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     const std::string timeLabel = formatEventPlaylistTime(event.time);
     const std::string sourceLabel = sourceLabelForEvent(event);
     const std::string eventLabel = event.label.empty() ? sourceLabel : event.label;
-    const std::string itemLabel = std::format("{}##event-playlist-item", eventLabel);
-    ImGui::TextDisabled("%s", timeLabel.c_str());
-    ImGui::SameLine(64.0f);
-    ImGui::PushStyleColor(ImGuiCol_Text, color);
-    const bool selected = ImGui::Selectable(itemLabel.c_str(), active);
-    ImGui::PopStyleColor();
-    if (selected) {
-      mechanicsReviewClipActive = false;
-      playbackCurrentTime = seekTime;
-      playbackSkipPostGoalTransitions = false;
-      playbackSkipKickoffs = false;
-      showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
-      if (hasReplayServer) {
-        replayServer.SkipToTime(seekTime);
-      }
-    }
     std::vector<std::string> metaParts;
     if (!event.actor.empty()) {
       metaParts.push_back(event.actor);
@@ -9098,14 +9134,22 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     if (!sourceLabel.empty()) {
       metaParts.push_back(sourceLabel);
     }
-    if (!metaParts.empty()) {
-      ImGui::SetCursorPosX(64.0f);
-      ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());
+    const std::string metaLabel = joinStrings(metaParts, " · ");
+    const bool selected =
+        renderEventPlaylistItem(timeLabel, eventLabel, metaLabel, color, active);
+    if (selected) {
+      mechanicsReviewClipActive = false;
+      playbackCurrentTime = seekTime;
+      playbackSkipPostGoalTransitions = false;
+      playbackSkipKickoffs = false;
+      showSingletonWindow(uiPlaybackControlsOpen, playbackControlsPlacement);
+      if (hasReplayServer) {
+        replayServer.SkipToTime(seekTime);
+      }
     }
     if (active && eventPlaylistAutoFollow && activeEventKey != eventPlaylistLastActiveKey) {
       ImGui::SetScrollHereY(0.5f);
     }
-    ImGui::Separator();
     ImGui::PopID();
   }
   eventPlaylistLastActiveKey = activeEventKey;
