@@ -870,8 +870,38 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::TextDisabled("%s", event.details.empty() ? "Unlabeled" : event.details.c_str());',
+        'ImGui::TextDisabled("%s", tags.empty() ? "Unlabeled" : joinStrings(tags, " · ").c_str());',
         "plugin unlabeled goal tag fallback mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.confidence * 100)}%`;",
+        "stats evaluation player goal-label tag confidence chips",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "auto goalTagText = [](const UiEventRecord &event) {",
+        "plugin goal-label window formats replay goal tags",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool samePlayer = goalEvent.has_player == 0 || candidate.has_player == 0 ||",
+        "plugin goal-label tags match scorer like web goal tags",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool nearbyTime = std::fabs(candidate.time - goalEvent.time) <= 0.25f;",
+        "plugin goal-label tags associate with nearby goal context",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'ImGui::TextDisabled("%s", event.details.empty() ? "Unlabeled" : event.details.c_str());',
+        "plugin goal labels use event details instead of goal tag chips",
         errors,
     )
     for plugin_only_goal_labels_surface in (

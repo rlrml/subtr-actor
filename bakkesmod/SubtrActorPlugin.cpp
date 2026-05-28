@@ -12113,6 +12113,63 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
 
 void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
   (void)window;
+  auto isGoalTagEvent = [](const UiEventRecord &event) {
+    if (event.category != "mechanics") {
+      return false;
+    }
+    return event.type == "aerial_goal" || event.type == "high_aerial_goal" ||
+           event.type == "long_distance_goal" || event.type == "own_half_goal" ||
+           event.type == "empty_net_goal" || event.type == "counter_attack_goal" ||
+           event.type == "flick_goal" || event.type == "double_tap_goal" ||
+           event.type == "one_timer_goal" || event.type == "passing_goal" ||
+           event.type == "air_dribble_goal" || event.type == "flip_reset_goal" ||
+           event.type == "half_volley_goal";
+  };
+  auto goalTagText = [](const UiEventRecord &event) {
+    std::string label = event.label;
+    if (!event.actor.empty()) {
+      const std::string actorPrefix = event.actor + " ";
+      if (label.rfind(actorPrefix, 0) == 0) {
+        label = label.substr(actorPrefix.size());
+      }
+    }
+
+    std::string confidence = "100%";
+    const size_t parenthesizedConfidence = label.rfind(" (");
+    if (parenthesizedConfidence != std::string::npos && !label.empty() &&
+        label.back() == ')' &&
+        label.find('%', parenthesizedConfidence) != std::string::npos) {
+      confidence = label.substr(
+          parenthesizedConfidence + 2,
+          label.size() - parenthesizedConfidence - 3);
+      label = label.substr(0, parenthesizedConfidence);
+    } else if (const size_t percent = event.details.find('%');
+               percent != std::string::npos) {
+      const size_t start = event.details.rfind(' ', percent);
+      confidence = event.details.substr(start == std::string::npos ? 0 : start + 1, percent + 1);
+    }
+
+    return std::format("{} {}", label, confidence);
+  };
+  auto goalTagsForEvent = [&](const UiEventRecord &goalEvent) {
+    std::vector<std::string> tags;
+    for (const UiEventRecord &candidate : recentUiEvents) {
+      if (!isGoalTagEvent(candidate)) {
+        continue;
+      }
+      const bool samePlayer = goalEvent.has_player == 0 || candidate.has_player == 0 ||
+                              goalEvent.player_index == candidate.player_index;
+      const bool sameFrame = candidate.frame_number == goalEvent.frame_number;
+      const bool nearbyTime = std::fabs(candidate.time - goalEvent.time) <= 0.25f;
+      if (samePlayer && (sameFrame || nearbyTime)) {
+        tags.push_back(goalTagText(candidate));
+      }
+    }
+    std::sort(tags.begin(), tags.end());
+    tags.erase(std::unique(tags.begin(), tags.end()), tags.end());
+    return tags;
+  };
+
   std::vector<size_t> goalEventIndexes;
   goalEventIndexes.reserve(recentUiEvents.size());
   for (size_t index = 0; index < recentUiEvents.size(); index += 1) {
@@ -12143,7 +12200,8 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
         "%s · %s",
         formatEventPlaylistTime(event.time).c_str(),
         event.actor.empty() ? "Unknown scorer" : event.actor.c_str());
-    ImGui::TextDisabled("%s", event.details.empty() ? "Unlabeled" : event.details.c_str());
+    const std::vector<std::string> tags = goalTagsForEvent(event);
+    ImGui::TextDisabled("%s", tags.empty() ? "Unlabeled" : joinStrings(tags, " · ").c_str());
     if (ImGui::SmallButton("Watch")) {
       mechanicsReviewClipActive = false;
       playbackCurrentTime = seekTime;
