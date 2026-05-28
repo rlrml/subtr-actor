@@ -666,6 +666,7 @@ private:
   void pushEventMessage(const SaMechanicEvent &event);
   void pushTeamEventMessage(const SaTeamEvent &event);
   void pushGoalContextEventMessage(const SaGoalContextEvent &event);
+  void pushPlayerStatEventMessage(const SaPlayerStatEvent &event);
   bool overlayCategoryEnabled(std::string_view category);
   bool overlayMechanicEnabled(SaMechanicKind kind);
   std::string playerLabel(uint32_t playerIndex, uint8_t isTeam0) const;

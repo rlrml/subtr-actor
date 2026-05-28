@@ -206,9 +206,10 @@ struct UiStatIdAlias {
 
 std::string normalizeUiStatId(std::string_view statId);
 
-constexpr std::array<EventFilterOption, 33> EVENT_FILTER_OPTIONS{{
+constexpr std::array<EventFilterOption, 34> EVENT_FILTER_OPTIONS{{
     {"all", "All events", "All"},
     {"goal", "Goal", "Replay"},
+    {"core", "Shots, saves, assists", "Replay"},
     {"mechanics", "All mechanics", "Sources"},
     {"team", "Team events", "Sources"},
     {"goal_context", "Goal context", "Sources"},
@@ -1983,13 +1984,39 @@ std::string webTimelineEventSourceIdForFilterToken(std::string_view token) {
   if (token == "goal" || token == "mechanics" || token == "team" || token == "goal_context") {
     return {};
   }
-  if (token != "touch" && !isMechanicFilterToken(token)) {
+  if (token != "core" && token != "touch" && !isMechanicFilterToken(token)) {
     return {};
   }
 
   std::string id{token};
   std::replace(id.begin(), id.end(), '_', '-');
   return id;
+}
+
+std::string_view playerStatEventType(SaPlayerStatEventKind kind) {
+  switch (kind) {
+  case SaPlayerStatEventKindShot:
+    return "shot";
+  case SaPlayerStatEventKindSave:
+    return "save";
+  case SaPlayerStatEventKindAssist:
+    return "assist";
+  default:
+    return "core";
+  }
+}
+
+std::string_view playerStatEventLabel(SaPlayerStatEventKind kind) {
+  switch (kind) {
+  case SaPlayerStatEventKindShot:
+    return "Shot";
+  case SaPlayerStatEventKindSave:
+    return "Save";
+  case SaPlayerStatEventKindAssist:
+    return "Assist";
+  default:
+    return "Core event";
+  }
 }
 
 void appendUniqueFilterToken(std::vector<std::string> &tokens, std::string_view token) {
@@ -5332,6 +5359,7 @@ void SubtrActorPlugin::recordPlayerStatDeltas(
           event.shot_player = sampleRigidBody(car);
         }
       }
+      pushPlayerStatEventMessage(event);
       pendingPlayerStatEvents.push_back(event);
     }
   };
@@ -5367,6 +5395,7 @@ void SubtrActorPlugin::recordExplicitPlayerStat(PriWrapper pri, SaPlayerStatEven
   event.player_index = *playerIndex;
   event.is_team_0 = pri.GetTeamNum() == 0 ? 1 : 0;
   event.kind = kind;
+  pushPlayerStatEventMessage(event);
   pendingPlayerStatEvents.push_back(event);
 
   if (lastPlayerStats.find(pri.memory_address) == lastPlayerStats.end()) {
@@ -7050,6 +7079,23 @@ void SubtrActorPlugin::pushGoalContextEventMessage(const SaGoalContextEvent &eve
   while (messages.size() > static_cast<size_t>(overlayMaxMessages())) {
     messages.pop_front();
   }
+}
+
+void SubtrActorPlugin::pushPlayerStatEventMessage(const SaPlayerStatEvent &event) {
+  const bool isBlue = event.is_team_0 != 0;
+  const std::string actor = playerLabel(event.player_index, event.is_team_0);
+  const std::string label =
+      std::format("{} {}", actor, playerStatEventLabel(event.kind));
+  appendUiEvent(UiEventRecord{
+      "core",
+      std::string{playerStatEventType(event.kind)},
+      actor,
+      label,
+      "Shots, saves, assists",
+      isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
+      event.timing.frame_number,
+      event.timing.time,
+  });
 }
 
 void SubtrActorPlugin::Render() {

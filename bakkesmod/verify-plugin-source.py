@@ -1557,6 +1557,7 @@ def main() -> int:
             errors,
         )
     for label, plugin_needle in (
+        ("Shots, saves, assists", '{"core", "Shots, saves, assists", "Replay"}'),
         ("Possession", '"Possession",\n        timelineRangePossessionEnabled'),
         ("Half control", '"Half control",\n        timelineRangePressureEnabled'),
         ("Rush", '"Rush", timelineRangeRushEnabled'),
@@ -1574,6 +1575,24 @@ def main() -> int:
             f"plugin module summary label {label}",
             errors,
         )
+    require_contains(
+        plugin_source,
+        'appendUiEvent(UiEventRecord{\n      "core",',
+        "plugin sends shot/save/assist events to the web core event source",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'pushPlayerStatEventMessage(event);\n      pendingPlayerStatEvents.push_back(event);',
+        "plugin surfaces inferred player stat events before graph submission",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'pushPlayerStatEventMessage(event);\n  pendingPlayerStatEvents.push_back(event);',
+        "plugin surfaces explicit player stat events before graph submission",
+        errors,
+    )
     for stale_label in (
         '"Possession timeline"',
         '"Half control timeline"',
