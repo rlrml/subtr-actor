@@ -9098,6 +9098,7 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
       : candidates.empty()             ? "Load a review playlist."
                                        : "Loaded review playlist.";
   ImGui::TextWrapped("%s", statusReadout.c_str());
+  ImGui::Separator();
   ImGui::Text("%d / %zu", current == nullptr ? 0 : mechanicsReviewIndex + 1, candidates.size());
   const std::string currentTitle =
       current == nullptr ? "No candidate selected"

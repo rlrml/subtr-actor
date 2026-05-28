@@ -2365,8 +2365,9 @@ def main() -> int:
     require_contains(
         plugin_source,
         'ImGui::TextWrapped("%s", statusReadout.c_str());\n'
+        "  ImGui::Separator();\n"
         '  ImGui::Text("%d / %zu", current == nullptr ? 0 : mechanicsReviewIndex + 1, candidates.size());',
-        "plugin mechanics review status appears before current item like web",
+        "plugin mechanics review status is separated before current item like web",
         errors,
     )
     reject_contains(
