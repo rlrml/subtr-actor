@@ -8198,17 +8198,22 @@ void SubtrActorPlugin::renderEventSourceControls() {
     return;
   }
 
-  if (renderModuleSummaryToggle(
-          "All events",
-          allSelected,
-          "event-sources-actions")) {
+  auto renderEventSourceAction = [](const std::string &label) {
+    const bool clicked = ImGui::Button(label.c_str());
+    const float itemRight = ImGui::GetItemRectMax().x;
+    const float contentRight = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+    if (contentRight - itemRight > 112.0f) {
+      ImGui::SameLine();
+    }
+    return clicked;
+  };
+
+  if (renderEventSourceAction(
+          std::format("All events   {}##event-sources-actions-all", displaySources.size()))) {
     selected = selectedEventSourceTokens("all");
     applySelection();
   }
-  if (renderModuleSummaryToggle(
-          "No events",
-          selected.empty(),
-          "event-sources-actions")) {
+  if (renderEventSourceAction("No events   Off##event-sources-actions-none")) {
     selected.clear();
     applySelection();
   }

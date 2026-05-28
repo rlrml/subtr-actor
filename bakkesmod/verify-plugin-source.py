@@ -1005,8 +1005,8 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'renderModuleSummaryToggle(\n          "All events",\n          allSelected,\n          "event-sources-actions")',
-        "plugin Events window all-events action mirrors web",
+        'std::format("All events   {}##event-sources-actions-all", displaySources.size())',
+        "plugin Events window all-events action mirrors web count readout",
         errors,
     )
     require_contains(
@@ -1017,8 +1017,8 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'renderModuleSummaryToggle(\n          "No events",\n          selected.empty(),\n          "event-sources-actions")',
-        "plugin Events window no-events action mirrors web",
+        'renderEventSourceAction("No events   Off##event-sources-actions-none")',
+        "plugin Events window no-events action mirrors web off readout",
         errors,
     )
     require_contains(
@@ -1053,6 +1053,8 @@ def main() -> int:
         'ImGui::TreeNode("Event sources##event-source-controls")',
         'ImGui::SmallButton("All events##event-sources")',
         'ImGui::SmallButton("No events##event-sources")',
+        'renderModuleSummaryToggle(\n          "All events",\n          allSelected,\n          "event-sources-actions")',
+        'renderModuleSummaryToggle(\n          "No events",\n          selected.empty(),\n          "event-sources-actions")',
     ):
         reject_contains(
             plugin_source,
