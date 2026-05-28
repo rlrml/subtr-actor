@@ -1,21 +1,13 @@
 import * as THREE from "three";
 import { updateBoostMeter, type BoostMeter, type ReplayScene } from "./scene";
-import {
-  getActiveDemoEvent,
-  updateBoostTrail,
-  updateDemoIndicator,
-} from "./player-render-effects";
+import { getActiveDemoEvent, updateBoostTrail, updateDemoIndicator } from "./player-render-effects";
 import {
   interpolatePosition,
   interpolateQuaternion,
   rootPosition,
   worldPosition,
 } from "./player-internals/spatial";
-import type {
-  ReplayModel,
-  ReplayPlayerRenderTrackContext,
-  Vec3,
-} from "./types";
+import type { ReplayModel, ReplayPlayerRenderTrackContext, Vec3 } from "./types";
 
 interface ReplayFrameWindow {
   frameIndex: number;

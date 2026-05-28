@@ -10,10 +10,7 @@ import type { EventWindowsManager } from "./eventWindows.ts";
 import type { ModuleRuntimeController } from "./moduleRuntimeController.ts";
 import type { StatsPlayerConfig } from "./playerConfig.ts";
 import type { RecordingControls } from "./recordingControls.ts";
-import {
-  createReplayLoadController,
-  type ReplayLoadController,
-} from "./replayLoadController.ts";
+import { createReplayLoadController, type ReplayLoadController } from "./replayLoadController.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import type { StatDefinition } from "./statRegistry.ts";
 import type { StatsFrameLookup, StatsTimeline } from "./statsTimeline.ts";

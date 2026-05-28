@@ -1,11 +1,7 @@
 import type { StatDefinition, StatScopeKind } from "./statRegistry.ts";
 import { el } from "./reportDom.ts";
 import { createPageIntro } from "./reportLayout.ts";
-import type {
-  PlayerStatsSnapshot,
-  StatsFrame,
-  TeamStatsSnapshot,
-} from "./statsTimeline.ts";
+import type { PlayerStatsSnapshot, StatsFrame, TeamStatsSnapshot } from "./statsTimeline.ts";
 
 type StatsTarget = PlayerStatsSnapshot | TeamStatsSnapshot;
 
@@ -93,10 +89,7 @@ function renderStatsTable(
   return section;
 }
 
-export function renderDumpPage(
-  definitions: StatDefinition[],
-  finalFrame: StatsFrame,
-): HTMLElement {
+export function renderDumpPage(definitions: StatDefinition[], finalFrame: StatsFrame): HTMLElement {
   const grouped = groupDefinitions(definitions);
   const page = el("div", { className: "stats-report-page" });
   page.append(

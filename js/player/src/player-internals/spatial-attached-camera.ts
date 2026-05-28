@@ -1,5 +1,11 @@
 import * as THREE from "three";
-import { CHASE_CAMERA_HEIGHT_MULTIPLIER, DEFAULT_FORWARD, DEFAULT_UP, MIN_CAMERA_HEIGHT_UU, PLAYER_FOCUS_HEIGHT_UU } from "./spatial-constants";
+import {
+  CHASE_CAMERA_HEIGHT_MULTIPLIER,
+  DEFAULT_FORWARD,
+  DEFAULT_UP,
+  MIN_CAMERA_HEIGHT_UU,
+  PLAYER_FOCUS_HEIGHT_UU,
+} from "./spatial-constants";
 import type { AttachedCameraOptions } from "./spatial-attached-types";
 import { updateBallCameraTargets } from "./spatial-ball-cam";
 import { applyAttachedCameraView } from "./spatial-camera-apply";

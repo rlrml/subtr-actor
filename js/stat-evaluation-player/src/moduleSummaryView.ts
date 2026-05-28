@@ -68,11 +68,7 @@ function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string
   return timelineLabels[`${mod.id}:${kind}`] ?? `${mod.label} timeline`;
 }
 
-function renderToggle(
-  label: string,
-  active: boolean,
-  onClick: () => void,
-): HTMLButtonElement {
+function renderToggle(label: string, active: boolean, onClick: () => void): HTMLButtonElement {
   const item = document.createElement("button");
   item.type = "button";
   item.className = "module-summary-item";

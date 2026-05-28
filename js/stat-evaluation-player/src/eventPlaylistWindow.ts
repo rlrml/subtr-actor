@@ -1,8 +1,4 @@
-import type {
-  ReplayPlayer,
-  ReplayPlayerState,
-  ReplayTimelineEvent,
-} from "@rlrml/player";
+import type { ReplayPlayer, ReplayPlayerState, ReplayTimelineEvent } from "@rlrml/player";
 import type { StatModuleContext } from "./statModules.ts";
 import type { EventTimelineSource } from "./eventTimelineSources.ts";
 
@@ -160,7 +156,9 @@ export function createEventPlaylistWindowController(
     if (sources.length === 0) {
       const empty = document.createElement("p");
       empty.className = "stat-window-empty";
-      empty.textContent = deps.getReplayPlayer() ? "No events loaded." : "Load a replay to see events.";
+      empty.textContent = deps.getReplayPlayer()
+        ? "No events loaded."
+        : "Load a replay to see events.";
       eventPlaylistWindowBody.append(empty);
       return;
     }
@@ -335,10 +333,7 @@ export function createEventPlaylistWindowController(
     return bestItem;
   }
 
-  function syncTimeline(
-    state: ReplayPlayerState,
-    options: { forceScroll?: boolean } = {},
-  ): void {
+  function syncTimeline(state: ReplayPlayerState, options: { forceScroll?: boolean } = {}): void {
     const eventPlaylistWindowBody = deps.getPlaylistWindowBody();
     const list = eventPlaylistWindowBody?.querySelector<HTMLElement>(".event-playlist-list");
     if (!list) {
@@ -351,9 +346,11 @@ export function createEventPlaylistWindowController(
       return;
     }
 
-    list.querySelectorAll<HTMLElement>(".event-playlist-item[data-active='true']").forEach((item) => {
-      item.dataset.active = "false";
-    });
+    list
+      .querySelectorAll<HTMLElement>(".event-playlist-item[data-active='true']")
+      .forEach((item) => {
+        item.dataset.active = "false";
+      });
 
     if (activeItem) {
       activeItem.dataset.active = "true";

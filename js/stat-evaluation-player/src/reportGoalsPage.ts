@@ -5,11 +5,7 @@ import {
 } from "./playerConfig.ts";
 import { el } from "./reportDom.ts";
 import { createPageIntro, createSummaryCard } from "./reportLayout.ts";
-import {
-  formatBoostAmount,
-  formatFieldPosition,
-  formatTime,
-} from "./reportFormat.ts";
+import { formatBoostAmount, formatFieldPosition, formatTime } from "./reportFormat.ts";
 import {
   CHART_COLORS,
   TEAM_COLORS,

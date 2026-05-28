@@ -140,10 +140,7 @@ function countPickupOnce(accumulator: LedgerAccumulator, event: BoostLedgerEvent
   }
 }
 
-export function applyLedgerEvent(
-  accumulator: LedgerAccumulator,
-  event: BoostLedgerEvent,
-): void {
+export function applyLedgerEvent(accumulator: LedgerAccumulator, event: BoostLedgerEvent): void {
   const amount = f32(Number.isFinite(event.amount) ? event.amount : 0);
   if (event.transaction !== "used") {
     if (addLabeledAmount(accumulator.stats, event)) {

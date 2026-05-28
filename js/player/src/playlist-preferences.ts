@@ -1,8 +1,4 @@
-import type {
-  CameraSettings,
-  ReplayCameraViewMode,
-  ReplayPlaylistPlayerOptions,
-} from "./types";
+import type { CameraSettings, ReplayCameraViewMode, ReplayPlaylistPlayerOptions } from "./types";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const DEFAULT_PLAYBACK_RATE = 1;
@@ -50,9 +46,7 @@ export function normalizeCustomCameraSettings(
   return normalized;
 }
 
-export function createInitialPreferences(
-  options: ReplayPlaylistPlayerOptions,
-): PlayerPreferences {
+export function createInitialPreferences(options: ReplayPlaylistPlayerOptions): PlayerPreferences {
   return {
     speed: Math.max(0.1, options.initialPlaybackRate ?? DEFAULT_PLAYBACK_RATE),
     cameraDistanceScale: Math.max(

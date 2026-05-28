@@ -3,10 +3,7 @@ import type { StatEvaluationPlayerElements } from "./appElements.ts";
 import type { FloatingWindowController } from "./floatingWindows.ts";
 import type { WindowPlacementConfig } from "./playerConfig.ts";
 import type { StatDefinition } from "./statRegistry.ts";
-import {
-  createStatsWindowsManager,
-  type StatsWindowsManager,
-} from "./statsWindows.ts";
+import { createStatsWindowsManager, type StatsWindowsManager } from "./statsWindows.ts";
 import type { StatsFrame, StatsTimeline } from "./statsTimeline.ts";
 
 interface AppStatsWindowsManagerDeps {

@@ -46,10 +46,7 @@ export function resolveRangeBounds(
   };
 }
 
-export function mergeRange<T extends TimelineRangeLike>(
-  ranges: T[],
-  nextRange: T | null,
-): void {
+export function mergeRange<T extends TimelineRangeLike>(ranges: T[], nextRange: T | null): void {
   if (!nextRange) {
     return;
   }

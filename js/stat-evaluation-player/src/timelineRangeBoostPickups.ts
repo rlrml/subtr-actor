@@ -1,8 +1,4 @@
-import type {
-  ReplayBoostPadSize,
-  ReplayModel,
-  ReplayTimelineRange,
-} from "@rlrml/player";
+import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "@rlrml/player";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";

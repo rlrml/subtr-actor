@@ -18,10 +18,7 @@ export interface GoalLabelsOverviewDeps {
   cueGoalReplay(time: number): void;
 }
 
-export function renderGoalLabelsOverview(
-  body: HTMLElement,
-  deps: GoalLabelsOverviewDeps,
-): void {
+export function renderGoalLabelsOverview(body: HTMLElement, deps: GoalLabelsOverviewDeps): void {
   const timeline = deps.getStatsTimeline();
   const replay = deps.getReplay();
   if (!timeline || !replay) {
@@ -78,8 +75,7 @@ function renderGoalLabelItem(
   const scorerName = scorer
     ? (replay.players.find((player) => player.id === scorerId)?.name ?? scorerId)
     : "Unknown scorer";
-  const isTeamZero =
-    context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
+  const isTeamZero = context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
 
   const item = document.createElement("section");
   item.className = "goal-label-item";

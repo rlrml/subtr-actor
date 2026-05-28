@@ -31,9 +31,7 @@ export interface StatEvaluationPlayerElements {
   skipKickoffs: HTMLInputElement;
 }
 
-export function getStatEvaluationPlayerElements(
-  root: HTMLElement,
-): StatEvaluationPlayerElements {
+export function getStatEvaluationPlayerElements(root: HTMLElement): StatEvaluationPlayerElements {
   return {
     fileInput: mustElement<HTMLInputElement>(root, "#replay-file"),
     viewport: mustElement<HTMLDivElement>(root, "#viewport"),
@@ -48,18 +46,12 @@ export function getStatEvaluationPlayerElements(
       root,
       "#mechanics-timeline-window-body",
     ),
-    eventPlaylistWindowBody: mustElement<HTMLDivElement>(
-      root,
-      "#event-playlist-window-body",
-    ),
+    eventPlaylistWindowBody: mustElement<HTMLDivElement>(root, "#event-playlist-window-body"),
     boostPickupFiltersWindowBody: mustElement<HTMLDivElement>(
       root,
       "#boost-pickup-filters-window-body",
     ),
-    touchControlsWindowBody: mustElement<HTMLDivElement>(
-      root,
-      "#touch-controls-window-body",
-    ),
+    touchControlsWindowBody: mustElement<HTMLDivElement>(root, "#touch-controls-window-body"),
     statsWindowLayer: mustElement<HTMLDivElement>(root, "#stats-window-layer"),
     togglePlayback: mustElement<HTMLButtonElement>(root, "#toggle-playback"),
     playbackRate: mustElement<HTMLSelectElement>(root, "#playback-rate"),
@@ -73,10 +65,7 @@ export function getStatEvaluationPlayerElements(
     playersReadout: mustElement<HTMLElement>(root, "#players-readout"),
     framesReadout: mustElement<HTMLElement>(root, "#frames-readout"),
     eventsReadout: mustElement<HTMLElement>(root, "#events-readout"),
-    skipPostGoalTransitions: mustElement<HTMLInputElement>(
-      root,
-      "#skip-post-goal-transitions",
-    ),
+    skipPostGoalTransitions: mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions"),
     skipKickoffs: mustElement<HTMLInputElement>(root, "#skip-kickoffs"),
   };
 }

@@ -9,11 +9,7 @@ import {
   type ChartSpec,
 } from "./reportCharts.ts";
 import { el } from "./reportDom.ts";
-import {
-  formatBoostAmount,
-  formatSeconds,
-  formatShare,
-} from "./reportFormat.ts";
+import { formatBoostAmount, formatSeconds, formatShare } from "./reportFormat.ts";
 import { createPageIntro, getLeader } from "./reportLayout.ts";
 import type { StatDefinition } from "./statRegistry.ts";
 import type { PlayerStatsSnapshot, StatsFrame } from "./statsTimeline.ts";

@@ -1,4 +1,8 @@
-import { timelineEventSeekTime, type ReplayPlayer, type TimelineOverlayPlugin } from "@rlrml/player";
+import {
+  timelineEventSeekTime,
+  type ReplayPlayer,
+  type TimelineOverlayPlugin,
+} from "@rlrml/player";
 import type { EventWindowsManager } from "./eventWindows.ts";
 import {
   createModuleRuntimeController,

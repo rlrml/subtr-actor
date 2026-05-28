@@ -1,11 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { ReplayModel } from "./types";
-import {
-  createExampleSoccarField,
-  OPAQUE_WALL_OPACITY,
-  OUTSIDE_WALL_OPACITY,
-} from "./scene-field";
+import { createExampleSoccarField, OPAQUE_WALL_OPACITY, OUTSIDE_WALL_OPACITY } from "./scene-field";
 import { createBallTexture } from "./scene-ball-texture";
 import { createExampleCarMesh } from "./scene-car-mesh";
 import {

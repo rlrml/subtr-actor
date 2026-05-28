@@ -87,19 +87,13 @@ export function getCameraControlElements(root: ParentNode): CameraControlElement
     customDistance: mustElement<HTMLInputElement>(root, "#custom-camera-distance"),
     customStiffness: mustElement<HTMLInputElement>(root, "#custom-camera-stiffness"),
     customSwivelSpeed: mustElement<HTMLInputElement>(root, "#custom-camera-swivel-speed"),
-    customTransitionSpeed: mustElement<HTMLInputElement>(
-      root,
-      "#custom-camera-transition-speed",
-    ),
+    customTransitionSpeed: mustElement<HTMLInputElement>(root, "#custom-camera-transition-speed"),
     customFovReadout: mustElement<HTMLElement>(root, "#custom-camera-fov-readout"),
     customHeightReadout: mustElement<HTMLElement>(root, "#custom-camera-height-readout"),
     customPitchReadout: mustElement<HTMLElement>(root, "#custom-camera-pitch-readout"),
     customDistanceReadout: mustElement<HTMLElement>(root, "#custom-camera-distance-readout"),
     customStiffnessReadout: mustElement<HTMLElement>(root, "#custom-camera-stiffness-readout"),
-    customSwivelSpeedReadout: mustElement<HTMLElement>(
-      root,
-      "#custom-camera-swivel-speed-readout",
-    ),
+    customSwivelSpeedReadout: mustElement<HTMLElement>(root, "#custom-camera-swivel-speed-readout"),
     customTransitionSpeedReadout: mustElement<HTMLElement>(
       root,
       "#custom-camera-transition-speed-readout",
@@ -215,7 +209,9 @@ export function createCameraControls(options: CameraControlsOptions): CameraCont
       return;
     }
 
-    const player = replayPlayer.replay.players.find((candidate) => candidate.id === attachedPlayerId);
+    const player = replayPlayer.replay.players.find(
+      (candidate) => candidate.id === attachedPlayerId,
+    );
     if (!player) {
       elements.profileReadout.textContent = "Unknown";
       elements.fovReadout.textContent = "--";
@@ -286,7 +282,9 @@ export function createCameraControls(options: CameraControlsOptions): CameraCont
           elements.settingsControls.hidden = !elements.customSettings.checked;
           options
             .getReplayPlayer()
-            ?.setCustomCameraSettings(elements.customSettings.checked ? readCustomSettings() : null);
+            ?.setCustomCameraSettings(
+              elements.customSettings.checked ? readCustomSettings() : null,
+            );
           options.scheduleConfigUrlUpdate();
         },
         { signal },

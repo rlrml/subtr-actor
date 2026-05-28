@@ -106,6 +106,7 @@ fn live_processor_view_satisfies_processor_surface_from_live_frame() {
         player: Some(RemoteId::SplitScreen(2)),
         team_is_team_0: true,
         closest_approach_distance: Some(8.0),
+        dodge_contact: false,
     }];
     let dodge_refreshed_events = vec![DodgeRefreshedEvent {
         time: frame.time,
@@ -377,6 +378,7 @@ fn live_processor_view_exposes_cumulative_history_for_aggregate_inputs() {
                 team_is_team_0: true,
                 player: Some(RemoteId::SplitScreen(0)),
                 closest_approach_distance: Some(12.0),
+                dodge_contact: false,
             }],
             dodge_refreshed_events: vec![DodgeRefreshedEvent {
                 time,

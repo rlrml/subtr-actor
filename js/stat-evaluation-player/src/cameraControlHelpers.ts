@@ -1,8 +1,4 @@
-import type {
-  CameraSettings,
-  ReplayPlayerState,
-  ReplayPlayerTrack,
-} from "@rlrml/player";
+import type { CameraSettings, ReplayPlayerState, ReplayPlayerTrack } from "@rlrml/player";
 
 export interface CameraSettingElements {
   fov: HTMLInputElement;

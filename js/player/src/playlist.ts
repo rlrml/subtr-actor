@@ -5,7 +5,6 @@ import type {
   PlaylistAdvanceMode,
   PlaylistEndMode,
   PlaylistItem,
-  PlaylistLoadSource,
   PlaylistSourceLoadState,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,

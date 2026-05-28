@@ -1,9 +1,5 @@
 import type { PlayerStatsSnapshot } from "../statsTimeline.ts";
-import {
-  asNumber,
-  formatNumber,
-  formatTimeShare,
-} from "./rendererFormatting.ts";
+import { asNumber, formatNumber, formatTimeShare } from "./rendererFormatting.ts";
 
 function getPositioningTrackedTime(
   positioning: PlayerStatsSnapshot["positioning"] | undefined,

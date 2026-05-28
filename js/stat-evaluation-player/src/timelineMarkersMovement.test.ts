@@ -56,7 +56,6 @@ test("buildDodgeResetTimelineEvents emits non-flip-reset dodge refreshes", () =>
   ]);
 });
 
-
 test("buildBallCarryTimelineEvents maps carry completions to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
@@ -102,7 +101,6 @@ test("buildBallCarryTimelineEvents maps carry completions to timeline markers", 
   ]);
 });
 
-
 test("buildPowerslideTimelineEvents maps powerslide presses to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
@@ -136,7 +134,6 @@ test("buildPowerslideTimelineEvents maps powerslide presses to timeline markers"
     },
   ]);
 });
-
 
 test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline markers", () => {
   const replay = {
@@ -186,7 +183,6 @@ test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline marke
   ]);
 });
 
-
 test("buildHalfFlipTimelineEvents maps serialized half flips to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
@@ -233,7 +229,6 @@ test("buildHalfFlipTimelineEvents maps serialized half flips to timeline markers
     },
   ]);
 });
-
 
 test("buildWavedashTimelineEvents maps serialized wavedashes to their own timeline markers", () => {
   const replay = {
@@ -283,7 +278,6 @@ test("buildWavedashTimelineEvents maps serialized wavedashes to their own timeli
   ]);
 });
 
-
 test("buildWhiffTimelineEvents maps serialized whiffs to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
@@ -327,7 +321,6 @@ test("buildWhiffTimelineEvents maps serialized whiffs to timeline markers", () =
     },
   ]);
 });
-
 
 test("buildWhiffTimelineEvents labels beaten-to-ball events separately", () => {
   const replay = {

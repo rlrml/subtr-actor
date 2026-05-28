@@ -21,7 +21,6 @@ test("timeline defaults to goals and adds core and demo replay events when enabl
   ]);
 });
 
-
 test("filterReplayTimelineEvents keeps only goal markers by default", () => {
   const replay = {
     timelineEvents: [
@@ -42,7 +41,6 @@ test("filterReplayTimelineEvents keeps only goal markers by default", () => {
     ["goal", "save", "shot", "assist", "demo"],
   );
 });
-
 
 test("buildMechanicTimelineEvents skips span mechanics", () => {
   const replay = {
@@ -91,7 +89,6 @@ test("buildMechanicTimelineEvents skips span mechanics", () => {
   assert.deepEqual(buildMechanicTimelineEvents(statsTimeline, replay, ["double_tap", "flick"]), []);
 });
 
-
 test("buildMechanicTimelineEvents maps flip reset mechanics to moment markers", () => {
   const replay = {
     frames: Array.from({ length: 4 }, (_, time) => ({ time })),
@@ -135,7 +132,6 @@ test("buildMechanicTimelineEvents maps flip reset mechanics to moment markers", 
     },
   ]);
 });
-
 
 test("buildMechanicTimelineEvents skips all span mechanics regardless kind", () => {
   const replay = {
@@ -204,7 +200,6 @@ test("buildMechanicTimelineEvents skips all span mechanics regardless kind", () 
     [],
   );
 });
-
 
 test("buildMechanicPlaylistEvents includes span mechanics at their end time", () => {
   const replay = {

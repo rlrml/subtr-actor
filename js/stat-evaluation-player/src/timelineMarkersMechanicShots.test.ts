@@ -68,7 +68,6 @@ test("buildFiftyFiftyTimelineEvents maps 50/50 winners to timeline markers", () 
   ]);
 });
 
-
 test("buildCeilingShotTimelineEvents maps serialized ceiling shots to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
@@ -120,7 +119,6 @@ test("buildCeilingShotTimelineEvents maps serialized ceiling shots to timeline m
     },
   ]);
 });
-
 
 test("buildWallAerialTimelineEvents maps serialized wall aerial events to timeline markers", () => {
   const replay = {
@@ -179,7 +177,6 @@ test("buildWallAerialTimelineEvents maps serialized wall aerial events to timeli
   ]);
 });
 
-
 test("buildWallAerialShotTimelineEvents maps serialized wall aerial shot events to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
@@ -231,7 +228,6 @@ test("buildWallAerialShotTimelineEvents maps serialized wall aerial shot events 
   ]);
 });
 
-
 test("buildMustyFlickTimelineEvents maps cumulative musty counts to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
@@ -278,7 +274,6 @@ test("buildMustyFlickTimelineEvents maps cumulative musty counts to timeline mar
   ]);
 });
 
-
 test("buildBackboardTimelineEvents maps serialized backboard events to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
@@ -318,7 +313,6 @@ test("buildBackboardTimelineEvents maps serialized backboard events to timeline 
     },
   ]);
 });
-
 
 test("buildDoubleTapTimelineEvents maps serialized double tap events to timeline markers", () => {
   const replay = {

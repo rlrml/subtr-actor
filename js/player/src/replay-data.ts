@@ -1,8 +1,5 @@
 import type { RawReplayFramesData, ReplayModel } from "./types";
-import {
-  buildBoostPads,
-  buildBoostPadsAsync,
-} from "./replay-boost-pads";
+import { buildBoostPads, buildBoostPadsAsync } from "./replay-boost-pads";
 import {
   buildBallFrames,
   buildBallFramesAsync,

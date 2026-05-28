@@ -1,7 +1,4 @@
-import type {
-  StatsPlayerConfig,
-  StatsPlayerConfigParamSnapshot,
-} from "./playerConfig.ts";
+import type { StatsPlayerConfig, StatsPlayerConfigParamSnapshot } from "./playerConfig.ts";
 
 export function logStatsPlayerConfigLoadDebug(
   snapshot: StatsPlayerConfigParamSnapshot,

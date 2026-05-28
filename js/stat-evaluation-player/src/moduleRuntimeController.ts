@@ -7,10 +7,7 @@ import {
 import { renderModuleSummaryView, type ModuleCapabilityKind } from "./moduleSummaryView.ts";
 import { createStatModules, RELATIVE_POSITIONING_MODULE_ID } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
-import {
-  getMechanicKinds,
-  mechanicKindToModuleId,
-} from "./timelineMarkers.ts";
+import { getMechanicKinds, mechanicKindToModuleId } from "./timelineMarkers.ts";
 import type {
   BoostPickupAnimationPickup,
   ReplayPlayer,
@@ -145,21 +142,23 @@ export function createModuleRuntimeController(
   }
 
   function getConfigAdapters(): StatsPlayerConfigAdapter[] {
-    return modules.filter((mod) => mod.getConfig || mod.applyConfig).map((mod) => {
-      const adapter: StatsPlayerConfigAdapter = {
-        id: mod.id,
-      };
-      if (mod.id === "boost") {
-        adapter.aliases = ["boost-pickup-animation"];
-      }
-      if (mod.getConfig) {
-        adapter.getConfig = () => mod.getConfig?.();
-      }
-      if (mod.applyConfig) {
-        adapter.applyConfig = (config: unknown) => mod.applyConfig?.(config);
-      }
-      return adapter;
-    });
+    return modules
+      .filter((mod) => mod.getConfig || mod.applyConfig)
+      .map((mod) => {
+        const adapter: StatsPlayerConfigAdapter = {
+          id: mod.id,
+        };
+        if (mod.id === "boost") {
+          adapter.aliases = ["boost-pickup-animation"];
+        }
+        if (mod.getConfig) {
+          adapter.getConfig = () => mod.getConfig?.();
+        }
+        if (mod.applyConfig) {
+          adapter.applyConfig = (config: unknown) => mod.applyConfig?.(config);
+        }
+        return adapter;
+      });
   }
 
   const controller: ModuleRuntimeController = {

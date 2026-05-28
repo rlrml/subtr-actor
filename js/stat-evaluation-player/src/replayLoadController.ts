@@ -14,10 +14,7 @@ import type {
   TimelineOverlayPlugin,
 } from "@rlrml/player";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
-import {
-  formatReplayLoadProgress,
-  type ReplayLoadBundle,
-} from "./replayLoader.ts";
+import { formatReplayLoadProgress, type ReplayLoadBundle } from "./replayLoader.ts";
 import { getReplayFetchRequestFromSearch, type ReplayFetchRequest } from "./replayUrl.ts";
 import {
   createRemoteReplaySource,
@@ -25,13 +22,8 @@ import {
   type ReplayInputSource,
 } from "./replayInputSources.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
-import {
-  filterReplayTimelineEvents,
-} from "./timelineMarkers.ts";
-import type {
-  StatsFrameLookup,
-  StatsTimeline,
-} from "./statsTimeline.ts";
+import { filterReplayTimelineEvents } from "./timelineMarkers.ts";
+import type { StatsFrameLookup, StatsTimeline } from "./statsTimeline.ts";
 import type { StatsPlayerConfig } from "./playerConfig.ts";
 
 export interface ReplayLoadControllerOptions {

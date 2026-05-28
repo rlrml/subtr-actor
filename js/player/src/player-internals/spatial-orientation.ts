@@ -1,15 +1,9 @@
 import * as THREE from "three";
 import type { ReplayModel } from "../types";
-import {
-  DEFAULT_FORWARD,
-  DEFAULT_UP,
-  GROUND_HEIGHT_THRESHOLD_UU,
-} from "./spatial-constants";
+import { DEFAULT_FORWARD, DEFAULT_UP, GROUND_HEIGHT_THRESHOLD_UU } from "./spatial-constants";
 import { worldDirection } from "./spatial-vectors";
 
-export function getOrientationVectors(
-  frame: ReplayModel["players"][number]["frames"][number],
-): {
+export function getOrientationVectors(frame: ReplayModel["players"][number]["frames"][number]): {
   forward: THREE.Vector3;
   up: THREE.Vector3;
   right: THREE.Vector3;

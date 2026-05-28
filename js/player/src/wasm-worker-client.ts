@@ -1,8 +1,4 @@
-import type {
-  RawReplayFramesData,
-  ReplayLoadOptions,
-  ReplayLoadResult,
-} from "./types";
+import type { RawReplayFramesData, ReplayLoadOptions, ReplayLoadResult } from "./types";
 import type { ReplayLoadRequest, ReplayWorkerMessage } from "./wasm-messages";
 
 export async function loadReplayFromBytesWithWorker(

@@ -2,10 +2,7 @@ import * as THREE from "three";
 import type { ReplayScene } from "./scene";
 import type { ReplayPlayer } from "./player";
 import { getFrameWindow } from "./player-internals/timeline";
-import {
-  updateAttachedCamera,
-  updateFreeCameraTransition,
-} from "./player-internals/spatial";
+import { updateAttachedCamera, updateFreeCameraTransition } from "./player-internals/spatial";
 import { getActiveDemoEvent } from "./player-render-effects";
 import { renderReplayFrameScene } from "./player-render-frame";
 import type {
@@ -61,15 +58,14 @@ export function renderReplayPlayerFrame(
     ballPosition,
     ballWorldPosition,
     players: renderPlayers,
-  } =
-    renderReplayFrameScene({
-      replay: options.replay,
-      sceneState: options.sceneState,
-      frameWindow,
-      fieldScale: options.fieldScale,
-      currentTime: options.currentTime,
-      boostMeterEnabled: options.boostMeterEnabled,
-    });
+  } = renderReplayFrameScene({
+    replay: options.replay,
+    sceneState: options.sceneState,
+    frameWindow,
+    fieldScale: options.fieldScale,
+    currentTime: options.currentTime,
+    boostMeterEnabled: options.boostMeterEnabled,
+  });
 
   updateAttachedCamera({
     sceneState: options.sceneState,

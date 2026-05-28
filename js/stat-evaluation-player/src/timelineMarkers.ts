@@ -1,8 +1,4 @@
-import type {
-  ReplayModel,
-  ReplayTimelineEvent,
-  ReplayTimelineEventKind,
-} from "@rlrml/player";
+import type { ReplayModel, ReplayTimelineEvent, ReplayTimelineEventKind } from "@rlrml/player";
 import { buildTouchMarkers, playerIdToString } from "./touchOverlay.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import {
@@ -30,8 +26,6 @@ import {
 } from "./timelineMarkersMovement.ts";
 import {
   buildCenterTimelineEvents,
-  buildGoalContextTimelineEvents,
-  buildGoalTagTimelineEvents,
   buildHalfVolleyTimelineEvents,
   buildOneTimerTimelineEvents,
   buildPassTimelineEvents,

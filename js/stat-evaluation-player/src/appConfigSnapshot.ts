@@ -40,9 +40,7 @@ export function getPlaybackConfigSnapshot({
     skipPostGoalTransitions: replayPlayer
       ? state?.skipPostGoalTransitionsEnabled
       : elements.skipPostGoalTransitions.checked,
-    skipKickoffs: replayPlayer
-      ? state?.skipKickoffsEnabled
-      : elements.skipKickoffs.checked,
+    skipKickoffs: replayPlayer ? state?.skipKickoffsEnabled : elements.skipKickoffs.checked,
   };
 }
 
@@ -61,9 +59,7 @@ export function getStatsPlayerConfigSnapshot(
       boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
     },
     recording: options.recordingControls?.getConfigSnapshot() ?? {},
-    singletonWindows: options.floatingWindows.getSingletonWindowConfigs(
-      options.singletonWindowIds,
-    ),
+    singletonWindows: options.floatingWindows.getSingletonWindowConfigs(options.singletonWindowIds),
     statsWindows: options.statsWindowManager.getConfigs(),
     moduleConfigs: options.moduleRuntimeController.getModuleConfigSnapshot(),
   };

@@ -1,7 +1,4 @@
-import type {
-  ReplayLoadOverlayController,
-  ReplayLoadOverlayOptions,
-} from "./types";
+import type { ReplayLoadOverlayController, ReplayLoadOverlayOptions } from "./types";
 import { formatReplayLoadProgress, formatReplayLoadProgressMeta } from "./load-ui-format";
 import { ensureReplayLoadOverlayStyles } from "./load-ui-styles";
 

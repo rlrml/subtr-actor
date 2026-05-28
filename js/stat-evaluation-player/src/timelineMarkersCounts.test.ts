@@ -63,7 +63,6 @@ test("countEnabledTimelineEvents ignores mechanic-backed module ids", () => {
   assert.equal(countEnabledTimelineEvents(["flick"], replay, statsTimeline), 1);
 });
 
-
 test("countEnabledTimelineEvents includes enabled custom module markers", () => {
   const replay = {
     timelineEvents: [

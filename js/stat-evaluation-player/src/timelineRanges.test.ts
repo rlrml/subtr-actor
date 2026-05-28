@@ -128,7 +128,6 @@ test("buildMechanicTimelineRanges emits ranges for visible span mechanics", () =
   );
 });
 
-
 test("buildPossessionTimelineRanges derives merged team and neutral control spans", () => {
   const timeline = {
     replay_meta: {},
@@ -259,7 +258,6 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
   ]);
 });
 
-
 test("buildPossessionTimelineRanges derives spans from compact event timelines", () => {
   const timeline = createStatsTimeline({
     events: {
@@ -310,7 +308,6 @@ test("buildPossessionTimelineRanges derives spans from compact event timelines",
     },
   ]);
 });
-
 
 test("buildPressureTimelineRanges derives half-control spans from labeled deltas including neutral", () => {
   const timeline = {
@@ -388,7 +385,6 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
   ]);
 });
 
-
 test("buildPressureTimelineRanges derives spans from compact event timelines", () => {
   const timeline = createStatsTimeline({
     events: {
@@ -426,7 +422,6 @@ test("buildPressureTimelineRanges derives spans from compact event timelines", (
     },
   ]);
 });
-
 
 test("buildRushTimelineRanges maps serialized rush spans to replay timeline ranges", () => {
   const replay = {
@@ -479,7 +474,6 @@ test("buildRushTimelineRanges maps serialized rush spans to replay timeline rang
     },
   ]);
 });
-
 
 test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtered lane", () => {
   const replay = {
@@ -567,7 +561,6 @@ test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtere
     [],
   );
 });
-
 
 test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events", () => {
   const timeline = createLegacyStatsTimeline({
@@ -666,7 +659,6 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
     ["boost-pickup:ghost:20:Steam:orange-id:0"],
   );
 });
-
 
 test("buildPressureTimelineRanges uses replay centerline fallback for legacy half-control stats", () => {
   const timeline = {

@@ -1,9 +1,5 @@
 import type { ReplayModel, ReplayTimelineRange } from "@rlrml/player";
-import type {
-  PlayerStatsSnapshot,
-  StatsFrame,
-  StatsTimeline,
-} from "./statsTimeline.ts";
+import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
 import type { PositioningEvent } from "./generated/PositioningEvent.ts";
 import {
   DELTA_EPSILON,

@@ -1,13 +1,6 @@
-import type {
-  ReplayPlayer,
-  ReplayPlayerState,
-  ReplayTimelineEvent,
-} from "@rlrml/player";
+import type { ReplayPlayer, ReplayPlayerState, ReplayTimelineEvent } from "@rlrml/player";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
-import {
-  buildEventTimelineSources,
-  type EventTimelineSource,
-} from "./eventTimelineSources.ts";
+import { buildEventTimelineSources, type EventTimelineSource } from "./eventTimelineSources.ts";
 import { createEventPlaylistWindowController } from "./eventPlaylistWindow.ts";
 
 export type { EventTimelineSource } from "./eventTimelineSources.ts";

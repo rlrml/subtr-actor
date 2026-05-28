@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { ReplayModel } from "@rlrml/player";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import type { PositioningEvent } from "./generated/PositioningEvent.ts";
 import { createStatsTimeline } from "./testStatsTimeline.ts";
@@ -165,7 +164,6 @@ test("buildTimeInZoneTimelineRanges derives per-player third occupancy spans", (
   ]);
 });
 
-
 test("buildTimeInZoneTimelineRanges derives spans from compact positioning events", () => {
   const playerId = { Steam: "blue-id" };
   const timeline = createStatsTimeline({
@@ -255,7 +253,6 @@ test("buildTimeInZoneTimelineRanges derives spans from compact positioning event
     },
   ]);
 });
-
 
 test("buildTimeInZoneTimelineRanges merges continuous spans independently per player lane", () => {
   const timeline = {
@@ -423,7 +420,6 @@ test("buildTimeInZoneTimelineRanges merges continuous spans independently per pl
     },
   ]);
 });
-
 
 test("buildTimeInZoneTimelineRanges uses player-relative colors for orange players", () => {
   const timeline = {

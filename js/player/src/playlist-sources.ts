@@ -4,7 +4,6 @@ import type {
   PlaybackBound,
   PlaylistItem,
   PlaylistSourceLoadContext,
-  RawReplayFramesData,
   ReplaySource,
 } from "./types";
 

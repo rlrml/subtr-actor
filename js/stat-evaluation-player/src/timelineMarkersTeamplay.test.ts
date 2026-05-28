@@ -55,7 +55,6 @@ test("buildCenterTimelineEvents maps serialized center events to timeline marker
   ]);
 });
 
-
 test("buildPassTimelineEvents maps serialized passes to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
@@ -103,7 +102,6 @@ test("buildPassTimelineEvents maps serialized passes to timeline markers", () =>
   ]);
 });
 
-
 test("buildOneTimerTimelineEvents maps serialized one-timers to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
@@ -150,7 +148,6 @@ test("buildOneTimerTimelineEvents maps serialized one-timers to timeline markers
   ]);
 });
 
-
 test("buildHalfVolleyTimelineEvents maps serialized half volleys to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }],
@@ -189,7 +186,6 @@ test("buildHalfVolleyTimelineEvents maps serialized half volleys to timeline mar
   ]);
 });
 
-
 test("buildRushTimelineEvents maps serialized rush spans to end-time markers", () => {
   const replay = {
     frames: Array.from({ length: 6 }, (_, time) => ({ time })),
@@ -225,7 +221,6 @@ test("buildRushTimelineEvents maps serialized rush spans to end-time markers", (
     },
   ]);
 });
-
 
 test("buildGoalTagTimelineEvents and buildGoalContextTimelineEvents map goal analysis events", () => {
   const replay = {
@@ -294,7 +289,6 @@ test("buildGoalTagTimelineEvents and buildGoalContextTimelineEvents map goal ana
     },
   ]);
 });
-
 
 test("buildTouchTimelineEvents maps touch overlay markers to timeline markers", () => {
   const replay = {

@@ -1,9 +1,6 @@
 import type { ReplayPlayer, ReplayTimelineEvent } from "@rlrml/player";
 import type { StatEvaluationPlayerElements } from "./appElements.ts";
-import {
-  createEventWindowsManager,
-  type EventWindowsManager,
-} from "./eventWindows.ts";
+import { createEventWindowsManager, type EventWindowsManager } from "./eventWindows.ts";
 import type { ModuleRuntimeController } from "./moduleRuntimeController.ts";
 
 interface AppEventWindowsManagerDeps {
@@ -42,8 +39,7 @@ export function createAppEventWindowsManager(
     },
     renderModuleSettings: deps.renderModuleSettings,
     renderModuleSummary: deps.renderModuleSummary,
-    renderTimelineEventCount: () =>
-      deps.getModuleRuntimeController().renderTimelineEventCount(),
+    renderTimelineEventCount: () => deps.getModuleRuntimeController().renderTimelineEventCount(),
     scheduleConfigUrlUpdate: deps.scheduleConfigUrlUpdate,
     setMechanicTimelineKind(kind, enabled) {
       deps.getModuleRuntimeController().setMechanicTimelineKind(kind, enabled);

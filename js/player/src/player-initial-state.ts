@@ -1,9 +1,5 @@
 import { normalizeCustomCameraSettings } from "./player-camera-settings";
-import type {
-  CameraSettings,
-  ReplayCameraViewMode,
-  ReplayPlayerOptions,
-} from "./types";
+import type { CameraSettings, ReplayCameraViewMode, ReplayPlayerOptions } from "./types";
 
 const DEFAULT_FIELD_SCALE = 1;
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;

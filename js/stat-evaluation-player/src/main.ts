@@ -16,11 +16,7 @@ import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import { FloatingWindowController } from "./floatingWindows.ts";
 import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
-import type {
-  StatsFrame,
-  StatsFrameLookup,
-  StatsTimeline,
-} from "./statsTimeline.ts";
+import type { StatsFrame, StatsFrameLookup, StatsTimeline } from "./statsTimeline.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
 import type { ReplayLoadBundle } from "./replayLoader.ts";
 import {
@@ -39,21 +35,14 @@ import {
 } from "./replaySnapshotRenderer.ts";
 import type { ReplayLoadController } from "./replayLoadController.ts";
 import { renderScoreboardWindow } from "./scoreboardWindow.ts";
-import type { ModuleRuntimeController } from "./moduleRuntimeController.ts";
 import {
   createMechanicsReviewController,
   getMechanicsReviewElements,
   type MechanicsReviewController,
 } from "./mechanicsReviewController.ts";
 import { createReplayCueingController } from "./replayCueing.ts";
-import type { EventWindowsManager } from "./eventWindows.ts";
-import {
-  getReplayPlayerStatePatchFromConfig,
-} from "./appConfigSnapshot.ts";
-import {
-  type SingletonWindowId,
-  type StatsPlayerConfig,
-} from "./playerConfig.ts";
+import { getReplayPlayerStatePatchFromConfig } from "./appConfigSnapshot.ts";
+import { type SingletonWindowId, type StatsPlayerConfig } from "./playerConfig.ts";
 import { loadInitialStatsPlayerConfig } from "./appInitialConfig.ts";
 import {
   createStatsPlayerConfigUrlSyncController,
@@ -124,8 +113,6 @@ let recordingControls: RecordingControls | null = null;
 let cameraControls: CameraControls | null = null;
 let replayLoadController: ReplayLoadController | null = null;
 let replaySnapshotRenderer: ReplaySnapshotRenderer | null = null;
-let moduleRuntimeController: ModuleRuntimeController;
-let eventWindowsManager: EventWindowsManager;
 let cueTimelineEvent: (event: ReplayTimelineEvent) => void = () => {};
 let watchGoalReplay: (time: number, scorerId: string | null) => void = () => {};
 
@@ -152,7 +139,7 @@ const statsWindowManager = createAppStatsWindowsManager({
   watchGoalReplay,
 });
 
-moduleRuntimeController = createAppModuleRuntimeController({
+const moduleRuntimeController = createAppModuleRuntimeController({
   statsWindowManager,
   getEventWindowsManager() {
     return eventWindowsManager;
@@ -176,7 +163,7 @@ moduleRuntimeController = createAppModuleRuntimeController({
   requestConfigSync: scheduleConfigUrlUpdate,
 });
 
-eventWindowsManager = createAppEventWindowsManager({
+const eventWindowsManager = createAppEventWindowsManager({
   cueTimelineEvent,
   formatTime,
   getElements() {
@@ -298,10 +285,6 @@ function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0)
     getCurrentStatsFrame(frameIndex),
     replayPlayer !== null,
   );
-}
-
-function getStatById(statId: string): StatDefinition | null {
-  return statRegistry.find((definition) => definition.id === statId) ?? null;
 }
 
 function getCurrentStatsFrame(frameIndex: number): StatsFrame | null {
@@ -608,23 +591,25 @@ export function mountStatEvaluationPlayer(
   mechanicsReviewController?.render();
   eventWindowsManager.renderPlaylistWindow();
   if (options.initialBundle) {
-    void replayLoadController?.loadReplayBundleForDisplay(
-      {
-        name: options.initialReplayName ?? "replay",
-        preparingStatus: "Preparing replay...",
-        async readBytes() {
-          throw new Error("Replay bytes are not available for this preloaded replay");
+    void replayLoadController
+      ?.loadReplayBundleForDisplay(
+        {
+          name: options.initialReplayName ?? "replay",
+          preparingStatus: "Preparing replay...",
+          async readBytes() {
+            throw new Error("Replay bytes are not available for this preloaded replay");
+          },
         },
-      },
-      Promise.resolve(options.initialBundle),
-    ).catch((error) => {
-      if (listeners.signal.aborted) {
-        return;
-      }
-      console.error("Failed to load preprocessed replay bundle:", error);
-      appElements.statusReadout.textContent =
-        error instanceof Error ? error.message : "Failed to load preprocessed replay bundle";
-    });
+        Promise.resolve(options.initialBundle),
+      )
+      .catch((error) => {
+        if (listeners.signal.aborted) {
+          return;
+        }
+        console.error("Failed to load preprocessed replay bundle:", error);
+        appElements.statusReadout.textContent =
+          error instanceof Error ? error.message : "Failed to load preprocessed replay bundle";
+      });
   } else if (options.loadFromLocation !== false) {
     replayLoadController?.loadReplayFromLocation(listeners.signal);
   }

@@ -139,9 +139,7 @@ export function createRecordingControls(options: RecordingControlsOptions): Reco
             })
             .catch((error) => {
               console.error("Failed to record replay:", error);
-              options.setStatus(
-                error instanceof Error ? error.message : "Failed to record replay",
-              );
+              options.setStatus(error instanceof Error ? error.message : "Failed to record replay");
               sync(options.getRecorder()?.getStatus() ?? null);
             });
           sync();
