@@ -9282,10 +9282,10 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
   }
   const char *status = !annotationsEnabled
                            ? "Disabled"
-                           : !inReplay       ? "Waiting for replay"
+                           : !inReplay       ? "Pending"
                            : replayAnnotations ? "Loaded"
                            : replayAnnotationLoadFailed ? "Failed"
-                                                        : "Scanning";
+                                                        : "Loading";
   const bool hasReplaySource =
       replayPath || !rawReplayPath.empty() || !replayAnnotationPath.empty();
   const std::string replaySummary = hasReplaySource ? "1 replay" : "0 replays";

@@ -2381,6 +2381,24 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        'if (state.status === "idle") {\n    return "Pending";\n  }\n  if (state.status === "loading") {\n    return formatReplayLoadStateProgress(state.progress) || "Loading";\n  }',
+        "stats evaluation player replay loading row uses pending/loading status labels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        ': !inReplay       ? "Pending"\n                           : replayAnnotations ? "Loaded"',
+        "plugin replay loading pending status mirrors web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        ': "Loading";',
+        "plugin replay loading active row status mirrors web loading label",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         '.join(" · ");',
         "stats evaluation player replay loading rows use dot-separated metadata",
         errors,
@@ -2431,6 +2449,18 @@ def main() -> int:
         plugin_source,
         'ImGui::Text("Active: %s", status);',
         "plugin replay loading active status label",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        '"Waiting for replay"',
+        "plugin replay loading uses plugin-only waiting status label",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        '"Scanning"',
+        "plugin replay loading uses plugin-only scanning status label",
         errors,
     )
     reject_contains(
