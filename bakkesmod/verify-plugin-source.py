@@ -22,6 +22,12 @@ ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakke
 WEB_PLAYER_CONFIG_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/playerConfig.ts"
 WEB_PLAYER_MAIN_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/main.ts"
 WEB_PLAYER_TEMPLATE_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/appTemplate.ts"
+WEB_PLAYER_BOOST_PICKUP_FILTERS_SOURCE = (
+    REPO_ROOT / "js/stat-evaluation-player/src/boostPickupFilters.ts"
+)
+WEB_PLAYER_PLAYER_MODULES_SOURCE = (
+    REPO_ROOT / "js/stat-evaluation-player/src/stat-modules/playerModules.ts"
+)
 
 
 @dataclass(frozen=True)
@@ -328,6 +334,12 @@ def main() -> int:
     web_player_config_source = WEB_PLAYER_CONFIG_SOURCE.read_text(encoding="utf-8")
     web_player_main_source = WEB_PLAYER_MAIN_SOURCE.read_text(encoding="utf-8")
     web_player_template_source = WEB_PLAYER_TEMPLATE_SOURCE.read_text(encoding="utf-8")
+    web_player_boost_pickup_filters_source = WEB_PLAYER_BOOST_PICKUP_FILTERS_SOURCE.read_text(
+        encoding="utf-8"
+    )
+    web_player_player_modules_source = WEB_PLAYER_PLAYER_MODULES_SOURCE.read_text(
+        encoding="utf-8"
+    )
     cpp_combined = plugin_header + "\n" + plugin_source
     errors: list[str] = []
 
@@ -583,6 +595,87 @@ def main() -> int:
             plugin_source,
             plugin_only_camera_surface,
             "plugin camera window plugin-only surface",
+            errors,
+        )
+    for boost_filter_label in ("Pad type", "Activity", "Field half", "Player"):
+        web_boost_label_needles = {
+            "Pad type": 'createFilterGroup("Pad type",',
+            "Activity": '"Activity",\n            BOOST_PICKUP_ACTIVITY_OPTIONS',
+            "Field half": '"Field half",\n            BOOST_PICKUP_FIELD_HALF_OPTIONS',
+            "Player": 'groupTitle.textContent = "Player";',
+        }
+        require_contains(
+            web_player_boost_pickup_filters_source,
+            web_boost_label_needles[boost_filter_label],
+            f"stats evaluation player boost pickup filter label {boost_filter_label}",
+            errors,
+        )
+        require_contains(
+            plugin_source,
+            f'ImGui::TextColored(ImVec4{{0.53f, 0.69f, 0.83f, 1.0f}}, "{boost_filter_label}");',
+            f"plugin boost pickup filter label {boost_filter_label}",
+            errors,
+        )
+    for plugin_only_boost_surface in (
+        'ImGui::Text("Pickup labels: %s", pickupReadout.c_str());',
+        'ImGui::Text("Known pads: %zu", boostPadIds.size());',
+        'ImGui::Text("Pending pad events: %zu", pendingBoostPadEvents.size());',
+        'ImGui::Text("Recent boost pickups: %d", recentEventCountForType("boost_pickup"));',
+        'ImGui::Button("Show boost pickups")',
+        'ImGui::Button("Open boost stats")',
+        'ImGui::Button("Inspect boost nodes")',
+        'ImGui::Button("Boost output")',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_boost_surface,
+            "plugin boost pickup filters window plugin-only surface",
+            errors,
+        )
+    for touch_settings_label in (
+        'eyebrow.textContent = "Touch markers";',
+        'title.textContent = "Touch decay";',
+        'labelText.textContent = "Keep each marker visible after the touch";',
+        'modeEyebrow.textContent = "Overlay";',
+        'modeTitle.textContent = "Touch mode";',
+        'breakdownEyebrow.textContent = "Stat display";',
+        'breakdownTitle.textContent = "Touch breakdown";',
+    ):
+        require_contains(
+            web_player_player_modules_source,
+            touch_settings_label,
+            f"stats evaluation player touch controls setting {touch_settings_label}",
+            errors,
+        )
+    for plugin_touch_surface in (
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Touch markers");',
+        'ImGui::Text("Touch decay");',
+        'ImGui::TextDisabled("Keep each marker visible after the touch");',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Overlay");',
+        'ImGui::Text("Touch mode");',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Stat display");',
+        'ImGui::Text("Touch breakdown");',
+    ):
+        require_contains(
+            plugin_source,
+            plugin_touch_surface,
+            "plugin touch controls mirror stats evaluation player settings",
+            errors,
+        )
+    for plugin_only_touch_surface in (
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LIVE TOUCH STATE");',
+        'ImGui::Text("Pending touches: %zu", pendingTouches.size());',
+        'ImGui::Text("Pending dodge refreshes: %zu", pendingDodgeRefreshes.size());',
+        'ImGui::Text("Recent touch events: %d", recentEventCountForType("touch"));',
+        'ImGui::Button("Show touches")',
+        'ImGui::Button("Show movement")',
+        'ImGui::Button("Open touch stats")',
+        'ImGui::Button("Inspect touch nodes")',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_touch_surface,
+            "plugin touch controls window plugin-only surface",
             errors,
         )
     require_contains(
@@ -977,7 +1070,7 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYER");',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Player");',
         "boost pickup filters expose web player filter group",
         errors,
     )

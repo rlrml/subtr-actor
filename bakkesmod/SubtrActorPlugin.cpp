@@ -9181,41 +9181,6 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
     return;
   }
 
-  const int activePadTypes = static_cast<int>(boostPickupPadBig) +
-                             static_cast<int>(boostPickupPadSmall) +
-                             static_cast<int>(boostPickupPadAmbiguous);
-  const int activeActivities = static_cast<int>(boostPickupActivityActive) +
-                               static_cast<int>(boostPickupActivityInactive) +
-                               static_cast<int>(boostPickupActivityUnknown);
-  const int activeFieldHalves = static_cast<int>(boostPickupFieldOwn) +
-                                static_cast<int>(boostPickupFieldOpponent) +
-                                static_cast<int>(boostPickupFieldUnknown);
-  const size_t activePlayers =
-      boostPickupPlayerFilterEnabled ? boostPickupPlayerIds.size() : sampledPlayers.size();
-  const bool hidden =
-      activePadTypes == 0 || activeActivities == 0 || activeFieldHalves == 0 ||
-      (boostPickupPlayerFilterEnabled && boostPickupPlayerIds.empty());
-  const int constrainedGroups = static_cast<int>(activePadTypes < 3) +
-                                static_cast<int>(activeActivities < 3) +
-                                static_cast<int>(activeFieldHalves < 3) +
-                                static_cast<int>(
-                                    boostPickupPlayerFilterEnabled &&
-                                    activePlayers < sampledPlayers.size());
-  const std::string pickupReadout =
-      hidden ? "Hidden"
-             : constrainedGroups == 0 ? "All labels"
-                                      : std::format("{} filters", constrainedGroups);
-
-  ImGui::Text("Pickup labels: %s", pickupReadout.c_str());
-  ImGui::Text("Known pads: %zu", boostPadIds.size());
-  ImGui::Text("Pending pad events: %zu", pendingBoostPadEvents.size());
-  ImGui::Text("Recent boost pickups: %d", recentEventCountForType("boost_pickup"));
-
-  ImGui::Separator();
-  if (ImGui::Checkbox("Boost pickup animation", &boostPickupAnimationEnabled)) {
-    scheduleUiConfigAutosave();
-  }
-  ImGui::Separator();
   if (ImGui::Button("All filters")) {
     boostPickupPadBig = true;
     boostPickupPadSmall = true;
@@ -9247,7 +9212,7 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PAD TYPE");
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Pad type");
   if (ImGui::Checkbox("Big pads", &boostPickupPadBig)) {
     scheduleUiConfigAutosave();
   }
@@ -9260,7 +9225,7 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIVITY");
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Activity");
   if (ImGui::Checkbox("Active play", &boostPickupActivityActive)) {
     scheduleUiConfigAutosave();
   }
@@ -9273,7 +9238,7 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "FIELD HALF");
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Field half");
   if (ImGui::Checkbox("Own half", &boostPickupFieldOwn)) {
     scheduleUiConfigAutosave();
   }
@@ -9287,7 +9252,7 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
 
   if (!sampledPlayers.empty()) {
     ImGui::Separator();
-    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "PLAYER");
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Player");
     if (ImGui::Button("All players")) {
       boostPickupPlayerFilterEnabled = false;
       boostPickupPlayerIds.clear();
@@ -9327,28 +9292,6 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
         scheduleUiConfigAutosave();
       }
     }
-  }
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
-  if (ImGui::Button("Show boost pickups")) {
-    setCvarString("subtr_actor_overlay_event_types", "boost_pickup");
-    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Open boost stats")) {
-    createStatsModuleWindow("boost", 0);
-  }
-  if (ImGui::Button("Inspect boost nodes")) {
-    graphInspectorView = 1;
-    graphInspectorNodeQuery = "boost";
-    showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Boost output")) {
-    graphInspectorView = 0;
-    selectedGraphOutput = "events";
-    showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
   }
 
   ImGui::End();
@@ -9392,18 +9335,22 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
     return readout.empty() ? std::string{"Total only"} : readout;
   };
 
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "TOUCH MARKERS");
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Touch markers");
+  ImGui::Text("Touch decay");
   ImGui::SameLine();
   ImGui::TextColored(
       ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
       "%.1fs",
       touchMarkerDecaySeconds);
+  ImGui::TextDisabled("Keep each marker visible after the touch");
   if (ImGui::SliderFloat(
           "Marker decay seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs")) {
     scheduleUiConfigAutosave();
   }
 
-  ImGui::TextDisabled("Touch mode");
+  ImGui::Separator();
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Overlay");
+  ImGui::Text("Touch mode");
   ImGui::SameLine();
   ImGui::TextColored(
       ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
@@ -9420,7 +9367,8 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "STAT BREAKDOWN");
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Stat display");
+  ImGui::Text("Touch breakdown");
   ImGui::SameLine();
   ImGui::TextColored(
       ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
@@ -9439,43 +9387,6 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
   ImGui::SameLine();
   if (ImGui::Checkbox("Dodge", &touchBreakdownDodge)) {
     scheduleUiConfigAutosave();
-  }
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "LIVE TOUCH STATE");
-  if (lastTouch) {
-    ImGui::Text(
-        "Last touch: %s",
-        playerLabel(lastTouch->player_index, lastTouch->is_team_0).c_str());
-  } else {
-    ImGui::Text("Last touch: --");
-  }
-  ImGui::Text("Pending touches: %zu", pendingTouches.size());
-  ImGui::Text("Pending dodge refreshes: %zu", pendingDodgeRefreshes.size());
-  ImGui::Text("Recent touch events: %d", recentEventCountForType("touch"));
-  ImGui::Text(
-      "Recent touch movement: %d",
-      recentEventCountForType("touch_ball_movement"));
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
-  if (ImGui::Button("Show touches")) {
-    setCvarString("subtr_actor_overlay_event_types", "touch");
-    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Show movement")) {
-    setCvarString("subtr_actor_overlay_event_types", "touch_ball_movement");
-    showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
-  }
-  if (ImGui::Button("Open touch stats")) {
-    createStatsModuleWindow("touch", 0);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Inspect touch nodes")) {
-    graphInspectorView = 1;
-    graphInspectorNodeQuery = "touch";
-    showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
   }
 
   ImGui::End();
