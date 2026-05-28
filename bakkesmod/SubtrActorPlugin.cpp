@@ -8593,16 +8593,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
   }
   const bool launcherHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
 
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "ACTIONS");
-  const float actionButtonWidth = ImGui::GetContentRegionAvail().x;
-  if (ImGui::Button("Load Replay...", ImVec2{actionButtonWidth, 0.0f})) {
-    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
-    resetReplayAnnotations();
-    tickReplayAnnotations();
-    hideLauncherWindow();
-  }
-
-  ImGui::Separator();
   ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "WINDOWS");
   renderWebWindowToggleControls("launcher-web-windows", true, false, true);
   renderStatsWindowCreationControls("launcher-stats-windows", true, false, false, true);
@@ -8646,9 +8636,8 @@ void SubtrActorPlugin::renderEmptyStateWindow() {
     return;
   }
 
-  ImGui::TextUnformatted("Load a replay to start.");
-  if (ImGui::Button("Load Replay...", ImVec2{150.0f, 0.0f})) {
-    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
+  ImGui::TextUnformatted("Open a replay in Rocket League to start.");
+  if (gameWrapper->IsInReplay() && ImGui::Button("Refresh current replay", ImVec2{190.0f, 0.0f})) {
     resetReplayAnnotations();
     tickReplayAnnotations();
   }
@@ -9690,24 +9679,12 @@ void SubtrActorPlugin::renderModuleControlsWindow() {
     showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
   }
   ImGui::SameLine();
-  if (ImGui::Button("Open camera")) {
-    showSingletonWindow(uiCameraOpen, cameraPlacement);
-  }
-  ImGui::SameLine();
   if (ImGui::Button("Open event playlist")) {
     showSingletonWindow(uiEventPlaylistOpen, eventPlaylistPlacement);
   }
   ImGui::SameLine();
-  if (ImGui::Button("Open review")) {
-    showSingletonWindow(uiMechanicsReviewOpen, mechanicsReviewPlacement);
-  }
-  ImGui::SameLine();
   if (ImGui::Button("Open recording")) {
     showSingletonWindow(uiRecordingOpen, recordingPlacement);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Open replay loading")) {
-    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
   }
   ImGui::SameLine();
   if (ImGui::Button("Open touch controls")) {
@@ -10841,7 +10818,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "camera",
        "camera_open",
        "camera",
-       true,
+       false,
        0,
        &uiCameraOpen,
        &cameraPlacement,
@@ -10853,7 +10830,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "playback",
        "playback_controls_open",
        "playback_controls",
-       true,
+       false,
        2,
        &uiPlaybackControlsOpen,
        &playbackControlsPlacement,
@@ -10889,7 +10866,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "mechanics-review",
        "mechanics_review_open",
        "mechanics_review",
-       true,
+       false,
        6,
        &uiMechanicsReviewOpen,
        &mechanicsReviewPlacement,
@@ -10901,7 +10878,7 @@ SubtrActorPlugin::singletonWindowControls() {
        "replay-loading",
        "replay_loading_open",
        "replay_loading",
-       true,
+       false,
        7,
        &uiReplayLoadingOpen,
        &replayLoadingPlacement,
@@ -11238,9 +11215,8 @@ void SubtrActorPlugin::applyWorkspaceWindowVisibility(
 }
 
 void SubtrActorPlugin::applyDefaultUiWorkspace() {
-  applyWorkspaceWindowVisibility(false, {"scoreboard", "camera"});
+  applyWorkspaceWindowVisibility(false, {"scoreboard"});
   resetWindowPlacements();
-  cameraPlacement.pending_focus = true;
 }
 
 void SubtrActorPlugin::applyReplayReviewUiWorkspace() {
@@ -11249,10 +11225,6 @@ void SubtrActorPlugin::applyReplayReviewUiWorkspace() {
       {"scoreboard",
        "mechanics",
        "event-playlist",
-       "camera",
-       "playback",
-       "mechanics-review",
-       "replay-loading",
        "touch-controls",
        "boost-pickups"});
   eventPlaylistMechanicsEnabled = true;
@@ -11262,8 +11234,7 @@ void SubtrActorPlugin::applyReplayReviewUiWorkspace() {
   eventPlaylistSourceFilter = "default";
   eventPlaylistLastActiveKey.clear();
   resetWindowPlacements();
-  mechanicsReviewPlacement.pending_focus = true;
-  replayLoadingPlacement.pending_focus = true;
+  eventPlaylistPlacement.pending_focus = true;
 }
 
 void SubtrActorPlugin::applyGraphDebugUiWorkspace() {
@@ -11272,7 +11243,6 @@ void SubtrActorPlugin::applyGraphDebugUiWorkspace() {
       {"mechanics",
        "event-playlist",
        "status",
-       "playback",
        "graph-inspector",
        "module-controls"});
   resetWindowPlacements();
@@ -11281,12 +11251,9 @@ void SubtrActorPlugin::applyGraphDebugUiWorkspace() {
 }
 
 void SubtrActorPlugin::applyRecordingUiWorkspace() {
-  applyWorkspaceWindowVisibility(
-      true,
-      {"scoreboard", "status", "camera", "playback", "recording"});
+  applyWorkspaceWindowVisibility(true, {"scoreboard", "status", "recording"});
   resetWindowPlacements();
   recordingPlacement.pending_focus = true;
-  cameraPlacement.pending_focus = true;
 }
 
 void SubtrActorPlugin::createStatsWindow(UiStatsWindowKind kind, bool initializeEntries) {

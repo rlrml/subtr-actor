@@ -319,7 +319,7 @@ private:
   bool uiScoreboardOpen = true;
   bool uiEventsOpen = false;
   bool uiStatusOpen = false;
-  bool uiCameraOpen = true;
+  bool uiCameraOpen = false;
   bool uiPlaybackControlsOpen = false;
   bool uiRecordingOpen = false;
   bool uiGraphInspectorOpen = false;

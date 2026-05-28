@@ -513,6 +513,20 @@ def main() -> int:
             "stats evaluation player singleton window order differs from its config type: "
             f"type={web_singleton_type_ids!r} array={web_singleton_window_ids!r}"
         )
+    # Rocket League already provides camera and playback controls in-game, and the
+    # plugin does not support a real multi-replay queue. Keep those replay-player
+    # surfaces out of the BakkesMod launcher even though the web player retains them.
+    plugin_excluded_web_window_ids = (
+        "camera",
+        "playback",
+        "mechanics-review",
+        "replay-loading",
+    )
+    plugin_expected_web_singleton_window_ids = tuple(
+        window_id
+        for window_id in web_singleton_window_ids
+        if window_id not in plugin_excluded_web_window_ids
+    )
     web_stats_window_kind_ids = tuple(
         ts_type_alias_strings(web_player_config_source, "StatsWindowKind")
     )
@@ -537,19 +551,29 @@ def main() -> int:
         if web_config
     )
     web_window_ids = tuple(window_id for window_id, _ in plugin_web_window_controls)
-    if web_window_ids != web_singleton_window_ids:
+    if web_window_ids != plugin_expected_web_singleton_window_ids:
         errors.append(
             "web singleton window order drifted from stats evaluation player: "
-            f"expected={web_singleton_window_ids!r} actual={web_window_ids!r}"
+            f"expected={plugin_expected_web_singleton_window_ids!r} actual={web_window_ids!r}"
         )
     web_launcher_window_buttons = tuple(
-        web_launcher_buttons(web_player_template_source, "data-window-toggle")
+        (window_id, label)
+        for window_id, label in web_launcher_buttons(
+            web_player_template_source,
+            "data-window-toggle",
+        )
+        if window_id not in plugin_excluded_web_window_ids
     )
     if plugin_web_window_controls != web_launcher_window_buttons:
         errors.append(
             "web singleton launcher labels drifted from stats evaluation player: "
             f"expected={web_launcher_window_buttons!r} actual={plugin_web_window_controls!r}"
         )
+    for excluded_window_id in plugin_excluded_web_window_ids:
+        if any(window_id == excluded_window_id for window_id, _ in plugin_web_window_controls):
+            errors.append(
+                f"plugin launcher still exposes replay-player-only window {excluded_window_id!r}"
+            )
     plugin_window_open_variables = singleton_window_open_variables(plugin_source)
     plugin_bool_defaults = cpp_bool_defaults(plugin_header)
     web_initial_window_visibility = web_initial_singleton_visibility(web_player_template_source)
@@ -2171,27 +2195,19 @@ def main() -> int:
             "plugin touch controls window plugin-only surface",
             errors,
         )
-    require_contains(
+    reject_contains(
         plugin_source,
         '"Load Replay...", ImVec2{actionButtonWidth, 0.0f}',
-        "launcher actions expose replay loading like the web player",
+        "launcher exposes web replay-file loading action in-game",
         errors,
     )
-    require_contains(
-        web_player_main_source,
-        "function openReplayFilePicker(): void {\n  fileInput.click();\n  setLauncherOpen(false);\n}",
-        "stats evaluation player closes launcher after Load Replay action",
-        errors,
-    )
-    require_contains(
+    reject_contains(
         plugin_source,
-        'if (ImGui::Button("Load Replay...", ImVec2{actionButtonWidth, 0.0f})) {\n'
-        "    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);\n"
+        "showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);\n"
         "    resetReplayAnnotations();\n"
         "    tickReplayAnnotations();\n"
-        "    hideLauncherWindow();\n"
-        "  }",
-        "plugin launcher closes after Load Replay action like web",
+        "    hideLauncherWindow();",
+        "launcher opens replay-loading queue surface",
         errors,
     )
     reject_contains(
@@ -2201,21 +2217,14 @@ def main() -> int:
         errors,
     )
     require_contains(
-        web_player_template_source,
-        "<p>Load a replay to start.</p>\n          <button id=\"empty-load-replay\" type=\"button\">Load Replay...</button>",
-        "stats evaluation player empty state exposes only replay loading",
-        errors,
-    )
-    require_contains(
         plugin_source,
-        'ImGui::TextUnformatted("Load a replay to start.");\n'
-        '  if (ImGui::Button("Load Replay...", ImVec2{150.0f, 0.0f})) {\n'
-        "    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);\n"
+        'ImGui::TextUnformatted("Open a replay in Rocket League to start.");\n'
+        '  if (gameWrapper->IsInReplay() && ImGui::Button("Refresh current replay", ImVec2{190.0f, 0.0f})) {\n'
         "    resetReplayAnnotations();\n"
         "    tickReplayAnnotations();\n"
         "  }\n\n"
         "  ImGui::End();",
-        "plugin empty state mirrors web replay-loading-only card",
+        "plugin empty state uses current Rocket League replay instead of a replay queue",
         errors,
     )
     for plugin_only_empty_state_surface in (
