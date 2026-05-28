@@ -29,6 +29,7 @@ import {
 import type { ReplayInputSource } from "./replayInputSources.ts";
 import { renderMechanicsReviewPanel } from "./mechanicsReviewPanel.ts";
 import { renderMechanicsReviewReplayLoads } from "./mechanicsReviewReplayLoads.ts";
+import { installMechanicsReviewListeners } from "./mechanicsReviewListeners.ts";
 
 export interface MechanicsReviewElements {
   file: HTMLInputElement;
@@ -449,89 +450,24 @@ export function createMechanicsReviewController(
       return true;
     },
     installListeners(signal) {
-      elements.file.addEventListener(
-        "change",
-        async () => {
-          const file = elements.file.files?.[0];
-          if (!file) return;
-
-          try {
-            const manifest = parseMechanicsReviewPlaylistJson(await file.text());
-            await loadPlaylist(manifest, null);
-          } catch (error) {
-            console.error("Failed to load mechanics review playlist:", error);
-            setStatus(
-              error instanceof Error ? error.message : "Failed to load mechanics review playlist",
-            );
-          } finally {
-            elements.file.value = "";
-          }
+      installMechanicsReviewListeners({
+        elements,
+        signal,
+        activateItem,
+        getNavigationState() {
+          return activeReview
+            ? {
+                currentIndex: activeReview.currentIndex,
+                itemCount: activeReview.manifest.items.length,
+              }
+            : null;
         },
-        { signal },
-      );
-
-      elements.loadUrl.addEventListener(
-        "click",
-        () => {
-          void loadPlaylistFromUrl(elements.url.value.trim()).catch((error) => {
-            console.error("Failed to load mechanics review playlist URL:", error);
-            setStatus(
-              error instanceof Error
-                ? error.message
-                : "Failed to load mechanics review playlist URL",
-            );
-          });
-        },
-        { signal },
-      );
-
-      elements.previous.addEventListener(
-        "click",
-        () => {
-          const review = activeReview;
-          if (review) {
-            void activateItem(Math.max(0, review.currentIndex - 1));
-          }
-        },
-        { signal },
-      );
-
-      elements.replay.addEventListener("click", replayClip, { signal });
-
-      elements.next.addEventListener(
-        "click",
-        () => {
-          const review = activeReview;
-          if (review) {
-            void activateItem(Math.min(review.manifest.items.length - 1, review.currentIndex + 1));
-          }
-        },
-        { signal },
-      );
-
-      elements.confirm.addEventListener(
-        "click",
-        () => {
-          void submitDecision("confirmed");
-        },
-        { signal },
-      );
-
-      elements.reject.addEventListener(
-        "click",
-        () => {
-          void submitDecision("rejected");
-        },
-        { signal },
-      );
-
-      elements.uncertain.addEventListener(
-        "click",
-        () => {
-          void submitDecision("uncertain");
-        },
-        { signal },
-      );
+        loadPlaylist,
+        loadPlaylistFromUrl,
+        replayClip,
+        setStatus,
+        submitDecision,
+      });
     },
     loadFromLocation(signal) {
       const reviewUrl = getMechanicsReviewUrlFromLocation();
