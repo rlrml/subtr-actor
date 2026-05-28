@@ -1174,11 +1174,25 @@ def main() -> int:
             errors,
         )
     require_contains(
-        plugin_source,
-        '"Live analysis graph",\n            liveAnalysis,\n            "launcher-plugin-tools"',
-        "plugin-specific live analysis toggle lives under launcher plugin tools",
+        web_player_template_source,
+        '<div id="module-settings" class="module-settings" hidden></div>',
+        "stats evaluation player launcher ends with module settings",
         errors,
     )
+    for plugin_only_launcher_surface in (
+        'ImGui::TreeNode("Plugin tools##launcher-plugin-tools")',
+        '"Live analysis graph",\n            liveAnalysis,\n            "launcher-plugin-tools"',
+        'ImGui::Button("Verify graph", ImVec2{pluginToolButtonWidth, 0.0f})',
+        'ImGui::Button("Open modules", ImVec2{pluginToolButtonWidth, 0.0f})',
+        'ImGui::BeginChild("launcher-graph-stats-modules", ImVec2{0.0f, 130.0f}, true);',
+        'renderLauncherWorkspaceControls();',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_launcher_surface,
+            "plugin-only launcher surface",
+            errors,
+        )
     reject_contains(
         plugin_source,
         '"Live analysis graph",\n          liveAnalysis,\n          "launcher-actions"',

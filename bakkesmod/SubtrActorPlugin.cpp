@@ -8053,64 +8053,6 @@ void SubtrActorPlugin::renderLauncherWindow() {
     renderModuleSettingsControls("launcher-module-settings", false, true, true);
   }
 
-  if (ImGui::TreeNode("Plugin tools##launcher-plugin-tools")) {
-    const float pluginToolButtonWidth = ImGui::GetContentRegionAvail().x;
-    const bool liveAnalysis = liveProcessingEnabled();
-    if (renderModuleSummaryToggle(
-            "Live analysis graph",
-            liveAnalysis,
-            "launcher-plugin-tools",
-            pluginToolButtonWidth)) {
-      setCvarBool("subtr_actor_enabled", !liveAnalysis);
-    }
-    if (ImGui::Button("Verify graph", ImVec2{pluginToolButtonWidth, 0.0f})) {
-      showSingletonWindow(uiGraphInspectorOpen, graphInspectorPlacement);
-      verifyGraphRuntime({"subtr_actor_verify_graph"});
-      hideLauncherWindow();
-    }
-    if (ImGui::Button("Open modules", ImVec2{pluginToolButtonWidth, 0.0f})) {
-      showSingletonWindow(uiModuleControlsOpen, moduleControlsPlacement);
-      hideLauncherWindow();
-    }
-    if (ImGui::Button("Close launcher", ImVec2{pluginToolButtonWidth, 0.0f})) {
-      hideLauncherWindow();
-    }
-
-    ImGui::Separator();
-    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "GRAPH STATS MODULES");
-    const std::vector<std::string> &moduleNames = statsModuleNames();
-    if (moduleNames.empty()) {
-      ImGui::TextWrapped("Start live analysis to list graph-backed stats modules.");
-    } else {
-      ImGui::BeginChild("launcher-graph-stats-modules", ImVec2{0.0f, 130.0f}, true);
-      for (const std::string &moduleName : moduleNames) {
-        ImGui::PushID(moduleName.c_str());
-        if (ImGui::SmallButton("Frame")) {
-          createStatsModuleWindow(moduleName, 0);
-          hideLauncherWindow();
-        }
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Module")) {
-          createStatsModuleWindow(moduleName, 1);
-          hideLauncherWindow();
-        }
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Config")) {
-          createStatsModuleWindow(moduleName, 2);
-          hideLauncherWindow();
-        }
-        ImGui::SameLine();
-        ImGui::TextWrapped("%s", moduleName.c_str());
-        ImGui::PopID();
-      }
-      ImGui::EndChild();
-    }
-
-    ImGui::Separator();
-    renderLauncherWorkspaceControls();
-    ImGui::TreePop();
-  }
-
   if (uiLauncherOpen && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !launcherHovered &&
       !uiLauncherToggleHovered) {
     hideLauncherWindow();
