@@ -1341,6 +1341,24 @@ def main() -> int:
             f"plugin boost pickup filter label {boost_filter_label}",
             errors,
         )
+    require_contains(
+        web_player_boost_pickup_filters_source,
+        'optionText.textContent = `${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`;',
+        "stats evaluation player boost pickup player labels include team",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const std::string label = std::format(\n          "{} ({})##boost-pickup-player-{}",',
+        "plugin boost pickup player labels include team like web",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'std::format(\n          "{}##boost-pickup-player-{}",\n          playerLabel(player.player_index, player.is_team_0),',
+        "plugin boost pickup player labels use generic player label without team suffix",
+        errors,
+    )
     for plugin_only_boost_surface in (
         'ImGui::Text("Pickup labels: %s", pickupReadout.c_str());',
         'ImGui::Text("Known pads: %zu", boostPadIds.size());',

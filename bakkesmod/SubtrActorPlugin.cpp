@@ -9511,9 +9511,15 @@ void SubtrActorPlugin::renderBoostPickupControlsWindow() {
       const std::string playerId = webPlayerIdForIndex(player.player_index);
       bool selected =
           !boostPickupPlayerFilterEnabled || containsString(boostPickupPlayerIds, playerId);
+      const auto playerName = playerNamesByIndex.find(player.player_index);
+      const std::string displayName =
+          playerName != playerNamesByIndex.end() && !playerName->second.empty()
+              ? playerName->second
+              : std::format("Player {}", player.player_index + 1);
       const std::string label = std::format(
-          "{}##boost-pickup-player-{}",
-          playerLabel(player.player_index, player.is_team_0),
+          "{} ({})##boost-pickup-player-{}",
+          displayName,
+          teamLabel(player.is_team_0),
           player.player_index);
       if (ImGui::Checkbox(label.c_str(), &selected)) {
         if (!boostPickupPlayerFilterEnabled) {
