@@ -121,6 +121,13 @@ void popWebFloatingWindowStyle() {
   ImGui::PopStyleVar(4);
 }
 
+void renderWebDetailGridCell(std::string_view label, std::string_view value) {
+  const std::string labelString{label};
+  const std::string valueString{value};
+  ImGui::TextColored(ImVec4{0.54f, 0.64f, 0.73f, 1.0f}, "%s", labelString.c_str());
+  ImGui::TextColored(ImVec4{0.93f, 0.96f, 0.98f, 1.0f}, "%s", valueString.c_str());
+}
+
 constexpr char FRAME_EVENTS_STATE_NODE[] = "frame_events_state";
 constexpr std::array<const char *, 7> FRAME_EVENTS_STATE_EVENT_FIELDS{
     "active_demos",
@@ -9962,33 +9969,29 @@ void SubtrActorPlugin::renderCameraWindow() {
                                          : cameraCustomSettingsEnabled
                                                ? std::format("{} custom", activeCameraLabel)
                                                : activeCameraLabel;
-  auto renderAttachedCameraMetric = [&](const char *format, float value) {
+  auto attachedCameraMetric = [&](int precision, float value) {
     if (!hasAttachedCamera) {
-      ImGui::Text("--");
-      return;
+      return std::string{"--"};
     }
-    ImGui::Text(format, value);
+    if (precision == 2) {
+      return std::format("{:.2f}", value);
+    }
+    return precision == 1 ? std::format("{:.1f}", value) : std::format("{:.0f}", value);
   };
 
   ImGui::Separator();
   ImGui::Columns(2, "camera-detail-grid", false);
-  ImGui::TextDisabled("Profile");
-  ImGui::Text("%s", profileReadout.c_str());
+  renderWebDetailGridCell("Profile", profileReadout);
   ImGui::NextColumn();
-  ImGui::TextDisabled("FOV");
-  renderAttachedCameraMetric("%.0f", fov);
+  renderWebDetailGridCell("FOV", attachedCameraMetric(0, fov));
   ImGui::NextColumn();
-  ImGui::TextDisabled("Height");
-  renderAttachedCameraMetric("%.0f", height);
+  renderWebDetailGridCell("Height", attachedCameraMetric(0, height));
   ImGui::NextColumn();
-  ImGui::TextDisabled("Pitch");
-  renderAttachedCameraMetric("%.1f", pitch);
+  renderWebDetailGridCell("Pitch", attachedCameraMetric(1, pitch));
   ImGui::NextColumn();
-  ImGui::TextDisabled("Distance");
-  renderAttachedCameraMetric("%.0f", distance);
+  renderWebDetailGridCell("Distance", attachedCameraMetric(0, distance));
   ImGui::NextColumn();
-  ImGui::TextDisabled("Stiffness");
-  renderAttachedCameraMetric("%.2f", stiffness);
+  renderWebDetailGridCell("Stiffness", attachedCameraMetric(2, stiffness));
   ImGui::Columns(1);
 
   ImGui::End();
@@ -10155,17 +10158,17 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
   ImGui::Separator();
   const float durationSeconds = std::max(lastTime, playbackCurrentTime);
   ImGui::Columns(2, "playback-detail-grid", false);
-  ImGui::TextDisabled("Time");
-  ImGui::Text("%.2fs", playbackCurrentTime);
+  renderWebDetailGridCell("Time", std::format("{:.2f}s", playbackCurrentTime));
   ImGui::NextColumn();
-  ImGui::TextDisabled("Frame");
-  ImGui::Text("%llu", static_cast<unsigned long long>(frameNumber));
+  renderWebDetailGridCell(
+      "Frame",
+      std::format("{}", static_cast<unsigned long long>(frameNumber)));
   ImGui::NextColumn();
-  ImGui::TextDisabled("Duration");
-  ImGui::Text("%.2fs", durationSeconds);
+  renderWebDetailGridCell("Duration", std::format("{:.2f}s", durationSeconds));
   ImGui::NextColumn();
-  ImGui::TextDisabled("Status");
-  ImGui::Text("%s", playbackPlaying ? "Playing" : transportEnabled ? "Paused" : "Stopped");
+  renderWebDetailGridCell(
+      "Status",
+      playbackPlaying ? "Playing" : transportEnabled ? "Paused" : "Stopped");
   ImGui::Columns(1);
 
   ImGui::End();
@@ -10366,17 +10369,13 @@ void SubtrActorPlugin::renderRecordingWindow() {
       : !loaded || !engine ? "No replay"
                            : recordingStatus;
   ImGui::Columns(2, "recording-detail-grid", false);
-  ImGui::TextDisabled("Status");
-  ImGui::Text("%s", recordingStatusReadout.c_str());
+  renderWebDetailGridCell("Status", recordingStatusReadout);
   ImGui::NextColumn();
-  ImGui::TextDisabled("Elapsed");
-  ImGui::Text("%.1fs", elapsedSeconds);
+  renderWebDetailGridCell("Elapsed", std::format("{:.1f}s", elapsedSeconds));
   ImGui::NextColumn();
-  ImGui::TextDisabled("Size");
-  ImGui::Text("%s", formatByteSize(recordingLastBytes).c_str());
+  renderWebDetailGridCell("Size", formatByteSize(recordingLastBytes));
   ImGui::NextColumn();
-  ImGui::TextDisabled("Type");
-  ImGui::Text("JSON snapshots");
+  renderWebDetailGridCell("Type", "JSON snapshots");
   ImGui::Columns(1);
 
   ImGui::End();

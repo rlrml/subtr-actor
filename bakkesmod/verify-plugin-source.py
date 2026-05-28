@@ -1490,8 +1490,8 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::TextDisabled("Duration");\n  ImGui::Text("%.2fs", durationSeconds);',
-        "plugin playback duration always renders a numeric readout",
+        'renderWebDetailGridCell("Duration", std::format("{:.2f}s", durationSeconds));',
+        "plugin playback duration uses web-like detail grid readout",
         errors,
     )
     require_contains(
@@ -1699,8 +1699,8 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::Text("%s", recordingStatusReadout.c_str());',
-        "plugin recording status renders the web-like readout",
+        'renderWebDetailGridCell("Status", recordingStatusReadout);',
+        "plugin recording status renders the web-like detail grid readout",
         errors,
     )
     require_contains(
@@ -1849,13 +1849,10 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'auto renderAttachedCameraMetric = [&](const char *format, float value) {\n'
+        'auto attachedCameraMetric = [&](int precision, float value) {\n'
         "    if (!hasAttachedCamera) {\n"
-        '      ImGui::Text("--");\n'
-        "      return;\n"
-        "    }\n"
-        "    ImGui::Text(format, value);\n"
-        "  };",
+        '      return std::string{"--"};\n'
+        "    }\n",
         "plugin camera detail grid uses dash readouts without an attached camera",
         errors,
     )
