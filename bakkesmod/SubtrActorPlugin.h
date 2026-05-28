@@ -352,7 +352,7 @@ private:
   int cameraFreePreset = -1;
   uint32_t cameraSelectedPlayerIndex = 0;
   std::string cameraSelectedPlayerId;
-  float cameraDistanceScale = 1.0f;
+  float cameraDistanceScale = 2.25f;
   bool cameraCustomSettingsEnabled = false;
   bool cameraBallCamEnabled = false;
   float cameraCustomFov = 110.0f;

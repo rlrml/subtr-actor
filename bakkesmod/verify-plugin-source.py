@@ -1127,6 +1127,24 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;",
+        "stats evaluation player default camera distance scale",
+        errors,
+    )
+    require_contains(
+        plugin_header,
+        "float cameraDistanceScale = 2.25f;",
+        "plugin default camera distance scale mirrors stats evaluation player",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'parseJsonNumberProperty(json, "camera_distance_scale").value_or(cameraDistanceScale)',
+        "legacy camera distance config preserves plugin/web default when unset",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'ImGui::TextDisabled("Camera profile");\n  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);\n  const bool profileDisabled = !hasCameraContext;\n  pushCameraDisabledStyle(profileDisabled);\n  const bool profileOpen = ImGui::BeginCombo("##attached-player", selectedLabel.c_str());',
         "plugin camera profile selector mirrors web label and hidden control id",

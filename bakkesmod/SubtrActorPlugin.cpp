@@ -3702,7 +3702,7 @@ void SubtrActorPlugin::applyUiConfigJson(
   cameraSelectedPlayerIndex = static_cast<uint32_t>(
       std::max(0.0, parseJsonNumberProperty(json, "camera_selected_player_index").value_or(0.0)));
   cameraDistanceScale = static_cast<float>(std::clamp(
-      parseJsonNumberProperty(json, "camera_distance_scale").value_or(1.0),
+      parseJsonNumberProperty(json, "camera_distance_scale").value_or(cameraDistanceScale),
       0.75,
       4.0));
   cameraCustomSettingsEnabled =
