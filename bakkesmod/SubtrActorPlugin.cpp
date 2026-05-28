@@ -8211,62 +8211,11 @@ void SubtrActorPlugin::renderEventsWindow() {
     return;
   }
 
-  renderEventFilterCombo("Filter");
-  ImGui::SameLine();
-  if (ImGui::Button("Clear")) {
-    recentUiEvents.clear();
-    mechanicsReviewDecisions.clear();
-    mechanicsReviewIndex = 0;
-  }
-
   renderEventSourceControls();
-
-  size_t visibleCount = 0;
-  for (const UiEventRecord &event : recentUiEvents) {
-    if (uiEventVisible(event)) {
-      visibleCount += 1;
-    }
-  }
-  ImGui::Text("%zu visible / %zu recent", visibleCount, recentUiEvents.size());
-  ImGui::Separator();
-
-  ImGui::BeginChild("event-list", ImVec2{0.0f, 0.0f}, true);
-  ImGui::Columns(4, "event-columns", true);
-  ImGui::Text("Time");
-  ImGui::NextColumn();
-  ImGui::Text("Actor");
-  ImGui::NextColumn();
-  ImGui::Text("Event");
-  ImGui::NextColumn();
-  ImGui::Text("Details");
-  ImGui::NextColumn();
-  ImGui::Separator();
-
-  for (const UiEventRecord &event : recentUiEvents) {
-    if (!uiEventVisible(event)) {
-      continue;
-    }
-    ImGui::Text("%.2fs", event.time);
-    ImGui::NextColumn();
-    ImGui::TextColored(toImVec4(event.color), "%s", event.actor.c_str());
-    ImGui::NextColumn();
-    ImGui::TextWrapped("%s", event.label.c_str());
-    ImGui::NextColumn();
-    ImGui::TextWrapped("%s", event.details.c_str());
-    ImGui::NextColumn();
-  }
-
-  ImGui::Columns(1);
-  ImGui::EndChild();
   ImGui::End();
 }
 
 void SubtrActorPlugin::renderEventSourceControls() {
-  ImGui::SetNextItemOpen(true, ImGuiCond_FirstUseEver);
-  if (!ImGui::TreeNode("Event sources##event-source-controls")) {
-    return;
-  }
-
   const std::string currentFilter = cvarString("subtr_actor_overlay_event_types", "all");
   const bool allSelected = allEventSourcesSelected(currentFilter);
   std::vector<std::string> selected =
@@ -8302,41 +8251,31 @@ void SubtrActorPlugin::renderEventSourceControls() {
     displaySources.push_back(DisplaySource{&option, count, enabled});
   }
 
-  if (ImGui::SmallButton("All events##event-sources")) {
-    selected = selectedEventSourceTokens("all");
-    applySelection();
-  }
-  ImGui::SameLine();
-  if (ImGui::SmallButton("No events##event-sources")) {
-    selected.clear();
-    applySelection();
-  }
-  ImGui::SameLine();
-  const std::string preview =
-      eventFilterPreview(cvarString("subtr_actor_overlay_event_types", "all"));
-  ImGui::TextDisabled("%s", preview.c_str());
-  ImGui::TextDisabled("%zu loaded sources", displaySources.size());
-
-  ImGui::BeginChild("event-source-list", ImVec2{0.0f, 185.0f}, true);
   if (displaySources.empty()) {
     ImGui::TextDisabled("No events loaded.");
-    ImGui::EndChild();
-    ImGui::TreePop();
     return;
   }
 
-  std::string_view currentGroup;
+  if (renderModuleSummaryToggle(
+          "All events",
+          allSelected,
+          "event-sources-actions")) {
+    selected = selectedEventSourceTokens("all");
+    applySelection();
+  }
+  if (renderModuleSummaryToggle(
+          "No events",
+          selected.empty(),
+          "event-sources-actions")) {
+    selected.clear();
+    applySelection();
+  }
+
+  ImGui::Separator();
+  ImGui::BeginChild("event-source-list", ImVec2{0.0f, 0.0f}, true);
+
   for (const DisplaySource &source : displaySources) {
     const EventFilterOption &option = *source.option;
-    const std::string_view optionGroup{option.group};
-    if (currentGroup != optionGroup) {
-      if (!currentGroup.empty()) {
-        ImGui::Separator();
-      }
-      ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", option.group);
-      currentGroup = optionGroup;
-    }
-
     ImGui::PushID(option.value);
     bool enabled = source.enabled;
     const std::string label = std::format("{} ({})", option.label, source.count);
@@ -8353,7 +8292,6 @@ void SubtrActorPlugin::renderEventSourceControls() {
     ImGui::PopID();
   }
   ImGui::EndChild();
-  ImGui::TreePop();
 }
 
 bool SubtrActorPlugin::eventPlaylistSourceEnabled(const UiEventRecord &event) const {

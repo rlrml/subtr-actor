@@ -746,6 +746,69 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        'allName.textContent = "All events";',
+        "stats evaluation player Events window all-events action",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderModuleSummaryToggle(\n          "All events",\n          allSelected,\n          "event-sources-actions")',
+        "plugin Events window all-events action mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'noneName.textContent = "No events";',
+        "stats evaluation player Events window no-events action",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderModuleSummaryToggle(\n          "No events",\n          selected.empty(),\n          "event-sources-actions")',
+        "plugin Events window no-events action mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'item.className = "module-summary-item";',
+        "stats evaluation player Events window source rows are module summary items",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderModuleSummaryToggle(label.c_str(), enabled, "event-sources")',
+        "plugin Events window source rows are module summary toggles",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'empty.textContent = "No events loaded.";',
+        "stats evaluation player Events window empty state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("No events loaded.");',
+        "plugin Events window empty state mirrors web",
+        errors,
+    )
+    for plugin_only_events_surface in (
+        'renderEventFilterCombo("Filter");',
+        'ImGui::Button("Clear")',
+        'ImGui::Text("%zu visible / %zu recent", visibleCount, recentUiEvents.size());',
+        'ImGui::Columns(4, "event-columns", true);',
+        'ImGui::TreeNode("Event sources##event-source-controls")',
+        'ImGui::SmallButton("All events##event-sources")',
+        'ImGui::SmallButton("No events##event-sources")',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_events_surface,
+            "plugin Events window plugin-only log/table surface",
+            errors,
+        )
+    require_contains(
+        web_player_main_source,
         "summary.textContent = `Filters ${selectedSourceIds.size}/${sources.length}`;",
         "stats evaluation player event playlist filter count label",
         errors,
