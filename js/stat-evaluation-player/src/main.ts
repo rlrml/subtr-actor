@@ -38,6 +38,10 @@ import {
   type RecordingControls,
 } from "./recordingControls.ts";
 import {
+  createReplaySnapshotRenderer,
+  type ReplaySnapshotRenderer,
+} from "./replaySnapshotRenderer.ts";
+import {
   createReplayLoadController,
   type ReplayLoadController,
 } from "./replayLoadController.ts";
@@ -77,7 +81,6 @@ let canvasRecorder: CanvasRecorderPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: StatsFrameLookup | null = null;
 let unsubscribe: (() => void) | null = null;
-let lastPlayingSnapshotUiUpdateAt = 0;
 
 const standalonePluginRemovers = new Map<string, () => void>();
 
@@ -124,6 +127,7 @@ let mechanicsReviewController: MechanicsReviewController | null = null;
 let recordingControls: RecordingControls | null = null;
 let cameraControls: CameraControls | null = null;
 let replayLoadController: ReplayLoadController | null = null;
+let replaySnapshotRenderer: ReplaySnapshotRenderer | null = null;
 let moduleRuntimeController: ModuleRuntimeController;
 let eventWindowsManager: EventWindowsManager;
 let cueTimelineEvent: (event: ReplayTimelineEvent) => void = () => {};
@@ -389,30 +393,7 @@ function setTransportEnabled(enabled: boolean): void {
 }
 
 function renderSnapshot(state: ReplayPlayerState): void {
-  if (mechanicsReviewController?.enforceClipBoundary(state)) {
-    return;
-  }
-
-  const now = performance.now();
-  if (state.playing && now - lastPlayingSnapshotUiUpdateAt < PLAYING_SNAPSHOT_UI_INTERVAL_MS) {
-    return;
-  }
-  lastPlayingSnapshotUiUpdateAt = now;
-
-  appElements.timeReadout.textContent = `${state.currentTime.toFixed(2)}s`;
-  appElements.frameReadout.textContent = `${state.frameIndex}`;
-  appElements.durationReadout.textContent = `${state.duration.toFixed(2)}s`;
-  appElements.playbackStatusReadout.textContent = state.playing ? "Playing" : "Paused";
-  appElements.togglePlayback.textContent = state.playing ? "Pause" : "Play";
-  appElements.playbackRate.value = `${state.speed}`;
-  appElements.skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
-  appElements.skipKickoffs.checked = state.skipKickoffsEnabled;
-  appElements.emptyState.hidden = true;
-
-  cameraControls?.syncSnapshot(state);
-  statsWindowManager.render(state.frameIndex, { preserveOpenPickers: true });
-  renderScoreboard(state.frameIndex);
-  eventWindowsManager.syncPlaylistTimeline(state);
+  replaySnapshotRenderer?.render(state);
 }
 
 export function mountStatEvaluationPlayer(
@@ -426,6 +407,21 @@ export function mountStatEvaluationPlayer(
   replayLoadModal = createReplayLoadModal(root);
 
   appElements = getStatEvaluationPlayerElements(root);
+  replaySnapshotRenderer = createReplaySnapshotRenderer({
+    elements: appElements,
+    playingUiUpdateIntervalMs: PLAYING_SNAPSHOT_UI_INTERVAL_MS,
+    statsWindowManager,
+    getCameraControls() {
+      return cameraControls;
+    },
+    getEventWindowsManager() {
+      return eventWindowsManager;
+    },
+    getMechanicsReviewController() {
+      return mechanicsReviewController;
+    },
+    renderScoreboard,
+  });
   configUrlSyncController = createStatsPlayerConfigUrlSyncController({
     getLocation() {
       return window.location;
@@ -659,6 +655,7 @@ export function mountStatEvaluationPlayer(
     recordingControls = null;
     cameraControls = null;
     replayLoadController = null;
+    replaySnapshotRenderer = null;
     boostPadOverlayEnabled = true;
     loadedReplayName = null;
     initialUrlConfig = null;
