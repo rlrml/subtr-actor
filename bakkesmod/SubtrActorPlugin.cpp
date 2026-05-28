@@ -8072,19 +8072,11 @@ void SubtrActorPlugin::renderEmptyStateWindow() {
     return;
   }
 
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "subtr-actor");
   ImGui::TextUnformatted("Load a replay to start.");
   if (ImGui::Button("Load Replay...", ImVec2{150.0f, 0.0f})) {
     showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);
     resetReplayAnnotations();
     tickReplayAnnotations();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Start live analysis", ImVec2{150.0f, 0.0f})) {
-    setCvarBool("subtr_actor_enabled", true);
-  }
-  if (ImGui::Button("Open menu", ImVec2{150.0f, 0.0f})) {
-    showLauncherWindow();
   }
 
   ImGui::End();

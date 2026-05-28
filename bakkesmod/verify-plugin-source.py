@@ -961,6 +961,35 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_template_source,
+        "<p>Load a replay to start.</p>\n          <button id=\"empty-load-replay\" type=\"button\">Load Replay...</button>",
+        "stats evaluation player empty state exposes only replay loading",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextUnformatted("Load a replay to start.");\n'
+        '  if (ImGui::Button("Load Replay...", ImVec2{150.0f, 0.0f})) {\n'
+        "    showSingletonWindow(uiReplayLoadingOpen, replayLoadingPlacement);\n"
+        "    resetReplayAnnotations();\n"
+        "    tickReplayAnnotations();\n"
+        "  }\n\n"
+        "  ImGui::End();",
+        "plugin empty state mirrors web replay-loading-only card",
+        errors,
+    )
+    for plugin_only_empty_state_surface in (
+        'ImGui::Button("Start live analysis", ImVec2{150.0f, 0.0f})',
+        'ImGui::Button("Open menu", ImVec2{150.0f, 0.0f})',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "subtr-actor");',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_empty_state_surface,
+            "plugin empty state plugin-only surface",
+            errors,
+        )
+    require_contains(
         web_player_main_source,
         'renderModuleSummaryGroup("Timeline visualizations", timelineToggles)',
         "stats evaluation player launcher module summary timeline group",
