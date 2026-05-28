@@ -8991,8 +8991,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     const std::string timeLabel = formatEventPlaylistTime(event.time);
     const std::string sourceLabel = sourceLabelForEvent(event);
     const std::string eventLabel = event.label.empty() ? sourceLabel : event.label;
-    const std::string itemLabel =
-        std::format("{}  {}##event-playlist-item", timeLabel, eventLabel);
+    const std::string itemLabel = std::format("{}##event-playlist-item", eventLabel);
+    ImGui::TextDisabled("%s", timeLabel.c_str());
+    ImGui::SameLine(64.0f);
     ImGui::PushStyleColor(ImGuiCol_Text, color);
     const bool selected = ImGui::Selectable(itemLabel.c_str(), active);
     ImGui::PopStyleColor();

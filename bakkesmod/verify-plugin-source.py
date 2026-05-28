@@ -2047,6 +2047,18 @@ def main() -> int:
         "plugin event playlist row title falls back to source label like web",
         errors,
     )
+    require_contains(
+        plugin_source,
+        'const std::string itemLabel = std::format("{}##event-playlist-item", eventLabel);',
+        "plugin event playlist row title excludes time like web title column",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("%s", timeLabel.c_str());\n    ImGui::SameLine(64.0f);',
+        "plugin event playlist renders time as a separate column",
+        errors,
+    )
     reject_contains(
         plugin_source,
         "const std::string eventLabel = event.label.empty() ? event.type : event.label;",
@@ -2129,6 +2141,12 @@ def main() -> int:
         plugin_source,
         'std::format("All ({})", recentUiEvents.size()).c_str()',
         "plugin event playlist all action includes event count",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'std::format("{}  {}##event-playlist-item", timeLabel, eventLabel)',
+        "plugin event playlist row title prefixes time",
         errors,
     )
     for plugin_only_event_playlist_filter_surface in (
