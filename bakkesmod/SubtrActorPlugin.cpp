@@ -9018,6 +9018,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       metaParts.push_back(sourceLabel);
     }
     if (!metaParts.empty()) {
+      ImGui::SetCursorPosX(64.0f);
       ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());
     }
     if (active && eventPlaylistAutoFollow && activeEventKey != eventPlaylistLastActiveKey) {

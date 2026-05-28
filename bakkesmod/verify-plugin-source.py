@@ -2059,6 +2059,12 @@ def main() -> int:
         "plugin event playlist renders time as a separate column",
         errors,
     )
+    require_contains(
+        plugin_source,
+        'ImGui::SetCursorPosX(64.0f);\n      ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());',
+        "plugin event playlist metadata aligns under title column",
+        errors,
+    )
     reject_contains(
         plugin_source,
         "const std::string eventLabel = event.label.empty() ? event.type : event.label;",
