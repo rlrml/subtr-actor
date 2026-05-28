@@ -10228,9 +10228,14 @@ void SubtrActorPlugin::renderRecordingWindow() {
   }
 
   ImGui::Separator();
+  const std::string recordingStatusReadout =
+      recordingActive   ? "Recording"
+      : hasGraphSnapshot ? "Ready"
+      : !loaded || !engine ? "No replay"
+                           : recordingStatus;
   ImGui::Columns(2, "recording-detail-grid", false);
   ImGui::TextDisabled("Status");
-  ImGui::Text("%s", recordingStatus.c_str());
+  ImGui::Text("%s", recordingStatusReadout.c_str());
   ImGui::NextColumn();
   ImGui::TextDisabled("Elapsed");
   ImGui::Text("%.1fs", elapsedSeconds);

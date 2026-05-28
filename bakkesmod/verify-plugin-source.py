@@ -1189,6 +1189,24 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        'case "recording":\n      return "Recording";\n    case "stopping":\n      return "Stopping";\n    case "ready":\n      return "Ready";',
+        "stats evaluation player recording status uses user-facing state labels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const std::string recordingStatusReadout =\n      recordingActive   ? "Recording"\n      : hasGraphSnapshot ? "Ready"\n      : !loaded || !engine ? "No replay"\n                           : recordingStatus;',
+        "plugin recording status readout uses web-like state labels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Text("%s", recordingStatusReadout.c_str());',
+        "plugin recording status renders the web-like readout",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         'if (bytes <= 0) {\n    return "--";\n  }\n  const units = ["B", "KB", "MB", "GB"];',
         "stats evaluation player recording size formatter uses dash and decimal units",
         errors,
@@ -1206,6 +1224,7 @@ def main() -> int:
         '"recording_finish_before_dump"',
         'ImGui::Button("Snapshot")',
         'ImGui::Button("Log folder")',
+        'ImGui::Text("%s", recordingStatus.c_str());',
         'return std::format("{} B", bytes);',
         'KiB',
         'MiB',
