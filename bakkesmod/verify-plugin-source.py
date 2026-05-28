@@ -1895,8 +1895,33 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'const std::string replaySummary = replayPath ? "1 replay" : "0 replays";',
+        'const std::string replaySummary = hasReplaySource ? "1 replay" : "0 replays";',
         "plugin replay loading summary uses web-like replay count",
+        errors,
+    )
+    require_contains(
+        web_player_template_source,
+        '<span id="replay-loading-active">Idle</span>',
+        "stats evaluation player replay loading active summary exists",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'loaded === states.length\n              ? "Complete"',
+        "stats evaluation player replay loading active summary reports completion",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const char *activeSummary = !hasReplaySource         ? "No playlist"\n'
+        '                              : replayAnnotations      ? "Complete"',
+        "plugin replay loading active summary mirrors web completion state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("%s", activeSummary);',
+        "plugin replay loading renders active summary separately from replay count",
         errors,
     )
     require_contains(

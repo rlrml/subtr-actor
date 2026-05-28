@@ -9182,15 +9182,22 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
                            : replayAnnotations ? "Loaded"
                            : replayAnnotationLoadFailed ? "Failed"
                                                         : "Scanning";
-  const std::string replaySummary = replayPath ? "1 replay" : "0 replays";
+  const bool hasReplaySource =
+      replayPath || !rawReplayPath.empty() || !replayAnnotationPath.empty();
+  const std::string replaySummary = hasReplaySource ? "1 replay" : "0 replays";
+  const char *activeSummary = !hasReplaySource         ? "No playlist"
+                              : replayAnnotations      ? "Complete"
+                              : replayAnnotationLoadFailed ? "1 failed"
+                              : annotationsEnabled && inReplay ? "1 active, 0 pending"
+                                                               : status;
 
   ImGui::Text("%s", replaySummary.c_str());
   ImGui::SameLine();
-  ImGui::Text("%s", status);
+  ImGui::TextDisabled("%s", activeSummary);
 
   ImGui::Separator();
   ImGui::BeginChild("replay-loading-list", ImVec2{0.0f, 112.0f}, true);
-  if (!replayPath && rawReplayPath.empty() && replayAnnotationPath.empty()) {
+  if (!hasReplaySource) {
     ImGui::TextDisabled("No replay sources.");
   } else {
     const std::string title = replayPath ? *replayPath
