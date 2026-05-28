@@ -8633,23 +8633,34 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
       mechanicsReviewIndex + 1,
       candidates.size());
   ImGui::TextWrapped("%s", current.label.c_str());
-  ImGui::Text("Decision: %s", mechanicsReviewDecisionLabel(current));
-  ImGui::Text("Mechanic: %s", current.type.c_str());
-  ImGui::Text("Player: %s", current.actor.c_str());
-  ImGui::Text("Clip: %.2fs to %.2fs", clipStart, clipEnd);
-  if (mechanicsReviewClipActive) {
-    ImGui::TextColored(
-        ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
-        "Active clip: %.2fs to %.2fs",
-        mechanicsReviewClipStartSeconds,
-        mechanicsReviewClipEndSeconds);
-  }
-  if (!mechanicsReviewStatus.empty()) {
-    ImGui::TextWrapped("Status: %s", mechanicsReviewStatus.c_str());
-  }
-  ImGui::Text("Event: frame %llu", static_cast<unsigned long long>(current.frame_number));
-  if (!current.details.empty()) {
-    ImGui::TextWrapped("Reason: %s", current.details.c_str());
+  const std::string clipReadout = std::format("{:.2f}s to {:.2f}s", clipStart, clipEnd);
+  const std::string eventReadout =
+      std::format("frame {}", static_cast<unsigned long long>(current.frame_number));
+  const std::string reasonReadout = current.details.empty() ? "--" : current.details;
+  ImGui::Columns(2, "mechanics-review-fields", false);
+  ImGui::TextDisabled("Mechanic");
+  ImGui::Text("%s", current.type.empty() ? "--" : current.type.c_str());
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Player");
+  ImGui::Text("%s", current.actor.empty() ? "--" : current.actor.c_str());
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Clip");
+  ImGui::Text("%s", clipReadout.c_str());
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Event");
+  ImGui::Text("%s", eventReadout.c_str());
+  ImGui::NextColumn();
+  ImGui::TextDisabled("Reason");
+  ImGui::TextWrapped("%s", reasonReadout.c_str());
+  ImGui::Columns(1);
+  if (mechanicsReviewClipActive || !mechanicsReviewStatus.empty()) {
+    const std::string status = mechanicsReviewClipActive
+                                   ? std::format(
+                                         "Playing clip {:.2f}s to {:.2f}s",
+                                         mechanicsReviewClipStartSeconds,
+                                         mechanicsReviewClipEndSeconds)
+                                   : mechanicsReviewStatus;
+    ImGui::TextWrapped("%s", status.c_str());
   }
 
   if (ImGui::Button("Prev") && mechanicsReviewIndex > 0) {

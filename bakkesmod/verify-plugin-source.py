@@ -1127,6 +1127,32 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_template_source,
+        '<dl class="mechanics-review-fields">',
+        "stats evaluation player mechanics review current item field grid",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Columns(2, "mechanics-review-fields", false);',
+        "plugin mechanics review current item uses web-like field grid",
+        errors,
+    )
+    for plugin_only_mechanics_review_current_surface in (
+        'ImGui::Text("Decision: %s", mechanicsReviewDecisionLabel(current));',
+        'ImGui::Text("Mechanic: %s", current.type.c_str());',
+        'ImGui::Text("Player: %s", current.actor.c_str());',
+        'ImGui::Text("Clip: %.2fs to %.2fs", clipStart, clipEnd);',
+        'ImGui::Text("Event: frame %llu", static_cast<unsigned long long>(current.frame_number));',
+        'ImGui::TextWrapped("Reason: %s", current.details.c_str());',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_mechanics_review_current_surface,
+            "plugin mechanics review current item debug-style rows",
+            errors,
+        )
+    require_contains(
         web_player_main_source,
         "formatMechanicsReviewStatus(candidate.meta?.reviewStatus)",
         "stats evaluation player mechanics review rows expose review status",
