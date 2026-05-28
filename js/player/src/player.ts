@@ -13,6 +13,10 @@ import {
 } from "./player-render-effects";
 import { renderReplayFrameScene } from "./player-render-frame";
 import { normalizeCustomCameraSettings } from "./player-camera-settings";
+import {
+  DEFAULT_REPLAY_CAMERA_VIEW_MODE,
+  getReplayPlayerInitialState,
+} from "./player-initial-state";
 import { ReplayPlayerTimelineCache } from "./player-timeline-cache";
 import { findKickoffSkipTime, findPostGoalTransitionSkipTime } from "./player-skip";
 import {
@@ -43,10 +47,6 @@ import type {
   ReplayTimelineEvent,
   Vec3,
 } from "./types";
-
-const DEFAULT_FIELD_SCALE = 1;
-const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
-const DEFAULT_CAMERA_VIEW_MODE: ReplayCameraViewMode = "free";
 
 type ReplayPlayerListener = (state: ReplayPlayerState) => void;
 type InstalledReplayPlayerPlugin = {
@@ -99,25 +99,21 @@ export class ReplayPlayer extends EventTarget {
     this.container = container;
     this.replay = replay;
     this.options = options;
-    this.fieldScale = options.fieldScale ?? DEFAULT_FIELD_SCALE;
+    const initialState = getReplayPlayerInitialState(options);
+    this.fieldScale = initialState.fieldScale;
     this.sceneState = createReplayScene(container, replay, this.fieldScale);
     this.liveGameState = inferLiveGameState(replay);
     this.kickoffGameState = inferKickoffGameState(replay, this.liveGameState);
-    this.speed = Math.max(0.1, options.initialPlaybackRate ?? 1);
-    this.cameraDistanceScale = Math.max(
-      0.25,
-      options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
-    );
-    this.customCameraSettings = normalizeCustomCameraSettings(options.initialCustomCameraSettings);
-    this.attachedPlayerId = options.initialAttachedPlayerId ?? null;
-    this.cameraViewMode =
-      options.initialCameraViewMode ??
-      (this.attachedPlayerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE);
-    this.ballCamEnabled = options.initialBallCamEnabled ?? false;
-    this.boostMeterEnabled = options.initialBoostMeterEnabled ?? false;
-    this.boostPickupAnimationEnabled = options.initialBoostPickupAnimationEnabled ?? true;
-    this.skipPostGoalTransitionsEnabled = options.initialSkipPostGoalTransitionsEnabled ?? true;
-    this.skipKickoffsEnabled = options.initialSkipKickoffsEnabled ?? false;
+    this.speed = initialState.speed;
+    this.cameraDistanceScale = initialState.cameraDistanceScale;
+    this.customCameraSettings = initialState.customCameraSettings;
+    this.attachedPlayerId = initialState.attachedPlayerId;
+    this.cameraViewMode = initialState.cameraViewMode;
+    this.ballCamEnabled = initialState.ballCamEnabled;
+    this.boostMeterEnabled = initialState.boostMeterEnabled;
+    this.boostPickupAnimationEnabled = initialState.boostPickupAnimationEnabled;
+    this.skipPostGoalTransitionsEnabled = initialState.skipPostGoalTransitionsEnabled;
+    this.skipKickoffsEnabled = initialState.skipKickoffsEnabled;
     this.skipPostGoalTransitionIfNeeded();
     this.skipPastKickoffIfNeeded();
 
@@ -187,7 +183,7 @@ export class ReplayPlayer extends EventTarget {
 
   setAttachedPlayer(playerId: string | null): void {
     this.attachedPlayerId = playerId;
-    this.cameraViewMode = playerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE;
+    this.cameraViewMode = playerId ? "follow" : DEFAULT_REPLAY_CAMERA_VIEW_MODE;
     this.freeCameraTransition = null;
     this.render();
     this.emitChange();
@@ -202,7 +198,7 @@ export class ReplayPlayer extends EventTarget {
 
   setFreeCameraPreset(preset: ReplayFreeCameraPreset): void {
     const { fov, position, target, up } = getFreeCameraPreset(preset, this.fieldScale);
-    this.cameraViewMode = DEFAULT_CAMERA_VIEW_MODE;
+    this.cameraViewMode = DEFAULT_REPLAY_CAMERA_VIEW_MODE;
     this.freeCameraTransition = {
       position,
       target,
@@ -317,7 +313,7 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.attachedPlayerId !== undefined) {
       this.attachedPlayerId = nextState.attachedPlayerId;
       if (nextState.cameraViewMode === undefined) {
-        this.cameraViewMode = this.attachedPlayerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE;
+        this.cameraViewMode = this.attachedPlayerId ? "follow" : DEFAULT_REPLAY_CAMERA_VIEW_MODE;
       }
     }
     if (nextState.ballCamEnabled !== undefined) {
