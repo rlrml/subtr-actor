@@ -762,6 +762,30 @@ def main() -> int:
         "stats evaluation player playback config snapshot is explicit",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        "playbackRate.disabled = !enabled;",
+        "stats evaluation player disables playback rate without transport",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool playbackRateDisabled = !transportEnabled;\n"
+        "  pushPlaybackDisabledStyle(playbackRateDisabled);\n"
+        "  ImGui::SetNextItemWidth(96.0f);\n"
+        "  const bool playbackRateOpen =\n"
+        '      ImGui::BeginCombo("##playback-rate", playbackRateLabels[playbackRateIndex]);',
+        "plugin playback rate selector is disabled with transport",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "if (playbackRateDisabled) {\n"
+        "      ImGui::CloseCurrentPopup();\n"
+        "      ImGui::EndCombo();",
+        "plugin playback rate disabled selector cannot remain open",
+        errors,
+    )
     reject_contains(
         plugin_source,
         "playbackStatus",

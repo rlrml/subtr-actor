@@ -9876,11 +9876,16 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
       playbackRateIndex = index;
     }
   }
-  pushPlaybackDisabledStyle(!transportEnabled);
+  const bool playbackRateDisabled = !transportEnabled;
+  pushPlaybackDisabledStyle(playbackRateDisabled);
   ImGui::SetNextItemWidth(96.0f);
-  if (ImGui::BeginCombo("##playback-rate", playbackRateLabels[playbackRateIndex])) {
-    if (!transportEnabled) {
-      ImGui::TextDisabled("%s", playbackRateLabels[playbackRateIndex]);
+  const bool playbackRateOpen =
+      ImGui::BeginCombo("##playback-rate", playbackRateLabels[playbackRateIndex]);
+  popPlaybackDisabledStyle(playbackRateDisabled);
+  if (playbackRateOpen) {
+    if (playbackRateDisabled) {
+      ImGui::CloseCurrentPopup();
+      ImGui::EndCombo();
     } else {
       for (size_t index = 0; index < playbackRateValues.size(); index += 1) {
         const bool selected = index == playbackRateIndex;
@@ -9893,10 +9898,9 @@ void SubtrActorPlugin::renderPlaybackControlsWindow() {
           ImGui::SetItemDefaultFocus();
         }
       }
+      ImGui::EndCombo();
     }
-    ImGui::EndCombo();
   }
-  popPlaybackDisabledStyle(!transportEnabled);
 
   bool nextSkipPostGoalTransitions = playbackSkipPostGoalTransitions;
   pushPlaybackDisabledStyle(!transportEnabled);
