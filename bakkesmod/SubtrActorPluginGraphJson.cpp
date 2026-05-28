@@ -4,6 +4,10 @@
 
 namespace subtr_actor_plugin::graph_json {
 
+std::string jsonPropertyNeedle(const std::string &propertyName) {
+  return "\"" + propertyName + "\"";
+}
+
 void skipJsonWhitespace(const std::string &json, size_t &offset) {
   while (offset < json.size() &&
          std::isspace(static_cast<unsigned char>(json[offset])) != 0) {
@@ -107,7 +111,7 @@ std::vector<std::string> parseJsonStringArray(const std::string &json) {
 std::vector<std::string> parseJsonStringArrayProperty(
     const std::string &json,
     const std::string &propertyName) {
-  const std::string needle = std::format("\"{}\"", propertyName);
+  const std::string needle = jsonPropertyNeedle(propertyName);
   size_t offset = json.find(needle);
   if (offset == std::string::npos) {
     return {};
@@ -293,7 +297,7 @@ std::vector<std::string> parseJsonObjectKeys(const std::string &json) {
 std::optional<size_t> parseJsonArrayPropertyElementCount(
     const std::string &json,
     const std::string &propertyName) {
-  const std::string needle = std::format("\"{}\"", propertyName);
+  const std::string needle = jsonPropertyNeedle(propertyName);
   size_t offset = json.find(needle);
   if (offset == std::string::npos) {
     return std::nullopt;
