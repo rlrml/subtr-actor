@@ -12239,9 +12239,11 @@ bool SubtrActorPlugin::renderStatsWindowValueRow(
       ImGui::GetCursorPosX(),
       removeX - valueWidth - 12.0f);
   const std::string labelString{label};
-  ImGui::Text("%s", labelString.c_str());
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextColored(ImVec4{0.62f, 0.71f, 0.78f, 1.0f}, "%s", labelString.c_str());
   ImGui::SameLine(valueX);
-  ImGui::Text("%s", valueString.c_str());
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextColored(ImVec4{0.93f, 0.96f, 0.98f, 1.0f}, "%s", valueString.c_str());
   ImGui::SameLine(removeX);
   const std::string removeLabel = idSuffix.empty()
                                       ? std::format("x##remove-stat-{}-{}", window.id, entryIndex)
@@ -12250,11 +12252,15 @@ bool SubtrActorPlugin::renderStatsWindowValueRow(
                                             window.id,
                                             entryIndex,
                                             idSuffix);
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{5.0f, 2.0f});
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
   if (ImGui::SmallButton(removeLabel.c_str())) {
+    ImGui::PopStyleVar(2);
     window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(entryIndex));
     scheduleUiConfigAutosave();
     return true;
   }
+  ImGui::PopStyleVar(2);
   if (ImGui::IsItemHovered()) {
     ImGui::SetTooltip("Remove stat");
   }

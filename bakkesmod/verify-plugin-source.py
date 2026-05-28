@@ -1016,6 +1016,59 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        'row.className = "stats-window-stat-row";',
+        "stats evaluation player shared stat row class",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'name.className = "stats-window-stat-name";',
+        "stats evaluation player shared stat row label class",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'valueEl.className = "stats-window-stat-value";',
+        "stats evaluation player shared stat row value class",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'remove.className = "stats-window-stat-remove";',
+        "stats evaluation player shared stat row remove class",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".stats-window-stat-row {\n"
+        "  display: grid;\n"
+        "  grid-template-columns: minmax(0, 1fr) auto auto;\n"
+        "  gap: var(--ui-gap-sm);\n"
+        "  align-items: center;\n"
+        "  min-height: 1.45rem;",
+        "stats evaluation player shared stat row grid layout",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::AlignTextToFramePadding();\n"
+        "  ImGui::TextColored(ImVec4{0.62f, 0.71f, 0.78f, 1.0f}, \"%s\", labelString.c_str());\n"
+        "  ImGui::SameLine(valueX);\n"
+        "  ImGui::AlignTextToFramePadding();\n"
+        "  ImGui::TextColored(ImVec4{0.93f, 0.96f, 0.98f, 1.0f}, \"%s\", valueString.c_str());",
+        "plugin shared stat row uses muted label and bright value like web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{5.0f, 2.0f});\n"
+        "  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);\n"
+        "  if (ImGui::SmallButton(removeLabel.c_str())) {",
+        "plugin shared stat row uses compact rounded remove button",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'renderStatsWindowValueRow(\n                window, i, statLabel, statValue, std::format("player-{}", player.player_index))',
         "plugin all-player stats rows use shared row renderer",
