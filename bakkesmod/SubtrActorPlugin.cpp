@@ -7823,7 +7823,7 @@ void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
   placement.viewport_width = displaySize.x;
   placement.viewport_height = displaySize.y;
   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&
-      ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+      ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemActive()) {
     placement.z_index = nextUiWindowZIndex++;
   }
   if (!hadPlacement || previousX != placement.x || previousY != placement.y ||
@@ -7948,7 +7948,7 @@ void SubtrActorPlugin::captureStatsWindowPlacement(UiStatsWindow &window) {
   window.viewport_width = displaySize.x;
   window.viewport_height = displaySize.y;
   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&
-      ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+      ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemActive()) {
     window.z_index = nextUiWindowZIndex++;
   }
   if (!hadPlacement || previousX != window.x || previousY != window.y ||

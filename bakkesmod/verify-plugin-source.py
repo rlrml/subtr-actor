@@ -3116,6 +3116,32 @@ def main() -> int:
         "plugin reset placement z-order uses raw singleton declaration order",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        'Boolean(target.closest("button, input, select, textarea, option, label, a, [data-no-drag]"))',
+        "stats evaluation player window dragging ignores interactive controls",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "bringWindowToFront(windowEl);\n      const startX = event.clientX;",
+        "stats evaluation player brings windows forward from non-interactive pointer down",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&\n"
+        "      ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemActive()",
+        "plugin window z-order bumps ignore active controls like web dragging",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&\n"
+        "      ImGui::IsMouseClicked(ImGuiMouseButton_Left))",
+        "plugin window z-order bumps on interactive control clicks",
+        errors,
+    )
 
     require_contains(
         plugin_source,
