@@ -16,6 +16,7 @@ impl TouchCalculator {
                 continue;
             };
             let classification = Self::touch_classification_for_event(
+                touch_event,
                 ball,
                 players,
                 vertical_state,
@@ -43,6 +44,7 @@ impl TouchCalculator {
     }
 
     fn touch_classification_for_event(
+        touch_event: &TouchEvent,
         ball: &BallFrameState,
         players: &PlayerFrameState,
         vertical_state: &PlayerVerticalState,
