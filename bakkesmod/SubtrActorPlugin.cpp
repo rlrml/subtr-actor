@@ -8126,9 +8126,7 @@ void SubtrActorPlugin::renderWebWindowToggleControls(
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
       ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.25f, 0.55f, 0.43f, 1.0f});
     }
-    const std::string buttonLabel = includeState
-                                        ? std::format("{}   {}", window.label, isOpen ? "Hide" : "Show")
-                                        : std::string{window.label};
+    const std::string buttonLabel{window.label};
     const float buttonWidth = fullWidth ? ImGui::GetContentRegionAvail().x : 210.0f;
     if (ImGui::Button(buttonLabel.c_str(), ImVec2{buttonWidth, 0.0f})) {
       if (*window.open) {

@@ -990,6 +990,12 @@ def main() -> int:
         "plugin launcher closes after Load Replay action like web",
         errors,
     )
+    reject_contains(
+        plugin_source,
+        'std::format("{}   {}", window.label, isOpen ? "Hide" : "Show")',
+        "plugin launcher web window toggles append show/hide state text",
+        errors,
+    )
     require_contains(
         web_player_template_source,
         "<p>Load a replay to start.</p>\n          <button id=\"empty-load-replay\" type=\"button\">Load Replay...</button>",
