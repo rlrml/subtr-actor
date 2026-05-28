@@ -56,14 +56,16 @@ import { createStatsWindowsManager } from "./statsWindows.ts";
 import { createEventWindowsManager, type EventWindowsManager } from "./eventWindows.ts";
 import {
   getReplayPlayerStatePatchFromConfig,
-  getStatsPlayerConfigSnapshot,
 } from "./appConfigSnapshot.ts";
 import {
-  setStatsPlayerConfigOnUrl,
   type SingletonWindowId,
   type StatsPlayerConfig,
 } from "./playerConfig.ts";
 import { loadInitialStatsPlayerConfig } from "./appInitialConfig.ts";
+import {
+  createStatsPlayerConfigUrlSyncController,
+  type StatsPlayerConfigUrlSyncController,
+} from "./appConfigUrlSync.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -99,8 +101,7 @@ let statRegistry: StatDefinition[] = createStatRegistry(null);
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
-let isApplyingConfig = false;
-let configUrlUpdateTimer: number | null = null;
+let configUrlSyncController: StatsPlayerConfigUrlSyncController | null = null;
 
 const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "camera",
@@ -275,30 +276,7 @@ function toggleBoostPadOverlay(): void {
 }
 
 function scheduleConfigUrlUpdate(): void {
-  if (isApplyingConfig) {
-    return;
-  }
-  if (configUrlUpdateTimer !== null) {
-    window.clearTimeout(configUrlUpdateTimer);
-  }
-  configUrlUpdateTimer = window.setTimeout(() => {
-    configUrlUpdateTimer = null;
-    const nextUrl = setStatsPlayerConfigOnUrl(
-      new URL(window.location.href),
-      getStatsPlayerConfigSnapshot({
-        boostPadOverlayEnabled,
-        cameraControls,
-        elements: appElements,
-        floatingWindows,
-        moduleRuntimeController,
-        recordingControls,
-        replayPlayer,
-        singletonWindowIds: SINGLETON_WINDOW_IDS,
-        statsWindowManager,
-      }),
-    );
-    window.history.replaceState(window.history.state, "", nextUrl);
-  }, 150);
+  configUrlSyncController?.schedule();
 }
 
 function applyConfigToStaticControls(config: StatsPlayerConfig): void {
@@ -448,6 +426,27 @@ export function mountStatEvaluationPlayer(
   replayLoadModal = createReplayLoadModal(root);
 
   appElements = getStatEvaluationPlayerElements(root);
+  configUrlSyncController = createStatsPlayerConfigUrlSyncController({
+    getLocation() {
+      return window.location;
+    },
+    getSnapshotOptions() {
+      return {
+        boostPadOverlayEnabled,
+        cameraControls,
+        elements: appElements,
+        floatingWindows,
+        moduleRuntimeController,
+        recordingControls,
+        replayPlayer,
+        singletonWindowIds: SINGLETON_WINDOW_IDS,
+        statsWindowManager,
+      };
+    },
+    replaceUrl(url) {
+      window.history.replaceState(window.history.state, "", url);
+    },
+  });
   ({ cueTimelineEvent, watchGoalReplay } = createReplayCueingController({
     elements: appElements,
     getCameraControls() {
@@ -551,7 +550,7 @@ export function mountStatEvaluationPlayer(
       canvasRecorder = recorder;
     },
     setIsApplyingConfig(isApplying) {
-      isApplyingConfig = isApplying;
+      configUrlSyncController?.setApplyingConfig(isApplying);
     },
     setLoadedReplayName(name) {
       loadedReplayName = name;
@@ -663,11 +662,8 @@ export function mountStatEvaluationPlayer(
     boostPadOverlayEnabled = true;
     loadedReplayName = null;
     initialUrlConfig = null;
-    if (configUrlUpdateTimer !== null) {
-      window.clearTimeout(configUrlUpdateTimer);
-      configUrlUpdateTimer = null;
-    }
-    isApplyingConfig = false;
+    configUrlSyncController?.reset();
+    configUrlSyncController = null;
     floatingWindows.resetZIndex();
     if (appRoot === root) {
       appRoot = null;
@@ -680,11 +676,11 @@ export function mountStatEvaluationPlayer(
   currentMountCleanup = cleanup;
 
   if (initialUrlConfig) {
-    isApplyingConfig = true;
+    configUrlSyncController?.setApplyingConfig(true);
     try {
       applyConfigToStaticControls(initialUrlConfig);
     } finally {
-      isApplyingConfig = false;
+      configUrlSyncController?.setApplyingConfig(false);
     }
   }
 
