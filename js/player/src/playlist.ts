@@ -29,6 +29,7 @@ import {
   uniqueSourcesFromItems,
 } from "./playlist-policy";
 import { END_TIME_EPSILON, resolvePlaylistItem } from "./playlist-item-resolution";
+import { createReplayPlaylistPlayerState } from "./playlist-state";
 import {
   createInitialPreferences,
   normalizeCustomCameraSettings,
@@ -311,51 +312,19 @@ export class ReplayPlaylistPlayer extends EventTarget {
   }
 
   getState(): ReplayPlaylistPlayerState {
-    const playerState = this.player?.getState() ?? null;
-    const itemIndex = this.pendingItemIndex ?? this.currentItemIndex;
-    const item = this.items[itemIndex] ?? null;
-    const replayCurrentTime = playerState?.currentTime ?? 0;
-    const replayDuration =
-      playerState?.duration ?? this.currentResolvedItem?.replay.replay.duration ?? 0;
-    const itemStartTime = this.currentResolvedItem?.start.time ?? 0;
-    const duration = this.currentResolvedItem?.duration ?? 0;
-    const currentTime = clamp(replayCurrentTime - itemStartTime, 0, duration);
-    const itemEnded =
-      this.currentResolvedItem !== null && currentTime >= duration - END_TIME_EPSILON;
-
-    return {
-      ready: this.currentResolvedItem !== null && !this.loading && this.error === null,
-      loading: this.loading,
-      error: this.error,
-      replayLoadStates: this.getReplayLoadStates(),
-      itemIndex,
-      itemCount: this.items.length,
-      item,
+    return createReplayPlaylistPlayerState({
       advanceMode: this.advanceMode,
+      currentItemIndex: this.currentItemIndex,
+      currentResolvedItem: this.currentResolvedItem,
       endMode: this.endMode,
-      itemEnded,
-      playlistEnded: itemEnded && itemIndex >= this.items.length - 1,
-      currentTime,
-      duration,
-      replayCurrentTime,
-      replayDuration,
-      frameIndex: playerState?.frameIndex ?? this.currentResolvedItem?.start.frameIndex ?? 0,
-      activeMetadata: playerState?.activeMetadata ?? null,
-      playing: playerState?.playing ?? false,
-      speed: playerState?.speed ?? this.preferences.speed,
-      cameraDistanceScale: playerState?.cameraDistanceScale ?? this.preferences.cameraDistanceScale,
-      customCameraSettings:
-        playerState?.customCameraSettings ?? this.preferences.customCameraSettings,
-      cameraViewMode: playerState?.cameraViewMode ?? this.preferences.cameraViewMode,
-      attachedPlayerId: playerState?.attachedPlayerId ?? this.preferences.attachedPlayerId,
-      ballCamEnabled: playerState?.ballCamEnabled ?? this.preferences.ballCamEnabled,
-      boostPickupAnimationEnabled:
-        playerState?.boostPickupAnimationEnabled ?? this.preferences.boostPickupAnimationEnabled,
-      skipPostGoalTransitionsEnabled:
-        playerState?.skipPostGoalTransitionsEnabled ??
-        this.preferences.skipPostGoalTransitionsEnabled,
-      skipKickoffsEnabled: playerState?.skipKickoffsEnabled ?? this.preferences.skipKickoffsEnabled,
-    };
+      error: this.error,
+      items: this.items,
+      loading: this.loading,
+      pendingItemIndex: this.pendingItemIndex,
+      playerState: this.player?.getState() ?? null,
+      preferences: this.preferences,
+      replayLoadStates: this.getReplayLoadStates(),
+    });
   }
 
   getSnapshot(): ReplayPlaylistPlayerSnapshot {
