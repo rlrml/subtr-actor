@@ -2634,6 +2634,24 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        'row.append(main, status, progress);',
+        "stats evaluation player replay loading row places title/status/progress together",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const float statusX =\n        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - statusWidth);",
+        "plugin replay loading aligns status with row title",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::SameLine(statusX);\n    ImGui::TextColored(statusColor, "%s", status);',
+        "plugin replay loading renders status on title row",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'joinStrings(replayMeta, " · ")',
         "plugin replay loading source row uses web-like dot-separated metadata",
@@ -2679,6 +2697,12 @@ def main() -> int:
         plugin_source,
         'const std::string title = replayPath ? *replayPath\n                              : !rawReplayPath.empty() ? rawReplayPath\n                                                       : replayAnnotationPath;',
         "plugin replay loading row title uses the full replay path",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'ImGui::TextWrapped("%s", title.c_str());',
+        "plugin replay loading stacks title before status",
         errors,
     )
     for plugin_only_replay_loading_surface in (

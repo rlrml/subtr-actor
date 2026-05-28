@@ -9329,7 +9329,19 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
                                                            : replayAnnotationPath;
     const std::string title = replaySourceDisplayLabel(titlePath);
     const float replayLoadProgress = replayAnnotations ? 1.0f : 0.0f;
-    ImGui::TextWrapped("%s", title.c_str());
+    const ImVec4 statusColor =
+        replayAnnotations ? ImVec4{0.50f, 0.86f, 0.62f, 1.0f}
+                          : replayAnnotationLoadFailed
+                              ? ImVec4{0.95f, 0.45f, 0.45f, 1.0f}
+                              : ImVec4{0.72f, 0.78f, 0.86f, 1.0f};
+    const float statusWidth = ImGui::CalcTextSize(status).x;
+    const float statusX =
+        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - statusWidth);
+    ImGui::PushTextWrapPos(std::max(ImGui::GetCursorPosX(), statusX - 12.0f));
+    ImGui::TextUnformatted(title.c_str());
+    ImGui::PopTextWrapPos();
+    ImGui::SameLine(statusX);
+    ImGui::TextColored(statusColor, "%s", status);
     std::vector<std::string> replayMeta;
     if (!rawReplayPath.empty()) {
       replayMeta.push_back(std::format("raw: {}", rawReplayPath));
@@ -9346,13 +9358,6 @@ void SubtrActorPlugin::renderReplayLoadingWindow() {
     if (!replayMeta.empty()) {
       ImGui::TextDisabled("%s", joinStrings(replayMeta, " · ").c_str());
     }
-    ImGui::TextColored(
-        replayAnnotations ? ImVec4{0.50f, 0.86f, 0.62f, 1.0f}
-                          : replayAnnotationLoadFailed
-                              ? ImVec4{0.95f, 0.45f, 0.45f, 1.0f}
-                              : ImVec4{0.72f, 0.78f, 0.86f, 1.0f},
-        "%s",
-        status);
     ImGui::ProgressBar(replayLoadProgress, ImVec2{-1.0f, 0.0f}, "");
   }
   ImGui::EndChild();
