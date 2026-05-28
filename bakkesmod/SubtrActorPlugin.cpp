@@ -10855,10 +10855,10 @@ void SubtrActorPlugin::resetWindowPlacements() {
   nextUiWindowZIndex = 1;
   launcherPlacement = {};
   launcherPlacement.pending_focus = uiLauncherOpen;
-  for (const SingletonWindowControl &window : singletonWindowControls()) {
+  auto resetSingletonPlacement = [&](const SingletonWindowControl &window) {
     if (window.placement == &scoreboardPlacement) {
       resetScoreboardWindowPlacement();
-      continue;
+      return;
     }
     resetSingletonWindowPlacement(
         *window.placement,
@@ -10866,6 +10866,15 @@ void SubtrActorPlugin::resetWindowPlacements() {
         window.y,
         window.width,
         window.height);
+  };
+  for (const SingletonWindowControl &window : webSingletonWindowControls()) {
+    resetSingletonPlacement(window);
+  }
+  for (const SingletonWindowControl &window : singletonWindowControls()) {
+    if (window.web_config) {
+      continue;
+    }
+    resetSingletonPlacement(window);
   }
   for (size_t index = 0; index < uiStatsWindows.size(); index += 1) {
     resetStatsWindowPlacement(uiStatsWindows[index], index);

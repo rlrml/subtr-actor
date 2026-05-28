@@ -3079,6 +3079,43 @@ def main() -> int:
         "visible team stats scope combo label",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        'const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [',
+        "stats evaluation player has an explicit singleton window stacking order",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "for (const SingletonWindowControl &window : webSingletonWindowControls()) {\n"
+        "    resetSingletonPlacement(window);\n"
+        "  }\n"
+        "  for (const SingletonWindowControl &window : singletonWindowControls()) {\n"
+        "    if (window.web_config) {\n"
+        "      continue;\n"
+        "    }\n"
+        "    resetSingletonPlacement(window);\n"
+        "  }",
+        "plugin reset placement z-order follows web singleton order before plugin-only windows",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        "for (const SingletonWindowControl &window : singletonWindowControls()) {\n"
+        "    if (window.placement == &scoreboardPlacement) {\n"
+        "      resetScoreboardWindowPlacement();\n"
+        "      continue;\n"
+        "    }\n"
+        "    resetSingletonWindowPlacement(\n"
+        "        *window.placement,\n"
+        "        window.x,\n"
+        "        window.y,\n"
+        "        window.width,\n"
+        "        window.height);\n"
+        "  }",
+        "plugin reset placement z-order uses raw singleton declaration order",
+        errors,
+    )
 
     require_contains(
         plugin_source,
