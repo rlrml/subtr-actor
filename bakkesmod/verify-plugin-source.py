@@ -2912,6 +2912,56 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_styles_source,
+        ".mechanics-review-fields dt {\n"
+        "  color: var(--muted);\n"
+        "  font-size: 0.68rem;\n"
+        "  text-transform: uppercase;\n"
+        "}",
+        "stats evaluation player mechanics review fields use muted labels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderWebDetailGridCell("Mechanic", mechanicReadout);',
+        "plugin mechanics review mechanic field uses shared detail grid styling",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderWebDetailGridCell("Clip", clipReadout);',
+        "plugin mechanics review clip field uses shared detail grid styling",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderWebDetailGridCell("Event", eventReadout);',
+        "plugin mechanics review event field uses shared detail grid styling",
+        errors,
+    )
+    require_contains(
+        web_player_template_source,
+        '<div class="mechanics-review-wide">\n                    <dt>Reason</dt>',
+        "stats evaluation player mechanics review reason spans the field grid",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Columns(1);\n'
+        '  ImGui::Spacing();\n'
+        '  ImGui::TextColored(ImVec4{0.54f, 0.64f, 0.73f, 1.0f}, "Reason");',
+        "plugin mechanics review reason is rendered as a full-width field",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{0.93f, 0.96f, 0.98f, 1.0f});\n"
+        '  ImGui::TextWrapped("%s", reasonReadout.c_str());\n'
+        "  ImGui::PopStyleColor();",
+        "plugin mechanics review reason uses web-like value color while wrapping",
+        errors,
+    )
+    require_contains(
         web_player_main_source,
         'parts.push(`${Math.max(0, clipEnd - clipStart).toFixed(1)}s clip`);',
         "stats evaluation player mechanics review clip field includes duration",
@@ -2947,6 +2997,17 @@ def main() -> int:
         "plugin mechanics review event field omits event time",
         errors,
     )
+    for plugin_only_mechanics_review_field_surface in (
+        'ImGui::TextDisabled("Mechanic");\n  const std::string mechanicReadout =',
+        'ImGui::TextDisabled("Clip");\n  ImGui::Text("%s", clipReadout.c_str());',
+        'ImGui::TextDisabled("Reason");\n  ImGui::TextWrapped("%s", reasonReadout.c_str());',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_mechanics_review_field_surface,
+            "plugin mechanics review plugin-only raw field surface",
+            errors,
+        )
     require_contains(
         web_player_main_source,
         'return typeof item.meta?.mechanic === "string" ? formatMechanicKind(item.meta.mechanic) : "--";',

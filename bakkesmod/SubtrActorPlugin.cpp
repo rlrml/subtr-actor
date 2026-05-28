@@ -9256,23 +9256,23 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   const std::string reasonReadout =
       current == nullptr || current->details.empty() ? "--" : current->details;
   ImGui::Columns(2, "mechanics-review-fields", false);
-  ImGui::TextDisabled("Mechanic");
   const std::string mechanicReadout =
       current == nullptr || current->type.empty() ? "--" : eventTypeDisplayLabel(current->type);
-  ImGui::Text("%s", mechanicReadout.c_str());
+  renderWebDetailGridCell("Mechanic", mechanicReadout);
   ImGui::NextColumn();
-  ImGui::TextDisabled("Player");
-  ImGui::Text("%s", current == nullptr || current->actor.empty() ? "--" : current->actor.c_str());
+  renderWebDetailGridCell(
+      "Player",
+      current == nullptr || current->actor.empty() ? "--" : current->actor);
   ImGui::NextColumn();
-  ImGui::TextDisabled("Clip");
-  ImGui::Text("%s", clipReadout.c_str());
+  renderWebDetailGridCell("Clip", clipReadout);
   ImGui::NextColumn();
-  ImGui::TextDisabled("Event");
-  ImGui::Text("%s", eventReadout.c_str());
-  ImGui::NextColumn();
-  ImGui::TextDisabled("Reason");
-  ImGui::TextWrapped("%s", reasonReadout.c_str());
+  renderWebDetailGridCell("Event", eventReadout);
   ImGui::Columns(1);
+  ImGui::Spacing();
+  ImGui::TextColored(ImVec4{0.54f, 0.64f, 0.73f, 1.0f}, "Reason");
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{0.93f, 0.96f, 0.98f, 1.0f});
+  ImGui::TextWrapped("%s", reasonReadout.c_str());
+  ImGui::PopStyleColor();
 
   auto mechanicsReviewButton = [](const char *label,
                                   bool disabled,
