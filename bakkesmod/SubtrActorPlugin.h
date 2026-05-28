@@ -351,7 +351,7 @@ private:
   float playbackCurrentTime = 0.0f;
   bool playbackPlaying = false;
   float playbackRate = 1.0f;
-  bool playbackSkipPostGoalTransitions = false;
+  bool playbackSkipPostGoalTransitions = true;
   bool playbackSkipKickoffs = false;
   std::string playbackStatus = "Stopped";
   int recordingFps = 60;

@@ -416,6 +416,30 @@ def main() -> int:
             f"expected={web_launcher_stats_buttons!r} actual={plugin_web_stats_window_controls!r}"
         )
     require_contains(
+        web_player_template_source,
+        '<input id="skip-post-goal-transitions" type="checkbox" checked />',
+        "stats evaluation player default skips post-goal resets",
+        errors,
+    )
+    require_contains(
+        plugin_header,
+        "bool playbackSkipPostGoalTransitions = true;",
+        "plugin playback default skips post-goal resets like web player",
+        errors,
+    )
+    require_contains(
+        web_player_template_source,
+        '<input id="skip-kickoffs" type="checkbox" />',
+        "stats evaluation player default does not skip kickoffs",
+        errors,
+    )
+    require_contains(
+        plugin_header,
+        "bool playbackSkipKickoffs = false;",
+        "plugin playback default does not skip kickoffs like web player",
+        errors,
+    )
+    require_contains(
         plugin_source,
         '"Load Replay...", ImVec2{actionButtonWidth, 0.0f}',
         "launcher actions expose replay loading like the web player",
