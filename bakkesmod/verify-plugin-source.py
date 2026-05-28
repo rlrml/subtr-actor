@@ -23,6 +23,7 @@ ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakke
 WEB_PLAYER_CONFIG_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/playerConfig.ts"
 WEB_PLAYER_MAIN_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/main.ts"
 WEB_PLAYER_TEMPLATE_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/appTemplate.ts"
+WEB_PLAYER_TIMELINE_MARKERS_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/timelineMarkers.ts"
 WEB_PLAYER_BOOST_PICKUP_FILTERS_SOURCE = (
     REPO_ROOT / "js/stat-evaluation-player/src/boostPickupFilters.ts"
 )
@@ -349,6 +350,9 @@ def main() -> int:
     web_player_config_source = WEB_PLAYER_CONFIG_SOURCE.read_text(encoding="utf-8")
     web_player_main_source = WEB_PLAYER_MAIN_SOURCE.read_text(encoding="utf-8")
     web_player_template_source = WEB_PLAYER_TEMPLATE_SOURCE.read_text(encoding="utf-8")
+    web_player_timeline_markers_source = WEB_PLAYER_TIMELINE_MARKERS_SOURCE.read_text(
+        encoding="utf-8"
+    )
     web_player_boost_pickup_filters_source = WEB_PLAYER_BOOST_PICKUP_FILTERS_SOURCE.read_text(
         encoding="utf-8"
     )
@@ -1393,6 +1397,48 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        "label.textContent = item.event.label ?? item.sourceLabel;",
+        "stats evaluation player event playlist row title uses event label",
+        errors,
+    )
+    require_contains(
+        web_player_timeline_markers_source,
+        'label: `${playerName} speed flip ${qualityPercent}%`,',
+        "stats evaluation player player mechanics include player names in titles",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'std::format("{} {}", playerLabel(event.player_index, event.is_team_0), action);',
+        "plugin player mechanics include player names in event titles",
+        errors,
+    )
+    require_contains(
+        web_player_timeline_markers_source,
+        "label: `${teamName} rush ${matchupLabel}`,",
+        "stats evaluation player team events include team names in titles",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        '"{} rush {}v{}"',
+        "plugin team events include team names in event titles",
+        errors,
+    )
+    require_contains(
+        web_player_timeline_markers_source,
+        'label: scorerName ? `${scorerName} goal context` : "Goal context",',
+        "stats evaluation player goal context includes scorer names in titles",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'std::format("{} {}", actor, goalContextLabel(event))',
+        "plugin goal context includes scorer names in event titles",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         '.join(" · ");',
         "stats evaluation player event playlist row meta uses dot separator",
         errors,
@@ -1469,6 +1515,8 @@ def main() -> int:
     for plugin_only_event_playlist_row_meta in (
         'joinStrings(metaParts, " / ").c_str());\n    }\n    if (!event.details.empty())',
         'ImGui::TextDisabled("%s", event.category.c_str());',
+        "playerLabel(event.player_index, event.is_team_0),\n      mechanicLabel(event.kind),",
+        "teamEventLabel(event),\n      std::format",
     ):
         reject_contains(
             plugin_source,

@@ -7244,12 +7244,12 @@ void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
                                        event.confidence * 100.0f)
                                  : mechanicLabel(event.kind);
   const std::string label =
-      std::format("{}: {}", playerLabel(event.player_index, event.is_team_0), action);
+      std::format("{} {}", playerLabel(event.player_index, event.is_team_0), action);
   appendUiEvent(UiEventRecord{
       isCorePlayerStat ? "core" : "mechanics",
       mechanicToken(event.kind),
       playerLabel(event.player_index, event.is_team_0),
-      mechanicLabel(event.kind),
+      label,
       isCorePlayerStat
           ? "Shots, saves, assists"
           : event.confidence < 0.999f
@@ -7282,18 +7282,24 @@ void SubtrActorPlugin::pushEventMessage(const SaMechanicEvent &event) {
 
 void SubtrActorPlugin::pushTeamEventMessage(const SaTeamEvent &event) {
   const bool isBlue = event.is_team_0 != 0;
+  const std::string title = event.kind == SaTeamEventKindRush
+                                ? std::format(
+                                      "{} rush {}v{}",
+                                      teamLabel(event.is_team_0),
+                                      event.attackers,
+                                      event.defenders)
+                                : std::format(
+                                      "{} {}",
+                                      teamLabel(event.is_team_0),
+                                      teamEventLabel(event));
   const std::string action = event.confidence < 0.999f
-                                 ? std::format(
-                                       "{} ({:.0f}%)",
-                                       teamEventLabel(event),
-                                       event.confidence * 100.0f)
-                                 : teamEventLabel(event);
-  const std::string label = std::format("{}: {}", teamLabel(event.is_team_0), action);
+                                 ? std::format("{} ({:.0f}%)", title, event.confidence * 100.0f)
+                                 : title;
   appendUiEvent(UiEventRecord{
       "team",
       "rush",
       teamLabel(event.is_team_0),
-      teamEventLabel(event),
+      title,
       std::format("{:.1f}s - {:.1f}s", event.start_time, event.end_time),
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       event.start_frame,
@@ -7305,7 +7311,7 @@ void SubtrActorPlugin::pushTeamEventMessage(const SaTeamEvent &event) {
   }
 
   OverlayMessage message{
-      label,
+      action,
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       std::chrono::steady_clock::now() +
           std::chrono::duration_cast<std::chrono::steady_clock::duration>(
@@ -7327,7 +7333,7 @@ void SubtrActorPlugin::pushGoalContextEventMessage(const SaGoalContextEvent &eve
       "goal_context",
       "goal_context",
       actor,
-      goalContextLabel(event),
+      std::format("{} {}", actor, goalContextLabel(event)),
       teamLabel(event.scoring_team_is_team_0),
       isBlue ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255},
       event.frame_number,
