@@ -499,6 +499,36 @@ def main() -> int:
         "plugin event playlist visible cue mini-button",
         errors,
     )
+    require_contains(
+        web_player_main_source,
+        'button.className = "mechanics-review-item";',
+        "stats evaluation player mechanics review rows are clickable items",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'std::format(\n        "{}  {}##mechanics-review-item",\n        formatEventPlaylistTime(event.time),\n        title)',
+        "plugin mechanics review rows use web-like title labels",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "formatMechanicsReviewStatus(candidate.meta?.reviewStatus)",
+        "stats evaluation player mechanics review rows expose review status",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'metaParts.push_back(mechanicsReviewDecisionLabel(event));',
+        "plugin mechanics review rows expose review status",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'std::format(\n        "{} {:.2f}s {} ({})",',
+        "plugin mechanics review rows use prefix/raw-seconds/status-in-title shape",
+        errors,
+    )
     for label, plugin_needle in (
         ("Possession", '"Possession",\n        timelineRangePossessionEnabled'),
         ("Half control", '"Half control",\n        timelineRangePressureEnabled'),

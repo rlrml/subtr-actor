@@ -8838,16 +8838,22 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   for (size_t i = 0; i < candidates.size(); i += 1) {
     const UiEventRecord &event = recentUiEvents[candidates[i]];
     ImGui::PushID(static_cast<int>(i));
+    const bool active = i == static_cast<size_t>(mechanicsReviewIndex);
+    const std::string title = event.label.empty() ? event.type : event.label;
     const std::string label = std::format(
-        "{} {:.2f}s {} ({})",
-        i == static_cast<size_t>(mechanicsReviewIndex) ? ">" : " ",
-        event.time,
-        event.label,
-        mechanicsReviewDecisionLabel(event));
-    if (ImGui::Selectable(label.c_str(), i == static_cast<size_t>(mechanicsReviewIndex))) {
+        "{}  {}##mechanics-review-item",
+        formatEventPlaylistTime(event.time),
+        title);
+    if (ImGui::Selectable(label.c_str(), active)) {
       mechanicsReviewIndex = static_cast<int>(i);
       scheduleUiConfigAutosave();
     }
+    std::vector<std::string> metaParts;
+    if (!event.type.empty()) {
+      metaParts.push_back(event.type);
+    }
+    metaParts.push_back(mechanicsReviewDecisionLabel(event));
+    ImGui::TextDisabled("%s", joinStrings(metaParts, " / ").c_str());
     ImGui::PopID();
   }
   ImGui::EndChild();
