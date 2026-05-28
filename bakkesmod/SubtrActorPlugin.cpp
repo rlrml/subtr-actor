@@ -8702,7 +8702,11 @@ void SubtrActorPlugin::renderEventSourceControls() {
 
   if (renderEventSourceAction(
           std::format("All events   {}##event-sources-actions-all", displaySources.size()))) {
-    selected = selectedEventSourceTokens("all");
+    selected.clear();
+    selected.reserve(displaySources.size());
+    for (const DisplaySource &source : displaySources) {
+      selected.emplace_back(source.option->value);
+    }
     applySelection();
   }
   if (renderEventSourceAction("No events   Off##event-sources-actions-none")) {
@@ -8890,7 +8894,12 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
 
   if (filtersOpen) {
     if (ImGui::Button("All##event-playlist-sources-all")) {
-      eventPlaylistSourceFilter = "all";
+      selectedSources.clear();
+      selectedSources.reserve(playlistSources.size());
+      for (const PlaylistSource &source : playlistSources) {
+        selectedSources.emplace_back(source.option->value);
+      }
+      eventPlaylistSourceFilter = eventFilterFromSelectedSources(selectedSources);
       eventPlaylistLastActiveKey.clear();
       scheduleUiConfigAutosave();
     }

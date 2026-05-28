@@ -1700,6 +1700,23 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        "for (const source of sources) {\n      source.setActive(true);\n    }",
+        "stats evaluation player Events window all action enables visible sources",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "selected.clear();\n"
+        "    selected.reserve(displaySources.size());\n"
+        "    for (const DisplaySource &source : displaySources) {\n"
+        "      selected.emplace_back(source.option->value);\n"
+        "    }\n"
+        "    applySelection();",
+        "plugin Events window all action enables displayed sources like web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         'noneName.textContent = "No events";',
         "stats evaluation player Events window no-events action",
         errors,
@@ -1907,6 +1924,29 @@ def main() -> int:
         plugin_source,
         'ImGui::Button("All##event-playlist-sources-all")',
         "plugin event playlist all action label mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "eventPlaylistActiveSourceIds = new Set(sources.map((source) => source.id));",
+        "stats evaluation player event playlist all action enables current sources",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "selectedSources.clear();\n"
+        "      selectedSources.reserve(playlistSources.size());\n"
+        "      for (const PlaylistSource &source : playlistSources) {\n"
+        "        selectedSources.emplace_back(source.option->value);\n"
+        "      }\n"
+        "      eventPlaylistSourceFilter = eventFilterFromSelectedSources(selectedSources);",
+        "plugin event playlist all action enables displayed sources like web",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'eventPlaylistSourceFilter = "all";',
+        "plugin event playlist all action enables hidden global sources",
         errors,
     )
     require_contains(
