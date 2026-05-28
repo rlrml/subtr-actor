@@ -166,6 +166,10 @@ REQUIRED_PLUGIN_ABI_EXPORTS = (
     ("subtr_actor_bakkesmod_replay_annotation_count", "replayAnnotationCount"),
     ("subtr_actor_bakkesmod_replay_annotation_player_count", "replayAnnotationPlayerCount"),
     ("subtr_actor_bakkesmod_write_replay_annotation_players", "writeReplayAnnotationPlayers"),
+    (
+        "subtr_actor_bakkesmod_write_replay_annotation_frame_players",
+        "writeReplayAnnotationFramePlayers",
+    ),
     ("subtr_actor_bakkesmod_replay_annotation_score_at_time", "replayAnnotationScoreAtTime"),
     ("subtr_actor_bakkesmod_poll_replay_annotations", "pollReplayAnnotations"),
 )
@@ -2177,6 +2181,18 @@ def main() -> int:
         plugin_source,
         "replayAnnotationScoreAtTime(replayAnnotations, replayTime, &score)",
         "plugin scoreboard follows replay annotation score at current playback time",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "writeReplayAnnotationFramePlayers(\n        replayAnnotations,\n        replayTime,",
+        "plugin replay annotations update sampled players from current replay stats frame",
+        errors,
+    )
+    require_contains(
+        rust_source,
+        "match_goals: player.core.goals,",
+        "replay annotation frame players expose core goals to plugin stats windows",
         errors,
     )
     reject_contains(

@@ -3167,6 +3167,8 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotation_player_count"));
   writeReplayAnnotationPlayers = reinterpret_cast<WriteReplayAnnotationPlayers>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_replay_annotation_players"));
+  writeReplayAnnotationFramePlayers = reinterpret_cast<WriteReplayAnnotationFramePlayers>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_replay_annotation_frame_players"));
   replayAnnotationScoreAtTime = reinterpret_cast<ReplayAnnotationScoreAtTime>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotation_score_at_time"));
   pollReplayAnnotations = reinterpret_cast<PollReplayAnnotations>(
@@ -3185,7 +3187,8 @@ bool SubtrActorPlugin::loadRustLibrary() {
       !drainEvents || !drainTeamEvents || !drainGoalContextEvents ||
       !replayAnnotationsCreate || !replayAnnotationsDestroy || !replayAnnotationCount ||
       !replayAnnotationPlayerCount || !writeReplayAnnotationPlayers ||
-      !replayAnnotationScoreAtTime || !pollReplayAnnotations) {
+      !writeReplayAnnotationFramePlayers || !replayAnnotationScoreAtTime ||
+      !pollReplayAnnotations) {
     unloadRustLibrary();
     return false;
   }
@@ -3247,6 +3250,7 @@ void SubtrActorPlugin::unloadRustLibrary() {
   replayAnnotationCount = nullptr;
   replayAnnotationPlayerCount = nullptr;
   writeReplayAnnotationPlayers = nullptr;
+  writeReplayAnnotationFramePlayers = nullptr;
   replayAnnotationScoreAtTime = nullptr;
   pollReplayAnnotations = nullptr;
 }
@@ -4689,9 +4693,13 @@ void SubtrActorPlugin::resetReplayAnnotations() {
   replayAnnotations = nullptr;
   replayAnnotationPath.clear();
   replayAnnotationLoadFailed = false;
+  if (gameWrapper && gameWrapper->IsInReplay()) {
+    sampledPlayers.clear();
+    sampledPlayerNames.clear();
+  }
 }
 
-void SubtrActorPlugin::importReplayAnnotationPlayers() {
+void SubtrActorPlugin::importReplayAnnotationPlayers(float replayTime) {
   if (!replayAnnotations || !replayAnnotationPlayerCount || !writeReplayAnnotationPlayers) {
     return;
   }
@@ -4701,15 +4709,42 @@ void SubtrActorPlugin::importReplayAnnotationPlayers() {
     return;
   }
 
+  if (writeReplayAnnotationFramePlayers) {
+    std::vector<SaPlayerFrame> framePlayers(playerCount);
+    const size_t copiedFramePlayers = writeReplayAnnotationFramePlayers(
+        replayAnnotations,
+        replayTime,
+        framePlayers.data(),
+        framePlayers.size());
+    if (copiedFramePlayers > 0) {
+      sampledPlayers.assign(framePlayers.begin(), framePlayers.begin() + copiedFramePlayers);
+      sampledPlayerNames.clear();
+      for (const SaPlayerFrame &player : sampledPlayers) {
+        if (player.player_name != nullptr && player.player_name[0] != '\0') {
+          playerNamesByIndex[player.player_index] = player.player_name;
+        }
+        playerTeamsByIndex[player.player_index] = player.is_team_0;
+      }
+      return;
+    }
+  }
+
   std::vector<SaReplayPlayerInfo> players(playerCount);
   const size_t copied =
       writeReplayAnnotationPlayers(replayAnnotations, players.data(), players.size());
+  sampledPlayers.clear();
+  sampledPlayerNames.clear();
   for (size_t i = 0; i < copied; i += 1) {
     const SaReplayPlayerInfo &player = players[i];
     if (player.name != nullptr && player.name[0] != '\0') {
       playerNamesByIndex[player.player_index] = player.name;
     }
     playerTeamsByIndex[player.player_index] = player.is_team_0;
+    SaPlayerFrame frame{};
+    frame.player_index = player.player_index;
+    frame.player_name = player.name;
+    frame.is_team_0 = player.is_team_0;
+    sampledPlayers.push_back(frame);
   }
 }
 
@@ -4795,13 +4830,14 @@ void SubtrActorPlugin::tickReplayAnnotations() {
     replayAnnotationLoadFailed = false;
     const size_t annotationCount =
         replayAnnotationCount ? replayAnnotationCount(replayAnnotations) : 0;
-    importReplayAnnotationPlayers();
+    importReplayAnnotationPlayers(replayServer.GetReplayTimeElapsed());
     cvarManager->log(std::format(
         "subtr-actor: loaded {} replay annotations from normal replay processor for {}",
         annotationCount,
         *replayPath));
   }
 
+  importReplayAnnotationPlayers(replayServer.GetReplayTimeElapsed());
   std::array<SaMechanicEvent, 64> replayEvents{};
   const size_t eventCount = pollReplayAnnotations(
       replayAnnotations,

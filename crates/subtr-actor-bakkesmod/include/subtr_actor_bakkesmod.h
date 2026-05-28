@@ -287,6 +287,11 @@ size_t subtr_actor_bakkesmod_write_replay_annotation_players(
     const SaReplayAnnotations *annotations,
     SaReplayPlayerInfo *out_players,
     size_t max_players);
+size_t subtr_actor_bakkesmod_write_replay_annotation_frame_players(
+    const SaReplayAnnotations *annotations,
+    float replay_time,
+    SaPlayerFrame *out_players,
+    size_t max_players);
 int32_t subtr_actor_bakkesmod_replay_annotation_score_at_time(
     const SaReplayAnnotations *annotations,
     float replay_time,

@@ -382,6 +382,18 @@ pub struct SaReplayAnnotations {
     initialized: bool,
 }
 
+fn replay_annotation_frame_at_time(
+    annotations: &SaReplayAnnotations,
+    replay_time: f32,
+) -> Option<&ReplayStatsFrame> {
+    annotations
+        .frames
+        .iter()
+        .take_while(|frame| frame.time <= replay_time + f32::EPSILON)
+        .last()
+        .or_else(|| annotations.frames.first())
+}
+
 const LIVE_GRAPH_OUTPUT_NAMES: &[&str] = &[
     "events",
     "frame",
@@ -2955,6 +2967,48 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_players(
     count
 }
 
+/// Copies replay players and current-frame core stats for replay playback.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_frame_players(
+    annotations: *const SaReplayAnnotations,
+    replay_time: f32,
+    out_players: *mut SaPlayerFrame,
+    max_players: usize,
+) -> usize {
+    let Some(annotations) = (unsafe { annotations.as_ref() }) else {
+        return 0;
+    };
+    if max_players == 0 || out_players.is_null() {
+        return 0;
+    }
+    let Some(frame) = replay_annotation_frame_at_time(annotations, replay_time) else {
+        return 0;
+    };
+
+    let count = frame.players.len().min(max_players);
+    for (index, player) in frame.players.iter().take(count).enumerate() {
+        let player_info = annotations.players.get(index);
+        let player_frame = SaPlayerFrame {
+            player_index: player_info
+                .map(|info| info.player_index)
+                .unwrap_or(index as u32),
+            player_name: player_info.map(|info| info.name).unwrap_or(ptr::null()),
+            is_team_0: player.is_team_0 as u8,
+            has_match_stats: 1,
+            match_goals: player.core.goals,
+            match_assists: player.core.assists,
+            match_saves: player.core.saves,
+            match_shots: player.core.shots,
+            match_score: player.core.score,
+            ..SaPlayerFrame::default()
+        };
+        unsafe {
+            *out_players.add(index) = player_frame;
+        }
+    }
+    count
+}
+
 /// Returns the scoreboard value for the latest processed replay frame at or before
 /// `replay_time`.
 #[no_mangle]
@@ -2969,13 +3023,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_score_at_time(
     if out_score.is_null() {
         return -1;
     }
-    let Some(frame) = annotations
-        .frames
-        .iter()
-        .take_while(|frame| frame.time <= replay_time + f32::EPSILON)
-        .last()
-        .or_else(|| annotations.frames.first())
-    else {
+    let Some(frame) = replay_annotation_frame_at_time(annotations, replay_time) else {
         return -2;
     };
 
@@ -4399,6 +4447,19 @@ mod tests {
             .iter()
             .any(|player| !player.name.is_null()));
         let final_time = unsafe { (*annotations).events.last().expect("events").time + 1.0 };
+        let mut frame_players = vec![SaPlayerFrame::default(); player_count];
+        let copied_frame_players = unsafe {
+            subtr_actor_bakkesmod_write_replay_annotation_frame_players(
+                annotations,
+                final_time,
+                frame_players.as_mut_ptr(),
+                frame_players.len(),
+            )
+        };
+        assert_eq!(copied_frame_players, player_count);
+        assert!(frame_players[..copied_frame_players]
+            .iter()
+            .all(|player| player.has_match_stats == 1 && !player.player_name.is_null()));
         let mut score = SaReplayScore::default();
         let score_result = unsafe {
             subtr_actor_bakkesmod_replay_annotation_score_at_time(

@@ -97,6 +97,8 @@ private:
   using ReplayAnnotationPlayerCount = size_t (*)(const SaReplayAnnotations *);
   using WriteReplayAnnotationPlayers =
       size_t (*)(const SaReplayAnnotations *, SaReplayPlayerInfo *, size_t);
+  using WriteReplayAnnotationFramePlayers =
+      size_t (*)(const SaReplayAnnotations *, float, SaPlayerFrame *, size_t);
   using ReplayAnnotationScoreAtTime =
       int32_t (*)(const SaReplayAnnotations *, float, SaReplayScore *);
   using PollReplayAnnotations =
@@ -256,6 +258,7 @@ private:
   ReplayAnnotationCount replayAnnotationCount = nullptr;
   ReplayAnnotationPlayerCount replayAnnotationPlayerCount = nullptr;
   WriteReplayAnnotationPlayers writeReplayAnnotationPlayers = nullptr;
+  WriteReplayAnnotationFramePlayers writeReplayAnnotationFramePlayers = nullptr;
   ReplayAnnotationScoreAtTime replayAnnotationScoreAtTime = nullptr;
   PollReplayAnnotations pollReplayAnnotations = nullptr;
 
@@ -651,7 +654,7 @@ private:
   std::string mechanicsReviewKey(const UiEventRecord &event) const;
   const char *mechanicsReviewDecisionLabel(const UiEventRecord &event) const;
   void tickReplayAnnotations();
-  void importReplayAnnotationPlayers();
+  void importReplayAnnotationPlayers(float replayTime);
   void tickMechanicsReviewClipBoundary();
   void resetReplayAnnotations();
   std::optional<std::string> currentReplayPath(ReplayServerWrapper replayServer);
