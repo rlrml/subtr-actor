@@ -2,12 +2,16 @@ import type {
   ReplayPlayerPlugin,
   ReplayPlayerPluginContext,
   ReplayPlayerPluginStateContext,
-  ReplayTimelineEvent,
   ReplayTimelineEventKind,
   ReplayTimelineEventSource,
   ReplayTimelineRangeSource,
 } from "./types";
 import { createTimelineOverlayElements } from "./timeline-overlay-dom";
+import {
+  renderTimelineEventLanes,
+  type TimelineEventLanePlayhead,
+  type TimelineMarkerRecord,
+} from "./timeline-overlay-events";
 import {
   renderTimelineRangeLanes,
   type TimelineRangeLanePlayhead,
@@ -15,18 +19,8 @@ import {
 } from "./timeline-overlay-ranges";
 import { ensureTimelineOverlayStyles } from "./timeline-overlay-styles";
 import {
-  DEFAULT_REPLAY_EVENT_KINDS,
-  bucketTitle,
-  eventAccent,
-  eventBadgeText,
   formatPlaybackTime,
-  groupEvents,
   markerLeftPercent,
-  resolveCustomEvents,
-  resolveEventSources,
-  timelineEventSeekTime,
-  type TimelineEventBucket,
-  type TimelineEventLane,
   type TimelineEventSourceRecord,
 } from "./timeline-overlay-model";
 
@@ -60,46 +54,7 @@ export interface TimelineOverlayPlugin extends ReplayPlayerPlugin {
   refreshRanges(): void;
 }
 
-interface TimelineEventLanePlayhead {
-  element: HTMLDivElement;
-}
-
-interface TimelineMarkerRecord {
-  element: HTMLButtonElement;
-  timelineTime: number;
-}
-
 const ACTIVE_MARKER_WINDOW_SECONDS = 0.2;
-const HIDDEN_EVENT_SEEK_EPSILON_SECONDS = 0.01;
-
-function resolveReplayEvents(
-  options: TimelineOverlayPluginOptions,
-  context: ReplayPlayerPluginContext,
-): ReplayTimelineEvent[] {
-  if (options.replayEvents) {
-    return resolveCustomEvents(options.replayEvents, context);
-  }
-
-  if (options.includeReplayEvents === false) {
-    return [];
-  }
-
-  const allowedKinds = new Set(options.replayEventKinds ?? DEFAULT_REPLAY_EVENT_KINDS);
-  return context.replay.timelineEvents.filter((event) => allowedKinds.has(event.kind));
-}
-
-function markerSeekTime(event: ReplayTimelineEvent, context: ReplayPlayerPluginContext): number {
-  const projection = context.player.projectReplayTimeToTimeline(timelineEventSeekTime(event));
-  if (!projection.hiddenBySkip) {
-    return projection.seekTime;
-  }
-
-  const nextTimelineTime = Math.min(
-    context.player.getTimelineDuration(),
-    projection.timelineTime + HIDDEN_EVENT_SEEK_EPSILON_SECONDS,
-  );
-  return context.player.projectTimelineTimeToReplay(nextTimelineTime);
-}
 
 export function createTimelineOverlayPlugin(
   options: TimelineOverlayPluginOptions = {},
@@ -134,12 +89,11 @@ export function createTimelineOverlayPlugin(
   let scrubbing = false;
   let resumePlaybackAfterScrub = false;
   let playerContext: ReplayPlayerPluginContext | null = null;
-  let eventLanes: TimelineEventLane[] = [];
   let projectionCacheKey: string | null = null;
-  const markerElements = new Map<string, TimelineMarkerRecord>();
+  let markerElements = new Map<string, TimelineMarkerRecord>();
   let rangeElements: TimelineRangeRecord[] = [];
   let rangeLanePlayheads: TimelineRangeLanePlayhead[] = [];
-  const eventLanePlayheads: TimelineEventLanePlayhead[] = [];
+  let eventLanePlayheads: TimelineEventLanePlayhead[] = [];
 
   function refreshMarkers(): void {
     if (!playerContext) {
@@ -235,112 +189,18 @@ export function createTimelineOverlayPlugin(
     }
   }
 
-  function createMarker(
-    bucket: TimelineEventBucket,
-    context: ReplayPlayerPluginContext,
-    duration: number,
-  ): HTMLButtonElement | null {
-    const primaryEvent = bucket.events[0];
-    if (!primaryEvent) {
-      return null;
-    }
-    const projection = context.player.projectReplayTimeToTimeline(bucket.time);
-
-    const marker = document.createElement("button");
-    marker.type = "button";
-    marker.className = "sap-tl-marker";
-    marker.style.left = markerLeftPercent(projection.timelineTime, duration);
-    marker.style.color = eventAccent(primaryEvent);
-    marker.title = bucketTitle(bucket);
-    marker.textContent = eventBadgeText(bucket);
-    marker.addEventListener("click", () => {
-      context.player.seek(markerSeekTime(primaryEvent, context));
-    });
-    marker.dataset.active = "false";
-    marker.dataset.passed = "false";
-
-    markerElements.set(bucket.key, {
-      element: marker,
-      timelineTime: projection.timelineTime,
-    });
-
-    return marker;
-  }
-
   function buildMarkers(context: ReplayPlayerPluginContext): void {
     if (!markers || !eventLanesRoot) {
       return;
     }
 
-    markers.replaceChildren();
-    eventLanesRoot.replaceChildren();
-    markerElements.clear();
-    eventLanePlayheads.splice(0, eventLanePlayheads.length);
-
-    const replayEvents = resolveReplayEvents(options, context);
-    eventLanes = [];
-    if (replayEvents.length > 0) {
-      eventLanes.push({
-        key: "replay",
-        label: options.replayEventsLabel ?? "Replay",
-        buckets: groupEvents(replayEvents),
-      });
-    }
-    eventLanes.push(...resolveEventSources(extraEventSources, context));
-    const duration = Math.max(context.player.getTimelineDuration(), 0.0001);
-
-    const replayLane = eventLanes[0];
-    if (replayLane?.key === "replay") {
-      for (const bucket of replayLane.buckets) {
-        const marker = createMarker(
-          { ...bucket, key: `${replayLane.key}:${bucket.key}` },
-          context,
-          duration,
-        );
-        if (marker) {
-          markers.append(marker);
-        }
-      }
-    }
-
-    const customLanes = eventLanes.filter((lane) => lane.key !== "replay");
-    eventLanesRoot.hidden = customLanes.length === 0;
-
-    for (const lane of customLanes) {
-      const laneEl = document.createElement("div");
-      laneEl.className = "sap-tl-event-lane";
-      laneEl.dataset.label = lane.label;
-
-      const label = document.createElement("span");
-      label.className = "sap-tl-event-lane-label";
-      label.textContent = lane.label;
-      label.setAttribute("aria-label", lane.label);
-      laneEl.append(label);
-
-      const track = document.createElement("div");
-      track.className = "sap-tl-event-lane-track";
-
-      const laneMarkers = document.createElement("div");
-      laneMarkers.className = "sap-tl-markers";
-
-      for (const bucket of lane.buckets) {
-        const marker = createMarker(
-          { ...bucket, key: `${lane.key}:${bucket.key}` },
-          context,
-          duration,
-        );
-        if (marker) {
-          laneMarkers.append(marker);
-        }
-      }
-
-      const playhead = document.createElement("div");
-      playhead.className = "sap-tl-event-playhead";
-      track.append(laneMarkers, playhead);
-      eventLanePlayheads.push({ element: playhead });
-      laneEl.append(track);
-      eventLanesRoot.append(laneEl);
-    }
+    ({ markerElements, eventLanePlayheads } = renderTimelineEventLanes(
+      markers,
+      eventLanesRoot,
+      options,
+      extraEventSources,
+      context,
+    ));
   }
 
   function buildRanges(context: ReplayPlayerPluginContext): void {
@@ -490,12 +350,11 @@ export function createTimelineOverlayPlugin(
       remainingTimeText = null;
       markers = null;
       playerContext = null;
-      eventLanes = [];
       projectionCacheKey = null;
-      markerElements.clear();
+      markerElements = new Map();
       rangeElements = [];
       rangeLanePlayheads = [];
-      eventLanePlayheads.splice(0, eventLanePlayheads.length);
+      eventLanePlayheads = [];
       if (changedContainerPosition) {
         context.container.style.position = originalContainerPosition;
         changedContainerPosition = false;
