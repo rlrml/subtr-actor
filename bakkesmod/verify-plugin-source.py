@@ -896,8 +896,25 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::TextDisabled("%s", tags.empty() ? "Unlabeled" : joinStrings(tags, " · ").c_str());',
-        "plugin unlabeled goal tag fallback mirrors web",
+        'renderGoalTagChip("Unlabeled", true, 0);',
+        "plugin unlabeled goal tag chip mirrors web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const std::string label = std::format("{}##goal-tag-chip-{}", text, chipIndex);',
+        "plugin goal-label tags render as individual chips",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "for (size_t tagIndex = 0; tagIndex < tags.size(); tagIndex += 1) {\n"
+        "        if (tagIndex > 0) {\n"
+        "          ImGui::SameLine();\n"
+        "        }\n"
+        "        renderGoalTagChip(tags[tagIndex], false, tagIndex);\n"
+        "      }",
+        "plugin goal-label tag chips preserve separate labels",
         errors,
     )
     require_contains(
@@ -968,6 +985,7 @@ def main() -> int:
         'ImGui::TextDisabled("%.2fs - %s", event.time, event.actor.c_str());',
         'ImGui::TextWrapped("%s", event.label.c_str());',
         'ImGui::TextWrapped("No goals loaded.");',
+        'ImGui::TextDisabled("%s", tags.empty() ? "Unlabeled" : joinStrings(tags, " · ").c_str());',
         'ImGui::TextDisabled("%s", tags.empty() ? "Unlabeled" : joinStrings(tags, " · ").c_str());\n    if (ImGui::SmallButton("Watch"))',
     ):
         reject_contains(

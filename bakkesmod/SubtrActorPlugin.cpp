@@ -12384,6 +12384,19 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
 
   ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
   const bool hasReplayServer = !replayServer.IsNull();
+  auto renderGoalTagChip = [](std::string_view text, bool empty, size_t chipIndex) {
+    const ImVec4 background = empty ? ImVec4{0.28f, 0.31f, 0.35f, 0.72f}
+                                    : ImVec4{0.12f, 0.29f, 0.46f, 0.82f};
+    const ImVec4 foreground = empty ? ImVec4{0.75f, 0.80f, 0.84f, 1.0f}
+                                    : ImVec4{0.81f, 0.90f, 1.0f, 1.0f};
+    const std::string label = std::format("{}##goal-tag-chip-{}", text, chipIndex);
+    ImGui::PushStyleColor(ImGuiCol_Button, background);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, background);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, background);
+    ImGui::PushStyleColor(ImGuiCol_Text, foreground);
+    ImGui::SmallButton(label.c_str());
+    ImGui::PopStyleColor(4);
+  };
   for (size_t ordinal = 0; ordinal < goalEventIndexes.size(); ordinal += 1) {
     const size_t index = goalEventIndexes[ordinal];
     const UiEventRecord &event = recentUiEvents[index];
@@ -12406,7 +12419,16 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
         formatEventPlaylistTime(event.time).c_str(),
         event.actor.empty() ? "Unknown scorer" : event.actor.c_str());
     const std::vector<std::string> tags = goalTagsForEvent(event);
-    ImGui::TextDisabled("%s", tags.empty() ? "Unlabeled" : joinStrings(tags, " · ").c_str());
+    if (tags.empty()) {
+      renderGoalTagChip("Unlabeled", true, 0);
+    } else {
+      for (size_t tagIndex = 0; tagIndex < tags.size(); tagIndex += 1) {
+        if (tagIndex > 0) {
+          ImGui::SameLine();
+        }
+        renderGoalTagChip(tags[tagIndex], false, tagIndex);
+      }
+    }
     if (watchClicked) {
       mechanicsReviewClipActive = false;
       playbackCurrentTime = seekTime;
