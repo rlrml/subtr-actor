@@ -1379,6 +1379,18 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "item.sourceLabel,",
+        "stats evaluation player event playlist row meta uses source labels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const std::string sourceLabel = sourceLabelForEvent(event);",
+        "plugin event playlist row meta uses selected source labels",
+        errors,
+    )
+    require_contains(
         plugin_source,
         "std::string formatEventPlaylistTime(float seconds)",
         "plugin event playlist uses web-like minute time labels",

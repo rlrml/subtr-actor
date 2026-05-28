@@ -8671,6 +8671,14 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   }
   const std::string activeEventKey =
       activeEventIndex ? mechanicsReviewKey(recentUiEvents[*activeEventIndex]) : "";
+  auto sourceLabelForEvent = [&](const UiEventRecord &event) -> std::string {
+    for (const PlaylistSource &source : playlistSources) {
+      if (source.enabled && eventFilterAllows(source.option->value, event.category, event.type)) {
+        return source.option->label;
+      }
+    }
+    return event.type;
+  };
 
   ImGui::BeginChild("event-playlist-list", ImVec2{0.0f, 0.0f}, true);
   for (const size_t index : playlistEventIndexes) {
@@ -8704,8 +8712,9 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     if (event.frame_number != 0) {
       metaParts.push_back(std::format("frame {}", event.frame_number));
     }
-    if (!event.type.empty()) {
-      metaParts.push_back(event.type);
+    const std::string sourceLabel = sourceLabelForEvent(event);
+    if (!sourceLabel.empty()) {
+      metaParts.push_back(sourceLabel);
     }
     if (!metaParts.empty()) {
       ImGui::TextDisabled("%s", joinStrings(metaParts, " · ").c_str());
