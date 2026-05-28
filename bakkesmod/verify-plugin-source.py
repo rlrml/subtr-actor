@@ -1788,6 +1788,24 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_styles_source,
+        ".camera-presets {\n"
+        "  display: grid;\n"
+        "  grid-template-columns: repeat(2, minmax(0, 1fr));\n"
+        "  gap: var(--ui-gap-xs);\n"
+        "}",
+        "stats evaluation player camera presets use a two-column grid",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        '.camera-presets button[data-active="true"] {\n'
+        "  border-color: rgba(142, 197, 255, 0.42);\n"
+        "  background: linear-gradient(180deg, rgba(33, 71, 107, 0.96), rgba(12, 27, 42, 0.98));",
+        "stats evaluation player active camera preset has accented button chrome",
+        errors,
+    )
+    require_contains(
         web_player_main_source,
         "cameraDistance.disabled = !hasAttachedCamera;",
         "stats evaluation player updates camera settings availability from active camera state",
@@ -1797,6 +1815,38 @@ def main() -> int:
         plugin_source,
         "const bool hasCameraContext = !sampledPlayers.empty();",
         "plugin camera derives replay context for disabled controls",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const float cameraPresetWidth =\n"
+        "      std::max(96.0f, (ImGui::GetContentRegionAvail().x - cameraPresetGap) * 0.5f);",
+        "plugin camera presets use two-column grid sizing",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool active = cameraViewMode == mode;",
+        "plugin camera presets track the active button state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{0.56f, 0.77f, 1.0f, 0.42f});\n"
+        "      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.13f, 0.28f, 0.42f, 0.96f});",
+        "plugin camera active preset uses web-like accented button chrome",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool clicked = ImGui::Button(label, ImVec2{cameraPresetWidth, 0.0f});",
+        "plugin camera preset controls use equal-width buttons",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::SameLine(0.0f, cameraPresetGap);",
+        "plugin camera preset grid uses explicit web-like gaps",
         errors,
     )
     require_contains(
@@ -1917,6 +1967,8 @@ def main() -> int:
         'ImGui::Text("%.1f", pitch);',
         'ImGui::Text("%.0f", distance);',
         'ImGui::Text("%.2f", stiffness);',
+        "ImGui::RadioButton(label,",
+        "ImGui::SameLine();\n  if (cameraViewButton(\"Follow##camera-view\"",
     ):
         reject_contains(
             plugin_source,

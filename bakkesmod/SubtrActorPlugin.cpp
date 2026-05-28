@@ -10008,10 +10008,24 @@ void SubtrActorPlugin::renderCameraWindow() {
     }
   }
 
+  const float cameraPresetGap = ImGui::GetStyle().ItemSpacing.x;
+  const float cameraPresetWidth =
+      std::max(96.0f, (ImGui::GetContentRegionAvail().x - cameraPresetGap) * 0.5f);
   auto cameraViewButton = [&](const char *label, int mode, bool disabled) {
-    int nextMode = cameraViewMode;
+    const bool active = cameraViewMode == mode;
     pushCameraDisabledStyle(disabled);
-    const bool clicked = ImGui::RadioButton(label, &nextMode, mode);
+    if (active) {
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{0.56f, 0.77f, 1.0f, 0.42f});
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.13f, 0.28f, 0.42f, 0.96f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.16f, 0.34f, 0.52f, 0.98f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.18f, 0.38f, 0.58f, 1.0f});
+    }
+    const bool clicked = ImGui::Button(label, ImVec2{cameraPresetWidth, 0.0f});
+    if (active) {
+      ImGui::PopStyleColor(4);
+      ImGui::PopStyleVar();
+    }
     popCameraDisabledStyle(disabled);
     return clicked && !disabled;
   };
@@ -10021,18 +10035,17 @@ void SubtrActorPlugin::renderCameraWindow() {
     cameraFreePreset = -1;
     scheduleUiConfigAutosave();
   }
-  ImGui::SameLine();
+  ImGui::SameLine(0.0f, cameraPresetGap);
   if (cameraViewButton("Follow##camera-view", 1, !hasCameraContext || selectedPlayer == nullptr)) {
     cameraViewMode = 1;
     cameraFreePreset = -1;
     scheduleUiConfigAutosave();
   }
-  ImGui::SameLine();
   if (cameraViewButton("Overhead##camera-view", 2, !hasCameraContext)) {
     cameraViewMode = 2;
     scheduleUiConfigAutosave();
   }
-  ImGui::SameLine();
+  ImGui::SameLine(0.0f, cameraPresetGap);
   if (cameraViewButton("Diagonal##camera-view", 3, !hasCameraContext)) {
     cameraViewMode = 3;
     scheduleUiConfigAutosave();
