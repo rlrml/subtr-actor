@@ -622,6 +622,50 @@ def main() -> int:
         "plugin leaves scoreboard pill separate from shared floating chrome",
         errors,
     )
+    require_contains(
+        web_player_styles_source,
+        ".floating-window-header h2,\n"
+        ".stats-window-header h2 {\n"
+        "  margin: 0;\n"
+        "  color: #87afd4;\n"
+        "  font-size: 0.68rem;\n"
+        "  font-weight: 800;\n"
+        "  letter-spacing: 0.14em;\n"
+        "  text-transform: uppercase;",
+        "stats evaluation player window headers render as uppercase labels",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "std::string uppercaseHeaderLabel(std::string_view value) {\n"
+        "  std::string label;\n"
+        "  label.reserve(value.size());\n"
+        "  for (char ch : value) {\n"
+        "    label.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));\n"
+        "  }\n"
+        "  return label;\n"
+        "}",
+        "plugin window headers render as uppercase labels",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".floating-window-hide,\n"
+        ".stats-window-action {\n"
+        "  flex-shrink: 0;\n"
+        "  padding: var(--ui-control-padding-block) var(--ui-control-padding-inline);\n"
+        "  border-radius: var(--ui-radius-md);",
+        "stats evaluation player window hide buttons share action chrome",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);\n"
+        "  const bool hideClicked = ImGui::Button(hideLabel.c_str());\n"
+        "  ImGui::PopStyleVar();",
+        "plugin window hide buttons use shared rounded action chrome",
+        errors,
+    )
 
     plugin_web_stats_window_controls = tuple(
         (kind_id, label)

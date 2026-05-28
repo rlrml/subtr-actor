@@ -98,6 +98,15 @@ std::string joinStrings(const std::vector<std::string> &parts, std::string_view 
   return joined;
 }
 
+std::string uppercaseHeaderLabel(std::string_view value) {
+  std::string label;
+  label.reserve(value.size());
+  for (char ch : value) {
+    label.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
+  }
+  return label;
+}
+
 void pushWebFloatingWindowStyle() {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{14.0f, 12.0f});
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
@@ -7858,7 +7867,8 @@ void SubtrActorPlugin::captureWindowPlacement(UiWindowPlacement &placement) {
 }
 
 bool SubtrActorPlugin::renderSingletonWindowHeader(const char *label, bool &open) {
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", label);
+  const std::string headerLabel = uppercaseHeaderLabel(label);
+  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", headerLabel.c_str());
   ImGui::SameLine();
   const std::string hideLabel = std::format("Hide##singleton-window-hide-{}", label);
   const float hideWidth =
@@ -7867,7 +7877,10 @@ bool SubtrActorPlugin::renderSingletonWindowHeader(const char *label, bool &open
   if (rightAlignedX > ImGui::GetCursorPosX()) {
     ImGui::SetCursorPosX(rightAlignedX);
   }
-  if (ImGui::SmallButton(hideLabel.c_str())) {
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+  const bool hideClicked = ImGui::Button(hideLabel.c_str());
+  ImGui::PopStyleVar();
+  if (hideClicked) {
     hideSingletonWindow(open);
     return true;
   }
@@ -11839,10 +11852,11 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window, size_t /*stackIn
 
   const bool scopeHeaderOnly = statsWindowKindHasScopeSelector(window.kind);
   if (!scopeHeaderOnly) {
+    const std::string headerLabel = uppercaseHeaderLabel(statsWindowKindLabel(window.kind));
     ImGui::TextColored(
         ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
         "%s",
-        statsWindowKindLabel(window.kind));
+        headerLabel.c_str());
     ImGui::SameLine();
   }
   const std::string hideLabel = std::format("Hide##stats-window-hide-{}", window.id);
@@ -11853,7 +11867,10 @@ void SubtrActorPlugin::renderStatsWindow(UiStatsWindow &window, size_t /*stackIn
   if (rightAlignedX > ImGui::GetCursorPosX()) {
     ImGui::SetCursorPosX(rightAlignedX);
   }
-  if (ImGui::SmallButton(hideLabel.c_str())) {
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+  const bool hideClicked = ImGui::Button(hideLabel.c_str());
+  ImGui::PopStyleVar();
+  if (hideClicked) {
     hideStatsWindow(window);
     ImGui::End();
     return;
