@@ -1267,6 +1267,24 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "if (activeKey === eventPlaylistLastActiveKey && !options.forceScroll) {\n    return;\n  }",
+        "stats evaluation player event playlist avoids repeated auto-follow scroll",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "active && eventPlaylistAutoFollow && activeEventKey != eventPlaylistLastActiveKey",
+        "plugin event playlist avoids repeated auto-follow scroll",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "eventPlaylistLastActiveKey = activeEventKey;",
+        "plugin event playlist remembers active auto-follow item",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'std::format(\n'
         '      "Filters {}/{}##event-playlist-filter",\n'

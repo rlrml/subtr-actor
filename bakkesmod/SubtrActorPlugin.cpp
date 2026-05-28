@@ -5162,6 +5162,7 @@ void SubtrActorPlugin::resetLiveState() {
   nextBoostPadId = 1;
   messages.clear();
   recentUiEvents.clear();
+  eventPlaylistLastActiveKey.clear();
   mechanicsReviewDecisions.clear();
   mechanicsReviewIndex = 0;
   cachedStatsJson.clear();
@@ -8579,6 +8580,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       });
 
   if (playlistSources.empty()) {
+    eventPlaylistLastActiveKey.clear();
     ImGui::TextDisabled(
         recentUiEvents.empty() && replayAnnotations == nullptr ? "Load a replay to see events."
                                                                : "No events loaded.");
@@ -8593,17 +8595,20 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
   const bool filtersOpen = ImGui::TreeNode(filterSummary.c_str());
   ImGui::SameLine();
   if (ImGui::Checkbox("Auto-follow", &eventPlaylistAutoFollow)) {
+    eventPlaylistLastActiveKey.clear();
     scheduleUiConfigAutosave();
   }
 
   if (filtersOpen) {
     if (ImGui::Button("All##event-playlist-sources-all")) {
       eventPlaylistSourceFilter = "all";
+      eventPlaylistLastActiveKey.clear();
       scheduleUiConfigAutosave();
     }
     ImGui::SameLine();
     if (ImGui::Button("None##event-playlist-sources-none")) {
       eventPlaylistSourceFilter = "none";
+      eventPlaylistLastActiveKey.clear();
       scheduleUiConfigAutosave();
     }
 
@@ -8632,6 +8637,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
           appendUniqueFilterToken(selectedSources, option.value);
         }
         eventPlaylistSourceFilter = eventFilterFromSelectedSources(selectedSources);
+        eventPlaylistLastActiveKey.clear();
         scheduleUiConfigAutosave();
       }
       ImGui::PopID();
@@ -8663,6 +8669,8 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       activeEventIndex = index;
     }
   }
+  const std::string activeEventKey =
+      activeEventIndex ? mechanicsReviewKey(recentUiEvents[*activeEventIndex]) : "";
 
   ImGui::BeginChild("event-playlist-list", ImVec2{0.0f, 0.0f}, true);
   for (const size_t index : playlistEventIndexes) {
@@ -8705,12 +8713,13 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
     if (!event.details.empty()) {
       ImGui::TextDisabled("%s", event.details.c_str());
     }
-    if (active && eventPlaylistAutoFollow) {
+    if (active && eventPlaylistAutoFollow && activeEventKey != eventPlaylistLastActiveKey) {
       ImGui::SetScrollHereY(0.5f);
     }
     ImGui::Separator();
     ImGui::PopID();
   }
+  eventPlaylistLastActiveKey = activeEventKey;
   if (playlistEventIndexes.empty()) {
     ImGui::TextWrapped(
         selectedSourceCount == 0 ? "No event types selected."
@@ -10495,6 +10504,7 @@ void SubtrActorPlugin::applyReplayReviewUiWorkspace() {
   eventPlaylistGoalContextEnabled = true;
   eventPlaylistAutoFollow = true;
   eventPlaylistSourceFilter = "default";
+  eventPlaylistLastActiveKey.clear();
   resetWindowPlacements();
   mechanicsReviewPlacement.pending_focus = true;
   replayLoadingPlacement.pending_focus = true;

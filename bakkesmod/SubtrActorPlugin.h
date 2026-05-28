@@ -325,6 +325,7 @@ private:
   bool eventPlaylistGoalContextEnabled = true;
   bool eventPlaylistAutoFollow = true;
   std::string eventPlaylistSourceFilter = "default";
+  std::string eventPlaylistLastActiveKey;
   bool timelineRangeBoostEnabled = false;
   bool timelineRangePossessionEnabled = false;
   bool timelineRangePressureEnabled = false;
