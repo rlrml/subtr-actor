@@ -11608,12 +11608,12 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     if (const SaPlayerFrame *player = sampledPlayerByIndex(window.selected_player_index)) {
       renderPlayerStatsTable(window, *player);
     } else {
-      ImGui::Text("Waiting for selected player.");
+      renderMissingStatsRows(window);
     }
     break;
   case UiStatsWindowKind::Team:
     if (sampledPlayers.empty() && currentStatsJson().empty()) {
-      ImGui::TextWrapped("Start live analysis or load replay stats to show team stats.");
+      ImGui::Text("Load a replay to show stats.");
       break;
     }
     renderTeamStatsTable(window, window.selected_team_is_team_0);
@@ -11623,7 +11623,7 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     break;
   case UiStatsWindowKind::AllTeams:
     if (sampledPlayers.empty() && currentStatsJson().empty()) {
-      ImGui::TextWrapped("Start live analysis or load replay stats to show team stats.");
+      ImGui::Text("Load a replay to show stats.");
       break;
     }
     renderAllTeamsStatsTable(window);
@@ -11638,14 +11638,41 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
   }
 }
 
+void SubtrActorPlugin::renderMissingStatsRows(UiStatsWindow &window) {
+  for (size_t i = 0; i < window.entries.size();) {
+    const std::string &statId = window.entries[i].stat_id;
+    if (!statsWindowSupportsStat(window, statId)) {
+      ++i;
+      continue;
+    }
+
+    const float removeWidth = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float valueWidth = std::max(48.0f, ImGui::CalcTextSize("--").x + 18.0f);
+    const float valueX = std::max(
+        ImGui::GetCursorPosX(),
+        ImGui::GetWindowContentRegionMax().x - valueWidth - removeWidth - 12.0f);
+    const float removeX =
+        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - removeWidth);
+
+    ImGui::Text("%s", uiStatLabel(statId).c_str());
+    ImGui::SameLine(valueX);
+    ImGui::Text("--");
+    ImGui::SameLine(removeX);
+    if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
+      window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
+      scheduleUiConfigAutosave();
+      return;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Remove stat");
+    }
+    ++i;
+  }
+}
+
 void SubtrActorPlugin::renderPlayerStatsTable(
     UiStatsWindow &window,
     const SaPlayerFrame &player) {
-  const std::string label = playerLabel(player.player_index, player.is_team_0);
-  const LinearColor color =
-      player.is_team_0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
-  ImGui::TextColored(toImVec4(color), "%s", label.c_str());
-  ImGui::Columns(3, "player-stat-rows", false);
   for (size_t i = 0; i < window.entries.size();) {
     const std::string &statId = window.entries[i].stat_id;
     if (!statsWindowSupportsStat(window, statId)) {
@@ -11653,30 +11680,31 @@ void SubtrActorPlugin::renderPlayerStatsTable(
       continue;
     }
     const std::string statLabel = uiStatLabel(statId);
+    const std::string statValue = playerStatValue(player, statId);
+    const float removeWidth = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float valueWidth = std::max(48.0f, ImGui::CalcTextSize(statValue.c_str()).x + 18.0f);
+    const float valueX = std::max(
+        ImGui::GetCursorPosX(),
+        ImGui::GetWindowContentRegionMax().x - valueWidth - removeWidth - 12.0f);
+    const float removeX =
+        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - removeWidth);
     ImGui::Text("%s", statLabel.c_str());
-    ImGui::NextColumn();
-    ImGui::Text("%s", playerStatValue(player, statId).c_str());
-    ImGui::NextColumn();
+    ImGui::SameLine(valueX);
+    ImGui::Text("%s", statValue.c_str());
+    ImGui::SameLine(removeX);
     if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
       scheduleUiConfigAutosave();
-      ImGui::Columns(1);
       return;
     }
     if (ImGui::IsItemHovered()) {
       ImGui::SetTooltip("Remove stat");
     }
-    ImGui::NextColumn();
     ++i;
   }
-  ImGui::Columns(1);
 }
 
 void SubtrActorPlugin::renderTeamStatsTable(UiStatsWindow &window, uint8_t isTeam0) {
-  const LinearColor color =
-      isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
-  ImGui::TextColored(toImVec4(color), "%s", teamLabel(isTeam0).c_str());
-  ImGui::Columns(3, "team-stat-rows", false);
   for (size_t i = 0; i < window.entries.size();) {
     const std::string &statId = window.entries[i].stat_id;
     if (!statsWindowSupportsStat(window, statId)) {
@@ -11684,28 +11712,33 @@ void SubtrActorPlugin::renderTeamStatsTable(UiStatsWindow &window, uint8_t isTea
       continue;
     }
     const std::string statLabel = uiStatLabel(statId);
+    const std::string statValue = teamStatValue(isTeam0, statId);
+    const float removeWidth = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float valueWidth = std::max(48.0f, ImGui::CalcTextSize(statValue.c_str()).x + 18.0f);
+    const float valueX = std::max(
+        ImGui::GetCursorPosX(),
+        ImGui::GetWindowContentRegionMax().x - valueWidth - removeWidth - 12.0f);
+    const float removeX =
+        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - removeWidth);
     ImGui::Text("%s", statLabel.c_str());
-    ImGui::NextColumn();
-    ImGui::Text("%s", teamStatValue(isTeam0, statId).c_str());
-    ImGui::NextColumn();
+    ImGui::SameLine(valueX);
+    ImGui::Text("%s", statValue.c_str());
+    ImGui::SameLine(removeX);
     if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
       scheduleUiConfigAutosave();
-      ImGui::Columns(1);
       return;
     }
     if (ImGui::IsItemHovered()) {
       ImGui::SetTooltip("Remove stat");
     }
-    ImGui::NextColumn();
     ++i;
   }
-  ImGui::Columns(1);
 }
 
 void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
   if (sampledPlayers.empty()) {
-    ImGui::Text("Waiting for sampled players.");
+    ImGui::Text("Load a replay to show stats.");
     return;
   }
 

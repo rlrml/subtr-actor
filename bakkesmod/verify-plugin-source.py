@@ -483,6 +483,49 @@ def main() -> int:
             errors,
         )
     require_contains(
+        web_player_main_source,
+        'empty.textContent = "Load a replay to show stats.";',
+        "stats evaluation player stats windows no-frame empty state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Text("Load a replay to show stats.");',
+        "plugin stats windows no-data empty state mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'target ? definition.format(definition.read(target)) : "--"',
+        "stats evaluation player scoped stats render missing targets as dash rows",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "void SubtrActorPlugin::renderMissingStatsRows(UiStatsWindow &window)",
+        "plugin scoped stats render missing targets as dash rows",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::Text("--");',
+        "plugin scoped stats missing target value mirrors web dash",
+        errors,
+    )
+    for plugin_only_stats_window_empty_surface in (
+        'ImGui::Text("Waiting for selected player.");',
+        'ImGui::Text("Waiting for sampled players.");',
+        'ImGui::TextWrapped("Start live analysis or load replay stats to show team stats.");',
+        'ImGui::Columns(3, "player-stat-rows", false);',
+        'ImGui::Columns(3, "team-stat-rows", false);',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_stats_window_empty_surface,
+            "plugin stats window table/waiting surface",
+            errors,
+        )
+    require_contains(
         web_player_template_source,
         '<input id="skip-post-goal-transitions" type="checkbox" checked />',
         "stats evaluation player default skips post-goal resets",

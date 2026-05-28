@@ -558,6 +558,7 @@ private:
   void renderStatsWindowScopeSelector(UiStatsWindow &window);
   void renderStatsWindowAddControl(UiStatsWindow &window);
   void renderStatsWindowEntries(UiStatsWindow &window);
+  void renderMissingStatsRows(UiStatsWindow &window);
   void renderPlayerStatsTable(UiStatsWindow &window, const SaPlayerFrame &player);
   void renderTeamStatsTable(UiStatsWindow &window, uint8_t isTeam0);
   void renderAllPlayersStatsTable(UiStatsWindow &window);
