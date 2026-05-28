@@ -1,8 +1,5 @@
 import "./styles.css";
-import {
-  timelineEventSeekTime,
-  ReplayPlayer,
-} from "@rlrml/player";
+import { ReplayPlayer } from "@rlrml/player";
 import type {
   CanvasRecorderPlugin,
   ReplayTimelineEvent,
@@ -45,10 +42,7 @@ import {
   type ReplayLoadController,
 } from "./replayLoadController.ts";
 import { renderScoreboardWindow } from "./scoreboardWindow.ts";
-import {
-  createModuleRuntimeController,
-  type ModuleRuntimeController,
-} from "./moduleRuntimeController.ts";
+import type { ModuleRuntimeController } from "./moduleRuntimeController.ts";
 import {
   createMechanicsReviewController,
   getMechanicsReviewElements,
@@ -71,6 +65,7 @@ import {
 import { createStandalonePluginController } from "./standalonePlugins.ts";
 import { createAppStatsWindowsManager } from "./appStatsWindowsManager.ts";
 import { createAppEventWindowsManager } from "./appEventWindowsManager.ts";
+import { createAppModuleRuntimeController } from "./appModuleRuntimeController.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -159,7 +154,8 @@ const statsWindowManager = createAppStatsWindowsManager({
   watchGoalReplay,
 });
 
-moduleRuntimeController = createModuleRuntimeController({
+moduleRuntimeController = createAppModuleRuntimeController({
+  statsWindowManager,
   getEventWindowsManager() {
     return eventWindowsManager;
   },
@@ -174,20 +170,6 @@ moduleRuntimeController = createModuleRuntimeController({
   },
   getTimelineOverlay() {
     return timelineOverlay;
-  },
-  renderTimelineEvent(event) {
-    return {
-      ...event,
-      seekTime: timelineEventSeekTime(event),
-    };
-  },
-  rerenderStatsWindow() {
-    if (!replayPlayer) {
-      return;
-    }
-
-    const state = replayPlayer.getState();
-    statsWindowManager.render(state.frameIndex);
   },
   renderModuleRuntimeViews: afterModuleRuntimeChange,
   renderTimelineEventCountValue(value) {
