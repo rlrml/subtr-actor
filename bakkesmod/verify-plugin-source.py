@@ -1332,9 +1332,33 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        'if (!replayPlayer || state?.cameraViewMode !== "follow" || attachedPlayerId === null) {\n'
+        '    cameraProfileReadout.textContent = "Free camera";\n'
+        '    cameraFovReadout.textContent = "--";\n'
+        '    cameraHeightReadout.textContent = "--";\n'
+        '    cameraPitchReadout.textContent = "--";\n'
+        '    cameraBaseDistanceReadout.textContent = "--";\n'
+        '    cameraStiffnessReadout.textContent = "--";',
+        "stats evaluation player camera detail grid uses dash readouts without an attached camera",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'ImGui::Columns(2, "camera-detail-grid", false);',
         "plugin camera uses web-like detail grid",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'auto renderAttachedCameraMetric = [&](const char *format, float value) {\n'
+        "    if (!hasAttachedCamera) {\n"
+        '      ImGui::Text("--");\n'
+        "      return;\n"
+        "    }\n"
+        "    ImGui::Text(format, value);\n"
+        "  };",
+        "plugin camera detail grid uses dash readouts without an attached camera",
         errors,
     )
     require_contains(
@@ -1367,6 +1391,11 @@ def main() -> int:
         'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "READOUT");',
         'ImGui::Button("Open player stats")',
         'ImGui::Checkbox("Custom settings", &nextCustomSettingsEnabled)',
+        'ImGui::Text("%.0f", fov);',
+        'ImGui::Text("%.0f", height);',
+        'ImGui::Text("%.1f", pitch);',
+        'ImGui::Text("%.0f", distance);',
+        'ImGui::Text("%.2f", stiffness);',
     ):
         reject_contains(
             plugin_source,

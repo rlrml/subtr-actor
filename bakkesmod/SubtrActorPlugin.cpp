@@ -9869,6 +9869,13 @@ void SubtrActorPlugin::renderCameraWindow() {
                                          : cameraCustomSettingsEnabled
                                                ? std::format("{} custom", activeCameraLabel)
                                                : activeCameraLabel;
+  auto renderAttachedCameraMetric = [&](const char *format, float value) {
+    if (!hasAttachedCamera) {
+      ImGui::Text("--");
+      return;
+    }
+    ImGui::Text(format, value);
+  };
 
   ImGui::Separator();
   ImGui::Columns(2, "camera-detail-grid", false);
@@ -9876,19 +9883,19 @@ void SubtrActorPlugin::renderCameraWindow() {
   ImGui::Text("%s", profileReadout.c_str());
   ImGui::NextColumn();
   ImGui::TextDisabled("FOV");
-  ImGui::Text("%.0f", fov);
+  renderAttachedCameraMetric("%.0f", fov);
   ImGui::NextColumn();
   ImGui::TextDisabled("Height");
-  ImGui::Text("%.0f", height);
+  renderAttachedCameraMetric("%.0f", height);
   ImGui::NextColumn();
   ImGui::TextDisabled("Pitch");
-  ImGui::Text("%.1f", pitch);
+  renderAttachedCameraMetric("%.1f", pitch);
   ImGui::NextColumn();
   ImGui::TextDisabled("Distance");
-  ImGui::Text("%.0f", distance);
+  renderAttachedCameraMetric("%.0f", distance);
   ImGui::NextColumn();
   ImGui::TextDisabled("Stiffness");
-  ImGui::Text("%.2f", stiffness);
+  renderAttachedCameraMetric("%.2f", stiffness);
   ImGui::Columns(1);
 
   ImGui::End();
