@@ -3009,6 +3009,58 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_frame_pla
     count
 }
 
+fn serialize_replay_annotation_frame(
+    annotations: &SaReplayAnnotations,
+    replay_time: f32,
+) -> Option<Vec<u8>> {
+    replay_annotation_frame_at_time(annotations, replay_time)
+        .and_then(|frame| serde_json::to_vec(frame).ok())
+}
+
+/// Returns the UTF-8 byte length of the replay stats frame at `replay_time`.
+///
+/// The JSON payload is a `ReplayStatsFrame` from the preprocessed replay
+/// timeline. It is the replay-mode counterpart of
+/// `subtr_actor_bakkesmod_frame_json_len`.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_frame_json_len(
+    annotations: *const SaReplayAnnotations,
+    replay_time: f32,
+) -> usize {
+    annotations
+        .as_ref()
+        .and_then(|annotations| serialize_replay_annotation_frame(annotations, replay_time))
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+}
+
+/// Writes the replay stats frame at `replay_time` into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_replay_annotation_frame_json_len` first to size the
+/// destination buffer.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_frame_json(
+    annotations: *const SaReplayAnnotations,
+    replay_time: f32,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(annotations) = annotations.as_ref() else {
+        return 0;
+    };
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+
+    let Some(bytes) = serialize_replay_annotation_frame(annotations, replay_time) else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
+}
+
 /// Returns the scoreboard value for the latest processed replay frame at or before
 /// `replay_time`.
 #[no_mangle]
@@ -4460,6 +4512,24 @@ mod tests {
         assert!(frame_players[..copied_frame_players]
             .iter()
             .all(|player| player.has_match_stats == 1 && !player.player_name.is_null()));
+        let frame_json_len = unsafe {
+            subtr_actor_bakkesmod_replay_annotation_frame_json_len(annotations, final_time)
+        };
+        assert!(frame_json_len > 0);
+        let mut frame_json = vec![0; frame_json_len];
+        let frame_json_written = unsafe {
+            subtr_actor_bakkesmod_write_replay_annotation_frame_json(
+                annotations,
+                final_time,
+                frame_json.as_mut_ptr(),
+                frame_json.len(),
+            )
+        };
+        assert_eq!(frame_json_written, frame_json_len);
+        let frame_json =
+            String::from_utf8(frame_json).expect("replay annotation frame JSON should be UTF-8");
+        assert!(frame_json.contains("\"players\""));
+        assert!(frame_json.contains("\"team_zero\""));
         let mut score = SaReplayScore::default();
         let score_result = unsafe {
             subtr_actor_bakkesmod_replay_annotation_score_at_time(

@@ -170,6 +170,14 @@ REQUIRED_PLUGIN_ABI_EXPORTS = (
         "subtr_actor_bakkesmod_write_replay_annotation_frame_players",
         "writeReplayAnnotationFramePlayers",
     ),
+    (
+        "subtr_actor_bakkesmod_replay_annotation_frame_json_len",
+        "replayAnnotationFrameJsonLen",
+    ),
+    (
+        "subtr_actor_bakkesmod_write_replay_annotation_frame_json",
+        "writeReplayAnnotationFrameJson",
+    ),
     ("subtr_actor_bakkesmod_replay_annotation_score_at_time", "replayAnnotationScoreAtTime"),
     ("subtr_actor_bakkesmod_poll_replay_annotations", "pollReplayAnnotations"),
 )

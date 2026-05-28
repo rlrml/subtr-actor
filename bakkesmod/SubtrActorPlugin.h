@@ -88,6 +88,9 @@ private:
   using WriteDecodedStatsPlayerConfigJson = size_t (*)(const char *, uint8_t *, size_t);
   using EncodedStatsPlayerConfigLen = size_t (*)(const char *);
   using WriteEncodedStatsPlayerConfig = size_t (*)(const char *, uint8_t *, size_t);
+  using ReplayAnnotationFrameJsonLen = size_t (*)(const SaReplayAnnotations *, float);
+  using WriteReplayAnnotationFrameJson =
+      size_t (*)(const SaReplayAnnotations *, float, uint8_t *, size_t);
   using DrainEvents = size_t (*)(SaEngine *, SaMechanicEvent *, size_t);
   using DrainTeamEvents = size_t (*)(SaEngine *, SaTeamEvent *, size_t);
   using DrainGoalContextEvents = size_t (*)(SaEngine *, SaGoalContextEvent *, size_t);
@@ -259,6 +262,8 @@ private:
   ReplayAnnotationPlayerCount replayAnnotationPlayerCount = nullptr;
   WriteReplayAnnotationPlayers writeReplayAnnotationPlayers = nullptr;
   WriteReplayAnnotationFramePlayers writeReplayAnnotationFramePlayers = nullptr;
+  ReplayAnnotationFrameJsonLen replayAnnotationFrameJsonLen = nullptr;
+  WriteReplayAnnotationFrameJson writeReplayAnnotationFrameJson = nullptr;
   ReplayAnnotationScoreAtTime replayAnnotationScoreAtTime = nullptr;
   PollReplayAnnotations pollReplayAnnotations = nullptr;
 
@@ -424,6 +429,8 @@ private:
       std::chrono::steady_clock::time_point{};
   mutable uint64_t cachedStatsJsonFrameNumber = std::numeric_limits<uint64_t>::max();
   mutable std::string cachedStatsJson;
+  mutable float cachedReplayFrameJsonTime = -1.0f;
+  mutable std::string cachedReplayFrameJson;
   std::chrono::steady_clock::time_point nextUiConfigAutosave =
       std::chrono::steady_clock::time_point{};
   std::string lastSavedUiConfigJson;
@@ -663,6 +670,7 @@ private:
       NamedJsonLen len,
       WriteNamedJson write,
       const std::string &name) const;
+  const std::string &currentReplayFrameJson() const;
   void dumpGraphJson(std::vector<std::string> params);
   void dumpStatsModuleJson(std::vector<std::string> params);
   void dumpStatsModuleFrameJson(std::vector<std::string> params);

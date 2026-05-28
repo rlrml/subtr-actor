@@ -1545,6 +1545,103 @@ std::vector<UiStatDefinitionCandidate> graphStatDefinitionsFromStatsJson(
   return definitions;
 }
 
+std::vector<UiStatDefinitionCandidate> graphStatDefinitionsFromReplayFrameJson(
+    const std::string &frameJson) {
+  std::vector<UiStatDefinitionCandidate> definitions;
+  std::unordered_set<std::string> seenIds;
+
+  auto appendStatsObject =
+      [&](const std::string &statsObject, const std::string &moduleName, const char *scope) {
+        std::vector<std::string> paths;
+        collectJsonLeafStatPaths(statsObject, "", paths, 8);
+        for (const std::string &path : paths) {
+          const std::string id = std::format("{}:{}.{}", scope, moduleName, path);
+          if (!seenIds.insert(id).second || normalizeUiStatId(id) != id) {
+            continue;
+          }
+          definitions.push_back(UiStatDefinitionCandidate{
+              id,
+              std::format("{}.{}", moduleName, path),
+              moduleName,
+              std::string_view{scope} == "player",
+              std::string_view{scope} == "team",
+              false,
+          });
+        }
+      };
+
+  if (const auto teamZero = parseJsonObjectProperty(frameJson, "team_zero")) {
+    for (const std::string &moduleName : parseJsonObjectKeys(*teamZero)) {
+      if (const auto module = parseJsonObjectProperty(*teamZero, moduleName)) {
+        appendStatsObject(*module, moduleName, "team");
+      }
+    }
+  } else if (const auto teamOne = parseJsonObjectProperty(frameJson, "team_one")) {
+    for (const std::string &moduleName : parseJsonObjectKeys(*teamOne)) {
+      if (const auto module = parseJsonObjectProperty(*teamOne, moduleName)) {
+        appendStatsObject(*module, moduleName, "team");
+      }
+    }
+  }
+
+  const std::vector<std::string> players =
+      parseJsonObjectArrayProperty(frameJson, "players");
+  if (!players.empty()) {
+    for (const std::string &moduleName : parseJsonObjectKeys(players.front())) {
+      if (moduleName == "player_id" || moduleName == "name" || moduleName == "is_team_0") {
+        continue;
+      }
+      if (const auto module = parseJsonObjectProperty(players.front(), moduleName)) {
+        appendStatsObject(*module, moduleName, "player");
+      }
+    }
+  }
+
+  return definitions;
+}
+
+std::string replayStatsModuleFrameJson(
+    const std::string &frameJson,
+    const std::string &moduleName) {
+  std::optional<std::string> teamZeroModule;
+  if (const auto teamZero = parseJsonObjectProperty(frameJson, "team_zero")) {
+    teamZeroModule = parseJsonObjectProperty(*teamZero, moduleName);
+  }
+  std::optional<std::string> teamOneModule;
+  if (const auto teamOne = parseJsonObjectProperty(frameJson, "team_one")) {
+    teamOneModule = parseJsonObjectProperty(*teamOne, moduleName);
+  }
+
+  std::string json = "{";
+  json += "\"team_zero\":";
+  json += teamZeroModule.value_or("null");
+  json += ",\"team_one\":";
+  json += teamOneModule.value_or("null");
+  json += ",\"player_stats\":[";
+  bool firstPlayer = true;
+  for (const std::string &player : parseJsonObjectArrayProperty(frameJson, "players")) {
+    const auto playerId = parseJsonPropertyValue(player, "player_id");
+    const auto stats = parseJsonObjectProperty(player, moduleName);
+    if (!playerId || !stats) {
+      continue;
+    }
+    if (!firstPlayer) {
+      json += ",";
+    }
+    firstPlayer = false;
+    json += "{\"player_id\":";
+    json += *playerId;
+    json += ",\"stats\":";
+    json += *stats;
+    json += "}";
+  }
+  json += "]}";
+  if (!teamZeroModule && !teamOneModule && firstPlayer) {
+    return {};
+  }
+  return json;
+}
+
 static_assert(sizeof(SaBoostPadEventKind) == 4);
 static_assert(sizeof(SaPlayerStatEventKind) == 4);
 
@@ -3169,6 +3266,10 @@ bool SubtrActorPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_replay_annotation_players"));
   writeReplayAnnotationFramePlayers = reinterpret_cast<WriteReplayAnnotationFramePlayers>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_replay_annotation_frame_players"));
+  replayAnnotationFrameJsonLen = reinterpret_cast<ReplayAnnotationFrameJsonLen>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotation_frame_json_len"));
+  writeReplayAnnotationFrameJson = reinterpret_cast<WriteReplayAnnotationFrameJson>(
+      GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_write_replay_annotation_frame_json"));
   replayAnnotationScoreAtTime = reinterpret_cast<ReplayAnnotationScoreAtTime>(
       GetProcAddress(rustLibrary, "subtr_actor_bakkesmod_replay_annotation_score_at_time"));
   pollReplayAnnotations = reinterpret_cast<PollReplayAnnotations>(
@@ -3187,8 +3288,8 @@ bool SubtrActorPlugin::loadRustLibrary() {
       !drainEvents || !drainTeamEvents || !drainGoalContextEvents ||
       !replayAnnotationsCreate || !replayAnnotationsDestroy || !replayAnnotationCount ||
       !replayAnnotationPlayerCount || !writeReplayAnnotationPlayers ||
-      !writeReplayAnnotationFramePlayers || !replayAnnotationScoreAtTime ||
-      !pollReplayAnnotations) {
+      !writeReplayAnnotationFramePlayers || !replayAnnotationFrameJsonLen ||
+      !writeReplayAnnotationFrameJson || !replayAnnotationScoreAtTime || !pollReplayAnnotations) {
     unloadRustLibrary();
     return false;
   }
@@ -3251,6 +3352,8 @@ void SubtrActorPlugin::unloadRustLibrary() {
   replayAnnotationPlayerCount = nullptr;
   writeReplayAnnotationPlayers = nullptr;
   writeReplayAnnotationFramePlayers = nullptr;
+  replayAnnotationFrameJsonLen = nullptr;
+  writeReplayAnnotationFrameJson = nullptr;
   replayAnnotationScoreAtTime = nullptr;
   pollReplayAnnotations = nullptr;
 }
@@ -4693,6 +4796,8 @@ void SubtrActorPlugin::resetReplayAnnotations() {
   replayAnnotations = nullptr;
   replayAnnotationPath.clear();
   replayAnnotationLoadFailed = false;
+  cachedReplayFrameJson.clear();
+  cachedReplayFrameJsonTime = -1.0f;
   if (gameWrapper && gameWrapper->IsInReplay()) {
     sampledPlayers.clear();
     sampledPlayerNames.clear();
@@ -5203,6 +5308,8 @@ void SubtrActorPlugin::resetLiveState() {
   mechanicsReviewIndex = 0;
   cachedStatsJson.clear();
   cachedStatsJsonFrameNumber = std::numeric_limits<uint64_t>::max();
+  cachedReplayFrameJson.clear();
+  cachedReplayFrameJsonTime = -1.0f;
 }
 
 void SubtrActorPlugin::clearPendingFrameEvents() {
@@ -10970,6 +11077,45 @@ const std::string &SubtrActorPlugin::currentStatsJson() const {
   return cachedStatsJson;
 }
 
+const std::string &SubtrActorPlugin::currentReplayFrameJson() const {
+  if (!replayAnnotations || !replayAnnotationFrameJsonLen || !writeReplayAnnotationFrameJson ||
+      !gameWrapper || !gameWrapper->IsInReplay()) {
+    cachedReplayFrameJson.clear();
+    cachedReplayFrameJsonTime = -1.0f;
+    return cachedReplayFrameJson;
+  }
+
+  ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
+  if (replayServer.IsNull()) {
+    cachedReplayFrameJson.clear();
+    cachedReplayFrameJsonTime = -1.0f;
+    return cachedReplayFrameJson;
+  }
+
+  const float replayTime = replayServer.GetReplayTimeElapsed();
+  if (cachedReplayFrameJsonTime == replayTime) {
+    return cachedReplayFrameJson;
+  }
+
+  const size_t byteCount = replayAnnotationFrameJsonLen(replayAnnotations, replayTime);
+  if (byteCount == 0) {
+    cachedReplayFrameJson.clear();
+    cachedReplayFrameJsonTime = replayTime;
+    return cachedReplayFrameJson;
+  }
+
+  std::string buffer(byteCount, '\0');
+  const size_t written = writeReplayAnnotationFrameJson(
+      replayAnnotations,
+      replayTime,
+      reinterpret_cast<uint8_t *>(buffer.data()),
+      buffer.size());
+  buffer.resize(written);
+  cachedReplayFrameJson = std::move(buffer);
+  cachedReplayFrameJsonTime = replayTime;
+  return cachedReplayFrameJson;
+}
+
 std::optional<std::string> SubtrActorPlugin::graphPlayerStatValue(
     const SaPlayerFrame &player,
     std::string_view statId) const {
@@ -10978,35 +11124,45 @@ std::optional<std::string> SubtrActorPlugin::graphPlayerStatValue(
     return std::nullopt;
   }
 
-  const std::string &statsJson = currentStatsJson();
-  if (statsJson.empty()) {
-    return std::nullopt;
-  }
-  const auto frame = parseJsonObjectProperty(statsJson, "frame");
-  if (!frame) {
-    return std::nullopt;
-  }
-  const auto modules = parseJsonObjectProperty(*frame, "modules");
-  if (!modules) {
-    return std::nullopt;
-  }
-  const auto module = parseJsonObjectProperty(*modules, std::string{parsed->module});
-  if (!module) {
-    return std::nullopt;
+  if (const std::string &statsJson = currentStatsJson(); !statsJson.empty()) {
+    const auto frame = parseJsonObjectProperty(statsJson, "frame");
+    const auto modules = frame ? parseJsonObjectProperty(*frame, "modules") : std::nullopt;
+    const auto module =
+        modules ? parseJsonObjectProperty(*modules, std::string{parsed->module})
+                : std::nullopt;
+    if (module) {
+      const std::vector<std::string> playerStats =
+          parseJsonObjectArrayProperty(*module, "player_stats");
+      for (const std::string &entry : playerStats) {
+        const auto playerId = parseJsonObjectProperty(entry, "player_id");
+        if (!playerId || !jsonPlayerIdMatchesIndex(*playerId, player.player_index)) {
+          continue;
+        }
+        const auto stats = parseJsonObjectProperty(entry, "stats");
+        if (!stats) {
+          return std::nullopt;
+        }
+        return jsonDisplayValueAtPath(*stats, parsed->path);
+      }
+    }
   }
 
-  const std::vector<std::string> playerStats =
-      parseJsonObjectArrayProperty(*module, "player_stats");
-  for (const std::string &entry : playerStats) {
+  const std::string &replayFrameJson = currentReplayFrameJson();
+  if (replayFrameJson.empty()) {
+    return std::nullopt;
+  }
+  const std::vector<std::string> replayPlayers =
+      parseJsonObjectArrayProperty(replayFrameJson, "players");
+  for (size_t index = 0; index < replayPlayers.size(); index += 1) {
+    const std::string &entry = replayPlayers[index];
     const auto playerId = parseJsonObjectProperty(entry, "player_id");
-    if (!playerId || !jsonPlayerIdMatchesIndex(*playerId, player.player_index)) {
+    const bool matchesById = playerId && jsonPlayerIdMatchesIndex(*playerId, player.player_index);
+    const bool matchesByReplayOrder = index == player.player_index;
+    if (!matchesById && !matchesByReplayOrder) {
       continue;
     }
-    const auto stats = parseJsonObjectProperty(entry, "stats");
-    if (!stats) {
-      return std::nullopt;
-    }
-    return jsonDisplayValueAtPath(*stats, parsed->path);
+    const auto module = parseJsonObjectProperty(entry, std::string{parsed->module});
+    return module ? jsonDisplayValueAtPath(*module, parsed->path) : std::nullopt;
   }
   return std::nullopt;
 }
@@ -11019,28 +11175,30 @@ std::optional<std::string> SubtrActorPlugin::graphTeamStatValue(
     return std::nullopt;
   }
 
-  const std::string &statsJson = currentStatsJson();
-  if (statsJson.empty()) {
+  if (const std::string &statsJson = currentStatsJson(); !statsJson.empty()) {
+    const auto frame = parseJsonObjectProperty(statsJson, "frame");
+    const auto modules = frame ? parseJsonObjectProperty(*frame, "modules") : std::nullopt;
+    const auto module =
+        modules ? parseJsonObjectProperty(*modules, std::string{parsed->module})
+                : std::nullopt;
+    const auto team =
+        module ? parseJsonObjectProperty(*module, isTeam0 != 0 ? "team_zero" : "team_one")
+               : std::nullopt;
+    if (team) {
+      return jsonDisplayValueAtPath(*team, parsed->path);
+    }
+  }
+
+  const std::string &replayFrameJson = currentReplayFrameJson();
+  if (replayFrameJson.empty()) {
     return std::nullopt;
   }
-  const auto frame = parseJsonObjectProperty(statsJson, "frame");
-  if (!frame) {
-    return std::nullopt;
-  }
-  const auto modules = parseJsonObjectProperty(*frame, "modules");
-  if (!modules) {
-    return std::nullopt;
-  }
-  const auto module = parseJsonObjectProperty(*modules, std::string{parsed->module});
-  if (!module) {
-    return std::nullopt;
-  }
-  const auto team =
-      parseJsonObjectProperty(*module, isTeam0 != 0 ? "team_zero" : "team_one");
-  if (!team) {
-    return std::nullopt;
-  }
-  return jsonDisplayValueAtPath(*team, parsed->path);
+  const auto teamSnapshot =
+      parseJsonObjectProperty(replayFrameJson, isTeam0 != 0 ? "team_zero" : "team_one");
+  const auto module =
+      teamSnapshot ? parseJsonObjectProperty(*teamSnapshot, std::string{parsed->module})
+                   : std::nullopt;
+  return module ? jsonDisplayValueAtPath(*module, parsed->path) : std::nullopt;
 }
 
 std::string SubtrActorPlugin::playerStatValue(
@@ -11463,6 +11621,12 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   }
   for (UiStatDefinitionCandidate &definition :
        graphStatDefinitionsFromStatsJson(currentStatsJson())) {
+    if (definitionIds.insert(definition.id).second) {
+      definitions.push_back(std::move(definition));
+    }
+  }
+  for (UiStatDefinitionCandidate &definition :
+       graphStatDefinitionsFromReplayFrameJson(currentReplayFrameJson())) {
     if (definitionIds.insert(definition.id).second) {
       definitions.push_back(std::move(definition));
     }
@@ -12030,7 +12194,7 @@ void SubtrActorPlugin::renderJsonInspectorPayload(
 
 void SubtrActorPlugin::renderStatsModuleWindow(UiStatsWindow &window) {
   if (!loaded || !engine) {
-    ImGui::TextWrapped("Start live analysis to inspect graph-backed stats modules.");
+    ImGui::TextWrapped("Load the graph runtime to inspect graph-backed stats modules.");
     return;
   }
 
@@ -12060,6 +12224,12 @@ void SubtrActorPlugin::renderStatsModuleWindow(UiStatsWindow &window) {
         statsModuleFrameJsonLen,
         writeStatsModuleFrameJson,
         window.module_name);
+    if (json.empty()) {
+      json = replayStatsModuleFrameJson(currentReplayFrameJson(), window.module_name);
+      if (!json.empty()) {
+        viewLabel = "replay frame";
+      }
+    }
   }
 
   if (json.empty()) {
