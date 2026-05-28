@@ -12125,7 +12125,12 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
            event.type == "air_dribble_goal" || event.type == "flip_reset_goal" ||
            event.type == "half_volley_goal";
   };
-  auto goalTagText = [](const UiEventRecord &event) {
+  struct GoalTagChip {
+    std::string label;
+    float confidence = 1.0f;
+    std::string text;
+  };
+  auto goalTagChip = [](const UiEventRecord &event) {
     std::string label = event.label;
     if (!event.actor.empty()) {
       const std::string actorPrefix = event.actor + " ";
@@ -12135,6 +12140,7 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
     }
 
     std::string confidence = "100%";
+    float confidenceValue = 1.0f;
     const size_t parenthesizedConfidence = label.rfind(" (");
     if (parenthesizedConfidence != std::string::npos && !label.empty() &&
         label.back() == ')' &&
@@ -12148,11 +12154,16 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
       const size_t start = event.details.rfind(' ', percent);
       confidence = event.details.substr(start == std::string::npos ? 0 : start + 1, percent + 1);
     }
+    try {
+      confidenceValue = std::clamp(std::stof(confidence) / 100.0f, 0.0f, 1.0f);
+    } catch (const std::exception &) {
+      confidenceValue = 1.0f;
+    }
 
-    return std::format("{} {}", label, confidence);
+    return GoalTagChip{label, confidenceValue, std::format("{} {}", label, confidence)};
   };
   auto goalTagsForEvent = [&](const UiEventRecord &goalEvent) {
-    std::vector<std::string> tags;
+    std::vector<GoalTagChip> tags;
     for (const UiEventRecord &candidate : recentUiEvents) {
       if (!isGoalTagEvent(candidate)) {
         continue;
@@ -12162,12 +12173,22 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
       const bool sameFrame = candidate.frame_number == goalEvent.frame_number;
       const bool nearbyTime = std::fabs(candidate.time - goalEvent.time) <= 0.25f;
       if (samePlayer && (sameFrame || nearbyTime)) {
-        tags.push_back(goalTagText(candidate));
+        tags.push_back(goalTagChip(candidate));
       }
     }
-    std::sort(tags.begin(), tags.end());
-    tags.erase(std::unique(tags.begin(), tags.end()), tags.end());
-    return tags;
+    std::sort(tags.begin(), tags.end(), [](const GoalTagChip &left, const GoalTagChip &right) {
+      if (left.label == right.label) {
+        return left.confidence > right.confidence;
+      }
+      return left.label < right.label;
+    });
+    std::vector<std::string> tagTexts;
+    for (const GoalTagChip &tag : tags) {
+      if (!containsString(tagTexts, tag.text)) {
+        tagTexts.push_back(tag.text);
+      }
+    }
+    return tagTexts;
   };
 
   std::vector<size_t> goalEventIndexes;

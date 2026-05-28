@@ -882,14 +882,35 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        "for (const group of tagsByGoalIndex.values()) {\n"
+        "    group.sort(\n"
+        "      (left, right) => left.kind.localeCompare(right.kind) || right.confidence - left.confidence,\n"
+        "    );\n"
+        "  }",
+        "stats evaluation player sorts goal tags by kind and confidence",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         "for (const index of tagsByGoalIndex.keys()) {\n    goalIndexes.add(index);\n  }",
         "stats evaluation player keeps tag-only goals in goal-label overview",
         errors,
     )
     require_contains(
         plugin_source,
-        "auto goalTagText = [](const UiEventRecord &event) {",
+        "auto goalTagChip = [](const UiEventRecord &event) {",
         "plugin goal-label window formats replay goal tags",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "std::sort(tags.begin(), tags.end(), [](const GoalTagChip &left, const GoalTagChip &right) {\n"
+        "      if (left.label == right.label) {\n"
+        "        return left.confidence > right.confidence;\n"
+        "      }\n"
+        "      return left.label < right.label;\n"
+        "    });",
+        "plugin sorts goal tags by label and descending confidence like web",
         errors,
     )
     require_contains(
