@@ -12389,15 +12389,25 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
     const UiEventRecord &event = recentUiEvents[index];
     const float seekTime = std::max(0.0f, event.time - GOAL_WATCH_LEAD_SECONDS);
     ImGui::PushID(static_cast<int>(index));
+    const float buttonPadding = ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float watchWidth = ImGui::CalcTextSize("Watch").x + buttonPadding;
+    const float cueWidth = ImGui::CalcTextSize("Cue").x + buttonPadding;
+    const float actionsX = std::max(
+        ImGui::GetCursorPosX(),
+        ImGui::GetWindowContentRegionMax().x - watchWidth - cueWidth -
+            ImGui::GetStyle().ItemSpacing.x);
     ImGui::TextColored(toImVec4(event.color), "Goal %zu", ordinal + 1);
+    ImGui::SameLine(actionsX);
+    const bool watchClicked = ImGui::SmallButton("Watch");
     ImGui::SameLine();
+    const bool cueClicked = ImGui::SmallButton("Cue");
     ImGui::TextDisabled(
         "%s · %s",
         formatEventPlaylistTime(event.time).c_str(),
         event.actor.empty() ? "Unknown scorer" : event.actor.c_str());
     const std::vector<std::string> tags = goalTagsForEvent(event);
     ImGui::TextDisabled("%s", tags.empty() ? "Unlabeled" : joinStrings(tags, " · ").c_str());
-    if (ImGui::SmallButton("Watch")) {
+    if (watchClicked) {
       mechanicsReviewClipActive = false;
       playbackCurrentTime = seekTime;
       playbackPlaying = true;
@@ -12408,12 +12418,11 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
         replayServer.StartPlaybackAtTime(seekTime);
       } else {
         cvarManager->log(std::format(
-            "subtr-actor: selected goal at {:.2f}s; open a replay to seek",
-            seekTime));
+          "subtr-actor: selected goal at {:.2f}s; open a replay to seek",
+          seekTime));
       }
     }
-    ImGui::SameLine();
-    if (ImGui::SmallButton("Cue")) {
+    if (cueClicked) {
       mechanicsReviewClipActive = false;
       playbackCurrentTime = seekTime;
       playbackPlaying = false;

@@ -864,6 +864,32 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        "actions.append(watch, jump);\n\n    item.append(header, labels, actions);",
+        "stats evaluation player goal-label actions are part of each card header layout",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const float actionsX = std::max(\n'
+        "        ImGui::GetCursorPosX(),\n"
+        "        ImGui::GetWindowContentRegionMax().x - watchWidth - cueWidth -\n"
+        "            ImGui::GetStyle().ItemSpacing.x);\n"
+        '    ImGui::TextColored(toImVec4(event.color), "Goal %zu", ordinal + 1);\n'
+        "    ImGui::SameLine(actionsX);",
+        "plugin goal-label actions align with goal header like web",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'const bool watchClicked = ImGui::SmallButton("Watch");\n'
+        "    ImGui::SameLine();\n"
+        '    const bool cueClicked = ImGui::SmallButton("Cue");\n'
+        "    ImGui::TextDisabled(",
+        "plugin goal-label actions render before metadata like web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         'empty.textContent = "Unlabeled";',
         "stats evaluation player unlabeled goal chip",
         errors,
@@ -942,6 +968,7 @@ def main() -> int:
         'ImGui::TextDisabled("%.2fs - %s", event.time, event.actor.c_str());',
         'ImGui::TextWrapped("%s", event.label.c_str());',
         'ImGui::TextWrapped("No goals loaded.");',
+        'ImGui::TextDisabled("%s", tags.empty() ? "Unlabeled" : joinStrings(tags, " · ").c_str());\n    if (ImGui::SmallButton("Watch"))',
     ):
         reject_contains(
             plugin_source,
