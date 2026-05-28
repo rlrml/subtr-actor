@@ -11456,18 +11456,13 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
   std::array<char, 128> queryBuffer{};
   const size_t querySize = std::min(window.picker_query.size(), queryBuffer.size() - 1);
   std::copy_n(window.picker_query.data(), querySize, queryBuffer.data());
+  ImGui::TextDisabled("Search stats");
   ImGui::SetNextItemWidth(-1.0f);
   if (ImGui::InputText(
-          std::format("Search stats##{}", window.id).c_str(),
+          std::format("##stats-window-search-{}", window.id).c_str(),
           queryBuffer.data(),
           queryBuffer.size())) {
     window.picker_query = queryBuffer.data();
-  }
-  if (!window.picker_query.empty()) {
-    ImGui::SameLine();
-    if (ImGui::SmallButton(std::format("Clear##stat-search-{}", window.id).c_str())) {
-      window.picker_query.clear();
-    }
   }
 
   std::vector<UiStatDefinitionCandidate> definitions;
@@ -11525,7 +11520,7 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
       continue;
     }
     const std::string label =
-        std::format("Add all {} ({})##{}-{}", category, count, window.id, category);
+        std::format("Add all {}   {}##{}-{}", category, count, window.id, category);
     if (ImGui::SmallButton(label.c_str())) {
       bool added = false;
       for (const UiStatDefinitionMatch &match : matches) {
@@ -11557,14 +11552,14 @@ void SubtrActorPlugin::renderStatsWindowAddControl(UiStatsWindow &window) {
     const UiStatDefinitionCandidate &definition = match.definition;
     const bool alreadySelected = statsWindowHasStat(window, definition.id);
     const std::string itemLabel = std::format(
-        "{}  [{}]##{}-{}",
+        "{}   {}##{}-{}",
         definition.label,
         uiStatScopeLabel(definition),
         window.id,
         definition.id);
     if (alreadySelected && window.kind != UiStatsWindowKind::AdHoc) {
       ImGui::TextDisabled(
-          "%s  [%s selected]",
+          "%s   %s",
           definition.label.c_str(),
           uiStatScopeLabel(definition));
       continue;

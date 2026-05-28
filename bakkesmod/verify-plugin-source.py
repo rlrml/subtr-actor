@@ -428,6 +428,61 @@ def main() -> int:
             f"expected={web_launcher_stats_buttons!r} actual={plugin_web_stats_window_controls!r}"
         )
     require_contains(
+        web_player_main_source,
+        'queryInput.placeholder = "Search stats";',
+        "stats evaluation player stats picker search placeholder",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("Search stats");',
+        "plugin stats picker shows web-like search prompt",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'std::format("##stats-window-search-{}", window.id).c_str()',
+        "plugin stats picker search input uses hidden label",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'addGroup.innerHTML = `<span>Add all ${category}</span><strong>${group.length}</strong>`;',
+        "stats evaluation player stats picker category row",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'std::format("Add all {}   {}##{}-{}", category, count, window.id, category);',
+        "plugin stats picker category row mirrors web count layout",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'item.innerHTML = `<span>${definition.label}</span><strong>${definition.scope}</strong>`;',
+        "stats evaluation player stats picker stat row",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'std::format(\n        "{}   {}##{}-{}",',
+        "plugin stats picker stat row mirrors web label/scope layout",
+        errors,
+    )
+    for plugin_only_stats_picker_surface in (
+        'std::format("Search stats##{}", window.id).c_str()',
+        'ImGui::SmallButton(std::format("Clear##stat-search-{}", window.id).c_str())',
+        'std::format("Add all {} ({})##{}-{}", category, count, window.id, category)',
+        'std::format(\n        "{}  [{}]##{}-{}",',
+        'ImGui::TextDisabled(\n          "%s  [%s selected]",',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_stats_picker_surface,
+            "plugin stats picker plugin-only row/search surface",
+            errors,
+        )
+    require_contains(
         web_player_template_source,
         '<input id="skip-post-goal-transitions" type="checkbox" checked />',
         "stats evaluation player default skips post-goal resets",
