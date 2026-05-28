@@ -1,0 +1,44 @@
+@media (max-width: 1180px) {
+  .sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .shell {
+    padding: 0;
+  }
+
+  .sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-heading {
+    display: grid;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .viewport-panel {
+    min-height: 100dvh;
+  }
+}
+
+@media (max-width: 560px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .transport-row {
+    flex-direction: column;
+  }
+
+  .floating-window,
+  .stats-window {
+    left: 0.55rem;
+    right: 0.55rem;
+    width: auto;
+  }
+}

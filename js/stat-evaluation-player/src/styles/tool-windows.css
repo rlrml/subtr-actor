@@ -1,0 +1,412 @@
+.mechanics-review-window-body {
+  display: grid;
+  gap: var(--ui-gap-md);
+}
+
+.event-playlist-window-body {
+  display: grid;
+  gap: var(--ui-gap-sm);
+  min-height: 0;
+}
+
+.event-playlist-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap-sm);
+}
+
+.event-playlist-filter {
+  position: relative;
+  min-width: 0;
+}
+
+.event-playlist-filter summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ui-control-height);
+  padding: var(--ui-control-padding-block) var(--ui-control-padding-inline);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: var(--ui-control-font-size);
+  cursor: pointer;
+  list-style: none;
+}
+
+.event-playlist-filter summary::-webkit-details-marker {
+  display: none;
+}
+
+.event-playlist-filter-panel {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  width: min(22rem, calc(100vw - 3rem));
+  max-height: min(28rem, calc(100dvh - 10rem));
+  overflow: auto;
+  display: grid;
+  gap: var(--ui-gap-md);
+  padding: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ui-radius-md);
+  background: rgba(9, 14, 22, 0.98);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+}
+
+.event-playlist-filter-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.event-playlist-filter-group {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.event-playlist-filter-group h3 {
+  margin: 0;
+  color: #87afd4;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.event-playlist-filter-option {
+  min-width: 0;
+}
+
+.event-playlist-follow {
+  flex-shrink: 0;
+}
+
+.event-playlist-list {
+  max-height: min(31rem, calc(100dvh - 11rem));
+  overflow: auto;
+  display: grid;
+  gap: 0.45rem;
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
+}
+
+.event-playlist-item {
+  --event-color: #d1d9e0;
+  appearance: none;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: start;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-left: 0.28rem solid var(--event-color);
+  border-radius: var(--ui-radius-md);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.event-playlist-item:hover,
+.event-playlist-item[data-active="true"] {
+  border-color: color-mix(in srgb, var(--event-color) 48%, rgba(255, 255, 255, 0.12));
+  background: color-mix(in srgb, var(--event-color) 15%, rgba(255, 255, 255, 0.045));
+}
+
+.event-playlist-time {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.event-playlist-main {
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.event-playlist-main strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.event-playlist-main span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.mechanics-review-load-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--ui-gap-sm);
+  align-items: center;
+}
+
+.mechanics-review-file {
+  display: inline-grid;
+  align-items: center;
+  min-height: var(--ui-control-height);
+  padding: var(--ui-control-padding-block) var(--ui-control-padding-inline);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-md);
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mechanics-review-file input {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.mechanics-review-url {
+  min-width: 0;
+}
+
+.mechanics-review-status {
+  min-height: 1.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.mechanics-review-current {
+  display: grid;
+  gap: var(--ui-gap-sm);
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ui-radius-md);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.mechanics-review-index {
+  color: #87afd4;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mechanics-review-current h3 {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.2;
+}
+
+.mechanics-review-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-gap-sm);
+  margin: 0;
+}
+
+.mechanics-review-fields div {
+  min-width: 0;
+}
+
+.mechanics-review-fields dt {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.mechanics-review-fields dd {
+  margin: 0.1rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.mechanics-review-wide {
+  grid-column: 1 / -1;
+}
+
+.mechanics-review-actions,
+.mechanics-review-decision-actions,
+.mechanics-review-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap-sm);
+}
+
+.mechanics-review-actions button,
+.mechanics-review-decision-actions button {
+  flex: 1 1 0;
+}
+
+#mechanics-review-confirm {
+  border-color: rgba(76, 175, 120, 0.52);
+}
+
+#mechanics-review-reject {
+  border-color: rgba(220, 95, 95, 0.58);
+}
+
+.mechanics-review-list-header {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mechanics-review-replays {
+  display: grid;
+  gap: var(--ui-gap-xs);
+}
+
+.replay-loading-window-body {
+  display: grid;
+  gap: var(--ui-gap-sm);
+}
+
+.replay-loading-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap-sm);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.replay-loading-list {
+  max-height: min(38rem, calc(100dvh - 9rem));
+  overflow: auto;
+  display: grid;
+  gap: var(--ui-gap-xs);
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
+}
+
+.mechanics-review-replay-load {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem var(--ui-gap-sm);
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ui-radius-md);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.mechanics-review-replay-load.loaded {
+  border-color: rgba(76, 175, 120, 0.42);
+}
+
+.mechanics-review-replay-load.error {
+  border-color: rgba(220, 95, 95, 0.58);
+}
+
+.mechanics-review-replay-load-main {
+  display: grid;
+  min-width: 0;
+  gap: 0.16rem;
+}
+
+.mechanics-review-replay-load-title,
+.mechanics-review-replay-load-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mechanics-review-replay-load-title {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mechanics-review-replay-load-meta {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.mechanics-review-replay-load-status {
+  max-width: 11rem;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mechanics-review-replay-load.loaded .mechanics-review-replay-load-status {
+  color: #83d4a4;
+}
+
+.mechanics-review-replay-load.error .mechanics-review-replay-load-status {
+  color: #ff9b9b;
+}
+
+.mechanics-review-replay-load-progress {
+  grid-column: 1 / -1;
+  height: 0.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mechanics-review-replay-load-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #77a9ff;
+  transition: width 140ms ease;
+}
+
+.mechanics-review-replay-load.loaded .mechanics-review-replay-load-progress span {
+  background: #4caf78;
+}
+
+.mechanics-review-replay-load.error .mechanics-review-replay-load-progress span {
+  background: #dc5f5f;
+}
+
+.mechanics-review-list {
+  display: grid;
+  gap: var(--ui-gap-xs);
+  overflow: visible;
+}
+
+.mechanics-review-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ui-gap-sm);
+  align-items: center;
+  width: 100%;
+  min-height: 2rem;
+  text-align: left;
+}
+
+.mechanics-review-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mechanics-review-item strong {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.mechanics-review-item[data-active="true"] {
+  border-color: rgba(75, 148, 255, 0.42);
+  background: rgba(75, 148, 255, 0.16);
+}

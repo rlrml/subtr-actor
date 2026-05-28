@@ -1,0 +1,227 @@
+:root {
+  color-scheme: dark;
+  font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  font-size: 13px;
+  --surface: rgba(8, 20, 30, 0.82);
+  --surface-strong: rgba(7, 16, 24, 0.94);
+  --surface-soft: rgba(12, 28, 40, 0.72);
+  --border: rgba(167, 199, 222, 0.14);
+  --text: #edf5fa;
+  --muted: #9eb4c6;
+  --blue: #4b94ff;
+  --blue-soft: rgba(75, 148, 255, 0.18);
+  --orange: #f39a37;
+  --orange-soft: rgba(243, 154, 55, 0.18);
+  --ui-gap-xs: 0.22rem;
+  --ui-gap-sm: 0.34rem;
+  --ui-gap-md: 0.5rem;
+  --ui-panel-padding: 0.52rem;
+  --ui-control-font-size: 0.72rem;
+  --ui-control-line-height: 1.15;
+  --ui-control-padding-block: 0.22rem;
+  --ui-control-padding-inline: 0.38rem;
+  --ui-control-height: 1.55rem;
+  --ui-radius-sm: 0.36rem;
+  --ui-radius-md: 0.5rem;
+  --ui-radius-lg: 0.72rem;
+  --ui-radius-pill: 999px;
+  --ui-border-subtle: rgba(255, 255, 255, 0.1);
+  --ui-border-hover: rgba(255, 255, 255, 0.18);
+  --ui-overlay-bg: rgba(4, 12, 18, 0.82);
+  --ui-overlay-bg-strong: rgba(4, 12, 18, 0.9);
+  background:
+    radial-gradient(circle at top left, rgba(73, 112, 158, 0.28), transparent 32%),
+    radial-gradient(circle at top right, rgba(243, 154, 55, 0.12), transparent 24%),
+    linear-gradient(180deg, #071018 0%, #0b1721 100%);
+  color: var(--text);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+
+.shell {
+  min-height: 100dvh;
+  height: 100dvh;
+  padding: 0;
+  display: block;
+}
+
+.workspace {
+  height: 100%;
+  display: block;
+  min-height: 0;
+}
+
+.panel h2,
+.stats-panel h2 {
+  margin: 0;
+}
+
+.panel-copy {
+  color: #bdd0de;
+}
+
+.viewport-panel,
+.panel,
+.stats-panel {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 1.4rem;
+  background: var(--surface);
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(10px);
+}
+
+.viewport-panel {
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #061019;
+  box-shadow: none;
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+}
+
+.top-chrome {
+  position: absolute;
+  top: 0.8rem;
+  left: 0.8rem;
+  z-index: 20;
+}
+
+.launcher-toggle {
+  width: 2.65rem;
+  min-width: 0;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-color: transparent;
+  border-radius: var(--ui-radius-md);
+  background: rgba(5, 14, 22, 0.68);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+}
+
+.launcher-toggle:hover,
+.launcher-toggle[aria-expanded="true"] {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(8, 24, 36, 0.82);
+}
+
+.launcher-toggle-bars,
+.launcher-toggle-bars::before,
+.launcher-toggle-bars::after {
+  display: block;
+  width: 1.18rem;
+  height: 0.12rem;
+  border-radius: var(--ui-radius-pill);
+  background: #edf5fa;
+}
+
+.launcher-toggle-bars {
+  position: relative;
+}
+
+.launcher-toggle-bars::before,
+.launcher-toggle-bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+
+.launcher-toggle-bars::before {
+  top: -0.38rem;
+}
+
+.launcher-toggle-bars::after {
+  top: 0.38rem;
+}
+
+.launcher-menu {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  left: 0;
+  width: min(22rem, calc(100vw - 1.6rem));
+  max-height: calc(100dvh - 7.5rem);
+  overflow: auto;
+  display: grid;
+  gap: var(--ui-gap-md);
+  padding: var(--ui-panel-padding);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-overlay-bg-strong);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(14px);
+}
+
+.launcher-menu[hidden] {
+  display: none;
+}
+
+.launcher-section {
+  display: grid;
+  gap: var(--ui-gap-xs);
+}
+
+.launcher-section h2 {
+  margin: 0;
+  color: #87afd4;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.launcher-section button {
+  width: 100%;
+  text-align: left;
+}
+
+.hidden-file-input,
+.visually-hidden {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.team-blue {
+  --team-accent: var(--blue);
+  --team-soft: var(--blue-soft);
+}
+
+.team-orange {
+  --team-accent: var(--orange);
+  --team-soft: var(--orange-soft);
+}
