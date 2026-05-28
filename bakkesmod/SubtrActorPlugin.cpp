@@ -10030,7 +10030,12 @@ void SubtrActorPlugin::renderRecordingWindow() {
   int nextRecordingFps = recordingFps;
   pushRecordingDisabledStyle(recordingSettingsLocked);
   ImGui::SetNextItemWidth(88.0f);
-  const bool fpsChanged = ImGui::InputInt("##recording-fps", &nextRecordingFps, 1, 10);
+  const bool fpsChanged = ImGui::InputInt(
+      "##recording-fps",
+      &nextRecordingFps,
+      1,
+      10,
+      recordingSettingsLocked ? ImGuiInputTextFlags_ReadOnly : 0);
   popRecordingDisabledStyle(recordingSettingsLocked);
   if (!recordingSettingsLocked && fpsChanged) {
     recordingFps = std::clamp(nextRecordingFps, 1, 120);

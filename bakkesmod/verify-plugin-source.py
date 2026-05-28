@@ -826,8 +826,20 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::InputInt("##recording-fps", &nextRecordingFps, 1, 10)',
+        'ImGui::InputInt(\n      "##recording-fps",',
         "plugin recording FPS uses web-like numeric input",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "recordingFps.disabled = isRecording;",
+        "stats evaluation player disables recording FPS while recording",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "recordingSettingsLocked ? ImGuiInputTextFlags_ReadOnly : 0",
+        "plugin recording FPS input is read-only while recording",
         errors,
     )
     require_contains(
