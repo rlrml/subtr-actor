@@ -11824,7 +11824,6 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
     return leftEvent.time < rightEvent.time;
   });
 
-  ImGui::BeginChild("goal-labels", ImVec2{0.0f, 0.0f}, true);
   ReplayServerWrapper replayServer = gameWrapper->GetGameEventAsReplay();
   const bool hasReplayServer = !replayServer.IsNull();
   for (size_t ordinal = 0; ordinal < goalEventIndexes.size(); ordinal += 1) {
@@ -11834,13 +11833,11 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
     ImGui::PushID(static_cast<int>(index));
     ImGui::TextColored(toImVec4(event.color), "Goal %zu", ordinal + 1);
     ImGui::SameLine();
-    ImGui::TextDisabled("%.2fs - %s", event.time, event.actor.c_str());
-    ImGui::TextWrapped("%s", event.label.c_str());
-    if (!event.details.empty()) {
-      ImGui::TextDisabled("%s", event.details.c_str());
-    } else {
-      ImGui::TextDisabled("Unlabeled");
-    }
+    ImGui::TextDisabled(
+        "%s · %s",
+        formatEventPlaylistTime(event.time).c_str(),
+        event.actor.empty() ? "Unknown scorer" : event.actor.c_str());
+    ImGui::TextDisabled("%s", event.details.empty() ? "Unlabeled" : event.details.c_str());
     if (ImGui::SmallButton("Watch")) {
       mechanicsReviewClipActive = false;
       playbackCurrentTime = seekTime;
@@ -11876,13 +11873,12 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
             std::format("Selected goal at {:.2f}s; open a replay to seek", seekTime);
       }
     }
-    ImGui::Separator();
+    ImGui::Spacing();
     ImGui::PopID();
   }
   if (goalEventIndexes.empty()) {
-    ImGui::TextWrapped("No goals loaded.");
+    ImGui::Text("No goals loaded.");
   }
-  ImGui::EndChild();
 }
 
 void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {

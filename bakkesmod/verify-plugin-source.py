@@ -608,6 +608,54 @@ def main() -> int:
             errors,
         )
     require_contains(
+        web_player_main_source,
+        'list.className = "goal-label-list";',
+        "stats evaluation player goal-label list",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'item.className = "goal-label-item";',
+        "stats evaluation player goal-label items",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'meta.textContent = `${formatTime(time)} · ${scorerName}`;',
+        "stats evaluation player goal-label meta format",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled(\n        "%s · %s",',
+        "plugin goal-label meta format mirrors web",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'empty.textContent = "Unlabeled";',
+        "stats evaluation player unlabeled goal chip",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextDisabled("%s", event.details.empty() ? "Unlabeled" : event.details.c_str());',
+        "plugin unlabeled goal tag fallback mirrors web",
+        errors,
+    )
+    for plugin_only_goal_labels_surface in (
+        'ImGui::BeginChild("goal-labels", ImVec2{0.0f, 0.0f}, true);',
+        'ImGui::TextDisabled("%.2fs - %s", event.time, event.actor.c_str());',
+        'ImGui::TextWrapped("%s", event.label.c_str());',
+        'ImGui::TextWrapped("No goals loaded.");',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_goal_labels_surface,
+            "plugin goal labels plugin-only log surface",
+            errors,
+        )
+    require_contains(
         web_player_template_source,
         '<input id="skip-post-goal-transitions" type="checkbox" checked />',
         "stats evaluation player default skips post-goal resets",
