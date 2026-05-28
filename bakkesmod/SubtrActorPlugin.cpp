@@ -8207,6 +8207,23 @@ void SubtrActorPlugin::renderEventSourceControls() {
     }
     return clicked;
   };
+  auto renderEventSourceRow = [](const EventFilterOption &option, bool enabled, size_t count) {
+    if (enabled) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.16f, 0.35f, 0.28f, 1.0f});
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.20f, 0.45f, 0.36f, 1.0f});
+    }
+    const std::string label = std::format(
+        "{}   {} {}##event-sources-{}",
+        option.label,
+        enabled ? "On" : "Off",
+        count,
+        option.value);
+    const bool clicked = ImGui::Button(label.c_str());
+    if (enabled) {
+      ImGui::PopStyleColor(2);
+    }
+    return clicked;
+  };
 
   if (renderEventSourceAction(
           std::format("All events   {}##event-sources-actions-all", displaySources.size()))) {
@@ -8224,10 +8241,8 @@ void SubtrActorPlugin::renderEventSourceControls() {
   for (const DisplaySource &source : displaySources) {
     const EventFilterOption &option = *source.option;
     ImGui::PushID(option.value);
-    bool enabled = source.enabled;
-    const std::string label = std::format("{} ({})", option.label, source.count);
-    if (renderModuleSummaryToggle(label.c_str(), enabled, "event-sources")) {
-      if (enabled) {
+    if (renderEventSourceRow(option, source.enabled, source.count)) {
+      if (source.enabled) {
         selected.erase(
             std::remove(selected.begin(), selected.end(), std::string{option.value}),
             selected.end());

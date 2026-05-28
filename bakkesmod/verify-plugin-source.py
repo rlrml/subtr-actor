@@ -1028,9 +1028,15 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        'state.textContent = `${source.active ? "On" : "Off"} ${source.count}`;',
+        "stats evaluation player Events window source rows expose state count readout",
+        errors,
+    )
+    require_contains(
         plugin_source,
-        'renderModuleSummaryToggle(label.c_str(), enabled, "event-sources")',
-        "plugin Events window source rows are module summary toggles",
+        'std::format(\n        "{}   {} {}##event-sources-{}",\n        option.label,\n        enabled ? "On" : "Off",\n        count,\n        option.value)',
+        "plugin Events window source rows expose web-like state count readout",
         errors,
     )
     require_contains(
@@ -1055,6 +1061,7 @@ def main() -> int:
         'ImGui::SmallButton("No events##event-sources")',
         'renderModuleSummaryToggle(\n          "All events",\n          allSelected,\n          "event-sources-actions")',
         'renderModuleSummaryToggle(\n          "No events",\n          selected.empty(),\n          "event-sources-actions")',
+        'renderModuleSummaryToggle(label.c_str(), enabled, "event-sources")',
     ):
         reject_contains(
             plugin_source,
