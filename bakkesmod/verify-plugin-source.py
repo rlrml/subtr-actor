@@ -2102,20 +2102,50 @@ def main() -> int:
             f"stats evaluation player touch controls setting {touch_settings_label}",
             errors,
         )
+    require_contains(
+        web_player_styles_source,
+        ".module-settings-card {\n"
+        "  display: grid;\n"
+        "  gap: 0.75rem;\n"
+        "  padding: 0.85rem 0.9rem;\n"
+        "  border-radius: 1rem;\n"
+        "  border: 1px solid rgba(255, 255, 255, 0.08);\n"
+        "  background: rgba(255, 255, 255, 0.035);",
+        "stats evaluation player touch controls use module settings card chrome",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".module-settings-subgroup {\n"
+        "  display: grid;\n"
+        "  gap: 0.65rem;\n"
+        "  padding-top: 0.15rem;\n"
+        "  border-top: 1px solid rgba(255, 255, 255, 0.06);",
+        "stats evaluation player touch controls use settings subgroups",
+        errors,
+    )
+    require_contains(
+        web_player_styles_source,
+        ".module-settings-header {\n"
+        "  display: flex;\n"
+        "  align-items: start;\n"
+        "  justify-content: space-between;",
+        "stats evaluation player touch controls use header/readout rows",
+        errors,
+    )
     for plugin_touch_surface in (
-        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Touch markers");',
-        'ImGui::Text("Touch decay");',
+        'ImGui::BeginChild("touch-settings-card", ImVec2{0.0f, 0.0f}, true);',
+        'auto renderTouchSettingsHeader = [](const char *eyebrow,\n                                      const char *title,\n                                      const std::string &readout)',
+        'renderTouchSettingsHeader(\n      "Touch markers",\n      "Touch decay",\n      std::format("{:.1f}s", touchMarkerDecaySeconds));',
         'ImGui::TextDisabled("Keep each marker visible after the touch");',
         '"##touch-marker-decay-seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs"',
-        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Overlay");',
-        'ImGui::Text("Touch mode");',
-        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Stat display");',
-        'ImGui::Text("Touch breakdown");',
+        'renderTouchSettingsHeader(\n      "Overlay",\n      "Touch mode",\n      touchControlsMode == 1 ? "Advancement" : "Markers");',
+        'renderTouchSettingsHeader("Stat display", "Touch breakdown", touchBreakdownReadout());',
     ):
         require_contains(
             plugin_source,
             plugin_touch_surface,
-            "plugin touch controls mirror stats evaluation player settings",
+            "plugin touch controls mirror stats evaluation player settings card",
             errors,
         )
     for plugin_only_touch_surface in (
@@ -2128,6 +2158,12 @@ def main() -> int:
         'ImGui::Button("Open touch stats")',
         'ImGui::Button("Inspect touch nodes")',
         '"Marker decay seconds", &touchMarkerDecaySeconds',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Touch markers");',
+        'ImGui::Text("Touch decay");',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Overlay");',
+        'ImGui::Text("Touch mode");',
+        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Stat display");',
+        'ImGui::Text("Touch breakdown");',
     ):
         reject_contains(
             plugin_source,

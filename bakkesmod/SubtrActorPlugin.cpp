@@ -9858,14 +9858,28 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
     }
     return readout.empty() ? std::string{"Total only"} : readout;
   };
+  auto renderTouchSettingsHeader = [](const char *eyebrow,
+                                      const char *title,
+                                      const std::string &readout) {
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", eyebrow);
+    const float readoutWidth = ImGui::CalcTextSize(readout.c_str()).x;
+    const float readoutX =
+        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - readoutWidth);
+    ImGui::Text("%s", title);
+    ImGui::SameLine(readoutX);
+    ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "%s", readout.c_str());
+  };
 
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Touch markers");
-  ImGui::Text("Touch decay");
-  ImGui::SameLine();
-  ImGui::TextColored(
-      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
-      "%.1fs",
-      touchMarkerDecaySeconds);
+  ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{13.0f, 12.0f});
+  ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4{1.0f, 1.0f, 1.0f, 0.035f});
+  ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{1.0f, 1.0f, 1.0f, 0.08f});
+  ImGui::BeginChild("touch-settings-card", ImVec2{0.0f, 0.0f}, true);
+
+  renderTouchSettingsHeader(
+      "Touch markers",
+      "Touch decay",
+      std::format("{:.1f}s", touchMarkerDecaySeconds));
   ImGui::TextDisabled("Keep each marker visible after the touch");
   if (ImGui::SliderFloat(
           "##touch-marker-decay-seconds", &touchMarkerDecaySeconds, 1.0f, 10.0f, "%.1fs")) {
@@ -9873,12 +9887,9 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Overlay");
-  ImGui::Text("Touch mode");
-  ImGui::SameLine();
-  ImGui::TextColored(
-      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
-      "%s",
+  renderTouchSettingsHeader(
+      "Overlay",
+      "Touch mode",
       touchControlsMode == 1 ? "Advancement" : "Markers");
   if (ImGui::RadioButton("Markers##touch-mode", &touchControlsMode, 0)) {
     setCvarString("subtr_actor_overlay_event_types", "touch");
@@ -9891,13 +9902,7 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
   }
 
   ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "Stat display");
-  ImGui::Text("Touch breakdown");
-  ImGui::SameLine();
-  ImGui::TextColored(
-      ImVec4{0.53f, 0.69f, 0.83f, 1.0f},
-      "%s",
-      touchBreakdownReadout().c_str());
+  renderTouchSettingsHeader("Stat display", "Touch breakdown", touchBreakdownReadout());
   if (ImGui::Checkbox("Kind", &touchBreakdownKind)) {
     scheduleUiConfigAutosave();
   }
@@ -9913,6 +9918,9 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
     scheduleUiConfigAutosave();
   }
 
+  ImGui::EndChild();
+  ImGui::PopStyleColor(2);
+  ImGui::PopStyleVar(2);
   ImGui::End();
 }
 
