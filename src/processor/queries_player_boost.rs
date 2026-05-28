@@ -1,4 +1,4 @@
-use super::*;
+use super::super::*;
 
 impl<'a> ReplayProcessor<'a> {
     /// Returns the player's current boost amount in raw replay units.

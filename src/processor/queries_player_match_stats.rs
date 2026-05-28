@@ -1,4 +1,4 @@
-use super::*;
+use super::super::*;
 
 impl<'a> ReplayProcessor<'a> {
     fn get_player_int_stat(
