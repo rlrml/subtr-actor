@@ -967,6 +967,30 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        'createStatsWindow(button.dataset.createStatsWindow as StatsWindowKind);',
+        "stats evaluation player launcher creates stats windows",
+        errors,
+    )
+    if re.search(
+        r"data-create-stats-window.*?createStatsWindow\(button\.dataset\.createStatsWindow as StatsWindowKind\);.*?setLauncherOpen\(false\);",
+        web_player_main_source,
+        re.DOTALL,
+    ):
+        errors.append("stats evaluation player launcher closes after stats window creation")
+    require_contains(
+        plugin_source,
+        'renderStatsWindowCreationControls("launcher-stats-windows", false, false, false, true);',
+        "plugin launcher keeps menu open after stats window creation like the web player",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
+        'renderStatsWindowCreationControls("launcher-stats-windows", true, false, false, true);',
+        "plugin launcher closes after stats window creation",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         "if (panels.length === 0) {\n    moduleSettingsEl.hidden = true;",
         "stats evaluation player hides empty launcher module settings",
         errors,
