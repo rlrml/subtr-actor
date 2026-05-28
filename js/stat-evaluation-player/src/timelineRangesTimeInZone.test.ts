@@ -5,7 +5,7 @@ import type { ReplayModel } from "@rlrml/player";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import type { PositioningEvent } from "./generated/PositioningEvent.ts";
 import { createStatsTimeline } from "./testStatsTimeline.ts";
-import { buildTimeInZoneTimelineRanges } from "./timelineRanges.ts";
+import { buildTimeInZoneTimelineRanges } from "./timelineRangesTimeInZone.ts";
 
 function positioningEvent(
   overrides: Partial<PositioningEvent> &
