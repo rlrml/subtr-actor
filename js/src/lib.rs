@@ -1,12 +1,14 @@
 #![allow(clippy::result_large_err)]
 
+mod progress;
+
 use js_sys::{Array, Function, Object, Reflect, Uint8Array};
+use progress::{emit_progress, emit_stage_progress, emit_stats_timeline_progress};
 use subtr_actor::{
     collector::replay_data::{ReplayData, ReplayDataCollector},
     collector::CallbackCollector,
     Collector, FrameRateDecorator, NDArrayCollector, ReplayProcessor, ResolvedBoostPadCollector,
-    StatsCollector, StatsTimelineEventCollector, SubtrActorError, SubtrActorErrorVariant,
-    SubtrActorResult,
+    StatsCollector, StatsTimelineEventCollector, SubtrActorError,
 };
 use wasm_bindgen::prelude::*;
 
@@ -45,64 +47,6 @@ fn get_total_frames(replay: &boxcars::Replay) -> Result<usize, JsValue> {
         .as_ref()
         .map(|network_frames| network_frames.frames.len())
         .ok_or_else(|| JsValue::from_str("Replay has no network frames"))
-}
-
-fn emit_progress(
-    callback: &Function,
-    stage: &str,
-    processed_frames: usize,
-    total_frames: usize,
-) -> SubtrActorResult<()> {
-    let progress = if total_frames == 0 {
-        1.0
-    } else {
-        processed_frames as f64 / total_frames as f64
-    };
-    let payload = serde_wasm_bindgen::to_value(&serde_json::json!({
-        "stage": stage,
-        "processedFrames": processed_frames,
-        "totalFrames": total_frames,
-        "progress": progress,
-    }))
-    .map_err(|error| {
-        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(format!(
-            "Failed to serialize progress payload: {error}"
-        )))
-    })?;
-
-    callback.call1(&JsValue::NULL, &payload).map_err(|error| {
-        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
-            error
-                .as_string()
-                .unwrap_or_else(|| "Progress callback threw a non-string error".to_string()),
-        ))
-    })?;
-    Ok(())
-}
-
-fn emit_stage_progress(callback: &Function, stage: &str, progress: f64) -> SubtrActorResult<()> {
-    let payload = serde_wasm_bindgen::to_value(&serde_json::json!({
-        "stage": stage,
-        "progress": progress.clamp(0.0, 1.0),
-    }))
-    .map_err(|error| {
-        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(format!(
-            "Failed to serialize progress payload: {error}"
-        )))
-    })?;
-
-    callback.call1(&JsValue::NULL, &payload).map_err(|error| {
-        SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
-            error
-                .as_string()
-                .unwrap_or_else(|| "Progress callback threw a non-string error".to_string()),
-        ))
-    })?;
-    Ok(())
-}
-
-fn emit_stats_timeline_progress(callback: &Function, progress: f64) -> SubtrActorResult<()> {
-    emit_stage_progress(callback, "stats-timeline", progress)
 }
 
 fn collect_replay_data_with_optional_progress(
