@@ -11638,6 +11638,44 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
   }
 }
 
+bool SubtrActorPlugin::renderStatsWindowValueRow(
+    UiStatsWindow &window,
+    size_t entryIndex,
+    std::string_view label,
+    std::string_view value,
+    std::string_view idSuffix) {
+  const std::string valueString{value};
+  const float removeWidth = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+  const float valueWidth =
+      std::max(48.0f, ImGui::CalcTextSize(valueString.c_str()).x + 18.0f);
+  const float removeX =
+      std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - removeWidth);
+  const float valueX = std::max(
+      ImGui::GetCursorPosX(),
+      removeX - valueWidth - 12.0f);
+  const std::string labelString{label};
+  ImGui::Text("%s", labelString.c_str());
+  ImGui::SameLine(valueX);
+  ImGui::Text("%s", valueString.c_str());
+  ImGui::SameLine(removeX);
+  const std::string removeLabel = idSuffix.empty()
+                                      ? std::format("x##remove-stat-{}-{}", window.id, entryIndex)
+                                      : std::format(
+                                            "x##remove-stat-{}-{}-{}",
+                                            window.id,
+                                            entryIndex,
+                                            idSuffix);
+  if (ImGui::SmallButton(removeLabel.c_str())) {
+    window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(entryIndex));
+    scheduleUiConfigAutosave();
+    return true;
+  }
+  if (ImGui::IsItemHovered()) {
+    ImGui::SetTooltip("Remove stat");
+  }
+  return false;
+}
+
 void SubtrActorPlugin::renderMissingStatsRows(UiStatsWindow &window) {
   for (size_t i = 0; i < window.entries.size();) {
     const std::string &statId = window.entries[i].stat_id;
@@ -11646,25 +11684,8 @@ void SubtrActorPlugin::renderMissingStatsRows(UiStatsWindow &window) {
       continue;
     }
 
-    const float removeWidth = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    const float valueWidth = std::max(48.0f, ImGui::CalcTextSize("--").x + 18.0f);
-    const float valueX = std::max(
-        ImGui::GetCursorPosX(),
-        ImGui::GetWindowContentRegionMax().x - valueWidth - removeWidth - 12.0f);
-    const float removeX =
-        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - removeWidth);
-
-    ImGui::Text("%s", uiStatLabel(statId).c_str());
-    ImGui::SameLine(valueX);
-    ImGui::Text("--");
-    ImGui::SameLine(removeX);
-    if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
-      window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
-      scheduleUiConfigAutosave();
+    if (renderStatsWindowValueRow(window, i, uiStatLabel(statId), "--")) {
       return;
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Remove stat");
     }
     ++i;
   }
@@ -11681,24 +11702,8 @@ void SubtrActorPlugin::renderPlayerStatsTable(
     }
     const std::string statLabel = uiStatLabel(statId);
     const std::string statValue = playerStatValue(player, statId);
-    const float removeWidth = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    const float valueWidth = std::max(48.0f, ImGui::CalcTextSize(statValue.c_str()).x + 18.0f);
-    const float valueX = std::max(
-        ImGui::GetCursorPosX(),
-        ImGui::GetWindowContentRegionMax().x - valueWidth - removeWidth - 12.0f);
-    const float removeX =
-        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - removeWidth);
-    ImGui::Text("%s", statLabel.c_str());
-    ImGui::SameLine(valueX);
-    ImGui::Text("%s", statValue.c_str());
-    ImGui::SameLine(removeX);
-    if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
-      window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
-      scheduleUiConfigAutosave();
+    if (renderStatsWindowValueRow(window, i, statLabel, statValue)) {
       return;
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Remove stat");
     }
     ++i;
   }
@@ -11713,24 +11718,8 @@ void SubtrActorPlugin::renderTeamStatsTable(UiStatsWindow &window, uint8_t isTea
     }
     const std::string statLabel = uiStatLabel(statId);
     const std::string statValue = teamStatValue(isTeam0, statId);
-    const float removeWidth = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    const float valueWidth = std::max(48.0f, ImGui::CalcTextSize(statValue.c_str()).x + 18.0f);
-    const float valueX = std::max(
-        ImGui::GetCursorPosX(),
-        ImGui::GetWindowContentRegionMax().x - valueWidth - removeWidth - 12.0f);
-    const float removeX =
-        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - removeWidth);
-    ImGui::Text("%s", statLabel.c_str());
-    ImGui::SameLine(valueX);
-    ImGui::Text("%s", statValue.c_str());
-    ImGui::SameLine(removeX);
-    if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
-      window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
-      scheduleUiConfigAutosave();
+    if (renderStatsWindowValueRow(window, i, statLabel, statValue)) {
       return;
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Remove stat");
     }
     ++i;
   }
@@ -11763,39 +11752,23 @@ void SubtrActorPlugin::renderAllPlayersStatsTable(UiStatsWindow &window) {
 
       ImGui::PushID(static_cast<int>(player.player_index));
       const std::string playerName = playerLabel(player.player_index, player.is_team_0);
-      if (ImGui::TreeNodeEx(playerName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Columns(
-            3,
-            std::format("all-player-stat-rows-{}", player.player_index).c_str(),
-            false);
-        for (size_t i = 0; i < window.entries.size();) {
-          const std::string &statId = window.entries[i].stat_id;
-          if (!statsWindowSupportsStat(window, statId)) {
-            ++i;
-            continue;
-          }
-          const std::string statLabel = uiStatLabel(statId);
-          ImGui::Text("%s", statLabel.c_str());
-          ImGui::NextColumn();
-          ImGui::Text("%s", playerStatValue(player, statId).c_str());
-          ImGui::NextColumn();
-          if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
-            window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
-            scheduleUiConfigAutosave();
-            ImGui::Columns(1);
-            ImGui::TreePop();
-            ImGui::PopID();
-            return true;
-          }
-          if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Remove stat");
-          }
-          ImGui::NextColumn();
+      ImGui::TextColored(toImVec4(color), "%s", playerName.c_str());
+      for (size_t i = 0; i < window.entries.size();) {
+        const std::string &statId = window.entries[i].stat_id;
+        if (!statsWindowSupportsStat(window, statId)) {
           ++i;
+          continue;
         }
-        ImGui::Columns(1);
-        ImGui::TreePop();
+        const std::string statLabel = uiStatLabel(statId);
+        const std::string statValue = playerStatValue(player, statId);
+        if (renderStatsWindowValueRow(
+                window, i, statLabel, statValue, std::format("player-{}", player.player_index))) {
+          ImGui::PopID();
+          return true;
+        }
+        ++i;
       }
+      ImGui::Spacing();
       ImGui::PopID();
     }
     return false;
@@ -11814,7 +11787,6 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
     const LinearColor color =
         isTeam0 != 0 ? LinearColor{80, 190, 255, 255} : LinearColor{255, 175, 80, 255};
     ImGui::TextColored(toImVec4(color), "%s", teamLabel(isTeam0).c_str());
-    ImGui::Columns(3, std::format("all-team-stat-rows-{}", isTeam0).c_str(), false);
     for (size_t i = 0; i < window.entries.size();) {
       const std::string &statId = window.entries[i].stat_id;
       if (!statsWindowSupportsStat(window, statId)) {
@@ -11822,25 +11794,14 @@ void SubtrActorPlugin::renderAllTeamsStatsTable(UiStatsWindow &window) {
         continue;
       }
       const std::string statLabel = uiStatLabel(statId);
-      ImGui::Text("%s", statLabel.c_str());
-      ImGui::NextColumn();
-      ImGui::Text("%s", teamStatValue(isTeam0, statId).c_str());
-      ImGui::NextColumn();
-      if (ImGui::SmallButton(
-              std::format("x##remove-stat-{}-{}-{}", window.id, isTeam0, i).c_str())) {
-        window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
-        scheduleUiConfigAutosave();
-        ImGui::Columns(1);
+      const std::string statValue = teamStatValue(isTeam0, statId);
+      if (renderStatsWindowValueRow(
+              window, i, statLabel, statValue, std::format("team-{}", isTeam0))) {
         return;
       }
-      if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Remove stat");
-      }
-      ImGui::NextColumn();
       ++i;
     }
-    ImGui::Columns(1);
-    ImGui::Separator();
+    ImGui::Spacing();
   }
 }
 

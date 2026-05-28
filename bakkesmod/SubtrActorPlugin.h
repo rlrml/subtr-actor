@@ -558,6 +558,12 @@ private:
   void renderStatsWindowScopeSelector(UiStatsWindow &window);
   void renderStatsWindowAddControl(UiStatsWindow &window);
   void renderStatsWindowEntries(UiStatsWindow &window);
+  bool renderStatsWindowValueRow(
+      UiStatsWindow &window,
+      size_t entryIndex,
+      std::string_view label,
+      std::string_view value,
+      std::string_view idSuffix = {});
   void renderMissingStatsRows(UiStatsWindow &window);
   void renderPlayerStatsTable(UiStatsWindow &window, const SaPlayerFrame &player);
   void renderTeamStatsTable(UiStatsWindow &window, uint8_t isTeam0);

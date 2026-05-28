@@ -508,7 +508,7 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        'ImGui::Text("--");',
+        'renderStatsWindowValueRow(window, i, uiStatLabel(statId), "--")',
         "plugin scoped stats missing target value mirrors web dash",
         errors,
     )
@@ -564,6 +564,47 @@ def main() -> int:
             plugin_source,
             plugin_only_ad_hoc_surface,
             "plugin ad-hoc stats window plugin-only table/event surface",
+            errors,
+        )
+    require_contains(
+        web_player_main_source,
+        'teamSection.className = `stats-window-team-group ${getTeamScopeClass(team)}`;',
+        "stats evaluation player all-player stats team groups",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'section.className = `stats-window-entity ${getTeamClass(player.is_team_0)}`;',
+        "stats evaluation player all-player stats entity sections",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "bool SubtrActorPlugin::renderStatsWindowValueRow(",
+        "plugin shared stats row renderer",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderStatsWindowValueRow(\n                window, i, statLabel, statValue, std::format("player-{}", player.player_index))',
+        "plugin all-player stats rows use shared row renderer",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'renderStatsWindowValueRow(\n              window, i, statLabel, statValue, std::format("team-{}", isTeam0))',
+        "plugin all-team stats rows use shared row renderer",
+        errors,
+    )
+    for plugin_only_grouped_stats_surface in (
+        'ImGui::TreeNodeEx(playerName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)',
+        'std::format("all-player-stat-rows-{}", player.player_index).c_str()',
+        'std::format("all-team-stat-rows-{}", isTeam0).c_str()',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_grouped_stats_surface,
+            "plugin grouped stats table/tree surface",
             errors,
         )
     require_contains(
