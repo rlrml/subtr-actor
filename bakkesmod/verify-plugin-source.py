@@ -1116,8 +1116,36 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
+        'std::format(\n'
+        '      "Filters {}/{}##event-playlist-filter",\n'
+        "      selectedSourceCount,\n"
+        "      playlistSources.size())",
+        "plugin event playlist filter disclosure mirrors web summary",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool filtersOpen = ImGui::TreeNode(filterSummary.c_str());",
+        "plugin event playlist filter panel is collapsed like web details",
+        errors,
+    )
+    reject_contains(
+        plugin_source,
         'ImGui::Text("Filters %zu/%zu", selectedSourceCount, playlistSources.size());',
-        "plugin event playlist filter count label mirrors web spacing",
+        "plugin event playlist renders filter summary as static text",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'empty.textContent = replayPlayer ? "No events loaded." : "Load a replay to see events.";',
+        "stats evaluation player event playlist empty state distinguishes no replay",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'recentUiEvents.empty() && replayAnnotations == nullptr ? "Load a replay to see events."\n'
+        '                                                               : "No events loaded."',
+        "plugin event playlist empty state distinguishes no replay",
         errors,
     )
     require_contains(

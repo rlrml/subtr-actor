@@ -8395,29 +8395,39 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
         return left < right;
       });
 
-  ImGui::Text("Filters %zu/%zu", selectedSourceCount, playlistSources.size());
-  if (ImGui::Button("All##event-playlist-sources-all")) {
-    eventPlaylistMechanicsEnabled = true;
-    eventPlaylistTeamEventsEnabled = true;
-    eventPlaylistGoalContextEnabled = true;
-    setCvarString("subtr_actor_overlay_event_types", "all");
+  if (playlistSources.empty()) {
+    ImGui::TextDisabled(
+        recentUiEvents.empty() && replayAnnotations == nullptr ? "Load a replay to see events."
+                                                               : "No events loaded.");
+    ImGui::End();
+    return;
   }
+
+  const std::string filterSummary = std::format(
+      "Filters {}/{}##event-playlist-filter",
+      selectedSourceCount,
+      playlistSources.size());
+  const bool filtersOpen = ImGui::TreeNode(filterSummary.c_str());
   ImGui::SameLine();
-  if (ImGui::Button("None##event-playlist-sources-none")) {
-    eventPlaylistMechanicsEnabled = false;
-    eventPlaylistTeamEventsEnabled = false;
-    eventPlaylistGoalContextEnabled = false;
-    setCvarString("subtr_actor_overlay_event_types", "none");
-  }
   if (ImGui::Checkbox("Auto-follow", &eventPlaylistAutoFollow)) {
     scheduleUiConfigAutosave();
   }
 
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "FILTERS");
-  if (playlistSources.empty()) {
-    ImGui::TextDisabled("No events loaded.");
-  } else {
+  if (filtersOpen) {
+    if (ImGui::Button("All##event-playlist-sources-all")) {
+      eventPlaylistMechanicsEnabled = true;
+      eventPlaylistTeamEventsEnabled = true;
+      eventPlaylistGoalContextEnabled = true;
+      setCvarString("subtr_actor_overlay_event_types", "all");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("None##event-playlist-sources-none")) {
+      eventPlaylistMechanicsEnabled = false;
+      eventPlaylistTeamEventsEnabled = false;
+      eventPlaylistGoalContextEnabled = false;
+      setCvarString("subtr_actor_overlay_event_types", "none");
+    }
+
     ImGui::BeginChild("event-playlist-source-list", ImVec2{0.0f, 170.0f}, true);
     std::string_view currentGroup;
     for (const PlaylistSource &source : playlistSources) {
@@ -8450,6 +8460,7 @@ void SubtrActorPlugin::renderEventPlaylistWindow() {
       ImGui::PopID();
     }
     ImGui::EndChild();
+    ImGui::TreePop();
   }
 
   ImGui::Text("%zu selected / %zu recent", playlistEventIndexes.size(), recentUiEvents.size());
