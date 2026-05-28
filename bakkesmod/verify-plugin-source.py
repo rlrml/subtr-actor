@@ -526,6 +526,47 @@ def main() -> int:
             errors,
         )
     require_contains(
+        web_player_main_source,
+        "function renderAdHocStats(",
+        "stats evaluation player ad-hoc stats renderer",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'targetSelect.className = "stats-window-stat-target";',
+        "stats evaluation player ad-hoc rows expose target selector",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window)",
+        "plugin ad-hoc stats renderer",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "renderAdHocTargetSelector(window, entry, statId, i);",
+        "plugin ad-hoc rows expose target selector",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const std::string statValue = adHocStatValue(statId, entry.target_id);",
+        "plugin ad-hoc rows render stat value inline like web",
+        errors,
+    )
+    for plugin_only_ad_hoc_surface in (
+        'ImGui::Columns(4, "ad-hoc-stat-rows", false);',
+        'ImGui::BeginChild("ad-hoc-events", ImVec2{0.0f, 0.0f}, true);',
+        'ImGui::TextColored(toImVec4(event.color), "%.2fs %s", event.time, event.actor.c_str());',
+    ):
+        reject_contains(
+            plugin_source,
+            plugin_only_ad_hoc_surface,
+            "plugin ad-hoc stats window plugin-only table/event surface",
+            errors,
+        )
+    require_contains(
         web_player_template_source,
         '<input id="skip-post-goal-transitions" type="checkbox" checked />',
         "stats evaluation player default skips post-goal resets",

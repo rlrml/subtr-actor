@@ -11925,7 +11925,6 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
 }
 
 void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
-  ImGui::Columns(4, "ad-hoc-stat-rows", false);
   for (size_t i = 0; i < window.entries.size();) {
     UiStatsWindow::Entry &entry = window.entries[i];
     const std::string &statId = entry.stat_id;
@@ -11934,45 +11933,33 @@ void SubtrActorPlugin::renderAdHocStatsWindow(UiStatsWindow &window) {
       continue;
     }
     const std::string statLabel = uiStatLabel(statId);
+    const std::string statValue = adHocStatValue(statId, entry.target_id);
+    const float removeWidth = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float valueWidth = std::max(48.0f, ImGui::CalcTextSize(statValue.c_str()).x + 18.0f);
+    const float removeX =
+        std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - removeWidth);
+    const float valueX = std::max(
+        ImGui::GetCursorPosX(),
+        removeX - valueWidth - 12.0f);
+    const float targetX = std::max(ImGui::GetCursorPosX(), valueX - 148.0f);
+
     ImGui::Text("%s", statLabel.c_str());
-    ImGui::NextColumn();
+    ImGui::SameLine(targetX);
+    ImGui::SetNextItemWidth(132.0f);
     renderAdHocTargetSelector(window, entry, statId, i);
-    ImGui::NextColumn();
-    ImGui::Text("%s", adHocStatValue(statId, entry.target_id).c_str());
-    ImGui::NextColumn();
+    ImGui::SameLine(valueX);
+    ImGui::Text("%s", statValue.c_str());
+    ImGui::SameLine(removeX);
     if (ImGui::SmallButton(std::format("x##remove-stat-{}-{}", window.id, i).c_str())) {
       window.entries.erase(window.entries.begin() + static_cast<std::ptrdiff_t>(i));
       scheduleUiConfigAutosave();
-      ImGui::Columns(1);
       return;
     }
     if (ImGui::IsItemHovered()) {
       ImGui::SetTooltip("Remove stat");
     }
-    ImGui::NextColumn();
     ++i;
   }
-  ImGui::Columns(1);
-  ImGui::Separator();
-  ImGui::BeginChild("ad-hoc-events", ImVec2{0.0f, 0.0f}, true);
-  for (const UiEventRecord &event : recentUiEvents) {
-    const bool selected = std::any_of(
-        window.entries.begin(),
-        window.entries.end(),
-        [&](const UiStatsWindow::Entry &entry) {
-          if (entry.stat_id == "recent_events") {
-            return true;
-          }
-          return eventFilterAllows(entry.stat_id, event.category, event.type);
-        });
-    if (!selected) {
-      continue;
-    }
-    ImGui::TextColored(toImVec4(event.color), "%.2fs %s", event.time, event.actor.c_str());
-    ImGui::SameLine();
-    ImGui::TextWrapped("%s", event.label.c_str());
-  }
-  ImGui::EndChild();
 }
 
 void SubtrActorPlugin::renderJsonSummary(const std::string &json) {
