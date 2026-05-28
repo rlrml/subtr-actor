@@ -312,6 +312,50 @@ def singleton_window_controls(source: str) -> list[tuple[str, str, bool, int]]:
     return controls
 
 
+def singleton_window_open_variables(source: str) -> dict[str, str]:
+    match = re.search(
+        r"return\s+\{\{(.*?)\}\};\s*\}\s*\n\s*std::vector<SubtrActorPlugin::SingletonWindowControl>",
+        source,
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError("missing singletonWindowControls return block")
+
+    variables: dict[str, str] = {}
+    for control in re.finditer(
+        r'\{\s*"[^"]+",\s*"(?P<id>[^"]+)",\s*"[^"]+",\s*"[^"]+",\s*'
+        r"(?:true|false),\s*\d+,\s*&(?P<open_var>ui[A-Za-z0-9_]+Open),",
+        match.group(1),
+        re.DOTALL,
+    ):
+        variables[control.group("id")] = control.group("open_var")
+    if not variables:
+        raise AssertionError("could not parse singletonWindowControls open variables")
+    return variables
+
+
+def cpp_bool_defaults(source: str) -> dict[str, bool]:
+    return {
+        match.group("name"): match.group("value") == "true"
+        for match in re.finditer(
+            r"\bbool\s+(?P<name>[A-Za-z0-9_]+)\s*=\s*(?P<value>true|false)\s*;",
+            source,
+        )
+    }
+
+
+def web_initial_singleton_visibility(source: str) -> dict[str, bool]:
+    visibility: dict[str, bool] = {}
+    for section in re.finditer(r"<section\b(?P<tag>[^>]*)>", source, re.DOTALL):
+        tag = section.group("tag")
+        window_id = re.search(r'\bdata-window-id="(?P<id>[^"]+)"', tag)
+        if window_id:
+            visibility[window_id.group("id")] = not re.search(r"\bhidden\b", tag)
+    if not visibility:
+        raise AssertionError("could not parse web singleton window visibility")
+    return visibility
+
+
 def stats_window_kind_controls(source: str) -> list[tuple[str, str, bool]]:
     match = re.search(
         r"SubtrActorPlugin::statsWindowKindControls\(\)\s+const\s+\{\s+return\s+\{\{"
@@ -423,6 +467,39 @@ def main() -> int:
         errors.append(
             "web singleton launcher labels drifted from stats evaluation player: "
             f"expected={web_launcher_window_buttons!r} actual={plugin_web_window_controls!r}"
+        )
+    plugin_window_open_variables = singleton_window_open_variables(plugin_source)
+    plugin_bool_defaults = cpp_bool_defaults(plugin_header)
+    web_initial_window_visibility = web_initial_singleton_visibility(web_player_template_source)
+    plugin_initial_window_visibility: list[tuple[str, bool]] = []
+    web_initial_window_visibility_ordered: list[tuple[str, bool]] = []
+    for window_id in web_window_ids:
+        open_variable = plugin_window_open_variables.get(window_id)
+        if open_variable is None:
+            errors.append(f"plugin singleton window {window_id!r} is missing an open bool pointer")
+            continue
+        if open_variable not in plugin_bool_defaults:
+            errors.append(
+                f"plugin singleton window {window_id!r} points at {open_variable}, "
+                "but the header has no default bool value for it"
+            )
+            continue
+        if window_id not in web_initial_window_visibility:
+            errors.append(
+                f"stats evaluation player template has no initial visibility for {window_id!r}"
+            )
+            continue
+        plugin_initial_window_visibility.append(
+            (window_id, plugin_bool_defaults[open_variable])
+        )
+        web_initial_window_visibility_ordered.append(
+            (window_id, web_initial_window_visibility[window_id])
+        )
+    if plugin_initial_window_visibility != web_initial_window_visibility_ordered:
+        errors.append(
+            "plugin singleton default visibility drifted from stats evaluation player: "
+            f"expected={web_initial_window_visibility_ordered!r} "
+            f"actual={plugin_initial_window_visibility!r}"
         )
 
     plugin_web_stats_window_controls = tuple(
