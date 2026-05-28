@@ -825,6 +825,18 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "recordingStart.disabled = !hasRecorder || isRecording;",
+        "stats evaluation player recording start waits for recorder and idle state",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'recordingButton("Start", recordingActive || !loaded || !engine)',
+        "plugin recording start waits for analysis engine and idle state",
+        errors,
+    )
+    require_contains(
         plugin_source,
         'recordingButton("Download", recordingActive || !hasGraphSnapshot)',
         "plugin recording exposes web-like download action",

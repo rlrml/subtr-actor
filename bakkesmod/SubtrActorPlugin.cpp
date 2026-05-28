@@ -10031,7 +10031,7 @@ void SubtrActorPlugin::renderRecordingWindow() {
     scheduleUiConfigAutosave();
   }
 
-  if (recordingButton("Start", recordingActive)) {
+  if (recordingButton("Start", recordingActive || !loaded || !engine)) {
     recordingActive = true;
     recordingStartedAt = std::chrono::steady_clock::now();
     recordingStatus = "Recording analysis snapshots";
