@@ -9051,6 +9051,16 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   const float clipEnd = current == nullptr ? 0.0f : current->time + mechanicsReviewClipTrailSeconds;
   ImGui::Text("%d / %zu", current == nullptr ? 0 : mechanicsReviewIndex + 1, candidates.size());
   ImGui::TextWrapped("%s", current == nullptr ? "No candidate selected" : current->label.c_str());
+  const std::string statusReadout =
+      mechanicsReviewClipActive
+          ? std::format(
+                "Playing clip {:.2f}s to {:.2f}s",
+                mechanicsReviewClipStartSeconds,
+                mechanicsReviewClipEndSeconds)
+      : !mechanicsReviewStatus.empty() ? mechanicsReviewStatus
+      : candidates.empty()             ? "Load a review playlist."
+                                       : "Loaded review playlist.";
+  ImGui::TextWrapped("%s", statusReadout.c_str());
   const std::string clipReadout =
       current == nullptr ? "--" : std::format("{:.2f}s to {:.2f}s", clipStart, clipEnd);
   const std::string eventReadout =
@@ -9077,15 +9087,6 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   ImGui::TextDisabled("Reason");
   ImGui::TextWrapped("%s", reasonReadout.c_str());
   ImGui::Columns(1);
-  if (mechanicsReviewClipActive || !mechanicsReviewStatus.empty()) {
-    const std::string status = mechanicsReviewClipActive
-                                   ? std::format(
-                                         "Playing clip {:.2f}s to {:.2f}s",
-                                         mechanicsReviewClipStartSeconds,
-                                         mechanicsReviewClipEndSeconds)
-                                   : mechanicsReviewStatus;
-    ImGui::TextWrapped("%s", status.c_str());
-  }
 
   auto mechanicsReviewButton = [](const char *label, bool disabled) {
     if (disabled) {

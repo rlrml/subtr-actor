@@ -2054,6 +2054,25 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_template_source,
+        '<div id="mechanics-review-status" class="mechanics-review-status">\n                Load a review playlist.\n              </div>',
+        "stats evaluation player mechanics review initial status text",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        ': candidates.empty()             ? "Load a review playlist."\n'
+        '                                       : "Loaded review playlist.";',
+        "plugin mechanics review renders web-like default status text",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        'ImGui::TextWrapped("%s", statusReadout.c_str());',
+        "plugin mechanics review status is always visible like web",
+        errors,
+    )
+    require_contains(
         web_player_main_source,
         "mechanicsReviewPrev.disabled = !review || review.loading || review.currentIndex <= 0;",
         "stats evaluation player mechanics review disables unavailable previous action",
