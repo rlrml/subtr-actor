@@ -1586,6 +1586,42 @@ def main() -> int:
         errors,
     )
     require_contains(
+        web_player_main_source,
+        "mechanicsReviewPrev.disabled = !review || review.loading || review.currentIndex <= 0;",
+        "stats evaluation player mechanics review disables unavailable previous action",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool prevDisabled = current == nullptr || mechanicsReviewIndex <= 0;",
+        "plugin mechanics review disables unavailable previous action",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "mechanicsReviewReplay.disabled = !review || review.loading || !review.currentClip;",
+        "stats evaluation player mechanics review disables unavailable replay action",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool replayDisabled = current == nullptr;",
+        "plugin mechanics review disables unavailable replay action",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "mechanicsReviewConfirm.disabled = decisionDisabled;",
+        "stats evaluation player mechanics review disables unavailable decisions",
+        errors,
+    )
+    require_contains(
+        plugin_source,
+        "const bool decisionDisabled = current == nullptr;",
+        "plugin mechanics review disables unavailable decisions",
+        errors,
+    )
+    require_contains(
         web_player_template_source,
         '<span id="mechanics-review-replay-load-summary">0 replays</span>',
         "stats evaluation player mechanics review replay summary",

@@ -9026,12 +9026,28 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     ImGui::TextWrapped("%s", status.c_str());
   }
 
-  if (ImGui::Button("Prev") && current != nullptr && mechanicsReviewIndex > 0) {
+  auto mechanicsReviewButton = [](const char *label, bool disabled) {
+    if (disabled) {
+      ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
+    }
+    const bool clicked = ImGui::Button(label);
+    if (disabled) {
+      ImGui::PopStyleVar();
+    }
+    return clicked && !disabled;
+  };
+  const bool prevDisabled = current == nullptr || mechanicsReviewIndex <= 0;
+  const bool replayDisabled = current == nullptr;
+  const bool nextDisabled =
+      current == nullptr || mechanicsReviewIndex >= static_cast<int>(candidates.size()) - 1;
+  const bool decisionDisabled = current == nullptr;
+
+  if (mechanicsReviewButton("Prev", prevDisabled)) {
     mechanicsReviewIndex -= 1;
     scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
-  if (ImGui::Button("Replay clip") && current != nullptr) {
+  if (mechanicsReviewButton("Replay clip", replayDisabled)) {
     playbackCurrentTime = clipStart;
     playbackPlaying = true;
     playbackSkipPostGoalTransitions = false;
@@ -9055,21 +9071,20 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
     scheduleUiConfigAutosave();
   }
   ImGui::SameLine();
-  if (ImGui::Button("Next") &&
-      current != nullptr && mechanicsReviewIndex < static_cast<int>(candidates.size()) - 1) {
+  if (mechanicsReviewButton("Next", nextDisabled)) {
     mechanicsReviewIndex += 1;
     scheduleUiConfigAutosave();
   }
 
-  if (ImGui::Button("Confirm") && current != nullptr) {
+  if (mechanicsReviewButton("Confirm", decisionDisabled)) {
     mechanicsReviewDecisions[currentKey] = 1;
   }
   ImGui::SameLine();
-  if (ImGui::Button("Reject") && current != nullptr) {
+  if (mechanicsReviewButton("Reject", decisionDisabled)) {
     mechanicsReviewDecisions[currentKey] = 2;
   }
   ImGui::SameLine();
-  if (ImGui::Button("Uncertain") && current != nullptr) {
+  if (mechanicsReviewButton("Uncertain", decisionDisabled)) {
     mechanicsReviewDecisions[currentKey] = 3;
   }
 
