@@ -1,80 +1,27 @@
-import type { PlaylistManifestPage } from "@rlrml/player";
 import { formatMechanicKind } from "./timelineMarkers.ts";
-import {
-  formatReplayLoadProgress,
-  type ReplayLoadBundle,
-  type ReplayLoadProgress,
-} from "./replayLoader.ts";
+import { formatReplayLoadProgress, type ReplayLoadProgress } from "./replayLoader.ts";
+import { isRecord } from "./mechanicsReviewPlaylist.ts";
+import type {
+  ActiveMechanicsReview,
+  MechanicsReviewItem,
+  MechanicsReviewPlaybackBound,
+  MechanicsReviewReplayLoadState,
+} from "./mechanicsReviewTypes.ts";
 
-export type MechanicsReviewPlaybackBound =
-  | { kind: "time"; value: number }
-  | { kind: "frame"; value: number };
-
-export interface MechanicsReviewReplay {
-  id: string;
-  path?: string;
-  label?: string;
-  locator?: Record<string, unknown>;
-  meta?: Record<string, unknown>;
-}
-
-export interface MechanicsReviewItemMeta {
-  confidence?: number | null;
-  eventId?: string;
-  mechanic?: string;
-  mechanicLabel?: string;
-  playerId?: string;
-  playerName?: string | null;
-  reason?: string;
-  reviewEndpoint?: string;
-  reviewStatus?: string | null;
-  target?: Record<string, unknown>;
-  followupGoal?: unknown;
-  [key: string]: unknown;
-}
-
-export interface MechanicsReviewItem {
-  id?: string;
-  replay: string;
-  start: MechanicsReviewPlaybackBound;
-  end: MechanicsReviewPlaybackBound;
-  label?: string;
-  meta?: MechanicsReviewItemMeta;
-}
-
-export interface MechanicsReviewPlaylist {
-  label?: string;
-  replays?: MechanicsReviewReplay[];
-  items: MechanicsReviewItem[];
-  page?: PlaylistManifestPage;
-  playback?: unknown;
-  meta?: unknown;
-}
-
-export type MechanicsReviewReplayLoadStatus = "idle" | "loading" | "loaded" | "error";
-
-export interface MechanicsReviewReplayLoadState {
-  replayId: string;
-  label: string;
-  path: string;
-  clipCount: number;
-  status: MechanicsReviewReplayLoadStatus;
-  progress: ReplayLoadProgress | null;
-  error: string | null;
-}
-
-export interface ActiveMechanicsReview {
-  manifest: MechanicsReviewPlaylist;
-  sourceUrl: string | null;
-  replaysById: Map<string, MechanicsReviewReplay>;
-  replayLoadStates: Map<string, MechanicsReviewReplayLoadState>;
-  replayLoadCache: Map<string, Promise<ReplayLoadBundle>>;
-  currentIndex: number;
-  loading: boolean;
-  preloading: boolean;
-  currentReplayId: string | null;
-  currentClip: { startTime: number; endTime: number } | null;
-}
+export type {
+  ActiveMechanicsReview,
+  MechanicsReviewItem,
+  MechanicsReviewItemMeta,
+  MechanicsReviewPlaybackBound,
+  MechanicsReviewPlaylist,
+  MechanicsReviewReplay,
+  MechanicsReviewReplayLoadState,
+  MechanicsReviewReplayLoadStatus,
+} from "./mechanicsReviewTypes.ts";
+export {
+  parseMechanicsReviewPlaylist,
+  parseMechanicsReviewPlaylistJson,
+} from "./mechanicsReviewPlaylist.ts";
 
 interface MechanicsReviewPlayer {
   id: string;
@@ -83,136 +30,6 @@ interface MechanicsReviewPlayer {
 
 interface ReplayFrameTime {
   time: number;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseMechanicsReviewBound(value: unknown): MechanicsReviewPlaybackBound | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-  if (
-    (value.kind === "time" || value.kind === "frame") &&
-    typeof value.value === "number" &&
-    Number.isFinite(value.value)
-  ) {
-    return {
-      kind: value.kind,
-      value: value.value,
-    };
-  }
-  return null;
-}
-
-function parseOptionalMechanicsReviewPageInteger(
-  value: unknown,
-  field: string,
-): number | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  if (
-    typeof value !== "number" ||
-    !Number.isInteger(value) ||
-    !Number.isFinite(value) ||
-    value < 0
-  ) {
-    throw new Error(`Review playlist page ${field} must be a non-negative integer.`);
-  }
-  return value;
-}
-
-function parseOptionalMechanicsReviewPageString(value: unknown, field: string): string | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  if (typeof value !== "string") {
-    throw new Error(`Review playlist page ${field} must be a string.`);
-  }
-  return value;
-}
-
-function parseMechanicsReviewPage(value: unknown): PlaylistManifestPage | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  if (!isRecord(value)) {
-    throw new Error("Review playlist page must be an object.");
-  }
-
-  return {
-    next: parseOptionalMechanicsReviewPageString(value.next, "next"),
-    previous: parseOptionalMechanicsReviewPageString(value.previous, "previous"),
-    total: parseOptionalMechanicsReviewPageInteger(value.total, "total"),
-    count: parseOptionalMechanicsReviewPageInteger(value.count, "count"),
-    limit: parseOptionalMechanicsReviewPageInteger(value.limit, "limit"),
-    offset: parseOptionalMechanicsReviewPageInteger(value.offset, "offset"),
-  };
-}
-
-export function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPlaylist {
-  if (!isRecord(value) || !Array.isArray(value.items)) {
-    throw new Error("Review playlist must contain an items array.");
-  }
-
-  const items = value.items.map((rawItem, index): MechanicsReviewItem => {
-    if (!isRecord(rawItem) || typeof rawItem.replay !== "string") {
-      throw new Error(`Invalid review item at index ${index}.`);
-    }
-    const start = parseMechanicsReviewBound(rawItem.start);
-    const end = parseMechanicsReviewBound(rawItem.end);
-    if (!start || !end) {
-      throw new Error(`Review item ${index + 1} has invalid start or end.`);
-    }
-    return {
-      id: typeof rawItem.id === "string" ? rawItem.id : undefined,
-      replay: rawItem.replay,
-      start,
-      end,
-      label: typeof rawItem.label === "string" ? rawItem.label : undefined,
-      meta: isRecord(rawItem.meta) ? rawItem.meta : undefined,
-    };
-  });
-
-  const replays = Array.isArray(value.replays)
-    ? value.replays
-        .map((rawReplay): MechanicsReviewReplay | null => {
-          if (!isRecord(rawReplay) || typeof rawReplay.id !== "string") {
-            return null;
-          }
-          return {
-            id: rawReplay.id,
-            path: typeof rawReplay.path === "string" ? rawReplay.path : undefined,
-            label: typeof rawReplay.label === "string" ? rawReplay.label : undefined,
-            locator: isRecord(rawReplay.locator) ? rawReplay.locator : undefined,
-            meta: isRecord(rawReplay.meta) ? rawReplay.meta : undefined,
-          };
-        })
-        .filter((replay): replay is MechanicsReviewReplay => replay !== null)
-    : undefined;
-
-  return {
-    label: typeof value.label === "string" ? value.label : undefined,
-    replays,
-    items,
-    page: parseMechanicsReviewPage(value.page),
-    playback: value.playback,
-    meta: value.meta,
-  };
-}
-
-export function parseMechanicsReviewPlaylistJson(text: string): MechanicsReviewPlaylist {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error) {
-    throw new Error(
-      `Invalid review playlist JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  return parseMechanicsReviewPlaylist(parsed);
 }
 
 export function getMechanicsReviewUrlFromLocation(): string | null {
