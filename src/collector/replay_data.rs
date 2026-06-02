@@ -719,28 +719,13 @@ impl ReplayDataCollector {
         self.frame_data
     }
 
-    /// Builds replay data from this collector and an already-processed
-    /// [`ReplayProcessor`].
-    ///
-    /// This keeps replay-data collection composable: callers can run
-    /// [`ReplayDataCollector`] alongside any other collectors with
-    /// [`ReplayProcessor::process_all`] and then decide which enrichments to
-    /// merge into the final payload.
     pub fn into_replay_data(self, processor: ReplayProcessor<'_>) -> SubtrActorResult<ReplayData> {
-        self.into_replay_data_with_boost_pads(processor, Vec::new())
-    }
-
-    pub fn into_replay_data_with_boost_pads(
-        self,
-        processor: ReplayProcessor<'_>,
-        boost_pads: Vec<ResolvedBoostPad>,
-    ) -> SubtrActorResult<ReplayData> {
         let meta = processor.get_replay_meta()?;
         Ok(ReplayData {
             meta,
             demolish_infos: processor.demolishes().to_vec(),
             boost_pad_events: processor.boost_pad_events().to_vec(),
-            boost_pads,
+            boost_pads: processor.resolved_boost_pads(),
             touch_events: processor.touch_events().to_vec(),
             dodge_refreshed_events: processor.dodge_refreshed_events().to_vec(),
             player_stat_events: processor.player_stat_events().to_vec(),
@@ -787,12 +772,8 @@ impl ReplayDataCollector {
     /// ```
     pub fn get_replay_data(mut self, replay: &boxcars::Replay) -> SubtrActorResult<ReplayData> {
         let mut processor = ReplayProcessor::new(replay)?;
-        let mut boost_pad_collector = ResolvedBoostPadCollector::new();
-        processor.process_all(&mut [&mut self, &mut boost_pad_collector])?;
-        self.into_replay_data_with_boost_pads(
-            processor,
-            boost_pad_collector.into_resolved_boost_pads(),
-        )
+        processor.process_all(&mut [&mut self])?;
+        self.into_replay_data(processor)
     }
 
     /// Extracts player frame data for all players at the specified time.

@@ -212,6 +212,20 @@ impl<'a> ReplayProcessor<'a> {
             })
     }
 
+    fn observe_boost_pad_pickup_for_resolution(&mut self, event: &BoostPadEvent) {
+        let BoostPadEventKind::PickedUp { .. } = event.kind else {
+            return;
+        };
+        let Some(player_id) = &event.player else {
+            return;
+        };
+        let Ok(rigid_body) = self.get_normalized_player_rigid_body(player_id) else {
+            return;
+        };
+        self.boost_pad_resolution
+            .observe_pickup(&event.pad_id, vec_to_glam(&rigid_body.location));
+    }
+
     /// Detects boost-pad pickup and respawn events in the current frame.
     pub(crate) fn update_boost_pad_events(
         &mut self,
@@ -295,6 +309,7 @@ impl<'a> ReplayProcessor<'a> {
                     .insert((event.pad_id.clone(), sequence), event.time);
             }
 
+            self.observe_boost_pad_pickup_for_resolution(&event);
             self.current_frame_boost_pad_events.push(event.clone());
             self.boost_pad_events.push(event);
         }

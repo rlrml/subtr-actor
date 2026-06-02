@@ -3,8 +3,10 @@ use boxcars;
 use std::collections::HashMap;
 
 pub mod actor_state;
+mod boost_pad_resolution;
 pub mod view;
 pub use actor_state::*;
+pub(crate) use boost_pad_resolution::*;
 pub use view::*;
 
 pub(crate) fn attribute_type_name(attribute: &boxcars::Attribute) -> &'static str {
@@ -294,6 +296,7 @@ pub struct ReplayProcessor<'a> {
     pub boost_pad_events: Vec<BoostPadEvent>,
     current_frame_boost_pad_events: Vec<BoostPadEvent>,
     boost_pad_pickup_sequence_times: HashMap<(String, u8), f32>,
+    boost_pad_resolution: BoostPadResolutionState,
     /// All touch events observed so far in the replay.
     pub touch_events: Vec<TouchEvent>,
     current_frame_touch_events: Vec<TouchEvent>,
@@ -402,6 +405,7 @@ impl<'a> ReplayProcessor<'a> {
             boost_pad_events: Vec::new(),
             current_frame_boost_pad_events: Vec::new(),
             boost_pad_pickup_sequence_times: HashMap::new(),
+            boost_pad_resolution: BoostPadResolutionState::default(),
             touch_events: Vec::new(),
             current_frame_touch_events: Vec::new(),
             dodge_refreshed_events: Vec::new(),
@@ -686,6 +690,7 @@ impl<'a> ReplayProcessor<'a> {
         self.boost_pad_events = Vec::new();
         self.current_frame_boost_pad_events = Vec::new();
         self.boost_pad_pickup_sequence_times = HashMap::new();
+        self.boost_pad_resolution = BoostPadResolutionState::default();
         self.touch_events = Vec::new();
         self.current_frame_touch_events = Vec::new();
         self.dodge_refreshed_events = Vec::new();

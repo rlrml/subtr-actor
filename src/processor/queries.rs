@@ -112,6 +112,11 @@ impl<'a> ReplayProcessor<'a> {
         &self.current_frame_boost_pad_events
     }
 
+    /// Returns the standard Soccar boost pad layout annotated with replay pad ids when known.
+    pub fn resolved_boost_pads(&self) -> Vec<ResolvedBoostPad> {
+        self.boost_pad_resolution.resolved_boost_pads()
+    }
+
     /// Returns the touch events detected while processing the current frame.
     pub fn current_frame_touch_events(&self) -> &[TouchEvent] {
         &self.current_frame_touch_events
