@@ -5,8 +5,10 @@ use boxcars;
 use boxcars::HeaderProp;
 use serde::{Deserialize, Serialize};
 
-use super::boost_invariants::{boost_invariant_violations, BoostInvariantKind};
 use crate::*;
+
+mod boost_invariants;
+pub use boost_invariants::*;
 
 const CONFIDENCE_BAND_LABELS: [StatLabel; 2] = [
     StatLabel::new("confidence_band", "standard"),
