@@ -4,6 +4,8 @@ use subtr_actor::{GoalTagKind, StatsCollector, StatsFrameResolution, StatsTimeli
 
 const THIRD_GOAL_DOUBLE_TAP_REPLAY: &str =
     "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
+const NUTTRBACK_GOAL_7_DOUBLE_TAP_REPLAY: &str =
+    "assets/nuttrback-double-tap-goal-7-2026-06-01.replay";
 
 #[test]
 fn tags_colonelpanic8_third_goal_as_double_tap() {
@@ -39,6 +41,47 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
             .iter()
             .any(|event| event.goal_index == 2 && event.kind == GoalTagKind::DoubleTapGoal),
         "expected third goal to be tagged as a double tap; got {:?}",
+        timeline.events.goal_tags
+    );
+}
+
+#[test]
+fn tags_nuttrback_seventh_goal_as_double_tap() {
+    let replay = common::parse_replay(NUTTRBACK_GOAL_7_DOUBLE_TAP_REPLAY);
+    let timeline = StatsTimelineCollector::new()
+        .get_legacy_replay_stats_timeline(&replay)
+        .expect("failed to collect stats timeline for double tap replay");
+
+    assert!(
+        timeline.events.double_tap.iter().any(|event| {
+            (event.backboard_time - 343.42084).abs() < 0.05 && (event.time - 343.69733).abs() < 0.05
+        }),
+        "expected raw double tap event before the seventh goal; got {:?}",
+        timeline.events.double_tap
+    );
+    assert!(
+        timeline.events.mechanics.iter().any(|event| {
+            event.kind == "double_tap"
+                && match event.timing {
+                    subtr_actor::MechanicTiming::Span {
+                        start_time,
+                        end_time,
+                        ..
+                    } => {
+                        (start_time - 343.42084).abs() < 0.05 && (end_time - 343.69733).abs() < 0.05
+                    }
+                    subtr_actor::MechanicTiming::Moment { .. } => false,
+                }
+        }),
+        "expected generic mechanics stream to include nuttrback's double tap"
+    );
+    assert!(
+        timeline
+            .events
+            .goal_tags
+            .iter()
+            .any(|event| event.goal_index == 6 && event.kind == GoalTagKind::DoubleTapGoal),
+        "expected seventh goal to be tagged as a double tap; got {:?}",
         timeline.events.goal_tags
     );
 }

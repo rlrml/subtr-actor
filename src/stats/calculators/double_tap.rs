@@ -1,5 +1,6 @@
 use super::*;
 
+/// Maximum time between the attributed backboard bounce and the follow-up touch.
 const DOUBLE_TAP_TOUCH_WINDOW_SECONDS: f32 = 2.5;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -39,6 +40,21 @@ struct PendingBackboardBounce {
     frame: usize,
 }
 
+/// Detects double taps from a backboard-bounce sequence.
+///
+/// Current heuristic:
+///
+/// 1. A [`BackboardBounceEvent`] arms a pending double tap for the player who
+///    last touched the ball before the bounce. The exact backboard geometry and
+///    attribution thresholds live in [`BackboardBounceCalculator`].
+/// 2. The same player must touch the ball again within
+///    [`DOUBLE_TAP_TOUCH_WINDOW_SECONDS`] while the replay is in live play.
+/// 3. The ball's post-touch constant-velocity trajectory must project into or
+///    close to the opponent goal mouth.
+///
+/// The detector intentionally does not aim at the center of the goal. Near-post
+/// shots and cross-goal trajectories can be valid double taps even when their
+/// velocity is poorly aligned with the goal center.
 #[derive(Debug, Clone, Default)]
 pub struct DoubleTapCalculator {
     player_stats: HashMap<PlayerId, DoubleTapPlayerStats>,
@@ -131,13 +147,9 @@ impl DoubleTapCalculator {
                 touch.team_is_team_0 == pending.is_team_0
                     && touch.player.as_ref() == Some(&pending.player_id)
             });
-            let conflicting_touch = touch_events
-                .iter()
-                .any(|touch| touch.player.as_ref() != Some(&pending.player_id));
 
             if matching_touch
-                && !conflicting_touch
-                && Self::followup_touch_is_goal_directed(ball, pending.is_team_0)
+                && Self::followup_touch_projects_on_goal_mouth(ball, pending.is_team_0)
             {
                 completed_events.push(DoubleTapEvent {
                     time: frame.time,
@@ -174,29 +186,37 @@ impl DoubleTapCalculator {
         self.events.push(event);
     }
 
-    fn followup_touch_is_goal_directed(ball: &BallFrameState, is_team_0: bool) -> bool {
-        const GOAL_CENTER_Y: f32 = 5120.0;
-        const MIN_GOAL_ALIGNMENT_COSINE: f32 = 0.6;
+    /// Returns true when the ball's current trajectory crosses the opponent
+    /// goal line within the goal mouth, with a small ball-radius based margin.
+    ///
+    /// This is a straight-line projection from the sampled post-touch ball
+    /// velocity. It deliberately ignores gravity, wall bounces, and later
+    /// touches; goal tagging handles the separate question of whether a nearby
+    /// goal should receive the double-tap label.
+    fn followup_touch_projects_on_goal_mouth(ball: &BallFrameState, is_team_0: bool) -> bool {
+        const GOAL_LINE_Y: f32 = 5120.0;
+        const GOAL_MOUTH_HEIGHT_Z: f32 = 642.775;
+        const GOAL_MOUTH_TRAJECTORY_MARGIN: f32 = BALL_RADIUS_Z * 1.5;
 
         let Some(ball) = ball.sample() else {
             return false;
         };
 
-        let target_y = if is_team_0 {
-            GOAL_CENTER_Y
-        } else {
-            -GOAL_CENTER_Y
-        };
+        let target_y = if is_team_0 { GOAL_LINE_Y } else { -GOAL_LINE_Y };
         let ball_velocity = ball.velocity();
         if ball_velocity.length_squared() <= f32::EPSILON {
             return false;
         }
 
-        let goal_direction = glam::Vec3::new(0.0, target_y, ball.position().z) - ball.position();
-        goal_direction
-            .normalize_or_zero()
-            .dot(ball_velocity.normalize_or_zero())
-            >= MIN_GOAL_ALIGNMENT_COSINE
+        let time_to_goal_line = (target_y - ball.position().y) / ball_velocity.y;
+        if !time_to_goal_line.is_finite() || time_to_goal_line < 0.0 {
+            return false;
+        }
+
+        let projected = ball.position() + ball_velocity * time_to_goal_line;
+        projected.x.abs() <= BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X + GOAL_MOUTH_TRAJECTORY_MARGIN
+            && projected.z >= BALL_RADIUS_Z - GOAL_MOUTH_TRAJECTORY_MARGIN
+            && projected.z <= GOAL_MOUTH_HEIGHT_Z + GOAL_MOUTH_TRAJECTORY_MARGIN
     }
 
     pub fn update(
@@ -224,3 +244,7 @@ impl DoubleTapCalculator {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "double_tap_tests.rs"]
+mod tests;
