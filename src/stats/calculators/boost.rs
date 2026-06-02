@@ -1125,9 +1125,7 @@ impl BoostCalculator {
 
     fn tracks_boost_pickups(gameplay: &GameplayState, live_play: bool) -> bool {
         live_play
-            || (gameplay.ball_has_been_hit == Some(false)
-                && gameplay.game_state != Some(GAME_STATE_KICKOFF_COUNTDOWN)
-                && gameplay.kickoff_countdown_time.is_none_or(|t| t <= 0))
+            || (gameplay.ball_has_been_hit == Some(false) && !gameplay.kickoff_countdown_active())
     }
 
     fn activity_label(active: bool) -> BoostPickupActivity {
@@ -1350,9 +1348,7 @@ impl BoostCalculator {
         let track_boost_pickups = Self::tracks_boost_pickups(gameplay, live_play);
         let boost_levels_resumed_this_sample =
             boost_levels_live && !self.previous_boost_levels_live.unwrap_or(false);
-        let kickoff_phase_active = gameplay.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
-            || gameplay.kickoff_countdown_time.is_some_and(|t| t > 0)
-            || gameplay.ball_has_been_hit == Some(false);
+        let kickoff_phase_active = gameplay.kickoff_phase_active();
         let kickoff_phase_started = kickoff_phase_active && !self.kickoff_phase_active_last_frame;
         if kickoff_phase_started {
             self.kickoff_respawn_awarded.clear();
@@ -1529,7 +1525,7 @@ impl BoostCalculator {
             let mut respawn_amount = 0.0;
             // Grant initial kickoff respawn the first time we see each player.
             // This handles replays that start after the kickoff countdown has
-            // already ended (game_state != 55 on the first frame).
+            // already ended on the first frame.
             let first_seen_player = self
                 .initial_respawn_awarded
                 .insert(player.player_id.clone());

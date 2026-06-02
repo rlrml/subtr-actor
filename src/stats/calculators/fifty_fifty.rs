@@ -536,9 +536,7 @@ impl FiftyFiftyCalculator {
     }
 
     pub(crate) fn kickoff_phase_active(gameplay: &GameplayState) -> bool {
-        gameplay.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
-            || gameplay.kickoff_countdown_time.is_some_and(|time| time > 0)
-            || gameplay.ball_has_been_hit == Some(false)
+        gameplay.kickoff_phase_active()
     }
 
     pub(crate) fn contested_touch(

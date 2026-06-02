@@ -31,10 +31,15 @@ impl GameplayState {
         Some((self.team_zero_score?, self.team_one_score?))
     }
 
+    pub fn kickoff_countdown_active(&self) -> bool {
+        self.kickoff_countdown_time
+            .is_some_and(|time| (1..=3).contains(&time))
+            || (self.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
+                && self.kickoff_countdown_time.is_none())
+    }
+
     pub fn kickoff_phase_active(&self) -> bool {
-        self.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
-            || self.kickoff_countdown_time.is_some_and(|time| time > 0)
-            || self.ball_has_been_hit == Some(false)
+        self.kickoff_countdown_active() || self.ball_has_been_hit == Some(false)
     }
 
     pub fn current_in_game_team_player_count(&self, is_team_0: bool) -> usize {
@@ -104,5 +109,5 @@ pub struct FrameEventsState {
     pub goal_events: Vec<GoalEvent>,
 }
 
-pub(crate) const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 55;
-pub(crate) const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 86;
+pub(crate) const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 53;
+pub(crate) const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 67;

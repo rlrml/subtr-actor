@@ -1049,9 +1049,7 @@ impl MatchStatsCalculator {
     }
 
     fn kickoff_phase_active(gameplay: &GameplayState) -> bool {
-        gameplay.game_state == Some(GAME_STATE_KICKOFF_COUNTDOWN)
-            || gameplay.kickoff_countdown_time.is_some_and(|time| time > 0)
-            || gameplay.ball_has_been_hit == Some(false)
+        gameplay.kickoff_phase_active()
     }
 
     fn update_kickoff_reference(&mut self, gameplay: &GameplayState, events: &FrameEventsState) {

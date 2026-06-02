@@ -74,9 +74,7 @@ impl LivePlayTracker {
             self.last_score = Some(score);
         }
 
-        if gameplay.game_state == Some(crate::stats::calculators::GAME_STATE_KICKOFF_COUNTDOWN)
-            || gameplay.kickoff_countdown_time.is_some_and(|time| time > 0)
-        {
+        if gameplay.kickoff_countdown_active() {
             GameplayPhase::KickoffCountdown
         } else if gameplay.game_state
             == Some(crate::stats::calculators::GAME_STATE_GOAL_SCORED_REPLAY)
