@@ -113,7 +113,10 @@ impl<'a> ReplayProcessor<'a> {
     }
 
     /// Returns the standard Soccar boost pad layout annotated with replay pad ids when known.
-    pub fn resolved_boost_pads(&self) -> Vec<ResolvedBoostPad> {
+    ///
+    /// This is incremental reconstruction state and should only be materialized by
+    /// final replay-data assembly after the processor has completed its replay pass.
+    pub(crate) fn resolved_boost_pads(&self) -> Vec<ResolvedBoostPad> {
         self.boost_pad_resolution.resolved_boost_pads()
     }
 
