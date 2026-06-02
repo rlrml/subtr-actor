@@ -5,6 +5,7 @@ use crate::stats::analysis_graph::{
     AnalysisGraph, StatsTimelineEventsNode, StatsTimelineEventsState, StatsTimelineFrameNode,
     StatsTimelineFrameState,
 };
+use crate::stats::calculators::ReplayFrameInputBuilder;
 use crate::*;
 use std::collections::BTreeMap;
 
@@ -89,8 +90,9 @@ pub fn default_stats_timeline_config() -> StatsTimelineConfig {
 pub struct StatsTimelineCollector {
     graph: AnalysisGraph,
     replay_meta: Option<ReplayMeta>,
-    last_replay_meta_player_count: Option<usize>,
     frames: Vec<ReplayStatsFrame>,
+    frame_input_builder: ReplayFrameInputBuilder,
+    last_replay_meta_player_count: Option<usize>,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
 }
@@ -112,8 +114,9 @@ impl StatsTimelineCollector {
         Self {
             graph,
             replay_meta: None,
-            last_replay_meta_player_count: None,
             frames: Vec::new(),
+            frame_input_builder: ReplayFrameInputBuilder::default(),
+            last_replay_meta_player_count: None,
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
         }
@@ -204,8 +207,9 @@ impl StatsTimelineCollector {
 pub struct StatsTimelineEventCollector {
     graph: AnalysisGraph,
     replay_meta: Option<ReplayMeta>,
-    last_replay_meta_player_count: Option<usize>,
     frames: Vec<ReplayStatsFrameScaffold>,
+    frame_input_builder: ReplayFrameInputBuilder,
+    last_replay_meta_player_count: Option<usize>,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
 }
@@ -221,8 +225,9 @@ impl StatsTimelineEventCollector {
         Self {
             graph: build_timeline_event_graph(),
             replay_meta: None,
-            last_replay_meta_player_count: None,
             frames: Vec::new(),
+            frame_input_builder: ReplayFrameInputBuilder::default(),
+            last_replay_meta_player_count: None,
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
         }
@@ -349,7 +354,9 @@ impl Collector for StatsTimelineCollector {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let frame_input = FrameInput::timeline(processor, frame_number, current_time, dt);
+        let frame_input =
+            self.frame_input_builder
+                .timeline(processor, frame_number, current_time, dt);
         self.graph.evaluate_with_state(&frame_input)?;
         self.last_sample_time = Some(current_time);
 
@@ -411,7 +418,9 @@ impl Collector for StatsTimelineEventCollector {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let frame_input = FrameInput::timeline(processor, frame_number, current_time, dt);
+        let frame_input =
+            self.frame_input_builder
+                .timeline(processor, frame_number, current_time, dt);
         self.graph.evaluate_with_state(&frame_input)?;
         self.last_sample_time = Some(current_time);
 

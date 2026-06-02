@@ -7,6 +7,7 @@ use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
 use crate::stats::analysis_graph::{graph_with_builtin_analysis_nodes, AnalysisGraph};
+use crate::stats::calculators::ReplayFrameInputBuilder;
 use crate::*;
 
 use super::builtins::{
@@ -280,18 +281,13 @@ pub struct StatsCollector<T = StatsSnapshotFrame, F = IdentityFrameTransform> {
     modules: BuiltinModuleSelection,
     graph: AnalysisGraph,
     replay_meta: Option<ReplayMeta>,
-    last_replay_meta_player_count: Option<usize>,
     frame_transform: F,
     captured_frames: Option<Vec<T>>,
     sample_mode: SampleMode,
+    frame_input_builder: ReplayFrameInputBuilder,
+    last_replay_meta_player_count: Option<usize>,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
-    last_demolish_count: usize,
-    last_boost_pad_event_count: usize,
-    last_touch_event_count: usize,
-    last_dodge_refreshed_event_count: usize,
-    last_player_stat_event_count: usize,
-    last_goal_event_count: usize,
     _marker: PhantomData<T>,
 }
 
@@ -424,18 +420,13 @@ impl<T, F> StatsCollector<T, F> {
             graph: modules.graph()?,
             modules,
             replay_meta: None,
-            last_replay_meta_player_count: None,
             frame_transform,
             captured_frames: None,
             sample_mode: SampleMode::Aggregate,
+            frame_input_builder: ReplayFrameInputBuilder::default(),
+            last_replay_meta_player_count: None,
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
-            last_demolish_count: 0,
-            last_boost_pad_event_count: 0,
-            last_touch_event_count: 0,
-            last_dodge_refreshed_event_count: 0,
-            last_player_stat_event_count: 0,
-            last_goal_event_count: 0,
             _marker: PhantomData,
         })
     }
@@ -451,35 +442,25 @@ impl<T, F> StatsCollector<T, F> {
             modules,
             graph,
             replay_meta,
-            last_replay_meta_player_count,
             captured_frames,
             sample_mode,
+            frame_input_builder,
+            last_replay_meta_player_count,
             last_sample_time,
             frame_persistence,
-            last_demolish_count,
-            last_boost_pad_event_count,
-            last_touch_event_count,
-            last_dodge_refreshed_event_count,
-            last_player_stat_event_count,
-            last_goal_event_count,
             ..
         } = self;
         StatsCollector {
             modules,
             graph,
             replay_meta,
-            last_replay_meta_player_count,
             frame_transform,
             captured_frames: captured_frames.map(|_| Vec::new()),
             sample_mode,
+            frame_input_builder,
+            last_replay_meta_player_count,
             last_sample_time,
             frame_persistence,
-            last_demolish_count,
-            last_boost_pad_event_count,
-            last_touch_event_count,
-            last_dodge_refreshed_event_count,
-            last_player_stat_event_count,
-            last_goal_event_count,
             _marker: PhantomData,
         }
     }
@@ -611,19 +592,14 @@ where
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
         let frame_input = match self.sample_mode {
-            SampleMode::Aggregate => FrameInput::aggregate(
-                processor,
-                frame_number,
-                current_time,
-                dt,
-                self.last_demolish_count,
-                self.last_boost_pad_event_count,
-                self.last_touch_event_count,
-                self.last_dodge_refreshed_event_count,
-                self.last_player_stat_event_count,
-                self.last_goal_event_count,
-            ),
-            SampleMode::Timeline => FrameInput::timeline(processor, frame_number, current_time, dt),
+            SampleMode::Aggregate => {
+                self.frame_input_builder
+                    .aggregate(processor, frame_number, current_time, dt)
+            }
+            SampleMode::Timeline => {
+                self.frame_input_builder
+                    .timeline(processor, frame_number, current_time, dt)
+            }
         };
         self.graph.evaluate_with_state(&frame_input)?;
 
@@ -639,16 +615,7 @@ where
                 self.capture_frame_snapshot(&replay_meta, frame)?;
             }
         }
-
         self.last_sample_time = Some(current_time);
-        if matches!(self.sample_mode, SampleMode::Aggregate) {
-            self.last_demolish_count = processor.demolishes().len();
-            self.last_boost_pad_event_count = processor.boost_pad_events().len();
-            self.last_touch_event_count = processor.touch_events().len();
-            self.last_dodge_refreshed_event_count = processor.dodge_refreshed_events().len();
-            self.last_player_stat_event_count = processor.player_stat_events().len();
-            self.last_goal_event_count = processor.goal_events().len();
-        }
 
         Ok(TimeAdvance::NextFrame)
     }

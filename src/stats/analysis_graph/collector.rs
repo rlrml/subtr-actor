@@ -1,18 +1,13 @@
 use super::graph::AnalysisGraph;
-use crate::stats::calculators::FrameInput;
+use crate::stats::calculators::{FrameInput, ReplayFrameInputBuilder};
 use crate::*;
 
 #[allow(dead_code)]
 pub struct AnalysisNodeCollector {
     graph: AnalysisGraph,
+    frame_input_builder: ReplayFrameInputBuilder,
     last_sample_time: Option<f32>,
     last_replay_meta_player_count: Option<usize>,
-    last_demolish_count: usize,
-    last_boost_pad_event_count: usize,
-    last_touch_event_count: usize,
-    last_dodge_refreshed_event_count: usize,
-    last_player_stat_event_count: usize,
-    last_goal_event_count: usize,
 }
 
 #[allow(dead_code)]
@@ -21,14 +16,9 @@ impl AnalysisNodeCollector {
         graph.register_input_state::<FrameInput>();
         Self {
             graph,
+            frame_input_builder: ReplayFrameInputBuilder::default(),
             last_sample_time: None,
             last_replay_meta_player_count: None,
-            last_demolish_count: 0,
-            last_boost_pad_event_count: 0,
-            last_touch_event_count: 0,
-            last_dodge_refreshed_event_count: 0,
-            last_player_stat_event_count: 0,
-            last_goal_event_count: 0,
         }
     }
 
@@ -63,26 +53,11 @@ impl Collector for AnalysisNodeCollector {
             .last_sample_time
             .map(|last_time| (current_time - last_time).max(0.0))
             .unwrap_or(0.0);
-        let frame_input = FrameInput::aggregate(
-            processor,
-            frame_number,
-            current_time,
-            dt,
-            self.last_demolish_count,
-            self.last_boost_pad_event_count,
-            self.last_touch_event_count,
-            self.last_dodge_refreshed_event_count,
-            self.last_player_stat_event_count,
-            self.last_goal_event_count,
-        );
+        let frame_input =
+            self.frame_input_builder
+                .aggregate(processor, frame_number, current_time, dt);
         self.graph.evaluate_with_state(&frame_input)?;
         self.last_sample_time = Some(current_time);
-        self.last_demolish_count = processor.demolishes().len();
-        self.last_boost_pad_event_count = processor.boost_pad_events().len();
-        self.last_touch_event_count = processor.touch_events().len();
-        self.last_dodge_refreshed_event_count = processor.dodge_refreshed_events().len();
-        self.last_player_stat_event_count = processor.player_stat_events().len();
-        self.last_goal_event_count = processor.goal_events().len();
 
         Ok(TimeAdvance::NextFrame)
     }
