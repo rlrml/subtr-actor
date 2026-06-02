@@ -15,10 +15,10 @@ import type { LabeledCountEntry } from "./generated/LabeledCountEntry.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { LabeledFloatSumEntry } from "./generated/LabeledFloatSumEntry.ts";
 import type { LabeledFloatSums } from "./generated/LabeledFloatSums.ts";
-import type { MechanicEvent } from "./generated/MechanicEvent.ts";
-import type { MechanicEventProperty } from "./generated/MechanicEventProperty.ts";
-import type { MechanicEventPropertyValue } from "./generated/MechanicEventPropertyValue.ts";
-import type { MechanicTiming } from "./generated/MechanicTiming.ts";
+import type { StatsTimelineTagEvent } from "./generated/StatsTimelineTagEvent.ts";
+import type { StatsEventProperty } from "./generated/StatsEventProperty.ts";
+import type { StatsEventPropertyValue } from "./generated/StatsEventPropertyValue.ts";
+import type { StatsEventTiming } from "./generated/StatsEventTiming.ts";
 import type { MovementEvent } from "./generated/MovementEvent.ts";
 import type { MustyFlickEvent } from "./generated/MustyFlickEvent.ts";
 import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
@@ -79,10 +79,10 @@ export type {
   LabeledFloatSumEntry,
   LabeledFloatSums,
   BallCarryEvent,
-  MechanicEvent,
-  MechanicEventProperty,
-  MechanicEventPropertyValue,
-  MechanicTiming,
+  StatsTimelineTagEvent,
+  StatsEventProperty,
+  StatsEventPropertyValue,
+  StatsEventTiming,
   MovementEvent,
   MustyFlickEvent,
   OneTimerEvent,

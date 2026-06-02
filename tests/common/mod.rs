@@ -3,8 +3,8 @@ use std::path::Path;
 use serde::Serialize;
 use serde_json::Value;
 use subtr_actor::{
-    CoreTeamStats, MechanicEvent, MechanicEventPropertyValue, MechanicTiming, ReplayStatsFrame,
-    ReplayStatsTimeline, ReplayStatsTimelineEvents, TeamStatsSnapshot,
+    CoreTeamStats, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
+    StatsEventPropertyValue, StatsEventTiming, StatsTimelineTagEvent, TeamStatsSnapshot,
 };
 
 pub fn parse_replay(path: &str) -> boxcars::Replay {
@@ -19,10 +19,10 @@ pub fn parse_replay(path: &str) -> boxcars::Replay {
 }
 
 #[allow(dead_code)]
-pub fn mechanic_event_time_span(event: &MechanicEvent) -> (f32, f32) {
+pub fn mechanic_event_time_span(event: &StatsTimelineTagEvent) -> (f32, f32) {
     match event.timing {
-        MechanicTiming::Moment { time, .. } => (time, time),
-        MechanicTiming::Span {
+        StatsEventTiming::Moment { time, .. } => (time, time),
+        StatsEventTiming::Span {
             start_time,
             end_time,
             ..
@@ -33,7 +33,7 @@ pub fn mechanic_event_time_span(event: &MechanicEvent) -> (f32, f32) {
 #[allow(dead_code)]
 pub fn mechanic_event_player_name<'a>(
     timeline: &'a ReplayStatsTimeline,
-    event: &MechanicEvent,
+    event: &StatsTimelineTagEvent,
 ) -> Option<&'a str> {
     timeline
         .replay_meta
@@ -50,7 +50,7 @@ pub fn assert_mechanic_event_roughly_at<'a>(
     expected_start_time: f32,
     expected_end_time: f32,
     tolerance_seconds: f32,
-) -> &'a MechanicEvent {
+) -> &'a StatsTimelineTagEvent {
     let event = timeline.events.mechanics.iter().find(|event| {
         if event.kind != kind {
             return false;
@@ -85,24 +85,27 @@ pub fn assert_mechanic_event_roughly_at<'a>(
 }
 
 #[allow(dead_code)]
-pub fn mechanic_event_text_property<'a>(event: &'a MechanicEvent, key: &str) -> Option<&'a str> {
+pub fn mechanic_event_text_property<'a>(
+    event: &'a StatsTimelineTagEvent,
+    key: &str,
+) -> Option<&'a str> {
     event.properties.iter().find_map(|property| {
         (property.key == key)
             .then_some(&property.value)
             .and_then(|value| match value {
-                MechanicEventPropertyValue::Text(value) => Some(value.as_str()),
+                StatsEventPropertyValue::Text(value) => Some(value.as_str()),
                 _ => None,
             })
     })
 }
 
 #[allow(dead_code)]
-pub fn mechanic_event_unsigned_property(event: &MechanicEvent, key: &str) -> Option<u32> {
+pub fn mechanic_event_unsigned_property(event: &StatsTimelineTagEvent, key: &str) -> Option<u32> {
     event.properties.iter().find_map(|property| {
         (property.key == key)
             .then_some(&property.value)
             .and_then(|value| match value {
-                MechanicEventPropertyValue::Unsigned(value) => Some(*value),
+                StatsEventPropertyValue::Unsigned(value) => Some(*value),
                 _ => None,
             })
     })

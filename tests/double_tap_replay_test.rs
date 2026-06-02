@@ -24,12 +24,12 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
         timeline.events.mechanics.iter().any(|event| {
             event.kind == "double_tap"
                 && match event.timing {
-                    subtr_actor::MechanicTiming::Span {
+                    subtr_actor::StatsEventTiming::Span {
                         start_time,
                         end_time,
                         ..
                     } => (start_time - 174.0366).abs() < 0.05 && (end_time - 174.481).abs() < 0.05,
-                    subtr_actor::MechanicTiming::Moment { .. } => false,
+                    subtr_actor::StatsEventTiming::Moment { .. } => false,
                 }
         }),
         "expected generic mechanics stream to include the double tap"
@@ -63,14 +63,14 @@ fn tags_nuttrback_seventh_goal_as_double_tap() {
         timeline.events.mechanics.iter().any(|event| {
             event.kind == "double_tap"
                 && match event.timing {
-                    subtr_actor::MechanicTiming::Span {
+                    subtr_actor::StatsEventTiming::Span {
                         start_time,
                         end_time,
                         ..
                     } => {
                         (start_time - 343.42084).abs() < 0.05 && (end_time - 343.69733).abs() < 0.05
                     }
-                    subtr_actor::MechanicTiming::Moment { .. } => false,
+                    subtr_actor::StatsEventTiming::Moment { .. } => false,
                 }
         }),
         "expected generic mechanics stream to include nuttrback's double tap"

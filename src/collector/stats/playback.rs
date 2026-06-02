@@ -235,7 +235,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         Ok(events)
     }
 
-    fn mechanic_events_typed(&self) -> SubtrActorResult<Vec<MechanicEvent>> {
+    fn mechanic_events_typed(&self) -> SubtrActorResult<Vec<StatsTimelineTagEvent>> {
         let mut events = Vec::new();
 
         for (index, value) in self.module_array("ball_carry", "events").iter().enumerate() {
@@ -2182,13 +2182,13 @@ fn moment_mechanic_event(
     time: f32,
     player_id: PlayerId,
     is_team_0: bool,
-) -> MechanicEvent {
-    MechanicEvent {
+) -> StatsTimelineTagEvent {
+    StatsTimelineTagEvent {
         id: format!("{kind}:{frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
         is_team_0,
-        timing: MechanicTiming::Moment { frame, time },
+        timing: StatsEventTiming::Moment { frame, time },
         properties: Vec::new(),
     }
 }
@@ -2203,13 +2203,13 @@ fn span_mechanic_event(
     end_time: f32,
     player_id: PlayerId,
     is_team_0: bool,
-) -> MechanicEvent {
-    MechanicEvent {
+) -> StatsTimelineTagEvent {
+    StatsTimelineTagEvent {
         id: format!("{kind}:{start_frame}:{end_frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
         is_team_0,
-        timing: MechanicTiming::Span {
+        timing: StatsEventTiming::Span {
             start_frame,
             end_frame,
             start_time,
@@ -2219,30 +2219,30 @@ fn span_mechanic_event(
     }
 }
 
-fn mechanic_event_start_time(event: &MechanicEvent) -> f32 {
+fn mechanic_event_start_time(event: &StatsTimelineTagEvent) -> f32 {
     match event.timing {
-        MechanicTiming::Moment { time, .. } => time,
-        MechanicTiming::Span { start_time, .. } => start_time,
+        StatsEventTiming::Moment { time, .. } => time,
+        StatsEventTiming::Span { start_time, .. } => start_time,
     }
 }
 
-fn mechanic_event_text_property(key: &str, value: &str) -> MechanicEventProperty {
-    MechanicEventProperty {
+fn mechanic_event_text_property(key: &str, value: &str) -> StatsEventProperty {
+    StatsEventProperty {
         key: key.to_owned(),
-        value: MechanicEventPropertyValue::Text(value.to_owned()),
+        value: StatsEventPropertyValue::Text(value.to_owned()),
     }
 }
 
-fn mechanic_event_unsigned_property(key: &str, value: u32) -> MechanicEventProperty {
-    MechanicEventProperty {
+fn mechanic_event_unsigned_property(key: &str, value: u32) -> StatsEventProperty {
+    StatsEventProperty {
         key: key.to_owned(),
-        value: MechanicEventPropertyValue::Unsigned(value),
+        value: StatsEventPropertyValue::Unsigned(value),
     }
 }
 
 fn ball_carry_mechanic_event_properties(
     object: &serde_json::Map<String, Value>,
-) -> Vec<MechanicEventProperty> {
+) -> Vec<StatsEventProperty> {
     let mut properties = Vec::new();
     if let Some(origin) = object.get("air_dribble_origin").and_then(Value::as_str) {
         properties.push(mechanic_event_text_property("origin", origin));
@@ -2256,7 +2256,10 @@ fn ball_carry_mechanic_event_properties(
     properties
 }
 
-fn parse_ball_carry_mechanic_event(value: &Value, index: usize) -> SubtrActorResult<MechanicEvent> {
+fn parse_ball_carry_mechanic_event(
+    value: &Value,
+    index: usize,
+) -> SubtrActorResult<StatsTimelineTagEvent> {
     let object = json_object(value, "ball carry mechanic event")?;
     let serialized_kind = json_required_str(object, "kind")?;
     let kind = match serialized_kind {
@@ -2283,7 +2286,7 @@ fn parse_ball_carry_mechanic_event(value: &Value, index: usize) -> SubtrActorRes
 fn parse_dodge_reset_mechanic_event(
     value: &Value,
     index: usize,
-) -> SubtrActorResult<MechanicEvent> {
+) -> SubtrActorResult<StatsTimelineTagEvent> {
     let object = json_object(value, "dodge reset mechanic event")?;
     Ok(moment_mechanic_event(
         "flip_reset",
@@ -2503,7 +2506,10 @@ fn parse_touch_last_touch_event(value: &Value) -> SubtrActorResult<TouchLastTouc
     })
 }
 
-fn parse_flick_mechanic_event(value: &Value, index: usize) -> SubtrActorResult<MechanicEvent> {
+fn parse_flick_mechanic_event(
+    value: &Value,
+    index: usize,
+) -> SubtrActorResult<StatsTimelineTagEvent> {
     let object = json_object(value, "flick mechanic event")?;
     Ok(span_mechanic_event(
         "flick",
@@ -2548,7 +2554,7 @@ fn parse_flick_event(value: &Value) -> SubtrActorResult<FlickEvent> {
 fn parse_musty_flick_mechanic_event(
     value: &Value,
     index: usize,
-) -> SubtrActorResult<MechanicEvent> {
+) -> SubtrActorResult<StatsTimelineTagEvent> {
     let object = json_object(value, "musty flick mechanic event")?;
     Ok(span_mechanic_event(
         "musty_flick",

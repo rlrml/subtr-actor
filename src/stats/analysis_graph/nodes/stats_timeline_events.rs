@@ -271,13 +271,13 @@ fn moment_mechanic_event(
     time: f32,
     player_id: PlayerId,
     is_team_0: bool,
-) -> MechanicEvent {
-    MechanicEvent {
+) -> StatsTimelineTagEvent {
+    StatsTimelineTagEvent {
         id: format!("{kind}:{frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
         is_team_0,
-        timing: MechanicTiming::Moment { frame, time },
+        timing: StatsEventTiming::Moment { frame, time },
         properties: Vec::new(),
     }
 }
@@ -292,13 +292,13 @@ fn span_mechanic_event(
     end_time: f32,
     player_id: PlayerId,
     is_team_0: bool,
-) -> MechanicEvent {
-    MechanicEvent {
+) -> StatsTimelineTagEvent {
+    StatsTimelineTagEvent {
         id: format!("{kind}:{start_frame}:{end_frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
         is_team_0,
-        timing: MechanicTiming::Span {
+        timing: StatsEventTiming::Span {
             start_frame,
             end_frame,
             start_time,
@@ -308,21 +308,21 @@ fn span_mechanic_event(
     }
 }
 
-fn mechanic_event_text_property(key: &str, value: &str) -> MechanicEventProperty {
-    MechanicEventProperty {
+fn mechanic_event_text_property(key: &str, value: &str) -> StatsEventProperty {
+    StatsEventProperty {
         key: key.to_owned(),
-        value: MechanicEventPropertyValue::Text(value.to_owned()),
+        value: StatsEventPropertyValue::Text(value.to_owned()),
     }
 }
 
-fn mechanic_event_unsigned_property(key: &str, value: u32) -> MechanicEventProperty {
-    MechanicEventProperty {
+fn mechanic_event_unsigned_property(key: &str, value: u32) -> StatsEventProperty {
+    StatsEventProperty {
         key: key.to_owned(),
-        value: MechanicEventPropertyValue::Unsigned(value),
+        value: StatsEventPropertyValue::Unsigned(value),
     }
 }
 
-fn ball_carry_mechanic_event_properties(event: &BallCarryEvent) -> Vec<MechanicEventProperty> {
+fn ball_carry_mechanic_event_properties(event: &BallCarryEvent) -> Vec<StatsEventProperty> {
     let mut properties = Vec::new();
     if let Some(origin) = event.air_dribble_origin {
         properties.push(mechanic_event_text_property(
@@ -356,7 +356,7 @@ fn build_mechanic_events(
     half_flip: &HalfFlipCalculator,
     half_volley: &HalfVolleyCalculator,
     wavedash: &WavedashCalculator,
-) -> Vec<MechanicEvent> {
+) -> Vec<StatsTimelineTagEvent> {
     let mut events = Vec::new();
 
     for (index, event) in ball_carry.carry_events().iter().enumerate() {
@@ -573,10 +573,10 @@ fn build_mechanic_events(
     events
 }
 
-fn mechanic_event_start_time(event: &MechanicEvent) -> f32 {
+fn mechanic_event_start_time(event: &StatsTimelineTagEvent) -> f32 {
     match event.timing {
-        MechanicTiming::Moment { time, .. } => time,
-        MechanicTiming::Span { start_time, .. } => start_time,
+        StatsEventTiming::Moment { time, .. } => time,
+        StatsEventTiming::Span { start_time, .. } => start_time,
     }
 }
 

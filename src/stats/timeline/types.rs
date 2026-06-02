@@ -106,7 +106,7 @@ pub struct ReplayStatsTimelineEvents {
     pub positioning: Vec<PositioningEvent>,
     pub rotation_player: Vec<RotationPlayerEvent>,
     pub rotation_team: Vec<RotationTeamEvent>,
-    pub mechanics: Vec<MechanicEvent>,
+    pub mechanics: Vec<StatsTimelineTagEvent>,
     pub goal_context: Vec<GoalContextEvent>,
     pub backboard: Vec<BackboardBounceEvent>,
     pub ceiling_shot: Vec<CeilingShotEvent>,
@@ -142,7 +142,7 @@ pub struct ReplayStatsTimelineEvents {
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[ts(export)]
-pub enum MechanicTiming {
+pub enum StatsEventTiming {
     Moment {
         frame: usize,
         time: f32,
@@ -158,7 +158,7 @@ pub enum MechanicTiming {
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[ts(export)]
-pub enum MechanicEventPropertyValue {
+pub enum StatsEventPropertyValue {
     Text(String),
     Unsigned(u32),
     Float(f32),
@@ -167,22 +167,22 @@ pub enum MechanicEventPropertyValue {
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct MechanicEventProperty {
+pub struct StatsEventProperty {
     pub key: String,
-    pub value: MechanicEventPropertyValue,
+    pub value: StatsEventPropertyValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct MechanicEvent {
+pub struct StatsTimelineTagEvent {
     pub id: String,
     pub kind: String,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
     pub is_team_0: bool,
-    pub timing: MechanicTiming,
+    pub timing: StatsEventTiming,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub properties: Vec<MechanicEventProperty>,
+    pub properties: Vec<StatsEventProperty>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
