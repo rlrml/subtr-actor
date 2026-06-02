@@ -32,37 +32,6 @@ pub struct BumpEvent {
     pub victim_position: [f32; 3],
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct BumpPlayerStats {
-    pub bumps_inflicted: u32,
-    pub bumps_taken: u32,
-    pub team_bumps_inflicted: u32,
-    pub team_bumps_taken: u32,
-    pub last_bump_time: Option<f32>,
-    pub last_bump_frame: Option<usize>,
-    pub last_bump_strength: Option<f32>,
-    pub max_bump_strength: f32,
-    pub cumulative_bump_strength: f32,
-}
-
-impl BumpPlayerStats {
-    pub fn average_bump_strength(&self) -> f32 {
-        if self.bumps_inflicted == 0 {
-            0.0
-        } else {
-            self.cumulative_bump_strength / self.bumps_inflicted as f32
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct BumpTeamStats {
-    pub bumps_inflicted: u32,
-    pub team_bumps_inflicted: u32,
-}
-
 #[derive(Debug, Clone)]
 struct PreviousPlayerSample {
     rigid_body: boxcars::RigidBody,
@@ -78,10 +47,7 @@ struct DirectionalBumpCandidate {
 
 #[derive(Debug, Clone, Default)]
 pub struct BumpCalculator {
-    player_stats: HashMap<PlayerId, BumpPlayerStats>,
-    player_teams: HashMap<PlayerId, bool>,
-    team_zero_stats: BumpTeamStats,
-    team_one_stats: BumpTeamStats,
+    stats: BumpStatsAccumulator,
     events: Vec<BumpEvent>,
     previous_players: HashMap<PlayerId, PreviousPlayerSample>,
     last_seen_pair_frame: HashMap<(PlayerId, PlayerId), usize>,
@@ -93,15 +59,19 @@ impl BumpCalculator {
     }
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, BumpPlayerStats> {
-        &self.player_stats
+        self.stats.player_stats()
     }
 
     pub fn team_zero_stats(&self) -> &BumpTeamStats {
-        &self.team_zero_stats
+        self.stats.team_zero_stats()
     }
 
     pub fn team_one_stats(&self) -> &BumpTeamStats {
-        &self.team_one_stats
+        self.stats.team_one_stats()
+    }
+
+    pub fn stats(&self) -> &BumpStatsAccumulator {
+        &self.stats
     }
 
     pub fn events(&self) -> &[BumpEvent] {
@@ -132,11 +102,6 @@ impl BumpCalculator {
         fifty_fifty_state: &FiftyFiftyState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
-        for player in &players.players {
-            self.player_teams
-                .insert(player.player_id.clone(), player.is_team_0);
-        }
-
         if !live_play {
             self.previous_players.clear();
             return Ok(());
@@ -427,41 +392,7 @@ impl BumpCalculator {
     }
 
     fn record_bump(&mut self, event: BumpEvent) {
-        let initiator_stats = self
-            .player_stats
-            .entry(event.initiator.clone())
-            .or_default();
-        initiator_stats.bumps_inflicted += 1;
-        if event.is_team_bump {
-            initiator_stats.team_bumps_inflicted += 1;
-        }
-        initiator_stats.last_bump_time = Some(event.time);
-        initiator_stats.last_bump_frame = Some(event.frame);
-        initiator_stats.last_bump_strength = Some(event.strength);
-        initiator_stats.max_bump_strength = initiator_stats.max_bump_strength.max(event.strength);
-        initiator_stats.cumulative_bump_strength += event.strength;
-
-        let victim_stats = self.player_stats.entry(event.victim.clone()).or_default();
-        victim_stats.bumps_taken += 1;
-        if event.is_team_bump {
-            victim_stats.team_bumps_taken += 1;
-        }
-
-        match event.initiator_is_team_0 {
-            true => {
-                self.team_zero_stats.bumps_inflicted += 1;
-                if event.is_team_bump {
-                    self.team_zero_stats.team_bumps_inflicted += 1;
-                }
-            }
-            false => {
-                self.team_one_stats.bumps_inflicted += 1;
-                if event.is_team_bump {
-                    self.team_one_stats.team_bumps_inflicted += 1;
-                }
-            }
-        }
-
+        self.stats.apply_event(&event);
         self.events.push(event);
     }
 }

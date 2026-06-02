@@ -404,3 +404,75 @@ fn bump_detector_suppresses_same_pair_repeats() {
 
     assert_eq!(calculator.events().len(), 1);
 }
+
+#[test]
+fn bump_stats_accumulator_derives_summaries_from_events() {
+    let events = vec![
+        BumpEvent {
+            time: 1.0,
+            frame: 10,
+            initiator: boxcars::RemoteId::Steam(1),
+            victim: boxcars::RemoteId::Steam(2),
+            initiator_is_team_0: true,
+            victim_is_team_0: false,
+            is_team_bump: false,
+            strength: 800.0,
+            confidence: 0.75,
+            contact_distance: 120.0,
+            closing_speed: 900.0,
+            victim_impulse: 500.0,
+            initiator_position: [0.0, 0.0, 17.0],
+            victim_position: [150.0, 0.0, 17.0],
+        },
+        BumpEvent {
+            time: 2.0,
+            frame: 20,
+            initiator: boxcars::RemoteId::Steam(1),
+            victim: boxcars::RemoteId::Steam(3),
+            initiator_is_team_0: true,
+            victim_is_team_0: true,
+            is_team_bump: true,
+            strength: 1000.0,
+            confidence: 0.8,
+            contact_distance: 110.0,
+            closing_speed: 950.0,
+            victim_impulse: 600.0,
+            initiator_position: [0.0, 0.0, 17.0],
+            victim_position: [150.0, 0.0, 17.0],
+        },
+    ];
+
+    let stats = BumpStatsAccumulator::from_events(&events);
+    let initiator_stats = stats
+        .player_stats()
+        .get(&boxcars::RemoteId::Steam(1))
+        .expect("initiator should have derived stats");
+    assert_eq!(initiator_stats.bumps_inflicted, 2);
+    assert_eq!(initiator_stats.team_bumps_inflicted, 1);
+    assert_eq!(initiator_stats.last_bump_time, Some(2.0));
+    assert_eq!(initiator_stats.last_bump_frame, Some(20));
+    assert_eq!(initiator_stats.last_bump_strength, Some(1000.0));
+    assert_eq!(initiator_stats.max_bump_strength, 1000.0);
+    assert_eq!(initiator_stats.cumulative_bump_strength, 1800.0);
+    assert_eq!(initiator_stats.average_bump_strength(), 900.0);
+
+    assert_eq!(
+        stats
+            .player_stats()
+            .get(&boxcars::RemoteId::Steam(2))
+            .expect("first victim should have derived stats")
+            .bumps_taken,
+        1
+    );
+    assert_eq!(
+        stats
+            .player_stats()
+            .get(&boxcars::RemoteId::Steam(3))
+            .expect("team-bump victim should have derived stats")
+            .team_bumps_taken,
+        1
+    );
+    assert_eq!(stats.team_zero_stats().bumps_inflicted, 2);
+    assert_eq!(stats.team_zero_stats().team_bumps_inflicted, 1);
+    assert_eq!(stats.team_one_stats().bumps_inflicted, 0);
+}

@@ -113,7 +113,8 @@ impl<'a> ReplayProcessor<'a> {
 
         let kickoff_countdown_active = replicated_game_state_time_remaining
             .is_some_and(|countdown| (1..=3).contains(&countdown))
-            || (replicated_state_name == Some(crate::stats::calculators::GAME_STATE_KICKOFF_COUNTDOWN)
+            || (replicated_state_name
+                == Some(crate::stats::calculators::GAME_STATE_KICKOFF_COUNTDOWN)
                 && replicated_game_state_time_remaining.is_none());
 
         kickoff_countdown_active || ball_has_been_hit == Some(false)

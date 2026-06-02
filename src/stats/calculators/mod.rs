@@ -61,6 +61,8 @@ pub mod boost;
 pub use boost::*;
 pub mod bump;
 pub use bump::*;
+pub mod bump_stats;
+pub use bump_stats::*;
 pub mod ceiling_shot;
 pub use ceiling_shot::*;
 pub mod center;
