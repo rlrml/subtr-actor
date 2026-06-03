@@ -117,6 +117,8 @@ pub mod match_stats;
 pub use match_stats::*;
 pub mod movement;
 pub use movement::*;
+pub mod movement_stats;
+pub use movement_stats::*;
 pub mod musty_flick;
 pub use musty_flick::*;
 pub mod musty_flick_stats;
