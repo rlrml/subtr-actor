@@ -19,7 +19,7 @@ import { getAppTemplate } from "./appTemplate.ts";
 import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import { createCameraControlsController, type CameraControlsController } from "./cameraControls.ts";
-import { createStatModules, getTeamClass, RELATIVE_POSITIONING_MODULE_ID } from "./statModules.ts";
+import { createStatModules, getTeamClass } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
 import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
@@ -46,6 +46,11 @@ import {
   createEventTimelineControlsController,
   type EventTimelineControlsController,
 } from "./eventTimelineControls.ts";
+import {
+  createModuleControlsController,
+  type ModuleCapabilityKind,
+  type ModuleControlsController,
+} from "./moduleControls.ts";
 import {
   createEventPlaylistWindowController,
   type EventPlaylistWindowController,
@@ -170,17 +175,6 @@ let activeTimelineRangeModuleIds = new Set<string>();
 let activeMechanicTimelineKinds = new Set<string>();
 let activeRenderEffectModuleIds = new Set<string>();
 
-const RENDER_EFFECT_MODULE_IDS = new Set([
-  "ceiling-shot",
-  "fifty-fifty",
-  "pressure",
-  RELATIVE_POSITIONING_MODULE_ID,
-  "absolute-positioning",
-  "speed-flip",
-  "touch",
-]);
-const TOUCH_MODULE_ID = "touch";
-
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
   destroy(): void;
@@ -227,13 +221,9 @@ let replayLoadingActive!: HTMLElement;
 let replayLoadingList!: HTMLDivElement;
 let mechanicsReviewCount!: HTMLElement;
 let mechanicsReviewList!: HTMLDivElement;
-let boostPickupFiltersWindowBody!: HTMLDivElement;
-let touchControlsWindowBody!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
 let playbackRate!: HTMLSelectElement;
-let moduleSummaryEl!: HTMLDivElement;
-let moduleSettingsEl!: HTMLDivElement;
 let timeReadout!: HTMLElement;
 let frameReadout!: HTMLElement;
 let durationReadout!: HTMLElement;
@@ -253,6 +243,7 @@ let recordingWindowController: RecordingWindowController | null = null;
 let statsWindowsController: StatsWindowsController | null = null;
 let eventPlaylistController: EventPlaylistWindowController | null = null;
 let eventTimelineControlsController: EventTimelineControlsController | null = null;
+let moduleControlsController: ModuleControlsController | null = null;
 let mechanicsReviewReplayLoadsController: MechanicsReviewReplayLoadsController | null = null;
 let nextWindowZIndex = 30;
 let boostPadOverlayEnabled = true;
@@ -267,7 +258,6 @@ interface ReplayInputSource {
   readBytes(): Promise<Uint8Array>;
 }
 
-type ModuleCapabilityKind = "events" | "ranges" | "effects";
 const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "camera",
   "scoreboard",
@@ -976,72 +966,7 @@ function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
 }
 
 function renderModuleSummary(): void {
-  moduleSummaryEl.replaceChildren();
-
-  const timelineToggles: HTMLButtonElement[] = [];
-  const inGameVisualizationToggles: HTMLButtonElement[] = [];
-
-  for (const mod of MODULES) {
-    const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
-    if (!mod.getTimelineEvents && !mod.getTimelineRanges && !hasRenderEffect) {
-      continue;
-    }
-
-    if (mod.getTimelineEvents) {
-      timelineToggles.push(
-        renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "events"), "events"),
-      );
-    }
-    if (mod.getTimelineRanges) {
-      timelineToggles.push(
-        renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "ranges"), "ranges"),
-      );
-    }
-    if (hasRenderEffect) {
-      inGameVisualizationToggles.push(
-        renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "effects"), "effects"),
-      );
-    }
-  }
-
-  const boostAnimationActive = replayPlayer?.getState().boostPickupAnimationEnabled ?? false;
-  const boostAnimation = document.createElement("button");
-  boostAnimation.type = "button";
-  boostAnimation.className = "module-summary-item";
-  boostAnimation.dataset.active = boostAnimationActive ? "true" : "false";
-  boostAnimation.setAttribute("aria-pressed", boostAnimationActive ? "true" : "false");
-  boostAnimation.addEventListener("click", () => {
-    const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
-    replayPlayer?.setBoostPickupAnimationEnabled(next);
-    setupActiveModules();
-    renderModuleSummary();
-    renderModuleSettings();
-    scheduleConfigUrlUpdate();
-  });
-  const boostName = document.createElement("span");
-  boostName.textContent = "Boost pickup animation";
-  const boostState = document.createElement("strong");
-  boostState.textContent = boostAnimationActive ? "On" : "Off";
-  boostAnimation.append(boostName, boostState);
-  inGameVisualizationToggles.push(boostAnimation);
-
-  const boostPadOverlay = document.createElement("button");
-  boostPadOverlay.type = "button";
-  boostPadOverlay.className = "module-summary-item";
-  boostPadOverlay.dataset.active = boostPadOverlayEnabled ? "true" : "false";
-  boostPadOverlay.setAttribute("aria-pressed", boostPadOverlayEnabled ? "true" : "false");
-  boostPadOverlay.addEventListener("click", toggleBoostPadOverlay);
-  const boostPadName = document.createElement("span");
-  boostPadName.textContent = "Boost pad locations";
-  const boostPadState = document.createElement("strong");
-  boostPadState.textContent = boostPadOverlayEnabled ? "On" : "Off";
-  boostPadOverlay.append(boostPadName, boostPadState);
-  inGameVisualizationToggles.push(boostPadOverlay);
-
-  moduleSummaryEl.append(
-    renderModuleSummaryGroup("Timeline visualizations", timelineToggles),
-    renderModuleSummaryGroup("In-game visualizations", inGameVisualizationToggles),
-  );
+  moduleControlsController?.renderSummary();
 }
 
 function renderMechanicsTimelineControls(): void {
@@ -1442,118 +1367,8 @@ function enforceMechanicsReviewClipBoundary(state: ReplayPlayerState): boolean {
   return true;
 }
 
-function renderModuleSummaryGroup(title: string, items: HTMLButtonElement[]): HTMLElement {
-  const group = document.createElement("section");
-  group.className = "module-summary-group";
-
-  const heading = document.createElement("h3");
-  heading.textContent = title;
-
-  const list = document.createElement("div");
-  list.className = "module-list";
-  list.append(...items);
-
-  group.append(heading, list);
-  return group;
-}
-
-function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string {
-  const timelineLabels: Record<string, string> = {
-    "absolute-positioning:ranges": "Position zones",
-    "backboard:events": "Backboard",
-    "ball-carry:events": "Ball carry",
-    "boost:ranges": "Boost pickup timeline",
-    "bump:events": "Bump",
-    "ceiling-shot:events": "Ceiling shot",
-    "demo:events": "Demo",
-    "dodge-reset:events": "Dodge refresh",
-    "double-tap:events": "Double tap",
-    "fifty-fifty:events": "50/50",
-    "half-flip:events": "Half flip",
-    "musty-flick:events": "Musty flick",
-    "possession:ranges": "Possession",
-    "powerslide:events": "Powerslide",
-    "pressure:ranges": "Half control",
-    "rush:ranges": "Rush",
-    "speed-flip:events": "Speed flip",
-    "touch:events": "Touch",
-    "wavedash:events": "Wavedash",
-  };
-  const inGameVisualizationLabels: Record<string, string> = {
-    "absolute-positioning": "Position zones",
-    "ceiling-shot": "Ceiling shot labels",
-    "fifty-fifty": "50/50 labels",
-    pressure: "Half control",
-    "relative-positioning": "Player roles",
-    "speed-flip": "Speed flip labels",
-    touch: "Touch labels",
-  };
-
-  if (kind === "effects") {
-    return inGameVisualizationLabels[mod.id] ?? mod.label;
-  }
-
-  return timelineLabels[`${mod.id}:${kind}`] ?? `${mod.label} timeline`;
-}
-
-function renderCapabilityToggle(
-  moduleId: string,
-  label: string,
-  kind: ModuleCapabilityKind,
-): HTMLButtonElement {
-  const activeIds = getActiveCapabilityIds(kind);
-  const active = activeIds.has(moduleId);
-  const item = document.createElement("button");
-  item.type = "button";
-  item.className = "module-summary-item";
-  item.dataset.active = active ? "true" : "false";
-  item.setAttribute("aria-pressed", active ? "true" : "false");
-  item.addEventListener("click", () => {
-    toggleCapability(moduleId, kind, !activeIds.has(moduleId));
-  });
-
-  const name = document.createElement("span");
-  name.textContent = label;
-
-  const state = document.createElement("strong");
-  state.textContent = active ? "On" : "Off";
-
-  item.append(name, state);
-  return item;
-}
-
 function renderModuleSettings(): void {
-  moduleSettingsEl.replaceChildren();
-
-  const ctx = getModuleContext();
-  const panels = activeModules
-    .filter((mod) => mod.id !== "boost" && mod.id !== TOUCH_MODULE_ID)
-    .map((mod) => mod.renderSettings?.(ctx) ?? null)
-    .filter((panel): panel is HTMLElement => panel instanceof HTMLElement);
-
-  if (panels.length === 0) {
-    moduleSettingsEl.hidden = true;
-    renderBoostPickupFiltersWindow();
-    renderTouchControlsWindow();
-    return;
-  }
-
-  moduleSettingsEl.hidden = false;
-  moduleSettingsEl.append(...panels);
-  renderBoostPickupFiltersWindow();
-  renderTouchControlsWindow();
-}
-
-function renderBoostPickupFiltersWindow(): void {
-  if (!boostPickupFiltersWindowBody) {
-    return;
-  }
-
-  const ctx = getModuleContext();
-  const panel = boostPickupFilters.renderSettings(ctx, {
-    showHeader: false,
-  });
-  boostPickupFiltersWindowBody.replaceChildren(panel);
+  moduleControlsController?.renderSettings();
 }
 
 function formatScoreboardInteger(value: number | null | undefined): string {
@@ -1602,20 +1417,6 @@ function createScoreboardGoalValue(
   score.className = `scoreboard-goal-value ${getTeamClass(isTeamZero)}`;
   score.textContent = formatScoreboardInteger(goals);
   return score;
-}
-
-function renderTouchControlsWindow(): void {
-  if (!touchControlsWindowBody) {
-    return;
-  }
-
-  const ctx = getModuleContext();
-  const touchModule = MODULES.find((mod) => mod.id === TOUCH_MODULE_ID);
-  const panel = touchModule?.renderSettings?.(ctx) ?? null;
-  touchControlsWindowBody.replaceChildren();
-  if (panel instanceof HTMLElement) {
-    touchControlsWindowBody.append(panel);
-  }
 }
 
 function setTransportEnabled(enabled: boolean): void {
@@ -1968,11 +1769,11 @@ export function mountStatEvaluationPlayer(
   });
   mechanicsReviewCount = mustElement<HTMLElement>(root, "#mechanics-review-count");
   mechanicsReviewList = mustElement<HTMLDivElement>(root, "#mechanics-review-list");
-  boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(
+  const boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(
     root,
     "#boost-pickup-filters-window-body",
   );
-  touchControlsWindowBody = mustElement<HTMLDivElement>(root, "#touch-controls-window-body");
+  const touchControlsWindowBody = mustElement<HTMLDivElement>(root, "#touch-controls-window-body");
   statsWindowLayer = mustElement<HTMLDivElement>(root, "#stats-window-layer");
   statsWindowsController = createStatsWindowsController({
     layer: statsWindowLayer,
@@ -2041,8 +1842,32 @@ export function mountStatEvaluationPlayer(
     getReplayPlayer: () => replayPlayer,
     requestConfigSync: scheduleConfigUrlUpdate,
   });
-  moduleSummaryEl = mustElement<HTMLDivElement>(root, "#module-summary");
-  moduleSettingsEl = mustElement<HTMLDivElement>(root, "#module-settings");
+  moduleControlsController = createModuleControlsController({
+    elements: {
+      summary: mustElement<HTMLDivElement>(root, "#module-summary"),
+      settings: mustElement<HTMLDivElement>(root, "#module-settings"),
+      boostPickupFilters: boostPickupFiltersWindowBody,
+      touchControls: touchControlsWindowBody,
+    },
+    modules: MODULES,
+    boostPickupFilters,
+    getContext: getModuleContext,
+    getActiveModules: () => activeModules,
+    getActiveCapabilityIds,
+    getBoostPickupAnimationEnabled: () =>
+      replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
+    getBoostPadOverlayEnabled: () => boostPadOverlayEnabled,
+    toggleCapability,
+    toggleBoostPickupAnimation() {
+      const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
+      replayPlayer?.setBoostPickupAnimationEnabled(next);
+      setupActiveModules();
+      renderModuleSummary();
+      renderModuleSettings();
+      scheduleConfigUrlUpdate();
+    },
+    toggleBoostPadOverlay,
+  });
   timeReadout = mustElement<HTMLElement>(root, "#time-readout");
   frameReadout = mustElement<HTMLElement>(root, "#frame-readout");
   durationReadout = mustElement<HTMLElement>(root, "#duration-readout");
@@ -2135,6 +1960,7 @@ export function mountStatEvaluationPlayer(
     loadedReplayName = null;
     cameraControlsController = null;
     recordingWindowController = null;
+    moduleControlsController = null;
     initialUrlConfig = null;
     if (configUrlUpdateTimer !== null) {
       window.clearTimeout(configUrlUpdateTimer);
