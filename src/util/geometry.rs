@@ -166,3 +166,7 @@ pub fn get_interpolated_rigid_body(
         angular_velocity: start_body.angular_velocity,
     })
 }
+
+#[cfg(test)]
+#[path = "geometry_tests.rs"]
+mod tests;

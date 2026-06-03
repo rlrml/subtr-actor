@@ -46,7 +46,7 @@
 //! ## Stats and exports
 //!
 //! The [`stats`] module houses analysis calculators, graph nodes, stat
-//! mechanics helpers, and the exported stat-field model built around
+//! event calculators, and the exported stat-field model built around
 //! [`ExportedStat`].
 //!
 //! ## Examples
@@ -121,20 +121,24 @@
 pub mod collector;
 pub mod constants;
 pub mod error;
-pub mod geometry;
-pub mod mechanics;
 pub mod playlist_generation;
 pub mod processor;
 pub mod replay_meta;
 pub mod replay_plausibility;
 pub mod replay_types;
-pub mod search;
 pub mod stats;
 pub mod ts_bindings;
-pub mod vec_map;
+pub mod util;
 
-#[cfg(test)]
-mod shared_test;
+pub mod geometry {
+    //! Compatibility re-export for geometry helpers.
+    pub use crate::util::geometry::*;
+}
+
+pub mod search {
+    //! Compatibility re-export for search helpers.
+    pub use crate::util::search::*;
+}
 
 pub mod actor_state {
     //! Compatibility re-export for processor actor-state types.
@@ -146,7 +150,6 @@ pub use crate::collector::*;
 pub use crate::constants::*;
 pub use crate::error::*;
 pub use crate::geometry::*;
-pub use crate::mechanics::*;
 pub use crate::playlist_generation::*;
 pub use crate::processor::*;
 pub use crate::replay_meta::*;
@@ -154,4 +157,4 @@ pub use crate::replay_plausibility::*;
 pub use crate::replay_types::*;
 pub use crate::search::*;
 pub use crate::stats::*;
-pub(crate) use crate::vec_map::*;
+pub(crate) use crate::util::vec_map::*;

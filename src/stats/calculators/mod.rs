@@ -46,8 +46,6 @@ pub mod demo;
 pub use demo::*;
 mod flip_reset;
 pub use flip_reset::*;
-mod flip_reset_tuning_set;
-pub use flip_reset_tuning_set::*;
 pub mod dodge_reset;
 pub use dodge_reset::*;
 pub mod double_tap;

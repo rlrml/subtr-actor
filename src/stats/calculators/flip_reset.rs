@@ -718,3 +718,7 @@ impl Collector for FlipResetTracker {
         Ok(TimeAdvance::NextFrame)
     }
 }
+
+#[cfg(test)]
+#[path = "flip_reset_tests.rs"]
+mod tests;
