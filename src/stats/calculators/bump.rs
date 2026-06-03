@@ -48,7 +48,7 @@ struct DirectionalBumpCandidate {
 #[derive(Debug, Clone, Default)]
 pub struct BumpCalculator {
     stats: BumpStatsAccumulator,
-    events: Vec<BumpEvent>,
+    events: EventStream<BumpEvent>,
     previous_players: HashMap<PlayerId, PreviousPlayerSample>,
     last_seen_pair_frame: HashMap<(PlayerId, PlayerId), usize>,
 }
@@ -75,7 +75,11 @@ impl BumpCalculator {
     }
 
     pub fn events(&self) -> &[BumpEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[BumpEvent] {
+        self.events.new_events()
     }
 
     pub fn update(
@@ -102,6 +106,8 @@ impl BumpCalculator {
         fifty_fifty_state: &FiftyFiftyState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
+
         if !live_play {
             self.previous_players.clear();
             return Ok(());

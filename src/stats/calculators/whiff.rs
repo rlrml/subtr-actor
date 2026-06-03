@@ -150,7 +150,7 @@ struct ActiveWhiffCandidate {
 pub struct WhiffCalculator {
     player_stats: HashMap<PlayerId, WhiffStats>,
     active_candidates: HashMap<PlayerId, ActiveWhiffCandidate>,
-    events: Vec<WhiffEvent>,
+    events: EventStream<WhiffEvent>,
     current_last_whiff_player: Option<PlayerId>,
 }
 
@@ -164,7 +164,11 @@ impl WhiffCalculator {
     }
 
     pub fn events(&self) -> &[WhiffEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[WhiffEvent] {
+        self.events.new_events()
     }
 
     fn hitbox_distance(ball_position: glam::Vec3, player: &PlayerSample) -> Option<f32> {
@@ -431,6 +435,7 @@ impl WhiffCalculator {
         touch_state: &TouchState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if !live_play {
             self.active_candidates.clear();
             self.current_last_whiff_player = None;

@@ -339,7 +339,7 @@ impl PossessionTracker {
 pub struct PossessionCalculator {
     stats: PossessionStats,
     tracker: PossessionTracker,
-    events: Vec<PossessionEvent>,
+    events: EventStream<PossessionEvent>,
     last_emitted_event_state: Option<PossessionEventState>,
 }
 
@@ -360,7 +360,11 @@ impl PossessionCalculator {
     }
 
     pub fn events(&self) -> &[PossessionEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[PossessionEvent] {
+        self.events.new_events()
     }
 
     fn apply_possession_time(
@@ -415,6 +419,7 @@ impl PossessionCalculator {
         possession_state: &PossessionState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if !live_play_state.is_live_play {
             self.emit_event_if_changed(frame, false, PossessionStateLabel::Neutral, None);
             return Ok(());

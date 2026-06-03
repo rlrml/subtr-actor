@@ -269,78 +269,78 @@ struct GoalTaggingContext<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AerialGoalCalculator {
     config: AerialGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HighAerialGoalCalculator {
     config: HighAerialGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LongDistanceGoalCalculator {
     config: LongDistanceGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OwnHalfGoalCalculator {
     config: OwnHalfGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EmptyNetGoalCalculator {
     config: EmptyNetGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CounterAttackGoalCalculator {
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlickGoalCalculator {
     config: FlickGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoubleTapGoalCalculator {
     config: DoubleTapGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OneTimerGoalCalculator {
     config: OneTimerGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PassingGoalCalculator {
     config: PassingGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AirDribbleGoalCalculator {
     config: AirDribbleGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlipResetGoalCalculator {
     config: FlipResetGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HalfVolleyGoalCalculator {
     config: HalfVolleyGoalCalculatorConfig,
-    events: Vec<GoalTagEvent>,
+    events: EventStream<GoalTagEvent>,
 }
 
 macro_rules! impl_goal_tag_calculator {
@@ -359,7 +359,7 @@ macro_rules! impl_goal_tag_calculator {
             pub fn with_config(config: $config) -> Self {
                 Self {
                     config,
-                    events: Vec::new(),
+                    events: EventStream::new(),
                 }
             }
 
@@ -368,7 +368,11 @@ macro_rules! impl_goal_tag_calculator {
             }
 
             pub fn events(&self) -> &[GoalTagEvent] {
-                &self.events
+                self.events.all()
+            }
+
+            pub fn new_events(&self) -> &[GoalTagEvent] {
+                self.events.new_events()
             }
         }
     };
@@ -394,11 +398,17 @@ impl Default for CounterAttackGoalCalculator {
 
 impl CounterAttackGoalCalculator {
     pub fn new() -> Self {
-        Self { events: Vec::new() }
+        Self {
+            events: EventStream::new(),
+        }
     }
 
     pub fn events(&self) -> &[GoalTagEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[GoalTagEvent] {
+        self.events.new_events()
     }
 }
 
@@ -416,7 +426,7 @@ impl HalfVolleyGoalCalculator {
     pub fn with_config(config: HalfVolleyGoalCalculatorConfig) -> Self {
         Self {
             config,
-            events: Vec::new(),
+            events: EventStream::new(),
         }
     }
 
@@ -425,13 +435,18 @@ impl HalfVolleyGoalCalculator {
     }
 
     pub fn events(&self) -> &[GoalTagEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[GoalTagEvent] {
+        self.events.new_events()
     }
 }
 
 impl AerialGoalCalculator {
     pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events());
+        self.events
+            .replace_all_assuming_append_only(self.tag_goals(match_stats.goal_context_events()));
         Ok(())
     }
 
@@ -442,7 +457,8 @@ impl AerialGoalCalculator {
 
 impl HighAerialGoalCalculator {
     pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events());
+        self.events
+            .replace_all_assuming_append_only(self.tag_goals(match_stats.goal_context_events()));
         Ok(())
     }
 
@@ -453,7 +469,8 @@ impl HighAerialGoalCalculator {
 
 impl LongDistanceGoalCalculator {
     pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events());
+        self.events
+            .replace_all_assuming_append_only(self.tag_goals(match_stats.goal_context_events()));
         Ok(())
     }
 
@@ -468,7 +485,8 @@ impl LongDistanceGoalCalculator {
 
 impl OwnHalfGoalCalculator {
     pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events());
+        self.events
+            .replace_all_assuming_append_only(self.tag_goals(match_stats.goal_context_events()));
         Ok(())
     }
 
@@ -484,7 +502,8 @@ impl OwnHalfGoalCalculator {
 
 impl EmptyNetGoalCalculator {
     pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events());
+        self.events
+            .replace_all_assuming_append_only(self.tag_goals(match_stats.goal_context_events()));
         Ok(())
     }
 
@@ -550,7 +569,8 @@ impl EmptyNetGoalCalculator {
 
 impl CounterAttackGoalCalculator {
     pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events());
+        self.events
+            .replace_all_assuming_append_only(self.tag_goals(match_stats.goal_context_events()));
         Ok(())
     }
 
@@ -577,7 +597,9 @@ impl FlickGoalCalculator {
         match_stats: &MatchStatsCalculator,
         flick: &FlickCalculator,
     ) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events(), flick.events());
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), flick.events()),
+        );
         Ok(())
     }
 
@@ -597,7 +619,9 @@ impl OneTimerGoalCalculator {
         match_stats: &MatchStatsCalculator,
         one_timer: &OneTimerCalculator,
     ) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events(), one_timer.events());
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), one_timer.events()),
+        );
         Ok(())
     }
 
@@ -617,7 +641,9 @@ impl PassingGoalCalculator {
         match_stats: &MatchStatsCalculator,
         pass: &PassCalculator,
     ) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events(), pass.events());
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), pass.events()),
+        );
         Ok(())
     }
 
@@ -656,7 +682,9 @@ impl DoubleTapGoalCalculator {
         match_stats: &MatchStatsCalculator,
         double_tap: &DoubleTapCalculator,
     ) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events(), double_tap.events());
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), double_tap.events()),
+        );
         Ok(())
     }
 
@@ -680,7 +708,9 @@ impl AirDribbleGoalCalculator {
         match_stats: &MatchStatsCalculator,
         ball_carry: &BallCarryCalculator,
     ) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events(), ball_carry.carry_events());
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), ball_carry.carry_events()),
+        );
         Ok(())
     }
 
@@ -699,10 +729,10 @@ impl FlipResetGoalCalculator {
         match_stats: &MatchStatsCalculator,
         dodge_reset: &DodgeResetCalculator,
     ) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(
+        self.events.replace_all_assuming_append_only(self.tag_goals(
             match_stats.goal_context_events(),
             dodge_reset.confirmed_flip_reset_events(),
-        );
+        ));
         Ok(())
     }
 
@@ -726,7 +756,9 @@ impl HalfVolleyGoalCalculator {
         match_stats: &MatchStatsCalculator,
         half_volley: &HalfVolleyCalculator,
     ) -> SubtrActorResult<()> {
-        self.events = self.tag_goals(match_stats.goal_context_events(), half_volley.events());
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), half_volley.events()),
+        );
         Ok(())
     }
 

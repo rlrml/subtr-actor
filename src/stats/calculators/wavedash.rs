@@ -96,7 +96,7 @@ struct ActiveWavedashCandidate {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WavedashCalculator {
     player_stats: HashMap<PlayerId, WavedashStats>,
-    events: Vec<WavedashEvent>,
+    events: EventStream<WavedashEvent>,
     active_candidates: HashMap<PlayerId, ActiveWavedashCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     current_last_wavedash_player: Option<PlayerId>,
@@ -112,7 +112,11 @@ impl WavedashCalculator {
     }
 
     pub fn events(&self) -> &[WavedashEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[WavedashEvent] {
+        self.events.new_events()
     }
 
     fn horizontal_speed(player: &PlayerSample) -> f32 {
@@ -294,6 +298,7 @@ impl WavedashCalculator {
         players: &PlayerFrameState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if !live_play {
             self.active_candidates.clear();
             self.current_last_wavedash_player = None;

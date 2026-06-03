@@ -34,7 +34,7 @@ pub struct PowerslideCalculator {
     team_zero_stats: PowerslideStats,
     team_one_stats: PowerslideStats,
     last_active: HashMap<PlayerId, bool>,
-    events: Vec<PowerslideEvent>,
+    events: EventStream<PowerslideEvent>,
 }
 
 impl PowerslideCalculator {
@@ -55,7 +55,11 @@ impl PowerslideCalculator {
     }
 
     pub fn events(&self) -> &[PowerslideEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[PowerslideEvent] {
+        self.events.new_events()
     }
 
     fn is_effective_powerslide(player: &PlayerSample) -> bool {
@@ -72,6 +76,7 @@ impl PowerslideCalculator {
         players: &PlayerFrameState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         for player in &players.players {
             let effective_powerslide = Self::is_effective_powerslide(player);
             let previous_active = self

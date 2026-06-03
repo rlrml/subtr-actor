@@ -118,7 +118,7 @@ struct ActiveSpeedFlipCandidate {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpeedFlipCalculator {
     player_stats: HashMap<PlayerId, SpeedFlipStats>,
-    events: Vec<SpeedFlipEvent>,
+    events: EventStream<SpeedFlipEvent>,
     active_candidates: HashMap<PlayerId, ActiveSpeedFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     kickoff_approach_active_last_frame: bool,
@@ -136,7 +136,11 @@ impl SpeedFlipCalculator {
     }
 
     pub fn events(&self) -> &[SpeedFlipEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[SpeedFlipEvent] {
+        self.events.new_events()
     }
 
     fn kickoff_approach_active(gameplay: &GameplayState) -> bool {
@@ -541,6 +545,7 @@ impl SpeedFlipCalculator {
         players: &PlayerFrameState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         let kickoff_approach_active = Self::kickoff_approach_active(gameplay);
         if !live_play && !kickoff_approach_active {
             self.active_candidates.clear();

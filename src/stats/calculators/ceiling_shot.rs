@@ -107,7 +107,7 @@ struct CeilingContactObservation {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CeilingShotCalculator {
     player_stats: HashMap<PlayerId, CeilingShotStats>,
-    events: Vec<CeilingShotEvent>,
+    events: EventStream<CeilingShotEvent>,
     recent_ceiling_contacts: HashMap<PlayerId, RecentCeilingContact>,
     previous_ball_velocity: Option<glam::Vec3>,
     current_last_ceiling_shot_player: Option<PlayerId>,
@@ -123,7 +123,11 @@ impl CeilingShotCalculator {
     }
 
     pub fn events(&self) -> &[CeilingShotEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[CeilingShotEvent] {
+        self.events.new_events()
     }
 
     fn normalize_score(value: f32, min_value: f32, max_value: f32) -> f32 {
@@ -396,6 +400,7 @@ impl CeilingShotCalculator {
         touch_events: &[TouchEvent],
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if !live_play {
             self.reset_live_play_state(ball);
             return Ok(());

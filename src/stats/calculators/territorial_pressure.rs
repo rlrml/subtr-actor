@@ -146,7 +146,7 @@ impl Default for TerritorialPressureCalculatorConfig {
 pub struct TerritorialPressureCalculator {
     config: TerritorialPressureCalculatorConfig,
     stats: TerritorialPressureStats,
-    events: Vec<TerritorialPressureEvent>,
+    events: EventStream<TerritorialPressureEvent>,
     candidate: Option<CandidateTerritorialPressureSession>,
     active: Option<ActiveTerritorialPressureSession>,
     last_frame: Option<TerritorialPressureFrameMarker>,
@@ -206,7 +206,11 @@ impl TerritorialPressureCalculator {
     }
 
     pub fn events(&self) -> &[TerritorialPressureEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[TerritorialPressureEvent] {
+        self.events.new_events()
     }
 
     pub fn config(&self) -> &TerritorialPressureCalculatorConfig {
@@ -475,6 +479,7 @@ impl TerritorialPressureCalculator {
         possession_state: &PossessionState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         self.last_frame = Some(frame.into());
         if !live_play_state.is_live_play {
             self.candidate = None;

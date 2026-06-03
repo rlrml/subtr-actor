@@ -160,7 +160,7 @@ struct RecentDodgeStart {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlickCalculator {
     player_stats: HashMap<PlayerId, FlickStats>,
-    events: Vec<FlickEvent>,
+    events: EventStream<FlickEvent>,
     active_setups: HashMap<PlayerId, ActiveFlickSetup>,
     recent_setups: HashMap<PlayerId, FlickSetupSummary>,
     recent_dodge_starts: HashMap<PlayerId, RecentDodgeStart>,
@@ -179,7 +179,11 @@ impl FlickCalculator {
     }
 
     pub fn events(&self) -> &[FlickEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[FlickEvent] {
+        self.events.new_events()
     }
 
     fn normalize_score(value: f32, min_value: f32, max_value: f32) -> f32 {
@@ -578,6 +582,7 @@ impl FlickCalculator {
         touch_state: &TouchState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if !live_play_state.is_live_play {
             self.reset_live_play_state(ball);
             return Ok(());

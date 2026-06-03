@@ -117,7 +117,7 @@ pub struct CenterCalculator {
     player_stats: HashMap<PlayerId, CenterPlayerStats>,
     team_zero_stats: CenterTeamStats,
     team_one_stats: CenterTeamStats,
-    events: Vec<CenterEvent>,
+    events: EventStream<CenterEvent>,
     pending_touch: Option<PendingCenterTouch>,
     current_last_center_player: Option<PlayerId>,
 }
@@ -140,7 +140,11 @@ impl CenterCalculator {
     }
 
     pub fn events(&self) -> &[CenterEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[CenterEvent] {
+        self.events.new_events()
     }
 
     fn begin_sample(&mut self, frame: &FrameInfo) {
@@ -289,6 +293,7 @@ impl CenterCalculator {
         frame_events: &FrameEventsState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         self.begin_sample(frame);
         if !live_play {
             self.pending_touch = None;

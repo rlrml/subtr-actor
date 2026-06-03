@@ -214,7 +214,7 @@ struct ArmedWallAerial {
 #[derive(Debug, Clone, Default)]
 pub struct WallAerialCalculator {
     player_stats: HashMap<PlayerId, WallAerialStats>,
-    events: Vec<WallAerialEvent>,
+    events: EventStream<WallAerialEvent>,
     active_wall_controls: HashMap<PlayerId, ActiveWallControl>,
     recent_wall_contacts: HashMap<PlayerId, RecentWallContact>,
     armed_aerials: HashMap<PlayerId, ArmedWallAerial>,
@@ -233,7 +233,11 @@ impl WallAerialCalculator {
     }
 
     pub fn events(&self) -> &[WallAerialEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[WallAerialEvent] {
+        self.events.new_events()
     }
 
     fn begin_sample(&mut self, frame: &FrameInfo) {
@@ -560,6 +564,7 @@ impl WallAerialCalculator {
         touch_state: &TouchState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         self.begin_sample(frame);
         if !live_play {
             self.active_wall_controls.clear();

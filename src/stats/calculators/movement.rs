@@ -168,7 +168,7 @@ pub struct MovementCalculator {
     previous_positions: HashMap<PlayerId, glam::Vec3>,
     team_zero_stats: MovementStats,
     team_one_stats: MovementStats,
-    events: Vec<MovementEvent>,
+    events: EventStream<MovementEvent>,
 }
 
 impl MovementCalculator {
@@ -189,7 +189,11 @@ impl MovementCalculator {
     }
 
     pub fn events(&self) -> &[MovementEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[MovementEvent] {
+        self.events.new_events()
     }
 
     fn classify_movement(speed: f32, height_band: PlayerVerticalBand) -> MovementClassification {
@@ -234,6 +238,7 @@ impl MovementCalculator {
         vertical_state: &PlayerVerticalState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if frame.dt == 0.0 {
             for player in &players.players {
                 if let Some(position) = player.position() {

@@ -106,7 +106,7 @@ pub struct HalfVolleyCalculator {
     player_stats: HashMap<PlayerId, HalfVolleyPlayerStats>,
     team_zero_stats: HalfVolleyTeamStats,
     team_one_stats: HalfVolleyTeamStats,
-    events: Vec<HalfVolleyEvent>,
+    events: EventStream<HalfVolleyEvent>,
     last_floor_bounce: Option<FloorBounce>,
     last_ground_contacts: HashMap<PlayerId, GroundContact>,
     recent_dodge_starts: HashMap<PlayerId, DodgeStart>,
@@ -144,7 +144,11 @@ impl HalfVolleyCalculator {
     }
 
     pub fn events(&self) -> &[HalfVolleyEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[HalfVolleyEvent] {
+        self.events.new_events()
     }
 
     fn begin_sample(&mut self, frame: &FrameInfo) {
@@ -314,6 +318,7 @@ impl HalfVolleyCalculator {
         touch_state: &TouchState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         self.begin_sample(frame);
         if !live_play {
             self.last_floor_bounce = None;

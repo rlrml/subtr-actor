@@ -500,7 +500,7 @@ impl FiftyFiftyStats {
 pub struct FiftyFiftyCalculator {
     stats: FiftyFiftyStats,
     player_stats: HashMap<PlayerId, FiftyFiftyPlayerStats>,
-    events: Vec<FiftyFiftyEvent>,
+    events: EventStream<FiftyFiftyEvent>,
 }
 
 impl FiftyFiftyCalculator {
@@ -517,7 +517,11 @@ impl FiftyFiftyCalculator {
     }
 
     pub fn events(&self) -> &[FiftyFiftyEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[FiftyFiftyEvent] {
+        self.events.new_events()
     }
 
     fn apply_event(&mut self, event: &FiftyFiftyEvent) {
@@ -613,6 +617,7 @@ impl FiftyFiftyCalculator {
     }
 
     pub fn update(&mut self, fifty_fifty_state: &FiftyFiftyState) -> SubtrActorResult<()> {
+        self.events.begin_update();
         for event in &fifty_fifty_state.resolved_events {
             self.apply_event(event);
         }

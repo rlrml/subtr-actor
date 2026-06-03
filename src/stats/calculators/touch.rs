@@ -244,9 +244,9 @@ struct PendingFiftyFiftyMovement {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchCalculator {
     player_stats: HashMap<PlayerId, TouchStats>,
-    events: Vec<TouchStatsEvent>,
-    ball_movement_events: Vec<TouchBallMovementEvent>,
-    last_touch_events: Vec<TouchLastTouchEvent>,
+    events: EventStream<TouchStatsEvent>,
+    ball_movement_events: EventStream<TouchBallMovementEvent>,
+    last_touch_events: EventStream<TouchLastTouchEvent>,
     current_last_touch_player: Option<PlayerId>,
     previous_ball_velocity: Option<glam::Vec3>,
     previous_ball_position: Option<glam::Vec3>,
@@ -263,15 +263,27 @@ impl TouchCalculator {
     }
 
     pub fn events(&self) -> &[TouchStatsEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[TouchStatsEvent] {
+        self.events.new_events()
     }
 
     pub fn ball_movement_events(&self) -> &[TouchBallMovementEvent] {
-        &self.ball_movement_events
+        self.ball_movement_events.all()
+    }
+
+    pub fn new_ball_movement_events(&self) -> &[TouchBallMovementEvent] {
+        self.ball_movement_events.new_events()
     }
 
     pub fn last_touch_events(&self) -> &[TouchLastTouchEvent] {
-        &self.last_touch_events
+        self.last_touch_events.all()
+    }
+
+    pub fn new_last_touch_events(&self) -> &[TouchLastTouchEvent] {
+        self.last_touch_events.new_events()
     }
 
     fn ball_speed_change(
@@ -657,6 +669,9 @@ impl TouchCalculator {
         fifty_fifty_state: &FiftyFiftyState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
+        self.ball_movement_events.begin_update();
+        self.last_touch_events.begin_update();
         if !live_play {
             self.current_last_touch_player = None;
             self.previous_ball_velocity = ball.velocity();
