@@ -3,16 +3,16 @@ import { createReplayScene, updateBoostMeter, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import {
   DEFAULT_CAMERA_VIEW_MODE,
+  getActiveDemoEvent,
+  getKickoffSkipTargetTime,
+  getPostGoalTransitionSkipTargetTime,
+  isPlayerSamplePresent,
   normalizeCustomCameraSettings,
   resolveInitialPlayerSettings,
-} from "./player-initial-settings";
-import { updateReplayBallRender } from "./player-ball-render";
-import {
-  getActiveDemoEvent,
-  isPlayerSamplePresent,
   updateBoostTrail,
   updateDemoIndicator,
-} from "./player-render-effects";
+  updateReplayBallRender,
+} from "./player-helpers";
 import {
   clampFrameIndex,
   computeTimelineSegments,
@@ -24,10 +24,6 @@ import {
   projectReplayTimeToTimeline,
   projectTimelineTimeToReplay,
 } from "./player-internals/timeline";
-import {
-  getKickoffSkipTargetTime,
-  getPostGoalTransitionSkipTargetTime,
-} from "./player-skip-targets";
 import {
   getFreeCameraPreset,
   interpolateQuaternion,
