@@ -1,7 +1,6 @@
 import "./styles.css";
 import {
   createBallchasingOverlayPlugin,
-  createBoostPadOverlayPlugin,
   createBoostPickupAnimationPlugin,
   createCanvasRecorderPlugin,
   createTimelineOverlayPlugin,
@@ -20,7 +19,7 @@ import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import { createCameraControlsController, type CameraControlsController } from "./cameraControls.ts";
 import { createStatModules } from "./statModules.ts";
-import type { StatModule, StatModuleContext } from "./statModules.ts";
+import type { StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
 import { applyConfigAdapterSnapshot } from "./configAdapters.ts";
 import type { StatsFrameLookup, StatsTimeline } from "./statsTimeline.ts";
@@ -31,11 +30,7 @@ import {
   type RenderStatsWindowsOptions,
   type StatsWindowsController,
 } from "./statsWindows.ts";
-import {
-  filterReplayTimelineEvents,
-  getMechanicKinds,
-  mechanicKindToModuleId,
-} from "./timelineMarkers.ts";
+import { filterReplayTimelineEvents } from "./timelineMarkers.ts";
 import { getEventPlaylistSources as getEventPlaylistSourcesFromTimelineSources } from "./eventTimelineSources.ts";
 import {
   createEventTimelineControlsController,
@@ -75,6 +70,7 @@ import {
   type PlaybackReadoutsController,
 } from "./playbackReadouts.ts";
 import { installMountEventListeners } from "./mountEventListeners.ts";
+import { createActiveModulesRuntime } from "./activeModulesRuntime.ts";
 import {
   getMechanicsReviewMechanicKind,
   getMechanicsReviewUrlFromLocation,
@@ -121,12 +117,7 @@ let canvasRecorder: CanvasRecorderPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: StatsFrameLookup | null = null;
 let unsubscribe: (() => void) | null = null;
-let removeRenderHook: (() => void) | null = null;
 let lastPlayingSnapshotUiUpdateAt = 0;
-
-const timelineSourceRemovers = new Map<string, () => void>();
-const timelineRangeSourceRemovers = new Map<string, () => void>();
-const standalonePluginRemovers = new Map<string, () => void>();
 
 const boostPickupFilters = createBoostPickupFilterController({
   refreshTimelineRanges() {
@@ -167,11 +158,24 @@ const MODULES = createStatModules(
   },
 );
 
-let activeModules: StatModule[] = [];
-let activeTimelineEventSourceIds = new Set<string>();
-let activeTimelineRangeModuleIds = new Set<string>();
-let activeMechanicTimelineKinds = new Set<string>();
-let activeRenderEffectModuleIds = new Set<string>();
+const activeModulesRuntime = createActiveModulesRuntime({
+  modules: MODULES,
+  boostPickupFilters,
+  getContext: getModuleContext,
+  getReplayPlayer: () => replayPlayer,
+  getTimelineOverlay: () => timelineOverlay,
+  getEventTimelineSources,
+  withTimelineEventSeekTimes,
+  renderModuleSummary,
+  renderModuleSettings,
+  renderStatsWindows() {
+    if (replayPlayer) {
+      renderStatsWindows(replayPlayer.getState().frameIndex);
+    }
+  },
+  renderTimelineEventCount,
+  requestConfigSync: scheduleConfigUrlUpdate,
+});
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -225,26 +229,13 @@ let mechanicsReviewController: MechanicsReviewWindowController | null = null;
 let floatingWindowController: FloatingWindowController | null = null;
 let scoreboardWindowController: ScoreboardWindowController | null = null;
 let playbackReadoutsController: PlaybackReadoutsController | null = null;
-let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
 let isApplyingConfig = false;
 let configUrlUpdateTimer: number | null = null;
 
-function getActiveModuleIds(): Set<string> {
-  return new Set([
-    ...activeTimelineEventSourceIds,
-    ...activeTimelineRangeModuleIds,
-    ...activeRenderEffectModuleIds,
-  ]);
-}
-
-function getActiveCapabilityIds(kind: ModuleCapabilityKind): Set<string> {
-  return kind === "events"
-    ? activeTimelineEventSourceIds
-    : kind === "ranges"
-      ? activeTimelineRangeModuleIds
-      : activeRenderEffectModuleIds;
+function getActiveCapabilityIds(kind: ModuleCapabilityKind): ReadonlySet<string> {
+  return activeModulesRuntime.getActiveCapabilityIds(kind);
 }
 
 function clearRenderCaches(): void {}
@@ -264,171 +255,47 @@ function getModuleContext(): StatModuleContext | null {
 }
 
 function setupActiveModules(): void {
-  teardownActiveModules();
-
-  const ctx = getModuleContext();
-  if (!ctx) return;
-
-  const activeSourceIds = getActiveModuleIds();
-  activeModules = MODULES.filter((mod) => activeSourceIds.has(mod.id));
-  boostPickupFilters.setup(ctx);
-
-  for (const mod of activeModules) {
-    mod.setup(ctx);
-  }
-
-  removeRenderHook = ctx.player.onBeforeRender((info) => {
-    for (const mod of activeModules) {
-      if (activeRenderEffectModuleIds.has(mod.id)) {
-        mod.onBeforeRender(info);
-      }
-    }
-  });
-
-  syncTimelineEvents();
-  syncTimelineRanges();
-  clearRenderCaches();
+  activeModulesRuntime.setupActiveModules();
 }
 
 function migrateMechanicBackedTimelineEventSelections(): void {
-  for (const kind of getMechanicKinds(statsTimeline)) {
-    const moduleId = mechanicKindToModuleId(kind);
-    if (activeTimelineEventSourceIds.delete(moduleId)) {
-      activeMechanicTimelineKinds.add(kind);
-    }
-  }
+  activeModulesRuntime.migrateMechanicBackedTimelineEventSelections();
 }
 
 function teardownActiveModules(): void {
-  removeRenderHook?.();
-  removeRenderHook = null;
-  clearTimelineEventSources();
-  clearTimelineRangeSources();
-
-  for (const mod of activeModules) {
-    mod.teardown();
-  }
-  activeModules = [];
-  clearRenderCaches();
+  activeModulesRuntime.teardownActiveModules();
 }
 
 function toggleCapability(id: string, kind: ModuleCapabilityKind, enabled: boolean): void {
-  const activeIds = getActiveCapabilityIds(kind);
-  if (enabled) {
-    activeIds.add(id);
-  } else {
-    activeIds.delete(id);
-  }
-
-  setupActiveModules();
-  renderModuleSummary();
-  renderModuleSettings();
-  if (replayPlayer) {
-    const state = replayPlayer.getState();
-    renderStatsWindows(state.frameIndex);
-  }
-  renderTimelineEventCount();
-  scheduleConfigUrlUpdate();
+  activeModulesRuntime.toggleCapability(id, kind, enabled);
 }
 
 function clearTimelineEventSources(): void {
-  for (const removeSource of timelineSourceRemovers.values()) {
-    removeSource();
-  }
-  timelineSourceRemovers.clear();
+  activeModulesRuntime.clearTimelineEventSources();
 }
 
 function clearTimelineRangeSources(): void {
-  for (const removeSource of timelineRangeSourceRemovers.values()) {
-    removeSource();
-  }
-  timelineRangeSourceRemovers.clear();
+  activeModulesRuntime.clearTimelineRangeSources();
 }
 
 function clearStandalonePlugins(): void {
-  for (const removePlugin of standalonePluginRemovers.values()) {
-    removePlugin();
-  }
-  standalonePluginRemovers.clear();
+  activeModulesRuntime.clearStandalonePlugins();
 }
 
 function syncBoostPadOverlayPlugin(): void {
-  standalonePluginRemovers.get("boost-pad-overlay")?.();
-  standalonePluginRemovers.delete("boost-pad-overlay");
-
-  if (!replayPlayer || !boostPadOverlayEnabled) {
-    return;
-  }
-
-  standalonePluginRemovers.set(
-    "boost-pad-overlay",
-    replayPlayer.addPlugin(createBoostPadOverlayPlugin()),
-  );
+  activeModulesRuntime.syncBoostPadOverlayPlugin();
 }
 
 function toggleBoostPadOverlay(): void {
-  boostPadOverlayEnabled = !boostPadOverlayEnabled;
-  syncBoostPadOverlayPlugin();
-  renderModuleSummary();
-  scheduleConfigUrlUpdate();
+  activeModulesRuntime.toggleBoostPadOverlay();
 }
 
 function syncTimelineEvents(): void {
-  clearTimelineEventSources();
-
-  const ctx = getModuleContext();
-  if (!timelineOverlay || !ctx) {
-    return;
-  }
-
-  for (const source of getEventTimelineSources(ctx)) {
-    if (!source.active) {
-      continue;
-    }
-    const events = source.buildTimelineEvents();
-    if (events.length === 0) continue;
-
-    timelineSourceRemovers.set(
-      source.timelineKey,
-      timelineOverlay.addEventSource(withTimelineEventSeekTimes(events), {
-        id: source.timelineId,
-        label: source.label,
-      }),
-    );
-  }
-
-  timelineOverlay.refreshEvents();
+  activeModulesRuntime.syncTimelineEvents();
 }
 
 function syncTimelineRanges(): void {
-  clearTimelineRangeSources();
-
-  const ctx = getModuleContext();
-  if (!timelineOverlay || !ctx) {
-    return;
-  }
-
-  for (const mod of activeModules) {
-    if (!activeTimelineRangeModuleIds.has(mod.id) || !mod.getTimelineRanges) {
-      continue;
-    }
-
-    timelineRangeSourceRemovers.set(
-      mod.id,
-      timelineOverlay.addRangeSource(() => mod.getTimelineRanges?.(ctx) ?? []),
-    );
-  }
-
-  for (const source of getEventTimelineSources(ctx)) {
-    if (!source.active || !source.buildTimelineRanges) {
-      continue;
-    }
-    const ranges = source.buildTimelineRanges();
-    if (ranges.length === 0) continue;
-    timelineRangeSourceRemovers.set(source.timelineKey, timelineOverlay.addRangeSource(ranges));
-  }
-
-  timelineOverlay.refreshRanges();
+  activeModulesRuntime.syncTimelineRanges();
 }
 
 function renderTimelineEventCount(): void {
@@ -528,13 +395,13 @@ function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
   return getStatsPlayerConfigSnapshotFromRuntime({
     playback: getPlaybackConfigSnapshot(),
     camera: getCameraConfigSnapshot(),
-    activeTimelineEventSourceIds,
-    activeTimelineRangeModuleIds,
-    activeMechanicTimelineKinds,
-    activeRenderEffectModuleIds,
+    activeTimelineEventSourceIds: activeModulesRuntime.getActiveTimelineEventSourceIds(),
+    activeTimelineRangeModuleIds: activeModulesRuntime.getActiveTimelineRangeModuleIds(),
+    activeMechanicTimelineKinds: activeModulesRuntime.getActiveMechanicTimelineKinds(),
+    activeRenderEffectModuleIds: activeModulesRuntime.getActiveRenderEffectModuleIds(),
     initialConfig: initialUrlConfig,
     replayPlayer,
-    boostPadOverlayEnabled,
+    boostPadOverlayEnabled: activeModulesRuntime.getBoostPadOverlayEnabled(),
     recording: getRecordingConfigSnapshot(),
     singletonWindows: getSingletonWindowConfigs(),
     statsWindows: getStatsWindowConfigs(),
@@ -564,12 +431,7 @@ function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
 }
 
 function applyConfigToStaticControls(config: StatsPlayerConfig): void {
-  activeTimelineEventSourceIds = new Set(config.overlays.timelineEvents);
-  activeTimelineRangeModuleIds = new Set(config.overlays.timelineRanges);
-  activeMechanicTimelineKinds = new Set(config.overlays.mechanics);
-  migrateMechanicBackedTimelineEventSelections();
-  activeRenderEffectModuleIds = new Set(config.overlays.renderEffects);
-  boostPadOverlayEnabled = config.overlays.boostPads;
+  activeModulesRuntime.applyOverlayConfig(config.overlays);
   skipPostGoalTransitions.checked =
     config.playback.skipPostGoalTransitions ?? skipPostGoalTransitions.checked;
   skipKickoffs.checked = config.playback.skipKickoffs ?? skipKickoffs.checked;
@@ -745,12 +607,8 @@ function activateMechanicsReviewTimelineSource(item: MechanicsReviewItem): void 
     return;
   }
 
-  activeMechanicTimelineKinds.add(mechanic);
-  syncTimelineEvents();
-  syncTimelineRanges();
+  activeModulesRuntime.activateMechanicTimelineKind(mechanic);
   renderMechanicsTimelineControls();
-  renderTimelineEventCount();
-  scheduleConfigUrlUpdate();
 }
 
 function enforceMechanicsReviewClipBoundary(state: ReplayPlayerState): boolean {
@@ -858,7 +716,10 @@ async function loadReplayBundleForDisplay(
       replayEventsLabel: "Replay",
       replayEvents: (context) =>
         withTimelineEventSeekTimes(
-          filterReplayTimelineEvents(context.replay, activeTimelineEventSourceIds),
+          filterReplayTimelineEvents(
+            context.replay,
+            activeModulesRuntime.getActiveTimelineEventSourceIds(),
+          ),
         ),
     });
     const recorder = createCanvasRecorderPlugin({
@@ -990,18 +851,13 @@ export function mountStatEvaluationPlayer(
     body: mechanicsTimelineWindowBody,
     modules: MODULES,
     getContext: getModuleContext,
-    getActiveTimelineEventSourceIds: () => activeTimelineEventSourceIds,
-    getActiveMechanicTimelineKinds: () => activeMechanicTimelineKinds,
+    getActiveTimelineEventSourceIds: () => activeModulesRuntime.getActiveTimelineEventSourceIds(),
+    getActiveMechanicTimelineKinds: () => activeModulesRuntime.getActiveMechanicTimelineKinds(),
     toggleEventSource(id, enabled) {
       toggleCapability(id, "events", enabled);
     },
     setMechanicTimelineKind(kind, enabled) {
-      if (enabled) {
-        activeMechanicTimelineKinds.add(kind);
-      } else {
-        activeMechanicTimelineKinds.delete(kind);
-      }
-      scheduleConfigUrlUpdate();
+      activeModulesRuntime.setMechanicTimelineKind(kind, enabled);
     },
     setupActiveModules,
     syncTimelineEvents,
@@ -1159,11 +1015,11 @@ export function mountStatEvaluationPlayer(
     modules: MODULES,
     boostPickupFilters,
     getContext: getModuleContext,
-    getActiveModules: () => activeModules,
+    getActiveModules: () => activeModulesRuntime.getActiveModules(),
     getActiveCapabilityIds,
     getBoostPickupAnimationEnabled: () =>
       replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
-    getBoostPadOverlayEnabled: () => boostPadOverlayEnabled,
+    getBoostPadOverlayEnabled: () => activeModulesRuntime.getBoostPadOverlayEnabled(),
     toggleCapability,
     toggleBoostPickupAnimation() {
       const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
@@ -1261,23 +1117,14 @@ export function mountStatEvaluationPlayer(
     statRegistry = createStatRegistry(null);
     clearStatsWindows();
     statsWindowsController = null;
-    clearTimelineEventSources();
-    clearTimelineRangeSources();
-    clearStandalonePlugins();
-    clearRenderCaches();
-    activeModules = [];
+    activeModulesRuntime.reset();
     replayLoadModal?.destroy();
     replayLoadModal = null;
-    activeTimelineEventSourceIds = new Set<string>();
-    activeTimelineRangeModuleIds = new Set<string>();
-    activeMechanicTimelineKinds = new Set<string>();
-    activeRenderEffectModuleIds = new Set<string>();
     resetEventPlaylistWindow();
     eventTimelineControlsController = null;
     eventPlaylistController = null;
     mechanicsReviewController?.reset();
     mechanicsReviewController = null;
-    boostPadOverlayEnabled = true;
     loadedReplayName = null;
     cameraControlsController = null;
     recordingWindowController = null;
@@ -1292,7 +1139,6 @@ export function mountStatEvaluationPlayer(
     isApplyingConfig = false;
     floatingWindowController?.reset();
     floatingWindowController = null;
-    removeRenderHook = null;
     if (appRoot === root) {
       appRoot = null;
       root.replaceChildren();
