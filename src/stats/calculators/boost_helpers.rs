@@ -391,6 +391,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: pending_pickup.frame,
             time: pending_pickup.time,
+            end_frame: pending_pickup.frame,
+            end_time: pending_pickup.time,
+            duration: 0.0,
             player_id: pending_pickup.player_id.clone(),
             player_position: Some(pending_pickup.player_position.to_array()),
             is_team_0: pending_pickup.is_team_0,
@@ -411,6 +414,9 @@ impl BoostCalculator {
             self.record_ledger_event(BoostLedgerEvent {
                 frame: pending_pickup.frame,
                 time: pending_pickup.time,
+                end_frame: pending_pickup.frame,
+                end_time: pending_pickup.time,
+                duration: 0.0,
                 player_id: pending_pickup.player_id.clone(),
                 player_position: Some(pending_pickup.player_position.to_array()),
                 is_team_0: pending_pickup.is_team_0,
@@ -425,6 +431,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: pending_pickup.frame,
             time: pending_pickup.time,
+            end_frame: pending_pickup.frame,
+            end_time: pending_pickup.time,
+            duration: 0.0,
             player_id: pending_pickup.player_id.clone(),
             player_position: Some(pending_pickup.player_position.to_array()),
             is_team_0: pending_pickup.is_team_0,
@@ -492,6 +501,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: ledger_context.frame,
             time: ledger_context.time,
+            end_frame: ledger_context.frame,
+            end_time: ledger_context.time,
+            duration: 0.0,
             player_id: player_id.clone(),
             player_position,
             is_team_0,
@@ -544,6 +556,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: ledger_context.frame,
             time: ledger_context.time,
+            end_frame: ledger_context.frame,
+            end_time: ledger_context.time,
+            duration: 0.0,
             player_id: player_id.clone(),
             player_position,
             is_team_0,
@@ -582,6 +597,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: ledger_context.frame,
             time: ledger_context.time,
+            end_frame: ledger_context.frame,
+            end_time: ledger_context.time,
+            duration: 0.0,
             player_id: player_id.clone(),
             player_position,
             is_team_0,

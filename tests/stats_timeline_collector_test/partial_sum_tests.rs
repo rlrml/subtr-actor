@@ -1,5 +1,5 @@
 #[test]
-fn test_boost_ledger_reconstructs_serialized_boost_partial_sums() {
+fn test_boost_stats_events_reconstruct_final_serialized_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
@@ -13,7 +13,7 @@ fn test_boost_ledger_reconstructs_serialized_boost_partial_sums() {
         !timeline.events.boost_state.is_empty(),
         "expected boost state events to be emitted"
     );
-    assert_boost_ledger_reconstructs_serialized_boost_partial_sums(replay_path, &timeline);
+    assert_boost_stats_events_reconstruct_final_serialized_sums(replay_path, &timeline);
 }
 
 #[test]
@@ -401,7 +401,7 @@ fn test_powerslide_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
-fn test_touch_events_reconstruct_serialized_partial_sums() {
+fn test_touch_events_reconstruct_final_serialized_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
@@ -416,7 +416,7 @@ fn test_touch_events_reconstruct_serialized_partial_sums() {
         !timeline.events.touch_ball_movement.is_empty(),
         "expected touch fixture to contain ball movement credit events"
     );
-    assert_touch_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
+    assert_touch_events_reconstruct_final_serialized_sums(replay_path, &timeline);
 }
 
 #[test]
@@ -469,7 +469,7 @@ fn test_pressure_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
-fn test_movement_events_reconstruct_serialized_partial_sums() {
+fn test_movement_events_reconstruct_final_serialized_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
@@ -480,11 +480,11 @@ fn test_movement_events_reconstruct_serialized_partial_sums() {
         !timeline.events.movement.is_empty(),
         "expected movement fixture to contain movement events"
     );
-    assert_movement_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
+    assert_movement_events_reconstruct_final_serialized_sums(replay_path, &timeline);
 }
 
 #[test]
-fn test_positioning_events_reconstruct_serialized_partial_sums() {
+fn test_positioning_events_reconstruct_final_serialized_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
     let timeline = StatsTimelineCollector::new()
@@ -495,7 +495,7 @@ fn test_positioning_events_reconstruct_serialized_partial_sums() {
         !timeline.events.positioning.is_empty(),
         "expected positioning fixture to contain positioning events"
     );
-    assert_positioning_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
+    assert_positioning_events_reconstruct_final_serialized_sums(replay_path, &timeline);
 }
 
 #[test]
@@ -517,12 +517,12 @@ fn assert_converted_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    assert_boost_ledger_reconstructs_serialized_boost_partial_sums(replay_path, timeline);
+    assert_boost_stats_events_reconstruct_final_serialized_sums(replay_path, timeline);
     assert_core_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_possession_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_pressure_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_movement_events_reconstruct_serialized_partial_sums(replay_path, timeline);
-    assert_positioning_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_positioning_events_reconstruct_final_serialized_sums(replay_path, timeline);
     assert_rotation_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_quality_mechanic_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_speed_flip_events_reconstruct_serialized_partial_sums(replay_path, timeline);
@@ -543,7 +543,7 @@ fn assert_converted_events_reconstruct_serialized_partial_sums(
     assert_musty_flick_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_dodge_reset_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_powerslide_events_reconstruct_serialized_partial_sums(replay_path, timeline);
-    assert_touch_events_reconstruct_serialized_partial_sums(replay_path, timeline);
+    assert_touch_events_reconstruct_final_serialized_sums(replay_path, timeline);
     assert_half_volley_events_reconstruct_serialized_partial_sums(replay_path, timeline);
 }
 
@@ -730,4 +730,3 @@ fn test_ceiling_shot_events_reconstruct_serialized_partial_sums() {
 
     assert_ceiling_shot_events_reconstruct_serialized_partial_sums("synthetic", &timeline);
 }
-

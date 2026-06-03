@@ -35,7 +35,19 @@ pub struct TerritorialPressureEvent {
 pub struct TerritorialPressureStatsEvent {
     pub time: f32,
     pub frame: usize,
+    #[serde(default)]
+    pub end_time: f32,
+    #[serde(default)]
+    pub end_frame: usize,
     pub delta: TerritorialPressureStats,
+}
+
+impl TerritorialPressureStatsEvent {
+    fn absorb_delta(&mut self, event: Self) {
+        self.end_time = event.time;
+        self.end_frame = event.frame;
+        add_territorial_pressure_stats_delta(&mut self.delta, &event.delta);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,6 +77,7 @@ pub struct TerritorialPressureCalculator {
     config: TerritorialPressureCalculatorConfig,
     events: EventStream<TerritorialPressureEvent>,
     stats_events: EventStream<TerritorialPressureStatsEvent>,
+    pending_stats_event: Option<TerritorialPressureStatsEvent>,
     candidate: Option<CandidateTerritorialPressureSession>,
     active: Option<ActiveTerritorialPressureSession>,
     last_frame: Option<TerritorialPressureFrameMarker>,
@@ -107,6 +120,35 @@ impl From<&FrameInfo> for TerritorialPressureFrameMarker {
     }
 }
 
+fn add_territorial_pressure_stats_delta(
+    stats: &mut TerritorialPressureStats,
+    delta: &TerritorialPressureStats,
+) {
+    stats.tracked_time += delta.tracked_time;
+    stats.team_zero_session_count += delta.team_zero_session_count;
+    stats.team_one_session_count += delta.team_one_session_count;
+    stats.team_zero_session_time += delta.team_zero_session_time;
+    stats.team_one_session_time += delta.team_one_session_time;
+    stats.team_zero_offensive_half_time += delta.team_zero_offensive_half_time;
+    stats.team_one_offensive_half_time += delta.team_one_offensive_half_time;
+    stats.team_zero_offensive_third_time += delta.team_zero_offensive_third_time;
+    stats.team_one_offensive_third_time += delta.team_one_offensive_third_time;
+    stats.team_zero_longest_session_time = stats
+        .team_zero_longest_session_time
+        .max(delta.team_zero_longest_session_time);
+    stats.team_one_longest_session_time = stats
+        .team_one_longest_session_time
+        .max(delta.team_one_longest_session_time);
+    for entry in &delta.labeled_session_counts.entries {
+        for _ in 0..entry.count {
+            stats.labeled_session_counts.increment(entry.labels.clone());
+        }
+    }
+    for entry in &delta.labeled_time.entries {
+        stats.labeled_time.add(entry.labels.clone(), entry.value);
+    }
+}
+
 impl TerritorialPressureCalculator {
     pub fn new() -> Self {
         Self::with_config(TerritorialPressureCalculatorConfig::default())
@@ -135,6 +177,14 @@ impl TerritorialPressureCalculator {
         self.stats_events.new_events()
     }
 
+    pub fn projected_stats_events(&self) -> Vec<TerritorialPressureStatsEvent> {
+        let mut events = self.stats_events.all().to_vec();
+        if let Some(pending) = &self.pending_stats_event {
+            events.push(pending.clone());
+        }
+        events
+    }
+
     pub fn config(&self) -> &TerritorialPressureCalculatorConfig {
         &self.config
     }
@@ -147,6 +197,7 @@ impl TerritorialPressureCalculator {
                 TerritorialPressureEndReason::ReplayEnd,
             );
         }
+        self.flush_pending_stats_event();
         Ok(())
     }
 
@@ -198,9 +249,39 @@ impl TerritorialPressureCalculator {
         let event = TerritorialPressureStatsEvent {
             time,
             frame: frame_number,
+            end_time: time,
+            end_frame: frame_number,
             delta,
         };
-        self.stats_events.push(event);
+        self.record_stats_event(event);
+    }
+
+    fn record_stats_event(&mut self, event: TerritorialPressureStatsEvent) {
+        if Self::is_continuous_stats_delta(&event.delta) {
+            if let Some(pending) = &mut self.pending_stats_event {
+                pending.absorb_delta(event);
+            } else {
+                self.pending_stats_event = Some(event);
+            }
+        } else {
+            self.flush_pending_stats_event();
+            self.stats_events.push(event);
+        }
+    }
+
+    fn flush_pending_stats_event(&mut self) {
+        let Some(pending) = self.pending_stats_event.take() else {
+            return;
+        };
+        self.stats_events.push(pending);
+    }
+
+    fn is_continuous_stats_delta(delta: &TerritorialPressureStats) -> bool {
+        delta.team_zero_session_count == 0
+            && delta.team_one_session_count == 0
+            && delta.team_zero_longest_session_time == 0.0
+            && delta.team_one_longest_session_time == 0.0
+            && delta.labeled_session_counts.is_empty()
     }
 
     fn emit_frame_stats_delta(&mut self, frame: &FrameInfo, delta: TerritorialPressureStats) {
@@ -448,12 +529,14 @@ impl TerritorialPressureCalculator {
         if !live_play_state.is_live_play {
             self.candidate = None;
             self.end_active_session(frame, TerritorialPressureEndReason::Stoppage);
+            self.flush_pending_stats_event();
             return Ok(());
         }
 
         let Some(ball) = ball.sample() else {
             self.candidate = None;
             self.end_active_session(frame, TerritorialPressureEndReason::BallMissing);
+            self.flush_pending_stats_event();
             return Ok(());
         };
 

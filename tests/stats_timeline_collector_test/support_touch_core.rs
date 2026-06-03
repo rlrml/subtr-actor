@@ -178,7 +178,7 @@ fn apply_touch_stats_event_for_derivation(
     stats.cumulative_ball_speed_change += event.ball_speed_change;
 }
 
-fn assert_touch_stats_close(
+fn assert_touch_final_additive_stats_close(
     replay_path: &str,
     player_name: &str,
     frame_number: usize,
@@ -212,30 +212,6 @@ fn assert_touch_stats_close(
     assert_eq!(
         actual.wall_touch_count, expected.wall_touch_count,
         "{replay_path} player {player_name} touch.wall_touch_count frame {frame_number}"
-    );
-    assert_eq!(
-        actual.is_last_touch, expected.is_last_touch,
-        "{replay_path} player {player_name} touch.is_last_touch frame {frame_number}"
-    );
-    assert_eq!(
-        actual.last_touch_time, expected.last_touch_time,
-        "{replay_path} player {player_name} touch.last_touch_time frame {frame_number}"
-    );
-    assert_eq!(
-        actual.last_touch_frame, expected.last_touch_frame,
-        "{replay_path} player {player_name} touch.last_touch_frame frame {frame_number}"
-    );
-    assert_eq!(
-        actual.time_since_last_touch, expected.time_since_last_touch,
-        "{replay_path} player {player_name} touch.time_since_last_touch frame {frame_number}"
-    );
-    assert_eq!(
-        actual.frames_since_last_touch, expected.frames_since_last_touch,
-        "{replay_path} player {player_name} touch.frames_since_last_touch frame {frame_number}"
-    );
-    assert_eq!(
-        actual.last_ball_speed_change, expected.last_ball_speed_change,
-        "{replay_path} player {player_name} touch.last_ball_speed_change frame {frame_number}"
     );
     assert!(
         (actual.max_ball_speed_change - expected.max_ball_speed_change).abs() < 0.001,
@@ -273,7 +249,7 @@ fn assert_touch_stats_close(
     );
 }
 
-fn assert_touch_events_reconstruct_serialized_partial_sums(
+fn assert_touch_events_reconstruct_final_serialized_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
@@ -291,101 +267,37 @@ fn assert_touch_events_reconstruct_serialized_partial_sums(
             .cmp(&right.frame)
             .then_with(|| left.time.total_cmp(&right.time))
     });
-    let mut last_touch_events = timeline.events.touch_last_touch.clone();
-    last_touch_events.sort_by(|left, right| {
-        left.sample_frame
-            .cmp(&right.sample_frame)
-            .then_with(|| left.sample_time.total_cmp(&right.sample_time))
-            .then_with(|| left.frame.cmp(&right.frame))
-            .then_with(|| left.time.total_cmp(&right.time))
-    });
-
-    let mut touch_event_index = 0;
-    let mut movement_event_index = 0;
-    let mut last_touch_event_index = 0;
-    let mut current_last_touch_player: Option<PlayerId> = None;
     let mut players: HashMap<PlayerId, TouchStats> = HashMap::new();
+    let final_frame = timeline
+        .frames
+        .last()
+        .expect("touch reconstruction requires at least one frame");
 
-    for frame in &timeline.frames {
-        if !frame.is_live_play {
-            current_last_touch_player = None;
-        } else {
-            for stats in players.values_mut() {
-                stats.is_last_touch = false;
-                if let Some(last_touch_time) = stats.last_touch_time {
-                    stats.time_since_last_touch = Some((frame.time - last_touch_time).max(0.0));
-                }
-                if let Some(last_touch_frame) = stats.last_touch_frame {
-                    stats.frames_since_last_touch =
-                        Some(frame.frame_number.saturating_sub(last_touch_frame));
-                }
-            }
-
-            while touch_event_index < touch_events.len()
-                && touch_events[touch_event_index].sample_frame <= frame.frame_number
-            {
-                let event = &touch_events[touch_event_index];
-                apply_touch_stats_event_for_derivation(
-                    players.entry(event.player.clone()).or_default(),
-                    event,
-                    frame,
-                );
-                touch_event_index += 1;
-            }
-
-            while last_touch_event_index < last_touch_events.len()
-                && last_touch_events[last_touch_event_index].sample_frame <= frame.frame_number
-            {
-                current_last_touch_player =
-                    last_touch_events[last_touch_event_index].player.clone();
-                last_touch_event_index += 1;
-            }
-
-            if let Some(player_id) = current_last_touch_player.as_ref() {
-                if let Some(stats) = players.get_mut(player_id) {
-                    stats.is_last_touch = true;
-                }
-            }
-        }
-
-        while movement_event_index < movement_events.len()
-            && movement_events[movement_event_index].frame <= frame.frame_number
-        {
-            let event = &movement_events[movement_event_index];
-            let stats = players.entry(event.player.clone()).or_default();
-            stats.total_ball_travel_distance += event.travel_distance;
-            stats.total_ball_advance_distance += event.advance_distance;
-            stats.total_ball_retreat_distance += event.retreat_distance;
-            movement_event_index += 1;
-        }
-
-        for player in &frame.players {
-            let expected = players.get(&player.player_id).cloned().unwrap_or_default();
-            assert_touch_stats_close(
-                replay_path,
-                &player.name,
-                frame.frame_number,
-                &player.touch,
-                &expected,
-            );
-        }
+    for event in &touch_events {
+        apply_touch_stats_event_for_derivation(
+            players.entry(event.player.clone()).or_default(),
+            event,
+            final_frame,
+        );
     }
 
-    assert_eq!(
-        touch_event_index,
-        touch_events.len(),
-        "{replay_path} unprocessed touch events"
-    );
-    assert_eq!(
-        movement_event_index,
-        movement_events.len(),
-        "{replay_path} unprocessed touch ball movement events"
-    );
-    assert_eq!(
-        last_touch_event_index,
-        last_touch_events.len(),
-        "{replay_path} unprocessed touch last-touch events"
-    );
+    for event in &movement_events {
+        let stats = players.entry(event.player.clone()).or_default();
+        stats.total_ball_travel_distance += event.travel_distance;
+        stats.total_ball_advance_distance += event.advance_distance;
+        stats.total_ball_retreat_distance += event.retreat_distance;
+    }
+
+    for player in &final_frame.players {
+        let expected = players.get(&player.player_id).cloned().unwrap_or_default();
+        assert_touch_final_additive_stats_close(
+            replay_path,
+            &player.name,
+            final_frame.frame_number,
+            &player.touch,
+            &expected,
+        );
+    }
 }
 
 fn assert_core_events_reconstruct_serialized_partial_sums(
@@ -807,4 +719,3 @@ fn assert_possession_events_reconstruct_serialized_partial_sums(
         "{replay_path} unprocessed possession events"
     );
 }
-

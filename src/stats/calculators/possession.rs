@@ -55,10 +55,20 @@ impl FieldThirdLabel {
 pub struct PossessionEvent {
     pub time: f32,
     pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
     pub active: bool,
     pub duration: f32,
     pub possession_state: String,
     pub field_third: Option<String>,
+}
+
+impl PossessionEvent {
+    fn absorb_duration(&mut self, frame: &FrameInfo, duration: f32) {
+        self.end_time = frame.time;
+        self.end_frame = frame.frame_number;
+        self.duration += duration;
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -225,6 +235,7 @@ pub struct PossessionCalculator {
     tracker: PossessionTracker,
     events: EventStream<PossessionEvent>,
     last_emitted_event_state: Option<PossessionEventState>,
+    pending_event: Option<PendingPossessionEvent>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -232,6 +243,12 @@ struct PossessionEventState {
     active: bool,
     possession_state: PossessionStateLabel,
     field_third: Option<FieldThirdLabel>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct PendingPossessionEvent {
+    state: PossessionEventState,
+    event: PossessionEvent,
 }
 
 impl PossessionCalculator {
@@ -245,6 +262,21 @@ impl PossessionCalculator {
 
     pub fn new_events(&self) -> &[PossessionEvent] {
         self.events.new_events()
+    }
+
+    pub fn projected_events(&self) -> Vec<PossessionEvent> {
+        let mut events = self.events.all().to_vec();
+        if let Some(pending) = &self.pending_event {
+            events.push(pending.event.clone());
+        }
+        events
+    }
+
+    pub fn flush_pending_event(&mut self) {
+        let Some(pending) = self.pending_event.take() else {
+            return;
+        };
+        self.events.push(pending.event);
     }
 
     fn emit_event_if_changed(
@@ -266,13 +298,39 @@ impl PossessionCalculator {
         let event = PossessionEvent {
             time: frame.time,
             frame: frame.frame_number,
+            end_time: frame.time,
+            end_frame: frame.frame_number,
             active,
             duration,
             possession_state: possession_state.as_label_value().to_owned(),
             field_third: field_third.map(|label| label.as_label_value().to_owned()),
         };
-        self.events.push(event);
+        self.record_event(event_state, frame, event);
         self.last_emitted_event_state = Some(event_state);
+    }
+
+    fn record_event(
+        &mut self,
+        state: PossessionEventState,
+        frame: &FrameInfo,
+        event: PossessionEvent,
+    ) {
+        let Some(pending) = self.pending_event.as_mut() else {
+            self.pending_event = Some(PendingPossessionEvent { state, event });
+            return;
+        };
+
+        if pending.state == state {
+            pending.event.absorb_duration(frame, event.duration);
+        } else {
+            let previous = self
+                .pending_event
+                .replace(PendingPossessionEvent { state, event });
+            let Some(previous) = previous else {
+                return;
+            };
+            self.events.push(previous.event);
+        }
     }
 
     pub fn update(

@@ -223,6 +223,49 @@ fn records_role_and_depth_time() {
 }
 
 #[test]
+fn rotation_player_events_emit_state_change_spans() {
+    let mut calculator = RotationCalculator::with_config(RotationCalculatorConfig {
+        first_man_ambiguity_margin: 50.0,
+        ..RotationCalculatorConfig::default()
+    });
+
+    for frame_number in 1..=3 {
+        update_team_zero(
+            &mut calculator,
+            frame_number,
+            frame_number as f32 * 0.1,
+            glam::Vec3::new(0.0, -500.0, 0.0),
+            glam::Vec3::new(1000.0, 500.0, 0.0),
+        );
+    }
+    calculator.flush_pending_player_events();
+
+    let player_events = calculator.player_events();
+    assert_eq!(player_events.len(), 4);
+    let first_man = player_events
+        .iter()
+        .find(|event| event.player == PlayerId::Steam(1) && event.active)
+        .expect("first man span should be emitted");
+    assert_eq!(first_man.frame, 1);
+    assert_eq!(first_man.end_frame, 3);
+    assert!((first_man.duration - 0.3).abs() < 1e-6);
+    assert!((first_man.active_game_time - 0.3).abs() < 1e-6);
+    assert!((first_man.time_first_man - 0.3).abs() < 1e-6);
+    assert!((first_man.time_behind_play - 0.3).abs() < 1e-6);
+
+    let second_man = player_events
+        .iter()
+        .find(|event| event.player == PlayerId::Steam(2) && event.active)
+        .expect("second man span should be emitted");
+    assert_eq!(second_man.frame, 1);
+    assert_eq!(second_man.end_frame, 3);
+    assert!((second_man.duration - 0.3).abs() < 1e-6);
+    assert!((second_man.active_game_time - 0.3).abs() < 1e-6);
+    assert!((second_man.time_second_man - 0.3).abs() < 1e-6);
+    assert!((second_man.time_ahead_of_play - 0.3).abs() < 1e-6);
+}
+
+#[test]
 fn first_man_stints_survive_brief_interruptions() {
     let mut calculator = RotationCalculator::with_config(RotationCalculatorConfig {
         first_man_debounce_seconds: 0.25,

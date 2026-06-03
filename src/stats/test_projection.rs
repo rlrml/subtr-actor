@@ -84,24 +84,24 @@ pub(crate) trait BoostTestProjection {
 impl BoostTestProjection for BoostCalculator {
     fn player_stats(&self) -> &HashMap<PlayerId, BoostStats> {
         let mut stats = BoostStatsAccumulator::default();
-        for event in self.stats_events() {
-            stats.apply_event(event);
+        for event in self.projected_stats_events() {
+            stats.apply_event(&event);
         }
         leak_test_stats(stats.player_stats().clone())
     }
 
     fn team_zero_stats(&self) -> &BoostStats {
         let mut stats = BoostStatsAccumulator::default();
-        for event in self.stats_events() {
-            stats.apply_event(event);
+        for event in self.projected_stats_events() {
+            stats.apply_event(&event);
         }
         leak_test_stats(stats.team_zero_stats().clone())
     }
 
     fn team_one_stats(&self) -> &BoostStats {
         let mut stats = BoostStatsAccumulator::default();
-        for event in self.stats_events() {
-            stats.apply_event(event);
+        for event in self.projected_stats_events() {
+            stats.apply_event(&event);
         }
         leak_test_stats(stats.team_one_stats().clone())
     }
@@ -461,7 +461,8 @@ pub(crate) trait RotationTestProjection {
 impl RotationTestProjection for RotationCalculator {
     fn player_stats(&self) -> &HashMap<PlayerId, RotationPlayerStats> {
         let mut stats = RotationStatsAccumulator::default();
-        for event in self.player_events() {
+        let projected_player_events = self.projected_player_events();
+        for event in &projected_player_events {
             stats.apply_player_event(event);
         }
         for event in self.team_events() {
@@ -472,7 +473,8 @@ impl RotationTestProjection for RotationCalculator {
 
     fn team_zero_stats(&self) -> &RotationTeamStats {
         let mut stats = RotationStatsAccumulator::default();
-        for event in self.player_events() {
+        let projected_player_events = self.projected_player_events();
+        for event in &projected_player_events {
             stats.apply_player_event(event);
         }
         for event in self.team_events() {
@@ -483,7 +485,8 @@ impl RotationTestProjection for RotationCalculator {
 
     fn team_one_stats(&self) -> &RotationTeamStats {
         let mut stats = RotationStatsAccumulator::default();
-        for event in self.player_events() {
+        let projected_player_events = self.projected_player_events();
+        for event in &projected_player_events {
             stats.apply_player_event(event);
         }
         for event in self.team_events() {
@@ -546,8 +549,8 @@ impl TouchTestProjection for TouchCalculator {
             let frame = stats_test_frame(event.sample_time, event.sample_frame);
             stats.apply_touch_event(event, &frame);
         }
-        for event in self.ball_movement_events() {
-            stats.apply_ball_movement_event(event);
+        for event in self.projected_ball_movement_events() {
+            stats.apply_ball_movement_event(&event);
         }
         leak_test_stats(stats.player_stats().clone())
     }

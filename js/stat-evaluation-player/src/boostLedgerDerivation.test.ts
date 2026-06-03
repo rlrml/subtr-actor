@@ -9,7 +9,7 @@ import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
 import type { MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 const playerId = { Steam: "ledger-player" } as Record<string, unknown>;
-const compactedBoostFields = [
+const eventDerivedBoostFields = [
   "tracked_time",
   "boost_integral",
   "time_zero_boost",
@@ -229,11 +229,11 @@ test("boost ledger derivation matches serialized boost partial sums", () => {
 test("boost ledger derivation can populate boost partial sums for player rendering", () => {
   const timeline = ledgerTimeline();
   for (const frame of timeline.frames) {
-    for (const field of compactedBoostFields) {
+    for (const field of eventDerivedBoostFields) {
       delete (frame.team_zero.boost as Partial<typeof frame.team_zero.boost>)[field];
     }
     for (const player of frame.players) {
-      for (const field of compactedBoostFields) {
+      for (const field of eventDerivedBoostFields) {
         delete (player.boost as Partial<typeof player.boost>)[field];
       }
     }
@@ -251,4 +251,60 @@ test("boost ledger derivation can populate boost partial sums for player renderi
   assert.equal(timeline.frames[2]?.players[0]?.boost.amount_used, 5);
   assert.equal(timeline.frames[2]?.players[0]?.boost.amount_used_while_grounded, 5);
   assert.equal(timeline.frames[2]?.team_zero.boost.amount_used, 5);
+});
+
+test("boost derivation uses boost stats spans when present", () => {
+  const timeline = createStatsTimeline({
+    events: {
+      boost_stats: [
+        {
+          frame: 1,
+          time: 1,
+          end_frame: 3,
+          end_time: 3,
+          player_id: playerId,
+          is_team_0: true,
+          delta: {
+            tracked_time: 0.3,
+            boost_integral: 4.55,
+            time_zero_boost: 0.103125,
+            time_boost_0_25: 0.3,
+            amount_respawned: 33,
+            amount_collected: 12,
+            amount_collected_small: 12,
+            small_pads_collected: 1,
+            amount_used: 5,
+            amount_used_while_grounded: 5,
+          },
+        },
+      ],
+    },
+    frames: [
+      createStatsFrame({
+        frame_number: 1,
+        time: 1,
+        players: [{ player_id: playerId, is_team_0: true }],
+      }),
+      createStatsFrame({
+        frame_number: 2,
+        time: 2,
+        players: [{ player_id: playerId, is_team_0: true }],
+      }),
+      createStatsFrame({
+        frame_number: 3,
+        time: 3,
+        players: [{ player_id: playerId, is_team_0: true }],
+      }),
+    ],
+  });
+
+  applyBoostLedgerDerivedStats(timeline);
+
+  assertClose(timeline.frames[1]?.players[0]?.boost.tracked_time, 0);
+  assertClose(timeline.frames[2]?.players[0]?.boost.tracked_time, 0.3);
+  assertClose(timeline.frames[2]?.players[0]?.boost.boost_integral, 4.55);
+  assert.equal(timeline.frames[2]?.players[0]?.boost.amount_respawned, 33);
+  assert.equal(timeline.frames[2]?.players[0]?.boost.amount_collected, 12);
+  assert.equal(timeline.frames[2]?.players[0]?.boost.amount_used, 5);
+  assert.equal(timeline.frames[2]?.team_zero.boost.amount_used_while_grounded, 5);
 });

@@ -193,9 +193,9 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
         .player_stats()
         .get(&player_id)
         .expect("player stats should be recorded");
+    let projected_ledger_events = calculator.projected_ledger_events();
     let ledger_sum = |transaction| {
-        calculator
-            .ledger_events()
+        projected_ledger_events
             .iter()
             .filter(|event| event.transaction == transaction && event.player_id == player_id)
             .map(|event| event.amount)
@@ -218,8 +218,8 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
     );
 
     let mut reconstructed = BoostStatsAccumulator::new();
-    for event in calculator.stats_events() {
-        reconstructed.apply_event(event);
+    for event in calculator.projected_stats_events() {
+        reconstructed.apply_event(&event);
     }
     assert_eq!(reconstructed.player_stats(), calculator.player_stats());
     assert_eq!(

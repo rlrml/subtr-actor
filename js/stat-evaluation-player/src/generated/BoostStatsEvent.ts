@@ -2,4 +2,4 @@
 import type { BoostStats } from "./BoostStats.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type BoostStatsEvent = { frame: number, time: number, player_id: RemoteIdTs, is_team_0: boolean, delta: BoostStats, };
+export type BoostStatsEvent = { frame: number, time: number, end_frame: number, end_time: number, player_id: RemoteIdTs, is_team_0: boolean, delta: BoostStats, };

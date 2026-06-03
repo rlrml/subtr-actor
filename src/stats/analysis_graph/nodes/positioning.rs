@@ -56,6 +56,11 @@ impl AnalysisNode for PositioningNode {
         )
     }
 
+    fn finish(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        self.calculator.flush_pending_events();
+        Ok(())
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }

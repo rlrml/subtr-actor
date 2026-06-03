@@ -119,7 +119,7 @@ pub struct BoostPickupComparisonEvent {
     pub boost_after: Option<f32>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum BoostLedgerTransactionKind {
@@ -136,6 +136,9 @@ pub enum BoostLedgerTransactionKind {
 pub struct BoostLedgerEvent {
     pub frame: usize,
     pub time: f32,
+    pub end_frame: usize,
+    pub end_time: f32,
+    pub duration: f32,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -150,11 +153,26 @@ pub struct BoostLedgerEvent {
     pub boost_after: Option<f32>,
 }
 
+impl BoostLedgerEvent {
+    fn absorb_delta(&mut self, event: Self) {
+        self.end_frame = event.frame;
+        self.end_time = event.time;
+        self.duration += event.duration;
+        self.player_position = event.player_position;
+        self.amount += event.amount;
+        self.count += event.count;
+        self.boost_after = event.boost_after;
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BoostStateEvent {
     pub frame: usize,
     pub time: f32,
+    pub end_frame: usize,
+    pub end_time: f32,
+    pub duration: f32,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -164,15 +182,35 @@ pub struct BoostStateEvent {
     pub boost_before: Option<f32>,
 }
 
+impl BoostStateEvent {
+    fn absorb_sample(&mut self, event: Self) {
+        self.end_frame = event.frame;
+        self.end_time = event.time;
+        self.duration += event.duration;
+        self.player_position = event.player_position;
+        self.boost_amount = event.boost_amount;
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BoostStatsEvent {
     pub frame: usize,
     pub time: f32,
+    pub end_frame: usize,
+    pub end_time: f32,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
     pub is_team_0: bool,
     pub delta: BoostStats,
+}
+
+impl BoostStatsEvent {
+    fn absorb_delta(&mut self, event: Self) {
+        self.end_frame = event.frame;
+        self.end_time = event.time;
+        add_boost_stats_delta(&mut self.delta, &event.delta);
+    }
 }
 
 fn boost_transaction_label(kind: &'static str) -> StatLabel {
@@ -200,6 +238,45 @@ fn boost_field_half_label(field_half: BoostPickupFieldHalf) -> StatLabel {
         BoostPickupFieldHalf::Own => StatLabel::new("field_half", "own"),
         BoostPickupFieldHalf::Opponent => StatLabel::new("field_half", "opponent"),
         BoostPickupFieldHalf::Unknown => StatLabel::new("field_half", "unknown"),
+    }
+}
+
+fn add_boost_stats_delta(stats: &mut BoostStats, delta: &BoostStats) {
+    stats.tracked_time += delta.tracked_time;
+    stats.boost_integral += delta.boost_integral;
+    stats.time_zero_boost += delta.time_zero_boost;
+    stats.time_hundred_boost += delta.time_hundred_boost;
+    stats.time_boost_0_25 += delta.time_boost_0_25;
+    stats.time_boost_25_50 += delta.time_boost_25_50;
+    stats.time_boost_50_75 += delta.time_boost_50_75;
+    stats.time_boost_75_100 += delta.time_boost_75_100;
+    stats.amount_collected += delta.amount_collected;
+    stats.amount_collected_inactive += delta.amount_collected_inactive;
+    stats.big_pads_collected_inactive += delta.big_pads_collected_inactive;
+    stats.small_pads_collected_inactive += delta.small_pads_collected_inactive;
+    stats.amount_stolen += delta.amount_stolen;
+    stats.big_pads_collected += delta.big_pads_collected;
+    stats.small_pads_collected += delta.small_pads_collected;
+    stats.big_pads_stolen += delta.big_pads_stolen;
+    stats.small_pads_stolen += delta.small_pads_stolen;
+    stats.amount_collected_big += delta.amount_collected_big;
+    stats.amount_stolen_big += delta.amount_stolen_big;
+    stats.amount_collected_small += delta.amount_collected_small;
+    stats.amount_stolen_small += delta.amount_stolen_small;
+    stats.amount_respawned += delta.amount_respawned;
+    stats.overfill_total += delta.overfill_total;
+    stats.overfill_from_stolen += delta.overfill_from_stolen;
+    stats.amount_used += delta.amount_used;
+    stats.amount_used_while_grounded += delta.amount_used_while_grounded;
+    stats.amount_used_while_airborne += delta.amount_used_while_airborne;
+    stats.amount_used_while_supersonic += delta.amount_used_while_supersonic;
+    for entry in &delta.labeled_amounts.entries {
+        stats.labeled_amounts.add(entry.labels.clone(), entry.value);
+    }
+    for entry in &delta.labeled_counts.entries {
+        for _ in 0..entry.count {
+            stats.labeled_counts.increment(entry.labels.clone());
+        }
     }
 }
 
@@ -234,6 +311,9 @@ pub struct BoostCalculator {
     ledger_events: EventStream<BoostLedgerEvent>,
     state_events: EventStream<BoostStateEvent>,
     stats_events: EventStream<BoostStatsEvent>,
+    pending_ledger_events: HashMap<PendingBoostLedgerKey, PendingBoostLedgerEvent>,
+    pending_state_events: HashMap<PlayerId, PendingBoostStateEvent>,
+    pending_stats_events: HashMap<PlayerId, PendingBoostStatsEvent>,
     player_usage_state: HashMap<PlayerId, BoostUsageState>,
     kickoff_phase_active_last_frame: bool,
     kickoff_respawn_awarded: HashSet<PlayerId>,
@@ -264,6 +344,55 @@ struct BoostUsageState {
     amount_used: f32,
     amount_used_while_grounded: f32,
     amount_used_while_airborne: f32,
+}
+
+#[derive(Debug, Clone)]
+struct PendingBoostStatsEvent {
+    event: BoostStatsEvent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct PendingBoostLedgerKey {
+    player_id: PlayerId,
+    is_team_0: bool,
+    transaction: BoostLedgerTransactionKind,
+    labels: Vec<StatLabel>,
+}
+
+#[derive(Debug, Clone)]
+struct PendingBoostLedgerEvent {
+    key: PendingBoostLedgerKey,
+    event: BoostLedgerEvent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoostStateDirection {
+    Increasing,
+    Decreasing,
+    Flat,
+    Unknown,
+}
+
+impl BoostStateDirection {
+    fn from_event(event: &BoostStateEvent) -> Self {
+        let Some(boost_before) = event.boost_before else {
+            return Self::Unknown;
+        };
+        if event.boost_amount > boost_before {
+            Self::Increasing
+        } else if event.boost_amount < boost_before {
+            Self::Decreasing
+        } else {
+            Self::Flat
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PendingBoostStateEvent {
+    is_team_0: bool,
+    direction: BoostStateDirection,
+    event: BoostStateEvent,
 }
 
 impl BoostUsageState {
@@ -347,6 +476,25 @@ impl BoostCalculator {
         self.ledger_events.new_events()
     }
 
+    pub fn projected_ledger_events(&self) -> Vec<BoostLedgerEvent> {
+        let mut events = self.ledger_events.all().to_vec();
+        let mut pending: Vec<_> = self.pending_ledger_events.values().cloned().collect();
+        pending.sort_by(Self::compare_pending_ledger_events);
+        events.extend(pending.into_iter().map(|pending| pending.event));
+        events
+    }
+
+    pub fn flush_pending_ledger_events(&mut self) {
+        let mut pending: Vec<_> = self
+            .pending_ledger_events
+            .drain()
+            .map(|(_, pending)| pending)
+            .collect();
+        pending.sort_by(Self::compare_pending_ledger_events);
+        self.ledger_events
+            .extend(pending.into_iter().map(|pending| pending.event));
+    }
+
     pub fn state_events(&self) -> &[BoostStateEvent] {
         self.state_events.all()
     }
@@ -355,12 +503,74 @@ impl BoostCalculator {
         self.state_events.new_events()
     }
 
+    pub fn projected_state_events(&self) -> Vec<BoostStateEvent> {
+        let mut events = self.state_events.all().to_vec();
+        let mut pending: Vec<_> = self
+            .pending_state_events
+            .values()
+            .map(|pending| pending.event.clone())
+            .collect();
+        pending.sort_by(|left, right| {
+            left.frame.cmp(&right.frame).then_with(|| {
+                format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
+            })
+        });
+        events.extend(pending);
+        events
+    }
+
+    pub fn flush_pending_state_events(&mut self) {
+        let mut pending: Vec<_> = self
+            .pending_state_events
+            .drain()
+            .map(|(_, pending)| pending)
+            .collect();
+        pending.sort_by(|left, right| {
+            left.event.frame.cmp(&right.event.frame).then_with(|| {
+                format!("{:?}", left.event.player_id).cmp(&format!("{:?}", right.event.player_id))
+            })
+        });
+        self.state_events
+            .extend(pending.into_iter().map(|pending| pending.event));
+    }
+
     pub fn stats_events(&self) -> &[BoostStatsEvent] {
         self.stats_events.all()
     }
 
     pub fn new_stats_events(&self) -> &[BoostStatsEvent] {
         self.stats_events.new_events()
+    }
+
+    pub fn projected_stats_events(&self) -> Vec<BoostStatsEvent> {
+        let mut events = self.stats_events.all().to_vec();
+        let mut pending: Vec<_> = self
+            .pending_stats_events
+            .values()
+            .map(|pending| pending.event.clone())
+            .collect();
+        pending.sort_by(|left, right| {
+            left.frame.cmp(&right.frame).then_with(|| {
+                format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
+            })
+        });
+        events.extend(pending);
+        events
+    }
+
+    pub fn flush_pending_stats_events(&mut self) {
+        let mut pending: Vec<_> = self
+            .pending_stats_events
+            .drain()
+            .map(|(_, pending)| pending)
+            .collect();
+        pending.sort_by(|left, right| {
+            left.event.frame.cmp(&right.event.frame).then_with(|| {
+                format!("{:?}", left.event.player_id).cmp(&format!("{:?}", right.event.player_id))
+            })
+        });
+        self.stats_events
+            .extend(pending.into_iter().map(|pending| pending.event));
     }
 
     fn player_usage_state(&self, player_id: &PlayerId) -> BoostUsageState {
@@ -381,6 +591,8 @@ impl BoostCalculator {
         self.record_stats_event(BoostStatsEvent {
             frame,
             time,
+            end_frame: frame,
+            end_time: time,
             player_id,
             is_team_0,
             delta,
@@ -393,7 +605,60 @@ impl BoostCalculator {
             .entry(event.player_id.clone())
             .or_default();
         usage_state.apply_stats_delta(&event.delta);
-        self.stats_events.push(event);
+        if Self::is_continuous_stats_delta(&event.delta) {
+            self.record_continuous_stats_event(event);
+        } else {
+            self.flush_pending_stats_event_for_player(&event.player_id);
+            self.stats_events.push(event);
+        }
+    }
+
+    fn record_continuous_stats_event(&mut self, event: BoostStatsEvent) {
+        let player_id = event.player_id.clone();
+        let Some(pending) = self.pending_stats_events.get_mut(&player_id) else {
+            self.pending_stats_events
+                .insert(player_id, PendingBoostStatsEvent { event });
+            return;
+        };
+
+        if pending.event.is_team_0 == event.is_team_0 {
+            pending.event.absorb_delta(event);
+        } else {
+            let previous = self
+                .pending_stats_events
+                .insert(player_id, PendingBoostStatsEvent { event });
+            let Some(previous) = previous else {
+                return;
+            };
+            self.stats_events.push(previous.event);
+        }
+    }
+
+    fn flush_pending_stats_event_for_player(&mut self, player_id: &PlayerId) {
+        let Some(pending) = self.pending_stats_events.remove(player_id) else {
+            return;
+        };
+        self.stats_events.push(pending.event);
+    }
+
+    fn is_continuous_stats_delta(delta: &BoostStats) -> bool {
+        delta.amount_collected == 0.0
+            && delta.amount_collected_inactive == 0.0
+            && delta.big_pads_collected_inactive == 0
+            && delta.small_pads_collected_inactive == 0
+            && delta.amount_stolen == 0.0
+            && delta.big_pads_collected == 0
+            && delta.small_pads_collected == 0
+            && delta.big_pads_stolen == 0
+            && delta.small_pads_stolen == 0
+            && delta.amount_collected_big == 0.0
+            && delta.amount_stolen_big == 0.0
+            && delta.amount_collected_small == 0.0
+            && delta.amount_stolen_small == 0.0
+            && delta.amount_respawned == 0.0
+            && delta.overfill_total == 0.0
+            && delta.overfill_from_stolen == 0.0
+            && delta.labeled_counts.is_empty()
     }
 
     fn record_ledger_event(&mut self, event: BoostLedgerEvent) {
@@ -401,11 +666,102 @@ impl BoostCalculator {
             return;
         }
 
-        self.ledger_events.push(event);
+        if Self::is_continuous_ledger_event(&event) {
+            self.record_continuous_ledger_event(event);
+        } else {
+            self.flush_pending_ledger_events_for_player(&event.player_id);
+            self.ledger_events.push(event);
+        }
     }
 
     fn record_state_event(&mut self, event: BoostStateEvent) {
-        self.state_events.push(event);
+        let player_id = event.player_id.clone();
+        let direction = BoostStateDirection::from_event(&event);
+        let Some(pending) = self.pending_state_events.get_mut(&player_id) else {
+            self.pending_state_events.insert(
+                player_id,
+                PendingBoostStateEvent {
+                    is_team_0: event.is_team_0,
+                    direction,
+                    event,
+                },
+            );
+            return;
+        };
+
+        if pending.is_team_0 == event.is_team_0 && pending.direction == direction {
+            pending.event.absorb_sample(event);
+        } else {
+            let previous = self.pending_state_events.insert(
+                player_id,
+                PendingBoostStateEvent {
+                    is_team_0: event.is_team_0,
+                    direction,
+                    event,
+                },
+            );
+            let Some(previous) = previous else {
+                return;
+            };
+            self.state_events.push(previous.event);
+        }
+    }
+
+    fn is_continuous_ledger_event(event: &BoostLedgerEvent) -> bool {
+        matches!(
+            event.transaction,
+            BoostLedgerTransactionKind::Used | BoostLedgerTransactionKind::UsedAllocation
+        )
+    }
+
+    fn pending_ledger_key(event: &BoostLedgerEvent) -> PendingBoostLedgerKey {
+        PendingBoostLedgerKey {
+            player_id: event.player_id.clone(),
+            is_team_0: event.is_team_0,
+            transaction: event.transaction,
+            labels: event.labels.clone(),
+        }
+    }
+
+    fn record_continuous_ledger_event(&mut self, event: BoostLedgerEvent) {
+        let key = Self::pending_ledger_key(&event);
+        let Some(pending) = self.pending_ledger_events.get_mut(&key) else {
+            self.pending_ledger_events
+                .insert(key.clone(), PendingBoostLedgerEvent { key, event });
+            return;
+        };
+        pending.event.absorb_delta(event);
+    }
+
+    fn flush_pending_ledger_events_for_player(&mut self, player_id: &PlayerId) {
+        let mut pending: Vec<_> = self
+            .pending_ledger_events
+            .extract_if(|_, pending| pending.key.player_id == *player_id)
+            .map(|(_, pending)| pending)
+            .collect();
+        pending.sort_by(Self::compare_pending_ledger_events);
+        self.ledger_events
+            .extend(pending.into_iter().map(|pending| pending.event));
+    }
+
+    fn compare_pending_ledger_events(
+        left: &PendingBoostLedgerEvent,
+        right: &PendingBoostLedgerEvent,
+    ) -> std::cmp::Ordering {
+        left.event
+            .frame
+            .cmp(&right.event.frame)
+            .then_with(|| {
+                format!("{:?}", left.event.player_id).cmp(&format!("{:?}", right.event.player_id))
+            })
+            .then_with(|| left.event.is_team_0.cmp(&right.event.is_team_0))
+            .then_with(|| {
+                format!("{:?}", left.event.transaction)
+                    .cmp(&format!("{:?}", right.event.transaction))
+            })
+            .then_with(|| {
+                format!("{:?}", left.event.labels).cmp(&format!("{:?}", right.event.labels))
+            })
     }
 
     fn estimated_pad_position(&self, pad_id: &str) -> Option<glam::Vec3> {
@@ -739,6 +1095,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: pending_pickup.frame,
             time: pending_pickup.time,
+            end_frame: pending_pickup.frame,
+            end_time: pending_pickup.time,
+            duration: 0.0,
             player_id: pending_pickup.player_id.clone(),
             player_position: Some(pending_pickup.player_position.to_array()),
             is_team_0: pending_pickup.is_team_0,
@@ -759,6 +1118,9 @@ impl BoostCalculator {
             self.record_ledger_event(BoostLedgerEvent {
                 frame: pending_pickup.frame,
                 time: pending_pickup.time,
+                end_frame: pending_pickup.frame,
+                end_time: pending_pickup.time,
+                duration: 0.0,
                 player_id: pending_pickup.player_id.clone(),
                 player_position: Some(pending_pickup.player_position.to_array()),
                 is_team_0: pending_pickup.is_team_0,
@@ -773,6 +1135,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: pending_pickup.frame,
             time: pending_pickup.time,
+            end_frame: pending_pickup.frame,
+            end_time: pending_pickup.time,
+            duration: 0.0,
             player_id: pending_pickup.player_id.clone(),
             player_position: Some(pending_pickup.player_position.to_array()),
             is_team_0: pending_pickup.is_team_0,
@@ -836,6 +1201,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: ledger_context.frame,
             time: ledger_context.time,
+            end_frame: ledger_context.frame,
+            end_time: ledger_context.time,
+            duration: 0.0,
             player_id: player_id.clone(),
             player_position,
             is_team_0,
@@ -887,6 +1255,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: ledger_context.frame,
             time: ledger_context.time,
+            end_frame: ledger_context.frame,
+            end_time: ledger_context.time,
+            duration: 0.0,
             player_id: player_id.clone(),
             player_position,
             is_team_0,
@@ -927,6 +1298,9 @@ impl BoostCalculator {
         self.record_ledger_event(BoostLedgerEvent {
             frame: ledger_context.frame,
             time: ledger_context.time,
+            end_frame: ledger_context.frame,
+            end_time: ledger_context.time,
+            duration: 0.0,
             player_id: player_id.clone(),
             player_position,
             is_team_0,
@@ -1315,6 +1689,9 @@ impl BoostCalculator {
     pub fn finish_calculation(&mut self) -> SubtrActorResult<()> {
         self.flush_deferred_reported_pickups();
         self.pending_inferred_pickups.clear();
+        self.flush_pending_ledger_events();
+        self.flush_pending_state_events();
+        self.flush_pending_stats_events();
         Ok(())
     }
 
@@ -1366,6 +1743,11 @@ impl BoostCalculator {
         let boost_levels_live = Self::boost_levels_live(live_play);
         let track_boost_levels = Self::tracks_boost_levels(boost_levels_live);
         let track_boost_pickups = Self::tracks_boost_pickups(gameplay, live_play);
+        if !track_boost_levels {
+            self.flush_pending_ledger_events();
+            self.flush_pending_state_events();
+            self.flush_pending_stats_events();
+        }
         let boost_levels_resumed_this_sample =
             boost_levels_live && !self.previous_boost_levels_live.unwrap_or(false);
         let kickoff_phase_active = gameplay.kickoff_phase_active();
@@ -1473,6 +1855,9 @@ impl BoostCalculator {
                 self.record_state_event(BoostStateEvent {
                     frame: frame.frame_number,
                     time: frame.time,
+                    end_frame: frame.frame_number,
+                    end_time: frame.time,
+                    duration: frame.dt,
                     player_id: player.player_id.clone(),
                     player_position: player.position().map(|position| position.to_array()),
                     is_team_0: player.is_team_0,
@@ -1889,6 +2274,9 @@ impl BoostCalculator {
                     used_ledger_event = Some(BoostLedgerEvent {
                         frame: frame.frame_number,
                         time: frame.time,
+                        end_frame: frame.frame_number,
+                        end_time: frame.time,
+                        duration: frame.dt,
                         player_id: player.player_id.clone(),
                         player_position: player.position().map(|position| position.to_array()),
                         is_team_0: player.is_team_0,
@@ -1931,6 +2319,9 @@ impl BoostCalculator {
                 self.record_ledger_event(BoostLedgerEvent {
                     frame: frame.frame_number,
                     time: frame.time,
+                    end_frame: frame.frame_number,
+                    end_time: frame.time,
+                    duration: frame.dt,
                     player_id: player.player_id.clone(),
                     player_position: player.position().map(|position| position.to_array()),
                     is_team_0: player.is_team_0,
