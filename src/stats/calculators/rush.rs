@@ -210,19 +210,6 @@ impl RushCalculator {
             return;
         };
         self.record_active_rush(&mut active_rush);
-        if !active_rush.counted {
-            return;
-        }
-        let event = RushEvent {
-            start_time: active_rush.start_time,
-            start_frame: active_rush.start_frame,
-            end_time: active_rush.last_time,
-            end_frame: active_rush.last_frame,
-            is_team_0: active_rush.is_team_0,
-            attackers: active_rush.attackers,
-            defenders: active_rush.defenders,
-        };
-        self.events.push(event);
     }
 
     fn update_active_rush(

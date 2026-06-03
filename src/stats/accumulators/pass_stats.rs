@@ -105,6 +105,10 @@ impl PassStatsAccumulator {
         self.current_last_completed_pass_player = None;
     }
 
+    pub fn set_current_last_completed_pass_player(&mut self, player: Option<PlayerId>) {
+        self.current_last_completed_pass_player = player;
+    }
+
     pub fn apply_event(&mut self, frame: &FrameInfo, event: &PassEvent) {
         let passer_stats = self.player_stats.entry(event.passer.clone()).or_default();
         passer_stats.completed_pass_count += 1;
