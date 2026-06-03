@@ -86,8 +86,11 @@ import {
   type MechanicsReviewPlaybackBound,
   type MechanicsReviewPlaylist,
   type MechanicsReviewReplay,
-  type MechanicsReviewReplayLoadState,
 } from "./mechanicsReview.ts";
+import {
+  createMechanicsReviewReplayLoadsController,
+  type MechanicsReviewReplayLoadsController,
+} from "./mechanicsReviewReplayLoads.ts";
 import { getReplayFetchRequestFromSearch, type ReplayFetchRequest } from "./replayUrl.ts";
 import {
   getStatsPlayerConfigParamSnapshot,
@@ -254,6 +257,7 @@ let cameraControlsController: CameraControlsController | null = null;
 let recordingWindowController: RecordingWindowController | null = null;
 let statsWindowsController: StatsWindowsController | null = null;
 let eventPlaylistController: EventPlaylistWindowController | null = null;
+let mechanicsReviewReplayLoadsController: MechanicsReviewReplayLoadsController | null = null;
 let nextWindowZIndex = 30;
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
@@ -1216,29 +1220,6 @@ function resetEventPlaylistWindow(): void {
   eventPlaylistController?.reset();
 }
 
-function createMechanicsReviewReplaySource(
-  item: MechanicsReviewItem,
-  review: ActiveMechanicsReview,
-  signal?: AbortSignal,
-): ReplayInputSource {
-  const replayPath = getMechanicsReviewReplayPath(item, review);
-  const url = resolveMechanicsReviewUrl(replayPath, review.sourceUrl);
-  return {
-    name: getMechanicsReviewReplayLabel(item, review),
-    preparingStatus: "Loading review replay...",
-    async readBytes() {
-      const response = await fetch(url, { signal });
-      if (!response.ok) {
-        const statusText = response.statusText ? ` ${response.statusText}` : "";
-        throw new Error(
-          `Failed to fetch review replay from ${url} (${response.status}${statusText})`,
-        );
-      }
-      return new Uint8Array(await response.arrayBuffer());
-    },
-  };
-}
-
 function getMechanicsReviewBoundTime(bound: MechanicsReviewPlaybackBound): number {
   if (bound.kind === "time") {
     return bound.value;
@@ -1304,271 +1285,41 @@ function setMechanicsReviewStatus(message: string): void {
   }
 }
 
-function getMechanicsReviewReplayItems(
-  review: ActiveMechanicsReview,
-): Map<string, MechanicsReviewItem> {
-  const itemsByReplayId = new Map<string, MechanicsReviewItem>();
-  for (const item of review.manifest.items) {
-    if (!itemsByReplayId.has(item.replay)) {
-      itemsByReplayId.set(item.replay, item);
-    }
+function getMechanicsReviewReplayLoadsController(): MechanicsReviewReplayLoadsController {
+  if (!mechanicsReviewReplayLoadsController) {
+    throw new Error("Mechanics review replay loads are not initialized.");
   }
-  return itemsByReplayId;
+  return mechanicsReviewReplayLoadsController;
 }
 
-function getMechanicsReviewReplayClipCounts(review: ActiveMechanicsReview): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const item of review.manifest.items) {
-    counts.set(item.replay, (counts.get(item.replay) ?? 0) + 1);
-  }
-  return counts;
+function createMechanicsReviewReplaySource(
+  item: MechanicsReviewItem,
+  review: ActiveMechanicsReview,
+  signal?: AbortSignal,
+): ReplayInputSource {
+  return getMechanicsReviewReplayLoadsController().createReplaySource(item, review, signal);
 }
 
 function initializeMechanicsReviewReplayLoadStates(review: ActiveMechanicsReview): void {
-  const clipCounts = getMechanicsReviewReplayClipCounts(review);
-  for (const [replayId, item] of getMechanicsReviewReplayItems(review)) {
-    let path = "";
-    let label = replayId;
-    try {
-      path = getMechanicsReviewReplayPath(item, review);
-      label = getMechanicsReviewReplayLabel(item, review);
-    } catch {
-      const replay = review.replaysById.get(replayId);
-      label = replay?.label ?? replayId;
-    }
-    review.replayLoadStates.set(replayId, {
-      replayId,
-      label,
-      path,
-      clipCount: clipCounts.get(replayId) ?? 0,
-      status: "idle",
-      progress: null,
-      error: null,
-    });
-  }
-}
-
-function updateMechanicsReviewReplayLoadState(
-  review: ActiveMechanicsReview,
-  replayId: string,
-  patch: Partial<Omit<MechanicsReviewReplayLoadState, "replayId">>,
-): void {
-  const current =
-    review.replayLoadStates.get(replayId) ??
-    ({
-      replayId,
-      label: replayId,
-      path: "",
-      clipCount: 0,
-      status: "idle",
-      progress: null,
-      error: null,
-    } satisfies MechanicsReviewReplayLoadState);
-  review.replayLoadStates.set(replayId, {
-    ...current,
-    ...patch,
-  });
-  const activeItem = review.manifest.items[review.currentIndex];
-  if (review.loading && activeItem?.replay === replayId && patch.progress) {
-    statusReadout.textContent = formatReplayLoadProgress(patch.progress);
-    replayLoadModal?.update(patch.progress);
-  }
-  if (activeMechanicsReview === review) {
-    renderMechanicsReviewReplayLoads(review);
-  }
-}
-
-function formatReplayLoadStateProgress(progress: ReplayLoadProgress | null): string {
-  if (!progress) {
-    return "";
-  }
-  const label = formatReplayLoadProgress(progress);
-  if (progress.processedFrames !== undefined) {
-    const total = progress.totalFrames !== undefined ? ` / ${progress.totalFrames}` : "";
-    return `${label} (${progress.processedFrames}${total} frames)`;
-  }
-  if (progress.processedChunks !== undefined) {
-    const total = progress.totalChunks !== undefined ? ` / ${progress.totalChunks}` : "";
-    return `${label} (${progress.processedChunks}${total} chunks)`;
-  }
-  return label;
-}
-
-function mechanicsReviewReplayLoadStatusText(state: MechanicsReviewReplayLoadState): string {
-  if (state.status === "idle") {
-    return "Pending";
-  }
-  if (state.status === "loading") {
-    return formatReplayLoadStateProgress(state.progress) || "Loading";
-  }
-  if (state.status === "loaded") {
-    return "Loaded";
-  }
-  return state.error ? `Failed: ${state.error}` : "Failed";
-}
-
-function mechanicsReviewReplayLoadProgressValue(state: MechanicsReviewReplayLoadState): number {
-  if (state.status === "loaded") {
-    return 1;
-  }
-  const value = state.progress?.progress;
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+  getMechanicsReviewReplayLoadsController().initialize(review);
 }
 
 function renderMechanicsReviewReplayLoads(review: ActiveMechanicsReview | null): void {
-  if (!mechanicsReviewReplayLoadSummary || !replayLoadingSummary || !replayLoadingList) {
-    return;
-  }
-
-  const states = review ? Array.from(review.replayLoadStates.values()) : [];
-  const loaded = states.filter((state) => state.status === "loaded").length;
-  const loading = states.filter((state) => state.status === "loading").length;
-  const failed = states.filter((state) => state.status === "error").length;
-  const pending = states.filter((state) => state.status === "idle").length;
-  const summaryText =
-    states.length === 0
-      ? "0 replays"
-      : `${loaded}/${states.length} loaded${loading > 0 ? `, ${loading} loading` : ""}${
-          failed > 0 ? `, ${failed} failed` : ""
-        }`;
-  mechanicsReviewReplayLoadSummary.textContent = summaryText;
-  replayLoadingSummary.textContent = summaryText;
-  replayLoadingActive.textContent =
-    states.length === 0
-      ? "No playlist"
-      : loading > 0
-        ? `${loading} active, ${pending} pending`
-        : failed > 0
-          ? `${failed} failed`
-          : review?.preloading
-            ? `Background queue, ${pending} pending`
-            : loaded === states.length
-              ? "Complete"
-              : `${pending} pending`;
-
-  replayLoadingList.replaceChildren();
-  if (!review || states.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = "No replay sources.";
-    replayLoadingList.append(empty);
-    return;
-  }
-
-  for (const state of states) {
-    const row = document.createElement("div");
-    row.className = `mechanics-review-replay-load ${state.status}`;
-
-    const main = document.createElement("div");
-    main.className = "mechanics-review-replay-load-main";
-    const title = document.createElement("span");
-    title.className = "mechanics-review-replay-load-title";
-    title.textContent = state.label;
-    const meta = document.createElement("span");
-    meta.className = "mechanics-review-replay-load-meta";
-    meta.textContent = [
-      state.replayId,
-      `${state.clipCount} ${state.clipCount === 1 ? "clip" : "clips"}`,
-      state.path,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    main.append(title, meta);
-
-    const status = document.createElement("strong");
-    status.className = "mechanics-review-replay-load-status";
-    status.textContent = mechanicsReviewReplayLoadStatusText(state);
-
-    const progress = document.createElement("div");
-    progress.className = "mechanics-review-replay-load-progress";
-    const bar = document.createElement("span");
-    bar.style.width = `${Math.round(mechanicsReviewReplayLoadProgressValue(state) * 100)}%`;
-    progress.append(bar);
-
-    row.append(main, status, progress);
-    replayLoadingList.append(row);
-  }
+  mechanicsReviewReplayLoadsController?.render(review);
 }
 
 function preloadMechanicsReviewReplays(
   review: ActiveMechanicsReview,
   currentReplayId: string,
 ): void {
-  if (review.preloading) {
-    return;
-  }
-  review.preloading = true;
-  void (async () => {
-    try {
-      for (const [replayId, item] of getMechanicsReviewReplayItems(review)) {
-        if (replayId === currentReplayId) {
-          continue;
-        }
-        const state = review.replayLoadStates.get(replayId);
-        if (state?.status === "loaded" || state?.status === "loading") {
-          continue;
-        }
-        try {
-          await loadMechanicsReviewReplayBundle(item, review);
-        } catch {
-          // Background preload failures are rendered in the replay load window.
-        }
-      }
-    } finally {
-      review.preloading = false;
-    }
-  })();
+  getMechanicsReviewReplayLoadsController().preload(review, currentReplayId);
 }
 
 function loadMechanicsReviewReplayBundle(
   item: MechanicsReviewItem,
   review: ActiveMechanicsReview,
 ): Promise<ReplayLoadBundle> {
-  const cached = review.replayLoadCache.get(item.replay);
-  if (cached) {
-    return cached;
-  }
-
-  const source = createMechanicsReviewReplaySource(item, review);
-  updateMechanicsReviewReplayLoadState(review, item.replay, {
-    label: source.name,
-    path: getMechanicsReviewReplayPath(item, review),
-    status: "loading",
-    progress: null,
-    error: null,
-  });
-  const loadPromise = Promise.resolve()
-    .then(async () => {
-      const bytes = await source.readBytes();
-      return loadReplayBundleInWorker(bytes, {
-        reportEveryNFrames: 100,
-        onProgress(progress) {
-          updateMechanicsReviewReplayLoadState(review, item.replay, {
-            status: "loading",
-            progress,
-            error: null,
-          });
-        },
-      });
-    })
-    .then((bundle) => {
-      updateMechanicsReviewReplayLoadState(review, item.replay, {
-        status: "loaded",
-        progress: null,
-        error: null,
-      });
-      return bundle;
-    })
-    .catch((error) => {
-      review.replayLoadCache.delete(item.replay);
-      updateMechanicsReviewReplayLoadState(review, item.replay, {
-        status: "error",
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    });
-  review.replayLoadCache.set(item.replay, loadPromise);
-  return loadPromise;
+  return getMechanicsReviewReplayLoadsController().loadBundle(item, review);
 }
 
 function renderMechanicsReviewWindow(): void {
@@ -2323,6 +2074,21 @@ export function mountStatEvaluationPlayer(
   replayLoadingSummary = mustElement<HTMLElement>(root, "#replay-loading-summary");
   replayLoadingActive = mustElement<HTMLElement>(root, "#replay-loading-active");
   replayLoadingList = mustElement<HTMLDivElement>(root, "#replay-loading-list");
+  mechanicsReviewReplayLoadsController = createMechanicsReviewReplayLoadsController({
+    elements: {
+      reviewSummary: mechanicsReviewReplayLoadSummary,
+      loadingSummary: replayLoadingSummary,
+      loadingActive: replayLoadingActive,
+      loadingList: replayLoadingList,
+    },
+    isActiveReview(review) {
+      return activeMechanicsReview === review;
+    },
+    onActiveLoadProgress(progress) {
+      statusReadout.textContent = formatReplayLoadProgress(progress);
+      replayLoadModal?.update(progress);
+    },
+  });
   mechanicsReviewCount = mustElement<HTMLElement>(root, "#mechanics-review-count");
   mechanicsReviewList = mustElement<HTMLDivElement>(root, "#mechanics-review-list");
   boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(
@@ -2486,6 +2252,7 @@ export function mountStatEvaluationPlayer(
     eventPlaylistController = null;
     activeMechanicsReview = null;
     mechanicsReviewBoundaryGuard = false;
+    mechanicsReviewReplayLoadsController = null;
     boostPadOverlayEnabled = true;
     loadedReplayName = null;
     cameraControlsController = null;
