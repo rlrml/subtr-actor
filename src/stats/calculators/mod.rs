@@ -167,6 +167,8 @@ pub mod speed_flip_stats;
 pub use speed_flip_stats::*;
 pub mod territorial_pressure;
 pub use territorial_pressure::*;
+pub mod territorial_pressure_stats;
+pub use territorial_pressure_stats::*;
 pub mod touch;
 pub use touch::*;
 pub mod touch_stats;
