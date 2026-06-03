@@ -78,6 +78,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.ceiling_contact_time,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -95,6 +96,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.wall_contact_time,
                 event.time,
                 event.player,
+                Some(event.player_position),
                 event.is_team_0,
             );
             mechanic_event.properties = vec![mechanic_event_text_property(
@@ -117,6 +119,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.wall_contact_time,
                 event.time,
                 event.player,
+                Some(event.player_position),
                 event.is_team_0,
             );
             mechanic_event.properties = vec![mechanic_event_text_property(
@@ -135,6 +138,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.start_time,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -155,6 +159,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.backboard_time,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -178,6 +183,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.pass_start_time,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -191,6 +197,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.start_time,
                 event.time,
                 event.passer,
+                event.passer_position,
                 event.is_team_0,
             ));
         }
@@ -202,6 +209,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.frame,
                 event.time,
                 event.player,
+                Some(event.end_position),
                 event.is_team_0,
             ));
         }
@@ -213,6 +221,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.frame,
                 event.time,
                 event.player,
+                Some(event.end_position),
                 event.is_team_0,
             ));
         }
@@ -228,6 +237,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.frame,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -241,6 +251,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.dodge_time,
                 event.time,
                 event.player,
+                Some(event.landing_position),
                 event.is_team_0,
             ));
         }

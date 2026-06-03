@@ -259,6 +259,7 @@ pub(in crate::collector::stats::playback) fn parse_flick_mechanic_event(
         json_required_f32(object, "setup_start_time")?,
         json_required_f32(object, "time")?,
         json_required_remote_id(object, "player")?,
+        json_optional_vec3(object.get("player_position"))?,
         json_required_bool(object, "is_team_0")?,
     ))
 }
@@ -307,6 +308,7 @@ pub(in crate::collector::stats::playback) fn parse_musty_flick_mechanic_event(
         json_required_f32(object, "dodge_time")?,
         json_required_f32(object, "time")?,
         json_required_remote_id(object, "player")?,
+        json_optional_vec3(object.get("player_position"))?,
         json_required_bool(object, "is_team_0")?,
     ))
 }

@@ -7,13 +7,14 @@ pub(in crate::collector::stats::playback) fn moment_mechanic_event(
     frame: usize,
     time: f32,
     player_id: PlayerId,
+    player_position: Option<[f32; 3]>,
     is_team_0: bool,
 ) -> StatsTimelineTagEvent {
     StatsTimelineTagEvent {
         id: format!("{kind}:{frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
-        player_position: None,
+        player_position,
         is_team_0,
         timing: StatsEventTiming::Moment { frame, time },
         properties: Vec::new(),
@@ -29,13 +30,14 @@ pub(in crate::collector::stats::playback) fn span_mechanic_event(
     start_time: f32,
     end_time: f32,
     player_id: PlayerId,
+    player_position: Option<[f32; 3]>,
     is_team_0: bool,
 ) -> StatsTimelineTagEvent {
     StatsTimelineTagEvent {
         id: format!("{kind}:{start_frame}:{end_frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
-        player_position: None,
+        player_position,
         is_team_0,
         timing: StatsEventTiming::Span {
             start_frame,
@@ -111,6 +113,7 @@ pub(in crate::collector::stats::playback) fn parse_ball_carry_mechanic_event(
         json_required_f32(object, "start_time")?,
         json_required_f32(object, "end_time")?,
         json_required_remote_id(object, "player_id")?,
+        Some(json_required_vec3(object, "end_position")?),
         json_required_bool(object, "is_team_0")?,
     );
     if kind == "air_dribble" {
@@ -130,6 +133,7 @@ pub(in crate::collector::stats::playback) fn parse_dodge_reset_mechanic_event(
         json_required_usize(object, "frame")?,
         json_required_f32(object, "time")?,
         json_required_remote_id(object, "player")?,
+        json_optional_vec3(object.get("player_position"))?,
         json_required_bool(object, "is_team_0")?,
     ))
 }
