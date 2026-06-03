@@ -62,6 +62,13 @@ import {
   type ReplayLoadProgress,
 } from "./replayLoader.ts";
 import {
+  downloadRecording,
+  formatBytes,
+  getRecordingOptions as readRecordingOptions,
+  recordingFileName,
+  recordingLabel,
+} from "./recordingControls.ts";
+import {
   formatMechanicsReviewBound,
   formatMechanicsReviewClipDetails,
   formatMechanicsReviewEventDetails,
@@ -3265,49 +3272,11 @@ function populateAttachedPlayerOptions(players: ReplayPlayerTrack[]): void {
   }
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) {
-    return "--";
-  }
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const precision = unitIndex === 0 ? 0 : value >= 10 ? 1 : 2;
-  return `${value.toFixed(precision)} ${units[unitIndex]}`;
-}
-
-function recordingLabel(status: CanvasRecorderStatus | null): string {
-  if (!status) {
-    return "No replay";
-  }
-  if (status.error) {
-    return status.error;
-  }
-  switch (status.state) {
-    case "idle":
-      return "Idle";
-    case "recording":
-      return "Recording";
-    case "stopping":
-      return "Stopping";
-    case "ready":
-      return "Ready";
-    case "error":
-      return "Error";
-  }
-}
-
 function getRecordingOptions(): { fps: number; playbackRate: number } {
-  const fps = Number(recordingFps.value);
-  const playbackRate = Number(recordingPlaybackRate.value);
-  return {
-    fps: Number.isFinite(fps) ? Math.max(1, Math.min(120, Math.trunc(fps))) : 60,
-    playbackRate: Number.isFinite(playbackRate) ? Math.max(0.1, playbackRate) : 1,
-  };
+  return readRecordingOptions({
+    fpsValue: recordingFps.value,
+    playbackRateValue: recordingPlaybackRate.value,
+  });
 }
 
 function syncRecordingWindow(status = canvasRecorder?.getStatus() ?? null): void {
@@ -3327,24 +3296,6 @@ function syncRecordingWindow(status = canvasRecorder?.getStatus() ?? null): void
   recordingClear.disabled = !hasRecording || isRecording;
   recordingFps.disabled = isRecording;
   recordingPlaybackRate.disabled = isRecording;
-}
-
-function recordingFileName(): string {
-  const source = loadedReplayName?.replace(/\.replay$/i, "") || "replay";
-  const safeSource = source.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  return `${safeSource || "replay"}-${timestamp}.webm`;
-}
-
-function downloadRecording(blob: Blob): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = recordingFileName();
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function renderCameraProfile(state?: ReplayPlayerState): void {
@@ -4088,7 +4039,7 @@ export function mountStatEvaluationPlayer(
     () => {
       const blob = canvasRecorder?.getRecording();
       if (blob) {
-        downloadRecording(blob);
+        downloadRecording(blob, recordingFileName(loadedReplayName));
       }
     },
     { signal: listeners.signal },
