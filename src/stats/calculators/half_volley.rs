@@ -42,47 +42,6 @@ pub struct HalfVolleyEvent {
     pub goal_alignment: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct HalfVolleyPlayerStats {
-    pub count: u32,
-    pub total_ball_speed: f32,
-    pub fastest_ball_speed: f32,
-    pub is_last_half_volley: bool,
-    pub last_half_volley_time: Option<f32>,
-    pub last_half_volley_frame: Option<usize>,
-    pub time_since_last_half_volley: Option<f32>,
-    pub frames_since_last_half_volley: Option<usize>,
-}
-
-impl HalfVolleyPlayerStats {
-    pub fn average_ball_speed(&self) -> f32 {
-        if self.count == 0 {
-            0.0
-        } else {
-            self.total_ball_speed / self.count as f32
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct HalfVolleyTeamStats {
-    pub count: u32,
-    pub total_ball_speed: f32,
-    pub fastest_ball_speed: f32,
-}
-
-impl HalfVolleyTeamStats {
-    pub fn average_ball_speed(&self) -> f32 {
-        if self.count == 0 {
-            0.0
-        } else {
-            self.total_ball_speed / self.count as f32
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 struct FloorBounce {
     time: f32,
@@ -103,16 +62,13 @@ struct DodgeStart {
 #[derive(Debug, Clone, Default)]
 pub struct HalfVolleyCalculator {
     config: HalfVolleyCalculatorConfig,
-    player_stats: HashMap<PlayerId, HalfVolleyPlayerStats>,
-    team_zero_stats: HalfVolleyTeamStats,
-    team_one_stats: HalfVolleyTeamStats,
+    stats: HalfVolleyStatsAccumulator,
     events: EventStream<HalfVolleyEvent>,
     last_floor_bounce: Option<FloorBounce>,
     last_ground_contacts: HashMap<PlayerId, GroundContact>,
     recent_dodge_starts: HashMap<PlayerId, DodgeStart>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     previous_ball_velocity: Option<glam::Vec3>,
-    current_last_half_volley_player: Option<PlayerId>,
 }
 
 impl HalfVolleyCalculator {
@@ -132,15 +88,15 @@ impl HalfVolleyCalculator {
     }
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, HalfVolleyPlayerStats> {
-        &self.player_stats
+        self.stats.player_stats()
     }
 
     pub fn team_zero_stats(&self) -> &HalfVolleyTeamStats {
-        &self.team_zero_stats
+        self.stats.team_zero_stats()
     }
 
     pub fn team_one_stats(&self) -> &HalfVolleyTeamStats {
-        &self.team_one_stats
+        self.stats.team_one_stats()
     }
 
     pub fn events(&self) -> &[HalfVolleyEvent] {
@@ -149,18 +105,6 @@ impl HalfVolleyCalculator {
 
     pub fn new_events(&self) -> &[HalfVolleyEvent] {
         self.events.new_events()
-    }
-
-    fn begin_sample(&mut self, frame: &FrameInfo) {
-        for stats in self.player_stats.values_mut() {
-            stats.is_last_half_volley = false;
-            stats.time_since_last_half_volley = stats
-                .last_half_volley_time
-                .map(|time| (frame.time - time).max(0.0));
-            stats.frames_since_last_half_volley = stats
-                .last_half_volley_frame
-                .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
-        }
     }
 
     fn detect_floor_bounce(
@@ -249,26 +193,7 @@ impl HalfVolleyCalculator {
     fn record_half_volley(&mut self, frame: &FrameInfo, mut event: HalfVolleyEvent) {
         event.sample_time = frame.time;
         event.sample_frame = frame.frame_number;
-        let player_stats = self.player_stats.entry(event.player.clone()).or_default();
-        player_stats.count += 1;
-        player_stats.total_ball_speed += event.ball_speed;
-        player_stats.fastest_ball_speed = player_stats.fastest_ball_speed.max(event.ball_speed);
-        player_stats.last_half_volley_time = Some(event.time);
-        player_stats.last_half_volley_frame = Some(event.frame);
-        player_stats.time_since_last_half_volley = Some((frame.time - event.time).max(0.0));
-        player_stats.frames_since_last_half_volley =
-            Some(frame.frame_number.saturating_sub(event.frame));
-
-        let team_stats = if event.is_team_0 {
-            &mut self.team_zero_stats
-        } else {
-            &mut self.team_one_stats
-        };
-        team_stats.count += 1;
-        team_stats.total_ball_speed += event.ball_speed;
-        team_stats.fastest_ball_speed = team_stats.fastest_ball_speed.max(event.ball_speed);
-
-        self.current_last_half_volley_player = Some(event.player.clone());
+        self.stats.apply_event(&event, frame);
         self.events.push(event);
     }
 
@@ -319,14 +244,14 @@ impl HalfVolleyCalculator {
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.begin_sample(frame);
+        self.stats.begin_sample(frame);
         if !live_play {
             self.last_floor_bounce = None;
             self.last_ground_contacts.clear();
             self.recent_dodge_starts.clear();
             self.previous_dodge_active.clear();
             self.previous_ball_velocity = ball.velocity();
-            self.current_last_half_volley_player = None;
+            self.stats.reset_current_last_event_marker();
             return Ok(());
         }
 
@@ -348,11 +273,7 @@ impl HalfVolleyCalculator {
         }
 
         self.previous_ball_velocity = ball.velocity();
-        if let Some(player_id) = self.current_last_half_volley_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_half_volley = true;
-            }
-        }
+        self.stats.restore_current_last_event_marker();
 
         Ok(())
     }
