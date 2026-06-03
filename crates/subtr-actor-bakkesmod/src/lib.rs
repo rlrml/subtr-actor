@@ -20,12 +20,12 @@ use subtr_actor::{
     BoostPickupComparisonEvent, BumpEvent, CorePlayerStatsEvent, DemoEventSample,
     DemolishAttribute, DemolishInfo, DodgeRefreshedEvent, FiftyFiftyEvent, FrameEventsState,
     FrameInfo, FrameInput, GameplayPhase, GameplayState, GoalBuildupKind, GoalContextEvent,
-    GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, MechanicEvent, MechanicTiming,
-    PlayerFrameState, PlayerId, PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind,
-    ProcessorView, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
-    RushEvent, ShotEventMetadata, StatsTimelineEventCollector, SubtrActorError,
-    SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent,
-    TouchStateCalculator, WhiffEvent,
+    GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, PlayerFrameState, PlayerId, PlayerInfo,
+    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayFrameInputBuilder,
+    ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent,
+    ShotEventMetadata, StatsEventTiming, StatsTimelineEventCollector, StatsTimelineTagEvent,
+    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
+    TouchEvent, TouchStateCalculator, WhiffEvent,
 };
 
 #[repr(C)]
@@ -418,6 +418,7 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "boost_pickups",
     "boost_ledger",
     "boost_state",
+    "boost_stats",
     "bump",
     "touch",
     "touch_last_touch",
@@ -1702,10 +1703,10 @@ fn mechanic_kind(kind: &str) -> Option<SaMechanicKind> {
     }
 }
 
-fn mechanic_start(event: &MechanicEvent) -> (usize, f32) {
+fn mechanic_start(event: &StatsTimelineTagEvent) -> (usize, f32) {
     match event.timing {
-        MechanicTiming::Moment { frame, time } => (frame, time),
-        MechanicTiming::Span {
+        StatsEventTiming::Moment { frame, time } => (frame, time),
+        StatsEventTiming::Span {
             start_frame,
             start_time,
             ..
@@ -1768,7 +1769,7 @@ fn push_pending_goal_context_event(
 fn push_mechanic_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
-    mechanics: &[MechanicEvent],
+    mechanics: &[StatsTimelineTagEvent],
 ) {
     for event in mechanics {
         let Some(kind) = mechanic_kind(&event.kind) else {
@@ -4621,13 +4622,13 @@ mod tests {
         player_at_index(0, true, location)
     }
 
-    fn normalized_mechanic(id: &str, kind: &str, frame: usize, time: f32) -> MechanicEvent {
-        MechanicEvent {
+    fn normalized_mechanic(id: &str, kind: &str, frame: usize, time: f32) -> StatsTimelineTagEvent {
+        StatsTimelineTagEvent {
             id: id.to_owned(),
             kind: kind.to_owned(),
             player_id: RemoteId::SplitScreen(0),
             is_team_0: true,
-            timing: MechanicTiming::Moment { frame, time },
+            timing: StatsEventTiming::Moment { frame, time },
             properties: Vec::new(),
         }
     }
@@ -6077,8 +6078,8 @@ mod tests {
 
     #[test]
     fn process_frame_treats_sampled_game_state_as_replay_phase_signal() {
-        const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 55;
-        const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 86;
+        const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 53;
+        const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 67;
 
         let engine = subtr_actor_bakkesmod_engine_create();
         let kickoff_frame = SaLiveFrame {
@@ -10239,8 +10240,19 @@ mod tests {
         assert_eq!(view.current_frame_player_stat_events().len(), 0);
         assert_eq!(view.current_frame_goal_events().len(), 0);
 
-        let aggregate_input =
-            FrameInput::aggregate(&view, 3, frame.time, frame.dt, 1, 1, 1, 1, 1, 1);
+        let mut previous_history = SaLiveEventHistory::default();
+        previous_history.append_frame_events(&previous_events);
+        let previous_view = SaLiveProcessorView::new(
+            None,
+            &frame,
+            &players,
+            FrameEventsState::default(),
+            &previous_history,
+        );
+        let mut input_builder = ReplayFrameInputBuilder::default();
+        input_builder.aggregate(&previous_view, 2, 0.0, frame.dt);
+
+        let aggregate_input = input_builder.aggregate(&view, 3, frame.time, frame.dt);
         let aggregate_events = aggregate_input.frame_events_state();
         assert_eq!(aggregate_events.active_demos.len(), 1);
         assert_eq!(
