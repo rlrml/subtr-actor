@@ -117,6 +117,8 @@ pub mod half_volley_stats;
 pub use half_volley_stats::*;
 pub mod match_stats;
 pub use match_stats::*;
+pub mod match_stats_stats;
+pub use match_stats_stats::*;
 pub mod movement;
 pub use movement::*;
 pub mod movement_stats;

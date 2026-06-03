@@ -20,7 +20,7 @@ pub struct GoalAfterKickoffStats {
     pub medium_goal_count: u32,
     pub long_goal_count: u32,
     #[serde(default, skip_serializing)]
-    goal_times: Vec<f32>,
+    pub(crate) goal_times: Vec<f32>,
 }
 
 impl GoalAfterKickoffStats {
@@ -66,12 +66,13 @@ impl GoalAfterKickoffStats {
         }
     }
 
-    fn merge(&mut self, other: &Self) {
+    pub(crate) fn merge(&mut self, other: &Self) {
         self.kickoff_goal_count += other.kickoff_goal_count;
         self.short_goal_count += other.short_goal_count;
         self.medium_goal_count += other.medium_goal_count;
         self.long_goal_count += other.long_goal_count;
         self.goal_times.extend(other.goal_times.iter().copied());
+        self.goal_times.sort_by(|left, right| left.total_cmp(right));
     }
 }
 
@@ -82,7 +83,7 @@ pub struct GoalBallAirTimeStats {
     pub cumulative_goal_ball_air_time: f32,
     pub last_goal_ball_air_time: Option<f32>,
     #[serde(default, skip_serializing)]
-    goal_ball_air_times: Vec<f32>,
+    pub(crate) goal_ball_air_times: Vec<f32>,
 }
 
 impl GoalBallAirTimeStats {
@@ -123,7 +124,7 @@ impl GoalBallAirTimeStats {
         }
     }
 
-    fn merge(&mut self, other: &Self) {
+    pub(crate) fn merge(&mut self, other: &Self) {
         self.goal_ball_air_time_sample_count += other.goal_ball_air_time_sample_count;
         self.cumulative_goal_ball_air_time += other.cumulative_goal_ball_air_time;
         self.last_goal_ball_air_time = other
@@ -131,6 +132,8 @@ impl GoalBallAirTimeStats {
             .or(self.last_goal_ball_air_time);
         self.goal_ball_air_times
             .extend(other.goal_ball_air_times.iter().copied());
+        self.goal_ball_air_times
+            .sort_by(|left, right| left.total_cmp(right));
     }
 }
 
@@ -161,7 +164,7 @@ impl GoalBuildupStats {
         }
     }
 
-    fn merge(&mut self, other: &Self) {
+    pub(crate) fn merge(&mut self, other: &Self) {
         self.counter_attack_goal_count += other.counter_attack_goal_count;
         self.sustained_pressure_goal_count += other.sustained_pressure_goal_count;
         self.other_buildup_goal_count += other.other_buildup_goal_count;
@@ -733,7 +736,7 @@ fn core_team_stats_delta(current: &CoreTeamStats, previous: &CoreTeamStats) -> C
     }
 }
 
-fn player_id_sort_key(player_id: &PlayerId) -> String {
+pub(crate) fn player_id_sort_key(player_id: &PlayerId) -> String {
     match player_id {
         boxcars::RemoteId::PlayStation(id) => {
             format!("playstation:{}:{}:{:?}", id.online_id, id.name, id.unknown1)
@@ -829,12 +832,8 @@ struct BoostLeadupStats {
 
 #[derive(Debug, Clone, Default)]
 pub struct MatchStatsCalculator {
-    player_stats: HashMap<PlayerId, CorePlayerStats>,
-    player_teams: HashMap<PlayerId, bool>,
+    stats: CoreStatsAccumulator,
     previous_player_stats: HashMap<PlayerId, CorePlayerStats>,
-    last_emitted_player_stats: HashMap<PlayerId, CorePlayerStats>,
-    last_emitted_team_zero_stats: CoreTeamStats,
-    last_emitted_team_one_stats: CoreTeamStats,
     core_player_events: EventStream<CorePlayerStatsEvent>,
     core_team_events: EventStream<CoreTeamStatsEvent>,
     timeline: EventStream<TimelineEvent>,
@@ -856,7 +855,7 @@ impl MatchStatsCalculator {
     }
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, CorePlayerStats> {
-        &self.player_stats
+        self.stats.player_stats()
     }
 
     pub fn timeline(&self) -> &[TimelineEvent] {
@@ -903,28 +902,37 @@ impl MatchStatsCalculator {
             };
             let scorer_last_touch =
                 self.reconcile_goal_context_scorer(&pending_goal_event.event, &scorer);
-            let scorer_stats = self.player_stats.entry(scorer.clone()).or_default();
-            scorer_stats.goals += 1;
+            let mut delta = CorePlayerStats {
+                goals: 1,
+                ..CorePlayerStats::default()
+            };
             if let Some(touch_position) = scorer_last_touch.and_then(|touch| touch.ball_position) {
-                scorer_stats
+                delta
                     .scoring_context
                     .record_scoring_goal_last_touch_position(touch_position);
             }
             if let Some(time_after_kickoff) = pending_goal_event.time_after_kickoff {
-                scorer_stats
+                delta
                     .scoring_context
                     .goal_after_kickoff
                     .record_goal(time_after_kickoff);
             }
-            scorer_stats
+            delta
                 .scoring_context
                 .goal_buildup
                 .record(pending_goal_event.goal_buildup);
             if let Some(ball_air_time_before_goal) = pending_goal_event.ball_air_time_before_goal {
-                scorer_stats
+                delta
                     .scoring_context
                     .record_goal_ball_air_time(ball_air_time_before_goal);
             }
+            self.emit_core_player_delta_parts(
+                pending_goal_event.event.time,
+                pending_goal_event.event.frame,
+                scorer.clone(),
+                pending_goal_event.event.scoring_team_is_team_0,
+                delta,
+            );
 
             self.timeline.push(TimelineEvent {
                 time: pending_goal_event.event.time,
@@ -945,55 +953,11 @@ impl MatchStatsCalculator {
     }
 
     pub fn team_zero_stats(&self) -> CoreTeamStats {
-        self.team_stats_for_side(true)
+        self.stats.team_zero_stats()
     }
 
     pub fn team_one_stats(&self) -> CoreTeamStats {
-        self.team_stats_for_side(false)
-    }
-
-    fn team_stats_for_side(&self, is_team_0: bool) -> CoreTeamStats {
-        let mut player_stats: Vec<_> = self
-            .player_stats
-            .iter()
-            .filter(|(player_id, _)| self.player_teams.get(*player_id) == Some(&is_team_0))
-            .collect();
-        player_stats.sort_by_cached_key(|(player_id, _)| player_id_sort_key(player_id));
-
-        let mut stats = player_stats.into_iter().fold(
-            CoreTeamStats::default(),
-            |mut stats, (_, player_stats)| {
-                stats.score += player_stats.score;
-                stats.goals += player_stats.goals;
-                stats.assists += player_stats.assists;
-                stats.saves += player_stats.saves;
-                stats.shots += player_stats.shots;
-                stats
-                    .scoring_context
-                    .goal_after_kickoff
-                    .merge(&player_stats.scoring_context.goal_after_kickoff);
-                stats
-                    .scoring_context
-                    .goal_buildup
-                    .merge(&player_stats.scoring_context.goal_buildup);
-                stats
-                    .scoring_context
-                    .goal_ball_air_time
-                    .merge(&player_stats.scoring_context.goal_ball_air_time);
-                stats
-            },
-        );
-        stats
-            .scoring_context
-            .goal_after_kickoff
-            .goal_times
-            .sort_by(|left, right| left.total_cmp(right));
-        stats
-            .scoring_context
-            .goal_ball_air_time
-            .goal_ball_air_times
-            .sort_by(|left, right| left.total_cmp(right));
-        stats
+        self.stats.team_one_stats()
     }
 
     fn emit_timeline_events(
@@ -1016,55 +980,45 @@ impl MatchStatsCalculator {
         }
     }
 
-    fn emit_core_stats_events(&mut self, frame: &FrameInfo) {
-        let mut player_ids: Vec<_> = self.player_stats.keys().cloned().collect();
-        player_ids.sort_by(|left, right| format!("{left:?}").cmp(&format!("{right:?}")));
-        for player_id in player_ids {
-            let Some(stats) = self.player_stats.get(&player_id) else {
-                continue;
-            };
-            let previous_stats = self
-                .last_emitted_player_stats
-                .get(&player_id)
-                .cloned()
-                .unwrap_or_default();
-            if previous_stats == *stats {
-                continue;
-            }
-            let Some(is_team_0) = self.player_teams.get(&player_id).copied() else {
-                continue;
-            };
-            self.core_player_events.push(CorePlayerStatsEvent {
-                time: frame.time,
-                frame: frame.frame_number,
-                player: player_id.clone(),
+    fn emit_core_player_delta(
+        &mut self,
+        frame: &FrameInfo,
+        player: PlayerId,
+        is_team_0: bool,
+        delta: CorePlayerStats,
+    ) {
+        self.emit_core_player_delta_parts(frame.time, frame.frame_number, player, is_team_0, delta);
+    }
+
+    fn emit_core_player_delta_parts(
+        &mut self,
+        time: f32,
+        frame: usize,
+        player: PlayerId,
+        is_team_0: bool,
+        delta: CorePlayerStats,
+    ) {
+        if delta == CorePlayerStats::default() {
+            return;
+        }
+        let previous_team_stats = self.stats.team_stats_for_side(is_team_0);
+        let event = CorePlayerStatsEvent {
+            time,
+            frame,
+            player,
+            is_team_0,
+            delta,
+        };
+        self.stats.apply_player_event(&event);
+        self.core_player_events.push(event);
+        let current_team_stats = self.stats.team_stats_for_side(is_team_0);
+        if current_team_stats != previous_team_stats {
+            self.core_team_events.push(CoreTeamStatsEvent {
+                time,
+                frame,
                 is_team_0,
-                delta: core_player_stats_delta(stats, &previous_stats),
+                delta: core_team_stats_delta(&current_team_stats, &previous_team_stats),
             });
-            self.last_emitted_player_stats
-                .insert(player_id, stats.clone());
-        }
-
-        let team_zero_stats = self.team_zero_stats();
-        if team_zero_stats != self.last_emitted_team_zero_stats {
-            self.core_team_events.push(CoreTeamStatsEvent {
-                time: frame.time,
-                frame: frame.frame_number,
-                is_team_0: true,
-                delta: core_team_stats_delta(&team_zero_stats, &self.last_emitted_team_zero_stats),
-            });
-            self.last_emitted_team_zero_stats = team_zero_stats;
-        }
-
-        let team_one_stats = self.team_one_stats();
-        if team_one_stats != self.last_emitted_team_one_stats {
-            self.core_team_events.push(CoreTeamStatsEvent {
-                time: frame.time,
-                frame: frame.frame_number,
-                is_team_0: false,
-                delta: core_team_stats_delta(&team_one_stats, &self.last_emitted_team_one_stats),
-            });
-            self.last_emitted_team_one_stats = team_one_stats;
         }
     }
 
@@ -1296,19 +1250,27 @@ impl MatchStatsCalculator {
         defending_team_most_back_player: Option<&PlayerId>,
     ) {
         if let Some(player_id) = scoring_team_most_back_player {
-            self.player_stats
-                .entry(player_id.clone())
-                .or_default()
-                .scoring_context
-                .goals_for_while_most_back += 1;
+            let mut delta = CorePlayerStats::default();
+            delta.scoring_context.goals_for_while_most_back += 1;
+            self.emit_core_player_delta_parts(
+                goal_event.time,
+                goal_event.frame,
+                player_id.clone(),
+                goal_event.scoring_team_is_team_0,
+                delta,
+            );
         }
 
         if let Some(player_id) = defending_team_most_back_player {
-            self.player_stats
-                .entry(player_id.clone())
-                .or_default()
-                .scoring_context
-                .goals_against_while_most_back += 1;
+            let mut delta = CorePlayerStats::default();
+            delta.scoring_context.goals_against_while_most_back += 1;
+            self.emit_core_player_delta_parts(
+                goal_event.time,
+                goal_event.frame,
+                player_id.clone(),
+                !goal_event.scoring_team_is_team_0,
+                delta,
+            );
         }
 
         for player in players
@@ -1317,15 +1279,19 @@ impl MatchStatsCalculator {
             .filter(|player| player.is_team_0 != goal_event.scoring_team_is_team_0)
         {
             let boost_leadup = self.boost_leadup_for_player(&player.player_id);
-            self.player_stats
-                .entry(player.player_id.clone())
-                .or_default()
-                .scoring_context
-                .record_goal_against_snapshot(
-                    player.boost_amount.or(player.last_boost_amount),
-                    player.position().map(GoalContextPosition::from),
-                    boost_leadup,
-                );
+            let mut delta = CorePlayerStats::default();
+            delta.scoring_context.record_goal_against_snapshot(
+                player.boost_amount.or(player.last_boost_amount),
+                player.position().map(GoalContextPosition::from),
+                boost_leadup,
+            );
+            self.emit_core_player_delta_parts(
+                goal_event.time,
+                goal_event.frame,
+                player.player_id.clone(),
+                player.is_team_0,
+                delta,
+            );
         }
     }
 
@@ -1577,8 +1543,8 @@ impl MatchStatsCalculator {
         }
 
         for player in &players.players {
-            self.player_teams
-                .insert(player.player_id.clone(), player.is_team_0);
+            self.stats
+                .ensure_player(player.player_id.clone(), player.is_team_0);
             let mut current_stats = CorePlayerStats {
                 score: player.match_score.unwrap_or(0),
                 goals: player.match_goals.unwrap_or(0),
@@ -1586,10 +1552,9 @@ impl MatchStatsCalculator {
                 saves: player.match_saves.unwrap_or(0),
                 shots: player.match_shots.unwrap_or(0),
                 scoring_context: self
-                    .player_stats
-                    .get(&player.player_id)
-                    .map(|stats| stats.scoring_context.clone())
-                    .unwrap_or_default(),
+                    .stats
+                    .player_stats_for(&player.player_id)
+                    .scoring_context,
             };
 
             let previous_stats = self
@@ -1712,8 +1677,13 @@ impl MatchStatsCalculator {
 
             self.previous_player_stats
                 .insert(player.player_id.clone(), current_stats.clone());
-            self.player_stats
-                .insert(player.player_id.clone(), current_stats);
+            let previous_accumulated_stats = self.stats.player_stats_for(&player.player_id);
+            self.emit_core_player_delta(
+                frame,
+                player.player_id.clone(),
+                player.is_team_0,
+                core_player_stats_delta(&current_stats, &previous_accumulated_stats),
+            );
         }
 
         if let (Some(team_zero_score), Some(team_one_score)) =
@@ -1725,19 +1695,19 @@ impl MatchStatsCalculator {
 
                 if team_zero_delta > 0 {
                     if let Some(last_defender) = self.last_defender(players, false) {
-                        if let Some(stats) = self.player_stats.get_mut(&last_defender) {
-                            stats.scoring_context.goals_conceded_while_last_defender +=
-                                team_zero_delta as u32;
-                        }
+                        let mut delta = CorePlayerStats::default();
+                        delta.scoring_context.goals_conceded_while_last_defender +=
+                            team_zero_delta as u32;
+                        self.emit_core_player_delta(frame, last_defender, false, delta);
                     }
                 }
 
                 if team_one_delta > 0 {
                     if let Some(last_defender) = self.last_defender(players, true) {
-                        if let Some(stats) = self.player_stats.get_mut(&last_defender) {
-                            stats.scoring_context.goals_conceded_while_last_defender +=
-                                team_one_delta as u32;
-                        }
+                        let mut delta = CorePlayerStats::default();
+                        delta.scoring_context.goals_conceded_while_last_defender +=
+                            team_one_delta as u32;
+                        self.emit_core_player_delta(frame, last_defender, true, delta);
                     }
                 }
             }
@@ -1750,8 +1720,6 @@ impl MatchStatsCalculator {
                 .partial_cmp(&b.time)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        self.emit_core_stats_events(frame);
-
         Ok(())
     }
 }
