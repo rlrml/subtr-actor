@@ -255,6 +255,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.ceiling_contact_time,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -272,6 +273,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.wall_contact_time,
                 event.time,
                 event.player,
+                Some(event.player_position),
                 event.is_team_0,
             );
             mechanic_event.properties = vec![mechanic_event_text_property(
@@ -289,11 +291,12 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             let mut mechanic_event = span_mechanic_event(
                 "wall_aerial_shot",
                 index,
-                event.wall_contact_frame,
+                event.takeoff_frame,
                 event.frame,
-                event.wall_contact_time,
+                event.takeoff_time,
                 event.time,
                 event.player,
+                Some(event.player_position),
                 event.is_team_0,
             );
             mechanic_event.properties = vec![mechanic_event_text_property(
@@ -312,6 +315,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.start_time,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -332,6 +336,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.backboard_time,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -355,6 +360,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.pass_start_time,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -368,6 +374,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.start_time,
                 event.time,
                 event.passer,
+                event.passer_position,
                 event.is_team_0,
             ));
         }
@@ -379,6 +386,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.frame,
                 event.time,
                 event.player,
+                Some(event.end_position),
                 event.is_team_0,
             ));
         }
@@ -390,6 +398,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.frame,
                 event.time,
                 event.player,
+                Some(event.end_position),
                 event.is_team_0,
             ));
         }
@@ -405,6 +414,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.frame,
                 event.time,
                 event.player,
+                event.player_position,
                 event.is_team_0,
             ));
         }
@@ -418,6 +428,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 event.dodge_time,
                 event.time,
                 event.player,
+                Some(event.landing_position),
                 event.is_team_0,
             ));
         }
@@ -2182,13 +2193,14 @@ fn moment_mechanic_event(
     frame: usize,
     time: f32,
     player_id: PlayerId,
+    player_position: Option<[f32; 3]>,
     is_team_0: bool,
 ) -> StatsTimelineTagEvent {
     StatsTimelineTagEvent {
         id: format!("{kind}:{frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
-        player_position: None,
+        player_position,
         is_team_0,
         timing: StatsEventTiming::Moment { frame, time },
         properties: Vec::new(),
@@ -2204,13 +2216,14 @@ fn span_mechanic_event(
     start_time: f32,
     end_time: f32,
     player_id: PlayerId,
+    player_position: Option<[f32; 3]>,
     is_team_0: bool,
 ) -> StatsTimelineTagEvent {
     StatsTimelineTagEvent {
         id: format!("{kind}:{start_frame}:{end_frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
-        player_position: None,
+        player_position,
         is_team_0,
         timing: StatsEventTiming::Span {
             start_frame,
@@ -2278,6 +2291,7 @@ fn parse_ball_carry_mechanic_event(
         json_required_f32(object, "start_time")?,
         json_required_f32(object, "end_time")?,
         json_required_remote_id(object, "player_id")?,
+        Some(json_required_vec3(object, "end_position")?),
         json_required_bool(object, "is_team_0")?,
     );
     if kind == "air_dribble" {
@@ -2297,6 +2311,7 @@ fn parse_dodge_reset_mechanic_event(
         json_required_usize(object, "frame")?,
         json_required_f32(object, "time")?,
         json_required_remote_id(object, "player")?,
+        json_optional_vec3(object.get("player_position"))?,
         json_required_bool(object, "is_team_0")?,
     ))
 }
@@ -2531,6 +2546,7 @@ fn parse_flick_mechanic_event(
         json_required_f32(object, "setup_start_time")?,
         json_required_f32(object, "time")?,
         json_required_remote_id(object, "player")?,
+        json_optional_vec3(object.get("player_position"))?,
         json_required_bool(object, "is_team_0")?,
     ))
 }
@@ -2577,6 +2593,7 @@ fn parse_musty_flick_mechanic_event(
         json_required_f32(object, "dodge_time")?,
         json_required_f32(object, "time")?,
         json_required_remote_id(object, "player")?,
+        json_optional_vec3(object.get("player_position"))?,
         json_required_bool(object, "is_team_0")?,
     ))
 }
