@@ -1361,6 +1361,15 @@ impl BoostCalculator {
         self.pending_reported_pickups = remaining_pickups;
     }
 
+    fn flush_deferred_reported_pickups(&mut self) {
+        while let Some(mut deferred) = self.pending_reported_pickups.pop_front() {
+            let field_half =
+                self.resolve_pickup(&deferred.pad_id, deferred.pending_pickup, deferred.pad_size);
+            deferred.reported_event.field_half = field_half;
+            self.record_reported_pickup(deferred.reported_event);
+        }
+    }
+
     fn flush_stale_pickup_comparisons(&mut self, current_frame: usize) {
         while self
             .pending_inferred_pickups
@@ -1372,8 +1381,8 @@ impl BoostCalculator {
     }
 
     pub fn finish_calculation(&mut self) -> SubtrActorResult<()> {
+        self.flush_deferred_reported_pickups();
         self.pending_inferred_pickups.clear();
-        self.pending_reported_pickups.clear();
         Ok(())
     }
 
