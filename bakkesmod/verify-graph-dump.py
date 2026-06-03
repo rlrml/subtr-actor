@@ -46,6 +46,7 @@ DEFAULT_GRAPH_EVENT_FIELDS = (
     "wavedash",
     "whiff",
     "boost_pickups",
+    "boost_stats",
     "bump",
 )
 DEFAULT_REQUIRED_GRAPH_EVENT_FIELDS = ("timeline", "goal_context", "boost_pickups")
