@@ -147,7 +147,7 @@ constexpr std::array<const char *, 6> REQUIRED_EVENT_HISTORY_FIELDS{
     "player_stat_events",
     "goal_events",
 };
-constexpr std::array<const char *, 41> GRAPH_EVENT_FIELDS{
+constexpr std::array<const char *, 42> GRAPH_EVENT_FIELDS{
     "timeline",
     "mechanics",
     "goal_context",
@@ -185,6 +185,7 @@ constexpr std::array<const char *, 41> GRAPH_EVENT_FIELDS{
     "boost_pickups",
     "boost_ledger",
     "boost_state",
+    "boost_stats",
     "bump",
     "touch",
     "touch_last_touch",
