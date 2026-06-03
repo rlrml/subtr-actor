@@ -1,0 +1,213 @@
+use super::*;
+
+const TOUCH_KIND_LABEL_VALUES: [&str; 3] = ["control", "medium_hit", "hard_hit"];
+const TOUCH_SURFACE_LABEL_VALUES: [&str; 3] = ["ground", "air", "wall"];
+const TOUCH_DODGE_STATE_LABEL_VALUES: [&str; 2] = ["no_dodge", "dodge"];
+
+fn touch_kind_label(value: &str) -> StatLabel {
+    match value {
+        "medium_hit" => StatLabel::new("kind", "medium_hit"),
+        "hard_hit" => StatLabel::new("kind", "hard_hit"),
+        _ => StatLabel::new("kind", "control"),
+    }
+}
+
+fn touch_height_band_label(value: &str) -> StatLabel {
+    match value {
+        "low_air" => StatLabel::new("height_band", "low_air"),
+        "high_air" => StatLabel::new("height_band", "high_air"),
+        _ => StatLabel::new("height_band", "ground"),
+    }
+}
+
+fn touch_surface_label(value: &str) -> StatLabel {
+    match value {
+        "air" => StatLabel::new("surface", "air"),
+        "wall" => StatLabel::new("surface", "wall"),
+        _ => StatLabel::new("surface", "ground"),
+    }
+}
+
+fn touch_dodge_state_label(value: &str) -> StatLabel {
+    match value {
+        "dodge" => StatLabel::new("dodge_state", "dodge"),
+        _ => StatLabel::new("dodge_state", "no_dodge"),
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct TouchStats {
+    pub touch_count: u32,
+    pub control_touch_count: u32,
+    pub medium_hit_count: u32,
+    pub hard_hit_count: u32,
+    pub aerial_touch_count: u32,
+    pub high_aerial_touch_count: u32,
+    #[serde(default)]
+    pub wall_touch_count: u32,
+    pub is_last_touch: bool,
+    pub last_touch_time: Option<f32>,
+    pub last_touch_frame: Option<usize>,
+    pub time_since_last_touch: Option<f32>,
+    pub frames_since_last_touch: Option<usize>,
+    pub last_ball_speed_change: Option<f32>,
+    pub max_ball_speed_change: f32,
+    pub cumulative_ball_speed_change: f32,
+    #[serde(default)]
+    pub total_ball_travel_distance: f32,
+    #[serde(default)]
+    pub total_ball_advance_distance: f32,
+    #[serde(default)]
+    pub total_ball_retreat_distance: f32,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_touch_counts: LabeledCounts,
+}
+
+impl TouchStats {
+    pub fn average_ball_speed_change(&self) -> f32 {
+        if self.touch_count == 0 {
+            0.0
+        } else {
+            self.cumulative_ball_speed_change / self.touch_count as f32
+        }
+    }
+
+    pub fn touch_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
+        self.labeled_touch_counts.count_matching(labels)
+    }
+
+    pub fn dodge_touch_count(&self) -> u32 {
+        self.touch_count_with_labels(&[StatLabel::new("dodge_state", "dodge")])
+    }
+
+    pub fn dodge_hit_count(&self) -> u32 {
+        self.touch_count_with_labels(&[
+            StatLabel::new("dodge_state", "dodge"),
+            StatLabel::new("kind", "medium_hit"),
+        ]) + self.touch_count_with_labels(&[
+            StatLabel::new("dodge_state", "dodge"),
+            StatLabel::new("kind", "hard_hit"),
+        ])
+    }
+
+    pub fn complete_labeled_touch_counts(&self) -> LabeledCounts {
+        let mut entries: Vec<_> = ALL_PLAYER_VERTICAL_BANDS
+            .into_iter()
+            .flat_map(|height_band| {
+                TOUCH_SURFACE_LABEL_VALUES
+                    .into_iter()
+                    .flat_map(move |surface| {
+                        TOUCH_DODGE_STATE_LABEL_VALUES
+                            .into_iter()
+                            .flat_map(move |dodge_state| {
+                                TOUCH_KIND_LABEL_VALUES.into_iter().map(move |kind| {
+                                    let mut labels = vec![
+                                        StatLabel::new("kind", kind),
+                                        height_band.as_label(),
+                                        StatLabel::new("surface", surface),
+                                        StatLabel::new("dodge_state", dodge_state),
+                                    ];
+                                    labels.sort();
+                                    LabeledCountEntry {
+                                        count: self.labeled_touch_counts.count_exact(&labels),
+                                        labels,
+                                    }
+                                })
+                            })
+                    })
+            })
+            .collect();
+
+        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
+
+        LabeledCounts { entries }
+    }
+
+    pub fn with_complete_labeled_touch_counts(mut self) -> Self {
+        self.labeled_touch_counts = self.complete_labeled_touch_counts();
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TouchStatsAccumulator {
+    player_stats: HashMap<PlayerId, TouchStats>,
+    current_last_touch_player: Option<PlayerId>,
+}
+
+impl TouchStatsAccumulator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn player_stats(&self) -> &HashMap<PlayerId, TouchStats> {
+        &self.player_stats
+    }
+
+    pub fn begin_sample(&mut self, frame: &FrameInfo) {
+        for stats in self.player_stats.values_mut() {
+            stats.is_last_touch = false;
+            stats.time_since_last_touch = stats
+                .last_touch_time
+                .map(|time| (frame.time - time).max(0.0));
+            stats.frames_since_last_touch = stats
+                .last_touch_frame
+                .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
+        }
+    }
+
+    pub fn apply_touch_event(&mut self, event: &TouchStatsEvent, frame: &FrameInfo) {
+        let stats = self.player_stats.entry(event.player.clone()).or_default();
+        stats.touch_count += 1;
+        match event.height_band.as_str() {
+            "low_air" => stats.aerial_touch_count += 1,
+            "high_air" => {
+                stats.aerial_touch_count += 1;
+                stats.high_aerial_touch_count += 1;
+            }
+            _ => {}
+        }
+        match event.kind.as_str() {
+            "control" => stats.control_touch_count += 1,
+            "medium_hit" => stats.medium_hit_count += 1,
+            "hard_hit" => stats.hard_hit_count += 1,
+            _ => {}
+        }
+        if event.surface == "wall" {
+            stats.wall_touch_count += 1;
+        }
+        stats.labeled_touch_counts.increment([
+            touch_kind_label(&event.kind),
+            touch_height_band_label(&event.height_band),
+            touch_surface_label(&event.surface),
+            touch_dodge_state_label(&event.dodge_state),
+        ]);
+        stats.last_touch_time = Some(event.time);
+        stats.last_touch_frame = Some(event.frame);
+        stats.time_since_last_touch = Some((frame.time - event.time).max(0.0));
+        stats.frames_since_last_touch = Some(frame.frame_number.saturating_sub(event.frame));
+        stats.last_ball_speed_change = Some(event.ball_speed_change);
+        stats.max_ball_speed_change = stats.max_ball_speed_change.max(event.ball_speed_change);
+        stats.cumulative_ball_speed_change += event.ball_speed_change;
+    }
+
+    pub fn apply_ball_movement_event(&mut self, event: &TouchBallMovementEvent) {
+        let stats = self.player_stats.entry(event.player.clone()).or_default();
+        stats.total_ball_travel_distance += event.travel_distance;
+        stats.total_ball_advance_distance += event.advance_distance;
+        stats.total_ball_retreat_distance += event.retreat_distance;
+    }
+
+    pub fn set_current_last_touch_player(&mut self, player: Option<PlayerId>) {
+        self.current_last_touch_player = player;
+    }
+
+    pub fn restore_current_last_touch_marker(&mut self) {
+        if let Some(player_id) = self.current_last_touch_player.as_ref() {
+            if let Some(stats) = self.player_stats.get_mut(player_id) {
+                stats.is_last_touch = true;
+            }
+        }
+    }
+}
