@@ -222,6 +222,7 @@ impl CachedObjectIds {
 
 mod bootstrap;
 mod debug;
+mod player_queries;
 mod queries;
 mod updaters;
 
