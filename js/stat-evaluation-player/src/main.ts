@@ -23,11 +23,7 @@ import { createStatModules, getTeamClass } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
 import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
-import {
-  applyConfigAdapterSnapshot,
-  getConfigAdapterSnapshot,
-  type StatsPlayerConfigAdapter,
-} from "./configAdapters.ts";
+import { applyConfigAdapterSnapshot } from "./configAdapters.ts";
 import type { StatsFrameLookup, StatsTimeline } from "./statsTimeline.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
 import {
@@ -86,7 +82,6 @@ import {
   getStatsPlayerConfigFromLocation,
   isStatsPlayerConfigDebugEnabled,
   setStatsPlayerConfigOnUrl,
-  STATS_PLAYER_CONFIG_VERSION,
   type PlayerCameraConfig,
   type PlayerPlaybackConfig,
   type RecordingConfig,
@@ -97,6 +92,15 @@ import {
   type StatsWindowKind,
   type WindowPlacementConfig,
 } from "./playerConfig.ts";
+import {
+  getCameraConfigSnapshot as getCameraConfigSnapshotFromRuntime,
+  getConfigAdapters,
+  getModuleConfigSnapshot as getModuleConfigSnapshotFromRuntime,
+  getPlaybackConfigSnapshot as getPlaybackConfigSnapshotFromRuntime,
+  getReplayPlayerStatePatchFromConfig,
+  getStatsPlayerConfigSnapshot as getStatsPlayerConfigSnapshotFromRuntime,
+  logStatsPlayerConfigLoadDebug,
+} from "./playerConfigRuntime.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -465,30 +469,12 @@ function getSingletonWindowConfigs() {
   return floatingWindowController?.getSingletonConfigs() ?? [];
 }
 
-function getConfigAdapters(): StatsPlayerConfigAdapter[] {
-  return MODULES.filter((mod) => mod.getConfig || mod.applyConfig).map((mod) => {
-    const adapter: StatsPlayerConfigAdapter = {
-      id: mod.id,
-    };
-    if (mod.id === "boost") {
-      adapter.aliases = ["boost-pickup-animation"];
-    }
-    if (mod.getConfig) {
-      adapter.getConfig = () => mod.getConfig?.();
-    }
-    if (mod.applyConfig) {
-      adapter.applyConfig = (config: unknown) => mod.applyConfig?.(config);
-    }
-    return adapter;
-  });
-}
-
 function getModuleConfigSnapshot(): Record<string, unknown> {
-  return getConfigAdapterSnapshot(getConfigAdapters());
+  return getModuleConfigSnapshotFromRuntime(MODULES);
 }
 
 function applyModuleConfigSnapshot(configs: Record<string, unknown>): void {
-  applyConfigAdapterSnapshot(getConfigAdapters(), configs);
+  applyConfigAdapterSnapshot(getConfigAdapters(MODULES), configs);
 }
 
 function getStatsWindowConfigs(): StatsWindowConfig[] {
@@ -515,28 +501,19 @@ function clearStatsWindows(): void {
 }
 
 function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {
-  const state = replayPlayer?.getState();
-  return {
-    currentTime: state?.currentTime,
-    playing: state?.playing,
-    rate: state?.speed ?? Number(playbackRate?.value ?? 1),
-    skipPostGoalTransitions: replayPlayer
-      ? state?.skipPostGoalTransitionsEnabled
-      : skipPostGoalTransitions.checked,
-    skipKickoffs: replayPlayer ? state?.skipKickoffsEnabled : skipKickoffs.checked,
-  };
+  return getPlaybackConfigSnapshotFromRuntime({
+    replayPlayer,
+    playbackRate,
+    skipPostGoalTransitions,
+    skipKickoffs,
+  });
 }
 
 function getCameraConfigSnapshot(): PlayerCameraConfig {
-  const state = replayPlayer?.getState();
-  return {
-    mode: state?.cameraViewMode,
-    freePreset: cameraControlsController?.freeCameraPreset ?? null,
-    attachedPlayerId: state?.attachedPlayerId,
-    distanceScale: state?.cameraDistanceScale,
-    ballCam: state?.ballCamEnabled ?? cameraControlsController?.ballCamChecked,
-    customSettings: state?.customCameraSettings,
-  };
+  return getCameraConfigSnapshotFromRuntime({
+    replayPlayer,
+    cameraControlsController,
+  });
 }
 
 function getRecordingConfigSnapshot(): RecordingConfig {
@@ -544,31 +521,21 @@ function getRecordingConfigSnapshot(): RecordingConfig {
 }
 
 function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
-  return {
-    version: STATS_PLAYER_CONFIG_VERSION,
+  return getStatsPlayerConfigSnapshotFromRuntime({
     playback: getPlaybackConfigSnapshot(),
     camera: getCameraConfigSnapshot(),
-    overlays: {
-      timelineEvents: [...activeTimelineEventSourceIds],
-      timelineRanges: [...activeTimelineRangeModuleIds],
-      mechanics: [...activeMechanicTimelineKinds],
-      renderEffects: [...activeRenderEffectModuleIds],
-      ...(initialUrlConfig?.overlays.pluginRenderEffects !== undefined
-        ? { pluginRenderEffects: [...initialUrlConfig.overlays.pluginRenderEffects] }
-        : {}),
-      ...(initialUrlConfig?.overlays.pluginHudOverlay !== undefined
-        ? { pluginHudOverlay: initialUrlConfig.overlays.pluginHudOverlay }
-        : {}),
-      followedPlayerHud: false,
-      boostPads: boostPadOverlayEnabled,
-      boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
-      hitboxWireframes: replayPlayer?.getState().hitboxWireframesEnabled ?? false,
-    },
+    activeTimelineEventSourceIds,
+    activeTimelineRangeModuleIds,
+    activeMechanicTimelineKinds,
+    activeRenderEffectModuleIds,
+    initialConfig: initialUrlConfig,
+    replayPlayer,
+    boostPadOverlayEnabled,
     recording: getRecordingConfigSnapshot(),
     singletonWindows: getSingletonWindowConfigs(),
     statsWindows: getStatsWindowConfigs(),
     moduleConfigs: getModuleConfigSnapshot(),
-  };
+  });
 }
 
 function scheduleConfigUrlUpdate(): void {
@@ -586,45 +553,6 @@ function scheduleConfigUrlUpdate(): void {
     );
     window.history.replaceState(window.history.state, "", nextUrl);
   }, 150);
-}
-
-function logStatsPlayerConfigLoadDebug(
-  snapshot: StatsPlayerConfigParamSnapshot,
-  config: StatsPlayerConfig | null,
-  error: unknown,
-): void {
-  console.groupCollapsed("[subtr-actor] stats player cfg load");
-  console.log("location.href", window.location.href);
-  console.log("location.search", snapshot.search || "(empty)");
-  console.log("location.hash", snapshot.hash || "(empty)");
-  console.table([
-    ...snapshot.searchParams.map(([name, value]) => ({
-      source: "search",
-      name,
-      value,
-    })),
-    ...snapshot.hashParams.map(([name, value]) => ({
-      source: "hash",
-      name,
-      value,
-    })),
-  ]);
-  console.log("cfg selected source", snapshot.selectedSource ?? "(none)");
-  console.log("cfg selected raw text", snapshot.selectedValue ?? "(none)");
-  console.log("cfg selected raw length", snapshot.selectedValue?.length ?? 0);
-  console.log("cfg search values", snapshot.searchValues);
-  console.log("cfg hash values", snapshot.hashValues);
-  if (snapshot.hashValues.length > 0 && snapshot.searchValues.length > 0) {
-    console.warn("Both hash and search contain cfg; hash cfg is used.");
-  }
-  if (config) {
-    console.log("cfg normalized JSON", JSON.stringify(config, null, 2));
-    console.log("cfg normalized object", config);
-  }
-  if (error) {
-    console.error("cfg decode/apply error", error);
-  }
-  console.groupEnd();
 }
 
 function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
@@ -652,27 +580,6 @@ function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   renderModuleSummary();
   renderModuleSettings();
   renderTimelineEventCount();
-}
-
-function getReplayPlayerStatePatchFromConfig(
-  playback: PlayerPlaybackConfig,
-  camera: PlayerCameraConfig,
-  config: StatsPlayerConfig,
-): Parameters<ReplayPlayer["setState"]>[0] {
-  return {
-    currentTime: playback.currentTime,
-    playing: playback.playing,
-    speed: playback.rate,
-    cameraDistanceScale: camera.distanceScale,
-    customCameraSettings: camera.customSettings,
-    cameraViewMode: camera.mode,
-    attachedPlayerId: camera.attachedPlayerId,
-    ballCamEnabled: camera.ballCam,
-    boostPickupAnimationEnabled: config.overlays.boostPickupAnimation,
-    hitboxWireframesEnabled: config.overlays.hitboxWireframes,
-    skipPostGoalTransitionsEnabled: playback.skipPostGoalTransitions,
-    skipKickoffsEnabled: playback.skipKickoffs,
-  };
 }
 
 function watchGoalReplay(time: number, scorerId: string | null): void {
