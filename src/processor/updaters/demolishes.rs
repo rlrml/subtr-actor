@@ -68,6 +68,7 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<DemolishInfo> {
         let attacker = self.get_player_id_from_car_id(&demo.attacker_actor_id())?;
         let victim = self.get_player_id_from_car_id(&demo.victim_actor_id())?;
+        let attacker_location = self.get_normalized_player_position(&attacker);
         let (current_rigid_body, _) =
             self.get_player_rigid_body_and_updated_or_recently_deleted(&victim)?;
         Ok(DemolishInfo {
@@ -84,6 +85,7 @@ impl<'a> ReplayProcessor<'a> {
                 demo.victim_velocity(),
                 DEMOLISH_VELOCITY_NORMALIZATION_FACTOR,
             ),
+            attacker_location,
             victim_location: self.normalize_vector(current_rigid_body.location),
         })
     }

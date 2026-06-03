@@ -47,6 +47,7 @@ impl<'a> ReplayProcessor<'a> {
                     time: frame.time,
                     frame: frame_index,
                     player: player_id.clone(),
+                    player_position: self.get_normalized_player_position(&player_id),
                     is_team_0,
                     kind,
                     shot: shot.clone(),

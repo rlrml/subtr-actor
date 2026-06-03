@@ -9,6 +9,8 @@ pub struct FlipResetEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     /// Heuristic confidence in the range `[0.0, 1.0]`.
     pub confidence: f32,
@@ -26,6 +28,8 @@ pub struct DodgeRefreshedEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub counter_value: i32,
 }
@@ -37,6 +41,8 @@ pub struct PostWallDodgeEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub wall_contact_time: f32,
     pub time_since_wall_contact: f32,
@@ -49,6 +55,8 @@ pub struct FlipResetFollowupDodgeEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub candidate_touch_time: f32,
     pub time_since_candidate_touch: f32,
@@ -330,6 +338,10 @@ impl FlipResetTracker {
             time: touch_event.time,
             frame: frame_index,
             player: player.clone(),
+            player_position: touch_event
+                .player_position
+                .map(|position| vec_to_glam(&position).to_array())
+                .or_else(|| Some(vec_to_glam(&player_rigid_body.location).to_array())),
             is_team_0: touch_event.team_is_team_0,
             confidence: heuristic.confidence,
             local_ball_position: glam_to_vec(&heuristic.local_ball_position),
@@ -358,6 +370,7 @@ impl FlipResetTracker {
             time,
             frame: frame_index,
             player: player.clone(),
+            player_position: Some(vec_to_glam(&player_rigid_body.location).to_array()),
             is_team_0,
             confidence: heuristic.confidence,
             local_ball_position: glam_to_vec(&heuristic.local_ball_position),
@@ -385,6 +398,10 @@ impl FlipResetTracker {
             time: touch_event.time,
             frame: frame_index,
             player: player.clone(),
+            player_position: touch_event
+                .player_position
+                .map(|position| vec_to_glam(&position).to_array())
+                .or_else(|| Some(vec_to_glam(&player_rigid_body.location).to_array())),
             is_team_0: touch_event.team_is_team_0,
             confidence: heuristic.confidence,
             local_ball_position: glam_to_vec(&heuristic.local_ball_position),
@@ -412,6 +429,7 @@ impl FlipResetTracker {
             time,
             frame: frame_index,
             player: player.clone(),
+            player_position: Some(vec_to_glam(&player_rigid_body.location).to_array()),
             is_team_0: processor.get_player_is_team_0(player).unwrap_or(false),
             confidence: heuristic.confidence,
             local_ball_position: glam_to_vec(&heuristic.local_ball_position),
@@ -601,6 +619,7 @@ impl FlipResetTracker {
                 time: current_time,
                 frame: frame_index,
                 player: player_id.clone(),
+                player_position: Some(vec_to_glam(&player_rigid_body.location).to_array()),
                 is_team_0: processor.get_player_is_team_0(player_id).unwrap_or(false),
                 wall_contact_time,
                 time_since_wall_contact,
@@ -671,6 +690,7 @@ impl FlipResetTracker {
                 time: current_time,
                 frame: frame_index,
                 player: player_id.clone(),
+                player_position: Some(vec_to_glam(&player_rigid_body.location).to_array()),
                 is_team_0: processor.get_player_is_team_0(player_id).unwrap_or(false),
                 candidate_touch_time: candidate_event.time,
                 time_since_candidate_touch,

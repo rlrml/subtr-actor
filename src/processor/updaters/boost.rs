@@ -230,6 +230,17 @@ impl<'a> ReplayProcessor<'a> {
             .observe_pickup(&event.pad_id, vec_to_glam(&rigid_body.location));
     }
 
+    fn boost_pad_pickup_player(
+        &self,
+        instigator: &boxcars::ActorId,
+    ) -> (Option<PlayerId>, Option<boxcars::Vector3f>) {
+        let player = self.get_player_id_from_car_id(instigator).ok();
+        let player_position = player
+            .as_ref()
+            .and_then(|player_id| self.get_normalized_player_position(player_id));
+        (player, player_position)
+    }
+
     /// Detects boost-pad pickup and respawn events in the current frame.
     pub(crate) fn update_boost_pad_events(
         &mut self,
@@ -248,11 +259,14 @@ impl<'a> ReplayProcessor<'a> {
                     let pad_id = self.get_actor_instance_name(&update.actor_id)?;
                     if let Some(instigator) = pickup.instigator {
                         if instigator.0 >= 0 && pickup.picked_up != u8::MAX {
+                            let (player, player_position) =
+                                self.boost_pad_pickup_player(&instigator);
                             Some(BoostPadEvent {
                                 time: frame.time,
                                 frame: frame_index,
                                 pad_id,
-                                player: self.get_player_id_from_car_id(&instigator).ok(),
+                                player,
+                                player_position,
                                 kind: BoostPadEventKind::PickedUp {
                                     sequence: pickup.picked_up,
                                 },
@@ -266,6 +280,7 @@ impl<'a> ReplayProcessor<'a> {
                             frame: frame_index,
                             pad_id,
                             player: None,
+                            player_position: None,
                             kind: BoostPadEventKind::Available,
                         })
                     } else {
@@ -276,11 +291,14 @@ impl<'a> ReplayProcessor<'a> {
                     let pad_id = self.get_actor_instance_name(&update.actor_id)?;
                     if let Some(instigator) = pickup.instigator {
                         if instigator.0 >= 0 && pickup.picked_up {
+                            let (player, player_position) =
+                                self.boost_pad_pickup_player(&instigator);
                             Some(BoostPadEvent {
                                 time: frame.time,
                                 frame: frame_index,
                                 pad_id,
-                                player: self.get_player_id_from_car_id(&instigator).ok(),
+                                player,
+                                player_position,
                                 kind: BoostPadEventKind::PickedUp { sequence: 1 },
                             })
                         } else {
@@ -292,6 +310,7 @@ impl<'a> ReplayProcessor<'a> {
                             frame: frame_index,
                             pad_id,
                             player: None,
+                            player_position: None,
                             kind: BoostPadEventKind::Available,
                         })
                     } else {
