@@ -28,12 +28,12 @@ use subtr_actor::{
     BoostPickupComparisonEvent, BumpEvent, CorePlayerStatsEvent, DemoEventSample,
     DemolishAttribute, DemolishInfo, DodgeRefreshedEvent, FiftyFiftyEvent, FrameEventsState,
     FrameInfo, FrameInput, GameplayPhase, GameplayState, GoalBuildupKind, GoalContextEvent,
-    GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, MechanicEvent, MechanicTiming,
-    PlayerFrameState, PlayerId, PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind,
-    ProcessorView, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
-    RushEvent, ShotEventMetadata, StatsTimelineCollector, StatsTimelineEventCollector,
-    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
-    TouchEvent, TouchStateCalculator, WhiffEvent,
+    GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, PlayerFrameState, PlayerId, PlayerInfo,
+    PlayerSample, PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayFrameInputBuilder,
+    ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent,
+    ShotEventMetadata, StatsEventTiming, StatsTimelineCollector, StatsTimelineEventCollector,
+    StatsTimelineTagEvent, SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
+    TimelineEvent, TimelineEventKind, TouchEvent, TouchStateCalculator, WhiffEvent,
 };
 
 #[repr(C)]
@@ -598,6 +598,19 @@ fn player_index(id: &RemoteId) -> u32 {
         RemoteId::SplitScreen(index) => *index,
         _ => 0,
     }
+}
+
+fn player_frame_position(players: &PlayerFrameState, player_id: &PlayerId) -> Option<Vector3f> {
+    players
+        .player_position(player_id)
+        .map(|[x, y, z]| Vector3f { x, y, z })
+}
+
+fn player_frame_position_array(
+    players: &PlayerFrameState,
+    player_id: &PlayerId,
+) -> Option<[f32; 3]> {
+    players.player_position(player_id)
 }
 
 fn live_car_actor_id(id: &PlayerId) -> SubtrActorResult<boxcars::ActorId> {
@@ -1213,7 +1226,11 @@ fn event_seconds_remaining(frame: &FrameInfo, timing: SaEventTiming) -> i32 {
     }
 }
 
-fn explicit_touch_events(frame: &FrameInfo, events: &[SaTouchEvent]) -> Vec<TouchEvent> {
+fn explicit_touch_events(
+    frame: &FrameInfo,
+    players: &PlayerFrameState,
+    events: &[SaTouchEvent],
+) -> Vec<TouchEvent> {
     let mut accepted = Vec::new();
     let mut seen = HashSet::new();
     for event in events {
@@ -1227,6 +1244,9 @@ fn explicit_touch_events(frame: &FrameInfo, events: &[SaTouchEvent]) -> Vec<Touc
             time,
             frame: frame_number,
             team_is_team_0,
+            player_position: player
+                .as_ref()
+                .and_then(|player_id| player_frame_position(players, player_id)),
             player,
             closest_approach_distance: (event.has_closest_approach_distance != 0)
                 .then_some(event.closest_approach_distance),
@@ -1298,23 +1318,30 @@ fn goal_event_is_duplicate(previous: &GoalEvent, candidate: &GoalEvent) -> bool 
 
 fn explicit_player_stat_events(
     frame: &FrameInfo,
+    players: &PlayerFrameState,
     events: &[SaPlayerStatEvent],
 ) -> Vec<PlayerStatEvent> {
     events
         .iter()
         .map(|event| {
             let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            let player = player_id(event.player_index);
+            let shot = shot_event_metadata(event);
             PlayerStatEvent {
                 time,
                 frame: frame_number,
-                player: player_id(event.player_index),
+                player_position: shot
+                    .as_ref()
+                    .and_then(|shot| shot.player_position)
+                    .or_else(|| player_frame_position(players, &player)),
+                player,
                 is_team_0: event.is_team_0 != 0,
                 kind: match event.kind {
                     SaPlayerStatEventKind::Shot => PlayerStatEventKind::Shot,
                     SaPlayerStatEventKind::Save => PlayerStatEventKind::Save,
                     SaPlayerStatEventKind::Assist => PlayerStatEventKind::Assist,
                 },
-                shot: shot_event_metadata(event),
+                shot,
             }
         })
         .collect()
@@ -1334,17 +1361,24 @@ fn shot_event_metadata(event: &SaPlayerStatEvent) -> Option<ShotEventMetadata> {
     ))
 }
 
-fn explicit_demolish_events(frame: &FrameInfo, events: &[SaDemolishEvent]) -> Vec<DemolishInfo> {
+fn explicit_demolish_events(
+    frame: &FrameInfo,
+    players: &PlayerFrameState,
+    events: &[SaDemolishEvent],
+) -> Vec<DemolishInfo> {
     events
         .iter()
         .map(|event| {
             let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            let attacker = player_id(event.attacker_index);
+            let victim = player_id(event.victim_index);
             DemolishInfo {
                 time,
                 seconds_remaining: event_seconds_remaining(frame, event.timing),
                 frame: frame_number,
-                attacker: player_id(event.attacker_index),
-                victim: player_id(event.victim_index),
+                attacker_location: player_frame_position(players, &attacker),
+                attacker,
+                victim,
                 attacker_velocity: vec3(event.attacker_velocity),
                 victim_velocity: vec3(event.victim_velocity),
                 victim_location: vec3(event.victim_location),
@@ -1357,6 +1391,7 @@ impl SaLiveEventGenerator {
     fn explicit_dodge_refreshed_events(
         &mut self,
         frame: &FrameInfo,
+        players: &PlayerFrameState,
         events: &[SaDodgeRefreshedEvent],
     ) -> Vec<DodgeRefreshedEvent> {
         let mut dodge_refreshed_events = Vec::new();
@@ -1376,6 +1411,7 @@ impl SaLiveEventGenerator {
             dodge_refreshed_events.push(DodgeRefreshedEvent {
                 time,
                 frame: frame_number,
+                player_position: player_frame_position_array(players, &player),
                 player,
                 is_team_0: event.is_team_0 != 0,
                 counter_value: event.counter_value,
@@ -1452,6 +1488,7 @@ impl SaLiveEventGenerator {
     fn explicit_boost_pad_events(
         &mut self,
         frame: &FrameInfo,
+        players: &PlayerFrameState,
         events: &[SaBoostPadEvent],
     ) -> Vec<BoostPadEvent> {
         let mut boost_pad_events = Vec::new();
@@ -1476,11 +1513,15 @@ impl SaLiveEventGenerator {
                 }
                 SaBoostPadEventKind::Available => BoostPadEventKind::Available,
             };
+            let player = (event.has_player != 0).then_some(player_id(event.player_index));
             boost_pad_events.push(BoostPadEvent {
                 time,
                 frame: frame_number,
                 pad_id,
-                player: (event.has_player != 0).then_some(player_id(event.player_index)),
+                player_position: player
+                    .as_ref()
+                    .and_then(|player_id| player_frame_position(players, player_id)),
+                player,
                 kind,
             });
         }
@@ -1490,16 +1531,21 @@ impl SaLiveEventGenerator {
     fn explicit_goal_events(
         &mut self,
         frame: &FrameInfo,
+        players: &PlayerFrameState,
         events: &[SaGoalEvent],
     ) -> Vec<GoalEvent> {
         let mut goal_events = Vec::new();
         for event in events {
             let (frame_number, time) = event_frame_and_time(frame, event.timing);
+            let player = (event.has_player != 0).then_some(player_id(event.player_index));
             let goal_event = GoalEvent {
                 time,
                 frame: frame_number,
                 scoring_team_is_team_0: event.scoring_team_is_team_0 != 0,
-                player: (event.has_player != 0).then_some(player_id(event.player_index)),
+                player_position: player
+                    .as_ref()
+                    .and_then(|player_id| player_frame_position(players, player_id)),
+                player,
                 team_zero_score: (event.has_team_zero_score != 0).then_some(event.team_zero_score),
                 team_one_score: (event.has_team_one_score != 0).then_some(event.team_one_score),
             };
@@ -1525,21 +1571,21 @@ impl SaLiveEventGenerator {
         explicit_live_play: Option<LivePlayState>,
         explicit_events: &SaFrameEventSlices<'_>,
     ) -> (FrameEventsState, LivePlayState) {
-        let explicit_touch_events = explicit_touch_events(frame, explicit_events.touches);
+        let explicit_touch_events = explicit_touch_events(frame, players, explicit_events.touches);
         let has_explicit_touch_events = !explicit_touch_events.is_empty();
         let explicit_dodge_refresh_keys =
             explicit_dodge_refresh_keys(frame, explicit_events.dodge_refreshes);
         let has_explicit_dodge_refreshed_events = !explicit_dodge_refresh_keys.is_empty();
         let explicit_dodge_refreshed_events =
-            self.explicit_dodge_refreshed_events(frame, explicit_events.dodge_refreshes);
+            self.explicit_dodge_refreshed_events(frame, players, explicit_events.dodge_refreshes);
         let explicit_demolishes = self.explicit_demolish_events(frame, explicit_events.demolishes);
-        let demo_events = explicit_demolish_events(frame, &explicit_demolishes);
+        let demo_events = explicit_demolish_events(frame, players, &explicit_demolishes);
         let active_demos = self.sync_active_demos(frame, &explicit_demolishes);
         let boost_pad_events =
-            self.explicit_boost_pad_events(frame, explicit_events.boost_pad_events);
+            self.explicit_boost_pad_events(frame, players, explicit_events.boost_pad_events);
         let player_stat_events =
-            explicit_player_stat_events(frame, explicit_events.player_stat_events);
-        let goal_events = self.explicit_goal_events(frame, explicit_events.goals);
+            explicit_player_stat_events(frame, players, explicit_events.player_stat_events);
+        let goal_events = self.explicit_goal_events(frame, players, explicit_events.goals);
         let base_events = FrameEventsState {
             active_demos,
             demo_events,
@@ -1742,10 +1788,10 @@ fn mechanic_kind(kind: &str) -> Option<SaMechanicKind> {
     }
 }
 
-fn mechanic_start(event: &MechanicEvent) -> (usize, f32) {
+fn mechanic_start(event: &StatsTimelineTagEvent) -> (usize, f32) {
     match event.timing {
-        MechanicTiming::Moment { frame, time } => (frame, time),
-        MechanicTiming::Span {
+        StatsEventTiming::Moment { frame, time } => (frame, time),
+        StatsEventTiming::Span {
             start_frame,
             start_time,
             ..
@@ -1808,7 +1854,7 @@ fn push_pending_goal_context_event(
 fn push_mechanic_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
-    mechanics: &[MechanicEvent],
+    mechanics: &[StatsTimelineTagEvent],
 ) {
     for event in mechanics {
         let Some(kind) = mechanic_kind(&event.kind) else {
@@ -5147,13 +5193,14 @@ mod tests {
         player_at_index(0, true, location)
     }
 
-    fn normalized_mechanic(id: &str, kind: &str, frame: usize, time: f32) -> MechanicEvent {
-        MechanicEvent {
+    fn normalized_mechanic(id: &str, kind: &str, frame: usize, time: f32) -> StatsTimelineTagEvent {
+        StatsTimelineTagEvent {
             id: id.to_owned(),
             kind: kind.to_owned(),
             player_id: RemoteId::SplitScreen(0),
+            player_position: None,
             is_team_0: true,
-            timing: MechanicTiming::Moment { frame, time },
+            timing: StatsEventTiming::Moment { frame, time },
             properties: Vec::new(),
         }
     }
@@ -5172,6 +5219,7 @@ mod tests {
             approach_speed: 900.0,
             dodge_active: false,
             aerial: false,
+            player_position: None,
         }
     }
 
@@ -5199,6 +5247,7 @@ mod tests {
             time,
             frame,
             player: RemoteId::SplitScreen(0),
+            player_position: None,
             is_team_0: true,
         }
     }
@@ -5209,6 +5258,7 @@ mod tests {
             frame,
             time,
             player_id: RemoteId::SplitScreen(0),
+            player_position: None,
             is_team_0: true,
             pad_type: BoostPickupPadType::Big,
             field_half: BoostPickupFieldHalf::Opponent,
@@ -5258,6 +5308,7 @@ mod tests {
             kind,
             scoring_team_is_team_0: false,
             scorer,
+            scorer_position: None,
             confidence: 0.72,
             modifiers: Vec::new(),
             evidence: Vec::new(),
@@ -5295,6 +5346,7 @@ mod tests {
                 z: 3.0,
             }),
             ball_air_time_before_goal: Some(1.25),
+            ball_speed_at_goal: None,
             goal_buildup: GoalBuildupKind::CounterAttack,
             scorer_last_touch: None,
             players: Vec::new(),
@@ -6603,8 +6655,8 @@ mod tests {
 
     #[test]
     fn process_frame_treats_sampled_game_state_as_replay_phase_signal() {
-        const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 55;
-        const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 86;
+        const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 53;
+        const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 67;
 
         let engine = subtr_actor_bakkesmod_engine_create();
         let kickoff_frame = SaLiveFrame {
@@ -10408,6 +10460,7 @@ mod tests {
             time: frame.time,
             frame: frame.frame_number as usize,
             player: Some(RemoteId::SplitScreen(2)),
+            player_position: None,
             team_is_team_0: true,
             closest_approach_distance: Some(8.0),
             dodge_contact: false,
@@ -10416,6 +10469,7 @@ mod tests {
             time: frame.time,
             frame: frame.frame_number as usize,
             player: RemoteId::SplitScreen(2),
+            player_position: None,
             is_team_0: true,
             counter_value: 9,
         }];
@@ -10424,12 +10478,14 @@ mod tests {
             frame: frame.frame_number as usize,
             pad_id: "34".to_owned(),
             player: Some(RemoteId::SplitScreen(2)),
+            player_position: None,
             kind: BoostPadEventKind::PickedUp { sequence: 1 },
         }];
         let player_stat_events = vec![PlayerStatEvent {
             time: frame.time,
             frame: frame.frame_number as usize,
             player: RemoteId::SplitScreen(2),
+            player_position: None,
             is_team_0: true,
             kind: PlayerStatEventKind::Shot,
             shot: None,
@@ -10439,6 +10495,7 @@ mod tests {
             frame: frame.frame_number as usize,
             scoring_team_is_team_0: true,
             player: Some(RemoteId::SplitScreen(2)),
+            player_position: None,
             team_zero_score: Some(3),
             team_one_score: Some(4),
         }];
@@ -10448,6 +10505,7 @@ mod tests {
             seconds_remaining: frame.seconds_remaining,
             attacker: RemoteId::SplitScreen(2),
             victim: RemoteId::SplitScreen(5),
+            attacker_location: None,
             attacker_velocity: Vector3f {
                 x: 2300.0,
                 y: 0.0,
@@ -10652,6 +10710,7 @@ mod tests {
                     seconds_remaining: 300,
                     attacker: RemoteId::SplitScreen(0),
                     victim: RemoteId::SplitScreen(1),
+                    attacker_location: None,
                     attacker_velocity: Vector3f {
                         x: 2300.0,
                         y: 0.0,
@@ -10673,6 +10732,7 @@ mod tests {
                     frame,
                     pad_id: "34".to_owned(),
                     player: Some(RemoteId::SplitScreen(0)),
+                    player_position: None,
                     kind: BoostPadEventKind::PickedUp {
                         sequence: frame as u8,
                     },
@@ -10682,6 +10742,7 @@ mod tests {
                     frame,
                     team_is_team_0: true,
                     player: Some(RemoteId::SplitScreen(0)),
+                    player_position: None,
                     closest_approach_distance: Some(12.0),
                     dodge_contact: false,
                 }],
@@ -10689,6 +10750,7 @@ mod tests {
                     time,
                     frame,
                     player: RemoteId::SplitScreen(0),
+                    player_position: None,
                     is_team_0: true,
                     counter_value: frame as i32,
                 }],
@@ -10696,6 +10758,7 @@ mod tests {
                     time,
                     frame,
                     player: RemoteId::SplitScreen(0),
+                    player_position: None,
                     is_team_0: true,
                     kind: PlayerStatEventKind::Shot,
                     shot: None,
@@ -10705,6 +10768,7 @@ mod tests {
                     frame,
                     scoring_team_is_team_0: true,
                     player: Some(RemoteId::SplitScreen(0)),
+                    player_position: None,
                     team_zero_score: Some(frame as i32),
                     team_one_score: Some(0),
                 }],
@@ -10747,7 +10811,16 @@ mod tests {
             ..FrameEventsState::default()
         };
         let mut event_history = SaLiveEventHistory::default();
+        let mut builder = ReplayFrameInputBuilder::default();
         event_history.append_frame_events(&previous_events);
+        let previous_view = SaLiveProcessorView::new(
+            None,
+            &frame,
+            &players,
+            FrameEventsState::default(),
+            &event_history,
+        );
+        let _ = builder.aggregate(&previous_view, 3, frame.time, frame.dt);
         event_history.append_frame_events(&between_sample_events);
         let view = SaLiveProcessorView::new(None, &frame, &players, current_events, &event_history);
 
@@ -10765,8 +10838,7 @@ mod tests {
         assert_eq!(view.current_frame_player_stat_events().len(), 0);
         assert_eq!(view.current_frame_goal_events().len(), 0);
 
-        let aggregate_input =
-            FrameInput::aggregate(&view, 3, frame.time, frame.dt, 1, 1, 1, 1, 1, 1);
+        let aggregate_input = builder.aggregate(&view, 3, frame.time, frame.dt);
         let aggregate_events = aggregate_input.frame_events_state();
         assert_eq!(aggregate_events.active_demos.len(), 1);
         assert_eq!(
@@ -10811,6 +10883,7 @@ mod tests {
         let frame_info = frame_info(&frame);
         let demo_events = explicit_demolish_events(
             &frame_info,
+            &player_state(&players),
             &[SaDemolishEvent {
                 timing: SaEventTiming::default(),
                 attacker_index: 2,
@@ -10890,6 +10963,7 @@ mod tests {
         let frame_info = frame_info(&frame);
         let demo_events = explicit_demolish_events(
             &frame_info,
+            &player_state(&players),
             &[SaDemolishEvent {
                 timing: SaEventTiming::default(),
                 attacker_index: 0,
@@ -10980,6 +11054,7 @@ mod tests {
             seconds_remaining: 299,
             attacker: RemoteId::SplitScreen(0),
             victim: RemoteId::SplitScreen(1),
+            attacker_location: None,
             attacker_velocity: Vector3f {
                 x: 2300.0,
                 y: 0.0,
@@ -11057,6 +11132,7 @@ mod tests {
         let frame_info = frame_info(&frame);
         let demo_events = explicit_demolish_events(
             &frame_info,
+            &player_state(&players),
             &[SaDemolishEvent {
                 timing: SaEventTiming::default(),
                 attacker_index: 0,
@@ -11278,7 +11354,7 @@ mod tests {
 
     #[test]
     fn explicit_live_touch_marks_stale_kickoff_countdown_frame_as_active_play() {
-        const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 55;
+        const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 53;
 
         let engine = subtr_actor_bakkesmod_engine_create();
         let players = [player_at_index(
@@ -11592,6 +11668,7 @@ mod tests {
                     frame: Some(10),
                     kind: TimelineEventKind::Goal,
                     player_id: Some(RemoteId::SplitScreen(0)),
+                    player_position: None,
                     is_team_0: Some(true),
                 },
                 TimelineEvent {
@@ -11599,6 +11676,7 @@ mod tests {
                     frame: Some(10),
                     kind: TimelineEventKind::Shot,
                     player_id: Some(RemoteId::SplitScreen(0)),
+                    player_position: None,
                     is_team_0: Some(true),
                 },
                 TimelineEvent {
@@ -11606,6 +11684,7 @@ mod tests {
                     frame: Some(10),
                     kind: TimelineEventKind::Save,
                     player_id: Some(RemoteId::SplitScreen(1)),
+                    player_position: None,
                     is_team_0: Some(false),
                 },
                 TimelineEvent {
@@ -11613,6 +11692,7 @@ mod tests {
                     frame: Some(10),
                     kind: TimelineEventKind::Assist,
                     player_id: Some(RemoteId::SplitScreen(0)),
+                    player_position: None,
                     is_team_0: Some(true),
                 },
                 TimelineEvent {
@@ -11620,6 +11700,7 @@ mod tests {
                     frame: Some(13),
                     kind: TimelineEventKind::Kill,
                     player_id: Some(RemoteId::SplitScreen(0)),
+                    player_position: None,
                     is_team_0: Some(true),
                 },
                 TimelineEvent {
@@ -11627,6 +11708,7 @@ mod tests {
                     frame: Some(13),
                     kind: TimelineEventKind::Death,
                     player_id: Some(RemoteId::SplitScreen(1)),
+                    player_position: None,
                     is_team_0: Some(false),
                 },
             ],
