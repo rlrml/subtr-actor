@@ -23,6 +23,7 @@ import type {
   Vec3,
   Quaternion,
 } from "./types";
+import { getReplayHitboxSpec, inferReplayHitboxKind } from "./hitboxes";
 
 export interface NormalizeReplayDataOptions {
   onProgress?: (progress: number, details: NormalizeReplayProgress) => void;
@@ -622,6 +623,7 @@ function buildPlayerTracks(
       name,
       isTeamZero: inferTeamSide(name, teamZeroNames, teamOneNames, firstFrame),
       cameraSettings: extractCameraSettings(replayPlayerInfo),
+      hitbox: getReplayHitboxSpec(inferReplayHitboxKind(replayPlayerInfo)),
       frames,
     });
   }
@@ -673,6 +675,7 @@ async function buildPlayerTracksAsync(
       name,
       isTeamZero: inferTeamSide(name, teamZeroNames, teamOneNames, firstFrame),
       cameraSettings: extractCameraSettings(replayPlayerInfo),
+      hitbox: getReplayHitboxSpec(inferReplayHitboxKind(replayPlayerInfo)),
       frames,
     });
   }

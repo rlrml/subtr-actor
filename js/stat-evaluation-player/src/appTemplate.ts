@@ -266,6 +266,10 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <input id="skip-kickoffs" type="checkbox" />
               <span>Skip kickoff countdowns</span>
             </label>
+            <label class="toggle">
+              <input id="hitbox-wireframes" type="checkbox" />
+              <span>Show hitboxes</span>
+            </label>
             <div class="detail-grid">
               <div>
                 <dt>Time</dt>

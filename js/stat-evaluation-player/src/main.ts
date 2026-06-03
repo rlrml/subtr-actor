@@ -319,6 +319,7 @@ let cameraStiffnessReadout!: HTMLElement;
 let skipPostGoalTransitions!: HTMLInputElement;
 let replayLoadModal: ReplayLoadModalController | null = null;
 let skipKickoffs!: HTMLInputElement;
+let hitboxWireframes!: HTMLInputElement;
 let recordingFps!: HTMLInputElement;
 let recordingPlaybackRate!: HTMLSelectElement;
 let recordingStart!: HTMLButtonElement;
@@ -837,6 +838,7 @@ function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
       followedPlayerHud: false,
       boostPads: boostPadOverlayEnabled,
       boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
+      hitboxWireframes: replayPlayer?.getState().hitboxWireframesEnabled ?? false,
     },
     recording: getRecordingConfigSnapshot(),
     singletonWindows: getSingletonWindowConfigs(),
@@ -921,6 +923,7 @@ function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   skipPostGoalTransitions.checked =
     config.playback.skipPostGoalTransitions ?? skipPostGoalTransitions.checked;
   skipKickoffs.checked = config.playback.skipKickoffs ?? skipKickoffs.checked;
+  hitboxWireframes.checked = config.overlays.hitboxWireframes;
   if (config.playback.rate !== undefined) {
     playbackRate.value = `${config.playback.rate}`;
   }
@@ -953,6 +956,7 @@ function getReplayPlayerStatePatchFromConfig(
     attachedPlayerId: camera.attachedPlayerId,
     ballCamEnabled: camera.ballCam,
     boostPickupAnimationEnabled: config.overlays.boostPickupAnimation,
+    hitboxWireframesEnabled: config.overlays.hitboxWireframes,
     skipPostGoalTransitionsEnabled: playback.skipPostGoalTransitions,
     skipKickoffsEnabled: playback.skipKickoffs,
   };
@@ -3804,6 +3808,7 @@ function setTransportEnabled(enabled: boolean): void {
   attachedPlayer.disabled = !enabled;
   skipPostGoalTransitions.disabled = !enabled;
   skipKickoffs.disabled = !enabled;
+  hitboxWireframes.disabled = !enabled;
   syncCameraModeButtons(enabled ? replayPlayer?.getState() : undefined);
 }
 
@@ -4001,6 +4006,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
   attachedPlayer.value = state.attachedPlayerId ?? "";
   skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
   skipKickoffs.checked = state.skipKickoffsEnabled;
+  hitboxWireframes.checked = state.hitboxWireframesEnabled;
   emptyState.hidden = true;
 
   syncCameraControlAvailability(state);
@@ -4143,6 +4149,7 @@ async function loadReplayBundleForDisplay(
       initialCameraViewMode: config?.camera.mode,
       initialBallCamEnabled: config?.camera.ballCam ?? false,
       initialBoostPickupAnimationEnabled: config?.overlays.boostPickupAnimation ?? false,
+      initialHitboxWireframesEnabled: config?.overlays.hitboxWireframes ?? hitboxWireframes.checked,
       initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: skipKickoffs.checked,
       plugins: [
@@ -4332,6 +4339,7 @@ export function mountStatEvaluationPlayer(
   cameraStiffnessReadout = mustElement<HTMLElement>(root, "#camera-stiffness-readout");
   skipPostGoalTransitions = mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions");
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
+  hitboxWireframes = mustElement<HTMLInputElement>(root, "#hitbox-wireframes");
   recordingFps = mustElement<HTMLInputElement>(root, "#recording-fps");
   recordingPlaybackRate = mustElement<HTMLSelectElement>(root, "#recording-playback-rate");
   recordingStart = mustElement<HTMLButtonElement>(root, "#recording-start");
@@ -4820,6 +4828,15 @@ export function mountStatEvaluationPlayer(
     "change",
     () => {
       replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
+      scheduleConfigUrlUpdate();
+    },
+    { signal: listeners.signal },
+  );
+
+  hitboxWireframes.addEventListener(
+    "change",
+    () => {
+      replayPlayer?.setHitboxWireframesEnabled(hitboxWireframes.checked);
       scheduleConfigUrlUpdate();
     },
     { signal: listeners.signal },

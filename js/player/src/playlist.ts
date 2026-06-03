@@ -59,6 +59,7 @@ type PlayerPreferences = {
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
+  hitboxWireframesEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 };
@@ -157,6 +158,7 @@ function createInitialPreferences(options: ReplayPlaylistPlayerOptions): PlayerP
     attachedPlayerId: options.initialAttachedPlayerId ?? null,
     ballCamEnabled: options.initialBallCamEnabled ?? false,
     boostPickupAnimationEnabled: options.initialBoostPickupAnimationEnabled ?? true,
+    hitboxWireframesEnabled: options.initialHitboxWireframesEnabled ?? false,
     skipPostGoalTransitionsEnabled: options.initialSkipPostGoalTransitionsEnabled ?? true,
     skipKickoffsEnabled: options.initialSkipKickoffsEnabled ?? false,
   };
@@ -961,6 +963,12 @@ export class ReplayPlaylistPlayer extends EventTarget {
     this.emitChange();
   }
 
+  setHitboxWireframesEnabled(enabled: boolean): void {
+    this.preferences.hitboxWireframesEnabled = enabled;
+    this.player?.setHitboxWireframesEnabled(enabled);
+    this.emitChange();
+  }
+
   setSkipPostGoalTransitionsEnabled(enabled: boolean): void {
     this.preferences.skipPostGoalTransitionsEnabled = enabled;
     this.player?.setSkipPostGoalTransitionsEnabled(enabled);
@@ -1024,6 +1032,8 @@ export class ReplayPlaylistPlayer extends EventTarget {
       ballCamEnabled: playerState?.ballCamEnabled ?? this.preferences.ballCamEnabled,
       boostPickupAnimationEnabled:
         playerState?.boostPickupAnimationEnabled ?? this.preferences.boostPickupAnimationEnabled,
+      hitboxWireframesEnabled:
+        playerState?.hitboxWireframesEnabled ?? this.preferences.hitboxWireframesEnabled,
       skipPostGoalTransitionsEnabled:
         playerState?.skipPostGoalTransitionsEnabled ??
         this.preferences.skipPostGoalTransitionsEnabled,
@@ -1152,6 +1162,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
       initialAttachedPlayerId: attachedPlayerId,
       initialBallCamEnabled: this.preferences.ballCamEnabled,
       initialBoostPickupAnimationEnabled: this.preferences.boostPickupAnimationEnabled,
+      initialHitboxWireframesEnabled: this.preferences.hitboxWireframesEnabled,
       initialSkipPostGoalTransitionsEnabled: this.preferences.skipPostGoalTransitionsEnabled,
       initialSkipKickoffsEnabled: this.preferences.skipKickoffsEnabled,
       plugins: this.options.plugins,

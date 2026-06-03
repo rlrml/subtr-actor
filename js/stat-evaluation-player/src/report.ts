@@ -281,6 +281,7 @@ function getGoalWatchPlayerConfig(goalTime: number, scorerId: string | null): St
       followedPlayerHud: false,
       boostPads: true,
       boostPickupAnimation: false,
+      hitboxWireframes: false,
     },
     recording: {},
     singletonWindows: [],

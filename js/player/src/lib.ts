@@ -69,6 +69,14 @@ export type {
   NormalizeReplayProgress,
 } from "./replay-data";
 export {
+  DEFAULT_REPLAY_HITBOX_KIND,
+  REPLAY_HITBOX_SPECS,
+  getReplayHitboxSpec,
+  inferReplayHitboxKind,
+  normalizeReplayHitboxKind,
+} from "./hitboxes";
+export type { ReplayHitboxKind, ReplayHitboxSpec } from "./hitboxes";
+export {
   createReplayLoadOverlay,
   formatReplayLoadProgress,
   formatReplayLoadProgressMeta,
