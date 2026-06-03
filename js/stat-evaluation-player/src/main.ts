@@ -18,10 +18,7 @@ import type {
 import { getAppTemplate } from "./appTemplate.ts";
 import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
-import {
-  createCameraControlsController,
-  type CameraControlsController,
-} from "./cameraControls.ts";
+import { createCameraControlsController, type CameraControlsController } from "./cameraControls.ts";
 import { createStatModules, getTeamClass, RELATIVE_POSITIONING_MODULE_ID } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
@@ -41,15 +38,14 @@ import {
 } from "./statsWindows.ts";
 import {
   filterReplayTimelineEvents,
-  formatMechanicKind,
   getMechanicKinds,
   mechanicKindToModuleId,
 } from "./timelineMarkers.ts";
+import { getEventPlaylistSources as getEventPlaylistSourcesFromTimelineSources } from "./eventTimelineSources.ts";
 import {
-  getEventPlaylistSources as getEventPlaylistSourcesFromTimelineSources,
-  getEventTimelineSources as getConfiguredEventTimelineSources,
-  type EventTimelineSource,
-} from "./eventTimelineSources.ts";
+  createEventTimelineControlsController,
+  type EventTimelineControlsController,
+} from "./eventTimelineControls.ts";
 import {
   createEventPlaylistWindowController,
   type EventPlaylistWindowController,
@@ -207,7 +203,6 @@ let launcherMenu!: HTMLDivElement;
 let loadReplayAction!: HTMLButtonElement;
 let floatingWindowLayer!: HTMLDivElement;
 let scoreboardWindowBody!: HTMLDivElement;
-let mechanicsTimelineWindowBody!: HTMLDivElement;
 let eventPlaylistWindowBody!: HTMLDivElement;
 let mechanicsReviewFile!: HTMLInputElement;
 let mechanicsReviewUrl!: HTMLInputElement;
@@ -257,6 +252,7 @@ let cameraControlsController: CameraControlsController | null = null;
 let recordingWindowController: RecordingWindowController | null = null;
 let statsWindowsController: StatsWindowsController | null = null;
 let eventPlaylistController: EventPlaylistWindowController | null = null;
+let eventTimelineControlsController: EventTimelineControlsController | null = null;
 let mechanicsReviewReplayLoadsController: MechanicsReviewReplayLoadsController | null = null;
 let nextWindowZIndex = 30;
 let boostPadOverlayEnabled = true;
@@ -499,13 +495,7 @@ function renderTimelineEventCount(): void {
 }
 
 function countVisibleTimelineSources(ctx: StatModuleContext): number {
-  const goalCount = ctx.replay.timelineEvents.filter((event) => event.kind === "goal").length;
-  return (
-    goalCount +
-    getEventTimelineSources(ctx)
-      .filter((source) => source.active)
-      .reduce((count, source) => count + source.count, 0)
-  );
+  return eventTimelineControlsController?.countVisibleSources(ctx) ?? 0;
 }
 
 function mustElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
@@ -1054,150 +1044,12 @@ function renderModuleSummary(): void {
   );
 }
 
-function renderEventTimelineControls(): void {
-  mechanicsTimelineWindowBody.replaceChildren();
-
-  const ctx = getModuleContext();
-  const sources = getEventTimelineSources(ctx);
-
-  if (sources.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = "No events loaded.";
-    mechanicsTimelineWindowBody.append(empty);
-    return;
-  }
-
-  const actions = document.createElement("div");
-  actions.className = "mechanics-actions";
-
-  const allButton = document.createElement("button");
-  allButton.type = "button";
-  allButton.className = "module-summary-item";
-  allButton.addEventListener("click", () => {
-    for (const source of sources) {
-      source.setActive(true);
-    }
-    setupActiveModules();
-    syncTimelineEvents();
-    syncTimelineRanges();
-    renderEventTimelineControls();
-    renderModuleSummary();
-    renderModuleSettings();
-    renderTimelineEventCount();
-    scheduleConfigUrlUpdate();
-  });
-  const allName = document.createElement("span");
-  allName.textContent = "All events";
-  const allCount = document.createElement("strong");
-  allCount.textContent = `${sources.length}`;
-  allButton.append(allName, allCount);
-
-  const noneButton = document.createElement("button");
-  noneButton.type = "button";
-  noneButton.className = "module-summary-item";
-  noneButton.addEventListener("click", () => {
-    for (const source of sources) {
-      source.setActive(false);
-    }
-    setupActiveModules();
-    syncTimelineEvents();
-    syncTimelineRanges();
-    renderEventTimelineControls();
-    renderModuleSummary();
-    renderModuleSettings();
-    renderTimelineEventCount();
-    scheduleConfigUrlUpdate();
-  });
-  const noneName = document.createElement("span");
-  noneName.textContent = "No events";
-  const noneState = document.createElement("strong");
-  noneState.textContent = "Off";
-  noneButton.append(noneName, noneState);
-
-  actions.append(allButton, noneButton);
-  mechanicsTimelineWindowBody.append(actions);
-
-  const list = renderEventSourceList(sources);
-  if (list) {
-    mechanicsTimelineWindowBody.append(list);
-  }
-}
-
 function renderMechanicsTimelineControls(): void {
-  renderEventTimelineControls();
+  eventTimelineControlsController?.render();
 }
 
-function getEventTimelineSources(ctx: StatModuleContext | null): EventTimelineSource[] {
-  return getConfiguredEventTimelineSources({
-    ctx,
-    modules: MODULES,
-    activeTimelineEventSourceIds,
-    activeMechanicTimelineKinds,
-    toggleEventSource(id, enabled) {
-      toggleCapability(id, "events", enabled);
-    },
-    setMechanicTimelineKind(kind, enabled) {
-      if (enabled) {
-        activeMechanicTimelineKinds.add(kind);
-      } else {
-        activeMechanicTimelineKinds.delete(kind);
-      }
-      scheduleConfigUrlUpdate();
-    },
-  });
-}
-
-function renderEventSourceList(sources: EventTimelineSource[]): HTMLElement | null {
-  if (sources.length === 0) {
-    return null;
-  }
-
-  const list = document.createElement("div");
-  list.className = "module-list mechanics-list mechanics-event-list";
-  list.style.setProperty("--event-source-columns", `${getEventSourceColumnCount(sources.length)}`);
-
-  for (const source of sources) {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "module-summary-item";
-    item.dataset.active = source.active ? "true" : "false";
-    item.setAttribute("aria-pressed", source.active ? "true" : "false");
-    item.addEventListener("click", () => {
-      source.setActive(!source.active);
-      syncTimelineEvents();
-      syncTimelineRanges();
-      renderEventTimelineControls();
-      renderTimelineEventCount();
-    });
-
-    const name = document.createElement("span");
-    name.textContent = source.label;
-
-    const state = document.createElement("strong");
-    state.textContent = `${source.active ? "On" : "Off"} ${source.count}`;
-
-    item.append(name, state);
-    list.append(item);
-  }
-
-  return list;
-}
-
-function getEventSourceColumnCount(sourceCount: number): number {
-  if (window.innerWidth < 640) {
-    return 1;
-  }
-  if (window.innerWidth < 900) {
-    return sourceCount >= 7 ? 2 : 1;
-  }
-  if (sourceCount >= 13) {
-    return 3;
-  }
-  if (sourceCount >= 7) {
-    return 2;
-  }
-  return 1;
+function getEventTimelineSources(ctx: StatModuleContext | null) {
+  return eventTimelineControlsController?.getSources(ctx) ?? [];
 }
 
 function getEventPlaylistSourcesForWindow() {
@@ -1249,7 +1101,7 @@ function activateMechanicsReviewTimelineSource(item: MechanicsReviewItem): void 
   activeMechanicTimelineKinds.add(mechanic);
   syncTimelineEvents();
   syncTimelineRanges();
-  renderEventTimelineControls();
+  renderMechanicsTimelineControls();
   renderTimelineEventCount();
   scheduleConfigUrlUpdate();
 }
@@ -2038,10 +1890,35 @@ export function mountStatEvaluationPlayer(
   loadReplayAction = mustElement<HTMLButtonElement>(root, "#load-replay-action");
   floatingWindowLayer = mustElement<HTMLDivElement>(root, "#floating-window-layer");
   scoreboardWindowBody = mustElement<HTMLDivElement>(root, "#scoreboard-window-body");
-  mechanicsTimelineWindowBody = mustElement<HTMLDivElement>(
+  const mechanicsTimelineWindowBody = mustElement<HTMLDivElement>(
     root,
     "#mechanics-timeline-window-body",
   );
+  eventTimelineControlsController = createEventTimelineControlsController({
+    body: mechanicsTimelineWindowBody,
+    modules: MODULES,
+    getContext: getModuleContext,
+    getActiveTimelineEventSourceIds: () => activeTimelineEventSourceIds,
+    getActiveMechanicTimelineKinds: () => activeMechanicTimelineKinds,
+    toggleEventSource(id, enabled) {
+      toggleCapability(id, "events", enabled);
+    },
+    setMechanicTimelineKind(kind, enabled) {
+      if (enabled) {
+        activeMechanicTimelineKinds.add(kind);
+      } else {
+        activeMechanicTimelineKinds.delete(kind);
+      }
+      scheduleConfigUrlUpdate();
+    },
+    setupActiveModules,
+    syncTimelineEvents,
+    syncTimelineRanges,
+    renderModuleSummary,
+    renderModuleSettings,
+    renderTimelineEventCount,
+    requestConfigSync: scheduleConfigUrlUpdate,
+  });
   eventPlaylistWindowBody = mustElement<HTMLDivElement>(root, "#event-playlist-window-body");
   eventPlaylistController = createEventPlaylistWindowController({
     body: eventPlaylistWindowBody,
@@ -2249,6 +2126,7 @@ export function mountStatEvaluationPlayer(
     activeMechanicTimelineKinds = new Set<string>();
     activeRenderEffectModuleIds = new Set<string>();
     resetEventPlaylistWindow();
+    eventTimelineControlsController = null;
     eventPlaylistController = null;
     activeMechanicsReview = null;
     mechanicsReviewBoundaryGuard = false;
