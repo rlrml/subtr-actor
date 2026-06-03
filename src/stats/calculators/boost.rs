@@ -234,7 +234,7 @@ pub struct BoostCalculator {
     ledger_events: EventStream<BoostLedgerEvent>,
     state_events: EventStream<BoostStateEvent>,
     stats_events: EventStream<BoostStatsEvent>,
-    player_detection_stats: HashMap<PlayerId, BoostStats>,
+    player_usage_state: HashMap<PlayerId, BoostUsageState>,
     kickoff_phase_active_last_frame: bool,
     kickoff_respawn_awarded: HashSet<PlayerId>,
     initial_respawn_awarded: HashSet<PlayerId>,
@@ -242,7 +242,6 @@ pub struct BoostCalculator {
     demo_reset_boost_amounts: HashMap<PlayerId, f32>,
     pending_reported_pickups: VecDeque<DeferredReportedBoostPickup>,
     previous_boost_levels_live: Option<bool>,
-    active_invariant_warnings: HashSet<BoostInvariantWarningKey>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -251,18 +250,34 @@ struct PendingDemoRespawn {
     pre_demo_boost_amount: Option<f32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct BoostInvariantWarningKey {
-    scope: String,
-    kind: BoostInvariantKind,
-}
-
 #[derive(Debug, Clone, Copy)]
 struct BoostLedgerContext {
     frame: usize,
     time: f32,
     boost_before: Option<f32>,
     boost_after: Option<f32>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct BoostUsageState {
+    amount_obtained: f32,
+    amount_used: f32,
+    amount_used_while_grounded: f32,
+    amount_used_while_airborne: f32,
+}
+
+impl BoostUsageState {
+    fn amount_used_by_vertical_band(self) -> f32 {
+        self.amount_used_while_grounded + self.amount_used_while_airborne
+    }
+
+    fn apply_stats_delta(&mut self, delta: &BoostStats) {
+        self.amount_obtained +=
+            delta.amount_collected_big + delta.amount_collected_small + delta.amount_respawned;
+        self.amount_used += delta.amount_used;
+        self.amount_used_while_grounded += delta.amount_used_while_grounded;
+        self.amount_used_while_airborne += delta.amount_used_while_airborne;
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -333,10 +348,10 @@ impl BoostCalculator {
         self.stats_events.new_events()
     }
 
-    fn player_stats_snapshot(&self, player_id: &PlayerId) -> BoostStats {
-        self.player_detection_stats
+    fn player_usage_state(&self, player_id: &PlayerId) -> BoostUsageState {
+        self.player_usage_state
             .get(player_id)
-            .cloned()
+            .copied()
             .unwrap_or_default()
     }
 
@@ -358,11 +373,11 @@ impl BoostCalculator {
     }
 
     fn record_stats_event(&mut self, event: BoostStatsEvent) {
-        let player_stats = self
-            .player_detection_stats
+        let usage_state = self
+            .player_usage_state
             .entry(event.player_id.clone())
             .or_default();
-        apply_delta(player_stats, &event.delta);
+        usage_state.apply_stats_delta(&event.delta);
         self.stats_events.push(event);
     }
 
@@ -907,75 +922,6 @@ impl BoostCalculator {
             boost_before: ledger_context.boost_before,
             boost_after: ledger_context.boost_after,
         });
-    }
-
-    fn warn_for_boost_invariant_violations(
-        &mut self,
-        scope: &str,
-        frame_number: usize,
-        time: f32,
-        stats: &BoostStats,
-        observed_boost_amount: Option<f32>,
-    ) {
-        let violations = boost_invariant_violations(stats, observed_boost_amount);
-        let active_kinds: HashSet<BoostInvariantKind> =
-            violations.iter().map(|violation| violation.kind).collect();
-
-        for violation in violations {
-            let key = BoostInvariantWarningKey {
-                scope: scope.to_string(),
-                kind: violation.kind,
-            };
-            if self.active_invariant_warnings.insert(key) {
-                log::warn!(
-                    "Boost invariant violation for {} at frame {} (t={:.3}): {}",
-                    scope,
-                    frame_number,
-                    time,
-                    violation.message(),
-                );
-            }
-        }
-
-        for kind in BoostInvariantKind::ALL {
-            if active_kinds.contains(&kind) {
-                continue;
-            }
-            self.active_invariant_warnings
-                .remove(&BoostInvariantWarningKey {
-                    scope: scope.to_string(),
-                    kind,
-                });
-        }
-    }
-
-    fn warn_for_sample_boost_invariants(
-        &mut self,
-        frame: &FrameInfo,
-        players: &PlayerFrameState,
-        track_boost_levels: bool,
-    ) {
-        let player_scopes: Vec<(PlayerId, Option<f32>, BoostStats)> = players
-            .players
-            .iter()
-            .map(|player| {
-                (
-                    player.player_id.clone(),
-                    track_boost_levels.then_some(player.boost_amount).flatten(),
-                    self.player_stats_snapshot(&player.player_id),
-                )
-            })
-            .collect();
-
-        for (player_id, observed_boost_amount, stats) in player_scopes {
-            self.warn_for_boost_invariant_violations(
-                &format!("player {player_id:?}"),
-                frame.frame_number,
-                frame.time,
-                &stats,
-                observed_boost_amount,
-            );
-        }
     }
 
     fn interval_fraction_in_boost_range(
@@ -1809,22 +1755,22 @@ impl BoostCalculator {
                     .copied()
                     .or(player.last_boost_amount);
                 let mut used_ledger_event = None;
-                let stats = self.player_stats_snapshot(&player.player_id);
-                let previous_amount_used = stats.amount_used;
+                let usage_state = self.player_usage_state(&player.player_id);
+                let previous_amount_used = usage_state.amount_used;
                 let demo_reset_boost_amount = self
                     .demo_reset_boost_amounts
                     .get(&player.player_id)
                     .copied()
                     .unwrap_or(0.0);
                 let amount_used_raw =
-                    (stats.amount_obtained() - demo_reset_boost_amount - boost_amount).max(0.0);
-                let amount_used = amount_used_raw.max(stats.amount_used);
+                    (usage_state.amount_obtained - demo_reset_boost_amount - boost_amount).max(0.0);
+                let amount_used = amount_used_raw.max(usage_state.amount_used);
                 let amount_used_delta = amount_used - previous_amount_used;
                 let mut stats_delta = BoostStats {
                     amount_used: amount_used_delta,
                     ..BoostStats::default()
                 };
-                let split_amount = stats.amount_used_by_vertical_band();
+                let split_amount = usage_state.amount_used_by_vertical_band();
                 let amount_used_allocation_delta = (amount_used - split_amount).max(0.0);
                 if amount_used_allocation_delta > 0.0 {
                     let speed = player.speed();
@@ -1919,38 +1865,10 @@ impl BoostCalculator {
                     .insert(player.player_id.clone(), speed);
             }
         }
-        self.warn_for_sample_boost_invariants(frame, players, track_boost_levels);
         self.kickoff_phase_active_last_frame = kickoff_phase_active;
         self.previous_boost_levels_live = Some(boost_levels_live);
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-impl BoostCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, BoostStats> {
-        let mut stats = BoostStatsAccumulator::default();
-        for event in self.stats_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &BoostStats {
-        let mut stats = BoostStatsAccumulator::default();
-        for event in self.stats_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &BoostStats {
-        let mut stats = BoostStatsAccumulator::default();
-        for event in self.stats_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
     }
 }
 

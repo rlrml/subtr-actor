@@ -5,51 +5,11 @@ use boxcars;
 use boxcars::HeaderProp;
 use serde::{Deserialize, Serialize};
 
-use crate::*;
+pub(crate) use crate::stats::common::*;
 
-mod boost_invariants;
-pub use boost_invariants::*;
-
-const CONFIDENCE_BAND_LABELS: [StatLabel; 2] = [
-    StatLabel::new("confidence_band", "standard"),
-    StatLabel::new("confidence_band", "high"),
-];
-
-const VERTICAL_STATE_LABELS: [StatLabel; 2] = [
-    StatLabel::new("vertical_state", "grounded"),
-    StatLabel::new("vertical_state", "aerial"),
-];
-
+pub(crate) use crate::stats::accumulators::*;
 #[cfg(test)]
-fn stats_test_frame(time: f32, frame_number: usize) -> FrameInfo {
-    FrameInfo {
-        frame_number,
-        time,
-        dt: 0.0,
-        seconds_remaining: None,
-    }
-}
-
-#[cfg(test)]
-fn leak_test_stats<T: 'static>(value: T) -> &'static T {
-    Box::leak(Box::new(value))
-}
-
-fn confidence_band_label(high_confidence: bool) -> StatLabel {
-    if high_confidence {
-        StatLabel::new("confidence_band", "high")
-    } else {
-        StatLabel::new("confidence_band", "standard")
-    }
-}
-
-fn vertical_state_label(aerial: bool) -> StatLabel {
-    if aerial {
-        StatLabel::new("vertical_state", "aerial")
-    } else {
-        StatLabel::new("vertical_state", "grounded")
-    }
-}
+pub(crate) use crate::stats::test_projection::*;
 
 mod frame_input;
 pub use frame_input::*;
@@ -68,148 +28,86 @@ mod samples;
 pub use samples::*;
 pub mod backboard;
 pub use backboard::*;
-pub mod backboard_stats;
-pub use backboard_stats::*;
 pub mod backboard_bounce;
 pub use backboard_bounce::*;
 pub mod air_dribble;
 pub use air_dribble::*;
 pub mod ball_carry;
 pub use ball_carry::*;
-pub mod ball_carry_stats;
-pub use ball_carry_stats::*;
 pub mod boost;
 pub use boost::*;
-pub mod boost_stats;
-pub use boost_stats::*;
 pub mod bump;
 pub use bump::*;
-pub mod bump_stats;
-pub use bump_stats::*;
 pub mod ceiling_shot;
 pub use ceiling_shot::*;
-pub mod ceiling_shot_stats;
-pub use ceiling_shot_stats::*;
 pub mod center;
 pub use center::*;
-pub mod center_stats;
-pub use center_stats::*;
 pub mod demo;
 pub use demo::*;
-pub mod demo_stats;
-pub use demo_stats::*;
 mod flip_reset;
 pub use flip_reset::*;
 mod flip_reset_tuning_set;
 pub use flip_reset_tuning_set::*;
 pub mod dodge_reset;
 pub use dodge_reset::*;
-pub mod dodge_reset_stats;
-pub use dodge_reset_stats::*;
 pub mod double_tap;
 pub use double_tap::*;
-pub mod double_tap_stats;
-pub use double_tap_stats::*;
 pub mod fifty_fifty;
 pub use fifty_fifty::*;
-pub mod fifty_fifty_stats;
-pub use fifty_fifty_stats::*;
 pub mod fifty_fifty_state;
 pub use fifty_fifty_state::*;
 pub mod flick;
 pub use flick::*;
-pub mod flick_stats;
-pub use flick_stats::*;
 pub mod goal_tags;
 pub use goal_tags::*;
 pub mod half_flip;
 pub use half_flip::*;
-pub mod half_flip_stats;
-pub use half_flip_stats::*;
 pub mod half_volley;
 pub use half_volley::*;
-pub mod half_volley_stats;
-pub use half_volley_stats::*;
 pub mod match_stats;
 pub use match_stats::*;
-pub mod match_stats_stats;
-pub use match_stats_stats::*;
 pub mod movement;
 pub use movement::*;
-pub mod movement_stats;
-pub use movement_stats::*;
 pub mod musty_flick;
 pub use musty_flick::*;
-pub mod musty_flick_stats;
-pub use musty_flick_stats::*;
 pub mod one_timer;
 pub use one_timer::*;
-pub mod one_timer_stats;
-pub use one_timer_stats::*;
 pub mod pass;
 pub use pass::*;
-pub mod pass_stats;
-pub use pass_stats::*;
 pub mod positioning;
 pub use positioning::*;
-pub mod positioning_stats;
-pub use positioning_stats::*;
 pub mod player_vertical_state;
 pub use player_vertical_state::*;
 pub mod possession;
 pub use possession::*;
-pub mod possession_stats;
-pub use possession_stats::*;
 pub mod possession_state;
 pub use possession_state::*;
 pub mod powerslide;
 pub use powerslide::*;
-pub mod powerslide_stats;
-pub use powerslide_stats::*;
 pub mod pressure;
 pub use pressure::*;
-pub mod pressure_stats;
-pub use pressure_stats::*;
 pub mod rotation;
 pub use rotation::*;
-pub mod rotation_stats;
-pub use rotation_stats::*;
 pub mod rush;
 pub use rush::*;
-pub mod rush_stats;
-pub use rush_stats::*;
 pub mod settings;
 pub use settings::*;
 pub mod speed_flip;
 pub use speed_flip::*;
-pub mod speed_flip_stats;
-pub use speed_flip_stats::*;
 pub mod territorial_pressure;
 pub use territorial_pressure::*;
-pub mod territorial_pressure_stats;
-pub use territorial_pressure_stats::*;
 pub mod touch;
 pub use touch::*;
-pub mod touch_stats;
-pub use touch_stats::*;
 pub mod touch_state;
 pub use touch_state::*;
 pub mod wall_aerial;
 pub use wall_aerial::*;
-pub mod wall_aerial_stats;
-pub use wall_aerial_stats::*;
 pub mod wall_aerial_shot;
 pub use wall_aerial_shot::*;
-pub mod wall_aerial_shot_stats;
-pub use wall_aerial_shot_stats::*;
 pub mod wavedash;
 pub use wavedash::*;
-pub mod wavedash_stats;
-pub use wavedash_stats::*;
 pub mod whiff;
 pub use whiff::*;
-pub mod whiff_stats;
-pub use whiff_stats::*;
 
 fn interval_fraction_in_scalar_range(start: f32, end: f32, min_value: f32, max_value: f32) -> f32 {
     if (end - start).abs() <= f32::EPSILON {
@@ -261,7 +159,6 @@ fn interval_fraction_above_threshold(start: f32, end: f32, threshold: f32) -> f3
     }
 }
 
-const CAR_MAX_SPEED: f32 = 2300.0;
 const SUPERSONIC_SPEED_THRESHOLD: f32 = 2200.0;
 const BOOST_SPEED_THRESHOLD: f32 = 1410.0;
 const POWERSLIDE_MAX_Z_THRESHOLD: f32 = 40.0;

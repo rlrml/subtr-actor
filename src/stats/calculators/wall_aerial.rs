@@ -519,17 +519,5 @@ impl WallAerialCalculator {
 }
 
 #[cfg(test)]
-impl WallAerialCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, WallAerialStats> {
-        let mut stats = WallAerialStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.sample_time, event.sample_frame);
-            stats.apply_event(event, &frame);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "wall_aerial_tests.rs"]
 mod tests;

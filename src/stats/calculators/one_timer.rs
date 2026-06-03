@@ -118,35 +118,5 @@ impl OneTimerCalculator {
 }
 
 #[cfg(test)]
-impl OneTimerCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, OneTimerPlayerStats> {
-        let mut stats = OneTimerStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.time, event.frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &OneTimerTeamStats {
-        let mut stats = OneTimerStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.time, event.frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &OneTimerTeamStats {
-        let mut stats = OneTimerStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.time, event.frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "one_timer_tests.rs"]
 mod tests;

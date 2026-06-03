@@ -235,56 +235,5 @@ impl BallCarryCalculator {
 }
 
 #[cfg(test)]
-impl BallCarryCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, BallCarryStats> {
-        let mut stats = BallCarryStatsAccumulator::default();
-        for event in self.carry_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn player_air_dribble_stats(&self) -> &HashMap<PlayerId, AirDribbleStats> {
-        let mut stats = BallCarryStatsAccumulator::default();
-        for event in self.carry_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.player_air_dribble_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &BallCarryStats {
-        let mut stats = BallCarryStatsAccumulator::default();
-        for event in self.carry_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &BallCarryStats {
-        let mut stats = BallCarryStatsAccumulator::default();
-        for event in self.carry_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
-    }
-
-    pub fn team_zero_air_dribble_stats(&self) -> &AirDribbleStats {
-        let mut stats = BallCarryStatsAccumulator::default();
-        for event in self.carry_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.team_zero_air_dribble_stats().clone())
-    }
-
-    pub fn team_one_air_dribble_stats(&self) -> &AirDribbleStats {
-        let mut stats = BallCarryStatsAccumulator::default();
-        for event in self.carry_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.team_one_air_dribble_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "ball_carry_tests.rs"]
 mod tests;

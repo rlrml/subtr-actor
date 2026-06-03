@@ -723,41 +723,5 @@ fn play_depth_state(
 }
 
 #[cfg(test)]
-impl RotationCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, RotationPlayerStats> {
-        let mut stats = RotationStatsAccumulator::default();
-        for event in self.player_events() {
-            stats.apply_player_event(event);
-        }
-        for event in self.team_events() {
-            stats.apply_team_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &RotationTeamStats {
-        let mut stats = RotationStatsAccumulator::default();
-        for event in self.player_events() {
-            stats.apply_player_event(event);
-        }
-        for event in self.team_events() {
-            stats.apply_team_event(event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &RotationTeamStats {
-        let mut stats = RotationStatsAccumulator::default();
-        for event in self.player_events() {
-            stats.apply_player_event(event);
-        }
-        for event in self.team_events() {
-            stats.apply_team_event(event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "rotation_tests.rs"]
 mod tests;

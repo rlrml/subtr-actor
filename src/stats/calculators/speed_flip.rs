@@ -500,16 +500,5 @@ impl SpeedFlipCalculator {
 }
 
 #[cfg(test)]
-impl SpeedFlipCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, SpeedFlipStats> {
-        let mut stats = SpeedFlipStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "speed_flip_tests.rs"]
 mod tests;

@@ -137,32 +137,5 @@ impl DemoCalculator {
 }
 
 #[cfg(test)]
-impl DemoCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, DemoPlayerStats> {
-        let mut stats = DemoStatsAccumulator::default();
-        for event in self.timeline() {
-            stats.apply_timeline_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &DemoTeamStats {
-        let mut stats = DemoStatsAccumulator::default();
-        for event in self.timeline() {
-            stats.apply_timeline_event(event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &DemoTeamStats {
-        let mut stats = DemoStatsAccumulator::default();
-        for event in self.timeline() {
-            stats.apply_timeline_event(event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "demo_tests.rs"]
 mod tests;

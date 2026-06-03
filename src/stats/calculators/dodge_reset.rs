@@ -240,16 +240,5 @@ impl DodgeResetCalculator {
 }
 
 #[cfg(test)]
-impl DodgeResetCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, DodgeResetStats> {
-        let mut stats = DodgeResetStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "dodge_reset_tests.rs"]
 mod tests;

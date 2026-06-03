@@ -475,40 +475,5 @@ fn rigid_body_velocity(rigid_body: &boxcars::RigidBody) -> glam::Vec3 {
 }
 
 #[cfg(test)]
-impl BumpCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, BumpPlayerStats> {
-        let mut stats = BumpStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &BumpTeamStats {
-        let mut stats = BumpStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &BumpTeamStats {
-        let mut stats = BumpStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
-    }
-
-    pub fn stats(&self) -> &BumpStatsAccumulator {
-        let mut stats = BumpStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats)
-    }
-}
-
-#[cfg(test)]
 #[path = "bump_tests.rs"]
 mod tests;

@@ -319,16 +319,5 @@ impl HalfFlipCalculator {
 }
 
 #[cfg(test)]
-impl HalfFlipCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, HalfFlipStats> {
-        let mut stats = HalfFlipStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "half_flip_tests.rs"]
 mod tests;

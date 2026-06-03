@@ -268,35 +268,5 @@ impl HalfVolleyCalculator {
 }
 
 #[cfg(test)]
-impl HalfVolleyCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, HalfVolleyPlayerStats> {
-        let mut stats = HalfVolleyStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.sample_time, event.sample_frame);
-            stats.apply_event(event, &frame);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &HalfVolleyTeamStats {
-        let mut stats = HalfVolleyStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.sample_time, event.sample_frame);
-            stats.apply_event(event, &frame);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &HalfVolleyTeamStats {
-        let mut stats = HalfVolleyStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.sample_time, event.sample_frame);
-            stats.apply_event(event, &frame);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "half_volley_tests.rs"]
 mod tests;
