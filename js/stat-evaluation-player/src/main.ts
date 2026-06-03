@@ -16,7 +16,6 @@ import type {
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
   ReplayTimelineEvent,
-  ReplayTimelineRange,
   ReplayPlayerState,
   ReplayPlayerTrack,
   TimelineOverlayPlugin,
@@ -43,14 +42,19 @@ import type {
 import { createStatRegistry, type StatDefinition, type StatScopeKind } from "./statRegistry.ts";
 import { getStatDefinitionSearchMatches } from "./statSearch.ts";
 import {
-  buildMechanicPlaylistEvents,
-  buildMechanicTimelineEvents,
   filterReplayTimelineEvents,
   formatMechanicKind,
   getMechanicKinds,
   mechanicKindToModuleId,
 } from "./timelineMarkers.ts";
-import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
+import {
+  buildEventPlaylistItems as buildEventPlaylistSourceItems,
+  getEventPlaylistSelectedSourceIds,
+  getEventPlaylistSources as getEventPlaylistSourcesFromTimelineSources,
+  getEventTimelineSources as getConfiguredEventTimelineSources,
+  type EventPlaylistSource,
+  type EventTimelineSource,
+} from "./eventTimelineSources.ts";
 import {
   formatReplayLoadProgress,
   loadReplayBundleInWorker,
@@ -176,75 +180,6 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
   "touch",
 ]);
 const TOUCH_MODULE_ID = "touch";
-const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
-const EVENT_PLAYLIST_PLAYER_COLORS = [
-  "#3b82f6",
-  "#06b6d4",
-  "#22c55e",
-  "#a855f7",
-  "#f97316",
-  "#ef4444",
-  "#f59e0b",
-  "#ec4899",
-];
-const EVENT_PLAYLIST_NEUTRAL_COLOR = "#d1d9e0";
-
-interface EventWindowSourceDefinition {
-  id: string;
-  label: string;
-  buildEvents(ctx: StatModuleContext): ReplayTimelineEvent[];
-}
-
-interface EventTimelineSource {
-  id: string;
-  playlistId: string;
-  timelineKey: string;
-  timelineId: string;
-  group: string;
-  label: string;
-  count: number;
-  active: boolean;
-  buildTimelineEvents(): ReplayTimelineEvent[];
-  buildPlaylistEvents(): ReplayTimelineEvent[];
-  buildTimelineRanges?(): ReplayTimelineRange[];
-  setActive(enabled: boolean): void;
-}
-
-interface EventPlaylistSource {
-  id: string;
-  group: string;
-  label: string;
-  events: ReplayTimelineEvent[];
-}
-
-interface EventPlaylistItem {
-  key: string;
-  sourceId: string;
-  sourceLabel: string;
-  event: ReplayTimelineEvent;
-  color: string;
-}
-
-const REPLAY_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
-  {
-    id: "core",
-    label: "Shots, saves, assists",
-    buildEvents(ctx) {
-      return ctx.replay.timelineEvents.filter(
-        (event) => event.kind === "shot" || event.kind === "save" || event.kind === "assist",
-      );
-    },
-  },
-  {
-    id: "demo",
-    label: "Demos",
-    buildEvents(ctx) {
-      return ctx.replay.timelineEvents.filter((event) => event.kind === "demo");
-    },
-  },
-];
-
-const EXTRA_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [];
 
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
@@ -1225,130 +1160,23 @@ function renderMechanicsTimelineControls(): void {
 }
 
 function getEventTimelineSources(ctx: StatModuleContext | null): EventTimelineSource[] {
-  if (!ctx) {
-    return [];
-  }
-
-  const sources: EventTimelineSource[] = [];
-  for (const source of REPLAY_EVENT_SOURCE_DEFINITIONS) {
-    const events = source.buildEvents(ctx);
-    const count = events.length;
-    if (count === 0) {
-      continue;
-    }
-    sources.push({
-      id: source.id,
-      playlistId: `replay:${source.id}`,
-      timelineKey: `events:${source.id}`,
-      timelineId: `events:${source.id}`,
-      group: "Replay",
-      label: source.label,
-      count,
-      active: activeTimelineEventSourceIds.has(source.id),
-      buildTimelineEvents() {
-        return events;
-      },
-      buildPlaylistEvents() {
-        return events;
-      },
-      setActive(enabled) {
-        toggleCapability(source.id, "events", enabled);
-      },
-    });
-  }
-
-  for (const mod of MODULES.filter((module) => module.getTimelineEvents)) {
-    const events = mod.getTimelineEvents?.(ctx) ?? [];
-    const count = events.length;
-    if (count === 0) {
-      continue;
-    }
-    sources.push({
-      id: mod.id,
-      playlistId: `module:${mod.id}`,
-      timelineKey: `module:${mod.id}`,
-      timelineId: `module:${mod.id}`,
-      group: "Stats",
-      label: mod.label,
-      count,
-      active: activeTimelineEventSourceIds.has(mod.id),
-      buildTimelineEvents() {
-        return events;
-      },
-      buildPlaylistEvents() {
-        return events;
-      },
-      setActive(enabled) {
-        toggleCapability(mod.id, "events", enabled);
-      },
-    });
-  }
-
-  for (const source of EXTRA_EVENT_SOURCE_DEFINITIONS) {
-    const events = source.buildEvents(ctx);
-    const count = events.length;
-    if (count === 0) {
-      continue;
-    }
-    sources.push({
-      id: source.id,
-      playlistId: `extra:${source.id}`,
-      timelineKey: `extra:${source.id}`,
-      timelineId: `extra:${source.id}`,
-      group: "Stats",
-      label: source.label,
-      count,
-      active: activeTimelineEventSourceIds.has(source.id),
-      buildTimelineEvents() {
-        return events;
-      },
-      buildPlaylistEvents() {
-        return events;
-      },
-      setActive(enabled) {
-        toggleCapability(source.id, "events", enabled);
-      },
-    });
-  }
-
-  for (const kind of getMechanicKinds(ctx.statsTimeline)) {
-    const timelineEvents = buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const playlistEvents = buildMechanicPlaylistEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const timelineRanges = buildMechanicTimelineRanges(ctx.statsTimeline, ctx.replay, [kind]);
-    const count = timelineEvents.length + timelineRanges.length;
-    if (count === 0) {
-      continue;
-    }
-    sources.push({
-      id: `mechanic:${kind}`,
-      playlistId: `mechanic:${kind}`,
-      timelineKey: `mechanic:${kind}`,
-      timelineId: `mechanic:${kind}`,
-      group: "Mechanics",
-      label: formatMechanicKind(kind),
-      count,
-      active: activeMechanicTimelineKinds.has(kind),
-      buildTimelineEvents() {
-        return timelineEvents;
-      },
-      buildPlaylistEvents() {
-        return playlistEvents;
-      },
-      buildTimelineRanges() {
-        return timelineRanges;
-      },
-      setActive(enabled) {
-        if (enabled) {
-          activeMechanicTimelineKinds.add(kind);
-        } else {
-          activeMechanicTimelineKinds.delete(kind);
-        }
-        scheduleConfigUrlUpdate();
-      },
-    });
-  }
-
-  return sources.sort((left, right) => left.label.localeCompare(right.label));
+  return getConfiguredEventTimelineSources({
+    ctx,
+    modules: MODULES,
+    activeTimelineEventSourceIds,
+    activeMechanicTimelineKinds,
+    toggleEventSource(id, enabled) {
+      toggleCapability(id, "events", enabled);
+    },
+    setMechanicTimelineKind(kind, enabled) {
+      if (enabled) {
+        activeMechanicTimelineKinds.add(kind);
+      } else {
+        activeMechanicTimelineKinds.delete(kind);
+      }
+      scheduleConfigUrlUpdate();
+    },
+  });
 }
 
 function renderEventSourceList(sources: EventTimelineSource[]): HTMLElement | null {
@@ -1403,85 +1231,24 @@ function getEventSourceColumnCount(sourceCount: number): number {
   return 1;
 }
 
-function getEventPlaylistReplaySources(ctx: StatModuleContext): EventPlaylistSource[] {
-  const replaySources: EventPlaylistSource[] = [
-    {
-      id: "replay:goals",
-      group: "Replay",
-      label: "Goals",
-      events: ctx.replay.timelineEvents.filter((event) => event.kind === "goal"),
-    },
-  ];
-
-  return replaySources.filter((source) => source.events.length > 0);
-}
-
 function getEventPlaylistSources(): EventPlaylistSource[] {
   const ctx = getModuleContext();
-  if (!ctx) {
-    return [];
-  }
-
-  const eventSources = getEventTimelineSources(ctx)
-    .map((source) => ({
-      id: source.playlistId,
-      group: source.group,
-      label: source.label,
-      events: source.buildPlaylistEvents(),
-    }))
-    .filter((source) => source.events.length > 0);
-
-  return [...getEventPlaylistReplaySources(ctx), ...eventSources];
+  return getEventPlaylistSourcesFromTimelineSources(ctx, getEventTimelineSources(ctx));
 }
 
-function getEventPlaylistSelectedSourceIds(sources: EventPlaylistSource[]): Set<string> {
-  const sourceIds = sources.map((source) => source.id);
-  if (eventPlaylistActiveSourceIds === null) {
-    return new Set(sourceIds.filter((id) => !DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS.has(id)));
-  }
-  return new Set(sourceIds.filter((id) => eventPlaylistActiveSourceIds?.has(id)));
-}
-
-function getEventPlaylistPlayerColor(event: ReplayTimelineEvent): string {
-  const playerId = event.playerId ?? null;
-  const playerIndex =
-    playerId && replayPlayer
-      ? replayPlayer.replay.players.findIndex((player) => player.id === playerId)
-      : -1;
-  if (playerIndex >= 0) {
-    return EVENT_PLAYLIST_PLAYER_COLORS[playerIndex % EVENT_PLAYLIST_PLAYER_COLORS.length]!;
-  }
-  return event.color ?? EVENT_PLAYLIST_NEUTRAL_COLOR;
-}
-
-function buildEventPlaylistItems(sources: EventPlaylistSource[]): EventPlaylistItem[] {
-  const selectedSourceIds = getEventPlaylistSelectedSourceIds(sources);
-  return sources
-    .filter((source) => selectedSourceIds.has(source.id))
-    .flatMap((source) =>
-      source.events.map((event, index) => ({
-        key: `${source.id}:${event.id ?? `${event.kind}:${event.time}:${index}`}`,
-        sourceId: source.id,
-        sourceLabel: source.label,
-        event,
-        color: getEventPlaylistPlayerColor(event),
-      })),
-    )
-    .sort((left, right) => {
-      if (left.event.time !== right.event.time) {
-        return left.event.time - right.event.time;
-      }
-      return (left.event.label ?? left.sourceLabel).localeCompare(
-        right.event.label ?? right.sourceLabel,
-      );
-    });
+function buildEventPlaylistItems(sources: EventPlaylistSource[]) {
+  return buildEventPlaylistSourceItems({
+    sources,
+    activeSourceIds: eventPlaylistActiveSourceIds,
+    replayPlayers: replayPlayer?.replay.players ?? [],
+  });
 }
 
 function setEventPlaylistSourceSelection(
   sources: EventPlaylistSource[],
   updater: (selected: Set<string>) => void,
 ): void {
-  const selected = getEventPlaylistSelectedSourceIds(sources);
+  const selected = getEventPlaylistSelectedSourceIds(sources, eventPlaylistActiveSourceIds);
   updater(selected);
   eventPlaylistActiveSourceIds = selected;
   eventPlaylistLastActiveKey = null;
@@ -1507,7 +1274,7 @@ function renderEventPlaylistWindow(): void {
     return;
   }
 
-  const selectedSourceIds = getEventPlaylistSelectedSourceIds(sources);
+  const selectedSourceIds = getEventPlaylistSelectedSourceIds(sources, eventPlaylistActiveSourceIds);
   const items = buildEventPlaylistItems(sources);
 
   const toolbar = document.createElement("div");
