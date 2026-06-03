@@ -64,6 +64,7 @@ pub(in crate::collector::stats::playback) fn parse_possession_event(
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         active: json_required_bool(object, "active")?,
+        duration: json_required_f32(object, "duration")?,
         possession_state: json_required_str(object, "possession_state")?.to_owned(),
         field_third: match object.get("field_third") {
             None | Some(Value::Null) => None,
@@ -80,6 +81,7 @@ pub(in crate::collector::stats::playback) fn parse_pressure_event(
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         active: json_required_bool(object, "active")?,
+        duration: json_required_f32(object, "duration")?,
         field_half: json_required_str(object, "field_half")?.to_owned(),
     })
 }
