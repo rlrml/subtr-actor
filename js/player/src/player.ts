@@ -1,6 +1,18 @@
 import * as THREE from "three";
-import { createReplayScene, updateBoostMeter, type DemoIndicator, type ReplayScene } from "./scene";
+import { createReplayScene, updateBoostMeter, type ReplayScene } from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
+import {
+  DEFAULT_CAMERA_VIEW_MODE,
+  getActiveDemoEvent,
+  getKickoffSkipTargetTime,
+  getPostGoalTransitionSkipTargetTime,
+  isPlayerSamplePresent,
+  normalizeCustomCameraSettings,
+  resolveInitialPlayerSettings,
+  updateBoostTrail,
+  updateDemoIndicator,
+  updateReplayBallRender,
+} from "./player-helpers";
 import {
   clampFrameIndex,
   computeTimelineSegments,
@@ -9,9 +21,6 @@ import {
   getReplayPlaybackEndTime,
   inferKickoffGameState,
   inferLiveGameState,
-  isKickoffFrame,
-  isLiveGameplayFrame,
-  isPostGoalTransitionFrame,
   projectReplayTimeToTimeline,
   projectTimelineTimeToReplay,
 } from "./player-internals/timeline";
@@ -22,7 +31,6 @@ import {
   rootPosition,
   updateFreeCameraTransition,
   updateAttachedCamera,
-  worldPosition,
 } from "./player-internals/spatial";
 import type {
   BeforeRenderCallback,
@@ -44,14 +52,10 @@ import type {
   ReplayPlayerSnapshot,
   ReplayPlayerState,
   ReplayPlayerStatePatch,
-  ReplayTimelineEvent,
   Vec3,
 } from "./types";
 
 const DEFAULT_FIELD_SCALE = 1;
-const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
-const DEFAULT_CAMERA_VIEW_MODE: ReplayCameraViewMode = "free";
-const DEMO_INDICATOR_DURATION_SECONDS = 3.2;
 
 type ReplayPlayerListener = (state: ReplayPlayerState) => void;
 type InstalledReplayPlayerPlugin = {
@@ -64,43 +68,6 @@ type FreeCameraTransition = {
   up: THREE.Vector3;
   fov: number;
 };
-
-function finiteSetting(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function normalizeCustomCameraSettings(
-  settings: CameraSettings | null | undefined,
-): CameraSettings | null {
-  if (!settings) {
-    return null;
-  }
-
-  const normalized: CameraSettings = {};
-  const fov = finiteSetting(settings.fov);
-  const height = finiteSetting(settings.height);
-  const pitch = finiteSetting(settings.pitch);
-  const distance = finiteSetting(settings.distance);
-  const stiffness = finiteSetting(settings.stiffness);
-  const swivelSpeed = finiteSetting(settings.swivelSpeed);
-  const transitionSpeed = finiteSetting(settings.transitionSpeed);
-  if (fov !== undefined) normalized.fov = fov;
-  if (height !== undefined) normalized.height = height;
-  if (pitch !== undefined) normalized.pitch = pitch;
-  if (distance !== undefined) normalized.distance = distance;
-  if (stiffness !== undefined) normalized.stiffness = stiffness;
-  if (swivelSpeed !== undefined) normalized.swivelSpeed = swivelSpeed;
-  if (transitionSpeed !== undefined) {
-    normalized.transitionSpeed = transitionSpeed;
-  }
-  return normalized;
-}
-
-function isPlayerSamplePresent(
-  sample: ReplayModel["players"][number]["frames"][number] | null | undefined,
-): boolean {
-  return Boolean(sample?.position) && sample?.isPresent !== false;
-}
 
 export class ReplayPlayer extends EventTarget {
   readonly container: HTMLElement;
@@ -148,22 +115,18 @@ export class ReplayPlayer extends EventTarget {
     this.sceneState = createReplayScene(container, replay, this.fieldScale);
     this.liveGameState = inferLiveGameState(replay);
     this.kickoffGameState = inferKickoffGameState(replay, this.liveGameState);
-    this.speed = Math.max(0.1, options.initialPlaybackRate ?? 1);
-    this.cameraDistanceScale = Math.max(
-      0.25,
-      options.initialCameraDistanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
-    );
-    this.customCameraSettings = normalizeCustomCameraSettings(options.initialCustomCameraSettings);
-    this.attachedPlayerId = options.initialAttachedPlayerId ?? null;
-    this.cameraViewMode =
-      options.initialCameraViewMode ??
-      (this.attachedPlayerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE);
-    this.ballCamEnabled = options.initialBallCamEnabled ?? false;
-    this.boostMeterEnabled = options.initialBoostMeterEnabled ?? false;
-    this.boostPickupAnimationEnabled = options.initialBoostPickupAnimationEnabled ?? true;
-    this.hitboxWireframesEnabled = options.initialHitboxWireframesEnabled ?? false;
-    this.skipPostGoalTransitionsEnabled = options.initialSkipPostGoalTransitionsEnabled ?? true;
-    this.skipKickoffsEnabled = options.initialSkipKickoffsEnabled ?? false;
+    const initialSettings = resolveInitialPlayerSettings(options);
+    this.speed = initialSettings.speed;
+    this.cameraDistanceScale = initialSettings.cameraDistanceScale;
+    this.customCameraSettings = initialSettings.customCameraSettings;
+    this.attachedPlayerId = initialSettings.attachedPlayerId;
+    this.cameraViewMode = initialSettings.cameraViewMode;
+    this.ballCamEnabled = initialSettings.ballCamEnabled;
+    this.boostMeterEnabled = initialSettings.boostMeterEnabled;
+    this.boostPickupAnimationEnabled = initialSettings.boostPickupAnimationEnabled;
+    this.hitboxWireframesEnabled = initialSettings.hitboxWireframesEnabled;
+    this.skipPostGoalTransitionsEnabled = initialSettings.skipPostGoalTransitionsEnabled;
+    this.skipKickoffsEnabled = initialSettings.skipKickoffsEnabled;
     this.setHitboxWireframeVisibility();
     this.skipPostGoalTransitionIfNeeded();
     this.skipPastKickoffIfNeeded();
@@ -642,34 +605,13 @@ export class ReplayPlayer extends EventTarget {
   private render(): void {
     const frameWindow = getFrameWindow(this.replay, this.currentTime);
     const frameIndex = frameWindow.frameIndex;
-    const ballFrame = this.replay.ballFrames[frameIndex] ?? null;
-    const nextBallFrame = this.replay.ballFrames[frameWindow.nextFrameIndex] ?? ballFrame;
-    const interpolatedBallPosition = interpolatePosition(
-      ballFrame?.position ?? null,
-      nextBallFrame?.position ?? null,
-      frameWindow.alpha,
-    );
-    const ballPosition = interpolatedBallPosition
-      ? worldPosition(interpolatedBallPosition, this.fieldScale)
-      : null;
+    const { ballFrame, nextBallFrame, ballPosition } = updateReplayBallRender({
+      replay: this.replay,
+      sceneState: this.sceneState,
+      fieldScale: this.fieldScale,
+      frameWindow,
+    });
     const renderPlayers: ReplayPlayerRenderTrackContext[] = [];
-
-    if (interpolatedBallPosition) {
-      this.sceneState.ballMesh.visible = true;
-      this.sceneState.ballMesh.position.copy(rootPosition(interpolatedBallPosition));
-      const ballRotation = interpolateQuaternion(
-        ballFrame?.rotation ?? null,
-        nextBallFrame?.rotation ?? null,
-        frameWindow.alpha,
-      );
-      if (ballRotation) {
-        this.sceneState.ballMesh.quaternion.copy(ballRotation);
-      } else {
-        this.sceneState.ballMesh.quaternion.identity();
-      }
-    } else {
-      this.sceneState.ballMesh.visible = false;
-    }
 
     for (const [playerIndex, player] of this.replay.players.entries()) {
       const mesh = this.sceneState.playerMeshes.get(player.id);
@@ -702,7 +644,11 @@ export class ReplayPlayer extends EventTarget {
         nextFrame?.position ?? null,
         frameWindow.alpha,
       );
-      const activeDemoEvent = this.getActiveDemoEvent(player.id, this.currentTime);
+      const activeDemoEvent = getActiveDemoEvent(
+        this.replay.timelineEvents,
+        player.id,
+        this.currentTime,
+      );
       if (!interpolatedPosition) {
         mesh.visible = false;
         if (boostTrail) {
@@ -711,7 +657,13 @@ export class ReplayPlayer extends EventTarget {
         if (boostMeter) {
           boostMeter.group.visible = false;
         }
-        this.updateDemoIndicator(player.id, demoIndicator ?? null, null, activeDemoEvent);
+        updateDemoIndicator({
+          indicator: demoIndicator ?? null,
+          fallbackPosition: null,
+          demoEvent: activeDemoEvent,
+          currentTime: this.currentTime,
+          camera: this.sceneState.camera,
+        });
         renderPlayers.push({
           track: player,
           mesh,
@@ -732,12 +684,13 @@ export class ReplayPlayer extends EventTarget {
         if (boostMeter) {
           boostMeter.group.visible = false;
         }
-        this.updateDemoIndicator(
-          player.id,
-          demoIndicator ?? null,
-          interpolatedPosition,
-          activeDemoEvent,
-        );
+        updateDemoIndicator({
+          indicator: demoIndicator ?? null,
+          fallbackPosition: interpolatedPosition,
+          demoEvent: activeDemoEvent,
+          currentTime: this.currentTime,
+          camera: this.sceneState.camera,
+        });
         renderPlayers.push({
           track: player,
           mesh,
@@ -759,7 +712,13 @@ export class ReplayPlayer extends EventTarget {
         if (boostMeter) {
           boostMeter.group.visible = false;
         }
-        this.updateDemoIndicator(player.id, demoIndicator ?? null, interpolatedPosition);
+        updateDemoIndicator({
+          indicator: demoIndicator ?? null,
+          fallbackPosition: interpolatedPosition,
+          demoEvent: null,
+          currentTime: this.currentTime,
+          camera: this.sceneState.camera,
+        });
         renderPlayers.push({
           track: player,
           mesh,
@@ -803,13 +762,7 @@ export class ReplayPlayer extends EventTarget {
           frame?.boostActive ??
           nextFrame?.boostActive ??
           false;
-        this.updateBoostTrail(
-          boostTrail,
-          boostActive,
-          boostFraction,
-          this.currentTime,
-          playerIndex,
-        );
+        updateBoostTrail(boostTrail, boostActive, boostFraction, this.currentTime, playerIndex);
       }
 
       if (boostMeter) {
@@ -853,7 +806,8 @@ export class ReplayPlayer extends EventTarget {
       frameIndex,
       attachedPlayerUnavailable:
         this.attachedPlayerId !== null &&
-        this.getActiveDemoEvent(this.attachedPlayerId, this.currentTime) !== null,
+        getActiveDemoEvent(this.replay.timelineEvents, this.attachedPlayerId, this.currentTime) !==
+          null,
       ballPosition,
       desiredCameraPosition: this.desiredCameraPosition,
       desiredLookTarget: this.desiredLookTarget,
@@ -896,21 +850,17 @@ export class ReplayPlayer extends EventTarget {
       return false;
     }
 
-    const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
-    const frame = this.replay.frames[frameIndex];
-    if (!frame || !isKickoffFrame(frame, this.kickoffGameState)) {
-      return false;
-    }
-
-    const nextLiveFrame = this.replay.frames.find(
-      (candidate, index) =>
-        index > frameIndex && isLiveGameplayFrame(candidate, this.liveGameState),
+    const targetTime = getKickoffSkipTargetTime(
+      this.replay,
+      this.currentTime,
+      this.liveGameState,
+      this.kickoffGameState,
     );
-    if (!nextLiveFrame || nextLiveFrame.time === this.currentTime) {
+    if (targetTime === null) {
       return false;
     }
 
-    this.currentTime = nextLiveFrame.time;
+    this.currentTime = targetTime;
     if (this.playing) {
       this.reanchorPlaybackClock(now);
     }
@@ -922,64 +872,17 @@ export class ReplayPlayer extends EventTarget {
       return false;
     }
 
-    const frameIndex = findFrameIndexAtTime(this.replay, this.currentTime);
-    const frame = this.replay.frames[frameIndex];
-    if (
-      !frame ||
-      !isPostGoalTransitionFrame(
-        this.replay,
-        frame,
-        frameIndex,
-        this.liveGameState,
-        this.kickoffGameState,
-      )
-    ) {
-      return false;
-    }
-
-    const nextFrame = this.replay.frames.find(
-      (candidate, index) =>
-        index > frameIndex &&
-        !isPostGoalTransitionFrame(
-          this.replay,
-          candidate,
-          index,
-          this.liveGameState,
-          this.kickoffGameState,
-        ),
+    const targetTime = getPostGoalTransitionSkipTargetTime(
+      this.replay,
+      this.currentTime,
+      this.liveGameState,
+      this.kickoffGameState,
     );
-    if (!nextFrame) {
-      let startIndex = frameIndex;
-      while (
-        startIndex > 0 &&
-        isPostGoalTransitionFrame(
-          this.replay,
-          this.replay.frames[startIndex - 1],
-          startIndex - 1,
-          this.liveGameState,
-          this.kickoffGameState,
-        )
-      ) {
-        startIndex -= 1;
-      }
-
-      const transitionStartTime = this.replay.frames[startIndex]?.time;
-      if (transitionStartTime === undefined || transitionStartTime === this.currentTime) {
-        return false;
-      }
-
-      this.currentTime = transitionStartTime;
-      if (this.playing) {
-        this.reanchorPlaybackClock(now);
-      }
-      return true;
-    }
-
-    if (nextFrame.time === this.currentTime) {
+    if (targetTime === null) {
       return false;
     }
 
-    this.currentTime = nextFrame.time;
+    this.currentTime = targetTime;
     if (this.playing) {
       this.reanchorPlaybackClock(now);
     }
@@ -1076,113 +979,5 @@ export class ReplayPlayer extends EventTarget {
       entry.plugin.onStateChange?.(pluginStateContext);
     }
     this.dispatchEvent(new CustomEvent<ReplayPlayerState>("change", { detail: state }));
-  }
-
-  private getActiveDemoEvent(
-    victimPlayerId: string,
-    currentTime: number,
-  ): ReplayTimelineEvent | null {
-    for (let index = this.replay.timelineEvents.length - 1; index >= 0; index -= 1) {
-      const event = this.replay.timelineEvents[index]!;
-      const age = currentTime - event.time;
-      if (age < 0) {
-        continue;
-      }
-      if (age > DEMO_INDICATOR_DURATION_SECONDS) {
-        break;
-      }
-      if (event.kind === "demo" && event.secondaryPlayerId === victimPlayerId) {
-        return event;
-      }
-    }
-    return null;
-  }
-
-  private updateDemoIndicator(
-    playerId: string,
-    indicator: DemoIndicator | null,
-    fallbackPosition: Vec3 | null,
-    demoEvent: ReplayTimelineEvent | null = this.getActiveDemoEvent(playerId, this.currentTime),
-  ): void {
-    if (!indicator) {
-      return;
-    }
-
-    const position = demoEvent?.location ?? fallbackPosition;
-    if (!demoEvent || !position) {
-      indicator.group.visible = false;
-      return;
-    }
-
-    const age = Math.max(0, this.currentTime - demoEvent.time);
-    const phase = this.currentTime * 8;
-    const pulse = 1 + 0.08 * Math.sin(phase);
-    indicator.group.visible = true;
-    indicator.group.position.copy(rootPosition(position));
-    indicator.ring.rotation.z = phase * 0.15;
-    indicator.ring.scale.setScalar(pulse);
-    indicator.label.quaternion.copy(this.sceneState.camera.quaternion);
-    indicator.label.scale.setScalar(1 + 0.04 * Math.sin(phase + 1.3));
-
-    const opacity = THREE.MathUtils.clamp(1 - age / DEMO_INDICATOR_DURATION_SECONDS, 0.28, 1);
-    for (const node of [indicator.ring, indicator.label]) {
-      const material = node.material;
-      if (material instanceof THREE.Material) {
-        material.opacity = opacity;
-      }
-    }
-  }
-
-  private updateBoostTrail(
-    boostTrail: THREE.Group,
-    boostActive: boolean,
-    boostFraction: number,
-    time: number,
-    playerIndex: number,
-  ): void {
-    if (!boostActive) {
-      boostTrail.visible = false;
-      return;
-    }
-
-    boostTrail.visible = true;
-
-    const phase = time * 36 + playerIndex * 1.7;
-    const pulse = 0.86 + 0.14 * Math.sin(phase);
-    const intensity = THREE.MathUtils.clamp(0.62 + boostFraction * 0.88, 0.62, 1.5);
-    const lengthScale = intensity * (1.02 + pulse * 0.52);
-    const widthScale = 1.02 + intensity * 0.28;
-    boostTrail.scale.set(lengthScale, widthScale, widthScale);
-
-    for (const [index, child] of boostTrail.children.entries()) {
-      const plume = child as THREE.Group;
-      const plumePulse = 0.92 + 0.14 * Math.sin(phase + index * 0.85);
-      plume.scale.setScalar(plumePulse);
-
-      plume.traverse((node: THREE.Object3D) => {
-        if (!(node instanceof THREE.Mesh)) {
-          return;
-        }
-
-        const material = node.material;
-        if (!(material instanceof THREE.MeshBasicMaterial)) {
-          return;
-        }
-
-        switch (node.name) {
-          case "outer-flame":
-            material.opacity = 0.24 + intensity * 0.24;
-            break;
-          case "inner-flame":
-            material.opacity = 0.58 + intensity * 0.3;
-            break;
-          case "glow":
-            material.opacity = 0.4 + intensity * 0.26;
-            break;
-          default:
-            break;
-        }
-      });
-    }
   }
 }
