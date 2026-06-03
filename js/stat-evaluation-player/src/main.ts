@@ -1,15 +1,9 @@
 import "./styles.css";
-import {
-  createBallchasingOverlayPlugin,
-  createBoostPickupAnimationPlugin,
-  createCanvasRecorderPlugin,
-  createTimelineOverlayPlugin,
-  timelineEventSeekTime,
-  ReplayPlayer,
-} from "@rlrml/player";
+import { timelineEventSeekTime } from "@rlrml/player";
 import type {
   BoostPickupAnimationPickup,
   CanvasRecorderPlugin,
+  ReplayPlayer,
   ReplayTimelineEvent,
   ReplayPlayerState,
   TimelineOverlayPlugin,
@@ -21,7 +15,6 @@ import { createCameraControlsController, type CameraControlsController } from ".
 import { createStatModules } from "./statModules.ts";
 import type { StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
-import { applyConfigAdapterSnapshot } from "./configAdapters.ts";
 import type { StatsFrameLookup, StatsTimeline } from "./statsTimeline.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
 import {
@@ -53,10 +46,10 @@ import {
 import { formatReplayLoadProgress, type ReplayLoadBundle } from "./replayLoader.ts";
 import {
   createFileReplaySource,
-  createRemoteReplaySource,
   loadReplayBundleFromSource,
   type ReplayInputSource,
 } from "./replaySources.ts";
+import { loadReplayBundleForDisplay as loadReplayBundleForDisplayRuntime } from "./replayDisplayRuntime.ts";
 import {
   createRecordingWindowController,
   type RecordingWindowController,
@@ -71,41 +64,25 @@ import {
 } from "./playbackReadouts.ts";
 import { installMountEventListeners } from "./mountEventListeners.ts";
 import { createActiveModulesRuntime } from "./activeModulesRuntime.ts";
-import {
-  getMechanicsReviewMechanicKind,
-  getMechanicsReviewUrlFromLocation,
-  type MechanicsReviewItem,
-} from "./mechanicsReview.ts";
+import { getMechanicsReviewMechanicKind, type MechanicsReviewItem } from "./mechanicsReview.ts";
 import { createMechanicsReviewReplayLoadsController } from "./mechanicsReviewReplayLoads.ts";
 import {
   createMechanicsReviewWindowController,
   type MechanicsReviewWindowController,
 } from "./mechanicsReviewWindow.ts";
-import { getReplayFetchRequestFromSearch, type ReplayFetchRequest } from "./replayUrl.ts";
+import { installInitialReplayLoads } from "./initialReplayLoads.ts";
 import {
   getStatsPlayerConfigParamSnapshot,
   getStatsPlayerConfigFromLocation,
   isStatsPlayerConfigDebugEnabled,
-  setStatsPlayerConfigOnUrl,
-  type PlayerCameraConfig,
-  type PlayerPlaybackConfig,
-  type RecordingConfig,
-  type SingletonWindowId,
   type StatsPlayerConfig,
-  type StatsPlayerConfigParamSnapshot,
-  type StatsWindowConfig,
   type StatsWindowKind,
   type WindowPlacementConfig,
 } from "./playerConfig.ts";
-import {
-  getCameraConfigSnapshot as getCameraConfigSnapshotFromRuntime,
-  getConfigAdapters,
-  getModuleConfigSnapshot as getModuleConfigSnapshotFromRuntime,
-  getPlaybackConfigSnapshot as getPlaybackConfigSnapshotFromRuntime,
-  getReplayPlayerStatePatchFromConfig,
-  getStatsPlayerConfigSnapshot as getStatsPlayerConfigSnapshotFromRuntime,
-  logStatsPlayerConfigLoadDebug,
-} from "./playerConfigRuntime.ts";
+import { logStatsPlayerConfigLoadDebug } from "./playerConfigRuntime.ts";
+import { createPlaybackActionController } from "./playbackActions.ts";
+import { createPlayerConfigBindings, type PlayerConfigBindings } from "./playerConfigBindings.ts";
+import { createWindowCommandController } from "./windowCommands.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -177,6 +154,30 @@ const activeModulesRuntime = createActiveModulesRuntime({
   requestConfigSync: scheduleConfigUrlUpdate,
 });
 
+const playbackActions = createPlaybackActionController({
+  goalWatchLeadSeconds: GOAL_WATCH_LEAD_SECONDS,
+  getReplayPlayer: () => replayPlayer,
+  getCameraControlsController: () => cameraControlsController,
+  getMechanicsReviewController: () => mechanicsReviewController,
+  getSkipPostGoalTransitions: () => skipPostGoalTransitions,
+  getSkipKickoffs: () => skipKickoffs,
+  syncBoostPadOverlayPlugin,
+  setupActiveModules,
+  renderModuleSummary,
+  renderModuleSettings,
+  renderStatsWindows(frameIndex) {
+    renderStatsWindows(frameIndex);
+  },
+  scheduleConfigUrlUpdate,
+});
+
+const windowCommands = createWindowCommandController({
+  getFloatingWindowController: () => floatingWindowController,
+  getLauncherMenu: () => launcherMenu,
+  getLauncherToggle: () => launcherToggle,
+  getFileInput: () => fileInput,
+});
+
 export interface StatEvaluationPlayerHandle {
   readonly root: HTMLElement;
   destroy(): void;
@@ -229,10 +230,9 @@ let mechanicsReviewController: MechanicsReviewWindowController | null = null;
 let floatingWindowController: FloatingWindowController | null = null;
 let scoreboardWindowController: ScoreboardWindowController | null = null;
 let playbackReadoutsController: PlaybackReadoutsController | null = null;
+let configBindings: PlayerConfigBindings | null = null;
 let loadedReplayName: string | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
-let isApplyingConfig = false;
-let configUrlUpdateTimer: number | null = null;
 
 function getActiveCapabilityIds(kind: ModuleCapabilityKind): ReadonlySet<string> {
   return activeModulesRuntime.getActiveCapabilityIds(kind);
@@ -321,10 +321,6 @@ function mustElement<T extends HTMLElement>(root: ParentNode, selector: string):
   return element as T;
 }
 
-function getElementWindowId(element: HTMLElement): string | null {
-  return element.closest<HTMLElement>("[data-window-id]")?.dataset.windowId ?? null;
-}
-
 function readWindowPlacement(windowEl: HTMLElement): WindowPlacementConfig {
   if (!floatingWindowController) {
     throw new Error("Floating windows are not initialized.");
@@ -334,22 +330,6 @@ function readWindowPlacement(windowEl: HTMLElement): WindowPlacementConfig {
 
 function applyWindowPlacement(windowEl: HTMLElement, placement: WindowPlacementConfig): void {
   floatingWindowController?.applyPlacement(windowEl, placement);
-}
-
-function getSingletonWindowConfigs() {
-  return floatingWindowController?.getSingletonConfigs() ?? [];
-}
-
-function getModuleConfigSnapshot(): Record<string, unknown> {
-  return getModuleConfigSnapshotFromRuntime(MODULES);
-}
-
-function applyModuleConfigSnapshot(configs: Record<string, unknown>): void {
-  applyConfigAdapterSnapshot(getConfigAdapters(MODULES), configs);
-}
-
-function getStatsWindowConfigs(): StatsWindowConfig[] {
-  return statsWindowsController?.getConfigs() ?? [];
 }
 
 function renderStatsWindows(
@@ -363,152 +343,16 @@ function createStatsWindow(kind: StatsWindowKind): void {
   statsWindowsController?.create(kind);
 }
 
-function replaceStatsWindowsFromConfig(configs: readonly StatsWindowConfig[]): void {
-  statsWindowsController?.replaceFromConfig(configs);
-}
-
 function clearStatsWindows(): void {
   statsWindowsController?.clear();
 }
 
-function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {
-  return getPlaybackConfigSnapshotFromRuntime({
-    replayPlayer,
-    playbackRate,
-    skipPostGoalTransitions,
-    skipKickoffs,
-  });
-}
-
-function getCameraConfigSnapshot(): PlayerCameraConfig {
-  return getCameraConfigSnapshotFromRuntime({
-    replayPlayer,
-    cameraControlsController,
-  });
-}
-
-function getRecordingConfigSnapshot(): RecordingConfig {
-  return recordingWindowController?.getConfigSnapshot() ?? {};
-}
-
-function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
-  return getStatsPlayerConfigSnapshotFromRuntime({
-    playback: getPlaybackConfigSnapshot(),
-    camera: getCameraConfigSnapshot(),
-    activeTimelineEventSourceIds: activeModulesRuntime.getActiveTimelineEventSourceIds(),
-    activeTimelineRangeModuleIds: activeModulesRuntime.getActiveTimelineRangeModuleIds(),
-    activeMechanicTimelineKinds: activeModulesRuntime.getActiveMechanicTimelineKinds(),
-    activeRenderEffectModuleIds: activeModulesRuntime.getActiveRenderEffectModuleIds(),
-    initialConfig: initialUrlConfig,
-    replayPlayer,
-    boostPadOverlayEnabled: activeModulesRuntime.getBoostPadOverlayEnabled(),
-    recording: getRecordingConfigSnapshot(),
-    singletonWindows: getSingletonWindowConfigs(),
-    statsWindows: getStatsWindowConfigs(),
-    moduleConfigs: getModuleConfigSnapshot(),
-  });
-}
-
 function scheduleConfigUrlUpdate(): void {
-  if (isApplyingConfig) {
-    return;
-  }
-  if (configUrlUpdateTimer !== null) {
-    window.clearTimeout(configUrlUpdateTimer);
-  }
-  configUrlUpdateTimer = window.setTimeout(() => {
-    configUrlUpdateTimer = null;
-    const nextUrl = setStatsPlayerConfigOnUrl(
-      new URL(window.location.href),
-      getStatsPlayerConfigSnapshot(),
-    );
-    window.history.replaceState(window.history.state, "", nextUrl);
-  }, 150);
-}
-
-function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
-  floatingWindowController?.applySingletonConfigs(config.singletonWindows);
+  configBindings?.scheduleConfigUrlUpdate();
 }
 
 function applyConfigToStaticControls(config: StatsPlayerConfig): void {
-  activeModulesRuntime.applyOverlayConfig(config.overlays);
-  skipPostGoalTransitions.checked =
-    config.playback.skipPostGoalTransitions ?? skipPostGoalTransitions.checked;
-  skipKickoffs.checked = config.playback.skipKickoffs ?? skipKickoffs.checked;
-  hitboxWireframes.checked = config.overlays.hitboxWireframes;
-  if (config.playback.rate !== undefined) {
-    playbackRate.value = `${config.playback.rate}`;
-  }
-  recordingWindowController?.applyConfig(config.recording);
-  applyModuleConfigSnapshot(config.moduleConfigs);
-  applyConfigToExistingWindows(config);
-  replaceStatsWindowsFromConfig(config.statsWindows);
-  renderModuleSummary();
-  renderModuleSettings();
-  renderTimelineEventCount();
-}
-
-function watchGoalReplay(time: number, scorerId: string | null): void {
-  if (!replayPlayer || !Number.isFinite(time)) {
-    return;
-  }
-
-  mechanicsReviewController?.clearCurrentClip();
-
-  const canFollowScorer =
-    scorerId !== null && replayPlayer.replay.players.some((player) => player.id === scorerId);
-  if (canFollowScorer) {
-    replayPlayer.setAttachedPlayer(scorerId);
-    replayPlayer.setCameraViewMode("follow");
-    if (cameraControlsController) {
-      cameraControlsController.freeCameraPreset = null;
-    }
-  }
-
-  skipPostGoalTransitions.checked = false;
-  skipKickoffs.checked = false;
-  replayPlayer.setState({
-    currentTime: Math.max(0, time - GOAL_WATCH_LEAD_SECONDS),
-    playing: true,
-    skipPostGoalTransitionsEnabled: false,
-    skipKickoffsEnabled: false,
-  });
-  scheduleConfigUrlUpdate();
-}
-
-function cueGoalReplay(time: number): void {
-  if (!replayPlayer || !Number.isFinite(time)) {
-    return;
-  }
-
-  mechanicsReviewController?.clearCurrentClip();
-
-  skipPostGoalTransitions.checked = false;
-  skipKickoffs.checked = false;
-  replayPlayer.setState({
-    currentTime: Math.max(0, time - GOAL_WATCH_LEAD_SECONDS),
-    playing: false,
-    skipPostGoalTransitionsEnabled: false,
-    skipKickoffsEnabled: false,
-  });
-  scheduleConfigUrlUpdate();
-}
-
-function cueTimelineEvent(event: ReplayTimelineEvent): void {
-  if (!replayPlayer) {
-    return;
-  }
-
-  mechanicsReviewController?.clearCurrentClip();
-
-  skipPostGoalTransitions.checked = false;
-  skipKickoffs.checked = false;
-  replayPlayer.setState({
-    currentTime: timelineEventSeekTime(event),
-    skipPostGoalTransitionsEnabled: false,
-    skipKickoffsEnabled: false,
-  });
-  scheduleConfigUrlUpdate();
+  configBindings?.applyConfigToStaticControls(config);
 }
 
 function withTimelineEventSeekTimes(events: ReplayTimelineEvent[]): ReplayTimelineEvent[] {
@@ -516,57 +360,6 @@ function withTimelineEventSeekTimes(events: ReplayTimelineEvent[]): ReplayTimeli
     ...event,
     seekTime: timelineEventSeekTime(event),
   }));
-}
-
-function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
-  if (!replayPlayer) {
-    return;
-  }
-  replayPlayer.setState(
-    getReplayPlayerStatePatchFromConfig(config.playback, config.camera, config),
-  );
-  if (cameraControlsController) {
-    cameraControlsController.freeCameraPreset = config.camera.freePreset ?? null;
-  }
-  if (config.camera.mode === "free" && config.camera.freePreset) {
-    replayPlayer.setFreeCameraPreset(config.camera.freePreset);
-  }
-  syncBoostPadOverlayPlugin();
-  setupActiveModules();
-  renderModuleSummary();
-  renderModuleSettings();
-  renderStatsWindows(replayPlayer.getState().frameIndex);
-}
-
-function bringWindowToFront(windowEl: HTMLElement): void {
-  floatingWindowController?.bringToFront(windowEl);
-}
-
-function showWindow(id: SingletonWindowId): void {
-  floatingWindowController?.show(id);
-}
-
-function toggleWindow(id: SingletonWindowId): void {
-  floatingWindowController?.toggle(id);
-}
-
-function hideWindow(id: string): void {
-  floatingWindowController?.hide(id);
-}
-
-function setLauncherOpen(open: boolean): void {
-  launcherMenu.hidden = !open;
-  launcherToggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
-  launcherToggle.setAttribute("aria-expanded", open ? "true" : "false");
-}
-
-function openReplayFilePicker(): void {
-  fileInput.click();
-  setLauncherOpen(false);
-}
-
-function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
-  floatingWindowController?.installDragging(root, signal);
 }
 
 function renderModuleSummary(): void {
@@ -669,150 +462,79 @@ async function loadReplayBundleForDisplay(
   source: ReplayInputSource,
   bundlePromise: Promise<ReplayLoadBundle>,
 ): Promise<void> {
-  statusReadout.textContent = source.preparingStatus;
-  fileInput.disabled = true;
-  replayLoadModal?.show(source.name, source.preparingStatus);
-  setTransportEnabled(false);
-  cameraControlsController?.syncAvailability();
-  emptyState.hidden = false;
-
-  if (unsubscribe) {
-    unsubscribe();
-    unsubscribe = null;
-  }
-
-  teardownActiveModules();
-  replayPlayer?.destroy();
-  replayPlayer = null;
-  canvasRecorder = null;
-  loadedReplayName = null;
-  timelineOverlay = null;
-  statsTimeline = null;
-  statsFrameLookup = null;
-  statRegistry = createStatRegistry(null);
-  clearTimelineEventSources();
-  clearTimelineRangeSources();
-  clearStandalonePlugins();
-  clearRenderCaches();
-  resetEventPlaylistWindow();
-  renderScoreboard();
-  renderTimelineEventCount();
-  renderMechanicsTimelineControls();
-  renderEventPlaylistWindow();
-  renderModuleSettings();
-  syncRecordingWindow();
-
-  try {
-    statusReadout.textContent = "Parsing replay...";
-    replayLoadModal?.show(source.name, "Parsing replay...");
-    const loadedReplay = await bundlePromise;
-    const { replay } = loadedReplay;
-    statsTimeline = loadedReplay.statsTimeline;
-    statsFrameLookup = loadedReplay.statsFrameLookup;
-    statRegistry = createStatRegistry(null);
-    migrateMechanicBackedTimelineEventSelections();
-
-    timelineOverlay = createTimelineOverlayPlugin({
-      replayEventsLabel: "Replay",
-      replayEvents: (context) =>
-        withTimelineEventSeekTimes(
-          filterReplayTimelineEvents(
-            context.replay,
-            activeModulesRuntime.getActiveTimelineEventSourceIds(),
-          ),
-        ),
-    });
-    const recorder = createCanvasRecorderPlugin({
-      onStatusChange: syncRecordingWindow,
-    });
-    canvasRecorder = recorder;
-    const config = initialUrlConfig;
-
-    replayPlayer = new ReplayPlayer(viewport, replay, {
-      initialPlaybackRate: config?.playback.rate,
-      initialCameraDistanceScale: config?.camera.distanceScale ?? DEFAULT_CAMERA_DISTANCE_SCALE,
-      initialCustomCameraSettings: config?.camera.customSettings ?? null,
-      initialAttachedPlayerId: config?.camera.attachedPlayerId ?? null,
-      initialCameraViewMode: config?.camera.mode,
-      initialBallCamEnabled: config?.camera.ballCam ?? false,
-      initialBoostPickupAnimationEnabled: config?.overlays.boostPickupAnimation ?? false,
-      initialHitboxWireframesEnabled: config?.overlays.hitboxWireframes ?? hitboxWireframes.checked,
-      initialSkipPostGoalTransitionsEnabled: skipPostGoalTransitions.checked,
-      initialSkipKickoffsEnabled: skipKickoffs.checked,
-      plugins: [
-        createBallchasingOverlayPlugin(),
-        createBoostPickupAnimationPlugin({
-          includePickup: includeBoostPickupAnimationPickup,
-        }),
-        recorder,
-        timelineOverlay,
-      ],
-    });
-    syncBoostPadOverlayPlugin();
-
-    setupActiveModules();
-    unsubscribe = replayPlayer.subscribe(renderSnapshot);
-    if (config) {
-      isApplyingConfig = true;
-      try {
-        applyConfigToReplayPlayer(config);
-      } finally {
-        isApplyingConfig = false;
-      }
-    }
-
-    cameraControlsController?.populateAttachedPlayerOptions(replay.players);
-    emptyState.hidden = true;
-    statusReadout.textContent = `Loaded ${source.name}`;
-    loadedReplayName = source.name;
-    playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
-    framesReadout.textContent = `${replay.frameCount}`;
-    renderTimelineEventCount();
-    renderMechanicsTimelineControls();
-    resetEventPlaylistWindow();
-    renderEventPlaylistWindow();
-    setTransportEnabled(true);
-    cameraControlsController?.syncAvailability(replayPlayer.getState());
-    renderSnapshot(replayPlayer.getState());
-    renderStatsWindows(replayPlayer.getState().frameIndex);
-    renderScoreboard(replayPlayer.getState().frameIndex);
-    syncEventPlaylistTimeline(replayPlayer.getState(), { forceScroll: true });
-    renderModuleSettings();
-    syncRecordingWindow();
-    replayLoadModal?.hide();
-  } catch (error) {
-    replayLoadModal?.hide();
-    replayPlayer?.destroy();
-    replayPlayer = null;
-    canvasRecorder = null;
-    syncRecordingWindow();
-    throw error;
-  } finally {
-    fileInput.disabled = false;
-  }
-}
-
-function loadReplayFromLocation(signal: AbortSignal): void {
-  let replayRequest: ReplayFetchRequest | null;
-  try {
-    replayRequest = getReplayFetchRequestFromSearch(window.location.search, window.location.href);
-  } catch (error) {
-    console.error("Invalid replay URL:", error);
-    statusReadout.textContent = error instanceof Error ? error.message : "Invalid replay URL";
-    return;
-  }
-
-  if (!replayRequest) {
-    return;
-  }
-
-  void loadReplay(createRemoteReplaySource(replayRequest, signal)).catch((error) => {
-    if (signal.aborted) {
-      return;
-    }
-    console.error("Failed to load replay URL:", error);
-    statusReadout.textContent =
-      error instanceof Error ? error.message : "Failed to load replay URL";
+  await loadReplayBundleForDisplayRuntime(source, bundlePromise, {
+    elements: {
+      fileInput,
+      viewport,
+      emptyState,
+      statusReadout,
+      playersReadout,
+      framesReadout,
+      skipPostGoalTransitions,
+      skipKickoffs,
+      hitboxWireframes,
+    },
+    defaultCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
+    getReplayLoadModal: () => replayLoadModal,
+    getReplayPlayer: () => replayPlayer,
+    setReplayPlayer(value) {
+      replayPlayer = value;
+    },
+    getUnsubscribe: () => unsubscribe,
+    setUnsubscribe(value) {
+      unsubscribe = value;
+    },
+    setCanvasRecorder(value) {
+      canvasRecorder = value;
+    },
+    setLoadedReplayName(value) {
+      loadedReplayName = value;
+    },
+    setTimelineOverlay(value) {
+      timelineOverlay = value;
+    },
+    setStatsTimeline(value) {
+      statsTimeline = value;
+    },
+    setStatsFrameLookup(value) {
+      statsFrameLookup = value;
+    },
+    setStatRegistry(value) {
+      statRegistry = value;
+    },
+    getInitialConfig: () => initialUrlConfig,
+    setApplyingConfig(value) {
+      configBindings?.setApplyingConfig(value);
+    },
+    getReplayTimelineEvents(replay) {
+      return filterReplayTimelineEvents(
+        replay,
+        activeModulesRuntime.getActiveTimelineEventSourceIds(),
+      );
+    },
+    withTimelineEventSeekTimes,
+    includeBoostPickupAnimationPickup,
+    syncRecordingWindow,
+    setTransportEnabled,
+    teardownActiveModules,
+    clearTimelineEventSources,
+    clearTimelineRangeSources,
+    clearStandalonePlugins,
+    clearRenderCaches,
+    resetEventPlaylistWindow,
+    renderScoreboard,
+    renderTimelineEventCount,
+    renderMechanicsTimelineControls,
+    renderEventPlaylistWindow,
+    renderModuleSettings,
+    migrateMechanicBackedTimelineEventSelections,
+    syncBoostPadOverlayPlugin,
+    setupActiveModules,
+    renderSnapshot,
+    applyConfigToReplayPlayer: playbackActions.applyConfigToReplayPlayer,
+    renderStatsWindows,
+    syncEventPlaylistTimeline,
+    getCameraControlsController: () => cameraControlsController,
   });
 }
 
@@ -872,7 +594,7 @@ export function mountStatEvaluationPlayer(
     body: eventPlaylistWindowBody,
     getReplayPlayer: () => replayPlayer,
     getSources: getEventPlaylistSourcesForWindow,
-    cueTimelineEvent,
+    cueTimelineEvent: playbackActions.cueTimelineEvent,
     formatTime,
   });
   replayLoadingSummary = mustElement<HTMLElement>(root, "#replay-loading-summary");
@@ -929,7 +651,7 @@ export function mountStatEvaluationPlayer(
     activateTimelineSource: activateMechanicsReviewTimelineSource,
     loadReplayBundleForDisplay,
     showReplayLoadingWindow() {
-      showWindow("replay-loading");
+      windowCommands.showWindow("replay-loading");
     },
   });
   const boostPickupFiltersWindowBody = mustElement<HTMLDivElement>(
@@ -946,11 +668,11 @@ export function mountStatEvaluationPlayer(
     getStatRegistry: () => statRegistry,
     readWindowPlacement,
     applyWindowPlacement,
-    bringWindowToFront,
-    setLauncherOpen,
+    bringWindowToFront: windowCommands.bringWindowToFront,
+    setLauncherOpen: windowCommands.setLauncherOpen,
     requestConfigSync: scheduleConfigUrlUpdate,
-    watchGoalReplay,
-    cueGoalReplay,
+    watchGoalReplay: playbackActions.watchGoalReplay,
+    cueGoalReplay: playbackActions.cueGoalReplay,
   });
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
@@ -1079,6 +801,23 @@ export function mountStatEvaluationPlayer(
     },
     requestConfigSync: scheduleConfigUrlUpdate,
   });
+  configBindings = createPlayerConfigBindings({
+    modules: MODULES,
+    playbackRate,
+    skipPostGoalTransitions,
+    skipKickoffs,
+    hitboxWireframes,
+    getReplayPlayer: () => replayPlayer,
+    getCameraControlsController: () => cameraControlsController,
+    getRecordingWindowController: () => recordingWindowController,
+    getFloatingWindowController: () => floatingWindowController,
+    getStatsWindowsController: () => statsWindowsController,
+    getActiveModulesRuntime: () => activeModulesRuntime,
+    getInitialConfig: () => initialUrlConfig,
+    renderModuleSummary,
+    renderModuleSettings,
+    renderTimelineEventCount,
+  });
 
   const configParamSnapshot = getStatsPlayerConfigParamSnapshot(window.location);
   const configDebugEnabled = isStatsPlayerConfigDebugEnabled(window.location);
@@ -1101,8 +840,8 @@ export function mountStatEvaluationPlayer(
   }
 
   const listeners = new AbortController();
-  installWindowDragging(floatingWindowLayer, listeners.signal);
-  installWindowDragging(statsWindowLayer, listeners.signal);
+  windowCommands.installWindowDragging(floatingWindowLayer, listeners.signal);
+  windowCommands.installWindowDragging(statsWindowLayer, listeners.signal);
   const cleanup = () => {
     listeners.abort();
     unsubscribe?.();
@@ -1132,11 +871,8 @@ export function mountStatEvaluationPlayer(
     scoreboardWindowController = null;
     playbackReadoutsController = null;
     initialUrlConfig = null;
-    if (configUrlUpdateTimer !== null) {
-      window.clearTimeout(configUrlUpdateTimer);
-      configUrlUpdateTimer = null;
-    }
-    isApplyingConfig = false;
+    configBindings?.reset();
+    configBindings = null;
     floatingWindowController?.reset();
     floatingWindowController = null;
     if (appRoot === root) {
@@ -1150,11 +886,11 @@ export function mountStatEvaluationPlayer(
   currentMountCleanup = cleanup;
 
   if (initialUrlConfig) {
-    isApplyingConfig = true;
+    configBindings?.setApplyingConfig(true);
     try {
       applyConfigToStaticControls(initialUrlConfig);
     } finally {
-      isApplyingConfig = false;
+      configBindings?.setApplyingConfig(false);
     }
   }
 
@@ -1173,11 +909,11 @@ export function mountStatEvaluationPlayer(
       hitboxWireframes,
     },
     signal: listeners.signal,
-    setLauncherOpen,
-    openReplayFilePicker,
-    getElementWindowId,
-    toggleWindow,
-    hideWindow,
+    setLauncherOpen: windowCommands.setLauncherOpen,
+    openReplayFilePicker: windowCommands.openReplayFilePicker,
+    getElementWindowId: windowCommands.getElementWindowId,
+    toggleWindow: windowCommands.toggleWindow,
+    hideWindow: windowCommands.hideWindow,
     createStatsWindow,
     async loadReplayFile(file) {
       try {
@@ -1224,44 +960,20 @@ export function mountStatEvaluationPlayer(
   renderTimelineEventCount();
   mechanicsReviewController?.render();
   renderEventPlaylistWindow();
-  if (options.initialBundle) {
-    void loadReplayBundleForDisplay(
-      {
-        name: options.initialReplayName ?? "replay",
-        preparingStatus: "Preparing replay...",
-        async readBytes() {
-          throw new Error("Replay bytes are not available for this preloaded replay");
-        },
-      },
-      Promise.resolve(options.initialBundle),
-    ).catch((error) => {
-      if (listeners.signal.aborted) {
-        return;
-      }
-      console.error("Failed to load preprocessed replay bundle:", error);
-      statusReadout.textContent =
-        error instanceof Error ? error.message : "Failed to load preprocessed replay bundle";
-    });
-  } else if (options.loadFromLocation !== false) {
-    loadReplayFromLocation(listeners.signal);
-  }
-
-  const reviewUrl = getMechanicsReviewUrlFromLocation();
-  if (reviewUrl) {
-    mechanicsReviewController?.setUrl(reviewUrl);
-    showWindow("mechanics-review");
-    void mechanicsReviewController?.loadPlaylistFromUrl(reviewUrl).catch((error) => {
-      if (listeners.signal.aborted) {
-        return;
-      }
-      console.error("Failed to load mechanics review playlist from URL:", error);
-      mechanicsReviewController?.setStatus(
-        error instanceof Error
-          ? error.message
-          : "Failed to load mechanics review playlist from URL",
-      );
-    });
-  }
+  installInitialReplayLoads({
+    signal: listeners.signal,
+    location: window.location,
+    statusReadout,
+    initialBundle: options.initialBundle,
+    initialReplayName: options.initialReplayName,
+    loadFromLocation: options.loadFromLocation,
+    loadReplay,
+    loadReplayBundleForDisplay,
+    getMechanicsReviewController: () => mechanicsReviewController,
+    showMechanicsReviewWindow() {
+      windowCommands.showWindow("mechanics-review");
+    },
+  });
 
   return {
     root,
