@@ -155,6 +155,8 @@ pub mod territorial_pressure;
 pub use territorial_pressure::*;
 pub mod touch;
 pub use touch::*;
+pub mod touch_stats;
+pub use touch_stats::*;
 pub mod touch_state;
 pub use touch_state::*;
 pub mod wall_aerial;
