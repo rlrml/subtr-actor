@@ -2,25 +2,10 @@ use super::*;
 
 const DEMO_REPEAT_FRAME_WINDOW: usize = 8;
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct DemoPlayerStats {
-    pub demos_inflicted: u32,
-    pub demos_taken: u32,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct DemoTeamStats {
-    pub demos_inflicted: u32,
-}
-
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DemoCalculator {
-    player_stats: HashMap<PlayerId, DemoPlayerStats>,
+    stats: DemoStatsAccumulator,
     player_teams: HashMap<PlayerId, bool>,
-    team_zero_stats: DemoTeamStats,
-    team_one_stats: DemoTeamStats,
     timeline: EventStream<TimelineEvent>,
     last_seen_frame: HashMap<(PlayerId, PlayerId), usize>,
     active_pairs: HashSet<(PlayerId, PlayerId)>,
@@ -32,15 +17,15 @@ impl DemoCalculator {
     }
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, DemoPlayerStats> {
-        &self.player_stats
+        self.stats.player_stats()
     }
 
     pub fn team_zero_stats(&self) -> &DemoTeamStats {
-        &self.team_zero_stats
+        self.stats.team_zero_stats()
     }
 
     pub fn team_one_stats(&self) -> &DemoTeamStats {
-        &self.team_one_stats
+        self.stats.team_one_stats()
     }
 
     pub fn timeline(&self) -> &[TimelineEvent] {
@@ -142,37 +127,27 @@ impl DemoCalculator {
             return;
         }
 
-        self.player_stats
-            .entry(attacker.clone())
-            .or_default()
-            .demos_inflicted += 1;
-        self.player_stats
-            .entry(victim.clone())
-            .or_default()
-            .demos_taken += 1;
-
-        match self.player_teams.get(attacker).copied() {
-            Some(true) => self.team_zero_stats.demos_inflicted += 1,
-            Some(false) => self.team_one_stats.demos_inflicted += 1,
-            None => {}
-        }
-
-        self.timeline.push(TimelineEvent {
+        let kill_event = TimelineEvent {
             time,
             frame: Some(frame_number),
             kind: TimelineEventKind::Kill,
             player_id: Some(attacker.clone()),
             player_position: attacker_position,
             is_team_0: self.player_teams.get(attacker).copied(),
-        });
-        self.timeline.push(TimelineEvent {
+        };
+        self.stats.apply_timeline_event(&kill_event);
+        self.timeline.push(kill_event);
+
+        let death_event = TimelineEvent {
             time,
             frame: Some(frame_number),
             kind: TimelineEventKind::Death,
             player_id: Some(victim.clone()),
             player_position: victim_position,
             is_team_0: self.player_teams.get(victim).copied(),
-        });
+        };
+        self.stats.apply_timeline_event(&death_event);
+        self.timeline.push(death_event);
     }
 }
 
