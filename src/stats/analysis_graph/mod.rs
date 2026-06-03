@@ -86,6 +86,7 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "player_vertical_state",
     "demo",
     "settings",
+    "stats_projection",
     "stats_timeline_frame",
     "stats_timeline_events",
 ];

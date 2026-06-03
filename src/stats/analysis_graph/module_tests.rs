@@ -163,9 +163,6 @@ fn every_resolved_shared_graph_node_name_is_directly_callable() {
         .copied()
         .collect::<HashSet<_>>();
     for name in graph.node_names() {
-        if name == "stats_projection" {
-            continue;
-        }
         assert!(
             builtin_names.contains(name),
             "resolved shared graph node should be callable by name: {name}"

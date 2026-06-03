@@ -993,6 +993,12 @@ pub fn builtin_analysis_node_json(
             .map(serialize_to_json_value)
             .transpose()?
             .unwrap_or(Value::Null),
+        "stats_projection" => {
+            let _ = graph_state::<StatsProjectionState>(graph, node_name)?;
+            json!({
+                "projected_stats_module_names": builtin_stats_module_names(),
+            })
+        }
         "frame_info" => {
             let state = graph_state::<FrameInfo>(graph, node_name)?;
             json!({
