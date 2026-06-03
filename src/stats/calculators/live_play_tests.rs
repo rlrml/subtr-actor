@@ -83,6 +83,7 @@ fn goal_event_enters_post_goal_phase() {
             frame: 1,
             scoring_team_is_team_0: true,
             player: None,
+            player_position: None,
             team_zero_score: None,
             team_one_score: None,
         }],

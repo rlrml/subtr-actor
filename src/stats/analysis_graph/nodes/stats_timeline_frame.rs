@@ -7,6 +7,13 @@ pub struct StatsTimelineFrameState {
     pub frame: Option<ReplayStatsFrame>,
 }
 
+/// Terminal materialization node for the full stats timeline frame export.
+///
+/// This node aggregates many concrete calculator states into the typed
+/// `ReplayStatsFrame` DTO for serialization and UI/client compatibility. It is
+/// not a shared data provider for other analysis nodes; cross-node data flow
+/// should stay on explicit dependencies on the specific upstream calculator or
+/// state node.
 pub struct StatsTimelineFrameNode {
     replay_meta: Option<ReplayMeta>,
     state: StatsTimelineFrameState,

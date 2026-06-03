@@ -72,6 +72,7 @@ fn records_inactive_pickup_without_active_collection() {
                     frame: 1,
                     pad_id: "inactive-small-pad".to_string(),
                     player: Some(player_id.clone()),
+                    player_position: None,
                     kind: BoostPadEventKind::PickedUp { sequence: 1 },
                 }],
                 ..FrameEventsState::default()
@@ -178,6 +179,7 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
                     frame: 3,
                     pad_id: "ledger-small-pad".to_string(),
                     player: Some(player_id.clone()),
+                    player_position: None,
                     kind: BoostPadEventKind::PickedUp { sequence: 1 },
                 }],
                 ..FrameEventsState::default()
@@ -290,6 +292,7 @@ fn demo_reset_does_not_count_removed_boost_as_used() {
                 victim: player_id.clone(),
                 attacker_velocity: glam_to_vec(&glam::Vec3::ZERO),
                 victim_velocity: glam_to_vec(&glam::Vec3::ZERO),
+                attacker_location: None,
                 victim_location: glam_to_vec(&player_position),
             }],
             ..FrameEventsState::default()
@@ -362,6 +365,7 @@ fn counts_reused_pickup_sequence_after_pad_respawn() {
                     frame: 1,
                     pad_id: pad_id.clone(),
                     player: Some(player_id.clone()),
+                    player_position: None,
                     kind: BoostPadEventKind::PickedUp { sequence: 7 },
                 }],
                 ..FrameEventsState::default()
@@ -389,6 +393,7 @@ fn counts_reused_pickup_sequence_after_pad_respawn() {
                     frame: 2,
                     pad_id: pad_id.clone(),
                     player: None,
+                    player_position: None,
                     kind: BoostPadEventKind::Available,
                 }],
                 ..FrameEventsState::default()
@@ -416,6 +421,7 @@ fn counts_reused_pickup_sequence_after_pad_respawn() {
                     frame: 3,
                     pad_id,
                     player: Some(player_id.clone()),
+                    player_position: None,
                     kind: BoostPadEventKind::PickedUp { sequence: 7 },
                 }],
                 ..FrameEventsState::default()
@@ -474,6 +480,7 @@ fn counts_pickup_after_respawn_without_available_event() {
                         frame: frame_number,
                         pad_id: pad_id.clone(),
                         player: Some(player_id.clone()),
+                        player_position: None,
                         kind: BoostPadEventKind::PickedUp { sequence },
                     }],
                     ..FrameEventsState::default()
@@ -520,6 +527,7 @@ fn skips_inactive_pickup_without_observed_boost_gain() {
                     frame: 1,
                     pad_id: "inactive-no-gain-big-pad".to_string(),
                     player: Some(player_id.clone()),
+                    player_position: None,
                     kind: BoostPadEventKind::PickedUp { sequence: 7 },
                 }],
                 ..FrameEventsState::default()
@@ -687,6 +695,7 @@ fn reported_pickup_without_observed_boost_increase_is_emitted_as_counted_pickup(
                     frame: 2,
                     pad_id: "full-boost-small-pad".to_string(),
                     player: Some(player_id.clone()),
+                    player_position: None,
                     kind: BoostPadEventKind::PickedUp { sequence: 1 },
                 }],
                 ..FrameEventsState::default()
@@ -777,6 +786,7 @@ fn matches_two_small_pickups_from_one_observed_boost_increase() {
                         frame: 2,
                         pad_id: "small-pad-one".to_string(),
                         player: Some(player_id.clone()),
+                        player_position: None,
                         kind: BoostPadEventKind::PickedUp { sequence: 1 },
                     },
                     BoostPadEvent {
@@ -784,6 +794,7 @@ fn matches_two_small_pickups_from_one_observed_boost_increase() {
                         frame: 2,
                         pad_id: "small-pad-two".to_string(),
                         player: Some(player_id.clone()),
+                        player_position: None,
                         kind: BoostPadEventKind::PickedUp { sequence: 1 },
                     },
                 ],

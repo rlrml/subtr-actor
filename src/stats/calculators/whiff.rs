@@ -35,6 +35,8 @@ pub struct WhiffEvent {
     pub resolved_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub closest_approach_distance: f32,
     pub forward_alignment: f32,
@@ -72,6 +74,7 @@ struct ActiveWhiffCandidate {
     start_time: f32,
     closest_time: f32,
     closest_frame: usize,
+    closest_position: [f32; 3],
     closest_approach_distance: f32,
     forward_alignment: f32,
     approach_speed: f32,
@@ -206,6 +209,7 @@ impl WhiffCalculator {
             start_time: frame.time,
             closest_time: frame.time,
             closest_frame: frame.frame_number,
+            closest_position: player_position.to_array(),
             closest_approach_distance: distance,
             forward_alignment,
             approach_speed,
@@ -260,6 +264,7 @@ impl WhiffCalculator {
             resolved_time: frame.time,
             resolved_frame: frame.frame_number,
             player: candidate.player.clone(),
+            player_position: Some(candidate.closest_position),
             is_team_0: candidate.is_team_0,
             closest_approach_distance: candidate.closest_approach_distance,
             forward_alignment: candidate.forward_alignment,
@@ -293,6 +298,9 @@ impl WhiffCalculator {
                     candidate.closest_approach_distance = distance;
                     candidate.closest_time = frame.time;
                     candidate.closest_frame = frame.frame_number;
+                    if let Some(position) = player.position() {
+                        candidate.closest_position = position.to_array();
+                    }
                     if let Some(updated) =
                         Self::whiff_candidate(frame, ball_position, ball_velocity, player)
                     {

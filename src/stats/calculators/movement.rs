@@ -30,6 +30,8 @@ pub struct MovementEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub dt: f32,
     pub speed: f32,
@@ -128,6 +130,7 @@ impl MovementCalculator {
                     time: frame.time,
                     frame: frame.frame_number,
                     player: player.player_id.clone(),
+                    player_position: Some(position.to_array()),
                     is_team_0: player.is_team_0,
                     dt: frame.dt,
                     speed,

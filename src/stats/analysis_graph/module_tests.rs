@@ -10,6 +10,7 @@ use crate::{
     PossessionState, RotationCalculator, StatsTimelineCollector, TerritorialPressureCalculator,
     TouchState, WallAerialCalculator, WallAerialShotCalculator,
 };
+use std::any::TypeId;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -78,6 +79,23 @@ fn every_builtin_analysis_node_name_builds() {
         graph
             .resolve()
             .unwrap_or_else(|_| panic!("builtin analysis node should resolve: {name}"));
+    }
+}
+
+#[test]
+fn materialized_timeline_frame_state_is_terminal_export_only() {
+    let materialized_frame_state = TypeId::of::<StatsTimelineFrameState>();
+
+    for node in all_analysis_nodes() {
+        let node_name = node.name();
+        for dependency in node.dependencies() {
+            assert_ne!(
+                dependency.state_type_id(),
+                materialized_frame_state,
+                "{node_name} must depend on specific calculator states, not \
+                 StatsTimelineFrameState"
+            );
+        }
     }
 }
 

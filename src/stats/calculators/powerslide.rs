@@ -7,6 +7,8 @@ pub struct PowerslideEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub active: bool,
 }
@@ -79,6 +81,7 @@ impl PowerslideCalculator {
                     time: frame.time,
                     frame: frame.frame_number,
                     player: player.player_id.clone(),
+                    player_position: player.position().map(|position| position.to_array()),
                     is_team_0: player.is_team_0,
                     active: effective_powerslide,
                 });

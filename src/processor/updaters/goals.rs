@@ -43,6 +43,9 @@ impl<'a> ReplayProcessor<'a> {
             let scorer = scoring_team_is_team_0.and_then(|team_is_team_0| {
                 self.goal_scorer_from_update(update, frame, team_is_team_0)
             });
+            let scorer_position = scorer
+                .as_ref()
+                .and_then(|player_id| self.get_normalized_player_position(player_id));
 
             if self.goal_event_is_duplicate(
                 frame.time,
@@ -65,6 +68,7 @@ impl<'a> ReplayProcessor<'a> {
                 frame: frame_index,
                 scoring_team_is_team_0,
                 player: scorer,
+                player_position: scorer_position,
                 team_zero_score,
                 team_one_score,
             };

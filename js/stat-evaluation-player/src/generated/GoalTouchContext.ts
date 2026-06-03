@@ -3,4 +3,4 @@ import type { GoalContextPosition } from "./GoalContextPosition.ts";
 import type { GoalPlayerContext } from "./GoalPlayerContext.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type GoalTouchContext = { time: number, frame: number, player: RemoteIdTs, is_team_0: boolean, ball_position: GoalContextPosition | null, player_position: GoalContextPosition | null, players: Array<GoalPlayerContext>, };
+export type GoalTouchContext = { time: number, frame: number, player: RemoteIdTs, is_team_0: boolean, ball_position: GoalContextPosition | null, ball_speed_after_touch?: number | null, player_position: GoalContextPosition | null, players: Array<GoalPlayerContext>, };

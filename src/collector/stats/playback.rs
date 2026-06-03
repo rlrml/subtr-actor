@@ -2180,6 +2180,7 @@ fn parse_timeline_event(value: &Value) -> SubtrActorResult<TimelineEvent> {
         frame: json_optional_usize(object.get("frame"))?,
         kind: decode_json_value(json_required_value(object, "kind")?.clone())?,
         player_id: json_optional_remote_id(object.get("player_id"))?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_optional_bool(object.get("is_team_0")),
     })
 }
@@ -2196,6 +2197,7 @@ fn moment_mechanic_event(
         id: format!("{kind}:{frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
+        player_position: None,
         is_team_0,
         timing: StatsEventTiming::Moment { frame, time },
         properties: Vec::new(),
@@ -2217,6 +2219,7 @@ fn span_mechanic_event(
         id: format!("{kind}:{start_frame}:{end_frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
+        player_position: None,
         is_team_0,
         timing: StatsEventTiming::Span {
             start_frame,
@@ -2314,6 +2317,7 @@ fn parse_dodge_reset_event(value: &Value) -> SubtrActorResult<DodgeResetEvent> {
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         counter_value: json_required_i32(object, "counter_value")?,
         on_ball: json_required_bool(object, "on_ball")?,
     })
@@ -2325,6 +2329,7 @@ fn parse_powerslide_event(value: &Value) -> SubtrActorResult<PowerslideEvent> {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         active: json_required_bool(object, "active")?,
     })
@@ -2336,6 +2341,7 @@ fn parse_core_player_stats_event(value: &Value) -> SubtrActorResult<CorePlayerSt
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         delta: decode_json_value(json_required_value(object, "delta")?.clone())?,
     })
@@ -2387,6 +2393,7 @@ fn parse_movement_event(value: &Value) -> SubtrActorResult<MovementEvent> {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         dt: json_required_f32(object, "dt")?,
         speed: json_required_f32(object, "speed")?,
@@ -2402,6 +2409,7 @@ fn parse_positioning_event(value: &Value) -> SubtrActorResult<PositioningEvent> 
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         active_game_time: json_required_f32(object, "active_game_time")?,
         tracked_time: json_required_f32(object, "tracked_time")?,
@@ -2446,6 +2454,7 @@ fn parse_rotation_player_event(value: &Value) -> SubtrActorResult<RotationPlayer
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         active: json_required_bool(object, "active")?,
         active_game_time: json_required_f32(object, "active_game_time")?,
@@ -2492,6 +2501,7 @@ fn parse_touch_stats_event(value: &Value) -> SubtrActorResult<TouchStatsEvent> {
         sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
         sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         kind: json_required_str(object, "kind")?.to_owned(),
         height_band: json_required_str(object, "height_band")?.to_owned(),
@@ -2507,6 +2517,7 @@ fn parse_touch_ball_movement_event(value: &Value) -> SubtrActorResult<TouchBallM
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         travel_distance: json_required_f32(object, "travel_distance")?,
         advance_distance: json_required_f32(object, "advance_distance")?,
@@ -2525,6 +2536,7 @@ fn parse_touch_last_touch_event(value: &Value) -> SubtrActorResult<TouchLastTouc
         sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         is_team_0: json_required_bool(object, "is_team_0")?,
         player: json_optional_remote_id(object.get("player"))?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
     })
 }
 
@@ -2555,6 +2567,7 @@ fn parse_flick_event(value: &Value) -> SubtrActorResult<FlickEvent> {
         sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
         sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         dodge_time: json_required_f32(object, "dodge_time")?,
         dodge_frame: json_required_usize(object, "dodge_frame")?,
@@ -2600,6 +2613,7 @@ fn parse_musty_flick_event(value: &Value) -> SubtrActorResult<MustyFlickEvent> {
         sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
         sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         aerial: json_required_bool(object, "aerial")?,
         dodge_time: json_required_f32(object, "dodge_time")?,
@@ -2629,6 +2643,7 @@ fn parse_goal_context_event(value: &Value) -> SubtrActorResult<GoalContextEvent>
             object.get("defending_team_most_back_player"),
         )?,
         ball_position: json_optional_goal_context_position(object.get("ball_position"))?,
+        ball_speed_at_goal: json_optional_f32(object.get("ball_speed_at_goal"))?,
         ball_air_time_before_goal: json_optional_f32(object.get("ball_air_time_before_goal"))?,
         goal_buildup: object
             .get("goal_buildup")
@@ -2667,6 +2682,7 @@ fn parse_goal_touch_context(value: &Value) -> SubtrActorResult<GoalTouchContext>
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         ball_position: json_optional_goal_context_position(object.get("ball_position"))?,
+        ball_speed_after_touch: json_optional_f32(object.get("ball_speed_after_touch"))?,
         player_position: json_optional_goal_context_position(object.get("player_position"))?,
         players: match object.get("players").and_then(Value::as_array) {
             Some(players) => players
@@ -2684,6 +2700,7 @@ fn parse_backboard_event(value: &Value) -> SubtrActorResult<BackboardBounceEvent
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
     })
 }
@@ -2694,6 +2711,7 @@ fn parse_ceiling_shot_event(value: &Value) -> SubtrActorResult<CeilingShotEvent>
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         ceiling_contact_time: json_required_f32(object, "ceiling_contact_time")?,
         ceiling_contact_frame: json_required_usize(object, "ceiling_contact_frame")?,
@@ -2770,6 +2788,7 @@ fn parse_center_event(value: &Value) -> SubtrActorResult<CenterEvent> {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         start_time: json_required_f32(object, "start_time")?,
         start_frame: json_required_usize(object, "start_frame")?,
@@ -2788,6 +2807,7 @@ fn parse_double_tap_event(value: &Value) -> SubtrActorResult<DoubleTapEvent> {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         backboard_time: json_required_f32(object, "backboard_time")?,
         backboard_frame: json_required_usize(object, "backboard_frame")?,
@@ -2804,7 +2824,9 @@ fn parse_pass_event(value: &Value) -> SubtrActorResult<PassEvent> {
         sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
         sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         passer: json_required_remote_id(object, "passer")?,
+        passer_position: json_optional_vec3(object.get("passer_position"))?,
         receiver: json_required_remote_id(object, "receiver")?,
+        receiver_position: json_optional_vec3(object.get("receiver_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         start_time: json_required_f32(object, "start_time")?,
         start_frame: json_required_usize(object, "start_frame")?,
@@ -2821,6 +2843,7 @@ fn parse_pass_last_completed_event(value: &Value) -> SubtrActorResult<PassLastCo
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_optional_remote_id(object.get("player"))?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
     })
 }
 
@@ -2848,6 +2871,8 @@ fn parse_ball_carry_event(value: &Value) -> SubtrActorResult<BallCarryEvent> {
     let object = json_object(value, "ball carry event")?;
     Ok(BallCarryEvent {
         player_id: json_required_remote_id(object, "player_id")?,
+        start_position: json_required_vec3(object, "start_position")?,
+        end_position: json_required_vec3(object, "end_position")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         kind: parse_ball_carry_kind(json_required_str(object, "kind")?)?,
         start_frame: json_required_usize(object, "start_frame")?,
@@ -2907,7 +2932,9 @@ fn parse_one_timer_event(value: &Value) -> SubtrActorResult<OneTimerEvent> {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         passer: json_required_remote_id(object, "passer")?,
+        passer_position: json_optional_vec3(object.get("passer_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         pass_start_time: json_required_f32(object, "pass_start_time")?,
         pass_start_frame: json_required_usize(object, "pass_start_frame")?,
@@ -2929,6 +2956,7 @@ fn parse_half_volley_event(value: &Value) -> SubtrActorResult<HalfVolleyEvent> {
         sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
         sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         bounce_time: json_required_f32(object, "bounce_time")?,
         bounce_frame: json_required_usize(object, "bounce_frame")?,
@@ -2947,6 +2975,7 @@ fn parse_goal_tag_event(value: &Value) -> SubtrActorResult<GoalTagEvent> {
         kind: decode_json_value(json_required_value(object, "kind")?.clone())?,
         scoring_team_is_team_0: json_required_bool(object, "scoring_team_is_team_0")?,
         scorer: json_optional_remote_id(object.get("scorer"))?,
+        scorer_position: json_optional_goal_context_position(object.get("scorer_position"))?,
         confidence: json_required_f32(object, "confidence")?,
         modifiers: json_optional_array(object.get("modifiers"))?
             .iter()
@@ -2966,6 +2995,7 @@ fn parse_goal_tag_evidence(value: &Value) -> SubtrActorResult<GoalTagEvidence> {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_optional_remote_id(object.get("player"))?,
+        player_position: json_optional_goal_context_position(object.get("player_position"))?,
     })
 }
 
@@ -3080,6 +3110,7 @@ fn parse_whiff_event(value: &Value) -> SubtrActorResult<WhiffEvent> {
         resolved_time: json_optional_f32(object.get("resolved_time"))?.unwrap_or(time),
         resolved_frame: json_optional_usize(object.get("resolved_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         closest_approach_distance: json_required_f32(object, "closest_approach_distance")?,
         forward_alignment: json_required_f32(object, "forward_alignment")?,
@@ -3118,6 +3149,7 @@ fn parse_boost_pickup_comparison_event(
         frame: json_required_usize(object, "frame")?,
         time: json_required_f32(object, "time")?,
         player_id: json_required_remote_id(object, "player_id")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         pad_type: decode_json_value(json_required_value(object, "pad_type")?.clone())?,
         field_half: decode_json_value(json_required_value(object, "field_half")?.clone())?,
@@ -3137,6 +3169,7 @@ fn parse_boost_ledger_event(value: &Value) -> SubtrActorResult<BoostLedgerEvent>
         frame: json_required_usize(object, "frame")?,
         time: json_required_f32(object, "time")?,
         player_id: json_required_remote_id(object, "player_id")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         transaction: decode_json_value(json_required_value(object, "transaction")?.clone())?,
         amount: json_required_f32(object, "amount")?,
@@ -3158,6 +3191,7 @@ fn parse_boost_state_event(value: &Value) -> SubtrActorResult<BoostStateEvent> {
         frame: json_required_usize(object, "frame")?,
         time: json_required_f32(object, "time")?,
         player_id: json_required_remote_id(object, "player_id")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         boost_amount: json_required_f32(object, "boost_amount")?,
         boost_before: json_optional_f32(object.get("boost_before"))?,
@@ -3380,6 +3414,43 @@ fn json_required_vec3(
             )))
         })?,
     ])
+}
+
+fn json_optional_vec3(value: Option<&Value>) -> SubtrActorResult<Option<[f32; 3]>> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => {
+            let array = value.as_array().ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+                    "Expected optional JSON value to be a 3-element array".to_owned(),
+                ))
+            })?;
+            if array.len() != 3 {
+                return SubtrActorError::new_result(
+                    SubtrActorErrorVariant::StatsSerializationError(
+                        "Expected optional JSON value to contain exactly 3 elements".to_owned(),
+                    ),
+                );
+            }
+            Ok(Some([
+                json_f32(&array[0]).ok_or_else(|| {
+                    SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+                        "Expected optional JSON value[0] to be a float".to_owned(),
+                    ))
+                })?,
+                json_f32(&array[1]).ok_or_else(|| {
+                    SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+                        "Expected optional JSON value[1] to be a float".to_owned(),
+                    ))
+                })?,
+                json_f32(&array[2]).ok_or_else(|| {
+                    SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+                        "Expected optional JSON value[2] to be a float".to_owned(),
+                    ))
+                })?,
+            ]))
+        }
+    }
 }
 
 fn json_required_remote_id(

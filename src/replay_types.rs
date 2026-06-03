@@ -81,6 +81,10 @@ pub struct DemolishInfo {
     /// The velocity of the victim at the time of demolition.
     #[ts(as = "crate::ts_bindings::Vector3fTs")]
     pub victim_velocity: boxcars::Vector3f,
+    /// The location of the attacker at the time of demolition.
+    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attacker_location: Option<boxcars::Vector3f>,
     /// The location of the victim at the time of demolition.
     #[ts(as = "crate::ts_bindings::Vector3fTs")]
     pub victim_location: boxcars::Vector3f,
@@ -108,6 +112,9 @@ pub struct BoostPadEvent {
     pub pad_id: String,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
+    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<boxcars::Vector3f>,
     pub kind: BoostPadEventKind,
 }
 
@@ -129,6 +136,9 @@ pub struct GoalEvent {
     pub scoring_team_is_team_0: bool,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
+    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<boxcars::Vector3f>,
     pub team_zero_score: Option<i32>,
     pub team_one_score: Option<i32>,
 }
@@ -219,6 +229,9 @@ pub struct PlayerStatEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<boxcars::Vector3f>,
     pub is_team_0: bool,
     pub kind: PlayerStatEventKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -233,6 +246,9 @@ pub struct TouchEvent {
     pub team_is_team_0: bool,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
+    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<boxcars::Vector3f>,
     pub closest_approach_distance: Option<f32>,
     pub dodge_contact: bool,
 }

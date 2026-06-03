@@ -1,11 +1,18 @@
 use super::*;
 
+#[derive(Debug, Clone)]
+struct TouchingPlayerEstimate {
+    player_id: PlayerId,
+    closest_approach_distance: f32,
+    player_position: boxcars::Vector3f,
+}
+
 impl<'a> ReplayProcessor<'a> {
     fn estimate_touching_player(
         &self,
         touch_team_is_team_0: bool,
         target_time: f32,
-    ) -> Option<(PlayerId, f32)> {
+    ) -> Option<TouchingPlayerEstimate> {
         const TOUCH_PLAYER_DISTANCE_THRESHOLD: f32 = 700.0;
 
         let ball_rigid_body = self
@@ -20,14 +27,21 @@ impl<'a> ReplayProcessor<'a> {
                     .ok()
                     .and_then(|rigid_body| {
                         touch_candidate_rank(&ball_rigid_body, &rigid_body)
-                            .map(|rank| (player_id.clone(), rank))
+                            .map(|rank| (player_id.clone(), rigid_body.location, rank))
                     })
             })
-            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .and_then(|(player_id, (closest_distance, _current_distance))| {
-                (closest_distance <= TOUCH_PLAYER_DISTANCE_THRESHOLD)
-                    .then_some((player_id, closest_distance))
-            })
+            .min_by(|(_, _, a), (_, _, b)| a.partial_cmp(b).unwrap())
+            .and_then(
+                |(player_id, player_position, (closest_distance, _current_distance))| {
+                    (closest_distance <= TOUCH_PLAYER_DISTANCE_THRESHOLD).then_some(
+                        TouchingPlayerEstimate {
+                            player_id,
+                            closest_approach_distance: closest_distance,
+                            player_position,
+                        },
+                    )
+                },
+            )
     }
 
     /// Detects ball touch events and estimates the responsible player when possible.
@@ -56,15 +70,21 @@ impl<'a> ReplayProcessor<'a> {
                 _ => continue,
             };
             let estimated_player = self.estimate_touching_player(team_is_team_0, frame.time);
-            let dodge_contact = estimated_player
-                .as_ref()
-                .is_some_and(|(player, _)| self.get_dodge_active(player).unwrap_or(0) % 2 == 1);
+            let dodge_contact = estimated_player.as_ref().is_some_and(|estimate| {
+                self.get_dodge_active(&estimate.player_id).unwrap_or(0) % 2 == 1
+            });
             let event = TouchEvent {
                 time: frame.time,
                 frame: frame_index,
                 team_is_team_0,
-                player: estimated_player.as_ref().map(|(player, _)| player.clone()),
-                closest_approach_distance: estimated_player.map(|(_, distance)| distance),
+                player: estimated_player
+                    .as_ref()
+                    .map(|estimate| estimate.player_id.clone()),
+                player_position: estimated_player
+                    .as_ref()
+                    .map(|estimate| estimate.player_position),
+                closest_approach_distance: estimated_player
+                    .map(|estimate| estimate.closest_approach_distance),
                 dodge_contact,
             };
             self.current_frame_touch_events.push(event.clone());
@@ -115,6 +135,9 @@ impl<'a> ReplayProcessor<'a> {
                     time: frame.time,
                     frame: frame_index,
                     player: player_id.clone(),
+                    player_position: self
+                        .get_normalized_player_position(&player_id)
+                        .map(|position| vec_to_glam(&position).to_array()),
                     is_team_0,
                     counter_value: previous_value + offset + 1,
                 };

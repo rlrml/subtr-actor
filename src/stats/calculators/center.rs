@@ -15,6 +15,8 @@ pub struct CenterEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub start_time: f32,
     pub start_frame: usize,
@@ -29,6 +31,7 @@ pub struct CenterEvent {
 #[derive(Debug, Clone)]
 struct PendingCenterTouch {
     player: PlayerId,
+    player_position: Option<[f32; 3]>,
     is_team_0: bool,
     time: f32,
     frame: usize,
@@ -106,6 +109,7 @@ impl CenterCalculator {
             time: frame.time,
             frame: frame.frame_number,
             player: pending.player.clone(),
+            player_position: pending.player_position,
             is_team_0: pending.is_team_0,
             start_time: pending.time,
             start_frame: pending.frame,
@@ -202,6 +206,9 @@ impl CenterCalculator {
 
             self.pending_touch = Some(PendingCenterTouch {
                 player,
+                player_position: touch
+                    .player_position
+                    .map(|position| vec_to_glam(&position).to_array()),
                 is_team_0: touch.team_is_team_0,
                 time: touch.time,
                 frame: touch.frame,

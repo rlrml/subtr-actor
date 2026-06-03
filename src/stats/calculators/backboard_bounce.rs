@@ -7,6 +7,8 @@ pub struct BackboardBounceEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
 }
 
@@ -86,6 +88,9 @@ impl BackboardBounceCalculator {
             time: frame.time,
             frame: frame.frame_number,
             player,
+            player_position: last_touch
+                .player_position
+                .map(|position| vec_to_glam(&position).to_array()),
             is_team_0: last_touch.team_is_team_0,
         })
     }

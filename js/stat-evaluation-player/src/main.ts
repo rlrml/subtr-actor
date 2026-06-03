@@ -431,7 +431,7 @@ interface ActiveMechanicsReview {
   loading: boolean;
   preloading: boolean;
   currentReplayId: string | null;
-  currentClip: { startTime: number; endTime: number } | null;
+  currentClip: { startTime: number; endTime: number; targetTime: number | null } | null;
 }
 
 interface SelectedStatEntry {
@@ -2091,6 +2091,35 @@ function getMechanicsReviewMechanicLabel(item: MechanicsReviewItem): string {
   return typeof item.meta?.mechanic === "string" ? formatMechanicKind(item.meta.mechanic) : "--";
 }
 
+function getMechanicsReviewMechanicKind(item: MechanicsReviewItem): string | null {
+  const mechanic = item.meta?.mechanic;
+  return typeof mechanic === "string" && mechanic.trim()
+    ? mechanic.trim().replaceAll("-", "_")
+    : null;
+}
+
+function getMechanicsReviewTargetTime(item: MechanicsReviewItem): number | null {
+  return (
+    getMechanicsReviewTargetNumber(item, "eventTime") ??
+    getMechanicsReviewTargetNumber(item, "startTime") ??
+    getMechanicsReviewTargetNumber(item, "endTime")
+  );
+}
+
+function activateMechanicsReviewTimelineSource(item: MechanicsReviewItem): void {
+  const mechanic = getMechanicsReviewMechanicKind(item);
+  if (!mechanic) {
+    return;
+  }
+
+  activeMechanicTimelineKinds.add(mechanic);
+  syncTimelineEvents();
+  syncTimelineRanges();
+  renderEventTimelineControls();
+  renderTimelineEventCount();
+  scheduleConfigUrlUpdate();
+}
+
 function formatMechanicsReviewStatus(value: unknown): string {
   return typeof value === "string" && value.trim() ? value.replaceAll("_", " ") : "unreviewed";
 }
@@ -2544,14 +2573,20 @@ async function activateMechanicsReviewItem(index: number): Promise<void> {
 
     skipPostGoalTransitions.checked = false;
     skipKickoffs.checked = false;
-    review.currentClip = { startTime, endTime };
+    const targetTime = getMechanicsReviewTargetTime(item);
+    review.currentClip = { startTime, endTime, targetTime };
+    activateMechanicsReviewTimelineSource(item);
     replayPlayer?.setState({
       currentTime: startTime,
       playing: true,
       skipPostGoalTransitionsEnabled: false,
       skipKickoffsEnabled: false,
     });
-    setMechanicsReviewStatus(`Playing ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`);
+    setMechanicsReviewStatus(
+      targetTime === null
+        ? `Playing ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`
+        : `Playing ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s; target ${targetTime.toFixed(2)}s`,
+    );
   } catch (error) {
     console.error("Failed to activate mechanics review item:", error);
     review.currentClip = null;

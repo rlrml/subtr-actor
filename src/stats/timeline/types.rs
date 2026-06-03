@@ -180,6 +180,8 @@ pub struct StatsTimelineTagEvent {
     pub kind: String,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub timing: StatsEventTiming,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -203,6 +205,16 @@ pub struct ReplayStatsFrame {
     pub players: Vec<PlayerStatsSnapshot>,
 }
 
+/// Team-owned fields in the materialized stats timeline export.
+///
+/// This is a serialization/client DTO, not an analysis-graph dependency
+/// surface. Analysis nodes that need another calculator's data should depend
+/// on that calculator's concrete node state through `AnalysisNode::dependencies`
+/// and read it from `AnalysisStateContext`.
+///
+/// The field list is a curated compatibility schema for full snapshot
+/// timelines. It is not the authoritative registry of team analysis outputs;
+/// use the module-keyed stats/graph surfaces when callers need discoverability.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TeamStatsSnapshot {
@@ -227,6 +239,10 @@ pub struct TeamStatsSnapshot {
     pub demo: DemoTeamStats,
 }
 
+/// Player-owned fields in the materialized stats timeline export.
+///
+/// Like `TeamStatsSnapshot`, this is a serialization/client DTO. It should not
+/// be used as an upstream data dependency between analysis nodes.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PlayerStatsSnapshot {

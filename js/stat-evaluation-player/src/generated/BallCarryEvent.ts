@@ -3,4 +3,4 @@ import type { AirDribbleOrigin } from "./AirDribbleOrigin.ts";
 import type { BallCarryKind } from "./BallCarryKind.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type BallCarryEvent = { player_id: RemoteIdTs, is_team_0: boolean, kind: BallCarryKind, start_frame: number, end_frame: number, start_time: number, end_time: number, duration: number, straight_line_distance: number, path_distance: number, average_horizontal_gap: number, average_vertical_gap: number, average_speed: number, touch_count: number, air_touch_count: number, air_dribble_origin: AirDribbleOrigin | null, };
+export type BallCarryEvent = { player_id: RemoteIdTs, is_team_0: boolean, kind: BallCarryKind, start_position: [number, number, number], end_position: [number, number, number], start_frame: number, end_frame: number, start_time: number, end_time: number, duration: number, straight_line_distance: number, path_distance: number, average_horizontal_gap: number, average_vertical_gap: number, average_speed: number, touch_count: number, air_touch_count: number, air_dribble_origin: AirDribbleOrigin | null, };

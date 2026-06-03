@@ -5,4 +5,4 @@ import type { BoostPickupFieldHalf } from "./BoostPickupFieldHalf.ts";
 import type { BoostPickupPadType } from "./BoostPickupPadType.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type BoostPickupComparisonEvent = { comparison: BoostPickupComparison, frame: number, time: number, player_id: RemoteIdTs, is_team_0: boolean, pad_type: BoostPickupPadType, field_half: BoostPickupFieldHalf, activity: BoostPickupActivity, reported_frame: number | null, reported_time: number | null, inferred_frame: number | null, inferred_time: number | null, boost_before: number | null, boost_after: number | null, };
+export type BoostPickupComparisonEvent = { comparison: BoostPickupComparison, frame: number, time: number, player_id: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, pad_type: BoostPickupPadType, field_half: BoostPickupFieldHalf, activity: BoostPickupActivity, reported_frame: number | null, reported_time: number | null, inferred_frame: number | null, inferred_time: number | null, boost_before: number | null, boost_after: number | null, };

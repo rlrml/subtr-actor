@@ -12,6 +12,8 @@ pub struct PositioningEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub active_game_time: f32,
     pub tracked_time: f32,
@@ -44,11 +46,17 @@ pub struct PositioningEvent {
 }
 
 impl PositioningEvent {
-    fn new(frame: &FrameInfo, player: PlayerId, is_team_0: bool) -> Self {
+    fn new(
+        frame: &FrameInfo,
+        player: PlayerId,
+        player_position: Option<[f32; 3]>,
+        is_team_0: bool,
+    ) -> Self {
         Self {
             time: frame.time,
             frame: frame.frame_number,
             player,
+            player_position,
             is_team_0,
             active_game_time: 0.0,
             tracked_time: 0.0,
@@ -163,11 +171,12 @@ impl PositioningCalculator {
         deltas: &'a mut HashMap<PlayerId, PositioningEvent>,
         frame: &FrameInfo,
         player_id: &PlayerId,
+        player_position: Option<[f32; 3]>,
         is_team_0: bool,
     ) -> &'a mut PositioningEvent {
-        deltas
-            .entry(player_id.clone())
-            .or_insert_with(|| PositioningEvent::new(frame, player_id.clone(), is_team_0))
+        deltas.entry(player_id.clone()).or_insert_with(|| {
+            PositioningEvent::new(frame, player_id.clone(), player_position, is_team_0)
+        })
     }
 
     fn record_goal_positioning_events(
@@ -201,8 +210,14 @@ impl PositioningCalculator {
                     continue;
                 }
 
-                Self::event_delta(event_deltas, frame, &player.player_id, player.is_team_0)
-                    .times_caught_ahead_of_play_on_conceded_goals += 1;
+                Self::event_delta(
+                    event_deltas,
+                    frame,
+                    &player.player_id,
+                    Some(position.to_array()),
+                    player.is_team_0,
+                )
+                .times_caught_ahead_of_play_on_conceded_goals += 1;
             }
         }
     }
@@ -258,6 +273,7 @@ impl PositioningCalculator {
                     &mut event_deltas,
                     frame,
                     &player.player_id,
+                    player.position().map(|position| position.to_array()),
                     player.is_team_0,
                 );
                 delta.active_game_time += frame.dt;
@@ -285,6 +301,7 @@ impl PositioningCalculator {
                     &mut event_deltas,
                     frame,
                     &player.player_id,
+                    Some(position.to_array()),
                     player.is_team_0,
                 );
                 delta.active_game_time += frame.dt;
@@ -380,6 +397,7 @@ impl PositioningCalculator {
                             &mut event_deltas,
                             frame,
                             &player.player_id,
+                            Some(position.to_array()),
                             player.is_team_0,
                         )
                         .sum_distance_to_teammates +=
@@ -391,11 +409,12 @@ impl PositioningCalculator {
                     || team_present_player_count < team_roster_count
                     || team_players.len() < 2
                 {
-                    for (player, _) in &team_players {
+                    for (player, position) in &team_players {
                         Self::event_delta(
                             &mut event_deltas,
                             frame,
                             &player.player_id,
+                            Some(position.to_array()),
                             player.is_team_0,
                         )
                         .time_no_teammates += frame.dt;
@@ -412,8 +431,15 @@ impl PositioningCalculator {
 
                     if team_spread <= self.config.most_back_forward_threshold_y {
                         for (player_id, _) in &sorted_team {
-                            Self::event_delta(&mut event_deltas, frame, player_id, is_team_0)
-                                .time_other_role += frame.dt;
+                            let player_position = players.player_position(player_id);
+                            Self::event_delta(
+                                &mut event_deltas,
+                                frame,
+                                player_id,
+                                player_position,
+                                is_team_0,
+                            )
+                            .time_other_role += frame.dt;
                         }
                     } else {
                         let min_y = sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
@@ -431,6 +457,7 @@ impl PositioningCalculator {
                                     &mut event_deltas,
                                     frame,
                                     player_id,
+                                    players.player_position(player_id),
                                     is_team_0,
                                 )
                                 .time_most_back += frame.dt;
@@ -439,6 +466,7 @@ impl PositioningCalculator {
                                     &mut event_deltas,
                                     frame,
                                     player_id,
+                                    players.player_position(player_id),
                                     is_team_0,
                                 )
                                 .time_most_forward += frame.dt;
@@ -447,6 +475,7 @@ impl PositioningCalculator {
                                     &mut event_deltas,
                                     frame,
                                     player_id,
+                                    players.player_position(player_id),
                                     is_team_0,
                                 )
                                 .time_mid_role += frame.dt;
@@ -455,6 +484,7 @@ impl PositioningCalculator {
                                     &mut event_deltas,
                                     frame,
                                     player_id,
+                                    players.player_position(player_id),
                                     is_team_0,
                                 )
                                 .time_other_role += frame.dt;
@@ -472,6 +502,9 @@ impl PositioningCalculator {
                         &mut event_deltas,
                         frame,
                         &closest_player.player_id,
+                        closest_player
+                            .position()
+                            .map(|position| position.to_array()),
                         closest_player.is_team_0,
                     )
                     .time_closest_to_ball += frame.dt;
@@ -486,6 +519,9 @@ impl PositioningCalculator {
                         &mut event_deltas,
                         frame,
                         &farthest_player.player_id,
+                        farthest_player
+                            .position()
+                            .map(|position| position.to_array()),
                         farthest_player.is_team_0,
                     )
                     .time_farthest_from_ball += frame.dt;

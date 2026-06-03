@@ -19,4 +19,16 @@ import type { RotationTeamStats } from "./RotationTeamStats.ts";
 import type { RushTeamStats } from "./RushTeamStats.ts";
 import type { TerritorialPressureTeamStats } from "./TerritorialPressureTeamStats.ts";
 
+/**
+ * Team-owned fields in the materialized stats timeline export.
+ *
+ * This is a serialization/client DTO, not an analysis-graph dependency
+ * surface. Analysis nodes that need another calculator's data should depend
+ * on that calculator's concrete node state through `AnalysisNode::dependencies`
+ * and read it from `AnalysisStateContext`.
+ *
+ * The field list is a curated compatibility schema for full snapshot
+ * timelines. It is not the authoritative registry of team analysis outputs;
+ * use the module-keyed stats/graph surfaces when callers need discoverability.
+ */
 export type TeamStatsSnapshot = { fifty_fifty: FiftyFiftyTeamStats, possession: PossessionTeamStats, pressure: PressureTeamStats, territorial_pressure: TerritorialPressureTeamStats, rotation: RotationTeamStats, rush: RushTeamStats, core: CoreTeamStats, backboard: BackboardTeamStats, double_tap: DoubleTapTeamStats, one_timer: OneTimerTeamStats, pass: PassTeamStats, ball_carry: BallCarryStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpTeamStats, half_volley: HalfVolleyTeamStats, movement: MovementStats, powerslide: PowerslideStats, demo: DemoTeamStats, };

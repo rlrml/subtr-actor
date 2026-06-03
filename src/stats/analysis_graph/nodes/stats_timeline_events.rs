@@ -271,12 +271,14 @@ fn moment_mechanic_event(
     frame: usize,
     time: f32,
     player_id: PlayerId,
+    player_position: Option<[f32; 3]>,
     is_team_0: bool,
 ) -> StatsTimelineTagEvent {
     StatsTimelineTagEvent {
         id: format!("{kind}:{frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
+        player_position,
         is_team_0,
         timing: StatsEventTiming::Moment { frame, time },
         properties: Vec::new(),
@@ -292,12 +294,14 @@ fn span_mechanic_event(
     start_time: f32,
     end_time: f32,
     player_id: PlayerId,
+    player_position: Option<[f32; 3]>,
     is_team_0: bool,
 ) -> StatsTimelineTagEvent {
     StatsTimelineTagEvent {
         id: format!("{kind}:{start_frame}:{end_frame}:{index}"),
         kind: kind.to_owned(),
         player_id,
+        player_position,
         is_team_0,
         timing: StatsEventTiming::Span {
             start_frame,
@@ -373,6 +377,7 @@ fn build_mechanic_events(
             event.start_time,
             event.end_time,
             event.player_id.clone(),
+            Some(event.end_position),
             event.is_team_0,
         );
         mechanic_event.properties = ball_carry_mechanic_event_properties(event);
@@ -388,6 +393,7 @@ fn build_mechanic_events(
             event.ceiling_contact_time,
             event.time,
             event.player.clone(),
+            event.player_position,
             event.is_team_0,
         ));
     }
@@ -401,6 +407,7 @@ fn build_mechanic_events(
             event.wall_contact_time,
             event.time,
             event.player.clone(),
+            Some(event.player_position),
             event.is_team_0,
         );
         mechanic_event.properties = vec![mechanic_event_text_property(
@@ -419,6 +426,7 @@ fn build_mechanic_events(
             event.takeoff_time,
             event.time,
             event.player.clone(),
+            Some(event.player_position),
             event.is_team_0,
         );
         mechanic_event.properties = vec![mechanic_event_text_property(
@@ -437,6 +445,7 @@ fn build_mechanic_events(
             event.start_time,
             event.time,
             event.player.clone(),
+            event.player_position,
             event.is_team_0,
         ));
     }
@@ -448,6 +457,7 @@ fn build_mechanic_events(
             event.frame,
             event.time,
             event.player.clone(),
+            event.player_position,
             event.is_team_0,
         ));
     }
@@ -461,6 +471,7 @@ fn build_mechanic_events(
             event.backboard_time,
             event.time,
             event.player.clone(),
+            event.player_position,
             event.is_team_0,
         ));
     }
@@ -474,6 +485,7 @@ fn build_mechanic_events(
             event.setup_start_time,
             event.time,
             event.player.clone(),
+            event.player_position,
             event.is_team_0,
         ));
     }
@@ -487,6 +499,7 @@ fn build_mechanic_events(
             event.dodge_time,
             event.time,
             event.player.clone(),
+            event.player_position,
             event.is_team_0,
         ));
     }
@@ -500,6 +513,7 @@ fn build_mechanic_events(
             event.pass_start_time,
             event.time,
             event.player.clone(),
+            event.player_position,
             event.is_team_0,
         ));
     }
@@ -513,6 +527,7 @@ fn build_mechanic_events(
             event.start_time,
             event.time,
             event.passer.clone(),
+            event.passer_position,
             event.is_team_0,
         ));
     }
@@ -524,6 +539,7 @@ fn build_mechanic_events(
             event.frame,
             event.time,
             event.player.clone(),
+            Some(event.end_position),
             event.is_team_0,
         ));
     }
@@ -535,6 +551,7 @@ fn build_mechanic_events(
             event.frame,
             event.time,
             event.player.clone(),
+            Some(event.end_position),
             event.is_team_0,
         ));
     }
@@ -546,6 +563,7 @@ fn build_mechanic_events(
             event.frame,
             event.time,
             event.player.clone(),
+            event.player_position,
             event.is_team_0,
         ));
     }
@@ -559,6 +577,7 @@ fn build_mechanic_events(
             event.dodge_time,
             event.time,
             event.player.clone(),
+            Some(event.landing_position),
             event.is_team_0,
         ));
     }

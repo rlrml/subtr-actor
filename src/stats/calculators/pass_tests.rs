@@ -41,6 +41,7 @@ fn touch(
         frame: frame_number,
         team_is_team_0: is_team_0,
         player: player_id,
+        player_position: None,
         closest_approach_distance: Some(0.0),
         dodge_contact: false,
     }
@@ -95,6 +96,7 @@ fn backboard_bounce(
         time,
         frame: frame_number,
         player,
+        player_position: None,
         is_team_0,
     };
     BackboardBounceState {

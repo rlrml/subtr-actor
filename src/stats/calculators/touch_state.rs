@@ -141,6 +141,7 @@ impl TouchStateCalculator {
                     frame: frame.frame_number,
                     team_is_team_0: player.is_team_0,
                     player: Some(player.player_id.clone()),
+                    player_position: Some(rigid_body.location),
                     closest_approach_distance: Some(collision_distance),
                     dodge_contact: player.dodge_active,
                 })
@@ -218,6 +219,7 @@ impl TouchStateCalculator {
 
         TouchEvent {
             player: event.player.clone().or(candidate.player),
+            player_position: event.player_position.or(candidate.player_position),
             closest_approach_distance: event
                 .closest_approach_distance
                 .or(candidate.closest_approach_distance),

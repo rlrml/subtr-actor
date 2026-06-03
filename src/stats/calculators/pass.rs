@@ -22,8 +22,12 @@ pub struct PassEvent {
     pub sample_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub passer: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passer_position: Option<[f32; 3]>,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub receiver: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receiver_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub start_time: f32,
     pub start_frame: usize,
@@ -40,11 +44,14 @@ pub struct PassLastCompletedEvent {
     pub frame: usize,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
 }
 
 #[derive(Debug, Clone)]
 struct PendingPassTouch {
     player: PlayerId,
+    player_position: Option<[f32; 3]>,
     is_team_0: bool,
     time: f32,
     frame: usize,
@@ -129,7 +136,11 @@ impl PassCalculator {
             sample_time: touch.time,
             sample_frame: touch.frame,
             passer: previous.player.clone(),
+            passer_position: previous.player_position,
             receiver: receiver.clone(),
+            receiver_position: touch
+                .player_position
+                .map(|position| vec_to_glam(&position).to_array()),
             is_team_0: touch.team_is_team_0,
             start_time: previous.time,
             start_frame: previous.frame,
@@ -214,7 +225,12 @@ impl PassCalculator {
         self.events.push(event);
     }
 
-    fn emit_last_completed_event(&mut self, frame: &FrameInfo, player: Option<PlayerId>) {
+    fn emit_last_completed_event(
+        &mut self,
+        frame: &FrameInfo,
+        player: Option<PlayerId>,
+        player_position: Option<[f32; 3]>,
+    ) {
         if self.emitted_last_completed_pass_player == player {
             return;
         }
@@ -223,6 +239,7 @@ impl PassCalculator {
             time: frame.time,
             frame: frame.frame_number,
             player,
+            player_position,
         });
     }
 
@@ -241,12 +258,12 @@ impl PassCalculator {
         if !live_play {
             self.last_touch = None;
             self.stats.clear_current_last();
-            self.emit_last_completed_event(frame, None);
+            self.emit_last_completed_event(frame, None, None);
             return Ok(());
         }
 
         let Some(ball_position) = ball.position() else {
-            self.emit_last_completed_event(frame, None);
+            self.emit_last_completed_event(frame, None, None);
             return Ok(());
         };
 
@@ -264,6 +281,9 @@ impl PassCalculator {
 
             self.last_touch = Some(PendingPassTouch {
                 player,
+                player_position: touch
+                    .player_position
+                    .map(|position| vec_to_glam(&position).to_array()),
                 is_team_0: touch.team_is_team_0,
                 time: touch.time,
                 frame: touch.frame,
@@ -273,9 +293,21 @@ impl PassCalculator {
         }
 
         self.stats.finish_sample();
+        let current_last_completed_pass_player =
+            self.stats.current_last_completed_pass_player().cloned();
+        let current_last_completed_pass_position = current_last_completed_pass_player
+            .as_ref()
+            .and_then(|player_id| {
+                self.events
+                    .iter()
+                    .rev()
+                    .find(|event| &event.passer == player_id)
+                    .and_then(|event| event.passer_position)
+            });
         self.emit_last_completed_event(
             frame,
-            self.stats.current_last_completed_pass_player().cloned(),
+            current_last_completed_pass_player,
+            current_last_completed_pass_position,
         );
 
         Ok(())

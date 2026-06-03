@@ -24,6 +24,8 @@ pub struct MustyFlickEvent {
     pub sample_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub aerial: bool,
     pub dodge_time: f32,
@@ -229,6 +231,7 @@ impl MustyFlickCalculator {
             sample_time: touch_event.time,
             sample_frame: touch_event.frame,
             player: player.player_id.clone(),
+            player_position: Some(player_position.to_array()),
             is_team_0: player.is_team_0,
             aerial: player_position.z >= MUSTY_AERIAL_HEIGHT,
             dodge_time: dodge_start.time,

@@ -78,6 +78,8 @@ pub struct TouchStatsEvent {
     pub sample_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub kind: String,
     pub height_band: String,
@@ -93,6 +95,8 @@ pub struct TouchBallMovementEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub travel_distance: f32,
     pub advance_distance: f32,
@@ -109,6 +113,8 @@ pub struct TouchLastTouchEvent {
     pub is_team_0: bool,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -297,6 +303,13 @@ impl TouchCalculator {
                 sample_time: frame.time,
                 sample_frame: frame.frame_number,
                 player: player_id.clone(),
+                player_position: touch_event
+                    .player_position
+                    .map(|position| vec_to_glam(&position).to_array())
+                    .or_else(|| {
+                        Self::player_position(players, player_id)
+                            .map(|position| position.to_array())
+                    }),
                 is_team_0: touch_event.team_is_team_0,
                 kind: classification.kind.as_label_value().to_owned(),
                 height_band: classification.height_band.as_label().value.to_owned(),
@@ -316,6 +329,16 @@ impl TouchCalculator {
                 sample_frame: frame.frame_number,
                 is_team_0: last_touch.team_is_team_0,
                 player: last_touch.player.clone(),
+                player_position: last_touch
+                    .player_position
+                    .map(|position| vec_to_glam(&position).to_array())
+                    .or_else(|| {
+                        last_touch
+                            .player
+                            .as_ref()
+                            .and_then(|player_id| Self::player_position(players, player_id))
+                            .map(|position| position.to_array())
+                    }),
             });
             self.stats
                 .set_current_last_touch_player(last_touch.player.clone());
@@ -324,12 +347,14 @@ impl TouchCalculator {
         self.stats.restore_current_last_touch_marker();
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn apply_ball_movement_credit(
         &mut self,
         frame: usize,
         time: f32,
         player_id: &PlayerId,
         team_is_team_0: bool,
+        player_position: Option<[f32; 3]>,
         delta: glam::Vec3,
         travel_distance: f32,
     ) {
@@ -344,6 +369,7 @@ impl TouchCalculator {
             time,
             frame,
             player: player_id.clone(),
+            player_position,
             is_team_0: team_is_team_0,
             travel_distance,
             advance_distance,
@@ -409,6 +435,11 @@ impl TouchCalculator {
             time: event.resolve_time,
             frame: event.resolve_frame,
             player: player_id.clone(),
+            player_position: if team_is_team_0 {
+                Some(event.team_zero_position)
+            } else {
+                Some(event.team_one_position)
+            },
             is_team_0: team_is_team_0,
             travel_distance: pending.travel_distance,
             advance_distance,
@@ -422,6 +453,7 @@ impl TouchCalculator {
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
+        players: &PlayerFrameState,
         possession_state: &PossessionState,
         fifty_fifty_state: &FiftyFiftyState,
         live_play: bool,
@@ -475,6 +507,7 @@ impl TouchCalculator {
             frame.time,
             player_id,
             team_is_team_0,
+            players.player_position(player_id),
             delta,
             travel_distance,
         );
@@ -511,7 +544,14 @@ impl TouchCalculator {
             vertical_state,
             &touch_state.touch_events,
         );
-        self.credit_ball_movement(frame, ball, possession_state, fifty_fifty_state, live_play);
+        self.credit_ball_movement(
+            frame,
+            ball,
+            players,
+            possession_state,
+            fifty_fifty_state,
+            live_play,
+        );
         self.previous_ball_velocity = ball.velocity();
 
         if let Some(player_id) = touch_state.last_touch_player.as_ref() {

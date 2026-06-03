@@ -836,6 +836,16 @@ impl<'a> ReplayProcessor<'a> {
             .map(|rigid_body| self.normalize_rigid_body(rigid_body))
     }
 
+    /// Returns the player's current normalized car position.
+    pub(crate) fn get_normalized_player_position(
+        &self,
+        player_id: &PlayerId,
+    ) -> Option<boxcars::Vector3f> {
+        self.get_normalized_player_rigid_body(player_id)
+            .ok()
+            .map(|rigid_body| rigid_body.location)
+    }
+
     /// Returns the player's rigid body and the frame where it was last updated.
     pub fn get_player_rigid_body_and_updated(
         &self,

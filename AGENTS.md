@@ -53,7 +53,12 @@ The same core pipeline is exposed through Python and JavaScript bindings.
 
 ## Common Commands
 
-- Rust formatting and checks generally use `cargo fmt` and `cargo test`.
+- Rust formatting generally uses `cargo fmt`.
+- For Rust tests, default to targeted commands for the specific behavior under
+  investigation, such as `cargo test path::to::test_name` or
+  `cargo test module_name`. Do not run the entire local `cargo test` suite by
+  default; only run the whole suite when there is a concrete reason, such as a
+  broad cross-cutting change or an explicit user request.
 - Rust build and maintenance commands should use `cargo ...`; `cargo clean`
   is acceptable when stale build artifacts are the issue.
 - JavaScript package work under `js/` commonly uses `npm install`,

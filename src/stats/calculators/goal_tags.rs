@@ -69,6 +69,8 @@ pub struct GoalTagEvidence {
     pub frame: usize,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<GoalContextPosition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -81,6 +83,8 @@ pub struct GoalTagEvent {
     pub scoring_team_is_team_0: bool,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub scorer: Option<PlayerId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scorer_position: Option<GoalContextPosition>,
     pub confidence: f32,
     pub modifiers: Vec<GoalTagModifier>,
     pub evidence: Vec<GoalTagEvidence>,
@@ -1104,6 +1108,12 @@ fn goal_context_evidence(goal: &GoalContextEvent) -> GoalTagEvidence {
         time: goal.time,
         frame: goal.frame,
         player: goal.scorer.clone(),
+        player_position: goal.scorer.as_ref().and_then(|scorer| {
+            goal.players
+                .iter()
+                .find(|player| &player.player == scorer)
+                .and_then(|player| player.position)
+        }),
     }
 }
 
@@ -1113,6 +1123,7 @@ fn last_touch_evidence(touch: &GoalTouchContext) -> GoalTagEvidence {
         time: touch.time,
         frame: touch.frame,
         player: Some(touch.player.clone()),
+        player_position: None,
     }
 }
 
@@ -1122,6 +1133,7 @@ fn defender_evidence(player: &GoalPlayerContext, goal: &GoalContextEvent) -> Goa
         time: goal.time,
         frame: goal.frame,
         player: Some(player.player.clone()),
+        player_position: player.position,
     }
 }
 
@@ -1131,6 +1143,12 @@ fn goal_buildup_evidence(goal: &GoalContextEvent) -> GoalTagEvidence {
         time: goal.time,
         frame: goal.frame,
         player: goal.scorer.clone(),
+        player_position: goal.scorer.as_ref().and_then(|scorer| {
+            goal.players
+                .iter()
+                .find(|player| &player.player == scorer)
+                .and_then(|player| player.position)
+        }),
     }
 }
 
@@ -1140,6 +1158,7 @@ fn point_mechanic_evidence(event: &impl GoalMechanicPointEvent) -> GoalTagEviden
         time: event.event_time(),
         frame: event.event_frame(),
         player: Some(event.event_player().clone()),
+        player_position: None,
     }
 }
 
@@ -1149,6 +1168,11 @@ fn pass_evidence(event: &PassEvent) -> GoalTagEvidence {
         time: event.time,
         frame: event.frame,
         player: Some(event.passer.clone()),
+        player_position: event.passer_position.map(|position| GoalContextPosition {
+            x: position[0],
+            y: position[1],
+            z: position[2],
+        }),
     }
 }
 
@@ -1158,6 +1182,11 @@ fn air_dribble_evidence(event: &BallCarryEvent) -> GoalTagEvidence {
         time: event.end_time,
         frame: event.end_frame,
         player: Some(event.player_id.clone()),
+        player_position: Some(GoalContextPosition {
+            x: event.end_position[0],
+            y: event.end_position[1],
+            z: event.end_position[2],
+        }),
     }
 }
 
@@ -1167,6 +1196,13 @@ fn half_volley_evidence(candidate: &HalfVolleyEvent) -> GoalTagEvidence {
         time: candidate.time,
         frame: candidate.frame,
         player: Some(candidate.player.clone()),
+        player_position: candidate
+            .player_position
+            .map(|position| GoalContextPosition {
+                x: position[0],
+                y: position[1],
+                z: position[2],
+            }),
     }
 }
 
@@ -1219,6 +1255,13 @@ fn goal_tag_with_modifiers(
         kind,
         scoring_team_is_team_0: ctx.goal.scoring_team_is_team_0,
         scorer: ctx.goal.scorer.clone(),
+        scorer_position: ctx.goal.scorer.as_ref().and_then(|scorer| {
+            ctx.goal
+                .players
+                .iter()
+                .find(|player| &player.player == scorer)
+                .and_then(|player| player.position)
+        }),
         confidence,
         modifiers,
         evidence,
