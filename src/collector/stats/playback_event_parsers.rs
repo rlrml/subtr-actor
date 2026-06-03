@@ -974,3 +974,16 @@ pub(in crate::collector::stats::playback) fn parse_boost_state_event(
         boost_before: json_optional_f32(object.get("boost_before"))?,
     })
 }
+
+pub(in crate::collector::stats::playback) fn parse_boost_stats_event(
+    value: &Value,
+) -> SubtrActorResult<BoostStatsEvent> {
+    let object = json_object(value, "boost stats event")?;
+    Ok(BoostStatsEvent {
+        frame: json_required_usize(object, "frame")?,
+        time: json_required_f32(object, "time")?,
+        player_id: json_required_remote_id(object, "player_id")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        delta: decode_json_value(json_required_value(object, "delta")?.clone())?,
+    })
+}

@@ -65,6 +65,8 @@ pub mod ball_carry_stats;
 pub use ball_carry_stats::*;
 pub mod boost;
 pub use boost::*;
+pub mod boost_stats;
+pub use boost_stats::*;
 pub mod bump;
 pub use bump::*;
 pub mod bump_stats;

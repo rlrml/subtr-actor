@@ -355,6 +355,13 @@ fn compare_timeline_events(
             &right.boost_state,
         )
     })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.boost_stats"),
+            &left.boost_stats,
+            &right.boost_stats,
+        )
+    })
     .or_else(|| compare_serialized_slice(&format!("{label}.bump"), &left.bump, &right.bump))
 }
 

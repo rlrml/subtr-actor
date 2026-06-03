@@ -228,6 +228,7 @@ impl StatsTimelineEventsNode {
             boost_pickups: boost.pickup_comparison_events().to_vec(),
             boost_ledger: boost.ledger_events().to_vec(),
             boost_state: boost.state_events().to_vec(),
+            boost_stats: boost.stats_events().to_vec(),
             bump: bump.events().to_vec(),
         };
         Ok(())
