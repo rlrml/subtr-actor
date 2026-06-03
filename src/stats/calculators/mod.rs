@@ -139,6 +139,8 @@ pub mod possession_state;
 pub use possession_state::*;
 pub mod powerslide;
 pub use powerslide::*;
+pub mod powerslide_stats;
+pub use powerslide_stats::*;
 pub mod pressure;
 pub use pressure::*;
 pub mod rotation;

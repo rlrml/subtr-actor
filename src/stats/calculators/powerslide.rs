@@ -11,28 +11,9 @@ pub struct PowerslideEvent {
     pub active: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct PowerslideStats {
-    pub total_duration: f32,
-    pub press_count: u32,
-}
-
-impl PowerslideStats {
-    pub fn average_duration(&self) -> f32 {
-        if self.press_count == 0 {
-            0.0
-        } else {
-            self.total_duration / self.press_count as f32
-        }
-    }
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct PowerslideCalculator {
-    player_stats: HashMap<PlayerId, PowerslideStats>,
-    team_zero_stats: PowerslideStats,
-    team_one_stats: PowerslideStats,
+    stats: PowerslideStatsAccumulator,
     last_active: HashMap<PlayerId, bool>,
     events: EventStream<PowerslideEvent>,
 }
@@ -43,15 +24,15 @@ impl PowerslideCalculator {
     }
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, PowerslideStats> {
-        &self.player_stats
+        self.stats.player_stats()
     }
 
     pub fn team_zero_stats(&self) -> &PowerslideStats {
-        &self.team_zero_stats
+        self.stats.team_zero_stats()
     }
 
     pub fn team_one_stats(&self) -> &PowerslideStats {
-        &self.team_one_stats
+        self.stats.team_one_stats()
     }
 
     pub fn events(&self) -> &[PowerslideEvent] {
@@ -84,25 +65,14 @@ impl PowerslideCalculator {
                 .get(&player.player_id)
                 .copied()
                 .unwrap_or(false);
-            let stats = self
-                .player_stats
-                .entry(player.player_id.clone())
-                .or_default();
-            let team_stats = if player.is_team_0 {
-                &mut self.team_zero_stats
-            } else {
-                &mut self.team_one_stats
-            };
-
-            if live_play && effective_powerslide {
-                stats.total_duration += frame.dt;
-                team_stats.total_duration += frame.dt;
-            }
-
-            if live_play && effective_powerslide && !previous_active {
-                stats.press_count += 1;
-                team_stats.press_count += 1;
-            }
+            self.stats.apply_sample(
+                &player.player_id,
+                player.is_team_0,
+                effective_powerslide,
+                previous_active,
+                frame.dt,
+                live_play,
+            );
 
             if effective_powerslide != previous_active {
                 self.events.push(PowerslideEvent {
