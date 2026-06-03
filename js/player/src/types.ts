@@ -32,6 +32,7 @@ export type {
   RawPlayerInfo,
   RawPlayerStatEvent,
   RawPlayerStatEventKind,
+  RawReplayTickMark,
   RawReplayFramesData,
   RawRigidBody,
   RawRotation,
@@ -116,6 +117,13 @@ export interface ReplayPlayerTrack {
 
 export type ReplayTimelineEventKind = "goal" | "shot" | "save" | "assist" | "demo" | (string & {});
 
+export interface ReplayTickMark {
+  id?: string;
+  description: string;
+  frame: number | null;
+  time: number;
+}
+
 export interface ReplayTimelineEvent {
   id?: string;
   time: number;
@@ -186,6 +194,7 @@ export interface ReplayModel {
   ballFrames: BallSample[];
   boostPads: ReplayBoostPad[];
   players: ReplayPlayerTrack[];
+  tickMarks: ReplayTickMark[];
   timelineEvents: ReplayTimelineEvent[];
   teamZeroNames: string[];
   teamOneNames: string[];

@@ -63,6 +63,7 @@ function buildReplay(): ReplayModel {
         ],
       },
     ],
+    tickMarks: [],
     timelineEvents: [],
     teamZeroNames: [],
     teamOneNames: [],

@@ -83,7 +83,11 @@ interface TimelineMarkerRecord {
 }
 
 const STYLE_ID = "subtr-actor-timeline-overlay-styles";
-const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>(["goal", "save"]);
+const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>([
+  "goal",
+  "save",
+  "bookmark",
+]);
 const ACTIVE_MARKER_WINDOW_SECONDS = 0.2;
 const DEFAULT_EVENT_SEEK_LEAD_SECONDS = 2;
 const GOAL_EVENT_SEEK_LEAD_SECONDS = 4;
@@ -598,6 +602,8 @@ function eventPriority(event: ReplayTimelineEvent): number {
       return 2;
     case "shot":
       return 1;
+    case "bookmark":
+      return 1;
     default:
       return 0;
   }
@@ -647,6 +653,8 @@ function eventAccent(event: ReplayTimelineEvent): string {
       return "#c084fc";
     case "shot":
       return "#60a5fa";
+    case "bookmark":
+      return "#facc15";
     default:
       return "#d1d9e0";
   }

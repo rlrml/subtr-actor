@@ -501,6 +501,7 @@ pub struct FrameData {
 /// * `dodge_refreshed_events` - Exact counter-derived dodge refresh events from the replay
 /// * `player_stat_events` - Exact shot/save/assist counter increment events
 /// * `goal_events` - Exact goal explosion events with scorer and cumulative score when available
+/// * `replay_tick_marks` - Replay-authored timeline tick marks/bookmarks
 ///
 /// # Example
 ///
@@ -543,6 +544,8 @@ pub struct ReplayData {
     pub player_stat_events: Vec<PlayerStatEvent>,
     /// Exact goal events observed during the replay
     pub goal_events: Vec<GoalEvent>,
+    /// Replay-authored tick marks/bookmarks from the replay body
+    pub replay_tick_marks: Vec<ReplayTickMark>,
 }
 
 impl ReplayData {
@@ -580,6 +583,24 @@ impl ReplayData {
     pub fn as_pretty_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
     }
+}
+
+fn replay_tick_marks(
+    replay: &boxcars::Replay,
+    metadata_frames: &[MetadataFrame],
+) -> Vec<ReplayTickMark> {
+    replay
+        .tick_marks
+        .iter()
+        .map(|tick_mark| ReplayTickMark {
+            description: tick_mark.description.clone(),
+            frame: tick_mark.frame,
+            time: usize::try_from(tick_mark.frame)
+                .ok()
+                .and_then(|frame| metadata_frames.get(frame))
+                .map(|frame| frame.time),
+        })
+        .collect()
 }
 
 impl FrameData {
@@ -721,6 +742,7 @@ impl ReplayDataCollector {
 
     pub fn into_replay_data(self, processor: ReplayProcessor<'_>) -> SubtrActorResult<ReplayData> {
         let meta = processor.get_replay_meta()?;
+        let frame_data = self.get_frame_data();
         Ok(ReplayData {
             meta,
             demolish_infos: processor.demolishes().to_vec(),
@@ -730,7 +752,8 @@ impl ReplayDataCollector {
             dodge_refreshed_events: processor.dodge_refreshed_events().to_vec(),
             player_stat_events: processor.player_stat_events().to_vec(),
             goal_events: processor.goal_events().to_vec(),
-            frame_data: self.get_frame_data(),
+            replay_tick_marks: replay_tick_marks(processor.replay, &frame_data.metadata_frames),
+            frame_data,
         })
     }
 

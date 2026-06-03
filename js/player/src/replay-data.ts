@@ -7,6 +7,7 @@ import type {
   RawGoalEvent,
   RawPlayerStatEvent,
   RawPlayerId,
+  RawReplayTickMark,
   PlayerSample,
   RawBallFrame,
   RawPlayerFrame,
@@ -17,6 +18,7 @@ import type {
   ReplayBoostPadSize,
   ReplayModel,
   ReplayPlayerTrack,
+  ReplayTickMark,
   ReplayTimelineEvent,
   Vec3,
   Quaternion,
@@ -280,7 +282,8 @@ function getNormalizationTotalUnits(raw: RawReplayFramesData): number {
   const timelineEventCount =
     (raw.goal_events?.length ?? 0) +
     (raw.player_stat_events?.length ?? 0) +
-    (raw.demolish_infos?.length ?? 0);
+    (raw.demolish_infos?.length ?? 0) +
+    (raw.replay_tick_marks?.length ?? 0);
 
   return [
     Math.max(1, raw.frame_data.metadata_frames.length),
@@ -994,6 +997,75 @@ function createTimelineEventId(prefix: string, frame: number, suffix: string): s
   return `${prefix}:${frame}:${suffix}`;
 }
 
+function tickMarkFrame(tickMark: RawReplayTickMark): number | null {
+  return Number.isInteger(tickMark.frame) && tickMark.frame >= 0 ? tickMark.frame : null;
+}
+
+function tickMarkRawTime(tickMark: RawReplayTickMark, raw: RawReplayFramesData): number | null {
+  if (typeof tickMark.time === "number" && Number.isFinite(tickMark.time)) {
+    return tickMark.time;
+  }
+
+  const frame = tickMarkFrame(tickMark);
+  if (frame === null) {
+    return null;
+  }
+
+  const frameTime = raw.frame_data.metadata_frames[frame]?.time;
+  return typeof frameTime === "number" && Number.isFinite(frameTime) ? frameTime : null;
+}
+
+function replayTickMarkId(tickMark: RawReplayTickMark, index: number): string {
+  const frame = tickMarkFrame(tickMark);
+  return `bookmark:${frame ?? "unknown"}:${tickMark.description || "tick-mark"}:${index}`;
+}
+
+function buildReplayTickMarks(
+  raw: RawReplayFramesData,
+  startTime: number,
+  progressTracker?: NormalizeReplayProgressTracker,
+): ReplayTickMark[] {
+  return (raw.replay_tick_marks ?? []).flatMap((tickMark, index) => {
+    progressTracker?.advance();
+    const rawTime = tickMarkRawTime(tickMark, raw);
+    if (rawTime === null) {
+      return [];
+    }
+
+    return [
+      {
+        id: replayTickMarkId(tickMark, index),
+        description: tickMark.description,
+        frame: tickMarkFrame(tickMark),
+        time: normalizeReplayTime(rawTime, startTime),
+      },
+    ];
+  });
+}
+
+function replayTickMarkTimelineEvent(tickMark: ReplayTickMark): ReplayTimelineEvent {
+  const label = tickMark.description.trim() || "Replay bookmark";
+  return {
+    id: tickMark.id,
+    time: tickMark.time,
+    seekTime: tickMark.time,
+    frame: tickMark.frame ?? undefined,
+    kind: "bookmark",
+    label,
+    shortLabel: "BM",
+    iconName: "bookmark",
+  };
+}
+
+function sortTimelineEvents(events: ReplayTimelineEvent[]): ReplayTimelineEvent[] {
+  return events.sort((left, right) => {
+    if (left.time !== right.time) {
+      return left.time - right.time;
+    }
+    return (left.frame ?? 0) - (right.frame ?? 0);
+  });
+}
+
 function goalTimelineEvent(
   event: RawGoalEvent,
   playersById: Map<string, ReplayPlayerTrack>,
@@ -1068,6 +1140,7 @@ function demoTimelineEvent(
 function buildTimelineEvents(
   raw: RawReplayFramesData,
   players: ReplayPlayerTrack[],
+  tickMarks: ReplayTickMark[],
   startTime: number,
   progressTracker?: NormalizeReplayProgressTracker,
 ): ReplayTimelineEvent[] {
@@ -1089,21 +1162,21 @@ function buildTimelineEvents(
     progressTracker?.advance();
   }
 
+  for (const tickMark of tickMarks) {
+    timelineEvents.push(replayTickMarkTimelineEvent(tickMark));
+  }
+
   if (timelineEvents.length === 0) {
     progressTracker?.advance();
   }
 
-  return timelineEvents.sort((left, right) => {
-    if (left.time !== right.time) {
-      return left.time - right.time;
-    }
-    return (left.frame ?? 0) - (right.frame ?? 0);
-  });
+  return sortTimelineEvents(timelineEvents);
 }
 
 async function buildTimelineEventsAsync(
   raw: RawReplayFramesData,
   players: ReplayPlayerTrack[],
+  tickMarks: ReplayTickMark[],
   startTime: number,
   progressTracker: AsyncNormalizeReplayProgressTracker,
 ): Promise<ReplayTimelineEvent[]> {
@@ -1131,16 +1204,15 @@ async function buildTimelineEventsAsync(
     }
   }
 
+  for (const tickMark of tickMarks) {
+    timelineEvents.push(replayTickMarkTimelineEvent(tickMark));
+  }
+
   if (timelineEvents.length === 0 && progressTracker.advance()) {
     await progressTracker.yieldToMainThread();
   }
 
-  return timelineEvents.sort((left, right) => {
-    if (left.time !== right.time) {
-      return left.time - right.time;
-    }
-    return (left.frame ?? 0) - (right.frame ?? 0);
-  });
+  return sortTimelineEvents(timelineEvents);
 }
 
 export function normalizeReplayData(
@@ -1156,7 +1228,8 @@ export function normalizeReplayData(
   const players = buildPlayerTracks(raw, progressTracker);
   const ballFrames = buildBallFrames(raw, progressTracker);
   const boostPads = buildBoostPads(raw, players, startTime, progressTracker);
-  const timelineEvents = buildTimelineEvents(raw, players, startTime, progressTracker);
+  const tickMarks = buildReplayTickMarks(raw, startTime, progressTracker);
+  const timelineEvents = buildTimelineEvents(raw, players, tickMarks, startTime, progressTracker);
   progressTracker.finish();
 
   return {
@@ -1166,6 +1239,7 @@ export function normalizeReplayData(
     ballFrames,
     boostPads,
     players,
+    tickMarks,
     timelineEvents,
     teamZeroNames: raw.meta.team_zero.map((player) => player.name),
     teamOneNames: raw.meta.team_one.map((player) => player.name),
@@ -1182,7 +1256,14 @@ export async function normalizeReplayDataAsync(
   const players = await buildPlayerTracksAsync(raw, progressTracker);
   const ballFrames = await buildBallFramesAsync(raw, progressTracker);
   const boostPads = await buildBoostPadsAsync(raw, players, startTime, progressTracker);
-  const timelineEvents = await buildTimelineEventsAsync(raw, players, startTime, progressTracker);
+  const tickMarks = buildReplayTickMarks(raw, startTime, progressTracker);
+  const timelineEvents = await buildTimelineEventsAsync(
+    raw,
+    players,
+    tickMarks,
+    startTime,
+    progressTracker,
+  );
   progressTracker.finish();
 
   return {
@@ -1192,6 +1273,7 @@ export async function normalizeReplayDataAsync(
     ballFrames,
     boostPads,
     players,
+    tickMarks,
     timelineEvents,
     teamZeroNames: raw.meta.team_zero.map((player) => player.name),
     teamOneNames: raw.meta.team_one.map((player) => player.name),

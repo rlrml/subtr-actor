@@ -135,6 +135,7 @@ export type {
   ReplayPlayerStatePatch,
   ReplayPlayerTrack,
   ReplaySource,
+  ReplayTickMark,
   ReplayTimelineEvent,
   ReplayTimelineEventKind,
   ReplayTimelineEventSource,

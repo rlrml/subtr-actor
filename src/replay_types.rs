@@ -143,6 +143,20 @@ pub struct GoalEvent {
     pub team_one_score: Option<i32>,
 }
 
+/// A replay tick mark stored in the replay file.
+///
+/// Rocket League/Boxcars use tick marks for replay timeline annotations such as
+/// goal markers and other saved replay highlights. The frame is preserved from
+/// the replay body; `time` is resolved from collected frame metadata when that
+/// frame is present in the processed replay.
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ReplayTickMark {
+    pub description: String,
+    pub frame: i32,
+    pub time: Option<f32>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub enum PlayerStatEventKind {

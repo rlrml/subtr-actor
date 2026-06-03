@@ -107,6 +107,7 @@ const replayData: RawReplayFramesData = {
   dodge_refreshed_events: [],
   player_stat_events: [],
   goal_events: [],
+  replay_tick_marks: [],
 };
 
 test("async replay normalization matches sync output and can yield progress", async () => {
