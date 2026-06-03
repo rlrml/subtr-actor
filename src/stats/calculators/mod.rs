@@ -81,6 +81,8 @@ mod flip_reset_tuning_set;
 pub use flip_reset_tuning_set::*;
 pub mod dodge_reset;
 pub use dodge_reset::*;
+pub mod dodge_reset_stats;
+pub use dodge_reset_stats::*;
 pub mod double_tap;
 pub use double_tap::*;
 pub mod double_tap_stats;
