@@ -22,8 +22,13 @@ PLUGIN_README = REPO_ROOT / "bakkesmod/README.md"
 ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakkesmod.h"
 WEB_PLAYER_CONFIG_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/playerConfig.ts"
 WEB_PLAYER_MAIN_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/main.ts"
+WEB_PLAYER_SOURCE_DIR = REPO_ROOT / "js/stat-evaluation-player/src"
 WEB_PLAYER_STYLES_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/styles.css"
+WEB_PLAYER_STYLES_DIR = REPO_ROOT / "js/stat-evaluation-player/src/styles"
 WEB_PLAYER_TEMPLATE_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/appTemplate.ts"
+WEB_PLAYER_FLOATING_WINDOWS_SOURCE = (
+    REPO_ROOT / "js/stat-evaluation-player/src/floatingWindows.ts"
+)
 WEB_PLAYER_TIMELINE_MARKERS_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/timelineMarkers.ts"
 WEB_PLAYER_BOOST_PICKUP_FILTERS_SOURCE = (
     REPO_ROOT / "js/stat-evaluation-player/src/boostPickupFilters.ts"
@@ -187,6 +192,34 @@ REQUIRED_PLUGIN_ABI_EXPORTS = (
 
 def quoted_strings(value: str) -> list[str]:
     return re.findall(r'"([^"]+)"', value)
+
+
+def expand_local_cpp_includes(source_path: Path, source: str) -> str:
+    include_pattern = re.compile(r'^\s*#include\s+"([^"]+\.cpp)"\s*$', re.MULTILINE)
+
+    def replace_include(match: re.Match[str]) -> str:
+        include_path = source_path.parent / match.group(1)
+        if not include_path.exists():
+            return match.group(0)
+        return include_path.read_text(encoding="utf-8")
+
+    return include_pattern.sub(replace_include, source)
+
+
+def read_web_player_sources() -> str:
+    ignored_suffixes = (".test.ts", ".slow-test.ts", ".test-helper.ts")
+    sources: list[str] = []
+    for path in sorted(WEB_PLAYER_SOURCE_DIR.rglob("*.ts")):
+        if "generated" in path.parts or path.name.endswith(ignored_suffixes):
+            continue
+        sources.append(path.read_text(encoding="utf-8"))
+    return "\n".join(sources)
+
+
+def read_web_player_styles() -> str:
+    sources = [WEB_PLAYER_STYLES_SOURCE.read_text(encoding="utf-8")]
+    sources.extend(path.read_text(encoding="utf-8") for path in sorted(WEB_PLAYER_STYLES_DIR.glob("*.css")))
+    return "\n".join(sources)
 
 
 def rust_array(source: str, name: str) -> list[str]:
@@ -420,7 +453,7 @@ def stats_window_kind_details(source: str) -> dict[str, tuple[str, bool, bool, b
 
 def web_stats_window_titles(source: str) -> dict[str, str]:
     match = re.search(
-        r"function\s+getStatsWindowTitle\([^)]*\):\s*string\s*\{(?P<body>.*?)\n\}",
+        r"(?:function\s+|(?:private\s+)?)getStatsWindowTitle\([^)]*\):\s*string\s*\{(?P<body>.*?)\n\s{2}\}",
         source,
         re.DOTALL,
     )
@@ -440,7 +473,7 @@ def web_stats_window_titles(source: str) -> dict[str, str]:
 
 def web_stats_window_scope_selector_ids(source: str) -> tuple[str, ...]:
     match = re.search(
-        r"function\s+hasStatsWindowScopeSelector\([^)]*\):\s*boolean\s*\{\s*"
+        r"(?:function\s+|(?:private\s+)?)hasStatsWindowScopeSelector\([^)]*\):\s*boolean\s*\{\s*"
         r"return\s+(?P<body>.*?);\s*\}",
         source,
         re.DOTALL,
@@ -452,7 +485,7 @@ def web_stats_window_scope_selector_ids(source: str) -> tuple[str, ...]:
 
 def web_stats_window_stat_picker_ids(source: str, kind_ids: tuple[str, ...]) -> tuple[str, ...]:
     match = re.search(
-        r"function\s+hasStatsWindowStatPicker\([^)]*\):\s*boolean\s*\{\s*"
+        r"(?:function\s+|(?:private\s+)?)hasStatsWindowStatPicker\([^)]*\):\s*boolean\s*\{\s*"
         r"return\s+(?P<body>.*?);\s*\}",
         source,
         re.DOTALL,
@@ -468,14 +501,20 @@ def web_stats_window_stat_picker_ids(source: str, kind_ids: tuple[str, ...]) -> 
 
 def main() -> int:
     rust_source = RUST_SOURCE.read_text(encoding="utf-8")
-    plugin_source = PLUGIN_SOURCE.read_text(encoding="utf-8")
+    plugin_source = expand_local_cpp_includes(
+        PLUGIN_SOURCE,
+        PLUGIN_SOURCE.read_text(encoding="utf-8"),
+    )
     plugin_header = PLUGIN_HEADER.read_text(encoding="utf-8")
     plugin_readme_source = PLUGIN_README.read_text(encoding="utf-8")
     abi_header = ABI_HEADER.read_text(encoding="utf-8")
     web_player_config_source = WEB_PLAYER_CONFIG_SOURCE.read_text(encoding="utf-8")
-    web_player_main_source = WEB_PLAYER_MAIN_SOURCE.read_text(encoding="utf-8")
-    web_player_styles_source = WEB_PLAYER_STYLES_SOURCE.read_text(encoding="utf-8")
+    web_player_main_source = read_web_player_sources()
+    web_player_styles_source = read_web_player_styles()
     web_player_template_source = WEB_PLAYER_TEMPLATE_SOURCE.read_text(encoding="utf-8")
+    web_player_floating_windows_source = WEB_PLAYER_FLOATING_WINDOWS_SOURCE.read_text(
+        encoding="utf-8"
+    )
     web_player_timeline_markers_source = WEB_PLAYER_TIMELINE_MARKERS_SOURCE.read_text(
         encoding="utf-8"
     )
@@ -507,7 +546,9 @@ def main() -> int:
     web_singleton_type_ids = tuple(
         ts_type_alias_strings(web_player_config_source, "SingletonWindowId")
     )
-    web_singleton_window_ids = tuple(ts_array(web_player_main_source, "SINGLETON_WINDOW_IDS"))
+    web_singleton_window_ids = tuple(
+        ts_array(web_player_floating_windows_source, "SINGLETON_WINDOW_IDS")
+    )
     if web_singleton_window_ids != web_singleton_type_ids:
         errors.append(
             "stats evaluation player singleton window order differs from its config type: "
