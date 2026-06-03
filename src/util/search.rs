@@ -31,15 +31,21 @@ where
     F: Fn(&T) -> Option<R>,
 {
     match direction {
-        SearchDirection::Forward => items
-            .iter()
-            .enumerate()
-            .skip(current_index + 1)
-            .find_map(|(i, item)| predicate(item).map(|res| (i, res))),
-        SearchDirection::Backward => items[..current_index]
+        SearchDirection::Forward => current_index.checked_add(1).and_then(|start| {
+            items
+                .iter()
+                .enumerate()
+                .skip(start)
+                .find_map(|(i, item)| predicate(item).map(|res| (i, res)))
+        }),
+        SearchDirection::Backward => items[..current_index.min(items.len())]
             .iter()
             .enumerate()
             .rev()
             .find_map(|(i, item)| predicate(item).map(|res| (i, res))),
     }
 }
+
+#[cfg(test)]
+#[path = "search_tests.rs"]
+mod tests;

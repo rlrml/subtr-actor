@@ -32,3 +32,7 @@ pub struct FlipResetTuningManifest {
     pub min_rank: String,
     pub replays: Vec<FlipResetTuningReplay>,
 }
+
+#[cfg(test)]
+#[path = "flip_reset_tests.rs"]
+mod tests;
