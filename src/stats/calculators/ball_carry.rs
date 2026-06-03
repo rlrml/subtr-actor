@@ -121,7 +121,7 @@ pub struct BallCarryCalculator {
     team_one_stats: BallCarryStats,
     team_zero_air_dribble_stats: AirDribbleStats,
     team_one_air_dribble_stats: AirDribbleStats,
-    carry_events: Vec<BallCarryEvent>,
+    carry_events: EventStream<BallCarryEvent>,
     processed_control_sequence_count: usize,
 }
 
@@ -155,7 +155,11 @@ impl BallCarryCalculator {
     }
 
     pub fn carry_events(&self) -> &[BallCarryEvent] {
-        &self.carry_events
+        self.carry_events.all()
+    }
+
+    pub fn new_carry_events(&self) -> &[BallCarryEvent] {
+        self.carry_events.new_events()
     }
 
     pub(crate) fn carry_frame_sample(
@@ -368,6 +372,7 @@ impl BallCarryCalculator {
     }
 
     pub fn update(&mut self, control_state: &ContinuousBallControlState) -> SubtrActorResult<()> {
+        self.carry_events.begin_update();
         for sequence in control_state
             .completed_sequences
             .iter()

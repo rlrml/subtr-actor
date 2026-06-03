@@ -622,16 +622,16 @@ pub struct MatchStatsCalculator {
     last_emitted_player_stats: HashMap<PlayerId, CorePlayerStats>,
     last_emitted_team_zero_stats: CoreTeamStats,
     last_emitted_team_one_stats: CoreTeamStats,
-    core_player_events: Vec<CorePlayerStatsEvent>,
-    core_team_events: Vec<CoreTeamStatsEvent>,
-    timeline: Vec<TimelineEvent>,
+    core_player_events: EventStream<CorePlayerStatsEvent>,
+    core_team_events: EventStream<CoreTeamStatsEvent>,
+    timeline: EventStream<TimelineEvent>,
     pending_goal_events: Vec<PendingGoalEvent>,
     previous_team_scores: Option<(i32, i32)>,
     kickoff_waiting_for_first_touch: bool,
     active_kickoff_touch_time: Option<f32>,
     goal_buildup_samples: Vec<GoalBuildupSample>,
     goal_buildup_pressure_events: Vec<GoalBuildupPressureEvent>,
-    goal_context_events: Vec<GoalContextEvent>,
+    goal_context_events: EventStream<GoalContextEvent>,
     last_touch_context_by_player: HashMap<PlayerId, GoalTouchContext>,
     boost_leadup_samples_by_player: HashMap<PlayerId, VecDeque<BoostLeadupSample>>,
     last_ball_ground_contact_time: Option<f32>,
@@ -647,19 +647,35 @@ impl MatchStatsCalculator {
     }
 
     pub fn timeline(&self) -> &[TimelineEvent] {
-        &self.timeline
+        self.timeline.all()
+    }
+
+    pub fn new_timeline_events(&self) -> &[TimelineEvent] {
+        self.timeline.new_events()
     }
 
     pub fn goal_context_events(&self) -> &[GoalContextEvent] {
-        &self.goal_context_events
+        self.goal_context_events.all()
+    }
+
+    pub fn new_goal_context_events(&self) -> &[GoalContextEvent] {
+        self.goal_context_events.new_events()
     }
 
     pub fn core_player_events(&self) -> &[CorePlayerStatsEvent] {
-        &self.core_player_events
+        self.core_player_events.all()
+    }
+
+    pub fn new_core_player_events(&self) -> &[CorePlayerStatsEvent] {
+        self.core_player_events.new_events()
     }
 
     pub fn core_team_events(&self) -> &[CoreTeamStatsEvent] {
-        &self.core_team_events
+        self.core_team_events.all()
+    }
+
+    pub fn new_core_team_events(&self) -> &[CoreTeamStatsEvent] {
+        self.core_team_events.new_events()
     }
 }
 
@@ -675,6 +691,10 @@ impl MatchStatsCalculator {
         live_play_state: &LivePlayState,
         touch_state: &TouchState,
     ) -> SubtrActorResult<()> {
+        self.timeline.begin_update();
+        self.goal_context_events.begin_update();
+        self.core_player_events.begin_update();
+        self.core_team_events.begin_update();
         self.update_kickoff_reference(gameplay, events);
         self.prune_goal_buildup_samples(frame.time);
         self.update_ball_ground_contact(frame, ball);

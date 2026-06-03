@@ -109,7 +109,7 @@ struct RecentDodgeStart {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct MustyFlickCalculator {
     player_stats: HashMap<PlayerId, MustyFlickStats>,
-    events: Vec<MustyFlickEvent>,
+    events: EventStream<MustyFlickEvent>,
     recent_dodge_starts: HashMap<PlayerId, RecentDodgeStart>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     previous_ball_velocity: Option<glam::Vec3>,
@@ -126,7 +126,11 @@ impl MustyFlickCalculator {
     }
 
     pub fn events(&self) -> &[MustyFlickEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[MustyFlickEvent] {
+        self.events.new_events()
     }
 
     fn begin_sample(&mut self, frame: &FrameInfo) {
@@ -378,6 +382,7 @@ impl MustyFlickCalculator {
         touch_events: &[TouchEvent],
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if !live_play {
             self.reset_live_play_state(ball);
             return Ok(());

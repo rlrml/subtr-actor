@@ -235,6 +235,10 @@ pub(super) fn player_id_sort_key(player_id: &PlayerId) -> String {
 
 impl MatchStatsCalculator {
     pub fn finish(&mut self) -> SubtrActorResult<()> {
+        self.timeline.begin_update();
+        self.goal_context_events.begin_update();
+        self.core_player_events.begin_update();
+        self.core_team_events.begin_update();
         let pending_goal_events = std::mem::take(&mut self.pending_goal_events);
         for pending_goal_event in pending_goal_events {
             let Some(scorer) = pending_goal_event.event.player.clone() else {

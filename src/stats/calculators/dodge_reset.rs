@@ -42,9 +42,9 @@ pub struct DodgeResetStats {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DodgeResetCalculator {
     player_stats: HashMap<PlayerId, DodgeResetStats>,
-    events: Vec<DodgeResetEvent>,
-    on_ball_events: Vec<DodgeRefreshedEvent>,
-    confirmed_flip_reset_events: Vec<ConfirmedFlipResetEvent>,
+    events: EventStream<DodgeResetEvent>,
+    on_ball_events: EventStream<DodgeRefreshedEvent>,
+    confirmed_flip_reset_events: EventStream<ConfirmedFlipResetEvent>,
     pending_on_ball_resets: HashMap<PlayerId, DodgeRefreshedEvent>,
     pending_reset_dodge_started: HashSet<PlayerId>,
     previous_dodge_active: HashMap<PlayerId, bool>,
@@ -60,15 +60,27 @@ impl DodgeResetCalculator {
     }
 
     pub fn events(&self) -> &[DodgeResetEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[DodgeResetEvent] {
+        self.events.new_events()
     }
 
     pub fn on_ball_events(&self) -> &[DodgeRefreshedEvent] {
-        &self.on_ball_events
+        self.on_ball_events.all()
+    }
+
+    pub fn new_on_ball_events(&self) -> &[DodgeRefreshedEvent] {
+        self.on_ball_events.new_events()
     }
 
     pub fn confirmed_flip_reset_events(&self) -> &[ConfirmedFlipResetEvent] {
-        &self.confirmed_flip_reset_events
+        self.confirmed_flip_reset_events.all()
+    }
+
+    pub fn new_confirmed_flip_reset_events(&self) -> &[ConfirmedFlipResetEvent] {
+        self.confirmed_flip_reset_events.new_events()
     }
 
     fn player<'a>(players: &'a PlayerFrameState, player_id: &PlayerId) -> Option<&'a PlayerSample> {
@@ -207,6 +219,9 @@ impl DodgeResetCalculator {
         players: &PlayerFrameState,
         events: &FrameEventsState,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
+        self.on_ball_events.begin_update();
+        self.confirmed_flip_reset_events.begin_update();
         self.prune_pending_resets(players);
         for event in &events.dodge_refreshed_events {
             let on_ball = Self::on_ball_dodge_reset(ball, players, &event.player);

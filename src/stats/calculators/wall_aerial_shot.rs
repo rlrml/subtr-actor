@@ -96,7 +96,7 @@ struct ArmedWallAerialShot {
 #[derive(Debug, Clone, Default)]
 pub struct WallAerialShotCalculator {
     player_stats: HashMap<PlayerId, WallAerialShotStats>,
-    events: Vec<WallAerialShotEvent>,
+    events: EventStream<WallAerialShotEvent>,
     recent_wall_contacts: HashMap<PlayerId, RecentWallContact>,
     armed_shots: HashMap<PlayerId, ArmedWallAerialShot>,
     current_last_wall_aerial_shot_player: Option<PlayerId>,
@@ -112,7 +112,11 @@ impl WallAerialShotCalculator {
     }
 
     pub fn events(&self) -> &[WallAerialShotEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[WallAerialShotEvent] {
+        self.events.new_events()
     }
 
     fn begin_sample(&mut self, frame: &FrameInfo) {
@@ -300,6 +304,7 @@ impl WallAerialShotCalculator {
         frame_events: &FrameEventsState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         self.begin_sample(frame);
         if !live_play {
             self.recent_wall_contacts.clear();

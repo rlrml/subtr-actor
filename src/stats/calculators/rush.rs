@@ -231,7 +231,7 @@ pub struct RushTeamStats {
 pub struct RushCalculator {
     config: RushCalculatorConfig,
     stats: RushStats,
-    events: Vec<RushEvent>,
+    events: EventStream<RushEvent>,
     active_rush: Option<ActiveRush>,
 }
 
@@ -256,7 +256,11 @@ impl RushCalculator {
     }
 
     pub fn events(&self) -> &[RushEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[RushEvent] {
+        self.events.new_events()
     }
 
     fn record_active_rush(&mut self, active_rush: &mut ActiveRush) {
@@ -447,6 +451,7 @@ impl RushCalculator {
         possession_state: &PossessionState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if !live_play_state.is_live_play || gameplay.kickoff_phase_active() {
             self.finalize_active_rush();
             return Ok(());
@@ -464,6 +469,7 @@ impl RushCalculator {
         Ok(())
     }
     pub fn finish_calculation(&mut self) -> SubtrActorResult<()> {
+        self.events.begin_update();
         self.finalize_active_rush();
         Ok(())
     }

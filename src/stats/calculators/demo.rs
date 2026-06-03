@@ -21,7 +21,7 @@ pub struct DemoCalculator {
     player_teams: HashMap<PlayerId, bool>,
     team_zero_stats: DemoTeamStats,
     team_one_stats: DemoTeamStats,
-    timeline: Vec<TimelineEvent>,
+    timeline: EventStream<TimelineEvent>,
     last_seen_frame: HashMap<(PlayerId, PlayerId), usize>,
     active_pairs: HashSet<(PlayerId, PlayerId)>,
 }
@@ -44,7 +44,11 @@ impl DemoCalculator {
     }
 
     pub fn timeline(&self) -> &[TimelineEvent] {
-        &self.timeline
+        self.timeline.all()
+    }
+
+    pub fn new_timeline_events(&self) -> &[TimelineEvent] {
+        self.timeline.new_events()
     }
 
     fn should_count_demo(
@@ -71,6 +75,7 @@ impl DemoCalculator {
         players: &PlayerFrameState,
         events: &FrameEventsState,
     ) -> SubtrActorResult<()> {
+        self.timeline.begin_update();
         for player in &players.players {
             self.player_teams
                 .insert(player.player_id.clone(), player.is_team_0);

@@ -150,7 +150,7 @@ impl Default for PressureCalculatorConfig {
 pub struct PressureCalculator {
     config: PressureCalculatorConfig,
     stats: PressureStats,
-    events: Vec<PressureEvent>,
+    events: EventStream<PressureEvent>,
     last_emitted_event_state: Option<PressureEventState>,
 }
 
@@ -177,7 +177,11 @@ impl PressureCalculator {
     }
 
     pub fn events(&self) -> &[PressureEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[PressureEvent] {
+        self.events.new_events()
     }
 
     pub fn config(&self) -> &PressureCalculatorConfig {
@@ -246,6 +250,7 @@ impl PressureCalculator {
         ball: &BallFrameState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if !live_play_state.is_live_play {
             self.emit_event_if_changed(frame, false, PressureHalfLabel::Neutral);
             return Ok(());

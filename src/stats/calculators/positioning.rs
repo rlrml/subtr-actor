@@ -279,7 +279,7 @@ pub struct PositioningCalculator {
     player_stats: HashMap<PlayerId, PositioningStats>,
     previous_ball_position: Option<glam::Vec3>,
     previous_player_positions: HashMap<PlayerId, glam::Vec3>,
-    events: Vec<PositioningEvent>,
+    events: EventStream<PositioningEvent>,
 }
 
 impl PositioningCalculator {
@@ -303,7 +303,11 @@ impl PositioningCalculator {
     }
 
     pub fn events(&self) -> &[PositioningEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[PositioningEvent] {
+        self.events.new_events()
     }
 
     fn event_delta<'a>(
@@ -766,6 +770,7 @@ impl PositioningCalculator {
         live_play: bool,
         possession_player_before_sample: Option<&PlayerId>,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         self.process_sample(
             frame,
             gameplay,

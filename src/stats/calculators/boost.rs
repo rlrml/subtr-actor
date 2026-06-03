@@ -231,9 +231,9 @@ pub struct BoostCalculator {
     inactive_pickup_frames: HashSet<(PlayerId, usize, BoostPadSize)>,
     last_pickup_times: HashMap<String, f32>,
     pending_inferred_pickups: VecDeque<PendingBoostPickupEvent>,
-    pickup_comparison_events: Vec<BoostPickupComparisonEvent>,
-    ledger_events: Vec<BoostLedgerEvent>,
-    state_events: Vec<BoostStateEvent>,
+    pickup_comparison_events: EventStream<BoostPickupComparisonEvent>,
+    ledger_events: EventStream<BoostLedgerEvent>,
+    state_events: EventStream<BoostStateEvent>,
     kickoff_phase_active_last_frame: bool,
     kickoff_respawn_awarded: HashSet<PlayerId>,
     initial_respawn_awarded: HashSet<PlayerId>,
@@ -313,15 +313,27 @@ impl BoostCalculator {
     }
 
     pub fn pickup_comparison_events(&self) -> &[BoostPickupComparisonEvent] {
-        &self.pickup_comparison_events
+        self.pickup_comparison_events.all()
+    }
+
+    pub fn new_pickup_comparison_events(&self) -> &[BoostPickupComparisonEvent] {
+        self.pickup_comparison_events.new_events()
     }
 
     pub fn ledger_events(&self) -> &[BoostLedgerEvent] {
-        &self.ledger_events
+        self.ledger_events.all()
+    }
+
+    pub fn new_ledger_events(&self) -> &[BoostLedgerEvent] {
+        self.ledger_events.new_events()
     }
 
     pub fn state_events(&self) -> &[BoostStateEvent] {
-        &self.state_events
+        self.state_events.all()
+    }
+
+    pub fn new_state_events(&self) -> &[BoostStateEvent] {
+        self.state_events.new_events()
     }
 
     fn record_ledger_event(&mut self, event: BoostLedgerEvent) {
@@ -345,6 +357,9 @@ impl BoostCalculator {
         vertical_state: &PlayerVerticalState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.pickup_comparison_events.begin_update();
+        self.ledger_events.begin_update();
+        self.state_events.begin_update();
         let boost_levels_live = Self::boost_levels_live(live_play);
         let track_boost_levels = Self::tracks_boost_levels(boost_levels_live);
         let track_boost_pickups = Self::tracks_boost_pickups(gameplay, live_play);

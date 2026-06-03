@@ -106,7 +106,7 @@ struct ActiveHalfFlipCandidate {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct HalfFlipCalculator {
     player_stats: HashMap<PlayerId, HalfFlipStats>,
-    events: Vec<HalfFlipEvent>,
+    events: EventStream<HalfFlipEvent>,
     active_candidates: HashMap<PlayerId, ActiveHalfFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     current_last_half_flip_player: Option<PlayerId>,
@@ -122,7 +122,11 @@ impl HalfFlipCalculator {
     }
 
     pub fn events(&self) -> &[HalfFlipEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[HalfFlipEvent] {
+        self.events.new_events()
     }
 
     fn normalize_score(value: f32, min_value: f32, max_value: f32) -> f32 {
@@ -373,6 +377,7 @@ impl HalfFlipCalculator {
         players: &PlayerFrameState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         if !live_play {
             self.active_candidates.clear();
             self.current_last_half_flip_player = None;

@@ -252,8 +252,8 @@ pub struct RotationCalculator {
     team_one_stats: RotationTeamStats,
     team_zero_tracker: TeamFirstManTracker,
     team_one_tracker: TeamFirstManTracker,
-    player_events: Vec<RotationPlayerEvent>,
-    team_events: Vec<RotationTeamEvent>,
+    player_events: EventStream<RotationPlayerEvent>,
+    team_events: EventStream<RotationTeamEvent>,
     last_emitted_player_states: HashMap<PlayerId, RotationPlayerEventState>,
     first_man_stints: HashMap<PlayerId, FirstManStintState>,
 }
@@ -287,11 +287,19 @@ impl RotationCalculator {
     }
 
     pub fn player_events(&self) -> &[RotationPlayerEvent] {
-        &self.player_events
+        self.player_events.all()
+    }
+
+    pub fn new_player_events(&self) -> &[RotationPlayerEvent] {
+        self.player_events.new_events()
     }
 
     pub fn team_events(&self) -> &[RotationTeamEvent] {
-        &self.team_events
+        self.team_events.all()
+    }
+
+    pub fn new_team_events(&self) -> &[RotationTeamEvent] {
+        self.team_events.new_events()
     }
 
     pub fn update(
@@ -303,6 +311,8 @@ impl RotationCalculator {
         events: &FrameEventsState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.player_events.begin_update();
+        self.team_events.begin_update();
         if frame.dt == 0.0 {
             return Ok(());
         }
