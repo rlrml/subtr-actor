@@ -16,96 +16,6 @@ pub enum TerritorialPressureEndReason {
     ReplayEnd,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct TerritorialPressureStats {
-    pub tracked_time: f32,
-    pub team_zero_session_count: u32,
-    pub team_one_session_count: u32,
-    pub team_zero_session_time: f32,
-    pub team_one_session_time: f32,
-    pub team_zero_offensive_half_time: f32,
-    pub team_one_offensive_half_time: f32,
-    pub team_zero_offensive_third_time: f32,
-    pub team_one_offensive_third_time: f32,
-    pub team_zero_longest_session_time: f32,
-    pub team_one_longest_session_time: f32,
-    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
-    pub labeled_session_counts: LabeledCounts,
-    #[serde(default, skip_serializing_if = "LabeledFloatSums::is_empty")]
-    pub labeled_time: LabeledFloatSums,
-}
-
-impl TerritorialPressureStats {
-    pub fn for_team(&self, is_team_zero: bool) -> TerritorialPressureTeamStats {
-        let (
-            session_count,
-            opponent_session_count,
-            session_time,
-            opponent_session_time,
-            offensive_half_time,
-            offensive_third_time,
-            longest_session_time,
-            opponent_longest_session_time,
-        ) = if is_team_zero {
-            (
-                self.team_zero_session_count,
-                self.team_one_session_count,
-                self.team_zero_session_time,
-                self.team_one_session_time,
-                self.team_zero_offensive_half_time,
-                self.team_zero_offensive_third_time,
-                self.team_zero_longest_session_time,
-                self.team_one_longest_session_time,
-            )
-        } else {
-            (
-                self.team_one_session_count,
-                self.team_zero_session_count,
-                self.team_one_session_time,
-                self.team_zero_session_time,
-                self.team_one_offensive_half_time,
-                self.team_one_offensive_third_time,
-                self.team_one_longest_session_time,
-                self.team_zero_longest_session_time,
-            )
-        };
-
-        let average_session_time = if session_count == 0 {
-            0.0
-        } else {
-            session_time / session_count as f32
-        };
-
-        TerritorialPressureTeamStats {
-            tracked_time: self.tracked_time,
-            session_count,
-            opponent_session_count,
-            session_time,
-            opponent_session_time,
-            offensive_half_time,
-            offensive_third_time,
-            longest_session_time,
-            opponent_longest_session_time,
-            average_session_time,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct TerritorialPressureTeamStats {
-    pub tracked_time: f32,
-    pub session_count: u32,
-    pub opponent_session_count: u32,
-    pub session_time: f32,
-    pub opponent_session_time: f32,
-    pub offensive_half_time: f32,
-    pub offensive_third_time: f32,
-    pub longest_session_time: f32,
-    pub opponent_longest_session_time: f32,
-    pub average_session_time: f32,
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TerritorialPressureEvent {
@@ -118,6 +28,14 @@ pub struct TerritorialPressureEvent {
     pub offensive_half_time: f32,
     pub offensive_third_time: f32,
     pub end_reason: TerritorialPressureEndReason,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct TerritorialPressureStatsEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub delta: TerritorialPressureStats,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -145,8 +63,9 @@ impl Default for TerritorialPressureCalculatorConfig {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TerritorialPressureCalculator {
     config: TerritorialPressureCalculatorConfig,
-    stats: TerritorialPressureStats,
+    stats: TerritorialPressureStatsAccumulator,
     events: EventStream<TerritorialPressureEvent>,
+    stats_events: EventStream<TerritorialPressureStatsEvent>,
     candidate: Option<CandidateTerritorialPressureSession>,
     active: Option<ActiveTerritorialPressureSession>,
     last_frame: Option<TerritorialPressureFrameMarker>,
@@ -202,7 +121,7 @@ impl TerritorialPressureCalculator {
     }
 
     pub fn stats(&self) -> &TerritorialPressureStats {
-        &self.stats
+        self.stats.stats()
     }
 
     pub fn events(&self) -> &[TerritorialPressureEvent] {
@@ -211,6 +130,14 @@ impl TerritorialPressureCalculator {
 
     pub fn new_events(&self) -> &[TerritorialPressureEvent] {
         self.events.new_events()
+    }
+
+    pub fn stats_events(&self) -> &[TerritorialPressureStatsEvent] {
+        self.stats_events.all()
+    }
+
+    pub fn new_stats_events(&self) -> &[TerritorialPressureStatsEvent] {
+        self.stats_events.new_events()
     }
 
     pub fn config(&self) -> &TerritorialPressureCalculatorConfig {
@@ -267,53 +194,80 @@ impl TerritorialPressureCalculator {
         }
     }
 
-    fn add_session_count(&mut self, team_is_team_0: bool) {
-        if team_is_team_0 {
-            self.stats.team_zero_session_count += 1;
-        } else {
-            self.stats.team_one_session_count += 1;
-        }
-        self.stats
-            .labeled_session_counts
-            .increment([Self::pressure_team_label(team_is_team_0)]);
+    fn emit_stats_delta(
+        &mut self,
+        frame_number: usize,
+        time: f32,
+        delta: TerritorialPressureStats,
+    ) {
+        let event = TerritorialPressureStatsEvent {
+            time,
+            frame: frame_number,
+            delta,
+        };
+        self.stats.apply_event(&event);
+        self.stats_events.push(event);
     }
 
-    fn add_session_time(&mut self, team_is_team_0: bool, normalized_ball_y: f32, dt: f32) {
+    fn emit_frame_stats_delta(&mut self, frame: &FrameInfo, delta: TerritorialPressureStats) {
+        self.emit_stats_delta(frame.frame_number, frame.time, delta);
+    }
+
+    fn session_count_delta(team_is_team_0: bool) -> TerritorialPressureStats {
+        let mut delta = TerritorialPressureStats::default();
         if team_is_team_0 {
-            self.stats.team_zero_session_time += dt;
+            delta.team_zero_session_count += 1;
+        } else {
+            delta.team_one_session_count += 1;
+        }
+        delta
+            .labeled_session_counts
+            .increment([Self::pressure_team_label(team_is_team_0)]);
+        delta
+    }
+
+    fn session_time_delta(
+        team_is_team_0: bool,
+        normalized_ball_y: f32,
+        dt: f32,
+    ) -> TerritorialPressureStats {
+        let mut delta = TerritorialPressureStats::default();
+        if team_is_team_0 {
+            delta.team_zero_session_time += dt;
             if normalized_ball_y > 0.0 {
-                self.stats.team_zero_offensive_half_time += dt;
+                delta.team_zero_offensive_half_time += dt;
             }
             if normalized_ball_y > FIELD_ZONE_BOUNDARY_Y {
-                self.stats.team_zero_offensive_third_time += dt;
+                delta.team_zero_offensive_third_time += dt;
             }
         } else {
-            self.stats.team_one_session_time += dt;
+            delta.team_one_session_time += dt;
             if normalized_ball_y > 0.0 {
-                self.stats.team_one_offensive_half_time += dt;
+                delta.team_one_offensive_half_time += dt;
             }
             if normalized_ball_y > FIELD_ZONE_BOUNDARY_Y {
-                self.stats.team_one_offensive_third_time += dt;
+                delta.team_one_offensive_third_time += dt;
             }
         }
 
-        self.stats.labeled_time.add(
+        delta.labeled_time.add(
             [
                 Self::pressure_team_label(team_is_team_0),
                 Self::territory_label(normalized_ball_y),
             ],
             dt,
         );
+        delta
     }
 
-    fn update_longest_session_time(&mut self, team_is_team_0: bool, duration: f32) {
+    fn longest_session_time_delta(team_is_team_0: bool, duration: f32) -> TerritorialPressureStats {
+        let mut delta = TerritorialPressureStats::default();
         if team_is_team_0 {
-            self.stats.team_zero_longest_session_time =
-                self.stats.team_zero_longest_session_time.max(duration);
+            delta.team_zero_longest_session_time = duration;
         } else {
-            self.stats.team_one_longest_session_time =
-                self.stats.team_one_longest_session_time.max(duration);
+            delta.team_one_longest_session_time = duration;
         }
+        delta
     }
 
     fn candidate_sample(
@@ -375,23 +329,32 @@ impl TerritorialPressureCalculator {
                 .candidate
                 .take()
                 .expect("candidate exists when pressure should start");
-            self.start_session(candidate);
+            self.start_session(frame, candidate);
         }
     }
 
-    fn start_session(&mut self, candidate: CandidateTerritorialPressureSession) {
-        self.add_session_count(candidate.team_is_team_0);
-        self.add_session_time(
-            candidate.team_is_team_0,
-            1.0,
-            candidate.offensive_half_time - candidate.offensive_third_time,
+    fn start_session(&mut self, frame: &FrameInfo, candidate: CandidateTerritorialPressureSession) {
+        self.emit_frame_stats_delta(frame, Self::session_count_delta(candidate.team_is_team_0));
+        self.emit_frame_stats_delta(
+            frame,
+            Self::session_time_delta(
+                candidate.team_is_team_0,
+                1.0,
+                candidate.offensive_half_time - candidate.offensive_third_time,
+            ),
         );
-        self.add_session_time(
-            candidate.team_is_team_0,
-            FIELD_ZONE_BOUNDARY_Y + 1.0,
-            candidate.offensive_third_time,
+        self.emit_frame_stats_delta(
+            frame,
+            Self::session_time_delta(
+                candidate.team_is_team_0,
+                FIELD_ZONE_BOUNDARY_Y + 1.0,
+                candidate.offensive_third_time,
+            ),
         );
-        self.update_longest_session_time(candidate.team_is_team_0, candidate.duration);
+        self.emit_frame_stats_delta(
+            frame,
+            Self::longest_session_time_delta(candidate.team_is_team_0, candidate.duration),
+        );
         self.active = Some(ActiveTerritorialPressureSession {
             team_is_team_0: candidate.team_is_team_0,
             start_time: candidate.start_time,
@@ -422,8 +385,14 @@ impl TerritorialPressureCalculator {
         if normalized_ball_y > FIELD_ZONE_BOUNDARY_Y {
             active.offensive_third_time += frame.dt;
         }
-        self.add_session_time(active.team_is_team_0, normalized_ball_y, frame.dt);
-        self.update_longest_session_time(active.team_is_team_0, active.duration);
+        self.emit_frame_stats_delta(
+            frame,
+            Self::session_time_delta(active.team_is_team_0, normalized_ball_y, frame.dt),
+        );
+        self.emit_frame_stats_delta(
+            frame,
+            Self::longest_session_time_delta(active.team_is_team_0, active.duration),
+        );
 
         if normalized_ball_y > self.config.neutral_zone_half_width_y {
             active.relief_time = 0.0;
@@ -480,6 +449,7 @@ impl TerritorialPressureCalculator {
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
+        self.stats_events.begin_update();
         self.last_frame = Some(frame.into());
         if !live_play_state.is_live_play {
             self.candidate = None;
@@ -493,7 +463,13 @@ impl TerritorialPressureCalculator {
             return Ok(());
         };
 
-        self.stats.tracked_time += frame.dt;
+        self.emit_frame_stats_delta(
+            frame,
+            TerritorialPressureStats {
+                tracked_time: frame.dt,
+                ..TerritorialPressureStats::default()
+            },
+        );
         if self.active.is_some() {
             self.update_active_session(frame, ball.position().y, possession_state);
         } else {

@@ -634,10 +634,11 @@ pub(crate) fn builtin_module_json(
         }
         "territorial_pressure" => {
             let calculator = graph_state::<TerritorialPressureCalculator>(graph, module_name)?;
-            serialize_to_json_value(&StatsWithEventsExport {
-                stats: calculator.stats(),
-                events: calculator.events(),
-            })
+            serialize_to_json_value(&serde_json::json!({
+                "stats": calculator.stats(),
+                "events": calculator.events(),
+                "stats_events": calculator.stats_events(),
+            }))
         }
         "rotation" => {
             let calculator = graph_state::<RotationCalculator>(graph, module_name)?;
