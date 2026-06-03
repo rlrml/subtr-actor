@@ -149,6 +149,8 @@ pub mod pressure;
 pub use pressure::*;
 pub mod rotation;
 pub use rotation::*;
+pub mod rotation_stats;
+pub use rotation_stats::*;
 pub mod rush;
 pub use rush::*;
 pub mod rush_stats;
