@@ -4,9 +4,9 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 use subtr_actor::{
-    boost_amount_to_percent, standard_soccar_boost_pad_layout, stats, BoostCalculator,
-    BoostPadEventKind, BoostPadSize, Collector, FrameInput, LivePlayTracker, PlayerId, PlayerInfo,
-    ProcessorView, ReplayProcessor, StatsTimelineCollector, TimeAdvance,
+    boost_amount_to_percent, standard_soccar_boost_pad_layout, stats, BoostPadEventKind,
+    BoostPadSize, BoostStatsAccumulator, Collector, FrameInput, LivePlayTracker, PlayerId,
+    PlayerInfo, ProcessorView, ReplayProcessor, StatsTimelineCollector, TimeAdvance,
     BOOST_KICKOFF_START_AMOUNT,
 };
 
@@ -82,7 +82,7 @@ fn expected_team_pad_count(ballchasing: &Value, team_key: &str, field: &str) -> 
 }
 
 fn describe_inactive_inclusive_team_pad_counts_against_ballchasing(
-    boost: &BoostCalculator,
+    boost: &BoostStatsAccumulator,
     ballchasing: &Value,
     team_key: &str,
     fixture_name: &str,
@@ -115,7 +115,7 @@ fn describe_inactive_inclusive_team_pad_counts_against_ballchasing(
 }
 
 fn assert_inactive_inclusive_big_pad_counts_match_ballchasing(
-    boost: &BoostCalculator,
+    boost: &BoostStatsAccumulator,
     players: &[PlayerInfo],
     ballchasing: &Value,
     team_key: &str,
@@ -168,12 +168,15 @@ fn problematic_private_duel_big_pad_counts_match_ballchasing_with_inactive_picku
         .expect("Expected replay processor")
         .get_replay_meta()
         .expect("Expected replay metadata");
-    let graph =
-        stats::analysis_graph::collect_builtin_analysis_graph_for_replay(&replay, ["boost"])
-            .expect("Expected boost analysis graph to process replay");
-    let boost = graph
-        .state::<BoostCalculator>()
-        .expect("Expected boost calculator state");
+    let graph = stats::analysis_graph::collect_builtin_analysis_graph_for_replay(
+        &replay,
+        ["boost", "stats_projection"],
+    )
+    .expect("Expected boost analysis graph to process replay");
+    let projection = graph
+        .state::<stats::analysis_graph::StatsProjectionState>()
+        .expect("Expected stats projection state");
+    let boost = &projection.boost;
 
     assert_inactive_inclusive_big_pad_counts_match_ballchasing(
         boost,
@@ -204,12 +207,15 @@ fn describe_ballchasing_fixture_team_pad_count_deltas_with_inactive_pickups() {
                 .unwrap_or_else(|_| panic!("Failed to read Ballchasing JSON for {fixture_name}")),
         )
         .unwrap_or_else(|_| panic!("Failed to parse Ballchasing JSON for {fixture_name}"));
-        let graph =
-            stats::analysis_graph::collect_builtin_analysis_graph_for_replay(&replay, ["boost"])
-                .unwrap_or_else(|_| panic!("Expected boost analysis graph for {fixture_name}"));
-        let boost = graph
-            .state::<BoostCalculator>()
-            .unwrap_or_else(|| panic!("Expected boost calculator state for {fixture_name}"));
+        let graph = stats::analysis_graph::collect_builtin_analysis_graph_for_replay(
+            &replay,
+            ["boost", "stats_projection"],
+        )
+        .unwrap_or_else(|_| panic!("Expected boost analysis graph for {fixture_name}"));
+        let projection = graph
+            .state::<stats::analysis_graph::StatsProjectionState>()
+            .unwrap_or_else(|| panic!("Expected stats projection state for {fixture_name}"));
+        let boost = &projection.boost;
 
         describe_inactive_inclusive_team_pad_counts_against_ballchasing(
             boost,
@@ -484,7 +490,7 @@ fn describe_problematic_private_duel_boost_increase_candidates() {
         .process_replay(&replay)
         .expect("Expected replay processing to produce boost increase report");
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline to process replay");
     let mut previous_big_pad_count = None;
     let mut big_pad_count_increments = Vec::new();

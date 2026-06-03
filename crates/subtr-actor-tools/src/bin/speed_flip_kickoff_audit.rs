@@ -69,7 +69,7 @@ fn main() -> anyhow::Result<()> {
 fn audit_replay(path: &str) -> anyhow::Result<ReplayAudit> {
     let replay = parse_replay(path)?;
     let timeline = StatsTimelineCollector::new()
-        .get_replay_data(&replay)
+        .get_legacy_replay_stats_timeline(&replay)
         .map_err(|error| anyhow::anyhow!("failed to build stats timeline for {path}: {error:?}"))?;
     let player_names = player_name_map(&timeline.replay_meta);
     let kickoff_start_indices = kickoff_start_indices(&timeline.frames);

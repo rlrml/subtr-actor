@@ -1,4 +1,5 @@
 #![allow(clippy::result_large_err)]
+#![allow(clippy::missing_safety_doc)]
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ffi::{CStr, CString};
