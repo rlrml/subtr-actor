@@ -95,6 +95,8 @@ pub mod double_tap_stats;
 pub use double_tap_stats::*;
 pub mod fifty_fifty;
 pub use fifty_fifty::*;
+pub mod fifty_fifty_stats;
+pub use fifty_fifty_stats::*;
 pub mod fifty_fifty_state;
 pub use fifty_fifty_state::*;
 pub mod flick;
