@@ -239,7 +239,6 @@ pub struct BoostCalculator {
     kickoff_respawn_awarded: HashSet<PlayerId>,
     initial_respawn_awarded: HashSet<PlayerId>,
     pending_demo_respawns: HashMap<PlayerId, PendingDemoRespawn>,
-    demo_reset_boost_amounts: HashMap<PlayerId, f32>,
     pending_reported_pickups: VecDeque<DeferredReportedBoostPickup>,
     previous_boost_levels_live: Option<bool>,
 }
@@ -261,6 +260,7 @@ struct BoostLedgerContext {
 #[derive(Debug, Clone, Copy, Default)]
 struct BoostUsageState {
     amount_obtained: f32,
+    amount_removed: f32,
     amount_used: f32,
     amount_used_while_grounded: f32,
     amount_used_while_airborne: f32,
@@ -277,6 +277,21 @@ impl BoostUsageState {
         self.amount_used += delta.amount_used;
         self.amount_used_while_grounded += delta.amount_used_while_grounded;
         self.amount_used_while_airborne += delta.amount_used_while_airborne;
+    }
+
+    fn apply_removed_amount(&mut self, amount: f32) {
+        self.amount_removed += amount;
+    }
+
+    fn inferred_amount_used(self, current_boost_amount: f32) -> f32 {
+        // Boost balance:
+        //   current = obtained - used - removed
+        //
+        // `obtained` contains pickups plus respawn grants. `removed` covers
+        // non-usage losses such as demoing a player with boost. Rearranging the
+        // balance lets us infer cumulative use from the observed current boost:
+        //   used = obtained - removed - current
+        (self.amount_obtained - self.amount_removed - current_boost_amount).max(0.0)
     }
 }
 
@@ -1544,14 +1559,16 @@ impl BoostCalculator {
             }
             if demo_respawn_supported || generic_respawn_supported {
                 if let Some(pending) = self.pending_demo_respawns.get(&player.player_id) {
-                    let demo_reset_amount = pending
+                    // A demo removes the victim's pre-demo boost; the respawn
+                    // grant below is a separate obtained amount.
+                    let boost_removed_by_demo_amount = pending
                         .pre_demo_boost_amount
                         .unwrap_or(previous_boost_amount)
                         .max(0.0);
-                    *self
-                        .demo_reset_boost_amounts
+                    self.player_usage_state
                         .entry(player.player_id.clone())
-                        .or_default() += demo_reset_amount;
+                        .or_default()
+                        .apply_removed_amount(boost_removed_by_demo_amount);
                 }
                 respawn_amount += BOOST_KICKOFF_START_AMOUNT;
                 self.pending_demo_respawns.remove(&player.player_id);
@@ -1833,13 +1850,7 @@ impl BoostCalculator {
                 let mut used_ledger_event = None;
                 let usage_state = self.player_usage_state(&player.player_id);
                 let previous_amount_used = usage_state.amount_used;
-                let demo_reset_boost_amount = self
-                    .demo_reset_boost_amounts
-                    .get(&player.player_id)
-                    .copied()
-                    .unwrap_or(0.0);
-                let amount_used_raw =
-                    (usage_state.amount_obtained - demo_reset_boost_amount - boost_amount).max(0.0);
+                let amount_used_raw = usage_state.inferred_amount_used(boost_amount);
                 let amount_used = amount_used_raw.max(usage_state.amount_used);
                 let amount_used_delta = amount_used - previous_amount_used;
                 let mut stats_delta = BoostStats {
