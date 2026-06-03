@@ -1,22 +1,10 @@
 import "./report.css";
 import { toBoostDisplayUnits } from "./boostFormatting.ts";
 import { formatReplayLoadProgress, loadReplayBundleInWorker } from "./replayLoader.ts";
-import { createStatRegistry, type StatDefinition, type StatScopeKind } from "./statRegistry.ts";
+import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
 import { formatMechanicKind } from "./timelineMarkers.ts";
-import {
-  setStatsPlayerConfigOnUrl,
-  STATS_PLAYER_CONFIG_VERSION,
-  type StatsPlayerConfig,
-} from "./playerConfig.ts";
-import { playerIdToString } from "./touchOverlay.ts";
 import { createStatsFrameLookup } from "./statsTimeline.ts";
-import type {
-  PlayerStatsSnapshot,
-  StatsFrame,
-  StatsFrameLookup,
-  StatsTimeline,
-  TeamStatsSnapshot,
-} from "./statsTimeline.ts";
+import type { PlayerStatsSnapshot, StatsFrame } from "./statsTimeline.ts";
 import {
   BOOST_TANK_COLORS,
   CHART_COLORS,
@@ -32,7 +20,6 @@ import {
   formatBoostAmount,
   formatBoostPerMinute,
   formatFieldPosition,
-  formatSectionTitle,
   formatSeconds,
   formatShare,
   formatTime,
@@ -51,9 +38,7 @@ import {
   renderMetricGrid,
   renderPieChartRows,
   renderStackedRows,
-  renderStatsTable,
   renderTerritoryShareChart,
-  sectionId,
   teamLabel,
   type ChartSpec,
   type GoalContextEvent,

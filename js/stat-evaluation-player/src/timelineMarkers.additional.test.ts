@@ -3,33 +3,14 @@ import assert from "node:assert/strict";
 
 import type { ReplayModel } from "@rlrml/player";
 import {
-  buildBackboardTimelineEvents,
   buildBallCarryTimelineEvents,
-  buildCeilingShotTimelineEvents,
-  buildCenterTimelineEvents,
   buildDodgeResetTimelineEvents,
-  buildDoubleTapTimelineEvents,
-  buildFiftyFiftyTimelineEvents,
-  buildGoalContextTimelineEvents,
-  buildGoalTagTimelineEvents,
   buildHalfFlipTimelineEvents,
-  buildHalfVolleyTimelineEvents,
-  buildMechanicPlaylistEvents,
-  buildMechanicTimelineEvents,
-  buildMustyFlickTimelineEvents,
-  buildOneTimerTimelineEvents,
-  buildPassTimelineEvents,
   buildPowerslideTimelineEvents,
-  buildRushTimelineEvents,
   buildSpeedFlipTimelineEvents,
   buildTouchTimelineEvents,
   buildWavedashTimelineEvents,
-  buildWallAerialTimelineEvents,
-  buildWallAerialShotTimelineEvents,
   buildWhiffTimelineEvents,
-  countEnabledTimelineEvents,
-  filterReplayTimelineEvents,
-  getReplayTimelineEventKinds,
 } from "./timelineMarkers.ts";
 import { createLegacyStatsTimeline } from "./testStatsTimeline.ts";
 

@@ -1,6 +1,5 @@
 import { toBoostDisplayUnits } from "./boostFormatting.ts";
-import { createStatRegistry, type StatDefinition, type StatScopeKind } from "./statRegistry.ts";
-import { formatMechanicKind } from "./timelineMarkers.ts";
+import type { StatDefinition, StatScopeKind } from "./statRegistry.ts";
 import {
   setStatsPlayerConfigOnUrl,
   STATS_PLAYER_CONFIG_VERSION,
@@ -36,7 +35,6 @@ export interface StatsReportGoalWatchRequest {
   goalTime: number;
   playerId: string | null;
 }
-
 
 export type ReportState = StatsReportData & { statsFrameLookup: StatsFrameLookup };
 
@@ -82,7 +80,6 @@ export const PAD_COLLECTION_COLORS = {
   big: "#f39a37",
   small: "#65d6ad",
 } as const;
-
 
 export const PAGES: readonly { id: ReportPageId; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -156,7 +153,11 @@ export function getPlayerTeamColor(player: PlayerStatsSnapshot): string {
   return player.is_team_0 ? TEAM_COLORS[0]! : TEAM_COLORS[1]!;
 }
 
-export function getChartTargetColor(target: StatsTarget, scope: StatScopeKind, index: number): string {
+export function getChartTargetColor(
+  target: StatsTarget,
+  scope: StatScopeKind,
+  index: number,
+): string {
   return scope === "player"
     ? getPlayerTeamColor(target as PlayerStatsSnapshot)
     : TEAM_COLORS[index % TEAM_COLORS.length]!;
@@ -238,7 +239,10 @@ export function getGoalWatchRequest(
   };
 }
 
-export function getGoalWatchPlayerConfig(goalTime: number, scorerId: string | null): StatsPlayerConfig {
+export function getGoalWatchPlayerConfig(
+  goalTime: number,
+  scorerId: string | null,
+): StatsPlayerConfig {
   return {
     version: STATS_PLAYER_CONFIG_VERSION,
     playback: {
@@ -394,7 +398,10 @@ export function getChartRows(definition: StatDefinition, finalFrame: StatsFrame)
     .filter((row) => row.value > 0);
 }
 
-export function renderBarChartRows(rows: NumberRow[], format: (value: number) => string): HTMLElement {
+export function renderBarChartRows(
+  rows: NumberRow[],
+  format: (value: number) => string,
+): HTMLElement {
   const max = Math.max(...rows.map((row) => row.value), 1);
   const body = el("div", { className: "stats-report-bar-chart" });
   rows.forEach((row) => {
@@ -456,7 +463,10 @@ export function describePieSegments(rows: NumberRow[]): string {
     .join(", ")})`;
 }
 
-export function renderPieChartRows(rows: NumberRow[], format: (value: number) => string): HTMLElement {
+export function renderPieChartRows(
+  rows: NumberRow[],
+  format: (value: number) => string,
+): HTMLElement {
   const total = rows.reduce((sum, row) => sum + row.value, 0);
   const body = el("div", { className: "stats-report-pie-chart" });
   const pie = el("div", { className: "stats-report-pie" });
@@ -484,7 +494,10 @@ export function renderPieChart(definition: StatDefinition, finalFrame: StatsFram
   );
 }
 
-export function renderTerritoryShareChart(finalFrame: StatsFrame, title = "Territory share"): HTMLElement {
+export function renderTerritoryShareChart(
+  finalFrame: StatsFrame,
+  title = "Territory share",
+): HTMLElement {
   return renderChartCard(
     title,
     renderPieChartRows(

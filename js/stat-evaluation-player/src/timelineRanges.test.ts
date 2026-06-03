@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "@rlrml/player";
-import type { PositioningEvent } from "./generated/PositioningEvent.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildBoostPickupTimelineRanges,
@@ -10,47 +9,8 @@ import {
   buildPossessionTimelineRanges,
   buildPressureTimelineRanges,
   buildRushTimelineRanges,
-  buildTimeInZoneTimelineRanges,
 } from "./timelineRanges.ts";
 import { createLegacyStatsTimeline, createStatsTimeline } from "./testStatsTimeline.ts";
-
-function positioningEvent(
-  overrides: Partial<PositioningEvent> &
-    Pick<PositioningEvent, "frame" | "time" | "player" | "is_team_0">,
-): PositioningEvent {
-  return {
-    frame: overrides.frame,
-    time: overrides.time,
-    player: overrides.player,
-    is_team_0: overrides.is_team_0,
-    active_game_time: 0,
-    tracked_time: 0,
-    sum_distance_to_teammates: 0,
-    sum_distance_to_ball: 0,
-    sum_distance_to_ball_has_possession: 0,
-    time_has_possession: 0,
-    sum_distance_to_ball_no_possession: 0,
-    time_no_possession: 0,
-    time_demolished: 0,
-    time_no_teammates: 0,
-    time_most_back: 0,
-    time_most_forward: 0,
-    time_mid_role: 0,
-    time_other_role: 0,
-    time_defensive_third: 0,
-    time_neutral_third: 0,
-    time_offensive_third: 0,
-    time_defensive_half: 0,
-    time_offensive_half: 0,
-    time_closest_to_ball: 0,
-    time_farthest_from_ball: 0,
-    time_behind_ball: 0,
-    time_level_with_ball: 0,
-    time_in_front_of_ball: 0,
-    times_caught_ahead_of_play_on_conceded_goals: 0,
-    ...overrides,
-  };
-}
 
 test("buildMechanicTimelineRanges emits ranges for visible span mechanics", () => {
   const replay = {

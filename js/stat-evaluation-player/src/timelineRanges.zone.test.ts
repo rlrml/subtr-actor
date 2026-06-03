@@ -1,18 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { ReplayModel } from "@rlrml/player";
 import type { PositioningEvent } from "./generated/PositioningEvent.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
-import {
-  buildBoostPickupTimelineRanges,
-  buildMechanicTimelineRanges,
-  buildPossessionTimelineRanges,
-  buildPressureTimelineRanges,
-  buildRushTimelineRanges,
-  buildTimeInZoneTimelineRanges,
-} from "./timelineRanges.ts";
-import { createLegacyStatsTimeline, createStatsTimeline } from "./testStatsTimeline.ts";
+import { buildTimeInZoneTimelineRanges } from "./timelineRanges.ts";
+import { createStatsTimeline } from "./testStatsTimeline.ts";
 
 function positioningEvent(
   overrides: Partial<PositioningEvent> &

@@ -4,7 +4,6 @@ import {
   formatMechanicsReviewEventDetails,
   getMechanicsReviewItemLabel,
   getMechanicsReviewMechanicLabel,
-  getMechanicsReviewMechanicKind,
   getMechanicsReviewPlayerId,
   getMechanicsReviewTargetTime,
   parseMechanicsReviewPlaylistJson,
