@@ -3,4 +3,4 @@ import type { BoostLedgerTransactionKind } from "./BoostLedgerTransactionKind.ts
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { StatLabel } from "./StatLabel.ts";
 
-export type BoostLedgerEvent = { frame: number, time: number, player_id: RemoteIdTs, is_team_0: boolean, transaction: BoostLedgerTransactionKind, amount: number, count: number, labels?: Array<StatLabel>, boost_before: number | null, boost_after: number | null, };
+export type BoostLedgerEvent = { frame: number, time: number, player_id: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, transaction: BoostLedgerTransactionKind, amount: number, count: number, labels?: Array<StatLabel>, boost_before: number | null, boost_after: number | null, };

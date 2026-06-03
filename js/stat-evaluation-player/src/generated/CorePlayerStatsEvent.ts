@@ -2,4 +2,4 @@
 import type { CorePlayerStats } from "./CorePlayerStats.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type CorePlayerStatsEvent = { time: number, frame: number, player: RemoteIdTs, is_team_0: boolean, delta: CorePlayerStats, };
+export type CorePlayerStatsEvent = { time: number, frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, delta: CorePlayerStats, };

@@ -3,4 +3,4 @@ import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { StatsEventProperty } from "./StatsEventProperty.ts";
 import type { StatsEventTiming } from "./StatsEventTiming.ts";
 
-export type StatsTimelineTagEvent = { id: string, kind: string, player_id: RemoteIdTs, is_team_0: boolean, timing: StatsEventTiming, properties?: Array<StatsEventProperty>, };
+export type StatsTimelineTagEvent = { id: string, kind: string, player_id: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, timing: StatsEventTiming, properties?: Array<StatsEventProperty>, };

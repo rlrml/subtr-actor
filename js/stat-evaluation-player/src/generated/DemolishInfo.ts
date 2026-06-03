@@ -39,6 +39,10 @@ attacker_velocity: Vector3fTs,
  */
 victim_velocity: Vector3fTs,
 /**
+ * The location of the attacker at the time of demolition.
+ */
+attacker_location?: Vector3fTs | null,
+/**
  * The location of the victim at the time of demolition.
  */
 victim_location: Vector3fTs, };

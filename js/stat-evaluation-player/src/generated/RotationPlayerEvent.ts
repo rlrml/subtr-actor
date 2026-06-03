@@ -3,4 +3,4 @@ import type { PlayDepthState } from "./PlayDepthState.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { RoleState } from "./RoleState.ts";
 
-export type RotationPlayerEvent = { time: number, frame: number, player: RemoteIdTs, is_team_0: boolean, active: boolean, became_first_man_count: number, lost_first_man_count: number, current_role_state: RoleState, current_depth_state: PlayDepthState, };
+export type RotationPlayerEvent = { time: number, frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, active: boolean, became_first_man_count: number, lost_first_man_count: number, current_role_state: RoleState, current_depth_state: PlayDepthState, };
