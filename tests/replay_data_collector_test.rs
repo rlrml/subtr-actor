@@ -1,6 +1,9 @@
 use std::path::Path;
 use subtr_actor::collector::replay_data::{BallFrame, PlayerFrame, ReplayDataCollector};
-use subtr_actor::{ReplayProcessor, ResolvedBoostPadCollector, BOOST_KICKOFF_START_AMOUNT};
+use subtr_actor::{
+    ReplayProcessor, ResolvedBoostPadCollector, StatsTimelineEventCollector,
+    BOOST_KICKOFF_START_AMOUNT,
+};
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
@@ -136,4 +139,34 @@ fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
     );
     assert_eq!(actual.player_stat_events, expected.player_stat_events);
     assert_eq!(actual.goal_events, expected.goal_events);
+}
+
+#[test]
+fn replay_data_touch_events_match_stats_timeline_player_touch_counts() {
+    let replay =
+        parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .expect("Failed to collect replay data");
+    let stats_timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
+        .expect("Failed to collect stats timeline");
+
+    let mut replay_data_counts = std::collections::BTreeMap::new();
+    for touch in replay_data
+        .touch_events
+        .iter()
+        .filter_map(|touch| touch.player.as_ref().map(|player| format!("{player:?}")))
+    {
+        *replay_data_counts.entry(touch).or_insert(0usize) += 1;
+    }
+
+    let mut stats_counts = std::collections::BTreeMap::new();
+    for touch in &stats_timeline.events.touch {
+        *stats_counts
+            .entry(format!("{:?}", touch.player))
+            .or_insert(0usize) += 1;
+    }
+
+    assert_eq!(replay_data_counts, stats_counts);
 }

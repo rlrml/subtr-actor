@@ -497,7 +497,8 @@ pub struct FrameData {
 /// * `demolish_infos` - Information about all demolition events that occurred during the replay
 /// * `boost_pad_events` - Exact boost pad pickup/availability events detected while processing
 /// * `boost_pads` - Resolved standard boost pad layout annotated with replay pad ids when known
-/// * `touch_events` - Exact team touch events plus attributed player when available
+/// * `touch_events` - Confirmed touch-state events, including replay-reported
+///   team touches and inferred player touches
 /// * `dodge_refreshed_events` - Exact counter-derived dodge refresh events from the replay
 /// * `player_stat_events` - Exact shot/save/assist counter increment events
 /// * `goal_events` - Exact goal explosion events with scorer and cumulative score when available
@@ -535,7 +536,11 @@ pub struct ReplayData {
     pub boost_pad_events: Vec<BoostPadEvent>,
     /// Resolved standard boost pad layout annotated with replay pad ids when known
     pub boost_pads: Vec<ResolvedBoostPad>,
-    /// Exact touch events observed during the replay
+    /// Confirmed touch-state events observed during the replay.
+    ///
+    /// This stream matches the touch signal used by stats timeline touch
+    /// counts. It includes replay-reported team touches and inferred player
+    /// touches from ball/player state.
     pub touch_events: Vec<TouchEvent>,
     /// Exact dodge refresh events observed via the replay's refreshed-dodge counter
     pub dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
@@ -687,6 +692,10 @@ impl FrameData {
 pub struct ReplayDataCollector {
     /// Internal storage for frame-by-frame data during collection
     frame_data: FrameData,
+    touch_events: Vec<TouchEvent>,
+    touch_state_calculator: TouchStateCalculator,
+    live_play_tracker: LivePlayTracker,
+    last_sample_time: Option<f32>,
 }
 
 impl Default for ReplayDataCollector {
@@ -707,6 +716,10 @@ impl ReplayDataCollector {
     pub fn new() -> Self {
         ReplayDataCollector {
             frame_data: FrameData::new(),
+            touch_events: Vec::new(),
+            touch_state_calculator: TouchStateCalculator::new(),
+            live_play_tracker: LivePlayTracker::default(),
+            last_sample_time: None,
         }
     }
 
@@ -735,17 +748,22 @@ impl ReplayDataCollector {
         processor: ReplayProcessor<'_>,
         boost_pads: Vec<ResolvedBoostPad>,
     ) -> SubtrActorResult<ReplayData> {
+        let ReplayDataCollector {
+            frame_data,
+            touch_events,
+            ..
+        } = self;
         let meta = processor.get_replay_meta()?;
         Ok(ReplayData {
             meta,
             demolish_infos: processor.demolishes().to_vec(),
             boost_pad_events: processor.boost_pad_events().to_vec(),
             boost_pads,
-            touch_events: processor.touch_events().to_vec(),
+            touch_events,
             dodge_refreshed_events: processor.dodge_refreshed_events().to_vec(),
             player_stat_events: processor.player_stat_events().to_vec(),
             goal_events: processor.goal_events().to_vec(),
-            frame_data: self.get_frame_data(),
+            frame_data,
         })
     }
 
@@ -861,9 +879,32 @@ impl Collector for ReplayDataCollector {
         &mut self,
         processor: &dyn ProcessorView,
         _frame: &boxcars::Frame,
-        _frame_number: usize,
+        frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<TimeAdvance> {
+        let dt = self
+            .last_sample_time
+            .map(|last_time| (current_time - last_time).max(0.0))
+            .unwrap_or(0.0);
+        let frame_input = FrameInput::timeline(processor, frame_number, current_time, dt);
+        let frame_info = frame_input.frame_info();
+        let gameplay_state = frame_input.gameplay_state();
+        let ball_frame_state = frame_input.ball_frame_state();
+        let player_frame_state = frame_input.player_frame_state();
+        let frame_events_state = frame_input.frame_events_state();
+        let live_play_state = self
+            .live_play_tracker
+            .state_parts(&gameplay_state, &frame_events_state);
+        let touch_state = self.touch_state_calculator.update(
+            &frame_info,
+            &ball_frame_state,
+            &player_frame_state,
+            &frame_events_state,
+            &live_play_state,
+        );
+        self.touch_events.extend(touch_state.touch_events);
+        self.last_sample_time = Some(current_time);
+
         let metadata_frame = MetadataFrame::new_from_processor(processor, current_time)?;
         let ball_frame = BallFrame::new_from_processor(processor, current_time);
         let player_frames = self.get_player_frames(processor, current_time)?;
