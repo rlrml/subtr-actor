@@ -151,6 +151,7 @@ impl StatsTimelineCollector {
             events.boost_pickups = boost.pickup_comparison_events().to_vec();
             events.boost_ledger = boost.ledger_events().to_vec();
             events.boost_state = boost.state_events().to_vec();
+            events.boost_stats = boost.stats_events().to_vec();
         }
         Ok(ReplayStatsTimeline {
             config: self.timeline_config(),

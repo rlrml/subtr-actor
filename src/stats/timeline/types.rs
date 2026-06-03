@@ -136,6 +136,7 @@ pub struct ReplayStatsTimelineEvents {
     pub boost_pickups: Vec<BoostPickupComparisonEvent>,
     pub boost_ledger: Vec<BoostLedgerEvent>,
     pub boost_state: Vec<BoostStateEvent>,
+    pub boost_stats: Vec<BoostStatsEvent>,
     pub bump: Vec<BumpEvent>,
 }
 

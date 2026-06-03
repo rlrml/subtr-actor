@@ -5401,6 +5401,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             boost_pickups: Vec::new(),
             boost_ledger: Vec::new(),
             boost_state: Vec::new(),
+            boost_stats: Vec::new(),
             bump: Vec::new(),
         },
         frames: vec![

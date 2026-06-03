@@ -1,4 +1,4 @@
-use super::boost::BoostStats;
+use super::BoostStats;
 use crate::*;
 
 /// A small tolerance for replay-boost accounting checks.

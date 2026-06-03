@@ -743,6 +743,7 @@ pub(crate) fn builtin_module_json(
                 "events": calculator.pickup_comparison_events(),
                 "ledger_events": calculator.ledger_events(),
                 "state_events": calculator.state_events(),
+                "stats_events": calculator.stats_events(),
             }))
         }
         "bump" => {

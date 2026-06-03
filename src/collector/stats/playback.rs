@@ -601,6 +601,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "state_events",
                 parse_boost_state_event,
             )?,
+            boost_stats: self.module_player_events(
+                "boost",
+                "stats_events",
+                parse_boost_stats_event,
+            )?,
             bump: self.module_player_events("bump", "events", parse_bump_event)?,
         })
     }
@@ -735,6 +740,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "boost_state".to_owned(),
             Value::Array(self.module_array("boost", "state_events")),
+        );
+        events.insert(
+            "boost_stats".to_owned(),
+            Value::Array(self.module_array("boost", "stats_events")),
         );
         events.insert(
             "bump".to_owned(),
@@ -3152,6 +3161,17 @@ fn parse_boost_state_event(value: &Value) -> SubtrActorResult<BoostStateEvent> {
         is_team_0: json_required_bool(object, "is_team_0")?,
         boost_amount: json_required_f32(object, "boost_amount")?,
         boost_before: json_optional_f32(object.get("boost_before"))?,
+    })
+}
+
+fn parse_boost_stats_event(value: &Value) -> SubtrActorResult<BoostStatsEvent> {
+    let object = json_object(value, "boost stats event")?;
+    Ok(BoostStatsEvent {
+        frame: json_required_usize(object, "frame")?,
+        time: json_required_f32(object, "time")?,
+        player_id: json_required_remote_id(object, "player_id")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        delta: decode_json_value(json_required_value(object, "delta")?.clone())?,
     })
 }
 
