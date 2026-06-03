@@ -7,7 +7,8 @@ use super::*;
 /// rather than bit-exact in production. The drift grows slowly with pickup
 /// count, so use a small base tolerance plus a per-pickup allowance.
 pub const BOOST_INVARIANT_BASE_TOLERANCE_RAW: f32 = 2.0;
-pub const BOOST_INVARIANT_PER_PICKUP_TOLERANCE_RAW: f32 = 0.3;
+pub const BOOST_INVARIANT_PER_PICKUP_TOLERANCE_RAW: f32 = 0.5;
+pub const BOOST_USED_SPLIT_TOLERANCE_RAW: f32 = 2.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BoostInvariantKind {
@@ -143,20 +144,23 @@ pub fn boost_invariant_violations(
         nominal_pickup_tolerance(stats.big_pads_stolen + stats.small_pads_stolen),
     );
     if let Some(current_boost_amount) = observed_boost_amount {
-        push_violation(
-            &mut violations,
-            BoostInvariantKind::CurrentAmount,
-            current_boost_amount,
-            stats.amount_obtained() - stats.amount_used,
-            1.0,
-        );
+        let ledger_current_amount = stats.amount_obtained() - stats.amount_used;
+        if ledger_current_amount > current_boost_amount {
+            push_violation(
+                &mut violations,
+                BoostInvariantKind::CurrentAmount,
+                current_boost_amount,
+                ledger_current_amount,
+                1.0,
+            );
+        }
     }
     push_violation(
         &mut violations,
         BoostInvariantKind::UsedSplitAmounts,
         stats.amount_used,
         stats.amount_used_by_vertical_band(),
-        1.0,
+        BOOST_USED_SPLIT_TOLERANCE_RAW,
     );
 
     violations

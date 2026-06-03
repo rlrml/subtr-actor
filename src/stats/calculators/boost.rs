@@ -1318,9 +1318,9 @@ impl BoostCalculator {
             };
             let previous_sample_boost_amount =
                 self.previous_boost_amounts.get(&player.player_id).copied();
-            let previous_boost_amount = player
-                .last_boost_amount
-                .unwrap_or_else(|| previous_sample_boost_amount.unwrap_or(boost_amount));
+            let previous_boost_amount = previous_sample_boost_amount
+                .or(player.last_boost_amount)
+                .unwrap_or(boost_amount);
             let previous_boost_amount = if boost_levels_resumed_this_sample {
                 boost_amount
             } else {
@@ -1351,23 +1351,27 @@ impl BoostCalculator {
                     kickoff_phase_active,
                     demo_respawn_supported,
                 );
-                for reason in &boost_increase_reasons {
-                    if let Ok(pad_type) = BoostPickupPadType::try_from(*reason) {
-                        self.record_inferred_pickup(PendingBoostPickupEvent {
-                            frame: frame.frame_number,
-                            time: frame.time,
-                            player_id: player.player_id.clone(),
-                            player_position: player.position().map(|position| position.to_array()),
-                            is_team_0: player.is_team_0,
-                            pad_type,
-                            field_half: Self::field_half_from_position(
-                                player.is_team_0,
-                                player.position(),
-                            ),
-                            activity: Self::activity_label(live_play),
-                            boost_before: Some(previous_sample_boost_amount),
-                            boost_after: Some(boost_amount),
-                        });
+                if track_boost_levels {
+                    for reason in &boost_increase_reasons {
+                        if let Ok(pad_type) = BoostPickupPadType::try_from(*reason) {
+                            self.record_inferred_pickup(PendingBoostPickupEvent {
+                                frame: frame.frame_number,
+                                time: frame.time,
+                                player_id: player.player_id.clone(),
+                                player_position: player
+                                    .position()
+                                    .map(|position| position.to_array()),
+                                is_team_0: player.is_team_0,
+                                pad_type,
+                                field_half: Self::field_half_from_position(
+                                    player.is_team_0,
+                                    player.position(),
+                                ),
+                                activity: Self::activity_label(live_play),
+                                boost_before: Some(previous_sample_boost_amount),
+                                boost_after: Some(boost_amount),
+                            });
+                        }
                     }
                 }
             }
@@ -1680,7 +1684,7 @@ impl BoostCalculator {
                             // exceeds what a small pad can provide, the pad must
                             // be big.  Use a margin to avoid float imprecision.
                             if size == BoostPadSize::Small
-                                && pre_applied_collected_amount > SMALL_PAD_AMOUNT_RAW * 1.5
+                                && pre_applied_collected_amount > SMALL_PAD_AMOUNT_RAW + 1.0
                             {
                                 size = BoostPadSize::Big;
                             }
@@ -1739,7 +1743,7 @@ impl BoostCalculator {
                 }
             }
         }
-        self.flush_stale_pickup_comparisons(frame.frame_number);
+        self.flush_stale_pickup_comparisons(frame);
 
         if track_boost_levels {
             for player in &players.players {
