@@ -157,6 +157,7 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "boost_pickups",
     "boost_ledger",
     "boost_state",
+    "boost_stats",
     "bump",
     "touch",
     "touch_last_touch",

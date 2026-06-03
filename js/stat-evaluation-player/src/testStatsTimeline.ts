@@ -56,6 +56,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       boost_pickups: [],
       boost_ledger: [],
       boost_state: [],
+      boost_stats: [],
       bump: [],
     },
     overrides,
