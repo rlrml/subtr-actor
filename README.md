@@ -43,7 +43,7 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 
 ```toml
 [dependencies]
-subtr-actor = "0.4.0"
+subtr-actor = "0.12.0"
 ```
 
 ### Python

@@ -14,7 +14,7 @@ The project publishes five packages:
 
 ## Automated Releases (GitHub Actions)
 
-When you push a tag starting with `v` (e.g., `v0.1.11`), the following workflows run automatically:
+When you push a tag starting with `v` (for example, `v<version>`), the following workflows run automatically:
 
 ### GitHub (`release-github.yml`)
 
@@ -76,22 +76,25 @@ Set the Cargo workspace version and synchronize every duplicated release
 metadata file from that source of truth:
 
 ```bash
-python3 scripts/sync_release_versions.py 0.1.11
+VERSION=${VERSION:?set VERSION to the target release}
+python3 scripts/sync_release_versions.py "$VERSION"
 python3 scripts/check_release_versions.py
 ```
 
 Or use the justfile helper:
 
 ```bash
-just bump 0.1.11
+VERSION=${VERSION:?set VERSION to the target release}
+just bump "$VERSION"
 ```
 
 ### 2. Commit and Tag
 
 ```bash
+VERSION=${VERSION:?set VERSION to the target release}
 git add -A
-git commit -m "Release v0.1.11"
-git tag v0.1.11
+git commit -m "Release v$VERSION"
+git tag "v$VERSION"
 git push origin master --tags
 ```
 
