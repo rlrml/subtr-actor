@@ -133,6 +133,8 @@ pub mod pass_stats;
 pub use pass_stats::*;
 pub mod positioning;
 pub use positioning::*;
+pub mod positioning_stats;
+pub use positioning_stats::*;
 pub mod player_vertical_state;
 pub use player_vertical_state::*;
 pub mod possession;
