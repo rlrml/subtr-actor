@@ -25,7 +25,6 @@ import {
   PAD_COLLECTION_COLORS,
   PAGES,
   TEAM_COLORS,
-  createDetailList,
   createPageIntro,
   createSummary,
   createSummaryCard,
@@ -38,6 +37,7 @@ import {
   formatShare,
   formatTime,
   getGoalWatchRequest,
+  getFinalFrame,
   getLeader,
   getPlayerTeamColor,
   groupDefinitions,
@@ -59,11 +59,14 @@ import {
   type GoalContextEvent,
   type GoalPlayerContext,
   type GoalTagEvent,
+  type NumberRow,
   type ReportPageId,
   type ReportState,
   type StatsReportData,
   type StatsReportGoalWatchRequest,
 } from "./reportShared.ts";
+
+export type { StatsReportData } from "./reportShared.ts";
 
 export interface StatsReportMountOptions {
   initialData?: StatsReportData | null;
