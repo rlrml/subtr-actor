@@ -71,6 +71,11 @@ import {
   type ScoreboardWindowController,
 } from "./scoreboardWindow.ts";
 import {
+  createPlaybackReadoutsController,
+  type PlaybackReadoutsController,
+} from "./playbackReadouts.ts";
+import { installMountEventListeners } from "./mountEventListeners.ts";
+import {
   getMechanicsReviewMechanicKind,
   getMechanicsReviewUrlFromLocation,
   type MechanicsReviewItem,
@@ -219,6 +224,7 @@ let moduleControlsController: ModuleControlsController | null = null;
 let mechanicsReviewController: MechanicsReviewWindowController | null = null;
 let floatingWindowController: FloatingWindowController | null = null;
 let scoreboardWindowController: ScoreboardWindowController | null = null;
+let playbackReadoutsController: PlaybackReadoutsController | null = null;
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
@@ -760,12 +766,7 @@ function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0)
 }
 
 function setTransportEnabled(enabled: boolean): void {
-  togglePlayback.disabled = !enabled;
-  playbackRate.disabled = !enabled;
-  skipPostGoalTransitions.disabled = !enabled;
-  skipKickoffs.disabled = !enabled;
-  hitboxWireframes.disabled = !enabled;
-  cameraControlsController?.setTransportEnabled(enabled, replayPlayer?.getState());
+  playbackReadoutsController?.setTransportEnabled(enabled, replayPlayer?.getState());
 }
 
 function syncRecordingWindow(status = canvasRecorder?.getStatus() ?? null): void {
@@ -783,17 +784,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
   }
   lastPlayingSnapshotUiUpdateAt = now;
 
-  timeReadout.textContent = `${state.currentTime.toFixed(2)}s`;
-  frameReadout.textContent = `${state.frameIndex}`;
-  durationReadout.textContent = `${state.duration.toFixed(2)}s`;
-  playbackStatusReadout.textContent = state.playing ? "Playing" : "Paused";
-  togglePlayback.textContent = state.playing ? "Pause" : "Play";
-  playbackRate.value = `${state.speed}`;
-  cameraControlsController?.syncState(state);
-  skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
-  skipKickoffs.checked = state.skipKickoffsEnabled;
-  hitboxWireframes.checked = state.hitboxWireframesEnabled;
-  emptyState.hidden = true;
+  playbackReadoutsController?.renderSnapshot(state);
 
   renderStatsWindows(state.frameIndex, { preserveOpenPickers: true });
   renderScoreboard(state.frameIndex);
@@ -1195,6 +1186,21 @@ export function mountStatEvaluationPlayer(
   skipPostGoalTransitions = mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions");
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
   hitboxWireframes = mustElement<HTMLInputElement>(root, "#hitbox-wireframes");
+  playbackReadoutsController = createPlaybackReadoutsController({
+    elements: {
+      togglePlayback,
+      playbackRate,
+      skipPostGoalTransitions,
+      skipKickoffs,
+      hitboxWireframes,
+      emptyState,
+      timeReadout,
+      frameReadout,
+      durationReadout,
+      playbackStatusReadout,
+    },
+    getCameraControlsController: () => cameraControlsController,
+  });
   recordingWindowController = createRecordingWindowController({
     elements: {
       fps: mustElement<HTMLInputElement>(root, "#recording-fps"),
@@ -1277,6 +1283,7 @@ export function mountStatEvaluationPlayer(
     recordingWindowController = null;
     moduleControlsController = null;
     scoreboardWindowController = null;
+    playbackReadoutsController = null;
     initialUrlConfig = null;
     if (configUrlUpdateTimer !== null) {
       window.clearTimeout(configUrlUpdateTimer);
@@ -1305,77 +1312,28 @@ export function mountStatEvaluationPlayer(
     }
   }
 
-  launcherToggle.addEventListener(
-    "click",
-    () => {
-      setLauncherOpen(launcherMenu.hidden);
+  installMountEventListeners({
+    elements: {
+      root,
+      launcherToggle,
+      launcherMenu,
+      loadReplayAction,
+      emptyLoadReplay,
+      fileInput,
+      togglePlayback,
+      playbackRate,
+      skipPostGoalTransitions,
+      skipKickoffs,
+      hitboxWireframes,
     },
-    { signal: listeners.signal },
-  );
-
-  root.addEventListener(
-    "click",
-    (event) => {
-      if (!(event.target instanceof Element)) {
-        return;
-      }
-      if (!event.target.closest(".top-chrome")) {
-        setLauncherOpen(false);
-      }
-    },
-    { signal: listeners.signal },
-  );
-
-  loadReplayAction.addEventListener("click", openReplayFilePicker, {
     signal: listeners.signal,
-  });
-  emptyLoadReplay.addEventListener("click", openReplayFilePicker, {
-    signal: listeners.signal,
-  });
-
-  root.querySelectorAll<HTMLElement>("[data-window-toggle]").forEach((button) => {
-    button.addEventListener(
-      "click",
-      () => {
-        const id = button.dataset.windowToggle as SingletonWindowId | undefined;
-        if (id) {
-          toggleWindow(id);
-          setLauncherOpen(false);
-        }
-      },
-      { signal: listeners.signal },
-    );
-  });
-
-  root.querySelectorAll<HTMLElement>("[data-window-hide]").forEach((button) => {
-    button.addEventListener(
-      "click",
-      () => {
-        const id = button.dataset.windowHide ?? getElementWindowId(button);
-        if (id) {
-          hideWindow(id);
-        }
-      },
-      { signal: listeners.signal },
-    );
-  });
-
-  root.querySelectorAll<HTMLElement>("[data-create-stats-window]").forEach((button) => {
-    button.addEventListener(
-      "click",
-      () => {
-        createStatsWindow(button.dataset.createStatsWindow as StatsWindowKind);
-      },
-      { signal: listeners.signal },
-    );
-  });
-
-  fileInput.addEventListener(
-    "change",
-    async () => {
-      const file = fileInput.files?.[0];
-      if (!file) return;
-
+    setLauncherOpen,
+    openReplayFilePicker,
+    getElementWindowId,
+    toggleWindow,
+    hideWindow,
+    createStatsWindow,
+    async loadReplayFile(file) {
       try {
         mechanicsReviewController?.clearCurrentClip({ resetReplayId: true, render: true });
         await loadReplay(createFileReplaySource(file));
@@ -1385,57 +1343,31 @@ export function mountStatEvaluationPlayer(
           error instanceof Error ? error.message : "Failed to load replay";
       }
     },
-    { signal: listeners.signal },
-  );
-
-  togglePlayback.addEventListener(
-    "click",
-    () => {
+    togglePlayback() {
       replayPlayer?.togglePlayback();
       scheduleConfigUrlUpdate();
     },
-    { signal: listeners.signal },
-  );
-
-  playbackRate.addEventListener(
-    "change",
-    () => {
-      replayPlayer?.setPlaybackRate(Number(playbackRate.value));
+    setPlaybackRate(value) {
+      replayPlayer?.setPlaybackRate(value);
       scheduleConfigUrlUpdate();
     },
-    { signal: listeners.signal },
-  );
+    setSkipPostGoalTransitionsEnabled(enabled) {
+      replayPlayer?.setSkipPostGoalTransitionsEnabled(enabled);
+      scheduleConfigUrlUpdate();
+    },
+    setSkipKickoffsEnabled(enabled) {
+      replayPlayer?.setSkipKickoffsEnabled(enabled);
+      scheduleConfigUrlUpdate();
+    },
+    setHitboxWireframesEnabled(enabled) {
+      replayPlayer?.setHitboxWireframesEnabled(enabled);
+      scheduleConfigUrlUpdate();
+    },
+  });
 
   mechanicsReviewController?.installEventListeners(listeners.signal);
   recordingWindowController?.installEventListeners(listeners.signal);
   cameraControlsController?.installEventListeners(listeners.signal);
-
-  skipPostGoalTransitions.addEventListener(
-    "change",
-    () => {
-      replayPlayer?.setSkipPostGoalTransitionsEnabled(skipPostGoalTransitions.checked);
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
-
-  skipKickoffs.addEventListener(
-    "change",
-    () => {
-      replayPlayer?.setSkipKickoffsEnabled(skipKickoffs.checked);
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
-
-  hitboxWireframes.addEventListener(
-    "change",
-    () => {
-      replayPlayer?.setHitboxWireframesEnabled(hitboxWireframes.checked);
-      scheduleConfigUrlUpdate();
-    },
-    { signal: listeners.signal },
-  );
 
   renderModuleSummary();
   renderModuleSettings();
