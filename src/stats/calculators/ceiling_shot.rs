@@ -20,6 +20,8 @@ pub struct CeilingShotEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub ceiling_contact_time: f32,
     pub ceiling_contact_frame: usize,
@@ -319,6 +321,7 @@ impl CeilingShotCalculator {
             time: touch_event.time,
             frame: touch_event.frame,
             player: player.player_id.clone(),
+            player_position: Some(player_position.to_array()),
             is_team_0: player.is_team_0,
             ceiling_contact_time: recent_contact.time,
             ceiling_contact_frame: recent_contact.frame,

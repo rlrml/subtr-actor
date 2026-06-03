@@ -107,6 +107,8 @@ pub struct RotationPlayerEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub active: bool,
     pub became_first_man_count: u32,
@@ -119,6 +121,7 @@ impl RotationPlayerEvent {
     fn new(
         frame: &FrameInfo,
         player: PlayerId,
+        player_position: Option<[f32; 3]>,
         is_team_0: bool,
         active: bool,
         current_role_state: RoleState,
@@ -128,6 +131,7 @@ impl RotationPlayerEvent {
             time: frame.time,
             frame: frame.frame_number,
             player,
+            player_position,
             is_team_0,
             active,
             became_first_man_count: 0,
@@ -354,6 +358,7 @@ impl RotationCalculator {
             self.emit_player_event_if_changed(
                 frame,
                 &player.player_id,
+                player.position().map(|position| position.to_array()),
                 player.is_team_0,
                 false,
                 current_role_state,
@@ -414,6 +419,7 @@ impl RotationCalculator {
         &mut self,
         frame: &FrameInfo,
         player_id: &PlayerId,
+        player_position: Option<[f32; 3]>,
         is_team_0: bool,
         active: bool,
         current_role_state: RoleState,
@@ -434,6 +440,7 @@ impl RotationCalculator {
         let mut event = RotationPlayerEvent::new(
             frame,
             player_id.clone(),
+            player_position,
             is_team_0,
             active,
             current_role_state,
@@ -491,6 +498,7 @@ impl RotationCalculator {
                 self.emit_player_event_if_changed(
                     frame,
                     &player.player_id,
+                    player.position().map(|position| position.to_array()),
                     player.is_team_0,
                     false,
                     current_role_state,
@@ -611,6 +619,7 @@ impl RotationCalculator {
             self.emit_player_event_if_changed(
                 frame,
                 &player.player_id,
+                player.position().map(|position| position.to_array()),
                 player.is_team_0,
                 true,
                 current_role_state,
@@ -628,6 +637,7 @@ impl RotationCalculator {
             self.emit_player_event_if_changed(
                 frame,
                 &player_id,
+                players.player_position(&player_id),
                 is_team_0,
                 false,
                 current_role_state,
@@ -644,6 +654,7 @@ impl RotationCalculator {
             self.emit_player_event_if_changed(
                 frame,
                 &player_id,
+                players.player_position(&player_id),
                 is_team_0,
                 false,
                 current_role_state,

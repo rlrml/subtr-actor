@@ -39,6 +39,7 @@ fn touch(player_id: PlayerId, is_team_0: bool, dodge_contact: bool) -> TouchEven
         frame: 10,
         team_is_team_0: is_team_0,
         player: Some(player_id),
+        player_position: None,
         closest_approach_distance: Some(0.0),
         dodge_contact,
     }

@@ -34,6 +34,8 @@ pub struct HalfVolleyEvent {
     pub sample_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub bounce_time: f32,
     pub bounce_frame: usize,
@@ -233,6 +235,9 @@ impl HalfVolleyCalculator {
             sample_time: touch.time,
             sample_frame: touch.frame,
             player,
+            player_position: touch
+                .player_position
+                .map(|position| vec_to_glam(&position).to_array()),
             is_team_0: touch.team_is_team_0,
             bounce_time: bounce.time,
             bounce_frame: bounce.frame,

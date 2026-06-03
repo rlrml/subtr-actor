@@ -78,7 +78,15 @@ impl DemoCalculator {
 
         if !events.demo_events.is_empty() {
             for demo in &events.demo_events {
-                self.record_demo(&demo.attacker, &demo.victim, demo.time, demo.frame);
+                self.record_demo(
+                    &demo.attacker,
+                    demo.attacker_location
+                        .map(|position| vec_to_glam(&position).to_array()),
+                    &demo.victim,
+                    Some(vec_to_glam(&demo.victim_location).to_array()),
+                    demo.time,
+                    demo.frame,
+                );
             }
             self.active_pairs = active_demo_pairs(events);
             return Ok(());
@@ -92,7 +100,14 @@ impl DemoCalculator {
             {
                 continue;
             }
-            self.record_demo(&demo.attacker, &demo.victim, frame.time, frame.frame_number);
+            self.record_demo(
+                &demo.attacker,
+                None,
+                &demo.victim,
+                None,
+                frame.time,
+                frame.frame_number,
+            );
         }
         self.active_pairs = current_active_pairs;
 
@@ -112,7 +127,9 @@ impl DemoCalculator {
     fn record_demo(
         &mut self,
         attacker: &PlayerId,
+        attacker_position: Option<[f32; 3]>,
         victim: &PlayerId,
+        victim_position: Option<[f32; 3]>,
         time: f32,
         frame_number: usize,
     ) {
@@ -140,6 +157,7 @@ impl DemoCalculator {
             frame: Some(frame_number),
             kind: TimelineEventKind::Kill,
             player_id: Some(attacker.clone()),
+            player_position: attacker_position,
             is_team_0: self.player_teams.get(attacker).copied(),
         });
         self.timeline.push(TimelineEvent {
@@ -147,6 +165,7 @@ impl DemoCalculator {
             frame: Some(frame_number),
             kind: TimelineEventKind::Death,
             player_id: Some(victim.clone()),
+            player_position: victim_position,
             is_team_0: self.player_teams.get(victim).copied(),
         });
     }

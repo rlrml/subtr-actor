@@ -60,6 +60,7 @@ fn touch(frame_number: usize, player_id: PlayerId) -> TouchEvent {
         frame: frame_number,
         team_is_team_0: true,
         player: Some(player_id),
+        player_position: None,
         closest_approach_distance: Some(0.0),
         dodge_contact: false,
     }

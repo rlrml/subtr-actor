@@ -1,6 +1,10 @@
 use super::*;
 
 fn rigid_body(position: glam::Vec3) -> boxcars::RigidBody {
+    rigid_body_with_velocity(position, glam::Vec3::ZERO)
+}
+
+fn rigid_body_with_velocity(position: glam::Vec3, velocity: glam::Vec3) -> boxcars::RigidBody {
     boxcars::RigidBody {
         sleeping: false,
         location: glam_to_vec(&position),
@@ -10,7 +14,7 @@ fn rigid_body(position: glam::Vec3) -> boxcars::RigidBody {
             z: 0.0,
             w: 1.0,
         },
-        linear_velocity: Some(glam_to_vec(&glam::Vec3::ZERO)),
+        linear_velocity: Some(glam_to_vec(&velocity)),
         angular_velocity: Some(glam_to_vec(&glam::Vec3::ZERO)),
     }
 }
@@ -18,6 +22,12 @@ fn rigid_body(position: glam::Vec3) -> boxcars::RigidBody {
 fn ball(z: f32) -> BallFrameState {
     BallFrameState::Present(BallSample {
         rigid_body: rigid_body(glam::Vec3::new(0.0, 0.0, z)),
+    })
+}
+
+fn ball_with_state(position: glam::Vec3, velocity: glam::Vec3) -> BallFrameState {
+    BallFrameState::Present(BallSample {
+        rigid_body: rigid_body_with_velocity(position, velocity),
     })
 }
 
@@ -54,6 +64,7 @@ fn goal_event(time: f32, frame: usize, scorer: PlayerId) -> GoalEvent {
         frame,
         scoring_team_is_team_0: true,
         player: Some(scorer),
+        player_position: None,
         team_zero_score: Some(1),
         team_one_score: Some(0),
     }
@@ -65,6 +76,7 @@ fn unattributed_goal_event(time: f32, frame: usize) -> GoalEvent {
         frame,
         scoring_team_is_team_0: true,
         player: None,
+        player_position: None,
         team_zero_score: Some(1),
         team_one_score: Some(0),
     }
@@ -156,6 +168,85 @@ fn fills_missing_goal_context_scorer_from_goal_delta() {
         1
     );
     assert_eq!(scorer_stats.average_goal_ball_air_time(), 2.5);
+}
+
+#[test]
+fn goal_context_links_scorer_touch_with_ball_location_and_speeds() {
+    let scorer = PlayerId::Steam(1);
+    let mut calculator = MatchStatsCalculator::new();
+    let touch_ball_position = glam::Vec3::new(100.0, 200.0, 300.0);
+
+    calculator
+        .update_parts(
+            &frame(10, 1.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                team_zero_score: Some(0),
+                team_one_score: Some(0),
+                ..GameplayState::default()
+            },
+            &ball_with_state(touch_ball_position, glam::Vec3::new(1200.0, 0.0, 0.0)),
+            &PlayerFrameState {
+                players: vec![player(scorer.clone(), true, 0)],
+            },
+            &FrameEventsState::default(),
+            &LivePlayState {
+                gameplay_phase: GameplayPhase::ActivePlay,
+                is_live_play: true,
+            },
+            &TouchState {
+                touch_events: vec![TouchEvent {
+                    time: 1.0,
+                    frame: 10,
+                    team_is_team_0: true,
+                    player: Some(scorer.clone()),
+                    player_position: None,
+                    closest_approach_distance: Some(0.0),
+                    dodge_contact: false,
+                }],
+                ..TouchState::default()
+            },
+        )
+        .unwrap();
+
+    calculator
+        .update_parts(
+            &frame(20, 2.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                team_zero_score: Some(1),
+                team_one_score: Some(0),
+                ..GameplayState::default()
+            },
+            &ball_with_state(
+                glam::Vec3::new(0.0, 5200.0, 100.0),
+                glam::Vec3::new(0.0, 1600.0, 0.0),
+            ),
+            &PlayerFrameState {
+                players: vec![player(scorer.clone(), true, 1)],
+            },
+            &FrameEventsState {
+                goal_events: vec![goal_event(2.0, 20, scorer.clone())],
+                ..FrameEventsState::default()
+            },
+            &LivePlayState {
+                gameplay_phase: GameplayPhase::ActivePlay,
+                is_live_play: true,
+            },
+            &TouchState::default(),
+        )
+        .unwrap();
+
+    let goal_context = &calculator.goal_context_events()[0];
+    assert_eq!(goal_context.ball_speed_at_goal, Some(1600.0));
+    let scorer_last_touch = goal_context.scorer_last_touch.as_ref().unwrap();
+    assert_eq!(scorer_last_touch.frame, 10);
+    assert_eq!(scorer_last_touch.time, 1.0);
+    assert_eq!(
+        scorer_last_touch.ball_position,
+        Some(GoalContextPosition::from(touch_ball_position))
+    );
+    assert_eq!(scorer_last_touch.ball_speed_after_touch, Some(1200.0));
 }
 
 #[test]

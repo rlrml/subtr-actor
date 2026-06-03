@@ -51,6 +51,7 @@ fn reset_event(player: PlayerId) -> DodgeRefreshedEvent {
         frame: 10,
         player,
         is_team_0: true,
+        player_position: None,
         counter_value: 1,
     }
 }
@@ -61,6 +62,7 @@ fn touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
         frame,
         team_is_team_0: true,
         player: Some(player),
+        player_position: None,
         closest_approach_distance: Some(0.0),
         dodge_contact: false,
     }

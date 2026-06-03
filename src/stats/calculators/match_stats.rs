@@ -470,6 +470,8 @@ pub struct CorePlayerStatsEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub delta: CorePlayerStats,
 }
@@ -503,6 +505,8 @@ pub struct TimelineEvent {
     pub kind: TimelineEventKind,
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub player_id: Option<PlayerId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: Option<bool>,
 }
 
@@ -770,6 +774,8 @@ pub struct GoalTouchContext {
     pub player: PlayerId,
     pub is_team_0: bool,
     pub ball_position: Option<GoalContextPosition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ball_speed_after_touch: Option<f32>,
     pub player_position: Option<GoalContextPosition>,
     pub players: Vec<GoalPlayerContext>,
 }
@@ -787,6 +793,8 @@ pub struct GoalContextEvent {
     #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
     pub defending_team_most_back_player: Option<PlayerId>,
     pub ball_position: Option<GoalContextPosition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ball_speed_at_goal: Option<f32>,
     pub ball_air_time_before_goal: Option<f32>,
     #[serde(default)]
     pub goal_buildup: GoalBuildupKind,
@@ -910,6 +918,10 @@ impl MatchStatsCalculator {
                 time: pending_goal_event.event.time,
                 frame: Some(pending_goal_event.event.frame),
                 kind: TimelineEventKind::Goal,
+                player_position: pending_goal_event
+                    .event
+                    .player_position
+                    .map(|position| vec_to_glam(&position).to_array()),
                 player_id: Some(scorer),
                 is_team_0: Some(pending_goal_event.event.scoring_team_is_team_0),
             });
@@ -976,6 +988,7 @@ impl MatchStatsCalculator {
         stats
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn emit_timeline_events(
         &mut self,
         time: f32,
@@ -983,6 +996,7 @@ impl MatchStatsCalculator {
         kind: TimelineEventKind,
         player_id: &PlayerId,
         is_team_0: bool,
+        player_position: Option<[f32; 3]>,
         delta: i32,
     ) {
         for _ in 0..delta.max(0) {
@@ -991,12 +1005,13 @@ impl MatchStatsCalculator {
                 frame,
                 kind,
                 player_id: Some(player_id.clone()),
+                player_position,
                 is_team_0: Some(is_team_0),
             });
         }
     }
 
-    fn emit_core_stats_events(&mut self, frame: &FrameInfo) {
+    fn emit_core_stats_events(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
         let mut player_ids: Vec<_> = self.player_stats.keys().cloned().collect();
         player_ids.sort_by(|left, right| format!("{left:?}").cmp(&format!("{right:?}")));
         for player_id in player_ids {
@@ -1018,6 +1033,7 @@ impl MatchStatsCalculator {
                 time: frame.time,
                 frame: frame.frame_number,
                 player: player_id.clone(),
+                player_position: players.player_position(&player_id),
                 is_team_0,
                 delta: core_player_stats_delta(stats, &previous_stats),
             });
@@ -1150,6 +1166,7 @@ impl MatchStatsCalculator {
         touch_events: &[TouchEvent],
     ) {
         let ball_position = ball.position().map(GoalContextPosition::from);
+        let ball_speed_after_touch = ball.velocity().map(|velocity| velocity.length());
         for touch in touch_events {
             let Some(player_id) = touch.player.clone() else {
                 continue;
@@ -1171,6 +1188,7 @@ impl MatchStatsCalculator {
                     player: player_id.clone(),
                     is_team_0: touch.team_is_team_0,
                     ball_position,
+                    ball_speed_after_touch,
                     player_position: Self::player_position(players, &player_id)
                         .map(GoalContextPosition::from),
                     players: touch_players,
@@ -1316,6 +1334,7 @@ impl MatchStatsCalculator {
         events: &FrameEventsState,
     ) {
         let ball_position = ball.position().map(GoalContextPosition::from);
+        let ball_speed_at_goal = ball.velocity().map(|velocity| velocity.length());
         for goal_event in &events.goal_events {
             let scoring_team_most_back_player =
                 Self::most_back_player(players, goal_event.scoring_team_is_team_0);
@@ -1346,6 +1365,7 @@ impl MatchStatsCalculator {
                 scoring_team_most_back_player: scoring_team_most_back_player.clone(),
                 defending_team_most_back_player: defending_team_most_back_player.clone(),
                 ball_position,
+                ball_speed_at_goal,
                 ball_air_time_before_goal,
                 goal_buildup,
                 scorer_last_touch,
@@ -1545,6 +1565,17 @@ impl MatchStatsCalculator {
                 frame: Some(event.frame),
                 kind,
                 player_id: Some(event.player.clone()),
+                player_position: event
+                    .player_position
+                    .map(|position| vec_to_glam(&position).to_array())
+                    .or_else(|| {
+                        event
+                            .shot
+                            .as_ref()
+                            .and_then(|shot| shot.player_position)
+                            .map(|position| vec_to_glam(&position).to_array())
+                    })
+                    .or_else(|| players.player_position(&event.player)),
                 is_team_0: Some(event.is_team_0),
             });
             *processor_event_counts
@@ -1601,6 +1632,7 @@ impl MatchStatsCalculator {
                     TimelineEventKind::Shot,
                     &player.player_id,
                     player.is_team_0,
+                    player.position().map(|position| position.to_array()),
                     shot_fallback_delta,
                 );
             }
@@ -1611,6 +1643,7 @@ impl MatchStatsCalculator {
                     TimelineEventKind::Save,
                     &player.player_id,
                     player.is_team_0,
+                    player.position().map(|position| position.to_array()),
                     save_fallback_delta,
                 );
             }
@@ -1621,6 +1654,7 @@ impl MatchStatsCalculator {
                     TimelineEventKind::Assist,
                     &player.player_id,
                     player.is_team_0,
+                    player.position().map(|position| position.to_array()),
                     assist_fallback_delta,
                 );
             }
@@ -1681,6 +1715,7 @@ impl MatchStatsCalculator {
                         frame: Some(goal_frame),
                         kind: TimelineEventKind::Goal,
                         player_id: Some(player.player_id.clone()),
+                        player_position: player.position().map(|position| position.to_array()),
                         is_team_0: Some(player.is_team_0),
                     });
                 }
@@ -1726,7 +1761,7 @@ impl MatchStatsCalculator {
                 .partial_cmp(&b.time)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        self.emit_core_stats_events(frame);
+        self.emit_core_stats_events(frame, players);
 
         Ok(())
     }

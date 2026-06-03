@@ -11,8 +11,12 @@ pub struct OneTimerEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub passer: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passer_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub pass_start_time: f32,
     pub pass_start_frame: usize,
@@ -142,7 +146,9 @@ impl OneTimerCalculator {
             time: pass.time,
             frame: pass.frame,
             player: pass.receiver.clone(),
+            player_position: pass.receiver_position,
             passer: pass.passer.clone(),
+            passer_position: pass.passer_position,
             is_team_0: pass.is_team_0,
             pass_start_time: pass.start_time,
             pass_start_frame: pass.start_frame,

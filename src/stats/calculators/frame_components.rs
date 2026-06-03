@@ -98,6 +98,16 @@ pub struct PlayerFrameState {
     pub players: Vec<PlayerSample>,
 }
 
+impl PlayerFrameState {
+    pub fn player_position(&self, player_id: &PlayerId) -> Option<[f32; 3]> {
+        self.players
+            .iter()
+            .find(|player| &player.player_id == player_id)
+            .and_then(PlayerSample::position)
+            .map(|position| position.to_array())
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct FrameEventsState {
     pub active_demos: Vec<DemoEventSample>,

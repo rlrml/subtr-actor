@@ -55,6 +55,7 @@ fn shot_event(frame: usize, time: f32, ball_body: &boxcars::RigidBody) -> Player
         time,
         frame,
         player: player.clone(),
+        player_position: None,
         is_team_0: true,
         kind: PlayerStatEventKind::Shot,
         shot: Some(ShotEventMetadata::from_rigid_bodies(

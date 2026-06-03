@@ -26,6 +26,8 @@ pub struct FlickEvent {
     pub sample_frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub dodge_time: f32,
     pub dodge_frame: usize,
@@ -491,6 +493,7 @@ impl FlickCalculator {
             sample_time: touch_event.time,
             sample_frame: touch_event.frame,
             player: player.player_id.clone(),
+            player_position: Some(player_position.to_array()),
             is_team_0: player.is_team_0,
             dodge_time: dodge_start.time,
             dodge_frame: dodge_start.frame,

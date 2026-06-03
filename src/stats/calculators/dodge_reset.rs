@@ -11,6 +11,8 @@ pub struct DodgeResetEvent {
     pub frame: usize,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub counter_value: i32,
     pub on_ball: bool,
@@ -23,6 +25,8 @@ pub struct ConfirmedFlipResetEvent {
     pub reset_time: f32,
     pub reset_frame: usize,
     pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub counter_value: i32,
     pub time_since_reset: f32,
@@ -185,6 +189,10 @@ impl DodgeResetCalculator {
                 reset_time: reset_event.time,
                 reset_frame: reset_event.frame,
                 player: player_id.clone(),
+                player_position: touch_event
+                    .player_position
+                    .map(|position| vec_to_glam(&position).to_array())
+                    .or_else(|| players.player_position(player_id)),
                 is_team_0: touch_event.team_is_team_0,
                 counter_value: reset_event.counter_value,
                 time_since_reset,
@@ -215,6 +223,7 @@ impl DodgeResetCalculator {
                 time: event.time,
                 frame: event.frame,
                 player: event.player.clone(),
+                player_position: players.player_position(&event.player),
                 is_team_0: event.is_team_0,
                 counter_value: event.counter_value,
                 on_ball,
