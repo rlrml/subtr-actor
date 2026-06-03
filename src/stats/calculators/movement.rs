@@ -42,7 +42,6 @@ pub struct MovementEvent {
 
 #[derive(Debug, Clone, Default)]
 pub struct MovementCalculator {
-    stats: MovementStatsAccumulator,
     player_teams: HashMap<PlayerId, bool>,
     previous_positions: HashMap<PlayerId, glam::Vec3>,
     events: EventStream<MovementEvent>,
@@ -51,18 +50,6 @@ pub struct MovementCalculator {
 impl MovementCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, MovementStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &MovementStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &MovementStats {
-        self.stats.team_one_stats()
     }
 
     pub fn events(&self) -> &[MovementEvent] {
@@ -138,7 +125,6 @@ impl MovementCalculator {
                     speed_band: classification.speed_band.as_label_value().to_owned(),
                     height_band: classification.height_band.as_label().value.to_owned(),
                 };
-                self.stats.apply_event(&event);
                 self.events.push(event);
             }
 

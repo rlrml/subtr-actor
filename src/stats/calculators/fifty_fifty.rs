@@ -52,6 +52,25 @@ impl ActiveFiftyFifty {
 }
 
 #[cfg(test)]
+impl FiftyFiftyCalculator {
+    pub fn stats(&self) -> &FiftyFiftyStats {
+        let mut stats = FiftyFiftyStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.stats().clone())
+    }
+
+    pub fn player_stats(&self) -> &HashMap<PlayerId, FiftyFiftyPlayerStats> {
+        let mut stats = FiftyFiftyStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+}
+
+#[cfg(test)]
 #[path = "fifty_fifty_tests.rs"]
 mod tests;
 
@@ -223,21 +242,12 @@ impl FiftyFiftyEvent {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FiftyFiftyCalculator {
-    stats: FiftyFiftyStatsAccumulator,
     events: EventStream<FiftyFiftyEvent>,
 }
 
 impl FiftyFiftyCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn stats(&self) -> &FiftyFiftyStats {
-        self.stats.stats()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, FiftyFiftyPlayerStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[FiftyFiftyEvent] {
@@ -249,7 +259,6 @@ impl FiftyFiftyCalculator {
     }
 
     fn apply_event(&mut self, event: &FiftyFiftyEvent) {
-        self.stats.apply_event(event);
         self.events.push(event.clone());
     }
 

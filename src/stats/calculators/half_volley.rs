@@ -64,7 +64,6 @@ struct DodgeStart {
 #[derive(Debug, Clone, Default)]
 pub struct HalfVolleyCalculator {
     config: HalfVolleyCalculatorConfig,
-    stats: HalfVolleyStatsAccumulator,
     events: EventStream<HalfVolleyEvent>,
     last_floor_bounce: Option<FloorBounce>,
     last_ground_contacts: HashMap<PlayerId, GroundContact>,
@@ -87,18 +86,6 @@ impl HalfVolleyCalculator {
 
     pub fn config(&self) -> &HalfVolleyCalculatorConfig {
         &self.config
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, HalfVolleyPlayerStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &HalfVolleyTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &HalfVolleyTeamStats {
-        self.stats.team_one_stats()
     }
 
     pub fn events(&self) -> &[HalfVolleyEvent] {
@@ -198,7 +185,6 @@ impl HalfVolleyCalculator {
     fn record_half_volley(&mut self, frame: &FrameInfo, mut event: HalfVolleyEvent) {
         event.sample_time = frame.time;
         event.sample_frame = frame.frame_number;
-        self.stats.apply_event(&event, frame);
         self.events.push(event);
     }
 
@@ -249,14 +235,12 @@ impl HalfVolleyCalculator {
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.stats.begin_sample(frame);
         if !live_play {
             self.last_floor_bounce = None;
             self.last_ground_contacts.clear();
             self.recent_dodge_starts.clear();
             self.previous_dodge_active.clear();
             self.previous_ball_velocity = ball.velocity();
-            self.stats.reset_current_last_event_marker();
             return Ok(());
         }
 
@@ -278,9 +262,38 @@ impl HalfVolleyCalculator {
         }
 
         self.previous_ball_velocity = ball.velocity();
-        self.stats.restore_current_last_event_marker();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl HalfVolleyCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, HalfVolleyPlayerStats> {
+        let mut stats = HalfVolleyStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.sample_time, event.sample_frame);
+            stats.apply_event(event, &frame);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &HalfVolleyTeamStats {
+        let mut stats = HalfVolleyStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.sample_time, event.sample_frame);
+            stats.apply_event(event, &frame);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &HalfVolleyTeamStats {
+        let mut stats = HalfVolleyStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.sample_time, event.sample_frame);
+            stats.apply_event(event, &frame);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
     }
 }
 

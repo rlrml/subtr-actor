@@ -4,7 +4,6 @@ const DEMO_REPEAT_FRAME_WINDOW: usize = 8;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DemoCalculator {
-    stats: DemoStatsAccumulator,
     player_teams: HashMap<PlayerId, bool>,
     timeline: EventStream<TimelineEvent>,
     last_seen_frame: HashMap<(PlayerId, PlayerId), usize>,
@@ -14,18 +13,6 @@ pub struct DemoCalculator {
 impl DemoCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, DemoPlayerStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &DemoTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &DemoTeamStats {
-        self.stats.team_one_stats()
     }
 
     pub fn timeline(&self) -> &[TimelineEvent] {
@@ -135,7 +122,6 @@ impl DemoCalculator {
             player_position: attacker_position,
             is_team_0: self.player_teams.get(attacker).copied(),
         };
-        self.stats.apply_timeline_event(&kill_event);
         self.timeline.push(kill_event);
 
         let death_event = TimelineEvent {
@@ -146,8 +132,34 @@ impl DemoCalculator {
             player_position: victim_position,
             is_team_0: self.player_teams.get(victim).copied(),
         };
-        self.stats.apply_timeline_event(&death_event);
         self.timeline.push(death_event);
+    }
+}
+
+#[cfg(test)]
+impl DemoCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, DemoPlayerStats> {
+        let mut stats = DemoStatsAccumulator::default();
+        for event in self.timeline() {
+            stats.apply_timeline_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &DemoTeamStats {
+        let mut stats = DemoStatsAccumulator::default();
+        for event in self.timeline() {
+            stats.apply_timeline_event(event);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &DemoTeamStats {
+        let mut stats = DemoStatsAccumulator::default();
+        for event in self.timeline() {
+            stats.apply_timeline_event(event);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
     }
 }
 

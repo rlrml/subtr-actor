@@ -84,7 +84,6 @@ struct ActiveWhiffCandidate {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WhiffCalculator {
-    stats: WhiffStatsAccumulator,
     active_candidates: HashMap<PlayerId, ActiveWhiffCandidate>,
     events: EventStream<WhiffEvent>,
 }
@@ -92,10 +91,6 @@ pub struct WhiffCalculator {
 impl WhiffCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, WhiffStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[WhiffEvent] {
@@ -272,8 +267,6 @@ impl WhiffCalculator {
             dodge_active: candidate.dodge_active,
             aerial: candidate.aerial,
         };
-
-        self.stats.apply_event(&event, frame);
         self.events.push(event);
     }
 
@@ -350,11 +343,8 @@ impl WhiffCalculator {
         self.events.begin_update();
         if !live_play {
             self.active_candidates.clear();
-            self.stats.reset_current_last_event_marker();
             return Ok(());
         }
-
-        self.stats.begin_sample(frame);
         self.finish_touched_candidates(frame, touch_state);
         if touch_state.touch_events.is_empty() {
             if let Some(ball_position) = ball.position() {
@@ -366,8 +356,19 @@ impl WhiffCalculator {
                 );
             }
         }
-        self.stats.restore_current_last_event_marker();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl WhiffCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, WhiffStats> {
+        let mut stats = WhiffStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(event, &frame);
+        }
+        leak_test_stats(stats.player_stats().clone())
     }
 }
 

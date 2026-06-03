@@ -133,7 +133,6 @@ impl Default for PositioningCalculatorConfig {
 #[derive(Debug, Clone, Default)]
 pub struct PositioningCalculator {
     config: PositioningCalculatorConfig,
-    stats: PositioningStatsAccumulator,
     previous_ball_position: Option<glam::Vec3>,
     previous_player_positions: HashMap<PlayerId, glam::Vec3>,
     events: EventStream<PositioningEvent>,
@@ -153,10 +152,6 @@ impl PositioningCalculator {
 
     pub fn config(&self) -> &PositioningCalculatorConfig {
         &self.config
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, PositioningStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[PositioningEvent] {
@@ -536,7 +531,6 @@ impl PositioningCalculator {
         frame_events.sort_by(|left, right| {
             format!("{:?}", left.player).cmp(&format!("{:?}", right.player))
         });
-        self.stats.apply_events(&frame_events);
         self.events.extend(frame_events);
 
         self.previous_ball_position = Some(ball_position);
@@ -580,6 +574,15 @@ fn ball_depth_fractions(level_margin: f32, start_delta: f32, end_delta: f32) -> 
         interval_fraction_in_scalar_range(start_delta, end_delta, -level_margin, level_margin);
     let in_front_fraction = (1.0 - behind_fraction - level_fraction).clamp(0.0, 1.0);
     (behind_fraction, level_fraction, in_front_fraction)
+}
+
+#[cfg(test)]
+impl PositioningCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, PositioningStats> {
+        let mut stats = PositioningStatsAccumulator::default();
+        stats.apply_events(self.events());
+        leak_test_stats(stats.player_stats().clone())
+    }
 }
 
 #[cfg(test)]

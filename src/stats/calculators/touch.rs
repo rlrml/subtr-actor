@@ -126,7 +126,6 @@ struct PendingFiftyFiftyMovement {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchCalculator {
-    stats: TouchStatsAccumulator,
     events: EventStream<TouchStatsEvent>,
     ball_movement_events: EventStream<TouchBallMovementEvent>,
     last_touch_events: EventStream<TouchLastTouchEvent>,
@@ -138,10 +137,6 @@ pub struct TouchCalculator {
 impl TouchCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, TouchStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[TouchStatsEvent] {
@@ -317,7 +312,6 @@ impl TouchCalculator {
                 dodge_state: classification.dodge_state.as_label_value().to_owned(),
                 ball_speed_change,
             };
-            self.stats.apply_touch_event(&event, frame);
             self.events.push(event);
         }
 
@@ -340,11 +334,7 @@ impl TouchCalculator {
                             .map(|position| position.to_array())
                     }),
             });
-            self.stats
-                .set_current_last_touch_player(last_touch.player.clone());
         }
-
-        self.stats.restore_current_last_touch_marker();
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -375,7 +365,6 @@ impl TouchCalculator {
             advance_distance,
             retreat_distance,
         };
-        self.stats.apply_ball_movement_event(&event);
         self.ball_movement_events.push(event);
     }
 
@@ -445,7 +434,6 @@ impl TouchCalculator {
             advance_distance,
             retreat_distance,
         };
-        self.stats.apply_ball_movement_event(&event);
         self.ball_movement_events.push(event);
     }
 
@@ -529,14 +517,11 @@ impl TouchCalculator {
         self.ball_movement_events.begin_update();
         self.last_touch_events.begin_update();
         if !live_play {
-            self.stats.set_current_last_touch_player(None);
             self.previous_ball_velocity = ball.velocity();
             self.previous_ball_position = ball.position();
             self.pending_fifty_fifty_movement = None;
             return Ok(());
         }
-
-        self.stats.begin_sample(frame);
         self.apply_touch_events(
             frame,
             ball,
@@ -554,14 +539,22 @@ impl TouchCalculator {
         );
         self.previous_ball_velocity = ball.velocity();
 
-        if let Some(player_id) = touch_state.last_touch_player.as_ref() {
-            self.stats
-                .set_current_last_touch_player(Some(player_id.clone()));
-        }
-
-        self.stats.restore_current_last_touch_marker();
-
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl TouchCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, TouchStats> {
+        let mut stats = TouchStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.sample_time, event.sample_frame);
+            stats.apply_touch_event(event, &frame);
+        }
+        for event in self.ball_movement_events() {
+            stats.apply_ball_movement_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
     }
 }
 

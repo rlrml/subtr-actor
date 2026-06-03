@@ -61,7 +61,6 @@ struct ActiveSpeedFlipCandidate {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpeedFlipCalculator {
-    stats: SpeedFlipStatsAccumulator,
     events: EventStream<SpeedFlipEvent>,
     active_candidates: HashMap<PlayerId, ActiveSpeedFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
@@ -72,10 +71,6 @@ pub struct SpeedFlipCalculator {
 impl SpeedFlipCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, SpeedFlipStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[SpeedFlipEvent] {
@@ -168,7 +163,6 @@ impl SpeedFlipCalculator {
     }
 
     fn apply_event(&mut self, event: SpeedFlipEvent) {
-        self.stats.apply_event(&event);
         self.events.push(event);
     }
 
@@ -469,8 +463,6 @@ impl SpeedFlipCalculator {
             return Ok(());
         }
 
-        self.stats.begin_sample(frame);
-
         if kickoff_approach_active && !self.kickoff_approach_active_last_frame {
             self.reset_kickoff_state();
         }
@@ -504,6 +496,17 @@ impl SpeedFlipCalculator {
 
     pub fn finalize_parts(&mut self, frame: &FrameInfo) {
         self.finalize_candidates(frame, true);
+    }
+}
+
+#[cfg(test)]
+impl SpeedFlipCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, SpeedFlipStats> {
+        let mut stats = SpeedFlipStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
     }
 }
 

@@ -104,7 +104,6 @@ impl Default for RushCalculatorConfig {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RushCalculator {
     config: RushCalculatorConfig,
-    stats: RushStatsAccumulator,
     events: EventStream<RushEvent>,
     active_rush: Option<ActiveRush>,
 }
@@ -123,10 +122,6 @@ impl RushCalculator {
 
     pub fn config(&self) -> &RushCalculatorConfig {
         &self.config
-    }
-
-    pub fn stats(&self) -> &RushStats {
-        self.stats.stats()
     }
 
     pub fn events(&self) -> &[RushEvent] {
@@ -154,7 +149,7 @@ impl RushCalculator {
             attackers: active_rush.attackers,
             defenders: active_rush.defenders,
         };
-        self.stats.apply_event(&event);
+        self.events.push(event);
         active_rush.counted = true;
     }
 
@@ -348,6 +343,17 @@ impl RushCalculator {
         self.events.begin_update();
         self.finalize_active_rush();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl RushCalculator {
+    pub fn stats(&self) -> &RushStats {
+        let mut stats = RushStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.stats().clone())
     }
 }
 

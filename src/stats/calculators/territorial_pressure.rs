@@ -63,7 +63,6 @@ impl Default for TerritorialPressureCalculatorConfig {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TerritorialPressureCalculator {
     config: TerritorialPressureCalculatorConfig,
-    stats: TerritorialPressureStatsAccumulator,
     events: EventStream<TerritorialPressureEvent>,
     stats_events: EventStream<TerritorialPressureStatsEvent>,
     candidate: Option<CandidateTerritorialPressureSession>,
@@ -118,10 +117,6 @@ impl TerritorialPressureCalculator {
             config,
             ..Self::default()
         }
-    }
-
-    pub fn stats(&self) -> &TerritorialPressureStats {
-        self.stats.stats()
     }
 
     pub fn events(&self) -> &[TerritorialPressureEvent] {
@@ -205,7 +200,6 @@ impl TerritorialPressureCalculator {
             frame: frame_number,
             delta,
         };
-        self.stats.apply_event(&event);
         self.stats_events.push(event);
     }
 
@@ -476,6 +470,17 @@ impl TerritorialPressureCalculator {
             self.update_candidate(frame, ball.position().y);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl TerritorialPressureCalculator {
+    pub fn stats(&self) -> &TerritorialPressureStats {
+        let mut stats = TerritorialPressureStatsAccumulator::default();
+        for event in self.stats_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.stats().clone())
     }
 }
 

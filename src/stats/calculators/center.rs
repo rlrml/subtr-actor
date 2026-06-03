@@ -40,7 +40,6 @@ struct PendingCenterTouch {
 
 #[derive(Debug, Clone, Default)]
 pub struct CenterCalculator {
-    stats: CenterStatsAccumulator,
     events: EventStream<CenterEvent>,
     pending_touch: Option<PendingCenterTouch>,
 }
@@ -48,18 +47,6 @@ pub struct CenterCalculator {
 impl CenterCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, CenterPlayerStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &CenterTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &CenterTeamStats {
-        self.stats.team_one_stats()
     }
 
     pub fn events(&self) -> &[CenterEvent] {
@@ -122,8 +109,7 @@ impl CenterCalculator {
         })
     }
 
-    fn record_center(&mut self, frame: &FrameInfo, event: CenterEvent) {
-        self.stats.apply_event(frame, &event);
+    fn record_center(&mut self, _frame: &FrameInfo, event: CenterEvent) {
         self.events.push(event);
         self.pending_touch = None;
     }
@@ -179,10 +165,8 @@ impl CenterCalculator {
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.stats.begin_sample(frame);
         if !live_play {
             self.pending_touch = None;
-            self.stats.clear_current_last();
             return Ok(());
         }
 
@@ -216,9 +200,37 @@ impl CenterCalculator {
             });
         }
 
-        self.stats.finish_sample();
-
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl CenterCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, CenterPlayerStats> {
+        let mut stats = CenterStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &CenterTeamStats {
+        let mut stats = CenterStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &CenterTeamStats {
+        let mut stats = CenterStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
     }
 }
 

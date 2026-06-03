@@ -52,7 +52,6 @@ struct CeilingContactObservation {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CeilingShotCalculator {
-    stats: CeilingShotStatsAccumulator,
     events: EventStream<CeilingShotEvent>,
     recent_ceiling_contacts: HashMap<PlayerId, RecentCeilingContact>,
     previous_ball_velocity: Option<glam::Vec3>,
@@ -61,10 +60,6 @@ pub struct CeilingShotCalculator {
 impl CeilingShotCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, CeilingShotStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[CeilingShotEvent] {
@@ -295,14 +290,11 @@ impl CeilingShotCalculator {
             else {
                 continue;
             };
-
-            self.stats.apply_event(&event, frame);
             self.events.push(event);
         }
     }
 
     fn reset_live_play_state(&mut self, ball: &BallFrameState) {
-        self.stats.reset_current_last_event_marker();
         self.recent_ceiling_contacts.clear();
         self.previous_ball_velocity = ball.velocity();
     }
@@ -320,8 +312,6 @@ impl CeilingShotCalculator {
             self.reset_live_play_state(ball);
             return Ok(());
         }
-
-        self.stats.begin_sample(frame);
         self.prune_recent_ceiling_contacts(frame.time);
         self.apply_touch_events(frame, ball, players, touch_events);
         self.update_recent_ceiling_contacts(frame, players);
