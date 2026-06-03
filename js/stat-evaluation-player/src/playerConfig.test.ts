@@ -130,6 +130,23 @@ test("stats player config round-trips through compressed url-safe encoding", () 
   assert.deepEqual(decodeStatsPlayerConfig(encoded), CONFIG);
 });
 
+test("stats player config also accepts uncompressed JSON cfg payloads", () => {
+  assert.deepEqual(decodeStatsPlayerConfig(JSON.stringify(CONFIG)), CONFIG);
+});
+
+test("stats player config preserves plugin-only overlay extension fields", () => {
+  const config: StatsPlayerConfig = {
+    ...CONFIG,
+    overlays: {
+      ...CONFIG.overlays,
+      pluginRenderEffects: ["mechanics", "team", "goal_context"],
+      pluginHudOverlay: false,
+    },
+  };
+
+  assert.deepEqual(decodeStatsPlayerConfig(JSON.stringify(config)), config);
+});
+
 test("stats player config can live in the URL hash without disturbing query params", () => {
   const url = setStatsPlayerConfigOnUrl(
     new URL("https://viewer.example/app/?r=abc#tab=stats"),
@@ -141,6 +158,15 @@ test("stats player config can live in the URL hash without disturbing query para
     search: url.search,
     hash: url.hash,
   } as Location);
+  assert.deepEqual(decoded, CONFIG);
+});
+
+test("stats player config accepts raw JSON from URL hash cfg values", () => {
+  const decoded = getStatsPlayerConfigFromLocation({
+    search: "",
+    hash: `#cfg=${encodeURIComponent(JSON.stringify(CONFIG))}`,
+  } as Location);
+
   assert.deepEqual(decoded, CONFIG);
 });
 

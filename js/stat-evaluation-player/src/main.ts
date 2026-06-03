@@ -828,6 +828,12 @@ function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
       timelineRanges: [...activeTimelineRangeModuleIds],
       mechanics: [...activeMechanicTimelineKinds],
       renderEffects: [...activeRenderEffectModuleIds],
+      ...(initialUrlConfig?.overlays.pluginRenderEffects !== undefined
+        ? { pluginRenderEffects: [...initialUrlConfig.overlays.pluginRenderEffects] }
+        : {}),
+      ...(initialUrlConfig?.overlays.pluginHudOverlay !== undefined
+        ? { pluginHudOverlay: initialUrlConfig.overlays.pluginHudOverlay }
+        : {}),
       followedPlayerHud: false,
       boostPads: boostPadOverlayEnabled,
       boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
@@ -2473,10 +2479,14 @@ function renderMechanicsReviewWindow(): void {
     title.textContent = getMechanicsReviewItemLabel(candidate, index);
 
     const meta = document.createElement("strong");
-    meta.textContent = [
-      getMechanicsReviewMechanicLabel(candidate),
-      formatMechanicsReviewStatus(candidate.meta?.reviewStatus),
-    ].join(" · ");
+    meta.textContent =
+      [
+        getMechanicsReviewMechanicLabel(candidate),
+        getMechanicsReviewPlayerName(candidate),
+        formatMechanicsReviewStatus(candidate.meta?.reviewStatus),
+      ]
+        .filter((part) => part && part !== "--")
+        .join(" · ") || "--";
 
     button.append(title, meta);
     mechanicsReviewList.append(button);
