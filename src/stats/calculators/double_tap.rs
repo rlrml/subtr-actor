@@ -190,35 +190,5 @@ impl DoubleTapCalculator {
 }
 
 #[cfg(test)]
-impl DoubleTapCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, DoubleTapPlayerStats> {
-        let mut stats = DoubleTapStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.time, event.frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &DoubleTapTeamStats {
-        let mut stats = DoubleTapStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.time, event.frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &DoubleTapTeamStats {
-        let mut stats = DoubleTapStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.time, event.frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "double_tap_tests.rs"]
 mod tests;

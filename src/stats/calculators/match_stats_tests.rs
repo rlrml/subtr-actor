@@ -308,7 +308,11 @@ fn rewrites_misattributed_goal_context_scorer_from_goal_delta() {
             .and_then(|event| event.player_id.as_ref()),
         Some(&scorer)
     );
-    let stale_stats = calculator.player_stats().get(&stale_touch_player).unwrap();
+    let stale_stats = calculator
+        .player_stats()
+        .get(&stale_touch_player)
+        .cloned()
+        .unwrap_or_default();
     assert_eq!(
         stale_stats
             .scoring_context

@@ -291,35 +291,5 @@ impl PassCalculator {
 }
 
 #[cfg(test)]
-impl PassCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, PassPlayerStats> {
-        let mut stats = PassStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.sample_time, event.sample_frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &PassTeamStats {
-        let mut stats = PassStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.sample_time, event.sample_frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &PassTeamStats {
-        let mut stats = PassStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.sample_time, event.sample_frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "pass_tests.rs"]
 mod tests;

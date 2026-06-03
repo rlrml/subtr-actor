@@ -347,16 +347,5 @@ impl RushCalculator {
 }
 
 #[cfg(test)]
-impl RushCalculator {
-    pub fn stats(&self) -> &RushStats {
-        let mut stats = RushStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "rush_tests.rs"]
 mod tests;

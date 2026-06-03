@@ -52,25 +52,6 @@ impl ActiveFiftyFifty {
 }
 
 #[cfg(test)]
-impl FiftyFiftyCalculator {
-    pub fn stats(&self) -> &FiftyFiftyStats {
-        let mut stats = FiftyFiftyStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.stats().clone())
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, FiftyFiftyPlayerStats> {
-        let mut stats = FiftyFiftyStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "fifty_fifty_tests.rs"]
 mod tests;
 

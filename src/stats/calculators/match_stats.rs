@@ -1754,32 +1754,5 @@ impl MatchStatsCalculator {
 }
 
 #[cfg(test)]
-impl MatchStatsCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, CorePlayerStats> {
-        let mut stats = CoreStatsAccumulator::default();
-        for event in self.core_player_events() {
-            stats.apply_player_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> CoreTeamStats {
-        let mut stats = CoreStatsAccumulator::default();
-        for event in self.core_player_events() {
-            stats.apply_player_event(event);
-        }
-        stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> CoreTeamStats {
-        let mut stats = CoreStatsAccumulator::default();
-        for event in self.core_player_events() {
-            stats.apply_player_event(event);
-        }
-        stats.team_one_stats()
-    }
-}
-
-#[cfg(test)]
 #[path = "match_stats_tests.rs"]
 mod tests;

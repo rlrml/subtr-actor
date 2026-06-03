@@ -474,16 +474,5 @@ impl TerritorialPressureCalculator {
 }
 
 #[cfg(test)]
-impl TerritorialPressureCalculator {
-    pub fn stats(&self) -> &TerritorialPressureStats {
-        let mut stats = TerritorialPressureStatsAccumulator::default();
-        for event in self.stats_events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "territorial_pressure_tests.rs"]
 mod tests;

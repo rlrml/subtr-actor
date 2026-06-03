@@ -219,16 +219,5 @@ impl WavedashCalculator {
 }
 
 #[cfg(test)]
-impl WavedashCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, WavedashStats> {
-        let mut stats = WavedashStatsAccumulator::default();
-        for event in self.events() {
-            stats.apply_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "wavedash_tests.rs"]
 mod tests;

@@ -577,14 +577,5 @@ fn ball_depth_fractions(level_margin: f32, start_delta: f32, end_delta: f32) -> 
 }
 
 #[cfg(test)]
-impl PositioningCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, PositioningStats> {
-        let mut stats = PositioningStatsAccumulator::default();
-        stats.apply_events(self.events());
-        leak_test_stats(stats.player_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "positioning_tests.rs"]
 mod tests;

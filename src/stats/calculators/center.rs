@@ -205,35 +205,5 @@ impl CenterCalculator {
 }
 
 #[cfg(test)]
-impl CenterCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, CenterPlayerStats> {
-        let mut stats = CenterStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.time, event.frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-
-    pub fn team_zero_stats(&self) -> &CenterTeamStats {
-        let mut stats = CenterStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.time, event.frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
-    }
-
-    pub fn team_one_stats(&self) -> &CenterTeamStats {
-        let mut stats = CenterStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.time, event.frame);
-            stats.apply_event(&frame, event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "center_tests.rs"]
 mod tests;

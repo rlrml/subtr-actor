@@ -492,17 +492,5 @@ impl FlickCalculator {
 }
 
 #[cfg(test)]
-impl FlickCalculator {
-    pub fn player_stats(&self) -> &HashMap<PlayerId, FlickStats> {
-        let mut stats = FlickStatsAccumulator::default();
-        for event in self.events() {
-            let frame = stats_test_frame(event.sample_time, event.sample_frame);
-            stats.apply_event(event, &frame);
-        }
-        leak_test_stats(stats.player_stats().clone())
-    }
-}
-
-#[cfg(test)]
 #[path = "flick_tests.rs"]
 mod tests;
