@@ -11,7 +11,6 @@ import {
 import type {
   BoostPickupAnimationPickup,
   CanvasRecorderPlugin,
-  CanvasRecorderStatus,
   ReplayTimelineEvent,
   ReplayPlayerState,
   TimelineOverlayPlugin,
@@ -63,12 +62,9 @@ import {
   type ReplayLoadProgress,
 } from "./replayLoader.ts";
 import {
-  downloadRecording,
-  formatBytes,
-  getRecordingOptions as readRecordingOptions,
-  recordingFileName,
-  recordingLabel,
-} from "./recordingControls.ts";
+  createRecordingWindowController,
+  type RecordingWindowController,
+} from "./recordingWindow.ts";
 import {
   formatMechanicsReviewBound,
   formatMechanicsReviewClipDetails,
@@ -252,20 +248,10 @@ let skipPostGoalTransitions!: HTMLInputElement;
 let replayLoadModal: ReplayLoadModalController | null = null;
 let skipKickoffs!: HTMLInputElement;
 let hitboxWireframes!: HTMLInputElement;
-let recordingFps!: HTMLInputElement;
-let recordingPlaybackRate!: HTMLSelectElement;
-let recordingStart!: HTMLButtonElement;
-let recordingFullReplay!: HTMLButtonElement;
-let recordingStop!: HTMLButtonElement;
-let recordingDownload!: HTMLButtonElement;
-let recordingClear!: HTMLButtonElement;
-let recordingStatus!: HTMLElement;
-let recordingElapsed!: HTMLElement;
-let recordingSize!: HTMLElement;
-let recordingType!: HTMLElement;
 let currentMountCleanup: (() => void) | null = null;
 let statRegistry: StatDefinition[] = createStatRegistry(null);
 let cameraControlsController: CameraControlsController | null = null;
+let recordingWindowController: RecordingWindowController | null = null;
 let statsWindowsController: StatsWindowsController | null = null;
 let eventPlaylistController: EventPlaylistWindowController | null = null;
 let nextWindowZIndex = 30;
@@ -663,10 +649,7 @@ function getCameraConfigSnapshot(): PlayerCameraConfig {
 }
 
 function getRecordingConfigSnapshot(): RecordingConfig {
-  return {
-    fps: Number(recordingFps?.value),
-    playbackRate: Number(recordingPlaybackRate?.value),
-  };
+  return recordingWindowController?.getConfigSnapshot() ?? {};
 }
 
 function getStatsPlayerConfigSnapshot(): StatsPlayerConfig {
@@ -777,12 +760,7 @@ function applyConfigToStaticControls(config: StatsPlayerConfig): void {
   if (config.playback.rate !== undefined) {
     playbackRate.value = `${config.playback.rate}`;
   }
-  if (config.recording.fps !== undefined) {
-    recordingFps.value = `${config.recording.fps}`;
-  }
-  if (config.recording.playbackRate !== undefined) {
-    recordingPlaybackRate.value = `${config.recording.playbackRate}`;
-  }
+  recordingWindowController?.applyConfig(config.recording);
   applyModuleConfigSnapshot(config.moduleConfigs);
   applyConfigToExistingWindows(config);
   replaceStatsWindowsFromConfig(config.statsWindows);
@@ -2046,30 +2024,8 @@ function setTransportEnabled(enabled: boolean): void {
   cameraControlsController?.setTransportEnabled(enabled, replayPlayer?.getState());
 }
 
-function getRecordingOptions(): { fps: number; playbackRate: number } {
-  return readRecordingOptions({
-    fpsValue: recordingFps.value,
-    playbackRateValue: recordingPlaybackRate.value,
-  });
-}
-
 function syncRecordingWindow(status = canvasRecorder?.getStatus() ?? null): void {
-  const hasRecorder = canvasRecorder !== null && replayPlayer !== null;
-  const state = status?.state ?? "idle";
-  const isRecording = state === "recording" || state === "stopping";
-  const hasRecording = (canvasRecorder?.getRecording() ?? null) !== null;
-
-  recordingStatus.textContent = recordingLabel(status);
-  recordingElapsed.textContent = `${(status?.elapsedSeconds ?? 0).toFixed(1)}s`;
-  recordingSize.textContent = formatBytes(status?.sizeBytes ?? 0);
-  recordingType.textContent = status?.mimeType || "WebM";
-  recordingStart.disabled = !hasRecorder || isRecording;
-  recordingFullReplay.disabled = !hasRecorder || isRecording;
-  recordingStop.disabled = !hasRecorder || !isRecording;
-  recordingDownload.disabled = !hasRecording || isRecording;
-  recordingClear.disabled = !hasRecording || isRecording;
-  recordingFps.disabled = isRecording;
-  recordingPlaybackRate.disabled = isRecording;
+  recordingWindowController?.sync(status);
 }
 
 function renderSnapshot(state: ReplayPlayerState): void {
@@ -2455,17 +2411,28 @@ export function mountStatEvaluationPlayer(
   skipPostGoalTransitions = mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions");
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
   hitboxWireframes = mustElement<HTMLInputElement>(root, "#hitbox-wireframes");
-  recordingFps = mustElement<HTMLInputElement>(root, "#recording-fps");
-  recordingPlaybackRate = mustElement<HTMLSelectElement>(root, "#recording-playback-rate");
-  recordingStart = mustElement<HTMLButtonElement>(root, "#recording-start");
-  recordingFullReplay = mustElement<HTMLButtonElement>(root, "#recording-full-replay");
-  recordingStop = mustElement<HTMLButtonElement>(root, "#recording-stop");
-  recordingDownload = mustElement<HTMLButtonElement>(root, "#recording-download");
-  recordingClear = mustElement<HTMLButtonElement>(root, "#recording-clear");
-  recordingStatus = mustElement<HTMLElement>(root, "#recording-status");
-  recordingElapsed = mustElement<HTMLElement>(root, "#recording-elapsed");
-  recordingSize = mustElement<HTMLElement>(root, "#recording-size");
-  recordingType = mustElement<HTMLElement>(root, "#recording-type");
+  recordingWindowController = createRecordingWindowController({
+    elements: {
+      fps: mustElement<HTMLInputElement>(root, "#recording-fps"),
+      playbackRate: mustElement<HTMLSelectElement>(root, "#recording-playback-rate"),
+      start: mustElement<HTMLButtonElement>(root, "#recording-start"),
+      fullReplay: mustElement<HTMLButtonElement>(root, "#recording-full-replay"),
+      stop: mustElement<HTMLButtonElement>(root, "#recording-stop"),
+      download: mustElement<HTMLButtonElement>(root, "#recording-download"),
+      clear: mustElement<HTMLButtonElement>(root, "#recording-clear"),
+      status: mustElement<HTMLElement>(root, "#recording-status"),
+      elapsed: mustElement<HTMLElement>(root, "#recording-elapsed"),
+      size: mustElement<HTMLElement>(root, "#recording-size"),
+      type: mustElement<HTMLElement>(root, "#recording-type"),
+    },
+    getCanvasRecorder: () => canvasRecorder,
+    getReplayPlayer: () => replayPlayer,
+    getLoadedReplayName: () => loadedReplayName,
+    setStatus(message) {
+      statusReadout.textContent = message;
+    },
+    requestConfigSync: scheduleConfigUrlUpdate,
+  });
 
   const configParamSnapshot = getStatsPlayerConfigParamSnapshot(window.location);
   const configDebugEnabled = isStatsPlayerConfigDebugEnabled(window.location);
@@ -2522,6 +2489,7 @@ export function mountStatEvaluationPlayer(
     boostPadOverlayEnabled = true;
     loadedReplayName = null;
     cameraControlsController = null;
+    recordingWindowController = null;
     initialUrlConfig = null;
     if (configUrlUpdateTimer !== null) {
       window.clearTimeout(configUrlUpdateTimer);
@@ -2740,94 +2708,7 @@ export function mountStatEvaluationPlayer(
     { signal: listeners.signal },
   );
 
-  recordingStart.addEventListener(
-    "click",
-    () => {
-      if (!canvasRecorder) {
-        return;
-      }
-      try {
-        const { fps } = getRecordingOptions();
-        canvasRecorder.start({ fps });
-        syncRecordingWindow();
-      } catch (error) {
-        console.error("Failed to start recording:", error);
-        statusReadout.textContent =
-          error instanceof Error ? error.message : "Failed to start recording";
-        syncRecordingWindow(canvasRecorder.getStatus());
-      }
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingFullReplay.addEventListener(
-    "click",
-    () => {
-      if (!canvasRecorder) {
-        return;
-      }
-      const { fps, playbackRate } = getRecordingOptions();
-      void canvasRecorder
-        .recordFullReplay({
-          fps,
-          playbackRate,
-          restorePlaybackState: true,
-        })
-        .catch((error) => {
-          console.error("Failed to record replay:", error);
-          statusReadout.textContent =
-            error instanceof Error ? error.message : "Failed to record replay";
-          syncRecordingWindow(canvasRecorder?.getStatus() ?? null);
-        });
-      syncRecordingWindow();
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingStop.addEventListener(
-    "click",
-    () => {
-      void canvasRecorder?.stop().catch((error) => {
-        console.error("Failed to stop recording:", error);
-        statusReadout.textContent =
-          error instanceof Error ? error.message : "Failed to stop recording";
-      });
-      syncRecordingWindow();
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingDownload.addEventListener(
-    "click",
-    () => {
-      const blob = canvasRecorder?.getRecording();
-      if (blob) {
-        downloadRecording(blob, recordingFileName(loadedReplayName));
-      }
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingClear.addEventListener(
-    "click",
-    () => {
-      try {
-        canvasRecorder?.clear();
-        syncRecordingWindow();
-      } catch (error) {
-        console.error("Failed to clear recording:", error);
-      }
-    },
-    { signal: listeners.signal },
-  );
-
-  recordingFps.addEventListener("change", scheduleConfigUrlUpdate, {
-    signal: listeners.signal,
-  });
-  recordingPlaybackRate.addEventListener("change", scheduleConfigUrlUpdate, {
-    signal: listeners.signal,
-  });
-
+  recordingWindowController?.installEventListeners(listeners.signal);
   cameraControlsController?.installEventListeners(listeners.signal);
 
   skipPostGoalTransitions.addEventListener(
