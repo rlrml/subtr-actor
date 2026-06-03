@@ -29,7 +29,6 @@ pub struct OneTimerEvent {
 
 #[derive(Debug, Clone, Default)]
 pub struct OneTimerCalculator {
-    stats: OneTimerStatsAccumulator,
     events: EventStream<OneTimerEvent>,
     processed_pass_events: usize,
 }
@@ -37,18 +36,6 @@ pub struct OneTimerCalculator {
 impl OneTimerCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, OneTimerPlayerStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &OneTimerTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &OneTimerTeamStats {
-        self.stats.team_one_stats()
     }
 
     pub fn events(&self) -> &[OneTimerEvent] {
@@ -99,8 +86,7 @@ impl OneTimerCalculator {
         })
     }
 
-    fn record_one_timer(&mut self, frame: &FrameInfo, event: OneTimerEvent) {
-        self.stats.apply_event(frame, &event);
+    fn record_one_timer(&mut self, _frame: &FrameInfo, event: OneTimerEvent) {
         self.events.push(event);
     }
 
@@ -112,9 +98,7 @@ impl OneTimerCalculator {
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.stats.begin_sample(frame);
         if !live_play {
-            self.stats.clear_current_last();
             self.processed_pass_events = pass_calculator.events().len();
             return Ok(());
         }
@@ -128,9 +112,38 @@ impl OneTimerCalculator {
             }
         }
         self.processed_pass_events = pass_calculator.events().len();
-        self.stats.finish_sample();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl OneTimerCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, OneTimerPlayerStats> {
+        let mut stats = OneTimerStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &OneTimerTeamStats {
+        let mut stats = OneTimerStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &OneTimerTeamStats {
+        let mut stats = OneTimerStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
     }
 }
 

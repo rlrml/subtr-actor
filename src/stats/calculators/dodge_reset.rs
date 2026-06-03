@@ -34,7 +34,6 @@ pub struct ConfirmedFlipResetEvent {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DodgeResetCalculator {
-    stats: DodgeResetStatsAccumulator,
     events: EventStream<DodgeResetEvent>,
     on_ball_events: EventStream<DodgeRefreshedEvent>,
     confirmed_flip_reset_events: EventStream<ConfirmedFlipResetEvent>,
@@ -46,10 +45,6 @@ pub struct DodgeResetCalculator {
 impl DodgeResetCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, DodgeResetStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[DodgeResetEvent] {
@@ -228,7 +223,6 @@ impl DodgeResetCalculator {
                 counter_value: event.counter_value,
                 on_ball,
             };
-            self.stats.apply_event(&event);
             if on_ball {
                 self.on_ball_events.push(reset_event.clone());
                 self.pending_on_ball_resets
@@ -242,6 +236,17 @@ impl DodgeResetCalculator {
             self.apply_confirmed_flip_reset_touch(players, touch_event);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl DodgeResetCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, DodgeResetStats> {
+        let mut stats = DodgeResetStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
     }
 }
 

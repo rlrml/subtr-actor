@@ -49,7 +49,6 @@ struct ActiveHalfFlipCandidate {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct HalfFlipCalculator {
-    stats: HalfFlipStatsAccumulator,
     events: EventStream<HalfFlipEvent>,
     active_candidates: HashMap<PlayerId, ActiveHalfFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
@@ -58,10 +57,6 @@ pub struct HalfFlipCalculator {
 impl HalfFlipCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, HalfFlipStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[HalfFlipEvent] {
@@ -250,7 +245,6 @@ impl HalfFlipCalculator {
     }
 
     fn apply_event(&mut self, event: HalfFlipEvent) {
-        self.stats.apply_event(&event);
         self.events.push(event);
     }
 
@@ -295,11 +289,8 @@ impl HalfFlipCalculator {
         self.events.begin_update();
         if !live_play {
             self.active_candidates.clear();
-            self.stats.reset_current_last_event_marker();
             return Ok(());
         }
-
-        self.stats.begin_sample(frame);
 
         for player in &players.players {
             self.maybe_start_candidate(frame, player);
@@ -324,6 +315,17 @@ impl HalfFlipCalculator {
 
     pub fn finalize(&mut self, frame: &FrameInfo) {
         self.finalize_candidates(frame, true);
+    }
+}
+
+#[cfg(test)]
+impl HalfFlipCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, HalfFlipStats> {
+        let mut stats = HalfFlipStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
     }
 }
 

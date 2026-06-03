@@ -54,6 +54,7 @@ pub(crate) mod rotation;
 pub(crate) mod rush;
 pub(crate) mod settings;
 pub(crate) mod speed_flip;
+pub(crate) mod stats_projection;
 pub(crate) mod stats_timeline_events;
 pub(crate) mod stats_timeline_frame;
 pub(crate) mod territorial_pressure;
@@ -144,6 +145,8 @@ pub use rush::RushNode;
 pub use settings::SettingsNode;
 #[allow(unused_imports)]
 pub use speed_flip::SpeedFlipNode;
+#[allow(unused_imports)]
+pub use stats_projection::{StatsProjectionNode, StatsProjectionState};
 #[allow(unused_imports)]
 pub use stats_timeline_events::{
     StatsTimelineEventsNode, StatsTimelineEventsState, STATS_TIMELINE_MECHANIC_KINDS,
@@ -407,4 +410,8 @@ pub(crate) fn powerslide_dependency() -> AnalysisDependency {
 
 pub(crate) fn demo_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<DemoCalculator>(demo::boxed_default)
+}
+
+pub(crate) fn stats_projection_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<StatsProjectionState>(stats_projection::boxed_default)
 }

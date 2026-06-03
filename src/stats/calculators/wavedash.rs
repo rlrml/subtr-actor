@@ -39,7 +39,6 @@ struct ActiveWavedashCandidate {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WavedashCalculator {
-    stats: WavedashStatsAccumulator,
     events: EventStream<WavedashEvent>,
     active_candidates: HashMap<PlayerId, ActiveWavedashCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
@@ -48,10 +47,6 @@ pub struct WavedashCalculator {
 impl WavedashCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, WavedashStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[WavedashEvent] {
@@ -171,7 +166,6 @@ impl WavedashCalculator {
     }
 
     fn apply_event(&mut self, event: WavedashEvent) {
-        self.stats.apply_event(&event);
         self.events.push(event);
     }
 
@@ -216,14 +210,22 @@ impl WavedashCalculator {
         self.events.begin_update();
         if !live_play {
             self.active_candidates.clear();
-            self.stats.reset_current_last_event_marker();
             return Ok(());
         }
-
-        self.stats.begin_sample(frame);
         self.update_active_candidates(frame, players);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl WavedashCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, WavedashStats> {
+        let mut stats = WavedashStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
     }
 }
 

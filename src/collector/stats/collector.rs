@@ -68,7 +68,9 @@ impl BuiltinModuleSelection {
         if self.module_names == builtin_stats_module_names() {
             return Ok(build_legacy_timeline_graph());
         }
-        graph_with_builtin_analysis_nodes(self.module_names.iter().copied())
+        let mut node_names = self.module_names.clone();
+        node_names.push("stats_projection");
+        graph_with_builtin_analysis_nodes(node_names)
     }
 
     fn collected_modules(

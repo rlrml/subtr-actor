@@ -222,7 +222,6 @@ impl PossessionTracker {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PossessionCalculator {
-    stats: PossessionStatsAccumulator,
     tracker: PossessionTracker,
     events: EventStream<PossessionEvent>,
     last_emitted_event_state: Option<PossessionEventState>,
@@ -238,10 +237,6 @@ struct PossessionEventState {
 impl PossessionCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn stats(&self) -> &PossessionStats {
-        self.stats.stats()
     }
 
     pub fn events(&self) -> &[PossessionEvent] {
@@ -276,7 +271,6 @@ impl PossessionCalculator {
             possession_state: possession_state.as_label_value().to_owned(),
             field_third: field_third.map(|label| label.as_label_value().to_owned()),
         };
-        self.stats.apply_event(&event);
         self.events.push(event);
         self.last_emitted_event_state = Some(event_state);
     }

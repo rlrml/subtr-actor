@@ -219,7 +219,6 @@ pub struct BoostCalculatorConfig {
 #[derive(Debug, Clone, Default)]
 pub struct BoostCalculator {
     config: BoostCalculatorConfig,
-    stats: BoostStatsAccumulator,
     previous_boost_amounts: HashMap<PlayerId, f32>,
     previous_player_speeds: HashMap<PlayerId, f32>,
     observed_pad_positions: HashMap<String, PadPositionEstimate>,
@@ -235,6 +234,7 @@ pub struct BoostCalculator {
     ledger_events: EventStream<BoostLedgerEvent>,
     state_events: EventStream<BoostStateEvent>,
     stats_events: EventStream<BoostStatsEvent>,
+    player_detection_stats: HashMap<PlayerId, BoostStats>,
     kickoff_phase_active_last_frame: bool,
     kickoff_respawn_awarded: HashSet<PlayerId>,
     initial_respawn_awarded: HashSet<PlayerId>,
@@ -292,18 +292,6 @@ impl BoostCalculator {
         }
     }
 
-    pub fn player_stats(&self) -> &HashMap<PlayerId, BoostStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &BoostStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &BoostStats {
-        self.stats.team_one_stats()
-    }
-
     pub fn pickup_comparison_events(&self) -> &[BoostPickupComparisonEvent] {
         self.pickup_comparison_events.all()
     }
@@ -337,12 +325,10 @@ impl BoostCalculator {
     }
 
     fn player_stats_snapshot(&self, player_id: &PlayerId) -> BoostStats {
-        self.stats.player_stats_for(player_id)
-    }
-
-    fn record_stats_event(&mut self, event: BoostStatsEvent) {
-        self.stats.apply_event(&event);
-        self.stats_events.push(event);
+        self.player_detection_stats
+            .get(player_id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     fn emit_stats_delta(
@@ -360,6 +346,15 @@ impl BoostCalculator {
             is_team_0,
             delta,
         });
+    }
+
+    fn record_stats_event(&mut self, event: BoostStatsEvent) {
+        let player_stats = self
+            .player_detection_stats
+            .entry(event.player_id.clone())
+            .or_default();
+        apply_delta(player_stats, &event.delta);
+        self.stats_events.push(event);
     }
 
     fn record_ledger_event(&mut self, event: BoostLedgerEvent) {
@@ -946,8 +941,6 @@ impl BoostCalculator {
     }
 
     fn warn_for_sample_boost_invariants(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
-        let team_zero_stats = self.team_zero_stats().clone();
-        let team_one_stats = self.team_one_stats().clone();
         let player_scopes: Vec<(PlayerId, Option<f32>, BoostStats)> = players
             .players
             .iter()
@@ -960,20 +953,6 @@ impl BoostCalculator {
             })
             .collect();
 
-        self.warn_for_boost_invariant_violations(
-            "team_zero",
-            frame.frame_number,
-            frame.time,
-            &team_zero_stats,
-            None,
-        );
-        self.warn_for_boost_invariant_violations(
-            "team_one",
-            frame.frame_number,
-            frame.time,
-            &team_one_stats,
-            None,
-        );
         for (player_id, observed_boost_amount, stats) in player_scopes {
             self.warn_for_boost_invariant_violations(
                 &format!("player {player_id:?}"),
@@ -1853,6 +1832,33 @@ impl BoostCalculator {
         self.previous_boost_levels_live = Some(boost_levels_live);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl BoostCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, BoostStats> {
+        let mut stats = BoostStatsAccumulator::default();
+        for event in self.stats_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &BoostStats {
+        let mut stats = BoostStatsAccumulator::default();
+        for event in self.stats_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &BoostStats {
+        let mut stats = BoostStatsAccumulator::default();
+        for event in self.stats_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
     }
 }
 

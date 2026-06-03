@@ -1,5 +1,6 @@
 use serde_json::Value;
 
+use subtr_actor::stats::analysis_graph::StatsProjectionState;
 use subtr_actor::*;
 
 use super::comparable_types::{
@@ -289,12 +290,7 @@ fn comparable_demo_from_team(stats: &DemoTeamStats) -> ComparableDemoStats {
 
 pub(crate) struct ComputedComparableStats {
     pub(super) replay_meta: ReplayMeta,
-    pub(super) match_stats: MatchStatsCalculator,
-    pub(super) boost: BoostCalculator,
-    pub(super) movement: MovementCalculator,
-    pub(super) positioning: PositioningCalculator,
-    pub(super) demo: DemoCalculator,
-    pub(super) powerslide: PowerslideCalculator,
+    pub(super) projection: StatsProjectionState,
 }
 
 #[derive(Default)]
@@ -339,29 +335,13 @@ pub(crate) fn compute_comparable_stats(
             "positioning",
             "demo",
             "powerslide",
+            "stats_projection",
         ],
     )?;
     Ok(ComputedComparableStats {
         replay_meta,
-        match_stats: graph
-            .state::<MatchStatsCalculator>()
-            .cloned()
-            .unwrap_or_default(),
-        boost: graph
-            .state::<BoostCalculator>()
-            .cloned()
-            .unwrap_or_default(),
-        movement: graph
-            .state::<MovementCalculator>()
-            .cloned()
-            .unwrap_or_default(),
-        positioning: graph
-            .state::<PositioningCalculator>()
-            .cloned()
-            .unwrap_or_default(),
-        demo: graph.state::<DemoCalculator>().cloned().unwrap_or_default(),
-        powerslide: graph
-            .state::<PowerslideCalculator>()
+        projection: graph
+            .state::<StatsProjectionState>()
             .cloned()
             .unwrap_or_default(),
     })
@@ -378,32 +358,33 @@ pub(crate) fn build_actual_comparable_stats(
     ] {
         let team_stats = comparable.team_mut(team_color);
         team_stats.core = comparable_core_from_team(&match team_color {
-            TeamColor::Blue => stats.match_stats.team_zero_stats(),
-            TeamColor::Orange => stats.match_stats.team_one_stats(),
+            TeamColor::Blue => stats.projection.core.team_zero_stats(),
+            TeamColor::Orange => stats.projection.core.team_one_stats(),
         });
         let mut team_boost = comparable_boost_from_stats(match team_color {
-            TeamColor::Blue => stats.boost.team_zero_stats(),
-            TeamColor::Orange => stats.boost.team_one_stats(),
+            TeamColor::Blue => stats.projection.boost.team_zero_stats(),
+            TeamColor::Orange => stats.projection.boost.team_one_stats(),
         });
         team_stats.movement = comparable_movement_from_stats(
             match team_color {
-                TeamColor::Blue => stats.movement.team_zero_stats(),
-                TeamColor::Orange => stats.movement.team_one_stats(),
+                TeamColor::Blue => stats.projection.movement.team_zero_stats(),
+                TeamColor::Orange => stats.projection.movement.team_one_stats(),
             },
             match team_color {
-                TeamColor::Blue => stats.powerslide.team_zero_stats(),
-                TeamColor::Orange => stats.powerslide.team_one_stats(),
+                TeamColor::Blue => stats.projection.powerslide.team_zero_stats(),
+                TeamColor::Orange => stats.projection.powerslide.team_one_stats(),
             },
         );
         team_stats.demo = comparable_demo_from_team(match team_color {
-            TeamColor::Blue => stats.demo.team_zero_stats(),
-            TeamColor::Orange => stats.demo.team_one_stats(),
+            TeamColor::Blue => stats.projection.demo.team_zero_stats(),
+            TeamColor::Orange => stats.projection.demo.team_one_stats(),
         });
 
         let mut player_boost_stats = Vec::new();
         for player in players {
             let player_boost = comparable_boost_from_stats(
                 &stats
+                    .projection
                     .boost
                     .player_stats()
                     .get(&player.remote_id)
@@ -414,7 +395,8 @@ pub(crate) fn build_actual_comparable_stats(
             let player_stats = ComparablePlayerStats {
                 core: comparable_core_from_player(
                     &stats
-                        .match_stats
+                        .projection
+                        .core
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()
@@ -423,12 +405,14 @@ pub(crate) fn build_actual_comparable_stats(
                 boost: player_boost,
                 movement: comparable_movement_from_stats(
                     &stats
+                        .projection
                         .movement
                         .player_stats()
                         .get(&player.remote_id)
                         .cloned()
                         .unwrap_or_default(),
                     &stats
+                        .projection
                         .powerslide
                         .player_stats()
                         .get(&player.remote_id)
@@ -437,6 +421,7 @@ pub(crate) fn build_actual_comparable_stats(
                 ),
                 positioning: comparable_positioning_from_stats(
                     &stats
+                        .projection
                         .positioning
                         .player_stats()
                         .get(&player.remote_id)
@@ -445,6 +430,7 @@ pub(crate) fn build_actual_comparable_stats(
                 ),
                 demo: comparable_demo_from_player(
                     &stats
+                        .projection
                         .demo
                         .player_stats()
                         .get(&player.remote_id)

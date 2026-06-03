@@ -35,7 +35,6 @@ pub enum BallCarryKind {
 
 #[derive(Debug, Clone, Default)]
 pub struct BallCarryCalculator {
-    stats: BallCarryStatsAccumulator,
     carry_events: EventStream<BallCarryEvent>,
     processed_control_sequence_count: usize,
 }
@@ -43,30 +42,6 @@ pub struct BallCarryCalculator {
 impl BallCarryCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, BallCarryStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn player_air_dribble_stats(&self) -> &HashMap<PlayerId, AirDribbleStats> {
-        self.stats.player_air_dribble_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &BallCarryStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &BallCarryStats {
-        self.stats.team_one_stats()
-    }
-
-    pub fn team_zero_air_dribble_stats(&self) -> &AirDribbleStats {
-        self.stats.team_zero_air_dribble_stats()
-    }
-
-    pub fn team_one_air_dribble_stats(&self) -> &AirDribbleStats {
-        self.stats.team_one_air_dribble_stats()
     }
 
     pub fn carry_events(&self) -> &[BallCarryEvent] {
@@ -238,7 +213,6 @@ impl BallCarryCalculator {
     }
 
     fn record_carry_event(&mut self, event: BallCarryEvent) {
-        self.stats.apply_event(&event);
         self.carry_events.push(event);
     }
 
@@ -257,6 +231,57 @@ impl BallCarryCalculator {
         }
         self.processed_control_sequence_count = control_state.completed_sequences.len();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl BallCarryCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, BallCarryStats> {
+        let mut stats = BallCarryStatsAccumulator::default();
+        for event in self.carry_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn player_air_dribble_stats(&self) -> &HashMap<PlayerId, AirDribbleStats> {
+        let mut stats = BallCarryStatsAccumulator::default();
+        for event in self.carry_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.player_air_dribble_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &BallCarryStats {
+        let mut stats = BallCarryStatsAccumulator::default();
+        for event in self.carry_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &BallCarryStats {
+        let mut stats = BallCarryStatsAccumulator::default();
+        for event in self.carry_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
+    }
+
+    pub fn team_zero_air_dribble_stats(&self) -> &AirDribbleStats {
+        let mut stats = BallCarryStatsAccumulator::default();
+        for event in self.carry_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.team_zero_air_dribble_stats().clone())
+    }
+
+    pub fn team_one_air_dribble_stats(&self) -> &AirDribbleStats {
+        let mut stats = BallCarryStatsAccumulator::default();
+        for event in self.carry_events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.team_one_air_dribble_stats().clone())
     }
 }
 

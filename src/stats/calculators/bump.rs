@@ -47,7 +47,6 @@ struct DirectionalBumpCandidate {
 
 #[derive(Debug, Clone, Default)]
 pub struct BumpCalculator {
-    stats: BumpStatsAccumulator,
     events: EventStream<BumpEvent>,
     previous_players: HashMap<PlayerId, PreviousPlayerSample>,
     last_seen_pair_frame: HashMap<(PlayerId, PlayerId), usize>,
@@ -56,22 +55,6 @@ pub struct BumpCalculator {
 impl BumpCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, BumpPlayerStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &BumpTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &BumpTeamStats {
-        self.stats.team_one_stats()
-    }
-
-    pub fn stats(&self) -> &BumpStatsAccumulator {
-        &self.stats
     }
 
     pub fn events(&self) -> &[BumpEvent] {
@@ -398,7 +381,6 @@ impl BumpCalculator {
     }
 
     fn record_bump(&mut self, event: BumpEvent) {
-        self.stats.apply_event(&event);
         self.events.push(event);
     }
 }
@@ -490,6 +472,41 @@ fn rigid_body_velocity(rigid_body: &boxcars::RigidBody) -> glam::Vec3 {
         .as_ref()
         .map(vec_to_glam)
         .unwrap_or(glam::Vec3::ZERO)
+}
+
+#[cfg(test)]
+impl BumpCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, BumpPlayerStats> {
+        let mut stats = BumpStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &BumpTeamStats {
+        let mut stats = BumpStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &BumpTeamStats {
+        let mut stats = BumpStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
+    }
+
+    pub fn stats(&self) -> &BumpStatsAccumulator {
+        let mut stats = BumpStatsAccumulator::default();
+        for event in self.events() {
+            stats.apply_event(event);
+        }
+        leak_test_stats(stats)
+    }
 }
 
 #[cfg(test)]

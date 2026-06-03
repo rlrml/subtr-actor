@@ -169,7 +169,6 @@ struct ArmedWallAerial {
 
 #[derive(Debug, Clone, Default)]
 pub struct WallAerialCalculator {
-    stats: WallAerialStatsAccumulator,
     events: EventStream<WallAerialEvent>,
     active_wall_controls: HashMap<PlayerId, ActiveWallControl>,
     recent_wall_contacts: HashMap<PlayerId, RecentWallContact>,
@@ -181,10 +180,6 @@ pub struct WallAerialCalculator {
 impl WallAerialCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, WallAerialStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[WallAerialEvent] {
@@ -476,7 +471,6 @@ impl WallAerialCalculator {
     fn record_event(&mut self, frame: &FrameInfo, mut event: WallAerialEvent) {
         event.sample_time = frame.time;
         event.sample_frame = frame.frame_number;
-        self.stats.apply_event(&event, frame);
         self.recent_event_times
             .insert(event.player.clone(), event.time);
         self.events.push(event);
@@ -491,14 +485,12 @@ impl WallAerialCalculator {
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.stats.begin_sample(frame);
         if !live_play {
             self.active_wall_controls.clear();
             self.recent_wall_contacts.clear();
             self.armed_aerials.clear();
             self.recent_event_times.clear();
             self.previous_ball_velocity = ball.velocity();
-            self.stats.reset_current_last_event_marker();
             return Ok(());
         }
 
@@ -521,9 +513,20 @@ impl WallAerialCalculator {
         }
 
         self.previous_ball_velocity = ball.velocity();
-        self.stats.restore_current_last_event_marker();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl WallAerialCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, WallAerialStats> {
+        let mut stats = WallAerialStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.sample_time, event.sample_frame);
+            stats.apply_event(event, &frame);
+        }
+        leak_test_stats(stats.player_stats().clone())
     }
 }
 

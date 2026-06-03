@@ -239,7 +239,6 @@ struct FirstManStintState {
 #[derive(Debug, Clone, Default)]
 pub struct RotationCalculator {
     config: RotationCalculatorConfig,
-    stats: RotationStatsAccumulator,
     team_zero_tracker: TeamFirstManTracker,
     team_one_tracker: TeamFirstManTracker,
     player_events: EventStream<RotationPlayerEvent>,
@@ -262,18 +261,6 @@ impl RotationCalculator {
 
     pub fn config(&self) -> &RotationCalculatorConfig {
         &self.config
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, RotationPlayerStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &RotationTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &RotationTeamStats {
-        self.stats.team_one_stats()
     }
 
     pub fn player_events(&self) -> &[RotationPlayerEvent] {
@@ -457,7 +444,6 @@ impl RotationCalculator {
         if !state_changed && !event.has_delta() {
             return;
         }
-        self.stats.apply_player_event(&event);
         self.player_events.push(event);
         self.last_emitted_player_states
             .insert(player_id.clone(), state);
@@ -542,7 +528,6 @@ impl RotationCalculator {
                 first_man_changes_for_team: 1,
                 rotation_count: 1,
             };
-            self.stats.apply_team_event(&event);
             self.team_events.push(event);
             *lost_first_man_counts.entry(previous).or_default() += 1;
             *became_first_man_counts.entry(next).or_default() += 1;
@@ -734,6 +719,42 @@ fn play_depth_state(
         PlayDepthState::AheadOfPlay
     } else {
         PlayDepthState::LevelWithPlay
+    }
+}
+
+#[cfg(test)]
+impl RotationCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, RotationPlayerStats> {
+        let mut stats = RotationStatsAccumulator::default();
+        for event in self.player_events() {
+            stats.apply_player_event(event);
+        }
+        for event in self.team_events() {
+            stats.apply_team_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &RotationTeamStats {
+        let mut stats = RotationStatsAccumulator::default();
+        for event in self.player_events() {
+            stats.apply_player_event(event);
+        }
+        for event in self.team_events() {
+            stats.apply_team_event(event);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &RotationTeamStats {
+        let mut stats = RotationStatsAccumulator::default();
+        for event in self.player_events() {
+            stats.apply_player_event(event);
+        }
+        for event in self.team_events() {
+            stats.apply_team_event(event);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
     }
 }
 

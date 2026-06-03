@@ -46,7 +46,6 @@ impl Default for PressureCalculatorConfig {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PressureCalculator {
     config: PressureCalculatorConfig,
-    stats: PressureStatsAccumulator,
     events: EventStream<PressureEvent>,
     last_emitted_event_state: Option<PressureEventState>,
 }
@@ -69,10 +68,6 @@ impl PressureCalculator {
         }
     }
 
-    pub fn stats(&self) -> &PressureStats {
-        self.stats.stats()
-    }
-
     pub fn events(&self) -> &[PressureEvent] {
         self.events.all()
     }
@@ -83,34 +78,6 @@ impl PressureCalculator {
 
     pub fn config(&self) -> &PressureCalculatorConfig {
         &self.config
-    }
-
-    pub fn team_zero_side_duration(&self) -> f32 {
-        self.stats.stats().team_zero_side_time
-    }
-
-    pub fn team_one_side_duration(&self) -> f32 {
-        self.stats.stats().team_one_side_time
-    }
-
-    pub fn neutral_duration(&self) -> f32 {
-        self.stats.stats().neutral_time
-    }
-
-    pub fn total_tracked_duration(&self) -> f32 {
-        self.stats.stats().tracked_time
-    }
-
-    pub fn team_zero_side_pct(&self) -> f32 {
-        self.stats.stats().team_zero_side_pct()
-    }
-
-    pub fn team_one_side_pct(&self) -> f32 {
-        self.stats.stats().team_one_side_pct()
-    }
-
-    pub fn neutral_pct(&self) -> f32 {
-        self.stats.stats().neutral_pct()
     }
 
     fn emit_event_if_changed(
@@ -131,7 +98,6 @@ impl PressureCalculator {
             duration,
             field_half: field_half.as_label_value().to_owned(),
         };
-        self.stats.apply_event(&event);
         self.events.push(event);
         self.last_emitted_event_state = Some(event_state);
     }

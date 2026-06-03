@@ -61,7 +61,6 @@ struct PendingPassTouch {
 
 #[derive(Debug, Clone, Default)]
 pub struct PassCalculator {
-    stats: PassStatsAccumulator,
     events: EventStream<PassEvent>,
     last_completed_events: EventStream<PassLastCompletedEvent>,
     last_touch: Option<PendingPassTouch>,
@@ -71,18 +70,6 @@ pub struct PassCalculator {
 impl PassCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, PassPlayerStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &PassTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &PassTeamStats {
-        self.stats.team_one_stats()
     }
 
     pub fn events(&self) -> &[PassEvent] {
@@ -221,7 +208,6 @@ impl PassCalculator {
     fn record_pass(&mut self, frame: &FrameInfo, mut event: PassEvent) {
         event.sample_time = frame.time;
         event.sample_frame = frame.frame_number;
-        self.stats.apply_event(frame, &event);
         self.events.push(event);
     }
 
@@ -254,10 +240,8 @@ impl PassCalculator {
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         self.last_completed_events.begin_update();
-        self.stats.begin_sample(frame);
         if !live_play {
             self.last_touch = None;
-            self.stats.clear_current_last();
             self.emit_last_completed_event(frame, None, None);
             return Ok(());
         }
@@ -291,19 +275,11 @@ impl PassCalculator {
                 from_fifty_fifty: Self::touch_from_fifty_fifty(touch, fifty_fifty_state),
             });
         }
-
-        self.stats.finish_sample();
+        let current_last_completed_pass_event = self.events.iter().next_back();
         let current_last_completed_pass_player =
-            self.stats.current_last_completed_pass_player().cloned();
-        let current_last_completed_pass_position = current_last_completed_pass_player
-            .as_ref()
-            .and_then(|player_id| {
-                self.events
-                    .iter()
-                    .rev()
-                    .find(|event| &event.passer == player_id)
-                    .and_then(|event| event.passer_position)
-            });
+            current_last_completed_pass_event.map(|event| event.passer.clone());
+        let current_last_completed_pass_position =
+            current_last_completed_pass_event.and_then(|event| event.passer_position);
         self.emit_last_completed_event(
             frame,
             current_last_completed_pass_player,
@@ -311,6 +287,36 @@ impl PassCalculator {
         );
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl PassCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, PassPlayerStats> {
+        let mut stats = PassStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.sample_time, event.sample_frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &PassTeamStats {
+        let mut stats = PassStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.sample_time, event.sample_frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &PassTeamStats {
+        let mut stats = PassStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.sample_time, event.sample_frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
     }
 }
 

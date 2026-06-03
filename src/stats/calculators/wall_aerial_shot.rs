@@ -56,7 +56,6 @@ struct ArmedWallAerialShot {
 
 #[derive(Debug, Clone, Default)]
 pub struct WallAerialShotCalculator {
-    stats: WallAerialShotStatsAccumulator,
     events: EventStream<WallAerialShotEvent>,
     recent_wall_contacts: HashMap<PlayerId, RecentWallContact>,
     armed_shots: HashMap<PlayerId, ArmedWallAerialShot>,
@@ -65,10 +64,6 @@ pub struct WallAerialShotCalculator {
 impl WallAerialShotCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, WallAerialShotStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[WallAerialShotEvent] {
@@ -221,8 +216,7 @@ impl WallAerialShotCalculator {
         })
     }
 
-    fn record_event(&mut self, frame: &FrameInfo, event: WallAerialShotEvent) {
-        self.stats.apply_event(&event, frame);
+    fn record_event(&mut self, _frame: &FrameInfo, event: WallAerialShotEvent) {
         self.recent_wall_contacts.remove(&event.player);
         self.armed_shots.remove(&event.player);
         self.events.push(event);
@@ -236,11 +230,9 @@ impl WallAerialShotCalculator {
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.stats.begin_sample(frame);
         if !live_play {
             self.recent_wall_contacts.clear();
             self.armed_shots.clear();
-            self.stats.reset_current_last_event_marker();
             return Ok(());
         }
 
@@ -252,8 +244,19 @@ impl WallAerialShotCalculator {
                 self.record_event(frame, event);
             }
         }
-        self.stats.restore_current_last_event_marker();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl WallAerialShotCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, WallAerialShotStats> {
+        let mut stats = WallAerialShotStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(event, &frame);
+        }
+        leak_test_stats(stats.player_stats().clone())
     }
 }
 

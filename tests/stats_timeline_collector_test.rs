@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use subtr_actor::stats::analysis_graph::StatsProjectionState;
 use subtr_actor::*;
 
 const TEST_BOOST_ZERO_BAND_RAW: f32 = 1.0;
@@ -5485,49 +5486,20 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
             "positioning",
             "powerslide",
             "demo",
+            "stats_projection",
         ],
     )
     .expect("Expected analysis graph to process replay");
 
-    let possession = graph
-        .state::<PossessionCalculator>()
-        .expect("missing possession calculator state");
-    let fifty_fifty = graph
-        .state::<FiftyFiftyCalculator>()
-        .expect("missing fifty_fifty calculator state");
-    let pressure = graph
-        .state::<PressureCalculator>()
-        .expect("missing pressure calculator state");
-    let rush = graph
-        .state::<RushCalculator>()
-        .expect("missing rush calculator state");
-    let match_stats = graph
-        .state::<MatchStatsCalculator>()
-        .expect("missing match stats calculator state");
+    let projection = graph
+        .state::<StatsProjectionState>()
+        .expect("missing stats projection state");
     let backboard = graph
         .state::<BackboardCalculator>()
         .expect("missing backboard calculator state");
     let double_tap = graph
         .state::<DoubleTapCalculator>()
         .expect("missing double tap calculator state");
-    let ball_carry = graph
-        .state::<BallCarryCalculator>()
-        .expect("missing ball carry calculator state");
-    let boost = graph
-        .state::<BoostCalculator>()
-        .expect("missing boost calculator state");
-    let movement = graph
-        .state::<MovementCalculator>()
-        .expect("missing movement calculator state");
-    let positioning = graph
-        .state::<PositioningCalculator>()
-        .expect("missing positioning calculator state");
-    let powerslide = graph
-        .state::<PowerslideCalculator>()
-        .expect("missing powerslide calculator state");
-    let demo = graph
-        .state::<DemoCalculator>()
-        .expect("missing demo calculator state");
 
     let assert_core_team_stats_match =
         |actual: &CoreTeamStats, expected: &CoreTeamStats, team_label: &str| {
@@ -5614,92 +5586,110 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
 
     assert_eq!(
         final_frame.team_zero.fifty_fifty,
-        fifty_fifty.stats().for_team(true)
+        projection.fifty_fifty.stats().for_team(true)
     );
     assert_eq!(
         final_frame.team_one.fifty_fifty,
-        fifty_fifty.stats().for_team(false)
+        projection.fifty_fifty.stats().for_team(false)
     );
     assert_eq!(
         final_frame.team_zero.possession,
-        possession.stats().for_team(true)
+        projection.possession.stats().for_team(true)
     );
     assert_eq!(
         final_frame.team_one.possession,
-        possession.stats().for_team(false)
+        projection.possession.stats().for_team(false)
     );
     assert_eq!(
         final_frame.team_zero.pressure,
-        pressure.stats().for_team(true)
+        projection.pressure.stats().for_team(true)
     );
     assert_eq!(
         final_frame.team_one.pressure,
-        pressure.stats().for_team(false)
+        projection.pressure.stats().for_team(false)
     );
-    assert_eq!(final_frame.team_zero.rush, rush.stats().for_team(true));
-    assert_eq!(final_frame.team_one.rush, rush.stats().for_team(false));
+    assert_eq!(
+        final_frame.team_zero.rush,
+        projection.rush.stats().for_team(true)
+    );
+    assert_eq!(
+        final_frame.team_one.rush,
+        projection.rush.stats().for_team(false)
+    );
     assert_core_team_stats_match(
         &final_frame.team_zero.core,
-        &match_stats.team_zero_stats(),
+        &projection.core.team_zero_stats(),
         "team zero",
     );
     assert_core_team_stats_match(
         &final_frame.team_one.core,
-        &match_stats.team_one_stats(),
+        &projection.core.team_one_stats(),
         "team one",
     );
     assert_eq!(
         final_frame.team_zero.ball_carry,
-        ball_carry.team_zero_stats().clone()
+        projection.ball_carry.team_zero_stats().clone()
     );
     assert_eq!(
         final_frame.team_zero.air_dribble,
-        ball_carry.team_zero_air_dribble_stats().clone()
+        projection.ball_carry.team_zero_air_dribble_stats().clone()
     );
     assert_eq!(
         final_frame.team_zero.backboard,
-        backboard.team_zero_stats().clone()
+        projection.backboard.team_zero_stats().clone()
     );
     assert_eq!(
         final_frame.team_one.backboard,
-        backboard.team_one_stats().clone()
+        projection.backboard.team_one_stats().clone()
     );
     assert_eq!(
         final_frame.team_zero.double_tap,
-        double_tap.team_zero_stats().clone()
+        projection.double_tap.team_zero_stats().clone()
     );
     assert_eq!(
         final_frame.team_one.double_tap,
-        double_tap.team_one_stats().clone()
+        projection.double_tap.team_one_stats().clone()
     );
     assert_eq!(
         final_frame.team_one.ball_carry,
-        ball_carry.team_one_stats().clone()
+        projection.ball_carry.team_one_stats().clone()
     );
     assert_eq!(
         final_frame.team_one.air_dribble,
-        ball_carry.team_one_air_dribble_stats().clone()
+        projection.ball_carry.team_one_air_dribble_stats().clone()
     );
-    assert_eq!(final_frame.team_zero.boost, boost.team_zero_stats().clone());
-    assert_eq!(final_frame.team_one.boost, boost.team_one_stats().clone());
+    assert_eq!(
+        final_frame.team_zero.boost,
+        projection.boost.team_zero_stats().clone()
+    );
+    assert_eq!(
+        final_frame.team_one.boost,
+        projection.boost.team_one_stats().clone()
+    );
     assert_eq!(
         final_frame.team_zero.movement,
-        movement.team_zero_stats().clone()
+        projection.movement.team_zero_stats().clone()
     );
     assert_eq!(
         final_frame.team_one.movement,
-        movement.team_one_stats().clone()
+        projection.movement.team_one_stats().clone()
     );
     assert_eq!(
         final_frame.team_zero.powerslide,
-        powerslide.team_zero_stats().clone()
+        projection.powerslide.team_zero_stats().clone()
     );
     assert_eq!(
         final_frame.team_one.powerslide,
-        powerslide.team_one_stats().clone()
+        projection.powerslide.team_one_stats().clone()
     );
-    assert_eq!(final_frame.team_zero.demo, demo.team_zero_stats().clone());
-    assert_eq!(final_frame.team_one.demo, demo.team_one_stats().clone());
+    assert_eq!(
+        final_frame.team_zero.demo,
+        projection.demo.team_zero_stats().clone()
+    );
+    assert_eq!(
+        final_frame.team_one.demo,
+        projection.demo.team_one_stats().clone()
+    );
 
     assert_eq!(
         final_frame.players.len(),
@@ -5708,7 +5698,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
     for player in &final_frame.players {
         assert_core_player_stats_match(
             &player.core,
-            &match_stats
+            &projection
+                .core
                 .player_stats()
                 .get(&player.player_id)
                 .cloned()
@@ -5717,7 +5708,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         );
         assert_eq!(
             player.ball_carry,
-            ball_carry
+            projection
+                .ball_carry
                 .player_stats()
                 .get(&player.player_id)
                 .cloned()
@@ -5725,7 +5717,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         );
         assert_eq!(
             player.air_dribble,
-            ball_carry
+            projection
+                .ball_carry
                 .player_air_dribble_stats()
                 .get(&player.player_id)
                 .cloned()
@@ -5733,7 +5726,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         );
         assert_eq!(
             player.backboard,
-            backboard
+            projection
+                .backboard
                 .player_stats()
                 .get(&player.player_id)
                 .cloned()
@@ -5741,7 +5735,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         );
         assert_eq!(
             player.double_tap,
-            double_tap
+            projection
+                .double_tap
                 .player_stats()
                 .get(&player.player_id)
                 .cloned()
@@ -5749,7 +5744,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         );
         assert_eq!(
             player.boost,
-            boost
+            projection
+                .boost
                 .player_stats()
                 .get(&player.player_id)
                 .cloned()
@@ -5757,7 +5753,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         );
         assert_eq!(
             complete_movement_breakdowns_for_comparison(&player.movement),
-            movement
+            projection
+                .movement
                 .player_stats()
                 .get(&player.player_id)
                 .map(complete_movement_breakdowns_for_comparison)
@@ -5767,7 +5764,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         );
         assert_eq!(
             player.positioning,
-            positioning
+            projection
+                .positioning
                 .player_stats()
                 .get(&player.player_id)
                 .cloned()
@@ -5775,7 +5773,8 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         );
         assert_eq!(
             player.powerslide,
-            powerslide
+            projection
+                .powerslide
                 .player_stats()
                 .get(&player.player_id)
                 .cloned()
@@ -5783,7 +5782,9 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         );
         assert_eq!(
             player.demo,
-            demo.player_stats()
+            projection
+                .demo
+                .player_stats()
                 .get(&player.player_id)
                 .cloned()
                 .unwrap_or_default()

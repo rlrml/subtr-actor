@@ -42,7 +42,6 @@ struct PendingBackboardBounce {
 /// velocity is poorly aligned with the goal center.
 #[derive(Debug, Clone, Default)]
 pub struct DoubleTapCalculator {
-    stats: DoubleTapStatsAccumulator,
     events: EventStream<DoubleTapEvent>,
     pending_backboard_bounces: Vec<PendingBackboardBounce>,
 }
@@ -50,18 +49,6 @@ pub struct DoubleTapCalculator {
 impl DoubleTapCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, DoubleTapPlayerStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &DoubleTapTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &DoubleTapTeamStats {
-        self.stats.team_one_stats()
     }
 
     pub fn events(&self) -> &[DoubleTapEvent] {
@@ -145,8 +132,7 @@ impl DoubleTapCalculator {
         }
     }
 
-    fn record_double_tap(&mut self, frame: &FrameInfo, event: DoubleTapEvent) {
-        self.stats.apply_event(frame, &event);
+    fn record_double_tap(&mut self, _frame: &FrameInfo, event: DoubleTapEvent) {
         self.events.push(event);
     }
 
@@ -192,7 +178,6 @@ impl DoubleTapCalculator {
         live_play: bool,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.stats.begin_sample(frame);
         if !live_play {
             self.pending_backboard_bounces.clear();
         }
@@ -200,8 +185,37 @@ impl DoubleTapCalculator {
         self.prune_pending_backboard_bounces(frame.time);
         self.record_backboard_bounces(backboard_bounce_state);
         self.resolve_double_tap_touches(frame, ball, &touch_state.touch_events);
-        self.stats.finish_sample();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl DoubleTapCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, DoubleTapPlayerStats> {
+        let mut stats = DoubleTapStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> &DoubleTapTeamStats {
+        let mut stats = DoubleTapStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.team_zero_stats().clone())
+    }
+
+    pub fn team_one_stats(&self) -> &DoubleTapTeamStats {
+        let mut stats = DoubleTapStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.time, event.frame);
+            stats.apply_event(&frame, event);
+        }
+        leak_test_stats(stats.team_one_stats().clone())
     }
 }
 

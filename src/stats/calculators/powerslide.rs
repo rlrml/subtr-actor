@@ -15,7 +15,6 @@ pub struct PowerslideEvent {
 
 #[derive(Debug, Clone, Default)]
 pub struct PowerslideCalculator {
-    stats: PowerslideStatsAccumulator,
     last_active: HashMap<PlayerId, bool>,
     events: EventStream<PowerslideEvent>,
 }
@@ -23,18 +22,6 @@ pub struct PowerslideCalculator {
 impl PowerslideCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, PowerslideStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &PowerslideStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &PowerslideStats {
-        self.stats.team_one_stats()
     }
 
     pub fn events(&self) -> &[PowerslideEvent] {
@@ -57,7 +44,7 @@ impl PowerslideCalculator {
         &mut self,
         frame: &FrameInfo,
         players: &PlayerFrameState,
-        live_play: bool,
+        _live_play: bool,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         for player in &players.players {
@@ -67,14 +54,6 @@ impl PowerslideCalculator {
                 .get(&player.player_id)
                 .copied()
                 .unwrap_or(false);
-            self.stats.apply_sample(
-                &player.player_id,
-                player.is_team_0,
-                effective_powerslide,
-                previous_active,
-                frame.dt,
-                live_play,
-            );
 
             if effective_powerslide != previous_active {
                 self.events.push(PowerslideEvent {

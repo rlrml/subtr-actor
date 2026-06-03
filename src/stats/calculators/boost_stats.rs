@@ -157,7 +157,7 @@ impl BoostStatsAccumulator {
     }
 }
 
-fn apply_delta(stats: &mut BoostStats, delta: &BoostStats) {
+pub(crate) fn apply_delta(stats: &mut BoostStats, delta: &BoostStats) {
     stats.tracked_time += delta.tracked_time;
     stats.boost_integral += delta.boost_integral;
     stats.time_zero_boost += delta.time_zero_boost;

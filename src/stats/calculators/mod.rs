@@ -20,6 +20,21 @@ const VERTICAL_STATE_LABELS: [StatLabel; 2] = [
     StatLabel::new("vertical_state", "aerial"),
 ];
 
+#[cfg(test)]
+fn stats_test_frame(time: f32, frame_number: usize) -> FrameInfo {
+    FrameInfo {
+        frame_number,
+        time,
+        dt: 0.0,
+        seconds_remaining: None,
+    }
+}
+
+#[cfg(test)]
+fn leak_test_stats<T: 'static>(value: T) -> &'static T {
+    Box::leak(Box::new(value))
+}
+
 fn confidence_band_label(high_confidence: bool) -> StatLabel {
     if high_confidence {
         StatLabel::new("confidence_band", "high")

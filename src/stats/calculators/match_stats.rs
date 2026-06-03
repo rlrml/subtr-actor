@@ -726,7 +726,10 @@ fn core_player_stats_delta(
     }
 }
 
-fn core_team_stats_delta(current: &CoreTeamStats, previous: &CoreTeamStats) -> CoreTeamStats {
+pub(crate) fn core_team_stats_delta(
+    current: &CoreTeamStats,
+    previous: &CoreTeamStats,
+) -> CoreTeamStats {
     CoreTeamStats {
         score: current.score - previous.score,
         goals: current.goals - previous.goals,
@@ -840,10 +843,8 @@ struct BoostLeadupStats {
 
 #[derive(Debug, Clone, Default)]
 pub struct MatchStatsCalculator {
-    stats: CoreStatsAccumulator,
     previous_player_stats: HashMap<PlayerId, CorePlayerStats>,
     core_player_events: EventStream<CorePlayerStatsEvent>,
-    core_team_events: EventStream<CoreTeamStatsEvent>,
     timeline: EventStream<TimelineEvent>,
     pending_goal_events: Vec<PendingGoalEvent>,
     previous_team_scores: Option<(i32, i32)>,
@@ -860,10 +861,6 @@ pub struct MatchStatsCalculator {
 impl MatchStatsCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, CorePlayerStats> {
-        self.stats.player_stats()
     }
 
     pub fn timeline(&self) -> &[TimelineEvent] {
@@ -890,19 +887,10 @@ impl MatchStatsCalculator {
         self.core_player_events.new_events()
     }
 
-    pub fn core_team_events(&self) -> &[CoreTeamStatsEvent] {
-        self.core_team_events.all()
-    }
-
-    pub fn new_core_team_events(&self) -> &[CoreTeamStatsEvent] {
-        self.core_team_events.new_events()
-    }
-
     pub fn finish(&mut self) -> SubtrActorResult<()> {
         self.timeline.begin_update();
         self.goal_context_events.begin_update();
         self.core_player_events.begin_update();
-        self.core_team_events.begin_update();
         let pending_goal_events = std::mem::take(&mut self.pending_goal_events);
         for pending_goal_event in pending_goal_events {
             let Some(scorer) = pending_goal_event.event.player.clone() else {
@@ -968,14 +956,6 @@ impl MatchStatsCalculator {
         Ok(())
     }
 
-    pub fn team_zero_stats(&self) -> CoreTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> CoreTeamStats {
-        self.stats.team_one_stats()
-    }
-
     #[allow(clippy::too_many_arguments)]
     fn emit_timeline_events(
         &mut self,
@@ -1029,7 +1009,6 @@ impl MatchStatsCalculator {
         if delta == CorePlayerStats::default() {
             return;
         }
-        let previous_team_stats = self.stats.team_stats_for_side(is_team_0);
         let event = CorePlayerStatsEvent {
             time,
             frame,
@@ -1038,17 +1017,7 @@ impl MatchStatsCalculator {
             is_team_0,
             delta,
         };
-        self.stats.apply_player_event(&event);
         self.core_player_events.push(event);
-        let current_team_stats = self.stats.team_stats_for_side(is_team_0);
-        if current_team_stats != previous_team_stats {
-            self.core_team_events.push(CoreTeamStatsEvent {
-                time,
-                frame,
-                is_team_0,
-                delta: core_team_stats_delta(&current_team_stats, &previous_team_stats),
-            });
-        }
     }
 
     fn kickoff_phase_active(gameplay: &GameplayState) -> bool {
@@ -1529,7 +1498,6 @@ impl MatchStatsCalculator {
         self.timeline.begin_update();
         self.goal_context_events.begin_update();
         self.core_player_events.begin_update();
-        self.core_team_events.begin_update();
         self.update_kickoff_reference(gameplay, events);
         self.prune_goal_buildup_samples(frame.time);
         self.update_ball_ground_contact(frame, ball);
@@ -1590,18 +1558,13 @@ impl MatchStatsCalculator {
         }
 
         for player in &players.players {
-            self.stats
-                .ensure_player(player.player_id.clone(), player.is_team_0);
-            let mut current_stats = CorePlayerStats {
+            let current_stats = CorePlayerStats {
                 score: player.match_score.unwrap_or(0),
                 goals: player.match_goals.unwrap_or(0),
                 assists: player.match_assists.unwrap_or(0),
                 saves: player.match_saves.unwrap_or(0),
                 shots: player.match_shots.unwrap_or(0),
-                scoring_context: self
-                    .stats
-                    .player_stats_for(&player.player_id)
-                    .scoring_context,
+                scoring_context: PlayerScoringContextStats::default(),
             };
 
             let previous_stats = self
@@ -1609,6 +1572,7 @@ impl MatchStatsCalculator {
                 .get(&player.player_id)
                 .cloned()
                 .unwrap_or_default();
+            let mut delta_stats = core_player_stats_delta(&current_stats, &previous_stats);
 
             let shot_delta = current_stats.shots - previous_stats.shots;
             let save_delta = current_stats.saves - previous_stats.saves;
@@ -1675,14 +1639,14 @@ impl MatchStatsCalculator {
                         if let Some(touch_position) =
                             scorer_last_touch.and_then(|touch| touch.ball_position)
                         {
-                            current_stats
+                            delta_stats
                                 .scoring_context
                                 .record_scoring_goal_last_touch_position(touch_position);
                         }
                         if let Some(ball_air_time_before_goal) =
                             pending_goal_event.ball_air_time_before_goal
                         {
-                            current_stats
+                            delta_stats
                                 .scoring_context
                                 .record_goal_ball_air_time(ball_air_time_before_goal);
                         }
@@ -1706,12 +1670,12 @@ impl MatchStatsCalculator {
                                 .map(|kickoff_touch_time| (goal_time - kickoff_touch_time).max(0.0))
                         });
                     if let Some(time_after_kickoff) = time_after_kickoff {
-                        current_stats
+                        delta_stats
                             .scoring_context
                             .goal_after_kickoff
                             .record_goal(time_after_kickoff);
                     }
-                    current_stats
+                    delta_stats
                         .scoring_context
                         .goal_buildup
                         .record(goal_buildup);
@@ -1728,13 +1692,12 @@ impl MatchStatsCalculator {
 
             self.previous_player_stats
                 .insert(player.player_id.clone(), current_stats.clone());
-            let previous_accumulated_stats = self.stats.player_stats_for(&player.player_id);
             self.emit_core_player_delta(
                 frame,
                 player.player_id.clone(),
                 player.position().map(|position| position.to_array()),
                 player.is_team_0,
-                core_player_stats_delta(&current_stats, &previous_accumulated_stats),
+                delta_stats,
             );
         }
 
@@ -1787,6 +1750,33 @@ impl MatchStatsCalculator {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl MatchStatsCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, CorePlayerStats> {
+        let mut stats = CoreStatsAccumulator::default();
+        for event in self.core_player_events() {
+            stats.apply_player_event(event);
+        }
+        leak_test_stats(stats.player_stats().clone())
+    }
+
+    pub fn team_zero_stats(&self) -> CoreTeamStats {
+        let mut stats = CoreStatsAccumulator::default();
+        for event in self.core_player_events() {
+            stats.apply_player_event(event);
+        }
+        stats.team_zero_stats()
+    }
+
+    pub fn team_one_stats(&self) -> CoreTeamStats {
+        let mut stats = CoreStatsAccumulator::default();
+        for event in self.core_player_events() {
+            stats.apply_player_event(event);
+        }
+        stats.team_one_stats()
     }
 }
 

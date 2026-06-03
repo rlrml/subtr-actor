@@ -85,7 +85,6 @@ struct RecentDodgeStart {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlickCalculator {
-    stats: FlickStatsAccumulator,
     events: EventStream<FlickEvent>,
     active_setups: HashMap<PlayerId, ActiveFlickSetup>,
     recent_setups: HashMap<PlayerId, FlickSetupSummary>,
@@ -97,10 +96,6 @@ pub struct FlickCalculator {
 impl FlickCalculator {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn player_stats(&self) -> &HashMap<PlayerId, FlickStats> {
-        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[FlickEvent] {
@@ -424,7 +419,6 @@ impl FlickCalculator {
     fn apply_event(&mut self, frame: &FrameInfo, mut event: FlickEvent) {
         event.sample_time = frame.time;
         event.sample_frame = frame.frame_number;
-        self.stats.apply_event(&event, frame);
         self.events.push(event);
     }
 
@@ -462,7 +456,6 @@ impl FlickCalculator {
     }
 
     fn reset_live_play_state(&mut self, ball: &BallFrameState) {
-        self.stats.reset_current_last_event_marker();
         self.active_setups.clear();
         self.recent_setups.clear();
         self.recent_dodge_starts.clear();
@@ -483,8 +476,6 @@ impl FlickCalculator {
             self.reset_live_play_state(ball);
             return Ok(());
         }
-
-        self.stats.begin_sample(frame);
         self.prune_recent_state(frame.time);
         self.update_control_setups(
             frame,
@@ -497,6 +488,18 @@ impl FlickCalculator {
         self.apply_touch_events(frame, ball, players, &touch_state.touch_events);
         self.previous_ball_velocity = ball.velocity();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl FlickCalculator {
+    pub fn player_stats(&self) -> &HashMap<PlayerId, FlickStats> {
+        let mut stats = FlickStatsAccumulator::default();
+        for event in self.events() {
+            let frame = stats_test_frame(event.sample_time, event.sample_frame);
+            stats.apply_event(event, &frame);
+        }
+        leak_test_stats(stats.player_stats().clone())
     }
 }
 
