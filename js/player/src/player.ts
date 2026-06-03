@@ -762,13 +762,7 @@ export class ReplayPlayer extends EventTarget {
           frame?.boostActive ??
           nextFrame?.boostActive ??
           false;
-        updateBoostTrail(
-          boostTrail,
-          boostActive,
-          boostFraction,
-          this.currentTime,
-          playerIndex,
-        );
+        updateBoostTrail(boostTrail, boostActive, boostFraction, this.currentTime, playerIndex);
       }
 
       if (boostMeter) {
@@ -812,11 +806,8 @@ export class ReplayPlayer extends EventTarget {
       frameIndex,
       attachedPlayerUnavailable:
         this.attachedPlayerId !== null &&
-        getActiveDemoEvent(
-          this.replay.timelineEvents,
-          this.attachedPlayerId,
-          this.currentTime,
-        ) !== null,
+        getActiveDemoEvent(this.replay.timelineEvents, this.attachedPlayerId, this.currentTime) !==
+          null,
       ballPosition,
       desiredCameraPosition: this.desiredCameraPosition,
       desiredLookTarget: this.desiredLookTarget,

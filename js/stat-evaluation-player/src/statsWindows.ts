@@ -375,7 +375,12 @@ export class StatsWindowsController {
     } else {
       select.append(
         new Option("Blue", "blue", statsWindow.team === "blue", statsWindow.team === "blue"),
-        new Option("Orange", "orange", statsWindow.team === "orange", statsWindow.team === "orange"),
+        new Option(
+          "Orange",
+          "orange",
+          statsWindow.team === "orange",
+          statsWindow.team === "orange",
+        ),
       );
       select.value = statsWindow.team ?? "blue";
       select.addEventListener("change", () => {
@@ -525,7 +530,8 @@ export class StatsWindowsController {
   }
 
   private addStatToWindow(statsWindow: StatsWindowState, definition: StatDefinition): void {
-    const targetId = statsWindow.kind === "ad-hoc" ? this.getDefaultAdHocTargetId(definition) : undefined;
+    const targetId =
+      statsWindow.kind === "ad-hoc" ? this.getDefaultAdHocTargetId(definition) : undefined;
     if (
       statsWindow.entries.some(
         (entry) => entry.statId === definition.id && entry.targetId === targetId,
@@ -603,7 +609,11 @@ export class StatsWindowsController {
       return;
     }
     if (statsWindow.kind === "team") {
-      this.renderScopedStatList(statsWindow, this.getTeamSnapshot(frame, statsWindow.team ?? "blue"), entries);
+      this.renderScopedStatList(
+        statsWindow,
+        this.getTeamSnapshot(frame, statsWindow.team ?? "blue"),
+        entries,
+      );
       return;
     }
     if (statsWindow.kind === "ad-hoc") {
@@ -656,7 +666,8 @@ export class StatsWindowsController {
       const scorerName = scorer
         ? (replay.players.find((player) => player.id === scorerId)?.name ?? scorerId)
         : "Unknown scorer";
-      const isTeamZero = context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
+      const isTeamZero =
+        context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
 
       const item = document.createElement("section");
       item.className = "goal-label-item";
@@ -773,7 +784,12 @@ export class StatsWindowsController {
         section.append(title);
         for (const { entry, definition } of entries) {
           section.append(
-            this.renderStatRow(statsWindow, entry, definition, definition.format(definition.read(player))),
+            this.renderStatRow(
+              statsWindow,
+              entry,
+              definition,
+              definition.format(definition.read(player)),
+            ),
           );
         }
         playerList.append(section);

@@ -267,9 +267,7 @@ function getEventPlaylistPlayerColor(
   replayPlayers: readonly ReplayPlayerTrack[],
 ): string {
   const playerId = event.playerId ?? null;
-  const playerIndex = playerId
-    ? replayPlayers.findIndex((player) => player.id === playerId)
-    : -1;
+  const playerIndex = playerId ? replayPlayers.findIndex((player) => player.id === playerId) : -1;
   if (playerIndex >= 0) {
     return EVENT_PLAYLIST_PLAYER_COLORS[playerIndex % EVENT_PLAYLIST_PLAYER_COLORS.length]!;
   }

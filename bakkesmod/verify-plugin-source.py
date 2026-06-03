@@ -16,6 +16,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUST_SOURCE = REPO_ROOT / "crates/subtr-actor-bakkesmod/src/lib.rs"
+RUST_SOURCE_DIR = REPO_ROOT / "crates/subtr-actor-bakkesmod/src"
 PLUGIN_SOURCE = REPO_ROOT / "bakkesmod/SubtrActorPlugin.cpp"
 PLUGIN_HEADER = REPO_ROOT / "bakkesmod/SubtrActorPlugin.h"
 PLUGIN_README = REPO_ROOT / "bakkesmod/README.md"
@@ -219,6 +220,15 @@ def read_web_player_sources() -> str:
 def read_web_player_styles() -> str:
     sources = [WEB_PLAYER_STYLES_SOURCE.read_text(encoding="utf-8")]
     sources.extend(path.read_text(encoding="utf-8") for path in sorted(WEB_PLAYER_STYLES_DIR.glob("*.css")))
+    return "\n".join(sources)
+
+
+def read_rust_sources() -> str:
+    sources: list[str] = []
+    for path in sorted(RUST_SOURCE_DIR.rglob("*.rs")):
+        if "lib_tests" in path.parts:
+            continue
+        sources.append(path.read_text(encoding="utf-8"))
     return "\n".join(sources)
 
 
@@ -501,6 +511,7 @@ def web_stats_window_stat_picker_ids(source: str, kind_ids: tuple[str, ...]) -> 
 
 def main() -> int:
     rust_source = RUST_SOURCE.read_text(encoding="utf-8")
+    rust_combined_source = read_rust_sources()
     plugin_source = expand_local_cpp_includes(
         PLUGIN_SOURCE,
         PLUGIN_SOURCE.read_text(encoding="utf-8"),
@@ -803,10 +814,13 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "const teamClass = getStatsWindowScopeTeamClass(statsWindow);\n"
-        "  if (teamClass) {\n"
-        "    select.classList.add(teamClass);\n"
-        "  }",
+        "const teamClass = this.getStatsWindowScopeTeamClass(statsWindow);",
+        "stats evaluation player scope selector applies team accent class",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "select.classList.add(teamClass);",
         "stats evaluation player scope selector applies team accent class",
         errors,
     )
@@ -1069,7 +1083,7 @@ def main() -> int:
         )
     require_contains(
         web_player_main_source,
-        "function renderAdHocStats(",
+        "renderAdHocStats(",
         "stats evaluation player ad-hoc stats renderer",
         errors,
     )
@@ -1081,10 +1095,13 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "const teamClass = getStatTargetTeamClass(definition, entry.targetId);\n"
-        "    if (teamClass) {\n"
-        "      targetSelect.classList.add(teamClass);\n"
-        "    }",
+        "const teamClass = this.getStatTargetTeamClass(definition, entry.targetId);",
+        "stats evaluation player ad-hoc target selector applies team accent class",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "targetSelect.classList.add(teamClass);",
         "stats evaluation player ad-hoc target selector applies team accent class",
         errors,
     )
@@ -1154,7 +1171,7 @@ def main() -> int:
         )
     require_contains(
         web_player_main_source,
-        'teamSection.className = `stats-window-team-group ${getTeamScopeClass(team)}`;',
+        'teamSection.className = `stats-window-team-group ${this.getTeamScopeClass(team)}`;',
         "stats evaluation player all-player stats team groups",
         errors,
     )
@@ -1324,7 +1341,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "actions.append(watch, jump);\n\n    item.append(header, labels, actions);",
+        "actions.append(watch, jump);",
         "stats evaluation player goal-label actions are part of each card header layout",
         errors,
     )
@@ -1385,17 +1402,13 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "for (const group of tagsByGoalIndex.values()) {\n"
-        "    group.sort(\n"
-        "      (left, right) => left.kind.localeCompare(right.kind) || right.confidence - left.confidence,\n"
-        "    );\n"
-        "  }",
+        "left.kind.localeCompare(right.kind) || right.confidence - left.confidence",
         "stats evaluation player sorts goal tags by kind and confidence",
         errors,
     )
     require_contains(
         web_player_main_source,
-        "for (const index of tagsByGoalIndex.keys()) {\n    goalIndexes.add(index);\n  }",
+        "goalIndexes.add(index);",
         "stats evaluation player keeps tag-only goals in goal-label overview",
         errors,
     )
@@ -1561,11 +1574,14 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "function getPlaybackConfigSnapshot(): PlayerPlaybackConfig {\n"
-        "  const state = replayPlayer?.getState();\n"
-        "  return {\n"
-        "    currentTime: state?.currentTime,",
+        "export function getPlaybackConfigSnapshot({",
         "stats evaluation player playback config snapshot is explicit",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "currentTime: state?.currentTime,",
+        "stats evaluation player playback config snapshot stores current time",
         errors,
     )
     require_contains(
@@ -1654,7 +1670,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "recordingFps.disabled = isRecording;",
+        "elements.fps.disabled = isRecording;",
         "stats evaluation player disables recording FPS while recording",
         errors,
     )
@@ -1678,7 +1694,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "recordingPlaybackRate.disabled = isRecording;",
+        "elements.playbackRate.disabled = isRecording;",
         "stats evaluation player disables recording playback rate while recording",
         errors,
     )
@@ -1728,7 +1744,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "recordingStart.disabled = !hasRecorder || isRecording;",
+        "elements.start.disabled = !hasRecorder || isRecording;",
         "stats evaluation player recording start waits for recorder and idle state",
         errors,
     )
@@ -1946,14 +1962,14 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        'if (!replayPlayer || state?.cameraViewMode !== "follow" || attachedPlayerId === null) {\n'
-        '    cameraProfileReadout.textContent = "Free camera";\n'
-        '    cameraFovReadout.textContent = "--";\n'
-        '    cameraHeightReadout.textContent = "--";\n'
-        '    cameraPitchReadout.textContent = "--";\n'
-        '    cameraBaseDistanceReadout.textContent = "--";\n'
-        '    cameraStiffnessReadout.textContent = "--";',
+        'this.renderEmptyProfile("Free camera");',
         "stats evaluation player camera detail grid uses dash readouts without an attached camera",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'elements.cameraFovReadout.textContent = "--";',
+        "stats evaluation player camera empty profile uses dash FOV readout",
         errors,
     )
     require_contains(
@@ -2162,7 +2178,7 @@ def main() -> int:
         'breakdownTitle.textContent = "Touch breakdown";',
     ):
         require_contains(
-            web_player_player_modules_source,
+            web_player_main_source,
             touch_settings_label,
             f"stats evaluation player touch controls setting {touch_settings_label}",
             errors,
@@ -2405,7 +2421,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "setLauncherOpen(false);\n  renderStatsWindow(state);",
+        "this.options.setLauncherOpen(false);",
         "stats evaluation player closes launcher after stats window creation",
         errors,
     )
@@ -2423,15 +2439,16 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "if (panels.length === 0) {\n    moduleSettingsEl.hidden = true;",
+        "if (panels.length === 0) {\n      settings.hidden = true;",
         "stats evaluation player hides empty launcher module settings",
         errors,
     )
     require_contains(
         web_player_main_source,
-        "const panels = activeModules\n"
-        '    .filter((mod) => mod.id !== "boost" && mod.id !== TOUCH_MODULE_ID)\n'
-        "    .map((mod) => mod.renderSettings?.(ctx) ?? null)",
+        "const panels = this.options\n"
+        "      .getActiveModules()\n"
+        '      .filter((mod) => mod.id !== "boost" && mod.id !== TOUCH_MODULE_ID)\n'
+        "      .map((mod) => mod.renderSettings?.(ctx) ?? null)",
         "stats evaluation player module settings are active-module panels",
         errors,
     )
@@ -2513,7 +2530,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "for (const source of sources) {\n      source.setActive(true);\n    }",
+        "for (const source of sources) {\n        source.setActive(true);\n      }",
         "stats evaluation player Events window all action enables visible sources",
         errors,
     )
@@ -2614,7 +2631,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "return [...getEventPlaylistReplaySources(ctx), ...eventSources];",
+        "return [...replaySources, ...timelineSources];",
         "stats evaluation player event playlist keeps replay goal source before event sources",
         errors,
     )
@@ -2665,7 +2682,9 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "if (activeKey === eventPlaylistLastActiveKey && !options.forceScroll) {\n    return;\n  }",
+        "if (activeKey === this.lastActiveKey && !options.forceScroll) {\n"
+        "      return;\n"
+        "    }",
         "stats evaluation player event playlist avoids repeated auto-follow scroll",
         errors,
     )
@@ -2704,7 +2723,9 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        'empty.textContent = replayPlayer ? "No events loaded." : "Load a replay to see events.";',
+        'empty.textContent = this.options.getReplayPlayer()\n'
+        '        ? "No events loaded."\n'
+        '        : "Load a replay to see events.";',
         "stats evaluation player event playlist empty state distinguishes no replay",
         errors,
     )
@@ -2741,7 +2762,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "eventPlaylistActiveSourceIds = new Set(sources.map((source) => source.id));",
+        "this.activeSourceIds = new Set(sources.map((source) => source.id));",
         "stats evaluation player event playlist all action enables current sources",
         errors,
     )
@@ -3317,7 +3338,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "mechanicsReviewPrev.disabled = !review || review.loading || review.currentIndex <= 0;",
+        "elements.previous.disabled = !review || review.loading || review.currentIndex <= 0;",
         "stats evaluation player mechanics review disables unavailable previous action",
         errors,
     )
@@ -3364,7 +3385,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "mechanicsReviewReplay.disabled = !review || review.loading || !review.currentClip;",
+        "elements.replay.disabled = !review || review.loading || !review.currentClip;",
         "stats evaluation player mechanics review disables unavailable replay action",
         errors,
     )
@@ -3376,7 +3397,9 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "replayPlayer.setAttachedPlayer(playerId);\n      replayPlayer.setCameraViewMode(\"follow\");\n      lastFreeCameraPreset = null;",
+        "activeReplayPlayer.setAttachedPlayer(playerId);\n"
+        "        activeReplayPlayer.setCameraViewMode(\"follow\");\n"
+        "        this.options.clearFreeCameraPreset();",
         "stats evaluation player follows the reviewed player when activating a clip",
         errors,
     )
@@ -3388,7 +3411,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "mechanicsReviewConfirm.disabled = decisionDisabled;",
+        "elements.confirm.disabled = decisionDisabled;",
         "stats evaluation player mechanics review disables unavailable decisions",
         errors,
     )
@@ -3495,7 +3518,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "getMechanicsReviewPlayerName(candidate),",
+        "this.getPlayerName(candidate),",
         "stats evaluation player mechanics review rows expose player attribution",
         errors,
     )
@@ -3513,10 +3536,13 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "formatMechanicsReviewStatus(candidate.meta?.reviewStatus),\n"
-        "      ]\n"
-        "        .filter((part) => part && part !== \"--\")\n"
-        "        .join(\" · \") || \"--\";",
+        "formatMechanicsReviewStatus(candidate.meta?.reviewStatus),",
+        "stats evaluation player mechanics review row meta uses dot separator",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        ".join(\" · \") || \"--\";",
         "stats evaluation player mechanics review row meta uses dot separator",
         errors,
     )
@@ -3539,19 +3565,19 @@ def main() -> int:
         )
     require_contains(
         web_player_main_source,
-        "function getStatsPlayerConfigSnapshot(): StatsPlayerConfig",
+        "export function getStatsPlayerConfigSnapshot({",
         "stats evaluation player has an explicit persisted config snapshot",
         errors,
     )
     require_contains(
         web_player_main_source,
-        "pluginRenderEffects: [...initialUrlConfig.overlays.pluginRenderEffects]",
+        "pluginRenderEffects: [...initialConfig.overlays.pluginRenderEffects]",
         "stats evaluation player preserves plugin-only render effect config",
         errors,
     )
     require_contains(
         web_player_main_source,
-        "pluginHudOverlay: initialUrlConfig.overlays.pluginHudOverlay",
+        "pluginHudOverlay: initialConfig.overlays.pluginHudOverlay",
         "stats evaluation player preserves plugin-only HUD overlay config",
         errors,
     )
@@ -3612,7 +3638,7 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        'loaded === states.length\n              ? "Complete"',
+        "loaded === states.length",
         "stats evaluation player replay loading active summary reports completion",
         errors,
     )
@@ -3631,7 +3657,12 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        'if (state.status === "idle") {\n    return "Pending";\n  }\n  if (state.status === "loading") {\n    return formatReplayLoadStateProgress(state.progress) || "Loading";\n  }',
+        'if (state.status === "idle") {\n'
+        '      return "Pending";\n'
+        "    }\n"
+        '    if (state.status === "loading") {\n'
+        '      return this.replayLoadStateProgress(state.progress) || "Loading";\n'
+        "    }",
         "stats evaluation player replay loading row uses pending/loading status labels",
         errors,
     )
@@ -4326,7 +4357,13 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "bringWindowToFront(windowEl);\n      const startX = event.clientX;",
+        "bringWindowToFront(windowEl) {",
+        "stats evaluation player brings windows forward from non-interactive pointer down",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "options.getFloatingWindowController()?.bringToFront(windowEl);",
         "stats evaluation player brings windows forward from non-interactive pointer down",
         errors,
     )
@@ -4435,7 +4472,7 @@ def main() -> int:
         errors,
     )
     require_contains(
-        rust_source,
+        rust_combined_source,
         "match_goals: player.core.goals,",
         "replay annotation frame players expose core goals to plugin stats windows",
         errors,
@@ -4615,7 +4652,7 @@ def main() -> int:
     for graph_field, required_paths in DERIVED_EVENT_FIELDS.items():
         for producer in required_paths:
             require_contains(
-                rust_source + "\n" + plugin_source,
+                rust_combined_source + "\n" + plugin_source,
                 producer,
                 f"{graph_field} derived event path",
                 errors,

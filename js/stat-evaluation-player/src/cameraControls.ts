@@ -247,7 +247,9 @@ export class CameraControlsController {
       return;
     }
 
-    const player = replayPlayer.replay.players.find((candidate) => candidate.id === attachedPlayerId);
+    const player = replayPlayer.replay.players.find(
+      (candidate) => candidate.id === attachedPlayerId,
+    );
     if (!player) {
       this.renderEmptyProfile("Unknown");
       return;

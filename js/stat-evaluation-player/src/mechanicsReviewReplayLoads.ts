@@ -109,10 +109,7 @@ export class MechanicsReviewReplayLoadsController {
     })();
   }
 
-  loadBundle(
-    item: MechanicsReviewItem,
-    review: ActiveMechanicsReview,
-  ): Promise<ReplayLoadBundle> {
+  loadBundle(item: MechanicsReviewItem, review: ActiveMechanicsReview): Promise<ReplayLoadBundle> {
     const cached = review.replayLoadCache.get(item.replay);
     if (cached) {
       return cached;
@@ -313,7 +310,9 @@ export class MechanicsReviewReplayLoadsController {
       return 1;
     }
     const value = state.progress?.progress;
-    return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+    return typeof value === "number" && Number.isFinite(value)
+      ? Math.max(0, Math.min(1, value))
+      : 0;
   }
 }
 

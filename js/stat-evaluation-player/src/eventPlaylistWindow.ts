@@ -194,10 +194,7 @@ export class EventPlaylistWindowController {
     this.options.body.append(toolbar, list);
   }
 
-  syncTimeline(
-    state: ReplayPlayerState,
-    options: SyncEventPlaylistTimelineOptions = {},
-  ): void {
+  syncTimeline(state: ReplayPlayerState, options: SyncEventPlaylistTimelineOptions = {}): void {
     const list = this.options.body.querySelector<HTMLElement>(".event-playlist-list");
     if (!list) {
       return;
@@ -209,9 +206,11 @@ export class EventPlaylistWindowController {
       return;
     }
 
-    list.querySelectorAll<HTMLElement>(".event-playlist-item[data-active='true']").forEach((item) => {
-      item.dataset.active = "false";
-    });
+    list
+      .querySelectorAll<HTMLElement>(".event-playlist-item[data-active='true']")
+      .forEach((item) => {
+        item.dataset.active = "false";
+      });
 
     if (activeItem) {
       activeItem.dataset.active = "true";

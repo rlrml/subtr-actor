@@ -116,7 +116,8 @@ export class RecordingWindowController {
 
   sync(status = this.options.getCanvasRecorder()?.getStatus() ?? null): void {
     const { elements } = this.options;
-    const hasRecorder = this.options.getCanvasRecorder() !== null && this.options.getReplayPlayer() !== null;
+    const hasRecorder =
+      this.options.getCanvasRecorder() !== null && this.options.getReplayPlayer() !== null;
     const state = status?.state ?? "idle";
     const isRecording = state === "recording" || state === "stopping";
     const hasRecording = (this.options.getCanvasRecorder()?.getRecording() ?? null) !== null;
@@ -187,12 +188,15 @@ export class RecordingWindowController {
     elements.stop.addEventListener(
       "click",
       () => {
-        void this.options.getCanvasRecorder()?.stop().catch((error) => {
-          console.error("Failed to stop recording:", error);
-          this.options.setStatus(
-            error instanceof Error ? error.message : "Failed to stop recording",
-          );
-        });
+        void this.options
+          .getCanvasRecorder()
+          ?.stop()
+          .catch((error) => {
+            console.error("Failed to stop recording:", error);
+            this.options.setStatus(
+              error instanceof Error ? error.message : "Failed to stop recording",
+            );
+          });
         this.sync();
       },
       { signal },

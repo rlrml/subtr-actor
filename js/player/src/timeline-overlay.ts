@@ -83,11 +83,7 @@ interface TimelineMarkerRecord {
   timelineTime: number;
 }
 
-const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>([
-  "goal",
-  "save",
-  "bookmark",
-]);
+const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>(["goal", "save", "bookmark"]);
 const ACTIVE_MARKER_WINDOW_SECONDS = 0.2;
 const DEFAULT_EVENT_SEEK_LEAD_SECONDS = 2;
 const GOAL_EVENT_SEEK_LEAD_SECONDS = 4;
