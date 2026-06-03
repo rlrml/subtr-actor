@@ -638,7 +638,7 @@ impl BoostCalculator {
         };
         let collected_amount = (BOOST_MAX_AMOUNT - pending_pickup.previous_boost_amount)
             .min(nominal_gain)
-            .max(pending_pickup.pre_applied_collected_amount);
+            .max(0.0);
         let collected_amount_delta = collected_amount - pending_pickup.pre_applied_collected_amount;
         let overfill = (nominal_gain - collected_amount).max(0.0);
         let field_half = if stolen {
@@ -1046,7 +1046,10 @@ impl BoostCalculator {
         }
 
         let small_pad_floor = SMALL_PAD_AMOUNT_RAW - 3.0;
-        let big_pad_floor = SMALL_PAD_AMOUNT_RAW + 5.0;
+        let big_pad_floor = SMALL_PAD_AMOUNT_RAW + TOLERANCE;
+        if delta > big_pad_floor {
+            return vec![BoostIncreaseReason::BigPad];
+        }
         if boost < BOOST_FULL_BAND_MIN_RAW && delta >= small_pad_floor {
             const SMALL_PICKUP_COUNT_TOLERANCE: f32 = 3.0;
             let inferred_small_pickups = ((delta - SMALL_PICKUP_COUNT_TOLERANCE)
@@ -1056,9 +1059,6 @@ impl BoostCalculator {
             return vec![BoostIncreaseReason::SmallPad; inferred_small_pickups];
         }
 
-        if delta > big_pad_floor {
-            return vec![BoostIncreaseReason::BigPad];
-        }
         if boost >= BOOST_MAX_AMOUNT - TOLERANCE {
             return vec![BoostIncreaseReason::AmbiguousPad];
         }
@@ -1159,6 +1159,17 @@ impl BoostCalculator {
                 Some(event),
             );
         } else {
+            if let Some(index) = self
+                .pending_inferred_pickups
+                .iter()
+                .position(|pending_event| {
+                    pending_event.player_id == event.player_id
+                        && pending_event.frame.abs_diff(event.frame)
+                            <= Self::PICKUP_MATCH_FRAME_WINDOW
+                })
+            {
+                self.pending_inferred_pickups.remove(index);
+            }
             self.emit_pickup_comparison_event(BoostPickupComparison::Both, None, Some(event));
         }
     }
@@ -1215,13 +1226,74 @@ impl BoostCalculator {
         }
     }
 
-    fn flush_stale_pickup_comparisons(&mut self, current_frame: usize) {
+    fn inferred_pickup_pad_size(&self, event: &PendingBoostPickupEvent) -> BoostPadSize {
+        match event.pad_type {
+            BoostPickupPadType::Big => BoostPadSize::Big,
+            BoostPickupPadType::Small => BoostPadSize::Small,
+            BoostPickupPadType::Ambiguous => event
+                .player_position
+                .and_then(|position| {
+                    self.guess_pad_size_from_position(
+                        &format!("inferred:{:?}:{}", event.player_id, event.frame),
+                        glam::Vec3::from_array(position),
+                    )
+                })
+                .unwrap_or(BoostPadSize::Big),
+        }
+    }
+
+    fn resolve_inferred_pickup(
+        &mut self,
+        event: PendingBoostPickupEvent,
+        application_frame: &FrameInfo,
+    ) {
+        let Some(boost_before) = event.boost_before else {
+            self.emit_pickup_comparison_event(BoostPickupComparison::Ghost, Some(event), None);
+            return;
+        };
+
+        let pad_size = self.inferred_pickup_pad_size(&event);
+        let player_position = event
+            .player_position
+            .map(glam::Vec3::from_array)
+            .unwrap_or(glam::Vec3::ZERO);
+        let pad_id = format!("inferred:{:?}:{}", event.player_id, event.frame);
+        let field_half = self.resolve_pickup(
+            &pad_id,
+            PendingBoostPickup {
+                frame: application_frame.frame_number,
+                time: application_frame.time,
+                player_id: event.player_id.clone(),
+                is_team_0: event.is_team_0,
+                previous_boost_amount: boost_before,
+                pre_applied_collected_amount: 0.0,
+                pre_applied_pad_size: None,
+                player_position,
+                boost_before: event.boost_before,
+                boost_after: event.boost_after,
+            },
+            pad_size,
+        );
+
+        let mut comparison_event = event;
+        comparison_event.pad_type = pad_size.into();
+        comparison_event.field_half = field_half;
+        self.emit_pickup_comparison_event(
+            BoostPickupComparison::Ghost,
+            Some(comparison_event),
+            None,
+        );
+    }
+
+    fn flush_stale_pickup_comparisons(&mut self, frame: &FrameInfo) {
         while self
             .pending_inferred_pickups
             .front()
-            .is_some_and(|event| event.frame + Self::PICKUP_MATCH_FRAME_WINDOW < current_frame)
+            .is_some_and(|event| event.frame + Self::PICKUP_MATCH_FRAME_WINDOW < frame.frame_number)
         {
-            self.pending_inferred_pickups.pop_front();
+            if let Some(event) = self.pending_inferred_pickups.pop_front() {
+                self.resolve_inferred_pickup(event, frame);
+            }
         }
     }
 
