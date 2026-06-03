@@ -176,7 +176,7 @@ fn header_struct_field_declarations(struct_name: &str) -> Vec<(String, String)> 
 }
 
 fn rust_struct_fields(struct_name: &str) -> Vec<String> {
-    let source = include_str!("lib.rs");
+    let source = include_str!("abi.rs");
     let start = format!("pub struct {struct_name} {{");
     let mut in_struct = false;
     let mut fields = Vec::new();
@@ -218,8 +218,9 @@ fn header_exported_function_names() -> BTreeSet<String> {
 }
 
 fn rust_exported_function_names() -> BTreeSet<String> {
-    include_str!("lib.rs")
-        .lines()
+    [include_str!("ffi.rs"), include_str!("ffi_graph_output.rs")]
+        .into_iter()
+        .flat_map(str::lines)
         .filter_map(|line| {
             let line = line.trim();
             if !line.starts_with("pub ") || !line.contains(" extern \"C\" fn ") {
