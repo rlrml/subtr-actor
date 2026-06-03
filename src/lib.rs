@@ -128,10 +128,15 @@ pub mod processor;
 pub mod replay_meta;
 pub mod replay_plausibility;
 pub mod replay_types;
-pub mod search;
 pub mod stats;
 pub mod ts_bindings;
+pub mod util;
 pub mod vec_map;
+
+pub mod search {
+    //! Compatibility re-exports for directional search helpers.
+    pub use crate::util::{find_in_direction, SearchDirection};
+}
 
 #[cfg(test)]
 mod shared_test;
@@ -152,6 +157,6 @@ pub use crate::processor::*;
 pub use crate::replay_meta::*;
 pub use crate::replay_plausibility::*;
 pub use crate::replay_types::*;
-pub use crate::search::*;
 pub use crate::stats::*;
+pub use crate::util::*;
 pub(crate) use crate::vec_map::*;
