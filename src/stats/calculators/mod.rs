@@ -95,6 +95,8 @@ pub mod fifty_fifty_state;
 pub use fifty_fifty_state::*;
 pub mod flick;
 pub use flick::*;
+pub mod flick_stats;
+pub use flick_stats::*;
 pub mod goal_tags;
 pub use goal_tags::*;
 pub mod half_flip;
@@ -109,6 +111,8 @@ pub mod movement;
 pub use movement::*;
 pub mod musty_flick;
 pub use musty_flick::*;
+pub mod musty_flick_stats;
+pub use musty_flick_stats::*;
 pub mod one_timer;
 pub use one_timer::*;
 pub mod one_timer_stats;
@@ -149,12 +153,16 @@ pub mod wall_aerial;
 pub use wall_aerial::*;
 pub mod wall_aerial_shot;
 pub use wall_aerial_shot::*;
+pub mod wall_aerial_shot_stats;
+pub use wall_aerial_shot_stats::*;
 pub mod wavedash;
 pub use wavedash::*;
 pub mod wavedash_stats;
 pub use wavedash_stats::*;
 pub mod whiff;
 pub use whiff::*;
+pub mod whiff_stats;
+pub use whiff_stats::*;
 
 fn interval_fraction_in_scalar_range(start: f32, end: f32, min_value: f32, max_value: f32) -> f32 {
     if (end - start).abs() <= f32::EPSILON {
