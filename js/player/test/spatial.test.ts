@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 
+import { getReplayHitboxSpec } from "../src/hitboxes";
 import { interpolateQuaternion, updateAttachedCamera } from "../src/player-internals/spatial";
 import type { ReplayModel } from "../src/types";
 import type { ReplayScene } from "../src/scene";
@@ -44,6 +45,7 @@ function buildReplay(): ReplayModel {
           pitch: -4,
           fov: 110,
         },
+        hitbox: getReplayHitboxSpec("octane"),
         frames: [
           {
             position: { x: 0, y: 0, z: 17 },
@@ -63,6 +65,7 @@ function buildReplay(): ReplayModel {
         ],
       },
     ],
+    tickMarks: [],
     timelineEvents: [],
     teamZeroNames: [],
     teamOneNames: [],

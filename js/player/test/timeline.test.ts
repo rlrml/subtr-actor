@@ -26,6 +26,7 @@ function replayWithGameStates(gameStates: number[]): ReplayModel {
     })),
     boostPads: [],
     players: [],
+    tickMarks: [],
     timelineEvents: [],
     teamZeroNames: [],
     teamOneNames: [],

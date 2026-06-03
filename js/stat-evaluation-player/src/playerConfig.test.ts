@@ -43,6 +43,7 @@ const CONFIG: StatsPlayerConfig = {
     followedPlayerHud: true,
     boostPads: false,
     boostPickupAnimation: true,
+    hitboxWireframes: true,
   },
   recording: {
     fps: 60,

@@ -6,6 +6,7 @@ import type { FrameData } from "./FrameData.ts";
 import type { GoalEvent } from "./GoalEvent.ts";
 import type { PlayerStatEvent } from "./PlayerStatEvent.ts";
 import type { ReplayMeta } from "./ReplayMeta.ts";
+import type { ReplayTickMark } from "./ReplayTickMark.ts";
 import type { ResolvedBoostPad } from "./ResolvedBoostPad.ts";
 import type { TouchEvent } from "./TouchEvent.ts";
 
@@ -26,6 +27,7 @@ import type { TouchEvent } from "./TouchEvent.ts";
  * * `dodge_refreshed_events` - Exact counter-derived dodge refresh events from the replay
  * * `player_stat_events` - Exact shot/save/assist counter increment events
  * * `goal_events` - Exact goal explosion events with scorer and cumulative score when available
+ * * `replay_tick_marks` - Replay-authored timeline tick marks/bookmarks
  *
  * # Example
  *
@@ -84,4 +86,8 @@ player_stat_events: Array<PlayerStatEvent>,
 /**
  * Exact goal events observed during the replay
  */
-goal_events: Array<GoalEvent>, };
+goal_events: Array<GoalEvent>,
+/**
+ * Replay-authored tick marks/bookmarks from the replay body
+ */
+replay_tick_marks: Array<ReplayTickMark>, };

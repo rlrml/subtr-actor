@@ -85,6 +85,7 @@ export interface PlayerOverlayConfig {
   readonly followedPlayerHud: boolean;
   readonly boostPads: boolean;
   readonly boostPickupAnimation: boolean;
+  readonly hitboxWireframes: boolean;
 }
 
 export interface RecordingConfig {
@@ -350,6 +351,7 @@ function normalizeOverlayConfig(value: unknown): PlayerOverlayConfig {
     followedPlayerHud: booleanValue(record.followedPlayerHud) ?? false,
     boostPads: booleanValue(record.boostPads) ?? true,
     boostPickupAnimation: booleanValue(record.boostPickupAnimation) ?? false,
+    hitboxWireframes: booleanValue(record.hitboxWireframes) ?? false,
   };
 }
 

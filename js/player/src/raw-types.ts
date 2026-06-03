@@ -12,6 +12,7 @@ import type { PlayerStatEventKind as GeneratedPlayerStatEventKind } from "./gene
 import type { QuaternionTs as GeneratedQuaternionTs } from "./generated/QuaternionTs.ts";
 import type { RemoteIdTs as GeneratedRemoteIdTs } from "./generated/RemoteIdTs.ts";
 import type { ReplayData as GeneratedReplayData } from "./generated/ReplayData.ts";
+import type { ReplayTickMark as GeneratedReplayTickMark } from "./generated/ReplayTickMark.ts";
 import type { ResolvedBoostPad as GeneratedResolvedBoostPad } from "./generated/ResolvedBoostPad.ts";
 import type { RigidBodyTs as GeneratedRigidBodyTs } from "./generated/RigidBodyTs.ts";
 import type { ShotEventMetadata as GeneratedShotEventMetadata } from "./generated/ShotEventMetadata.ts";
@@ -36,4 +37,5 @@ export type RawPlayerStatEvent = GeneratedPlayerStatEvent;
 export type RawShotEventMetadata = GeneratedShotEventMetadata;
 export type RawBoostPadEvent = GeneratedBoostPadEvent;
 export type RawBoostPad = GeneratedResolvedBoostPad;
+export type RawReplayTickMark = GeneratedReplayTickMark;
 export type RawReplayFramesData = GeneratedReplayData;

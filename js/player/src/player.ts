@@ -135,6 +135,7 @@ export class ReplayPlayer extends EventTarget {
   private ballCamEnabled: boolean;
   private boostMeterEnabled: boolean;
   private boostPickupAnimationEnabled: boolean;
+  private hitboxWireframesEnabled: boolean;
   private skipPostGoalTransitionsEnabled: boolean;
   private skipKickoffsEnabled: boolean;
 
@@ -160,8 +161,10 @@ export class ReplayPlayer extends EventTarget {
     this.ballCamEnabled = options.initialBallCamEnabled ?? false;
     this.boostMeterEnabled = options.initialBoostMeterEnabled ?? false;
     this.boostPickupAnimationEnabled = options.initialBoostPickupAnimationEnabled ?? true;
+    this.hitboxWireframesEnabled = options.initialHitboxWireframesEnabled ?? false;
     this.skipPostGoalTransitionsEnabled = options.initialSkipPostGoalTransitionsEnabled ?? true;
     this.skipKickoffsEnabled = options.initialSkipKickoffsEnabled ?? false;
+    this.setHitboxWireframeVisibility();
     this.skipPostGoalTransitionIfNeeded();
     this.skipPastKickoffIfNeeded();
 
@@ -280,6 +283,13 @@ export class ReplayPlayer extends EventTarget {
     this.emitChange();
   }
 
+  setHitboxWireframesEnabled(enabled: boolean): void {
+    this.hitboxWireframesEnabled = enabled;
+    this.setHitboxWireframeVisibility();
+    this.render();
+    this.emitChange();
+  }
+
   setSkipPostGoalTransitionsEnabled(enabled: boolean): void {
     this.skipPostGoalTransitionsEnabled = enabled;
     if (enabled) {
@@ -378,6 +388,10 @@ export class ReplayPlayer extends EventTarget {
     if (nextState.boostPickupAnimationEnabled !== undefined) {
       this.boostPickupAnimationEnabled = nextState.boostPickupAnimationEnabled;
     }
+    if (nextState.hitboxWireframesEnabled !== undefined) {
+      this.hitboxWireframesEnabled = nextState.hitboxWireframesEnabled;
+      this.setHitboxWireframeVisibility();
+    }
     if (nextState.skipPostGoalTransitionsEnabled !== undefined) {
       this.skipPostGoalTransitionsEnabled = nextState.skipPostGoalTransitionsEnabled;
     }
@@ -423,6 +437,7 @@ export class ReplayPlayer extends EventTarget {
       ballCamEnabled: this.ballCamEnabled,
       boostMeterEnabled: this.boostMeterEnabled,
       boostPickupAnimationEnabled: this.boostPickupAnimationEnabled,
+      hitboxWireframesEnabled: this.hitboxWireframesEnabled,
       skipPostGoalTransitionsEnabled: this.skipPostGoalTransitionsEnabled,
       skipKickoffsEnabled: this.skipKickoffsEnabled,
     };
@@ -576,6 +591,12 @@ export class ReplayPlayer extends EventTarget {
   private reanchorPlaybackClock(now = performance.now()): void {
     this.playbackStartedAt = now;
     this.playbackStartedTime = this.currentTime;
+  }
+
+  private setHitboxWireframeVisibility(): void {
+    for (const hitbox of this.sceneState.playerHitboxes.values()) {
+      hitbox.visible = this.hitboxWireframesEnabled;
+    }
   }
 
   private syncPlaybackClock(now = performance.now()): boolean {

@@ -81,6 +81,7 @@ function buildReplayData(frameCount: number, playerCount = 4): RawReplayFramesDa
     demolish_infos: [],
     boost_pad_events: [],
     boost_pads: [],
+    replay_tick_marks: [],
     touch_events: [],
     dodge_refreshed_events: [],
     player_stat_events: [],
@@ -173,6 +174,21 @@ test("normalization progress report cadence is configurable", () => {
   }
 });
 
+test("normalization carries inferred player hitbox metadata", () => {
+  const raw = buildReplayData(2, 2);
+  raw.meta.team_zero[0]!.stats = {
+    Body: { Str: "Dominus" },
+  };
+  raw.meta.team_one[0]!.stats = {
+    LoadoutBody: { Str: "Merc" },
+  };
+
+  const replay = normalizeReplayData(raw);
+
+  assert.equal(replay.players[0]!.hitbox.kind, "dominus");
+  assert.equal(replay.players[1]!.hitbox.kind, "merc");
+});
+
 test("async normalization can yield without a progress callback", async () => {
   let yieldCount = 0;
   const raw = buildReplayData(12);
@@ -186,6 +202,43 @@ test("async normalization can yield without a progress callback", async () => {
 
   assert.deepEqual(replay, normalizeReplayData(raw));
   assert.ok(yieldCount > 1, "expected async normalization to yield headlessly");
+});
+
+test("normalization exposes replay tick marks and timeline bookmark events", () => {
+  const raw = buildReplayData(4, 0);
+  raw.replay_tick_marks = [
+    {
+      description: "Team0Goal",
+      frame: 2,
+      time: 12,
+    },
+  ];
+
+  const replay = normalizeReplayData(raw);
+
+  assert.deepEqual(replay.tickMarks, [
+    {
+      id: "bookmark:2:Team0Goal:0",
+      description: "Team0Goal",
+      frame: 2,
+      time: 2,
+    },
+  ]);
+  assert.deepEqual(
+    replay.timelineEvents.filter((event) => event.kind === "bookmark"),
+    [
+      {
+        id: "bookmark:2:Team0Goal:0",
+        time: 2,
+        seekTime: 2,
+        frame: 2,
+        kind: "bookmark",
+        label: "Team0Goal",
+        shortLabel: "BM",
+        iconName: "bookmark",
+      },
+    ],
+  );
 });
 
 test("normalization keeps PlayStation players with duplicate online ids distinct", () => {

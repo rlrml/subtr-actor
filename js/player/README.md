@@ -64,13 +64,14 @@ The package ships with reusable UI plugins:
   availability markers driven by replay pad events
 - `createTimelineOverlayPlugin()` for a bottom-docked replay scrubber with
   integrated play/pause, time readouts, clickable event markers, configurable replay
-  markers (defaulting to goals/saves), and caller-supplied custom events
+  markers (defaulting to goals/saves/replay bookmarks), and caller-supplied
+  custom events
 
 Timeline markers can be tuned per consumer. For example, to include demolishes:
 
 ```ts
 createTimelineOverlayPlugin({
-  replayEventKinds: ["goal", "save", "demo"],
+  replayEventKinds: ["goal", "save", "bookmark", "demo"],
 });
 ```
 

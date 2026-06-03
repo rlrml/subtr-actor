@@ -5,6 +5,7 @@ import type { ReplayPlayer } from "./player";
 import type { PlaybackBound } from "./generated/PlaybackBound";
 import type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
 import type { PlaylistEndMode } from "./generated/PlaylistEndMode";
+import type { ReplayHitboxSpec } from "./hitboxes";
 
 export type { PlaybackBound } from "./generated/PlaybackBound";
 export type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
@@ -32,6 +33,7 @@ export type {
   RawPlayerInfo,
   RawPlayerStatEvent,
   RawPlayerStatEventKind,
+  RawReplayTickMark,
   RawReplayFramesData,
   RawRigidBody,
   RawRotation,
@@ -111,10 +113,18 @@ export interface ReplayPlayerTrack {
   name: string;
   isTeamZero: boolean;
   cameraSettings: CameraSettings;
+  hitbox: ReplayHitboxSpec;
   frames: PlayerSample[];
 }
 
 export type ReplayTimelineEventKind = "goal" | "shot" | "save" | "assist" | "demo" | (string & {});
+
+export interface ReplayTickMark {
+  id?: string;
+  description: string;
+  frame: number | null;
+  time: number;
+}
 
 export interface ReplayTimelineEvent {
   id?: string;
@@ -186,6 +196,7 @@ export interface ReplayModel {
   ballFrames: BallSample[];
   boostPads: ReplayBoostPad[];
   players: ReplayPlayerTrack[];
+  tickMarks: ReplayTickMark[];
   timelineEvents: ReplayTimelineEvent[];
   teamZeroNames: string[];
   teamOneNames: string[];
@@ -391,6 +402,7 @@ export interface ReplayPlayerOptions {
   initialBallCamEnabled?: boolean;
   initialBoostMeterEnabled?: boolean;
   initialBoostPickupAnimationEnabled?: boolean;
+  initialHitboxWireframesEnabled?: boolean;
   initialPlaybackRate?: number;
   initialSkipPostGoalTransitionsEnabled?: boolean;
   initialSkipKickoffsEnabled?: boolean;
@@ -419,6 +431,7 @@ export interface ReplayPlayerState {
   ballCamEnabled: boolean;
   boostMeterEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
+  hitboxWireframesEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
@@ -449,6 +462,7 @@ export interface ReplayPlaylistPlayerState {
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
+  hitboxWireframesEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
@@ -469,6 +483,7 @@ export type ReplayPlayerStatePatch = Partial<
     | "ballCamEnabled"
     | "boostMeterEnabled"
     | "boostPickupAnimationEnabled"
+    | "hitboxWireframesEnabled"
     | "skipPostGoalTransitionsEnabled"
     | "skipKickoffsEnabled"
   >
