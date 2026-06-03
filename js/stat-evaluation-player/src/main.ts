@@ -52,6 +52,10 @@ import {
   type ModuleControlsController,
 } from "./moduleControls.ts";
 import {
+  createFloatingWindowController,
+  type FloatingWindowController,
+} from "./floatingWindows.ts";
+import {
   createEventPlaylistWindowController,
   type EventPlaylistWindowController,
   type SyncEventPlaylistTimelineOptions,
@@ -81,14 +85,11 @@ import {
   getStatsPlayerConfigParamSnapshot,
   getStatsPlayerConfigFromLocation,
   isStatsPlayerConfigDebugEnabled,
-  mapWindowPlacementToViewport,
   setStatsPlayerConfigOnUrl,
   STATS_PLAYER_CONFIG_VERSION,
-  type ConfigViewportSize,
   type PlayerCameraConfig,
   type PlayerPlaybackConfig,
   type RecordingConfig,
-  type SingletonWindowConfig,
   type SingletonWindowId,
   type StatsPlayerConfig,
   type StatsPlayerConfigParamSnapshot,
@@ -209,7 +210,7 @@ let eventPlaylistController: EventPlaylistWindowController | null = null;
 let eventTimelineControlsController: EventTimelineControlsController | null = null;
 let moduleControlsController: ModuleControlsController | null = null;
 let mechanicsReviewController: MechanicsReviewWindowController | null = null;
-let nextWindowZIndex = 30;
+let floatingWindowController: FloatingWindowController | null = null;
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
@@ -221,19 +222,6 @@ interface ReplayInputSource {
   preparingStatus: string;
   readBytes(): Promise<Uint8Array>;
 }
-
-const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
-  "camera",
-  "scoreboard",
-  "playback",
-  "recording",
-  "mechanics",
-  "event-playlist",
-  "mechanics-review",
-  "replay-loading",
-  "boost-pickups",
-  "touch-controls",
-];
 
 function getActiveModuleIds(): Set<string> {
   return new Set([
@@ -462,61 +450,19 @@ function getElementWindowId(element: HTMLElement): string | null {
   return element.closest<HTMLElement>("[data-window-id]")?.dataset.windowId ?? null;
 }
 
-function getCurrentViewportSize(): ConfigViewportSize {
-  return {
-    width: Math.max(1, window.innerWidth),
-    height: Math.max(1, window.innerHeight),
-  };
-}
-
-function readWindowCoordinate(windowEl: HTMLElement, propertyName: string): number {
-  const inlineValue = windowEl.style.getPropertyValue(propertyName).trim();
-  const computedValue = getComputedStyle(windowEl).getPropertyValue(propertyName).trim();
-  const rawValue = inlineValue || computedValue;
-  const parsed = Number.parseFloat(rawValue);
-  if (Number.isFinite(parsed)) {
-    return parsed;
-  }
-
-  const rect = windowEl.getBoundingClientRect();
-  return propertyName === "--window-y" ? rect.top : rect.left;
-}
-
 function readWindowPlacement(windowEl: HTMLElement): WindowPlacementConfig {
-  const zIndex = Number.parseInt(windowEl.style.zIndex, 10);
-  return {
-    x: readWindowCoordinate(windowEl, "--window-x"),
-    y: readWindowCoordinate(windowEl, "--window-y"),
-    viewport: getCurrentViewportSize(),
-    zIndex: Number.isFinite(zIndex) ? zIndex : undefined,
-    visible: !windowEl.hidden,
-  };
+  if (!floatingWindowController) {
+    throw new Error("Floating windows are not initialized.");
+  }
+  return floatingWindowController.readPlacement(windowEl);
 }
 
 function applyWindowPlacement(windowEl: HTMLElement, placement: WindowPlacementConfig): void {
-  const mapped = mapWindowPlacementToViewport(placement, getCurrentViewportSize());
-  windowEl.style.setProperty("--window-x", `${mapped.x}px`);
-  windowEl.style.setProperty("--window-y", `${mapped.y}px`);
-  windowEl.hidden = !placement.visible;
-  if (placement.zIndex !== undefined) {
-    windowEl.style.zIndex = `${placement.zIndex}`;
-    nextWindowZIndex = Math.max(nextWindowZIndex, placement.zIndex + 1);
-  }
+  floatingWindowController?.applyPlacement(windowEl, placement);
 }
 
-function getSingletonWindowConfigs(): SingletonWindowConfig[] {
-  const configs: SingletonWindowConfig[] = [];
-  const root = appRoot ?? document;
-  for (const id of SINGLETON_WINDOW_IDS) {
-    const element = root.querySelector<HTMLElement>(`[data-window-id="${id}"]`);
-    if (element) {
-      configs.push({
-        id,
-        placement: readWindowPlacement(element),
-      });
-    }
-  }
-  return configs;
+function getSingletonWindowConfigs() {
+  return floatingWindowController?.getSingletonConfigs() ?? [];
 }
 
 function getConfigAdapters(): StatsPlayerConfigAdapter[] {
@@ -682,13 +628,7 @@ function logStatsPlayerConfigLoadDebug(
 }
 
 function applyConfigToExistingWindows(config: StatsPlayerConfig): void {
-  const root = appRoot ?? document;
-  for (const windowConfig of config.singletonWindows) {
-    const element = root.querySelector<HTMLElement>(`[data-window-id="${windowConfig.id}"]`);
-    if (element) {
-      applyWindowPlacement(element, windowConfig.placement);
-    }
-  }
+  floatingWindowController?.applySingletonConfigs(config.singletonWindows);
 }
 
 function applyConfigToStaticControls(config: StatsPlayerConfig): void {
@@ -826,29 +766,19 @@ function applyConfigToReplayPlayer(config: StatsPlayerConfig): void {
 }
 
 function bringWindowToFront(windowEl: HTMLElement): void {
-  windowEl.style.zIndex = `${nextWindowZIndex++}`;
+  floatingWindowController?.bringToFront(windowEl);
 }
 
 function showWindow(id: SingletonWindowId): void {
-  const windowEl = mustElement<HTMLElement>(appRoot ?? document, `[data-window-id="${id}"]`);
-  windowEl.hidden = false;
-  bringWindowToFront(windowEl);
-  scheduleConfigUrlUpdate();
+  floatingWindowController?.show(id);
 }
 
 function toggleWindow(id: SingletonWindowId): void {
-  const windowEl = mustElement<HTMLElement>(appRoot ?? document, `[data-window-id="${id}"]`);
-  windowEl.hidden = !windowEl.hidden;
-  if (!windowEl.hidden) {
-    bringWindowToFront(windowEl);
-  }
-  scheduleConfigUrlUpdate();
+  floatingWindowController?.toggle(id);
 }
 
 function hideWindow(id: string): void {
-  const windowEl = mustElement<HTMLElement>(appRoot ?? document, `[data-window-id="${id}"]`);
-  windowEl.hidden = true;
-  scheduleConfigUrlUpdate();
+  floatingWindowController?.hide(id);
 }
 
 function setLauncherOpen(open: boolean): void {
@@ -862,62 +792,8 @@ function openReplayFilePicker(): void {
   setLauncherOpen(false);
 }
 
-function isInteractiveDragTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    Boolean(target.closest("button, input, select, textarea, option, label, a, [data-no-drag]"))
-  );
-}
-
 function installWindowDragging(root: HTMLElement, signal: AbortSignal): void {
-  root.addEventListener(
-    "pointerdown",
-    (event) => {
-      if (!(event.target instanceof HTMLElement) || isInteractiveDragTarget(event.target)) {
-        return;
-      }
-
-      const windowEl = event.target.closest<HTMLElement>("[data-window-id]");
-      if (!windowEl || windowEl.hidden) {
-        return;
-      }
-
-      bringWindowToFront(windowEl);
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const rect = windowEl.getBoundingClientRect();
-      const pointerId = event.pointerId;
-
-      windowEl.setPointerCapture(pointerId);
-      event.preventDefault();
-
-      const onPointerMove = (moveEvent: PointerEvent) => {
-        const nextX = Math.max(
-          8,
-          Math.min(window.innerWidth - 120, rect.left + moveEvent.clientX - startX),
-        );
-        const nextY = Math.max(
-          8,
-          Math.min(window.innerHeight - 100, rect.top + moveEvent.clientY - startY),
-        );
-        windowEl.style.setProperty("--window-x", `${nextX}px`);
-        windowEl.style.setProperty("--window-y", `${nextY}px`);
-      };
-
-      const onPointerUp = () => {
-        windowEl.releasePointerCapture(pointerId);
-        windowEl.removeEventListener("pointermove", onPointerMove);
-        windowEl.removeEventListener("pointerup", onPointerUp);
-        windowEl.removeEventListener("pointercancel", onPointerUp);
-        scheduleConfigUrlUpdate();
-      };
-
-      windowEl.addEventListener("pointermove", onPointerMove);
-      windowEl.addEventListener("pointerup", onPointerUp);
-      windowEl.addEventListener("pointercancel", onPointerUp);
-    },
-    { signal },
-  );
+  floatingWindowController?.installDragging(root, signal);
 }
 
 function renderModuleSummary(): void {
@@ -1284,6 +1160,10 @@ export function mountStatEvaluationPlayer(
   root.innerHTML = getAppTemplate(DEFAULT_CAMERA_DISTANCE_SCALE);
   appRoot = root;
   replayLoadModal = createReplayLoadModal(root);
+  floatingWindowController = createFloatingWindowController({
+    getRoot: () => appRoot ?? document,
+    requestConfigSync: scheduleConfigUrlUpdate,
+  });
 
   fileInput = mustElement<HTMLInputElement>(root, "#replay-file");
   viewport = mustElement<HTMLDivElement>(root, "#viewport");
@@ -1585,7 +1465,8 @@ export function mountStatEvaluationPlayer(
       configUrlUpdateTimer = null;
     }
     isApplyingConfig = false;
-    nextWindowZIndex = 30;
+    floatingWindowController?.reset();
+    floatingWindowController = null;
     removeRenderHook = null;
     if (appRoot === root) {
       appRoot = null;
