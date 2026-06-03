@@ -1,4 +1,5 @@
 #![allow(clippy::result_large_err)]
+#![allow(clippy::missing_safety_doc)]
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ffi::{CStr, CString};
@@ -157,6 +158,7 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "boost_pickups",
     "boost_ledger",
     "boost_state",
+    "boost_stats",
     "bump",
     "touch",
     "touch_last_touch",

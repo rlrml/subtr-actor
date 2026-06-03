@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use subtr_actor::stats::analysis_graph::StatsProjectionState;
 use subtr_actor::*;
 
 const TEST_BOOST_ZERO_BAND_RAW: f32 = 1.0;
@@ -978,4 +979,3 @@ fn assert_speed_flip_derived_stats_match(
         expected.cumulative_quality,
     );
 }
-

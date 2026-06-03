@@ -216,6 +216,17 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
     assert!(
         (ledger_sum(BoostLedgerTransactionKind::Used) - player_stats.amount_used).abs() < 0.001
     );
+
+    let mut reconstructed = BoostStatsAccumulator::new();
+    for event in calculator.stats_events() {
+        reconstructed.apply_event(event);
+    }
+    assert_eq!(reconstructed.player_stats(), calculator.player_stats());
+    assert_eq!(
+        reconstructed.team_zero_stats(),
+        calculator.team_zero_stats()
+    );
+    assert_eq!(reconstructed.team_one_stats(), calculator.team_one_stats());
 }
 
 #[test]

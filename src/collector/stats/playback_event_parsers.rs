@@ -64,6 +64,7 @@ pub(in crate::collector::stats::playback) fn parse_possession_event(
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         active: json_required_bool(object, "active")?,
+        duration: json_required_f32(object, "duration")?,
         possession_state: json_required_str(object, "possession_state")?.to_owned(),
         field_third: match object.get("field_third") {
             None | Some(Value::Null) => None,
@@ -80,6 +81,7 @@ pub(in crate::collector::stats::playback) fn parse_pressure_event(
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         active: json_required_bool(object, "active")?,
+        duration: json_required_f32(object, "duration")?,
         field_half: json_required_str(object, "field_half")?.to_owned(),
     })
 }
@@ -166,6 +168,17 @@ pub(in crate::collector::stats::playback) fn parse_rotation_player_event(
         player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         active: json_required_bool(object, "active")?,
+        active_game_time: json_required_f32(object, "active_game_time")?,
+        tracked_time: json_required_f32(object, "tracked_time")?,
+        time_first_man: json_required_f32(object, "time_first_man")?,
+        time_second_man: json_required_f32(object, "time_second_man")?,
+        time_third_man: json_required_f32(object, "time_third_man")?,
+        time_ambiguous_role: json_required_f32(object, "time_ambiguous_role")?,
+        time_behind_play: json_required_f32(object, "time_behind_play")?,
+        time_level_with_play: json_required_f32(object, "time_level_with_play")?,
+        time_ahead_of_play: json_required_f32(object, "time_ahead_of_play")?,
+        longest_first_man_stint_time: json_required_f32(object, "longest_first_man_stint_time")?,
+        first_man_stint_count: json_required_usize(object, "first_man_stint_count")? as u32,
         became_first_man_count: json_required_usize(object, "became_first_man_count")? as u32,
         lost_first_man_count: json_required_usize(object, "lost_first_man_count")? as u32,
         current_role_state: decode_json_value(
@@ -959,5 +972,18 @@ pub(in crate::collector::stats::playback) fn parse_boost_state_event(
         is_team_0: json_required_bool(object, "is_team_0")?,
         boost_amount: json_required_f32(object, "boost_amount")?,
         boost_before: json_optional_f32(object.get("boost_before"))?,
+    })
+}
+
+pub(in crate::collector::stats::playback) fn parse_boost_stats_event(
+    value: &Value,
+) -> SubtrActorResult<BoostStatsEvent> {
+    let object = json_object(value, "boost stats event")?;
+    Ok(BoostStatsEvent {
+        frame: json_required_usize(object, "frame")?,
+        time: json_required_f32(object, "time")?,
+        player_id: json_required_remote_id(object, "player_id")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        delta: decode_json_value(json_required_value(object, "delta")?.clone())?,
     })
 }

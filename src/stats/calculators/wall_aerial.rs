@@ -113,50 +113,6 @@ pub struct WallAerialEvent {
     pub confidence: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct WallAerialStats {
-    pub count: u32,
-    pub high_confidence_count: u32,
-    pub is_last_wall_aerial: bool,
-    pub last_wall_aerial_time: Option<f32>,
-    pub last_wall_aerial_frame: Option<usize>,
-    pub time_since_last_wall_aerial: Option<f32>,
-    pub frames_since_last_wall_aerial: Option<usize>,
-    pub last_confidence: Option<f32>,
-    pub best_confidence: f32,
-    pub cumulative_confidence: f32,
-    pub cumulative_setup_duration: f32,
-    pub cumulative_takeoff_to_touch_time: f32,
-    pub cumulative_touch_height: f32,
-}
-
-impl WallAerialStats {
-    fn average(&self, value: f32) -> f32 {
-        if self.count == 0 {
-            0.0
-        } else {
-            value / self.count as f32
-        }
-    }
-
-    pub fn average_confidence(&self) -> f32 {
-        self.average(self.cumulative_confidence)
-    }
-
-    pub fn average_setup_duration(&self) -> f32 {
-        self.average(self.cumulative_setup_duration)
-    }
-
-    pub fn average_takeoff_to_touch_time(&self) -> f32 {
-        self.average(self.cumulative_takeoff_to_touch_time)
-    }
-
-    pub fn average_touch_height(&self) -> f32 {
-        self.average(self.cumulative_touch_height)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct WallControl {
     player_position: glam::Vec3,
@@ -213,14 +169,12 @@ struct ArmedWallAerial {
 
 #[derive(Debug, Clone, Default)]
 pub struct WallAerialCalculator {
-    player_stats: HashMap<PlayerId, WallAerialStats>,
-    events: Vec<WallAerialEvent>,
+    events: EventStream<WallAerialEvent>,
     active_wall_controls: HashMap<PlayerId, ActiveWallControl>,
     recent_wall_contacts: HashMap<PlayerId, RecentWallContact>,
     armed_aerials: HashMap<PlayerId, ArmedWallAerial>,
     recent_event_times: HashMap<PlayerId, f32>,
     previous_ball_velocity: Option<glam::Vec3>,
-    current_last_wall_aerial_player: Option<PlayerId>,
 }
 
 impl WallAerialCalculator {
@@ -228,24 +182,12 @@ impl WallAerialCalculator {
         Self::default()
     }
 
-    pub fn player_stats(&self) -> &HashMap<PlayerId, WallAerialStats> {
-        &self.player_stats
-    }
-
     pub fn events(&self) -> &[WallAerialEvent] {
-        &self.events
+        self.events.all()
     }
 
-    fn begin_sample(&mut self, frame: &FrameInfo) {
-        for stats in self.player_stats.values_mut() {
-            stats.is_last_wall_aerial = false;
-            stats.time_since_last_wall_aerial = stats
-                .last_wall_aerial_time
-                .map(|time| (frame.time - time).max(0.0));
-            stats.frames_since_last_wall_aerial = stats
-                .last_wall_aerial_frame
-                .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
-        }
+    pub fn new_events(&self) -> &[WallAerialEvent] {
+        self.events.new_events()
     }
 
     fn control_observation(
@@ -529,24 +471,6 @@ impl WallAerialCalculator {
     fn record_event(&mut self, frame: &FrameInfo, mut event: WallAerialEvent) {
         event.sample_time = frame.time;
         event.sample_frame = frame.frame_number;
-        let stats = self.player_stats.entry(event.player.clone()).or_default();
-        stats.count += 1;
-        if event.confidence >= WALL_AERIAL_HIGH_CONFIDENCE {
-            stats.high_confidence_count += 1;
-        }
-        stats.is_last_wall_aerial = true;
-        stats.last_wall_aerial_time = Some(event.time);
-        stats.last_wall_aerial_frame = Some(event.frame);
-        stats.time_since_last_wall_aerial = Some((frame.time - event.time).max(0.0));
-        stats.frames_since_last_wall_aerial = Some(frame.frame_number.saturating_sub(event.frame));
-        stats.last_confidence = Some(event.confidence);
-        stats.best_confidence = stats.best_confidence.max(event.confidence);
-        stats.cumulative_confidence += event.confidence;
-        stats.cumulative_setup_duration += event.setup_duration;
-        stats.cumulative_takeoff_to_touch_time += event.time_since_takeoff;
-        stats.cumulative_touch_height += event.player_position[2];
-
-        self.current_last_wall_aerial_player = Some(event.player.clone());
         self.recent_event_times
             .insert(event.player.clone(), event.time);
         self.events.push(event);
@@ -560,14 +484,13 @@ impl WallAerialCalculator {
         touch_state: &TouchState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
-        self.begin_sample(frame);
+        self.events.begin_update();
         if !live_play {
             self.active_wall_controls.clear();
             self.recent_wall_contacts.clear();
             self.armed_aerials.clear();
             self.recent_event_times.clear();
             self.previous_ball_velocity = ball.velocity();
-            self.current_last_wall_aerial_player = None;
             return Ok(());
         }
 
@@ -590,11 +513,6 @@ impl WallAerialCalculator {
         }
 
         self.previous_ball_velocity = ball.velocity();
-        if let Some(player_id) = self.current_last_wall_aerial_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_wall_aerial = true;
-            }
-        }
 
         Ok(())
     }

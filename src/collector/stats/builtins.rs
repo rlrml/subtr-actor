@@ -4,17 +4,13 @@ use serde::Serialize;
 use serde_json::{json, Map, Value};
 
 use crate::stats::analysis_graph::{
-    builtin_analysis_node_names, AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
+    builtin_analysis_node_names, AnalysisGraph, StatsProjectionState, StatsTimelineEventsState,
+    StatsTimelineFrameState,
 };
 use crate::*;
 use boxcars::{Quaternion, RigidBody, Vector3f};
 
 use super::types::serialize_to_json_value;
-
-#[path = "builtins_analysis.rs"]
-mod builtins_analysis;
-pub use builtins_analysis::{builtin_analysis_node_json, builtin_analysis_nodes_json};
-pub(crate) use builtins_analysis::{builtin_snapshot_config_json, builtin_snapshot_frame_json};
 
 fn player_stats_entries<'a, T>(
     player_stats: &'a HashMap<PlayerId, T>,
@@ -440,6 +436,13 @@ fn graph_state<'a, T: 'static>(
     })
 }
 
+fn projected_stats<'a>(
+    graph: &'a AnalysisGraph,
+    module_name: &str,
+) -> SubtrActorResult<&'a StatsProjectionState> {
+    graph_state::<StatsProjectionState>(graph, module_name)
+}
+
 pub(crate) fn builtin_module_json(
     module_name: &str,
     graph: &AnalysisGraph,
@@ -447,88 +450,98 @@ pub(crate) fn builtin_module_json(
     match module_name {
         "core" => {
             let calculator = graph_state::<MatchStatsCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&CoreStatsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.core.team_zero_stats(),
+                team_one: projection.core.team_one_stats(),
+                player_stats: player_stats_entries(projection.core.player_stats()),
                 timeline: calculator.timeline(),
                 goal_context: calculator.goal_context_events(),
                 player_events: calculator.core_player_events(),
-                team_events: calculator.core_team_events(),
+                team_events: &projection.core_team_events,
             })
         }
         "backboard" => {
             let calculator = graph_state::<BackboardCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.backboard.team_zero_stats(),
+                team_one: projection.backboard.team_one_stats(),
+                player_stats: player_stats_entries(projection.backboard.player_stats()),
                 events: calculator.events(),
             })
         }
         "ceiling_shot" => {
             let calculator = graph_state::<CeilingShotCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.ceiling_shot.player_stats()),
                 events: calculator.events(),
             })
         }
         "wall_aerial" => {
             let calculator = graph_state::<WallAerialCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.wall_aerial.player_stats()),
                 events: calculator.events(),
             })
         }
         "wall_aerial_shot" => {
             let calculator = graph_state::<WallAerialShotCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.wall_aerial_shot.player_stats()),
                 events: calculator.events(),
             })
         }
         "center" => {
             let calculator = graph_state::<CenterCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.center.team_zero_stats(),
+                team_one: projection.center.team_one_stats(),
+                player_stats: player_stats_entries(projection.center.player_stats()),
                 events: calculator.events(),
             })
         }
         "double_tap" => {
             let calculator = graph_state::<DoubleTapCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.double_tap.team_zero_stats(),
+                team_one: projection.double_tap.team_one_stats(),
+                player_stats: player_stats_entries(projection.double_tap.player_stats()),
                 events: calculator.events(),
             })
         }
         "one_timer" => {
             let calculator = graph_state::<OneTimerCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.one_timer.team_zero_stats(),
+                team_one: projection.one_timer.team_one_stats(),
+                player_stats: player_stats_entries(projection.one_timer.player_stats()),
                 events: calculator.events(),
             })
         }
         "half_volley" => {
             let calculator = graph_state::<HalfVolleyCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.half_volley.team_zero_stats(),
+                team_one: projection.half_volley.team_one_stats(),
+                player_stats: player_stats_entries(projection.half_volley.player_stats()),
                 events: calculator.events(),
             })
         }
         "pass" => {
             let calculator = graph_state::<PassCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.pass.team_zero_stats(),
+                team_one: projection.pass.team_one_stats(),
+                player_stats: player_stats_entries(projection.pass.player_stats()),
                 events: calculator.events(),
             })
         }
@@ -612,54 +625,62 @@ pub(crate) fn builtin_module_json(
         }
         "fifty_fifty" => {
             let calculator = graph_state::<FiftyFiftyCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsWithPlayerEventsExport {
-                stats: calculator.stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                stats: projection.fifty_fifty.stats(),
+                player_stats: player_stats_entries(projection.fifty_fifty.player_stats()),
                 events: calculator.events(),
             })
         }
         "possession" => {
             let calculator = graph_state::<PossessionCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsWithEventsExport {
-                stats: calculator.stats(),
+                stats: projection.possession.stats(),
                 events: calculator.events(),
             })
         }
         "pressure" => {
             let calculator = graph_state::<PressureCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsWithEventsExport {
-                stats: calculator.stats(),
+                stats: projection.pressure.stats(),
                 events: calculator.events(),
             })
         }
         "territorial_pressure" => {
             let calculator = graph_state::<TerritorialPressureCalculator>(graph, module_name)?;
-            serialize_to_json_value(&StatsWithEventsExport {
-                stats: calculator.stats(),
-                events: calculator.events(),
-            })
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&serde_json::json!({
+                "stats": projection.territorial_pressure.stats(),
+                "events": calculator.events(),
+                "stats_events": calculator.stats_events(),
+            }))
         }
         "rotation" => {
             let calculator = graph_state::<RotationCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&serde_json::json!({
-                "team_zero": calculator.team_zero_stats(),
-                "team_one": calculator.team_one_stats(),
-                "player_stats": player_stats_entries(calculator.player_stats()),
+                "team_zero": projection.rotation.team_zero_stats(),
+                "team_one": projection.rotation.team_one_stats(),
+                "player_stats": player_stats_entries(projection.rotation.player_stats()),
                 "player_events": calculator.player_events(),
                 "team_events": calculator.team_events(),
             }))
         }
         "rush" => {
             let calculator = graph_state::<RushCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsWithEventsExport {
-                stats: calculator.stats(),
+                stats: projection.rush.stats(),
                 events: calculator.events(),
             })
         }
         "touch" => {
             let calculator = graph_state::<TouchCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&serde_json::json!({
-                "player_stats": player_stats_entries(calculator.player_stats()),
+                "player_stats": player_stats_entries(projection.touch.player_stats()),
                 "events": calculator.events(),
                 "ball_movement_events": calculator.ball_movement_events(),
                 "last_touch_events": calculator.last_touch_events(),
@@ -667,128 +688,146 @@ pub(crate) fn builtin_module_json(
         }
         "whiff" => {
             let calculator = graph_state::<WhiffCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.whiff.player_stats()),
                 events: calculator.events(),
             })
         }
         "wavedash" => {
             let calculator = graph_state::<WavedashCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.wavedash.player_stats()),
                 events: calculator.events(),
             })
         }
         "speed_flip" => {
             let calculator = graph_state::<SpeedFlipCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.speed_flip.player_stats()),
                 events: calculator.events(),
             })
         }
         "half_flip" => {
             let calculator = graph_state::<HalfFlipCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.half_flip.player_stats()),
                 events: calculator.events(),
             })
         }
         "flick" => {
             let calculator = graph_state::<FlickCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.flick.player_stats()),
                 events: calculator.events(),
             })
         }
         "musty_flick" => {
             let calculator = graph_state::<MustyFlickCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.musty_flick.player_stats()),
                 events: calculator.events(),
             })
         }
         "dodge_reset" => {
             let calculator = graph_state::<DodgeResetCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&serde_json::json!({
-                "player_stats": player_stats_entries(calculator.player_stats()),
+                "player_stats": player_stats_entries(projection.dodge_reset.player_stats()),
                 "events": calculator.events(),
                 "on_ball_events": calculator.on_ball_events(),
             }))
         }
         "ball_carry" => {
             let calculator = graph_state::<BallCarryCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.ball_carry.team_zero_stats(),
+                team_one: projection.ball_carry.team_one_stats(),
+                player_stats: player_stats_entries(projection.ball_carry.player_stats()),
                 events: calculator.carry_events(),
             })
         }
         "air_dribble" => {
             let calculator = graph_state::<BallCarryCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             let events = calculator
                 .carry_events()
                 .iter()
                 .filter(|event| event.kind == BallCarryKind::AirDribble)
                 .collect::<Vec<_>>();
             serialize_to_json_value(&TeamPlayerStatsWithCollectedEventsExport {
-                team_zero: calculator.team_zero_air_dribble_stats(),
-                team_one: calculator.team_one_air_dribble_stats(),
-                player_stats: player_stats_entries(calculator.player_air_dribble_stats()),
+                team_zero: projection.ball_carry.team_zero_air_dribble_stats(),
+                team_one: projection.ball_carry.team_one_air_dribble_stats(),
+                player_stats: player_stats_entries(
+                    projection.ball_carry.player_air_dribble_stats(),
+                ),
                 events,
             })
         }
         "boost" => {
             let calculator = graph_state::<BoostCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&serde_json::json!({
-                "team_zero": calculator.team_zero_stats(),
-                "team_one": calculator.team_one_stats(),
-                "player_stats": player_stats_entries(calculator.player_stats()),
+                "team_zero": projection.boost.team_zero_stats(),
+                "team_one": projection.boost.team_one_stats(),
+                "player_stats": player_stats_entries(projection.boost.player_stats()),
                 "events": calculator.pickup_comparison_events(),
                 "ledger_events": calculator.ledger_events(),
                 "state_events": calculator.state_events(),
+                "stats_events": calculator.stats_events(),
             }))
         }
         "bump" => {
             let calculator = graph_state::<BumpCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.bump.team_zero_stats(),
+                team_one: projection.bump.team_one_stats(),
+                player_stats: player_stats_entries(projection.bump.player_stats()),
                 events: calculator.events(),
             })
         }
         "movement" => {
             let calculator = graph_state::<MovementCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.movement.team_zero_stats(),
+                team_one: projection.movement.team_one_stats(),
+                player_stats: player_stats_entries(projection.movement.player_stats()),
                 events: calculator.events(),
             })
         }
         "positioning" => {
             let calculator = graph_state::<PositioningCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(calculator.player_stats()),
+                player_stats: player_stats_entries(projection.positioning.player_stats()),
                 events: calculator.events(),
             })
         }
         "powerslide" => {
             let calculator = graph_state::<PowerslideCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.powerslide.team_zero_stats(),
+                team_one: projection.powerslide.team_one_stats(),
+                player_stats: player_stats_entries(projection.powerslide.player_stats()),
                 events: calculator.events(),
             })
         }
         "demo" => {
             let calculator = graph_state::<DemoCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&DemoStatsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.demo.team_zero_stats(),
+                team_one: projection.demo.team_one_stats(),
+                player_stats: player_stats_entries(projection.demo.player_stats()),
                 timeline: calculator.timeline(),
             })
         }
@@ -818,4 +857,742 @@ pub fn builtin_stats_module_config_json(
     graph: &AnalysisGraph,
 ) -> SubtrActorResult<Value> {
     Ok(builtin_snapshot_config_json(module_name, graph)?.unwrap_or(Value::Null))
+}
+
+fn vec3_json(value: &Vector3f) -> Value {
+    json!({
+        "x": value.x,
+        "y": value.y,
+        "z": value.z,
+    })
+}
+
+fn quat_json(value: &Quaternion) -> Value {
+    json!({
+        "x": value.x,
+        "y": value.y,
+        "z": value.z,
+        "w": value.w,
+    })
+}
+
+fn rigid_body_json(value: &RigidBody) -> Value {
+    json!({
+        "location": vec3_json(&value.location),
+        "rotation": quat_json(&value.rotation),
+        "sleeping": value.sleeping,
+        "linear_velocity": value.linear_velocity.as_ref().map(vec3_json),
+        "angular_velocity": value.angular_velocity.as_ref().map(vec3_json),
+    })
+}
+
+fn ball_frame_state_json(state: &BallFrameState) -> Value {
+    match state {
+        BallFrameState::Missing => json!({
+            "kind": "Missing",
+            "ball": Value::Null,
+        }),
+        BallFrameState::Present(ball) => json!({
+            "kind": "Present",
+            "ball": ball_sample_json(ball),
+        }),
+    }
+}
+
+fn ball_sample_json(sample: &BallSample) -> Value {
+    json!({
+        "rigid_body": rigid_body_json(&sample.rigid_body),
+    })
+}
+
+fn player_sample_json(sample: &PlayerSample) -> Value {
+    json!({
+        "player_id": sample.player_id,
+        "is_team_0": sample.is_team_0,
+        "rigid_body": sample.rigid_body.as_ref().map(rigid_body_json),
+        "boost_amount": sample.boost_amount,
+        "last_boost_amount": sample.last_boost_amount,
+        "boost_active": sample.boost_active,
+        "dodge_active": sample.dodge_active,
+        "powerslide_active": sample.powerslide_active,
+        "match_goals": sample.match_goals,
+        "match_assists": sample.match_assists,
+        "match_saves": sample.match_saves,
+        "match_shots": sample.match_shots,
+        "match_score": sample.match_score,
+    })
+}
+
+fn demo_event_sample_json(sample: &DemoEventSample) -> Value {
+    json!({
+        "attacker": sample.attacker,
+        "victim": sample.victim,
+    })
+}
+
+fn vertical_band_label(band: PlayerVerticalBand) -> &'static str {
+    match band {
+        PlayerVerticalBand::Ground => "ground",
+        PlayerVerticalBand::LowAir => "low_air",
+        PlayerVerticalBand::HighAir => "high_air",
+    }
+}
+
+fn player_vertical_state_json(state: &PlayerVerticalState) -> Value {
+    let mut players = state
+        .players
+        .iter()
+        .map(|(player_id, sample)| {
+            json!({
+                "player_id": player_id,
+                "height": sample.height,
+                "band": vertical_band_label(sample.band),
+            })
+        })
+        .collect::<Vec<_>>();
+    players.sort_by_key(|value| value["player_id"].to_string());
+    json!({ "players": players })
+}
+
+fn settings_json(calculator: &SettingsCalculator) -> Value {
+    let mut player_settings = calculator
+        .player_settings()
+        .iter()
+        .map(|(player_id, settings)| {
+            json!({
+                "player_id": player_id,
+                "settings": {
+                    "steering_sensitivity": settings.steering_sensitivity,
+                    "camera_fov": settings.camera_fov,
+                    "camera_height": settings.camera_height,
+                    "camera_pitch": settings.camera_pitch,
+                    "camera_distance": settings.camera_distance,
+                    "camera_stiffness": settings.camera_stiffness,
+                    "camera_swivel_speed": settings.camera_swivel_speed,
+                    "camera_transition_speed": settings.camera_transition_speed,
+                },
+            })
+        })
+        .collect::<Vec<_>>();
+    player_settings.sort_by_key(|value| value["player_id"].to_string());
+    json!({ "player_settings": player_settings })
+}
+
+pub fn builtin_analysis_node_json(
+    node_name: &str,
+    graph: &AnalysisGraph,
+) -> SubtrActorResult<Value> {
+    let value = match node_name {
+        "core" | "match_stats" => builtin_module_json("core", graph)?,
+        "stats_timeline_events" => serialize_to_json_value(
+            &graph_state::<StatsTimelineEventsState>(graph, node_name)?.events,
+        )?,
+        "stats_timeline_frame" => graph_state::<StatsTimelineFrameState>(graph, node_name)?
+            .frame
+            .as_ref()
+            .map(serialize_to_json_value)
+            .transpose()?
+            .unwrap_or(Value::Null),
+        "stats_projection" => {
+            let _ = graph_state::<StatsProjectionState>(graph, node_name)?;
+            json!({
+                "projected_stats_module_names": builtin_stats_module_names(),
+            })
+        }
+        "frame_info" => {
+            let state = graph_state::<FrameInfo>(graph, node_name)?;
+            json!({
+                "frame_number": state.frame_number,
+                "time": state.time,
+                "dt": state.dt,
+                "seconds_remaining": state.seconds_remaining,
+            })
+        }
+        "gameplay_state" => {
+            let state = graph_state::<GameplayState>(graph, node_name)?;
+            json!({
+                "game_state": state.game_state,
+                "ball_has_been_hit": state.ball_has_been_hit,
+                "kickoff_countdown_time": state.kickoff_countdown_time,
+                "team_zero_score": state.team_zero_score,
+                "team_one_score": state.team_one_score,
+                "possession_team_is_team_0": state.possession_team_is_team_0,
+                "scored_on_team_is_team_0": state.scored_on_team_is_team_0,
+                "current_in_game_team_player_counts": state.current_in_game_team_player_counts,
+                "is_live_play": state.is_live_play(),
+                "kickoff_phase_active": state.kickoff_phase_active(),
+            })
+        }
+        "ball_frame_state" => {
+            ball_frame_state_json(graph_state::<BallFrameState>(graph, node_name)?)
+        }
+        "player_frame_state" => {
+            let state = graph_state::<PlayerFrameState>(graph, node_name)?;
+            json!({
+                "players": state.players.iter().map(player_sample_json).collect::<Vec<_>>(),
+            })
+        }
+        "frame_events_state" => {
+            let state = graph_state::<FrameEventsState>(graph, node_name)?;
+            json!({
+                "active_demos": state.active_demos.iter().map(demo_event_sample_json).collect::<Vec<_>>(),
+                "demo_events": state.demo_events,
+                "boost_pad_events": state.boost_pad_events,
+                "touch_events": state.touch_events,
+                "dodge_refreshed_events": state.dodge_refreshed_events,
+                "player_stat_events": state.player_stat_events,
+                "goal_events": state.goal_events,
+            })
+        }
+        "live_play" => serialize_to_json_value(graph_state::<LivePlayState>(graph, node_name)?)?,
+        "touch_state" => {
+            let state = graph_state::<TouchState>(graph, node_name)?;
+            json!({
+                "touch_events": state.touch_events,
+                "last_touch": state.last_touch,
+                "last_touch_player": state.last_touch_player,
+                "last_touch_team_is_team_0": state.last_touch_team_is_team_0,
+            })
+        }
+        "possession_state" => {
+            let state = graph_state::<PossessionState>(graph, node_name)?;
+            json!({
+                "active_team_before_sample": state.active_team_before_sample,
+                "current_team_is_team_0": state.current_team_is_team_0,
+                "active_player_before_sample": state.active_player_before_sample,
+                "current_player": state.current_player,
+            })
+        }
+        "backboard_bounce_state" => {
+            let state = graph_state::<BackboardBounceState>(graph, node_name)?;
+            json!({
+                "bounce_events": state.bounce_events,
+                "last_bounce_event": state.last_bounce_event,
+            })
+        }
+        "continuous_ball_control" => {
+            let state = graph_state::<ContinuousBallControlState>(graph, node_name)?;
+            json!({
+                "completed_sequences": state.completed_sequences.iter().map(|sequence| {
+                    json!({
+                        "player_id": sequence.player_id,
+                        "is_team_0": sequence.is_team_0,
+                        "kind": sequence.kind,
+                        "start_frame": sequence.start_frame,
+                        "end_frame": sequence.end_frame,
+                        "start_time": sequence.start_time,
+                        "end_time": sequence.end_time,
+                        "duration": sequence.duration,
+                        "straight_line_distance": sequence.straight_line_distance,
+                        "path_distance": sequence.path_distance,
+                        "average_horizontal_gap": sequence.average_horizontal_gap,
+                        "average_vertical_gap": sequence.average_vertical_gap,
+                        "average_speed": sequence.average_speed,
+                        "start_position": {
+                            "x": sequence.start_position.x,
+                            "y": sequence.start_position.y,
+                            "z": sequence.start_position.z,
+                        },
+                        "end_position": {
+                            "x": sequence.end_position.x,
+                            "y": sequence.end_position.y,
+                            "z": sequence.end_position.z,
+                        },
+                        "touch_count": sequence.touch_count,
+                        "air_touch_count": sequence.air_touch_count,
+                    })
+                }).collect::<Vec<_>>(),
+            })
+        }
+        "fifty_fifty_state" => {
+            let state = graph_state::<FiftyFiftyState>(graph, node_name)?;
+            json!({
+                "active_event": state.active_event.as_ref().map(|event| {
+                    json!({
+                        "start_time": event.start_time,
+                        "start_frame": event.start_frame,
+                        "last_touch_time": event.last_touch_time,
+                        "last_touch_frame": event.last_touch_frame,
+                        "is_kickoff": event.is_kickoff,
+                        "team_zero_player": event.team_zero_player,
+                        "team_one_player": event.team_one_player,
+                        "team_zero_position": event.team_zero_position,
+                        "team_one_position": event.team_one_position,
+                        "midpoint": event.midpoint,
+                        "plane_normal": event.plane_normal,
+                    })
+                }),
+                "resolved_events": state.resolved_events,
+                "last_resolved_event": state.last_resolved_event,
+            })
+        }
+        "player_vertical_state" => {
+            player_vertical_state_json(graph_state::<PlayerVerticalState>(graph, node_name)?)
+        }
+        "settings" => settings_json(graph_state::<SettingsCalculator>(graph, node_name)?),
+        module_name if builtin_stats_module_names().contains(&module_name) => {
+            builtin_module_json(module_name, graph)?
+        }
+        _ => {
+            return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
+                node_name.to_owned(),
+            ));
+        }
+    };
+    Ok(value)
+}
+
+pub fn builtin_analysis_nodes_json(graph: &AnalysisGraph) -> SubtrActorResult<Value> {
+    let mut values = Map::new();
+    for node_name in builtin_analysis_node_names() {
+        values.insert(
+            (*node_name).to_owned(),
+            builtin_analysis_node_json(node_name, graph)?,
+        );
+    }
+    Ok(Value::Object(values))
+}
+
+pub(crate) fn builtin_snapshot_frame_json(
+    module_name: &str,
+    graph: &AnalysisGraph,
+    _replay_meta: &ReplayMeta,
+) -> SubtrActorResult<Option<Value>> {
+    let value = match module_name {
+        "core" => {
+            let projection = projected_stats(graph, module_name)?;
+            let mut player_stats: Vec<_> = projection
+                .core
+                .player_stats()
+                .iter()
+                .map(|(player_id, stats)| OwnedPlayerStatsEntry {
+                    player_id: player_id.clone(),
+                    stats: CorePlayerStatsSnapshot::from(stats),
+                })
+                .collect();
+            player_stats.sort_by(|left, right| {
+                format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
+            });
+            serialize_to_json_value(&CoreStatsSnapshotExport {
+                team_zero: projection.core.team_zero_stats().into(),
+                team_one: projection.core.team_one_stats().into(),
+                player_stats,
+            })?
+        }
+        "backboard" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.backboard.team_zero_stats(),
+                team_one: projection.backboard.team_one_stats(),
+                player_stats: player_stats_entries(projection.backboard.player_stats()),
+            })?
+        }
+        "ceiling_shot" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.ceiling_shot.player_stats()),
+            })?
+        }
+        "wall_aerial" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.wall_aerial.player_stats()),
+            })?
+        }
+        "wall_aerial_shot" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.wall_aerial_shot.player_stats()),
+            })?
+        }
+        "center" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.center.team_zero_stats(),
+                team_one: projection.center.team_one_stats(),
+                player_stats: player_stats_entries(projection.center.player_stats()),
+            })?
+        }
+        "double_tap" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.double_tap.team_zero_stats(),
+                team_one: projection.double_tap.team_one_stats(),
+                player_stats: player_stats_entries(projection.double_tap.player_stats()),
+            })?
+        }
+        "one_timer" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.one_timer.team_zero_stats(),
+                team_one: projection.one_timer.team_one_stats(),
+                player_stats: player_stats_entries(projection.one_timer.player_stats()),
+            })?
+        }
+        "half_volley" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.half_volley.team_zero_stats(),
+                team_one: projection.half_volley.team_one_stats(),
+                player_stats: player_stats_entries(projection.half_volley.player_stats()),
+            })?
+        }
+        "pass" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.pass.team_zero_stats(),
+                team_one: projection.pass.team_one_stats(),
+                player_stats: player_stats_entries(projection.pass.player_stats()),
+            })?
+        }
+        "aerial_goal"
+        | "high_aerial_goal"
+        | "long_distance_goal"
+        | "own_half_goal"
+        | "empty_net_goal"
+        | "counter_attack_goal"
+        | "flick_goal"
+        | "double_tap_goal"
+        | "one_timer_goal"
+        | "passing_goal"
+        | "air_dribble_goal"
+        | "flip_reset_goal"
+        | "half_volley_goal" => serialize_to_json_value(&serde_json::json!({}))?,
+        "fifty_fifty" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsWithPlayerStatsExport {
+                stats: projection.fifty_fifty.stats(),
+                player_stats: player_stats_entries(projection.fifty_fifty.player_stats()),
+            })?
+        }
+        "possession" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsExport {
+                stats: projection.possession.stats(),
+            })?
+        }
+        "pressure" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsExport {
+                stats: projection.pressure.stats(),
+            })?
+        }
+        "territorial_pressure" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsExport {
+                stats: projection.territorial_pressure.stats(),
+            })?
+        }
+        "rotation" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.rotation.team_zero_stats(),
+                team_one: projection.rotation.team_one_stats(),
+                player_stats: player_stats_entries(projection.rotation.player_stats()),
+            })?
+        }
+        "rush" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsExport {
+                stats: projection.rush.stats(),
+            })?
+        }
+        "touch" => {
+            let projection = projected_stats(graph, module_name)?;
+            let player_stats = projection
+                .touch
+                .player_stats()
+                .iter()
+                .map(|(player_id, stats)| OwnedPlayerStatsEntry {
+                    player_id: player_id.clone(),
+                    stats: stats.clone().with_complete_labeled_touch_counts(),
+                })
+                .collect();
+            serialize_to_json_value(&OwnedPlayerStatsExport { player_stats })?
+        }
+        "whiff" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.whiff.player_stats()),
+            })?
+        }
+        "wavedash" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.wavedash.player_stats()),
+            })?
+        }
+        "speed_flip" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.speed_flip.player_stats()),
+            })?
+        }
+        "half_flip" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.half_flip.player_stats()),
+            })?
+        }
+        "flick" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.flick.player_stats()),
+            })?
+        }
+        "musty_flick" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.musty_flick.player_stats()),
+            })?
+        }
+        "dodge_reset" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.dodge_reset.player_stats()),
+            })?
+        }
+        "ball_carry" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.ball_carry.team_zero_stats(),
+                team_one: projection.ball_carry.team_one_stats(),
+                player_stats: player_stats_entries(projection.ball_carry.player_stats()),
+            })?
+        }
+        "air_dribble" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.ball_carry.team_zero_air_dribble_stats(),
+                team_one: projection.ball_carry.team_one_air_dribble_stats(),
+                player_stats: player_stats_entries(
+                    projection.ball_carry.player_air_dribble_stats(),
+                ),
+            })?
+        }
+        "boost" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.boost.team_zero_stats(),
+                team_one: projection.boost.team_one_stats(),
+                player_stats: player_stats_entries(projection.boost.player_stats()),
+            })?
+        }
+        "bump" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.bump.team_zero_stats(),
+                team_one: projection.bump.team_one_stats(),
+                player_stats: player_stats_entries(projection.bump.player_stats()),
+            })?
+        }
+        "movement" => {
+            let projection = projected_stats(graph, module_name)?;
+            let player_stats = projection
+                .movement
+                .player_stats()
+                .iter()
+                .map(|(player_id, stats)| OwnedPlayerStatsEntry {
+                    player_id: player_id.clone(),
+                    stats: stats.clone().with_complete_labeled_tracked_time(),
+                })
+                .collect();
+            serialize_to_json_value(&TeamOwnedPlayerStatsExport {
+                team_zero: projection.movement.team_zero_stats(),
+                team_one: projection.movement.team_one_stats(),
+                player_stats,
+            })?
+        }
+        "positioning" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.positioning.player_stats()),
+            })?
+        }
+        "powerslide" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.powerslide.team_zero_stats(),
+                team_one: projection.powerslide.team_one_stats(),
+                player_stats: player_stats_entries(projection.powerslide.player_stats()),
+            })?
+        }
+        "demo" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.demo.team_zero_stats(),
+                team_one: projection.demo.team_one_stats(),
+                player_stats: player_stats_entries(projection.demo.player_stats()),
+            })?
+        }
+        _ => {
+            return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
+                module_name.to_owned(),
+            ))
+        }
+    };
+    Ok(Some(value))
+}
+
+pub(crate) fn builtin_snapshot_config_json(
+    module_name: &str,
+    graph: &AnalysisGraph,
+) -> SubtrActorResult<Option<Value>> {
+    let value = match module_name {
+        "positioning" => {
+            let calculator = graph_state::<PositioningCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "most_back_forward_threshold_y": calculator.config().most_back_forward_threshold_y,
+                "level_ball_depth_margin": calculator.config().level_ball_depth_margin,
+            }))?)
+        }
+        "pressure" => {
+            let calculator = graph_state::<PressureCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "pressure_neutral_zone_half_width_y": calculator.config().neutral_zone_half_width_y,
+            }))?)
+        }
+        "territorial_pressure" => {
+            let calculator = graph_state::<TerritorialPressureCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "territorial_pressure_neutral_zone_half_width_y": calculator.config().neutral_zone_half_width_y,
+                "territorial_pressure_min_establish_seconds": calculator.config().min_establish_seconds,
+                "territorial_pressure_min_establish_third_seconds": calculator.config().min_establish_third_seconds,
+                "territorial_pressure_relief_grace_seconds": calculator.config().relief_grace_seconds,
+                "territorial_pressure_confirmed_relief_grace_seconds": calculator.config().confirmed_relief_grace_seconds,
+            }))?)
+        }
+        "rotation" => {
+            let calculator = graph_state::<RotationCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "role_depth_margin": calculator.config().role_depth_margin,
+                "first_man_ambiguity_margin": calculator.config().first_man_ambiguity_margin,
+                "first_man_debounce_seconds": calculator.config().first_man_debounce_seconds,
+            }))?)
+        }
+        "rush" => {
+            let calculator = graph_state::<RushCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "rush_max_start_y": calculator.config().max_start_y,
+                "rush_attack_support_distance_y": calculator.config().attack_support_distance_y,
+                "rush_defender_distance_y": calculator.config().defender_distance_y,
+                "rush_min_possession_retained_seconds": calculator.config().min_possession_retained_seconds,
+            }))?)
+        }
+        "aerial_goal" => {
+            let calculator = graph_state::<AerialGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "aerial_goal_min_ball_z": calculator.config().min_ball_z,
+            }))?)
+        }
+        "high_aerial_goal" => {
+            let calculator = graph_state::<HighAerialGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "high_aerial_goal_min_ball_z": calculator.config().min_ball_z,
+            }))?)
+        }
+        "long_distance_goal" => {
+            let calculator = graph_state::<LongDistanceGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "long_distance_goal_max_attacking_y": calculator.config().max_attacking_y,
+            }))?)
+        }
+        "own_half_goal" => {
+            let calculator = graph_state::<OwnHalfGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "own_half_goal_max_attacking_y": calculator.config().max_attacking_y,
+            }))?)
+        }
+        "empty_net_goal" => {
+            let calculator = graph_state::<EmptyNetGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "empty_net_min_defender_y_margin": calculator.config().min_defender_y_margin,
+                "empty_net_min_defender_distance": calculator.config().min_defender_distance,
+                "empty_net_max_touch_attacking_y": calculator.config().max_touch_attacking_y,
+            }))?)
+        }
+        "flick_goal" => {
+            let calculator = graph_state::<FlickGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "flick_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "double_tap_goal" => {
+            let calculator = graph_state::<DoubleTapGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "double_tap_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "one_timer_goal" => {
+            let calculator = graph_state::<OneTimerGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "one_timer_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "passing_goal" => {
+            let calculator = graph_state::<PassingGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "passing_goal_max_pass_to_goal_seconds": calculator.config().max_pass_to_goal_seconds,
+            }))?)
+        }
+        "air_dribble_goal" => {
+            let calculator = graph_state::<AirDribbleGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "air_dribble_goal_max_end_to_goal_seconds": calculator.config().max_end_to_goal_seconds,
+            }))?)
+        }
+        "flip_reset_goal" => {
+            let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "flip_reset_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "half_volley_goal" => {
+            let calculator = graph_state::<HalfVolleyGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "half_volley_goal_max_touch_to_goal_seconds": calculator.config().max_touch_to_goal_seconds,
+                "half_volley_goal_min_goal_alignment": calculator.config().min_goal_alignment,
+            }))?)
+        }
+        "half_volley" => {
+            let calculator = graph_state::<HalfVolleyCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "half_volley_max_bounce_to_touch_seconds": calculator.config().max_bounce_to_touch_seconds,
+                "half_volley_min_ball_speed": calculator.config().min_ball_speed,
+            }))?)
+        }
+        "core"
+        | "backboard"
+        | "ceiling_shot"
+        | "wall_aerial"
+        | "wall_aerial_shot"
+        | "center"
+        | "double_tap"
+        | "one_timer"
+        | "pass"
+        | "fifty_fifty"
+        | "possession"
+        | "touch"
+        | "whiff"
+        | "wavedash"
+        | "speed_flip"
+        | "half_flip"
+        | "flick"
+        | "musty_flick"
+        | "dodge_reset"
+        | "ball_carry"
+        | "air_dribble"
+        | "counter_attack_goal"
+        | "boost"
+        | "bump"
+        | "movement"
+        | "powerslide"
+        | "demo" => None,
+        _ => {
+            return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
+                module_name.to_owned(),
+            ))
+        }
+    };
+    Ok(value)
 }

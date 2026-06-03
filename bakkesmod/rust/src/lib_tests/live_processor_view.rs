@@ -461,7 +461,7 @@ fn live_processor_view_exposes_cumulative_history_for_aggregate_inputs() {
         FrameEventsState::default(),
         &event_history,
     );
-    let _ = builder.aggregate(&previous_view, 3, frame.time, frame.dt);
+    let _ = builder.aggregate(&previous_view, 2, 0.0, frame.dt);
     event_history.append_frame_events(&between_sample_events);
     let view = SaLiveProcessorView::new(None, &frame, &players, current_events, &event_history);
 
@@ -742,4 +742,3 @@ fn live_processor_view_does_not_treat_inactive_demo_events_as_active() {
     assert!(frame_events.active_demos.is_empty());
     assert_eq!(frame_events.demo_events.len(), 1);
 }
-

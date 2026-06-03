@@ -30,30 +30,14 @@ fn compute_comparable_stats_reference(
             "positioning",
             "demo",
             "powerslide",
+            "stats_projection",
         ],
     )?;
 
     Ok(ComputedComparableStats {
         replay_meta,
-        match_stats: graph
-            .state::<MatchStatsCalculator>()
-            .cloned()
-            .unwrap_or_default(),
-        boost: graph
-            .state::<BoostCalculator>()
-            .cloned()
-            .unwrap_or_default(),
-        movement: graph
-            .state::<MovementCalculator>()
-            .cloned()
-            .unwrap_or_default(),
-        positioning: graph
-            .state::<PositioningCalculator>()
-            .cloned()
-            .unwrap_or_default(),
-        demo: graph.state::<DemoCalculator>().cloned().unwrap_or_default(),
-        powerslide: graph
-            .state::<PowerslideCalculator>()
+        projection: graph
+            .state::<stats::analysis_graph::StatsProjectionState>()
             .cloned()
             .unwrap_or_default(),
     })

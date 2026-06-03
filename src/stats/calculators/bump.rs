@@ -47,8 +47,7 @@ struct DirectionalBumpCandidate {
 
 #[derive(Debug, Clone, Default)]
 pub struct BumpCalculator {
-    stats: BumpStatsAccumulator,
-    events: Vec<BumpEvent>,
+    events: EventStream<BumpEvent>,
     previous_players: HashMap<PlayerId, PreviousPlayerSample>,
     last_seen_pair_frame: HashMap<(PlayerId, PlayerId), usize>,
 }
@@ -58,24 +57,12 @@ impl BumpCalculator {
         Self::default()
     }
 
-    pub fn player_stats(&self) -> &HashMap<PlayerId, BumpPlayerStats> {
-        self.stats.player_stats()
-    }
-
-    pub fn team_zero_stats(&self) -> &BumpTeamStats {
-        self.stats.team_zero_stats()
-    }
-
-    pub fn team_one_stats(&self) -> &BumpTeamStats {
-        self.stats.team_one_stats()
-    }
-
-    pub fn stats(&self) -> &BumpStatsAccumulator {
-        &self.stats
-    }
-
     pub fn events(&self) -> &[BumpEvent] {
-        &self.events
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[BumpEvent] {
+        self.events.new_events()
     }
 
     pub fn update(
@@ -102,6 +89,8 @@ impl BumpCalculator {
         fifty_fifty_state: &FiftyFiftyState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
+
         if !live_play {
             self.previous_players.clear();
             return Ok(());
@@ -392,7 +381,6 @@ impl BumpCalculator {
     }
 
     fn record_bump(&mut self, event: BumpEvent) {
-        self.stats.apply_event(&event);
         self.events.push(event);
     }
 }

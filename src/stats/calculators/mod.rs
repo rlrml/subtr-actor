@@ -5,41 +5,18 @@ use boxcars;
 use boxcars::HeaderProp;
 use serde::{Deserialize, Serialize};
 
-use crate::*;
+pub(crate) use crate::stats::common::*;
 
-mod boost_invariants;
-pub use boost_invariants::*;
-
-const CONFIDENCE_BAND_LABELS: [StatLabel; 2] = [
-    StatLabel::new("confidence_band", "standard"),
-    StatLabel::new("confidence_band", "high"),
-];
-
-const VERTICAL_STATE_LABELS: [StatLabel; 2] = [
-    StatLabel::new("vertical_state", "grounded"),
-    StatLabel::new("vertical_state", "aerial"),
-];
-
-fn confidence_band_label(high_confidence: bool) -> StatLabel {
-    if high_confidence {
-        StatLabel::new("confidence_band", "high")
-    } else {
-        StatLabel::new("confidence_band", "standard")
-    }
-}
-
-fn vertical_state_label(aerial: bool) -> StatLabel {
-    if aerial {
-        StatLabel::new("vertical_state", "aerial")
-    } else {
-        StatLabel::new("vertical_state", "grounded")
-    }
-}
+pub(crate) use crate::stats::accumulators::*;
+#[cfg(test)]
+pub(crate) use crate::stats::test_projection::*;
 
 mod frame_input;
 pub use frame_input::*;
 mod frame_components;
 pub use frame_components::*;
+mod event_stream;
+pub use event_stream::*;
 mod continuous_ball_control;
 pub use continuous_ball_control::*;
 #[cfg(test)]
@@ -61,8 +38,6 @@ pub mod boost;
 pub use boost::*;
 pub mod bump;
 pub use bump::*;
-pub mod bump_stats;
-pub use bump_stats::*;
 pub mod ceiling_shot;
 pub use ceiling_shot::*;
 pub mod center;
@@ -184,7 +159,6 @@ fn interval_fraction_above_threshold(start: f32, end: f32, threshold: f32) -> f3
     }
 }
 
-const CAR_MAX_SPEED: f32 = 2300.0;
 const SUPERSONIC_SPEED_THRESHOLD: f32 = 2200.0;
 const BOOST_SPEED_THRESHOLD: f32 = 1410.0;
 const POWERSLIDE_MAX_Z_THRESHOLD: f32 = 40.0;

@@ -86,6 +86,7 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "player_vertical_state",
     "demo",
     "settings",
+    "stats_projection",
     "stats_timeline_frame",
     "stats_timeline_events",
 ];
@@ -187,6 +188,7 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "player_vertical_state" => Some(nodes::player_vertical_state::boxed_default()),
         "demo" => Some(nodes::demo::boxed_default()),
         "settings" => Some(nodes::settings::boxed_default()),
+        "stats_projection" => Some(nodes::stats_projection::boxed_default()),
         "stats_timeline_frame" => Some(nodes::stats_timeline_frame::boxed_default()),
         "stats_timeline_events" => Some(nodes::stats_timeline_events::boxed_default()),
         _ => None,
@@ -278,6 +280,7 @@ pub fn all_analysis_nodes() -> Vec<Box<dyn AnalysisNodeDyn>> {
         nodes::rotation::boxed_default(),
         nodes::rush::boxed_default(),
         nodes::settings::boxed_default(),
+        nodes::stats_projection::boxed_default(),
         nodes::speed_flip::boxed_default(),
         nodes::half_flip::boxed_default(),
         nodes::half_volley::boxed_default(),

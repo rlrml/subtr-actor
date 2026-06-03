@@ -10,7 +10,6 @@ const SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS: f32 = 0.18;
 const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA: f32 = 80.0;
 const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT: f32 = 0.35;
 const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
-const SPEED_FLIP_HIGH_CONFIDENCE: f32 = 0.75;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -32,61 +31,6 @@ pub struct SpeedFlipEvent {
     pub cancel_score: f32,
     pub speed_score: f32,
     pub confidence: f32,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct SpeedFlipStats {
-    pub count: u32,
-    pub high_confidence_count: u32,
-    pub is_last_speed_flip: bool,
-    pub last_speed_flip_time: Option<f32>,
-    pub last_speed_flip_frame: Option<usize>,
-    pub time_since_last_speed_flip: Option<f32>,
-    pub frames_since_last_speed_flip: Option<usize>,
-    pub last_quality: Option<f32>,
-    pub best_quality: f32,
-    pub cumulative_quality: f32,
-    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
-    pub labeled_event_counts: LabeledCounts,
-}
-
-impl SpeedFlipStats {
-    pub fn average_quality(&self) -> f32 {
-        if self.count == 0 {
-            0.0
-        } else {
-            self.cumulative_quality / self.count as f32
-        }
-    }
-
-    fn record_event(&mut self, event: &SpeedFlipEvent) {
-        self.labeled_event_counts.increment([confidence_band_label(
-            event.confidence >= SPEED_FLIP_HIGH_CONFIDENCE,
-        )]);
-        self.sync_legacy_counts();
-        self.last_speed_flip_time = Some(event.time);
-        self.last_speed_flip_frame = Some(event.frame);
-        self.last_quality = Some(event.confidence);
-        self.best_quality = self.best_quality.max(event.confidence);
-        self.cumulative_quality += event.confidence;
-    }
-
-    pub fn event_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
-        self.labeled_event_counts.count_matching(labels)
-    }
-
-    pub fn complete_labeled_event_counts(&self) -> LabeledCounts {
-        LabeledCounts::complete_from_label_sets(
-            &[&CONFIDENCE_BAND_LABELS],
-            &self.labeled_event_counts,
-        )
-    }
-
-    fn sync_legacy_counts(&mut self) {
-        self.count = self.labeled_event_counts.total();
-        self.high_confidence_count = self.event_count_with_labels(&[confidence_band_label(true)]);
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -117,13 +61,11 @@ struct ActiveSpeedFlipCandidate {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpeedFlipCalculator {
-    player_stats: HashMap<PlayerId, SpeedFlipStats>,
-    events: Vec<SpeedFlipEvent>,
+    events: EventStream<SpeedFlipEvent>,
     active_candidates: HashMap<PlayerId, ActiveSpeedFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     kickoff_approach_active_last_frame: bool,
     current_kickoff_start_time: Option<f32>,
-    current_last_speed_flip_player: Option<PlayerId>,
 }
 
 impl SpeedFlipCalculator {
@@ -131,12 +73,12 @@ impl SpeedFlipCalculator {
         Self::default()
     }
 
-    pub fn player_stats(&self) -> &HashMap<PlayerId, SpeedFlipStats> {
-        &self.player_stats
+    pub fn events(&self) -> &[SpeedFlipEvent] {
+        self.events.all()
     }
 
-    pub fn events(&self) -> &[SpeedFlipEvent] {
-        &self.events
+    pub fn new_events(&self) -> &[SpeedFlipEvent] {
+        self.events.new_events()
     }
 
     fn kickoff_approach_active(gameplay: &GameplayState) -> bool {
@@ -221,36 +163,7 @@ impl SpeedFlipCalculator {
     }
 
     fn apply_event(&mut self, event: SpeedFlipEvent) {
-        for stats in self.player_stats.values_mut() {
-            stats.is_last_speed_flip = false;
-        }
-
-        let stats = self.player_stats.entry(event.player.clone()).or_default();
-        stats.record_event(&event);
-        stats.is_last_speed_flip = true;
-        stats.time_since_last_speed_flip = Some(0.0);
-        stats.frames_since_last_speed_flip = Some(0);
-
-        self.current_last_speed_flip_player = Some(event.player.clone());
         self.events.push(event);
-    }
-
-    fn begin_sample(&mut self, frame: &FrameInfo) {
-        for stats in self.player_stats.values_mut() {
-            stats.is_last_speed_flip = false;
-            stats.time_since_last_speed_flip = stats
-                .last_speed_flip_time
-                .map(|time| (frame.time - time).max(0.0));
-            stats.frames_since_last_speed_flip = stats
-                .last_speed_flip_frame
-                .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
-        }
-
-        if let Some(player_id) = self.current_last_speed_flip_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_speed_flip = true;
-            }
-        }
     }
 
     fn reset_kickoff_state(&mut self) {
@@ -541,6 +454,7 @@ impl SpeedFlipCalculator {
         players: &PlayerFrameState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
         let kickoff_approach_active = Self::kickoff_approach_active(gameplay);
         if !live_play && !kickoff_approach_active {
             self.active_candidates.clear();
@@ -548,8 +462,6 @@ impl SpeedFlipCalculator {
             self.kickoff_approach_active_last_frame = false;
             return Ok(());
         }
-
-        self.begin_sample(frame);
 
         if kickoff_approach_active && !self.kickoff_approach_active_last_frame {
             self.reset_kickoff_state();

@@ -24,13 +24,6 @@ enum TouchDodgeState {
     Dodge,
 }
 
-const ALL_TOUCH_KINDS: [TouchKind; 3] =
-    [TouchKind::Control, TouchKind::MediumHit, TouchKind::HardHit];
-const ALL_TOUCH_SURFACES: [TouchSurface; 3] =
-    [TouchSurface::Ground, TouchSurface::Air, TouchSurface::Wall];
-const ALL_TOUCH_DODGE_STATES: [TouchDodgeState; 2] =
-    [TouchDodgeState::NoDodge, TouchDodgeState::Dodge];
-
 impl TouchKind {
     fn as_label_value(self) -> &'static str {
         match self {
@@ -38,10 +31,6 @@ impl TouchKind {
             Self::MediumHit => "medium_hit",
             Self::HardHit => "hard_hit",
         }
-    }
-
-    fn as_label(self) -> StatLabel {
-        StatLabel::new("kind", self.as_label_value())
     }
 }
 
@@ -52,10 +41,6 @@ impl TouchSurface {
             Self::Air => "air",
             Self::Wall => "wall",
         }
-    }
-
-    fn as_label(self) -> StatLabel {
-        StatLabel::new("surface", self.as_label_value())
     }
 }
 
@@ -74,10 +59,6 @@ impl TouchDodgeState {
             Self::Dodge => "dodge",
         }
     }
-
-    fn as_label(self) -> StatLabel {
-        StatLabel::new("dodge_state", self.as_label_value())
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,110 +67,6 @@ struct TouchClassification {
     height_band: PlayerVerticalBand,
     surface: TouchSurface,
     dodge_state: TouchDodgeState,
-}
-
-impl TouchClassification {
-    fn labels(self) -> [StatLabel; 4] {
-        [
-            self.kind.as_label(),
-            self.height_band.as_label(),
-            self.surface.as_label(),
-            self.dodge_state.as_label(),
-        ]
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct TouchStats {
-    pub touch_count: u32,
-    pub control_touch_count: u32,
-    pub medium_hit_count: u32,
-    pub hard_hit_count: u32,
-    pub aerial_touch_count: u32,
-    pub high_aerial_touch_count: u32,
-    #[serde(default)]
-    pub wall_touch_count: u32,
-    pub is_last_touch: bool,
-    pub last_touch_time: Option<f32>,
-    pub last_touch_frame: Option<usize>,
-    pub time_since_last_touch: Option<f32>,
-    pub frames_since_last_touch: Option<usize>,
-    pub last_ball_speed_change: Option<f32>,
-    pub max_ball_speed_change: f32,
-    pub cumulative_ball_speed_change: f32,
-    #[serde(default)]
-    pub total_ball_travel_distance: f32,
-    #[serde(default)]
-    pub total_ball_advance_distance: f32,
-    #[serde(default)]
-    pub total_ball_retreat_distance: f32,
-    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
-    pub labeled_touch_counts: LabeledCounts,
-}
-
-impl TouchStats {
-    pub fn average_ball_speed_change(&self) -> f32 {
-        if self.touch_count == 0 {
-            0.0
-        } else {
-            self.cumulative_ball_speed_change / self.touch_count as f32
-        }
-    }
-
-    pub fn touch_count_with_labels(&self, labels: &[StatLabel]) -> u32 {
-        self.labeled_touch_counts.count_matching(labels)
-    }
-
-    pub fn dodge_touch_count(&self) -> u32 {
-        self.touch_count_with_labels(&[StatLabel::new("dodge_state", "dodge")])
-    }
-
-    pub fn dodge_hit_count(&self) -> u32 {
-        self.touch_count_with_labels(&[
-            StatLabel::new("dodge_state", "dodge"),
-            StatLabel::new("kind", "medium_hit"),
-        ]) + self.touch_count_with_labels(&[
-            StatLabel::new("dodge_state", "dodge"),
-            StatLabel::new("kind", "hard_hit"),
-        ])
-    }
-
-    pub fn complete_labeled_touch_counts(&self) -> LabeledCounts {
-        let mut entries: Vec<_> = ALL_PLAYER_VERTICAL_BANDS
-            .into_iter()
-            .flat_map(|height_band| {
-                ALL_TOUCH_SURFACES.into_iter().flat_map(move |surface| {
-                    ALL_TOUCH_DODGE_STATES
-                        .into_iter()
-                        .flat_map(move |dodge_state| {
-                            ALL_TOUCH_KINDS.into_iter().map(move |kind| {
-                                let mut labels = vec![
-                                    kind.as_label(),
-                                    height_band.as_label(),
-                                    surface.as_label(),
-                                    dodge_state.as_label(),
-                                ];
-                                labels.sort();
-                                LabeledCountEntry {
-                                    count: self.labeled_touch_counts.count_exact(&labels),
-                                    labels,
-                                }
-                            })
-                        })
-                })
-            })
-            .collect();
-
-        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
-
-        LabeledCounts { entries }
-    }
-
-    pub fn with_complete_labeled_touch_counts(mut self) -> Self {
-        self.labeled_touch_counts = self.complete_labeled_touch_counts();
-        self
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -249,11 +126,9 @@ struct PendingFiftyFiftyMovement {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchCalculator {
-    player_stats: HashMap<PlayerId, TouchStats>,
-    events: Vec<TouchStatsEvent>,
-    ball_movement_events: Vec<TouchBallMovementEvent>,
-    last_touch_events: Vec<TouchLastTouchEvent>,
-    current_last_touch_player: Option<PlayerId>,
+    events: EventStream<TouchStatsEvent>,
+    ball_movement_events: EventStream<TouchBallMovementEvent>,
+    last_touch_events: EventStream<TouchLastTouchEvent>,
     previous_ball_velocity: Option<glam::Vec3>,
     previous_ball_position: Option<glam::Vec3>,
     pending_fifty_fifty_movement: Option<PendingFiftyFiftyMovement>,
@@ -264,20 +139,28 @@ impl TouchCalculator {
         Self::default()
     }
 
-    pub fn player_stats(&self) -> &HashMap<PlayerId, TouchStats> {
-        &self.player_stats
+    pub fn events(&self) -> &[TouchStatsEvent] {
+        self.events.all()
     }
 
-    pub fn events(&self) -> &[TouchStatsEvent] {
-        &self.events
+    pub fn new_events(&self) -> &[TouchStatsEvent] {
+        self.events.new_events()
     }
 
     pub fn ball_movement_events(&self) -> &[TouchBallMovementEvent] {
-        &self.ball_movement_events
+        self.ball_movement_events.all()
+    }
+
+    pub fn new_ball_movement_events(&self) -> &[TouchBallMovementEvent] {
+        self.ball_movement_events.new_events()
     }
 
     pub fn last_touch_events(&self) -> &[TouchLastTouchEvent] {
-        &self.last_touch_events
+        self.last_touch_events.all()
+    }
+
+    pub fn new_last_touch_events(&self) -> &[TouchLastTouchEvent] {
+        self.last_touch_events.new_events()
     }
 
     fn ball_speed_change(
@@ -350,43 +233,6 @@ impl TouchCalculator {
         }
     }
 
-    fn apply_touch_classification(stats: &mut TouchStats, classification: TouchClassification) {
-        match classification.height_band {
-            PlayerVerticalBand::Ground => {}
-            PlayerVerticalBand::LowAir => stats.aerial_touch_count += 1,
-            PlayerVerticalBand::HighAir => {
-                stats.aerial_touch_count += 1;
-                stats.high_aerial_touch_count += 1;
-            }
-        }
-
-        match classification.kind {
-            TouchKind::Control => stats.control_touch_count += 1,
-            TouchKind::MediumHit => stats.medium_hit_count += 1,
-            TouchKind::HardHit => stats.hard_hit_count += 1,
-        }
-
-        if classification.surface == TouchSurface::Wall {
-            stats.wall_touch_count += 1;
-        }
-
-        stats
-            .labeled_touch_counts
-            .increment(classification.labels());
-    }
-
-    fn begin_sample(&mut self, frame: &FrameInfo) {
-        for stats in self.player_stats.values_mut() {
-            stats.is_last_touch = false;
-            stats.time_since_last_touch = stats
-                .last_touch_time
-                .map(|time| (frame.time - time).max(0.0));
-            stats.frames_since_last_touch = stats
-                .last_touch_frame
-                .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
-        }
-    }
-
     fn controlled_touch_kind(
         ball: &BallFrameState,
         players: &PlayerFrameState,
@@ -446,7 +292,7 @@ impl TouchCalculator {
                 ball_speed_change,
                 controlled_touch_kind,
             );
-            self.events.push(TouchStatsEvent {
+            let event = TouchStatsEvent {
                 time: touch_event.time,
                 frame: touch_event.frame,
                 sample_time: frame.time,
@@ -465,18 +311,8 @@ impl TouchCalculator {
                 surface: classification.surface.as_label_value().to_owned(),
                 dodge_state: classification.dodge_state.as_label_value().to_owned(),
                 ball_speed_change,
-            });
-            let stats = self.player_stats.entry(player_id.clone()).or_default();
-            stats.touch_count += 1;
-            Self::apply_touch_classification(stats, classification);
-            stats.last_touch_time = Some(touch_event.time);
-            stats.last_touch_frame = Some(touch_event.frame);
-            stats.time_since_last_touch = Some((frame.time - touch_event.time).max(0.0));
-            stats.frames_since_last_touch =
-                Some(frame.frame_number.saturating_sub(touch_event.frame));
-            stats.last_ball_speed_change = Some(ball_speed_change);
-            stats.max_ball_speed_change = stats.max_ball_speed_change.max(ball_speed_change);
-            stats.cumulative_ball_speed_change += ball_speed_change;
+            };
+            self.events.push(event);
         }
 
         if let Some(last_touch) = touch_events.last() {
@@ -498,13 +334,6 @@ impl TouchCalculator {
                             .map(|position| position.to_array())
                     }),
             });
-            self.current_last_touch_player = last_touch.player.clone();
-        }
-
-        if let Some(player_id) = self.current_last_touch_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_touch = true;
-            }
         }
     }
 
@@ -526,7 +355,7 @@ impl TouchCalculator {
         } else {
             (0.0, -advance_distance)
         };
-        self.ball_movement_events.push(TouchBallMovementEvent {
+        let event = TouchBallMovementEvent {
             time,
             frame,
             player: player_id.clone(),
@@ -535,11 +364,8 @@ impl TouchCalculator {
             travel_distance,
             advance_distance,
             retreat_distance,
-        });
-        let stats = self.player_stats.entry(player_id.clone()).or_default();
-        stats.total_ball_travel_distance += travel_distance;
-        stats.total_ball_advance_distance += advance_distance;
-        stats.total_ball_retreat_distance += retreat_distance;
+        };
+        self.ball_movement_events.push(event);
     }
 
     fn resolved_fifty_fifty_winner(event: &FiftyFiftyEvent) -> Option<(&PlayerId, bool)> {
@@ -594,7 +420,7 @@ impl TouchCalculator {
         } else {
             (0.0, -advance_distance)
         };
-        self.ball_movement_events.push(TouchBallMovementEvent {
+        let event = TouchBallMovementEvent {
             time: event.resolve_time,
             frame: event.resolve_frame,
             player: player_id.clone(),
@@ -607,11 +433,8 @@ impl TouchCalculator {
             travel_distance: pending.travel_distance,
             advance_distance,
             retreat_distance,
-        });
-        let stats = self.player_stats.entry(player_id.clone()).or_default();
-        stats.total_ball_travel_distance += pending.travel_distance;
-        stats.total_ball_advance_distance += advance_distance;
-        stats.total_ball_retreat_distance += retreat_distance;
+        };
+        self.ball_movement_events.push(event);
     }
 
     fn credit_ball_movement(
@@ -690,15 +513,15 @@ impl TouchCalculator {
         fifty_fifty_state: &FiftyFiftyState,
         live_play: bool,
     ) -> SubtrActorResult<()> {
+        self.events.begin_update();
+        self.ball_movement_events.begin_update();
+        self.last_touch_events.begin_update();
         if !live_play {
-            self.current_last_touch_player = None;
             self.previous_ball_velocity = ball.velocity();
             self.previous_ball_position = ball.position();
             self.pending_fifty_fifty_movement = None;
             return Ok(());
         }
-
-        self.begin_sample(frame);
         self.apply_touch_events(
             frame,
             ball,
@@ -715,16 +538,6 @@ impl TouchCalculator {
             live_play,
         );
         self.previous_ball_velocity = ball.velocity();
-
-        if let Some(player_id) = touch_state.last_touch_player.as_ref() {
-            self.current_last_touch_player = Some(player_id.clone());
-        }
-
-        if let Some(player_id) = self.current_last_touch_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_touch = true;
-            }
-        }
 
         Ok(())
     }
