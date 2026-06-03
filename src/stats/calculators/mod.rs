@@ -61,6 +61,8 @@ pub mod air_dribble;
 pub use air_dribble::*;
 pub mod ball_carry;
 pub use ball_carry::*;
+pub mod ball_carry_stats;
+pub use ball_carry_stats::*;
 pub mod boost;
 pub use boost::*;
 pub mod bump;
