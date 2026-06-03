@@ -19,10 +19,9 @@ import { getAppTemplate } from "./appTemplate.ts";
 import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import { createCameraControlsController, type CameraControlsController } from "./cameraControls.ts";
-import { createStatModules, getTeamClass } from "./statModules.ts";
+import { createStatModules } from "./statModules.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
-import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
 import { applyConfigAdapterSnapshot } from "./configAdapters.ts";
 import type { StatsFrameLookup, StatsTimeline } from "./statsTimeline.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
@@ -66,6 +65,10 @@ import {
   createRecordingWindowController,
   type RecordingWindowController,
 } from "./recordingWindow.ts";
+import {
+  createScoreboardWindowController,
+  type ScoreboardWindowController,
+} from "./scoreboardWindow.ts";
 import {
   getMechanicsReviewMechanicKind,
   getMechanicsReviewUrlFromLocation,
@@ -185,7 +188,6 @@ let launcherToggle!: HTMLButtonElement;
 let launcherMenu!: HTMLDivElement;
 let loadReplayAction!: HTMLButtonElement;
 let floatingWindowLayer!: HTMLDivElement;
-let scoreboardWindowBody!: HTMLDivElement;
 let eventPlaylistWindowBody!: HTMLDivElement;
 let replayLoadingSummary!: HTMLElement;
 let replayLoadingActive!: HTMLElement;
@@ -215,6 +217,7 @@ let eventTimelineControlsController: EventTimelineControlsController | null = nu
 let moduleControlsController: ModuleControlsController | null = null;
 let mechanicsReviewController: MechanicsReviewWindowController | null = null;
 let floatingWindowController: FloatingWindowController | null = null;
+let scoreboardWindowController: ScoreboardWindowController | null = null;
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
@@ -757,52 +760,8 @@ function renderModuleSettings(): void {
   moduleControlsController?.renderSettings();
 }
 
-function formatScoreboardInteger(value: number | null | undefined): string {
-  return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)}` : "--";
-}
-
 function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0): void {
-  if (!scoreboardWindowBody) {
-    return;
-  }
-
-  scoreboardWindowBody.replaceChildren();
-  const frame = statsFrameLookup ? getStatsFrameForReplayFrame(statsFrameLookup, frameIndex) : null;
-  const replay = replayPlayer?.replay ?? null;
-  if (!frame || !replay) {
-    const empty = document.createElement("p");
-    empty.className = "scoreboard-empty";
-    empty.textContent = "Load a replay to show the scoreboard.";
-    scoreboardWindowBody.append(empty);
-    return;
-  }
-
-  const header = document.createElement("div");
-  header.className = "scoreboard-scoreline";
-  header.append(
-    createScoreboardGoalValue(frame.team_zero?.core.goals, true),
-    createScoreboardDivider(),
-    createScoreboardGoalValue(frame.team_one?.core.goals, false),
-  );
-
-  scoreboardWindowBody.append(header);
-}
-
-function createScoreboardDivider(): HTMLElement {
-  const divider = document.createElement("span");
-  divider.className = "scoreboard-divider";
-  divider.textContent = "-";
-  return divider;
-}
-
-function createScoreboardGoalValue(
-  goals: number | null | undefined,
-  isTeamZero: boolean,
-): HTMLElement {
-  const score = document.createElement("strong");
-  score.className = `scoreboard-goal-value ${getTeamClass(isTeamZero)}`;
-  score.textContent = formatScoreboardInteger(goals);
-  return score;
+  scoreboardWindowController?.render(frameIndex);
 }
 
 function setTransportEnabled(enabled: boolean): void {
@@ -1080,7 +1039,11 @@ export function mountStatEvaluationPlayer(
   launcherMenu = mustElement<HTMLDivElement>(root, "#launcher-menu");
   loadReplayAction = mustElement<HTMLButtonElement>(root, "#load-replay-action");
   floatingWindowLayer = mustElement<HTMLDivElement>(root, "#floating-window-layer");
-  scoreboardWindowBody = mustElement<HTMLDivElement>(root, "#scoreboard-window-body");
+  scoreboardWindowController = createScoreboardWindowController({
+    body: mustElement<HTMLDivElement>(root, "#scoreboard-window-body"),
+    getReplayPlayer: () => replayPlayer,
+    getStatsFrameLookup: () => statsFrameLookup,
+  });
   const mechanicsTimelineWindowBody = mustElement<HTMLDivElement>(
     root,
     "#mechanics-timeline-window-body",
@@ -1366,6 +1329,7 @@ export function mountStatEvaluationPlayer(
     cameraControlsController = null;
     recordingWindowController = null;
     moduleControlsController = null;
+    scoreboardWindowController = null;
     initialUrlConfig = null;
     if (configUrlUpdateTimer !== null) {
       window.clearTimeout(configUrlUpdateTimer);
