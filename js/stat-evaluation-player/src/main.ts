@@ -47,13 +47,15 @@ import {
   mechanicKindToModuleId,
 } from "./timelineMarkers.ts";
 import {
-  buildEventPlaylistItems as buildEventPlaylistSourceItems,
-  getEventPlaylistSelectedSourceIds,
   getEventPlaylistSources as getEventPlaylistSourcesFromTimelineSources,
   getEventTimelineSources as getConfiguredEventTimelineSources,
-  type EventPlaylistSource,
   type EventTimelineSource,
 } from "./eventTimelineSources.ts";
+import {
+  createEventPlaylistWindowController,
+  type EventPlaylistWindowController,
+  type SyncEventPlaylistTimelineOptions,
+} from "./eventPlaylistWindow.ts";
 import {
   formatReplayLoadProgress,
   loadReplayBundleInWorker,
@@ -295,6 +297,7 @@ let recordingType!: HTMLElement;
 let currentMountCleanup: (() => void) | null = null;
 let statRegistry: StatDefinition[] = createStatRegistry(null);
 let statsWindowsController: StatsWindowsController | null = null;
+let eventPlaylistController: EventPlaylistWindowController | null = null;
 let nextWindowZIndex = 30;
 let boostPadOverlayEnabled = true;
 let loadedReplayName: string | null = null;
@@ -302,9 +305,6 @@ let lastFreeCameraPreset: ReplayFreeCameraPreset | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
 let isApplyingConfig = false;
 let configUrlUpdateTimer: number | null = null;
-let eventPlaylistActiveSourceIds: Set<string> | null = null;
-let eventPlaylistAutoFollow = true;
-let eventPlaylistLastActiveKey: string | null = null;
 
 interface ReplayInputSource {
   name: string;
@@ -1245,246 +1245,24 @@ function getEventSourceColumnCount(sourceCount: number): number {
   return 1;
 }
 
-function getEventPlaylistSources(): EventPlaylistSource[] {
+function getEventPlaylistSourcesForWindow() {
   const ctx = getModuleContext();
   return getEventPlaylistSourcesFromTimelineSources(ctx, getEventTimelineSources(ctx));
 }
 
-function buildEventPlaylistItems(sources: EventPlaylistSource[]) {
-  return buildEventPlaylistSourceItems({
-    sources,
-    activeSourceIds: eventPlaylistActiveSourceIds,
-    replayPlayers: replayPlayer?.replay.players ?? [],
-  });
-}
-
-function setEventPlaylistSourceSelection(
-  sources: EventPlaylistSource[],
-  updater: (selected: Set<string>) => void,
-): void {
-  const selected = getEventPlaylistSelectedSourceIds(sources, eventPlaylistActiveSourceIds);
-  updater(selected);
-  eventPlaylistActiveSourceIds = selected;
-  eventPlaylistLastActiveKey = null;
-  renderEventPlaylistWindow();
-  const state = replayPlayer?.getState();
-  if (state) {
-    syncEventPlaylistTimeline(state);
-  }
-}
-
 function renderEventPlaylistWindow(): void {
-  if (!eventPlaylistWindowBody) {
-    return;
-  }
-
-  eventPlaylistWindowBody.replaceChildren();
-  const sources = getEventPlaylistSources();
-  if (sources.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = replayPlayer ? "No events loaded." : "Load a replay to see events.";
-    eventPlaylistWindowBody.append(empty);
-    return;
-  }
-
-  const selectedSourceIds = getEventPlaylistSelectedSourceIds(sources, eventPlaylistActiveSourceIds);
-  const items = buildEventPlaylistItems(sources);
-
-  const toolbar = document.createElement("div");
-  toolbar.className = "event-playlist-toolbar";
-
-  const filters = document.createElement("details");
-  filters.className = "event-playlist-filter";
-  filters.dataset.noDrag = "true";
-
-  const summary = document.createElement("summary");
-  summary.textContent = `Filters ${selectedSourceIds.size}/${sources.length}`;
-  filters.append(summary);
-
-  const filterPanel = document.createElement("div");
-  filterPanel.className = "event-playlist-filter-panel";
-
-  const actions = document.createElement("div");
-  actions.className = "event-playlist-filter-actions";
-
-  const allButton = document.createElement("button");
-  allButton.type = "button";
-  allButton.textContent = "All";
-  allButton.addEventListener("click", () => {
-    eventPlaylistActiveSourceIds = new Set(sources.map((source) => source.id));
-    eventPlaylistLastActiveKey = null;
-    renderEventPlaylistWindow();
-    const state = replayPlayer?.getState();
-    if (state) syncEventPlaylistTimeline(state);
-  });
-
-  const noneButton = document.createElement("button");
-  noneButton.type = "button";
-  noneButton.textContent = "None";
-  noneButton.addEventListener("click", () => {
-    eventPlaylistActiveSourceIds = new Set();
-    eventPlaylistLastActiveKey = null;
-    renderEventPlaylistWindow();
-  });
-
-  actions.append(allButton, noneButton);
-  filterPanel.append(actions);
-
-  const sourcesByGroup = new Map<string, EventPlaylistSource[]>();
-  for (const source of sources) {
-    const group = sourcesByGroup.get(source.group) ?? [];
-    group.push(source);
-    sourcesByGroup.set(source.group, group);
-  }
-
-  for (const [group, groupSources] of sourcesByGroup) {
-    const groupEl = document.createElement("section");
-    groupEl.className = "event-playlist-filter-group";
-    const heading = document.createElement("h3");
-    heading.textContent = group;
-    groupEl.append(heading);
-
-    for (const source of groupSources) {
-      const label = document.createElement("label");
-      label.className = "toggle event-playlist-filter-option";
-
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.checked = selectedSourceIds.has(source.id);
-      input.addEventListener("change", () => {
-        setEventPlaylistSourceSelection(sources, (selected) => {
-          if (input.checked) {
-            selected.add(source.id);
-          } else {
-            selected.delete(source.id);
-          }
-        });
-      });
-
-      const text = document.createElement("span");
-      text.textContent = `${source.label} (${source.events.length})`;
-      label.append(input, text);
-      groupEl.append(label);
-    }
-
-    filterPanel.append(groupEl);
-  }
-
-  filters.append(filterPanel);
-
-  const followLabel = document.createElement("label");
-  followLabel.className = "toggle event-playlist-follow";
-  const followInput = document.createElement("input");
-  followInput.type = "checkbox";
-  followInput.checked = eventPlaylistAutoFollow;
-  followInput.addEventListener("change", () => {
-    eventPlaylistAutoFollow = followInput.checked;
-    const state = replayPlayer?.getState();
-    if (state) syncEventPlaylistTimeline(state, { forceScroll: true });
-  });
-  const followText = document.createElement("span");
-  followText.textContent = "Auto-follow";
-  followLabel.append(followInput, followText);
-
-  toolbar.append(filters, followLabel);
-
-  const list = document.createElement("div");
-  list.className = "event-playlist-list";
-  list.dataset.noDrag = "true";
-
-  if (items.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "stat-window-empty";
-    empty.textContent = "No event types selected.";
-    list.append(empty);
-  } else {
-    for (const item of items) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "event-playlist-item";
-      button.dataset.eventKey = item.key;
-      button.dataset.eventTime = `${item.event.time}`;
-      button.style.setProperty("--event-color", item.color);
-      button.addEventListener("click", () => {
-        cueTimelineEvent(item.event);
-      });
-
-      const time = document.createElement("span");
-      time.className = "event-playlist-time";
-      time.textContent = formatTime(item.event.time);
-
-      const main = document.createElement("span");
-      main.className = "event-playlist-main";
-      const label = document.createElement("strong");
-      label.textContent = item.event.label ?? item.sourceLabel;
-      const meta = document.createElement("span");
-      meta.textContent = [
-        item.event.playerName ?? null,
-        item.event.frame !== undefined ? `frame ${item.event.frame}` : null,
-        item.sourceLabel,
-      ]
-        .filter((part): part is string => Boolean(part))
-        .join(" · ");
-      main.append(label, meta);
-
-      button.append(time, main);
-      list.append(button);
-    }
-  }
-
-  eventPlaylistWindowBody.append(toolbar, list);
-}
-
-function getEventPlaylistActiveItem(list: HTMLElement, currentTime: number): HTMLElement | null {
-  const items = [...list.querySelectorAll<HTMLElement>(".event-playlist-item")];
-  if (items.length === 0) {
-    return null;
-  }
-
-  let bestItem = items[0] ?? null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const item of items) {
-    const time = Number(item.dataset.eventTime);
-    if (!Number.isFinite(time)) {
-      continue;
-    }
-    const distance = Math.abs(time - currentTime);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestItem = item;
-    }
-  }
-  return bestItem;
+  eventPlaylistController?.render();
 }
 
 function syncEventPlaylistTimeline(
   state: ReplayPlayerState,
-  options: { forceScroll?: boolean } = {},
+  options: SyncEventPlaylistTimelineOptions = {},
 ): void {
-  const list = eventPlaylistWindowBody?.querySelector<HTMLElement>(".event-playlist-list");
-  if (!list) {
-    return;
-  }
+  eventPlaylistController?.syncTimeline(state, options);
+}
 
-  const activeItem = getEventPlaylistActiveItem(list, state.currentTime);
-  const activeKey = activeItem?.dataset.eventKey ?? null;
-  if (activeKey === eventPlaylistLastActiveKey && !options.forceScroll) {
-    return;
-  }
-
-  list.querySelectorAll<HTMLElement>(".event-playlist-item[data-active='true']").forEach((item) => {
-    item.dataset.active = "false";
-  });
-
-  if (activeItem) {
-    activeItem.dataset.active = "true";
-    if (eventPlaylistAutoFollow || options.forceScroll) {
-      activeItem.scrollIntoView({ block: "nearest" });
-    }
-  }
-
-  eventPlaylistLastActiveKey = activeKey;
+function resetEventPlaylistWindow(): void {
+  eventPlaylistController?.reset();
 }
 
 function createMechanicsReviewReplaySource(
@@ -2624,8 +2402,7 @@ async function loadReplayBundleForDisplay(
   clearTimelineRangeSources();
   clearStandalonePlugins();
   clearRenderCaches();
-  eventPlaylistActiveSourceIds = null;
-  eventPlaylistLastActiveKey = null;
+  resetEventPlaylistWindow();
   renderScoreboard();
   renderTimelineEventCount();
   renderMechanicsTimelineControls();
@@ -2697,8 +2474,7 @@ async function loadReplayBundleForDisplay(
     framesReadout.textContent = `${replay.frameCount}`;
     renderTimelineEventCount();
     renderMechanicsTimelineControls();
-    eventPlaylistActiveSourceIds = null;
-    eventPlaylistLastActiveKey = null;
+    resetEventPlaylistWindow();
     renderEventPlaylistWindow();
     setTransportEnabled(true);
     syncCameraControlAvailability(replayPlayer.getState());
@@ -2769,6 +2545,13 @@ export function mountStatEvaluationPlayer(
     "#mechanics-timeline-window-body",
   );
   eventPlaylistWindowBody = mustElement<HTMLDivElement>(root, "#event-playlist-window-body");
+  eventPlaylistController = createEventPlaylistWindowController({
+    body: eventPlaylistWindowBody,
+    getReplayPlayer: () => replayPlayer,
+    getSources: getEventPlaylistSourcesForWindow,
+    cueTimelineEvent,
+    formatTime,
+  });
   mechanicsReviewFile = mustElement<HTMLInputElement>(root, "#mechanics-review-file");
   mechanicsReviewUrl = mustElement<HTMLInputElement>(root, "#mechanics-review-url");
   mechanicsReviewLoadUrl = mustElement<HTMLButtonElement>(root, "#mechanics-review-load-url");
@@ -2929,9 +2712,8 @@ export function mountStatEvaluationPlayer(
     activeTimelineRangeModuleIds = new Set<string>();
     activeMechanicTimelineKinds = new Set<string>();
     activeRenderEffectModuleIds = new Set<string>();
-    eventPlaylistActiveSourceIds = null;
-    eventPlaylistAutoFollow = true;
-    eventPlaylistLastActiveKey = null;
+    resetEventPlaylistWindow();
+    eventPlaylistController = null;
     activeMechanicsReview = null;
     mechanicsReviewBoundaryGuard = false;
     boostPadOverlayEnabled = true;
