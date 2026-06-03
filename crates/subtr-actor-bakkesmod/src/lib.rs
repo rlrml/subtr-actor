@@ -1,12 +1,20 @@
 #![allow(clippy::result_large_err)]
 
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
+use std::io::{Read, Write};
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
 
+use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
+use base64::Engine as _;
 use boxcars::{ParserBuilder, Quaternion, RemoteId, RigidBody, Vector3f};
+use flate2::{
+    read::{DeflateDecoder, ZlibDecoder},
+    write::DeflateEncoder,
+    Compression,
+};
 use subtr_actor::{
     boost_amount_to_percent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
     builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
@@ -23,9 +31,9 @@ use subtr_actor::{
     GoalEvent, GoalTagEvent, GoalTagKind, LivePlayState, MechanicEvent, MechanicTiming,
     PlayerFrameState, PlayerId, PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind,
     ProcessorView, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
-    RushEvent, ShotEventMetadata, StatsTimelineEventCollector, SubtrActorError,
-    SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent,
-    TouchStateCalculator, WhiffEvent,
+    RushEvent, ShotEventMetadata, StatsTimelineCollector, StatsTimelineEventCollector,
+    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
+    TouchEvent, TouchStateCalculator, WhiffEvent,
 };
 
 #[repr(C)]
@@ -228,6 +236,15 @@ pub struct SaLiveFrame {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SaReplayScore {
+    pub team_zero_score: i32,
+    pub has_team_zero_score: u8,
+    pub team_one_score: i32,
+    pub has_team_one_score: u8,
+}
+
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SaMechanicKind {
     SpeedFlip = 1,
@@ -281,6 +298,14 @@ pub struct SaMechanicEvent {
     pub frame_number: u64,
     pub time: f32,
     pub confidence: f32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SaReplayPlayerInfo {
+    pub player_index: u32,
+    pub is_team_0: u8,
+    pub name: *const c_char,
 }
 
 #[repr(C)]
@@ -349,9 +374,24 @@ pub struct SaEngine {
 
 pub struct SaReplayAnnotations {
     events: Vec<SaMechanicEvent>,
+    frames: Vec<ReplayStatsFrame>,
+    players: Vec<SaReplayPlayerInfo>,
+    _player_names: Vec<CString>,
     cursor: usize,
     last_poll_time: f32,
     initialized: bool,
+}
+
+fn replay_annotation_frame_at_time(
+    annotations: &SaReplayAnnotations,
+    replay_time: f32,
+) -> Option<&ReplayStatsFrame> {
+    annotations
+        .frames
+        .iter()
+        .take_while(|frame| frame.time <= replay_time + f32::EPSILON)
+        .last()
+        .or_else(|| annotations.frames.first())
 }
 
 const LIVE_GRAPH_OUTPUT_NAMES: &[&str] = &[
@@ -2186,6 +2226,22 @@ fn replay_player_index_map(replay_meta: &ReplayMeta) -> HashMap<RemoteId, u32> {
         .collect()
 }
 
+fn replay_annotation_players(replay_meta: &ReplayMeta) -> (Vec<CString>, Vec<SaReplayPlayerInfo>) {
+    let mut names = Vec::new();
+    let mut players = Vec::new();
+    for (player_index, player) in replay_meta.player_order().enumerate() {
+        names.push(CString::new(player.name.as_str()).unwrap_or_else(|_| {
+            CString::new(player.name.replace('\0', "")).expect("nul bytes removed")
+        }));
+        players.push(SaReplayPlayerInfo {
+            player_index: player_index as u32,
+            is_team_0: (player_index < replay_meta.team_zero.len()) as u8,
+            name: names.last().expect("player name was just pushed").as_ptr(),
+        });
+    }
+    (names, players)
+}
+
 fn replay_player_index(index_map: &HashMap<RemoteId, u32>, id: &RemoteId) -> u32 {
     index_map
         .get(id)
@@ -2731,6 +2787,49 @@ fn serialize_live_graph_output(engine: &SaEngine, output_name: &str) -> Option<V
     }
 }
 
+fn inflate_stats_player_config_bytes(compressed: &[u8]) -> Option<Vec<u8>> {
+    let mut raw_decoder = DeflateDecoder::new(compressed);
+    let mut json = Vec::new();
+    if raw_decoder.read_to_end(&mut json).is_ok()
+        && serde_json::from_slice::<serde_json::Value>(&json).is_ok()
+    {
+        return Some(json);
+    }
+
+    let mut zlib_decoder = ZlibDecoder::new(compressed);
+    let mut json = Vec::new();
+    if zlib_decoder.read_to_end(&mut json).is_ok()
+        && serde_json::from_slice::<serde_json::Value>(&json).is_ok()
+    {
+        return Some(json);
+    }
+
+    None
+}
+
+fn decode_stats_player_config_json(value: &CStr) -> Option<Vec<u8>> {
+    let value = value.to_str().ok()?.trim();
+    if value.starts_with('{') {
+        return Some(value.as_bytes().to_vec());
+    }
+
+    let compressed = URL_SAFE_NO_PAD
+        .decode(value)
+        .or_else(|_| URL_SAFE.decode(value))
+        .ok()?;
+    inflate_stats_player_config_bytes(&compressed)
+}
+
+fn encode_stats_player_config_json(value: &CStr) -> Option<Vec<u8>> {
+    let value = value.to_str().ok()?.trim();
+    serde_json::from_str::<serde_json::Value>(value).ok()?;
+
+    let mut encoder = DeflateEncoder::new(Vec::new(), Compression::best());
+    encoder.write_all(value.as_bytes()).ok()?;
+    let compressed = encoder.finish().ok()?;
+    Some(URL_SAFE_NO_PAD.encode(compressed).into_bytes())
+}
+
 fn refresh_timeline_graph_state(engine: &mut SaEngine) {
     let Some(events) = engine
         .graph
@@ -2784,9 +2883,14 @@ fn build_replay_annotations(path: &CStr) -> SubtrActorResult<SaReplayAnnotations
         })?;
     let timeline =
         StatsTimelineEventCollector::new().get_replay_stats_timeline_scaffold(&replay)?;
+    let score_timeline = StatsTimelineCollector::new().get_legacy_replay_stats_timeline(&replay)?;
     let events = replay_annotations_from_timeline(&timeline.replay_meta, &timeline.events);
+    let (player_names, players) = replay_annotation_players(&timeline.replay_meta);
     Ok(SaReplayAnnotations {
         events,
+        frames: score_timeline.frames,
+        players,
+        _player_names: player_names,
         cursor: 0,
         last_poll_time: 0.0,
         initialized: false,
@@ -2831,6 +2935,159 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_count(
     unsafe { annotations.as_ref() }
         .map(|annotations| annotations.events.len())
         .unwrap_or(0)
+}
+
+/// Returns the number of replay players available for annotation labels.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_player_count(
+    annotations: *const SaReplayAnnotations,
+) -> usize {
+    unsafe { annotations.as_ref() }
+        .map(|annotations| annotations.players.len())
+        .unwrap_or(0)
+}
+
+/// Copies replay player metadata into `out_players`.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_players(
+    annotations: *const SaReplayAnnotations,
+    out_players: *mut SaReplayPlayerInfo,
+    max_players: usize,
+) -> usize {
+    let Some(annotations) = (unsafe { annotations.as_ref() }) else {
+        return 0;
+    };
+    if max_players == 0 || out_players.is_null() {
+        return 0;
+    }
+    let count = annotations.players.len().min(max_players);
+    unsafe {
+        ptr::copy_nonoverlapping(annotations.players.as_ptr(), out_players, count);
+    }
+    count
+}
+
+/// Copies replay players and current-frame core stats for replay playback.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_frame_players(
+    annotations: *const SaReplayAnnotations,
+    replay_time: f32,
+    out_players: *mut SaPlayerFrame,
+    max_players: usize,
+) -> usize {
+    let Some(annotations) = (unsafe { annotations.as_ref() }) else {
+        return 0;
+    };
+    if max_players == 0 || out_players.is_null() {
+        return 0;
+    }
+    let Some(frame) = replay_annotation_frame_at_time(annotations, replay_time) else {
+        return 0;
+    };
+
+    let count = frame.players.len().min(max_players);
+    for (index, player) in frame.players.iter().take(count).enumerate() {
+        let player_info = annotations.players.get(index);
+        let player_frame = SaPlayerFrame {
+            player_index: player_info
+                .map(|info| info.player_index)
+                .unwrap_or(index as u32),
+            player_name: player_info.map(|info| info.name).unwrap_or(ptr::null()),
+            is_team_0: player.is_team_0 as u8,
+            has_match_stats: 1,
+            match_goals: player.core.goals,
+            match_assists: player.core.assists,
+            match_saves: player.core.saves,
+            match_shots: player.core.shots,
+            match_score: player.core.score,
+            ..SaPlayerFrame::default()
+        };
+        unsafe {
+            *out_players.add(index) = player_frame;
+        }
+    }
+    count
+}
+
+fn serialize_replay_annotation_frame(
+    annotations: &SaReplayAnnotations,
+    replay_time: f32,
+) -> Option<Vec<u8>> {
+    replay_annotation_frame_at_time(annotations, replay_time)
+        .and_then(|frame| serde_json::to_vec(frame).ok())
+}
+
+/// Returns the UTF-8 byte length of the replay stats frame at `replay_time`.
+///
+/// The JSON payload is a `ReplayStatsFrame` from the preprocessed replay
+/// timeline. It is the replay-mode counterpart of
+/// `subtr_actor_bakkesmod_frame_json_len`.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_frame_json_len(
+    annotations: *const SaReplayAnnotations,
+    replay_time: f32,
+) -> usize {
+    annotations
+        .as_ref()
+        .and_then(|annotations| serialize_replay_annotation_frame(annotations, replay_time))
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+}
+
+/// Writes the replay stats frame at `replay_time` into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_replay_annotation_frame_json_len` first to size the
+/// destination buffer.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_frame_json(
+    annotations: *const SaReplayAnnotations,
+    replay_time: f32,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(annotations) = annotations.as_ref() else {
+        return 0;
+    };
+    if out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+
+    let Some(bytes) = serialize_replay_annotation_frame(annotations, replay_time) else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
+}
+
+/// Returns the scoreboard value for the latest processed replay frame at or before
+/// `replay_time`.
+#[no_mangle]
+pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_score_at_time(
+    annotations: *const SaReplayAnnotations,
+    replay_time: f32,
+    out_score: *mut SaReplayScore,
+) -> i32 {
+    let Some(annotations) = (unsafe { annotations.as_ref() }) else {
+        return -1;
+    };
+    if out_score.is_null() {
+        return -1;
+    }
+    let Some(frame) = replay_annotation_frame_at_time(annotations, replay_time) else {
+        return -2;
+    };
+
+    unsafe {
+        *out_score = SaReplayScore {
+            team_zero_score: frame.team_zero.core.goals,
+            has_team_zero_score: 1,
+            team_one_score: frame.team_one.core.goals,
+            has_team_one_score: 1,
+        };
+    }
+    0
 }
 
 /// Drains annotation events whose normal replay-processing timestamp has been
@@ -3041,6 +3298,106 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_goal_context_event_count(
         .as_ref()
         .map(|engine| engine.pending_goal_context_events.len())
         .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Returns the UTF-8 byte length of a decoded stats-player config JSON payload.
+///
+/// Accepts the compressed base64url `cfg` value emitted by the web stats
+/// evaluation player. Raw JSON is accepted as a compatibility fallback.
+///
+/// # Safety
+///
+/// `encoded_config` must either be null or point to a valid null-terminated
+/// UTF-8 string.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_decoded_stats_player_config_json_len(
+    encoded_config: *const c_char,
+) -> usize {
+    if encoded_config.is_null() {
+        return 0;
+    }
+    let encoded_config = unsafe { CStr::from_ptr(encoded_config) };
+    decode_stats_player_config_json(encoded_config)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes a decoded stats-player config JSON payload into caller-owned storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_decoded_stats_player_config_json_len` first to size
+/// the destination buffer.
+///
+/// # Safety
+///
+/// `encoded_config` must point to a valid null-terminated UTF-8 string.
+/// `out_bytes` must point to writable storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_decoded_stats_player_config_json(
+    encoded_config: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    if encoded_config.is_null() || out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+    let encoded_config = unsafe { CStr::from_ptr(encoded_config) };
+    let Some(bytes) = decode_stats_player_config_json(encoded_config) else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
+}
+
+#[no_mangle]
+/// Returns the byte length of the compressed base64url stats-player cfg value.
+///
+/// The output format matches the web stats evaluation player's `cfg` payload:
+/// raw deflate of UTF-8 JSON, encoded as unpadded base64url.
+///
+/// # Safety
+///
+/// `json_config` must either be null or point to a valid null-terminated UTF-8
+/// JSON string.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_encoded_stats_player_config_len(
+    json_config: *const c_char,
+) -> usize {
+    if json_config.is_null() {
+        return 0;
+    }
+    let json_config = unsafe { CStr::from_ptr(json_config) };
+    encode_stats_player_config_json(json_config)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Writes the compressed base64url stats-player cfg value into caller storage.
+///
+/// Returns the number of bytes written. Call
+/// `subtr_actor_bakkesmod_encoded_stats_player_config_len` first to size the
+/// destination buffer.
+///
+/// # Safety
+///
+/// `json_config` must point to a valid null-terminated UTF-8 JSON string.
+/// `out_bytes` must point to writable storage for at least `max_bytes` bytes.
+pub unsafe extern "C" fn subtr_actor_bakkesmod_write_encoded_stats_player_config(
+    json_config: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    if json_config.is_null() || out_bytes.is_null() || max_bytes == 0 {
+        return 0;
+    }
+    let json_config = unsafe { CStr::from_ptr(json_config) };
+    let Some(bytes) = encode_stats_player_config_json(json_config) else {
+        return 0;
+    };
+    let count = max_bytes.min(bytes.len());
+    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+    count
 }
 
 #[no_mangle]
@@ -3659,6 +4016,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_goal_context_events(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use std::collections::{BTreeMap, BTreeSet};
     use std::ffi::CString;
     use subtr_actor::stats::analysis_graph::STATS_TIMELINE_MECHANIC_KINDS;
@@ -3681,6 +4039,81 @@ mod tests {
             .join("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay")
             .canonicalize()
             .expect("real replay fixture should resolve")
+    }
+
+    fn deflated_base64url_json(json: &str) -> CString {
+        let mut encoder =
+            flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::best());
+        encoder.write_all(json.as_bytes()).unwrap();
+        let compressed = encoder.finish().unwrap();
+        CString::new(URL_SAFE_NO_PAD.encode(compressed)).unwrap()
+    }
+
+    #[test]
+    fn decodes_stats_player_config_cfg_payload() {
+        let json = r#"{"version":1,"playback":{},"camera":{},"overlays":{"timelineEvents":[],"timelineRanges":[],"mechanics":[],"renderEffects":[],"followedPlayerHud":false,"boostPads":false,"boostPickupAnimation":false},"recording":{},"singletonWindows":[],"statsWindows":[],"moduleConfigs":{}}"#;
+        let encoded = deflated_base64url_json(json);
+
+        let byte_count =
+            unsafe { subtr_actor_bakkesmod_decoded_stats_player_config_json_len(encoded.as_ptr()) };
+        assert_eq!(byte_count, json.len());
+
+        let mut bytes = vec![0; byte_count];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_decoded_stats_player_config_json(
+                encoded.as_ptr(),
+                bytes.as_mut_ptr(),
+                bytes.len(),
+            )
+        };
+        assert_eq!(written, json.len());
+        assert_eq!(String::from_utf8(bytes).unwrap(), json);
+    }
+
+    #[test]
+    fn decoded_stats_player_config_accepts_raw_json_fallback() {
+        let json = CString::new(r#"{"version":1,"statsWindows":[]}"#).unwrap();
+        let byte_count =
+            unsafe { subtr_actor_bakkesmod_decoded_stats_player_config_json_len(json.as_ptr()) };
+        assert_eq!(byte_count, json.as_bytes().len());
+    }
+
+    #[test]
+    fn encodes_stats_player_config_cfg_payload() {
+        let json = r#"{"version":1,"statsWindows":[]}"#;
+        let json_cstr = CString::new(json).unwrap();
+
+        let encoded_count =
+            unsafe { subtr_actor_bakkesmod_encoded_stats_player_config_len(json_cstr.as_ptr()) };
+        assert!(encoded_count > 0);
+        assert!(encoded_count < json.len() * 2);
+
+        let mut encoded = vec![0; encoded_count];
+        let written = unsafe {
+            subtr_actor_bakkesmod_write_encoded_stats_player_config(
+                json_cstr.as_ptr(),
+                encoded.as_mut_ptr(),
+                encoded.len(),
+            )
+        };
+        assert_eq!(written, encoded_count);
+        let encoded_cstr = CString::new(encoded).unwrap();
+
+        let decoded_count = unsafe {
+            subtr_actor_bakkesmod_decoded_stats_player_config_json_len(encoded_cstr.as_ptr())
+        };
+        assert_eq!(decoded_count, json.len());
+
+        let mut decoded = vec![0; decoded_count];
+        let decoded_written = unsafe {
+            subtr_actor_bakkesmod_write_decoded_stats_player_config_json(
+                encoded_cstr.as_ptr(),
+                decoded.as_mut_ptr(),
+                decoded.len(),
+            )
+        };
+        assert_eq!(decoded_written, json.len());
+        assert_eq!(String::from_utf8(decoded).unwrap(), json);
     }
 
     fn header_enum_values(enum_name: &str) -> BTreeMap<String, i32> {
@@ -4043,7 +4476,71 @@ mod tests {
         let annotation_count =
             unsafe { subtr_actor_bakkesmod_replay_annotation_count(annotations) };
         assert!(annotation_count > 0);
+        let player_count =
+            unsafe { subtr_actor_bakkesmod_replay_annotation_player_count(annotations) };
+        assert!(player_count > 0);
+        let mut players = vec![
+            SaReplayPlayerInfo {
+                player_index: 0,
+                is_team_0: 0,
+                name: ptr::null(),
+            };
+            player_count
+        ];
+        let copied_players = unsafe {
+            subtr_actor_bakkesmod_write_replay_annotation_players(
+                annotations,
+                players.as_mut_ptr(),
+                players.len(),
+            )
+        };
+        assert_eq!(copied_players, player_count);
+        assert!(players[..copied_players]
+            .iter()
+            .any(|player| !player.name.is_null()));
         let final_time = unsafe { (*annotations).events.last().expect("events").time + 1.0 };
+        let mut frame_players = vec![SaPlayerFrame::default(); player_count];
+        let copied_frame_players = unsafe {
+            subtr_actor_bakkesmod_write_replay_annotation_frame_players(
+                annotations,
+                final_time,
+                frame_players.as_mut_ptr(),
+                frame_players.len(),
+            )
+        };
+        assert_eq!(copied_frame_players, player_count);
+        assert!(frame_players[..copied_frame_players]
+            .iter()
+            .all(|player| player.has_match_stats == 1 && !player.player_name.is_null()));
+        let frame_json_len = unsafe {
+            subtr_actor_bakkesmod_replay_annotation_frame_json_len(annotations, final_time)
+        };
+        assert!(frame_json_len > 0);
+        let mut frame_json = vec![0; frame_json_len];
+        let frame_json_written = unsafe {
+            subtr_actor_bakkesmod_write_replay_annotation_frame_json(
+                annotations,
+                final_time,
+                frame_json.as_mut_ptr(),
+                frame_json.len(),
+            )
+        };
+        assert_eq!(frame_json_written, frame_json_len);
+        let frame_json =
+            String::from_utf8(frame_json).expect("replay annotation frame JSON should be UTF-8");
+        assert!(frame_json.contains("\"players\""));
+        assert!(frame_json.contains("\"team_zero\""));
+        let mut score = SaReplayScore::default();
+        let score_result = unsafe {
+            subtr_actor_bakkesmod_replay_annotation_score_at_time(
+                annotations,
+                final_time,
+                &mut score,
+            )
+        };
+        assert_eq!(score_result, 0);
+        assert_eq!(score.has_team_zero_score, 1);
+        assert_eq!(score.has_team_one_score, 1);
 
         let mut events = vec![
             SaMechanicEvent {
@@ -4104,6 +4601,7 @@ mod tests {
             "SaDemolishEvent",
             "SaLiveFrame",
             "SaMechanicEvent",
+            "SaReplayPlayerInfo",
             "SaTeamEvent",
             "SaGoalContextEvent",
         ] {
@@ -4288,6 +4786,15 @@ mod tests {
                 ],
             ),
             (
+                "SaReplayScore",
+                vec![
+                    ("int32_t", "team_zero_score"),
+                    ("uint8_t", "has_team_zero_score"),
+                    ("int32_t", "team_one_score"),
+                    ("uint8_t", "has_team_one_score"),
+                ],
+            ),
+            (
                 "SaMechanicEvent",
                 vec![
                     ("SaMechanicKind", "kind"),
@@ -4296,6 +4803,14 @@ mod tests {
                     ("uint64_t", "frame_number"),
                     ("float", "time"),
                     ("float", "confidence"),
+                ],
+            ),
+            (
+                "SaReplayPlayerInfo",
+                vec![
+                    ("uint32_t", "player_index"),
+                    ("uint8_t", "is_team_0"),
+                    ("const char *", "name"),
                 ],
             ),
             (
@@ -4520,6 +5035,12 @@ mod tests {
         assert_offset!(SaLiveFrame, demolishes, 216);
         assert_offset!(SaLiveFrame, demolish_count, 224);
 
+        assert_layout!(SaReplayScore, size = 16, align = 4);
+        assert_offset!(SaReplayScore, team_zero_score, 0);
+        assert_offset!(SaReplayScore, has_team_zero_score, 4);
+        assert_offset!(SaReplayScore, team_one_score, 8);
+        assert_offset!(SaReplayScore, has_team_one_score, 12);
+
         assert_layout!(SaMechanicEvent, size = 32, align = 8);
         assert_offset!(SaMechanicEvent, kind, 0);
         assert_offset!(SaMechanicEvent, player_index, 4);
@@ -4527,6 +5048,11 @@ mod tests {
         assert_offset!(SaMechanicEvent, frame_number, 16);
         assert_offset!(SaMechanicEvent, time, 24);
         assert_offset!(SaMechanicEvent, confidence, 28);
+
+        assert_layout!(SaReplayPlayerInfo, size = 16, align = 8);
+        assert_offset!(SaReplayPlayerInfo, player_index, 0);
+        assert_offset!(SaReplayPlayerInfo, is_team_0, 4);
+        assert_offset!(SaReplayPlayerInfo, name, 8);
 
         assert_layout!(SaTeamEvent, size = 48, align = 8);
         assert_offset!(SaTeamEvent, kind, 0);

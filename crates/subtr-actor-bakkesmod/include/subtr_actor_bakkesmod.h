@@ -170,6 +170,13 @@ typedef struct SaLiveFrame {
   size_t demolish_count;
 } SaLiveFrame;
 
+typedef struct SaReplayScore {
+  int32_t team_zero_score;
+  uint8_t has_team_zero_score;
+  int32_t team_one_score;
+  uint8_t has_team_one_score;
+} SaReplayScore;
+
 typedef enum SaMechanicKind {
   SaMechanicKindSpeedFlip = 1,
   SaMechanicKindHalfFlip = 2,
@@ -222,6 +229,12 @@ typedef struct SaMechanicEvent {
   float confidence;
 } SaMechanicEvent;
 
+typedef struct SaReplayPlayerInfo {
+  uint32_t player_index;
+  uint8_t is_team_0;
+  const char *name;
+} SaReplayPlayerInfo;
+
 typedef enum SaTeamEventKind {
   SaTeamEventKindRush = 1,
 } SaTeamEventKind;
@@ -268,6 +281,29 @@ void subtr_actor_bakkesmod_replay_annotations_destroy(
     SaReplayAnnotations *annotations);
 size_t subtr_actor_bakkesmod_replay_annotation_count(
     const SaReplayAnnotations *annotations);
+size_t subtr_actor_bakkesmod_replay_annotation_player_count(
+    const SaReplayAnnotations *annotations);
+size_t subtr_actor_bakkesmod_write_replay_annotation_players(
+    const SaReplayAnnotations *annotations,
+    SaReplayPlayerInfo *out_players,
+    size_t max_players);
+size_t subtr_actor_bakkesmod_write_replay_annotation_frame_players(
+    const SaReplayAnnotations *annotations,
+    float replay_time,
+    SaPlayerFrame *out_players,
+    size_t max_players);
+size_t subtr_actor_bakkesmod_replay_annotation_frame_json_len(
+    const SaReplayAnnotations *annotations,
+    float replay_time);
+size_t subtr_actor_bakkesmod_write_replay_annotation_frame_json(
+    const SaReplayAnnotations *annotations,
+    float replay_time,
+    uint8_t *out_bytes,
+    size_t max_bytes);
+int32_t subtr_actor_bakkesmod_replay_annotation_score_at_time(
+    const SaReplayAnnotations *annotations,
+    float replay_time,
+    SaReplayScore *out_score);
 size_t subtr_actor_bakkesmod_poll_replay_annotations(
     SaReplayAnnotations *annotations,
     float replay_time,
@@ -280,6 +316,18 @@ int32_t subtr_actor_bakkesmod_process_frame(SaEngine *engine, const SaLiveFrame 
 size_t subtr_actor_bakkesmod_pending_event_count(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_pending_team_event_count(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_pending_goal_context_event_count(const SaEngine *engine);
+size_t subtr_actor_bakkesmod_decoded_stats_player_config_json_len(
+    const char *encoded_config);
+size_t subtr_actor_bakkesmod_write_decoded_stats_player_config_json(
+    const char *encoded_config,
+    uint8_t *out_bytes,
+    size_t max_bytes);
+size_t subtr_actor_bakkesmod_encoded_stats_player_config_len(
+    const char *json_config);
+size_t subtr_actor_bakkesmod_write_encoded_stats_player_config(
+    const char *json_config,
+    uint8_t *out_bytes,
+    size_t max_bytes);
 size_t subtr_actor_bakkesmod_events_json_len(const SaEngine *engine);
 size_t subtr_actor_bakkesmod_write_events_json(
     const SaEngine *engine,

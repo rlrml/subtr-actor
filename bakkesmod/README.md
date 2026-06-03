@@ -68,6 +68,15 @@ events, dodge-refresh transitions, and control state:
   `subtr_actor_bakkesmod_graph_info_json_len` and
   `subtr_actor_bakkesmod_write_graph_info_json`
 
+The in-game launcher can copy and paste the floating-window layout as raw JSON.
+It can also copy the same compressed `#cfg=...` fragment emitted by the stats
+evaluation player.
+Paste accepts raw layout JSON, that raw JSON `cfg` fragment, or a full URL
+containing either a raw JSON `cfg` value or the compressed base64url `cfg`
+value emitted by the web stats evaluation player.
+The same inputs can be applied from the BakkesMod console with
+`subtr_actor_apply_ui_config <json|cfg|url>`.
+
 ## Windows build outline
 
 The actual plugin build path is Windows/MSVC. From a Developer PowerShell with
