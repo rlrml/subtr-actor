@@ -15,12 +15,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RUST_SOURCE = REPO_ROOT / "crates/subtr-actor-bakkesmod/src/lib.rs"
-RUST_SOURCE_DIR = REPO_ROOT / "crates/subtr-actor-bakkesmod/src"
-PLUGIN_SOURCE = REPO_ROOT / "bakkesmod/SubtrActorPlugin.cpp"
-PLUGIN_HEADER = REPO_ROOT / "bakkesmod/SubtrActorPlugin.h"
+RUST_SOURCE = REPO_ROOT / "bakkesmod/rust/src/lib.rs"
+RUST_SOURCE_DIR = REPO_ROOT / "bakkesmod/rust/src"
+PLUGIN_SOURCE = REPO_ROOT / "bakkesmod/plugin/SubtrActorPlugin.cpp"
+PLUGIN_HEADER = REPO_ROOT / "bakkesmod/plugin/SubtrActorPlugin.h"
 PLUGIN_README = REPO_ROOT / "bakkesmod/README.md"
-ABI_HEADER = REPO_ROOT / "crates/subtr-actor-bakkesmod/include/subtr_actor_bakkesmod.h"
+ABI_HEADER = REPO_ROOT / "bakkesmod/rust/include/subtr_actor_bakkesmod.h"
 WEB_PLAYER_CONFIG_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/playerConfig.ts"
 WEB_PLAYER_MAIN_SOURCE = REPO_ROOT / "js/stat-evaluation-player/src/main.ts"
 WEB_PLAYER_SOURCE_DIR = REPO_ROOT / "js/stat-evaluation-player/src"

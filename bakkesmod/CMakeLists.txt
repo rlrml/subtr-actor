@@ -55,7 +55,7 @@ if(NOT BAKKESMOD_IMGUI_INCLUDE_DIR)
 endif()
 
 add_library(SubtrActorPlugin SHARED
-  SubtrActorPlugin.cpp
+  plugin/SubtrActorPlugin.cpp
   "${BAKKESMOD_IMGUI_ROOT}/imgui/imgui.cpp"
   "${BAKKESMOD_IMGUI_ROOT}/imgui/imgui_draw.cpp"
   "${BAKKESMOD_IMGUI_ROOT}/imgui/imgui_widgets.cpp"
@@ -64,7 +64,7 @@ add_library(SubtrActorPlugin SHARED
 target_include_directories(SubtrActorPlugin PRIVATE
   "${BAKKESMOD_SDK_DIR}/include"
   "${BAKKESMOD_IMGUI_INCLUDE_DIR}"
-  "${CMAKE_CURRENT_LIST_DIR}/../crates/subtr-actor-bakkesmod/include"
+  "${CMAKE_CURRENT_LIST_DIR}/rust/include"
 )
 
 target_link_directories(SubtrActorPlugin PRIVATE

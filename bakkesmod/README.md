@@ -2,7 +2,7 @@
 
 This is an early BakkesMod integration spike. It is intentionally split into:
 
-- `crates/subtr-actor-bakkesmod`: Rust C ABI that accepts sampled live frames,
+- `bakkesmod/rust`: Rust C ABI that accepts sampled live frames,
   adapts them through a `ProcessorView`, evaluates the shared `subtr-actor`
   analysis graph, drains normalized player and team events for overlay use, and
   exposes the live graph metadata, timeline, event bundle, graph-backed stats
@@ -277,7 +277,7 @@ smoke-tested as a Windows DLL from Linux after the MSVC-ABI build:
 
 ```sh
 x86_64-w64-mingw32-g++ -std=c++20 -static -static-libgcc -static-libstdc++ \
-  -I crates/subtr-actor-bakkesmod/include \
+  -I bakkesmod/rust/include \
   bakkesmod/verify-rust-dll-runtime.cpp \
   -o /tmp/subtr-actor-verify-rust-dll-runtime.exe
 
