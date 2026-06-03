@@ -157,6 +157,8 @@ pub mod touch_state;
 pub use touch_state::*;
 pub mod wall_aerial;
 pub use wall_aerial::*;
+pub mod wall_aerial_stats;
+pub use wall_aerial_stats::*;
 pub mod wall_aerial_shot;
 pub use wall_aerial_shot::*;
 pub mod wall_aerial_shot_stats;
