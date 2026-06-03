@@ -28,16 +28,9 @@ pub struct ConfirmedFlipResetEvent {
     pub time_since_reset: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export)]
-pub struct DodgeResetStats {
-    pub count: u32,
-    pub on_ball_count: u32,
-}
-
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DodgeResetCalculator {
-    player_stats: HashMap<PlayerId, DodgeResetStats>,
+    stats: DodgeResetStatsAccumulator,
     events: EventStream<DodgeResetEvent>,
     on_ball_events: EventStream<DodgeRefreshedEvent>,
     confirmed_flip_reset_events: EventStream<ConfirmedFlipResetEvent>,
@@ -52,7 +45,7 @@ impl DodgeResetCalculator {
     }
 
     pub fn player_stats(&self) -> &HashMap<PlayerId, DodgeResetStats> {
-        &self.player_stats
+        self.stats.player_stats()
     }
 
     pub fn events(&self) -> &[DodgeResetEvent] {
@@ -217,23 +210,23 @@ impl DodgeResetCalculator {
         self.prune_pending_resets(players);
         for event in &events.dodge_refreshed_events {
             let on_ball = Self::on_ball_dodge_reset(ball, players, &event.player);
-            let stats = self.player_stats.entry(event.player.clone()).or_default();
-            stats.count += 1;
-            if on_ball {
-                stats.on_ball_count += 1;
-                self.on_ball_events.push(event.clone());
-                self.pending_on_ball_resets
-                    .insert(event.player.clone(), event.clone());
-                self.pending_reset_dodge_started.remove(&event.player);
-            }
-            self.events.push(DodgeResetEvent {
+            let reset_event = event.clone();
+            let event = DodgeResetEvent {
                 time: event.time,
                 frame: event.frame,
                 player: event.player.clone(),
                 is_team_0: event.is_team_0,
                 counter_value: event.counter_value,
                 on_ball,
-            });
+            };
+            self.stats.apply_event(&event);
+            if on_ball {
+                self.on_ball_events.push(reset_event.clone());
+                self.pending_on_ball_resets
+                    .insert(event.player.clone(), reset_event);
+                self.pending_reset_dodge_started.remove(&event.player);
+            }
+            self.events.push(event);
         }
         self.update_pending_reset_dodges(players);
         for touch_event in &events.touch_events {
