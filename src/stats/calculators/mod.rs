@@ -71,6 +71,8 @@ pub mod ceiling_shot;
 pub use ceiling_shot::*;
 pub mod center;
 pub use center::*;
+pub mod center_stats;
+pub use center_stats::*;
 pub mod demo;
 pub use demo::*;
 mod flip_reset;
