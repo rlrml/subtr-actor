@@ -594,93 +594,6 @@ impl BoostCalculator {
         });
     }
 
-    pub(super) fn warn_for_boost_invariant_violations(
-        &mut self,
-        scope: &str,
-        frame_number: usize,
-        time: f32,
-        stats: &BoostStats,
-        observed_boost_amount: Option<f32>,
-    ) {
-        let violations = boost_invariant_violations(stats, observed_boost_amount);
-        let active_kinds: HashSet<BoostInvariantKind> =
-            violations.iter().map(|violation| violation.kind).collect();
-
-        for violation in violations {
-            let key = BoostInvariantWarningKey {
-                scope: scope.to_string(),
-                kind: violation.kind,
-            };
-            if self.active_invariant_warnings.insert(key) {
-                log::warn!(
-                    "Boost invariant violation for {} at frame {} (t={:.3}): {}",
-                    scope,
-                    frame_number,
-                    time,
-                    violation.message(),
-                );
-            }
-        }
-
-        for kind in BoostInvariantKind::ALL {
-            if active_kinds.contains(&kind) {
-                continue;
-            }
-            self.active_invariant_warnings
-                .remove(&BoostInvariantWarningKey {
-                    scope: scope.to_string(),
-                    kind,
-                });
-        }
-    }
-
-    pub(super) fn warn_for_sample_boost_invariants(
-        &mut self,
-        frame: &FrameInfo,
-        players: &PlayerFrameState,
-    ) {
-        let team_zero_stats = self.team_zero_stats.clone();
-        let team_one_stats = self.team_one_stats.clone();
-        let player_scopes: Vec<(PlayerId, Option<f32>, BoostStats)> = players
-            .players
-            .iter()
-            .map(|player| {
-                (
-                    player.player_id.clone(),
-                    player.boost_amount,
-                    self.player_stats
-                        .get(&player.player_id)
-                        .cloned()
-                        .unwrap_or_default(),
-                )
-            })
-            .collect();
-
-        self.warn_for_boost_invariant_violations(
-            "team_zero",
-            frame.frame_number,
-            frame.time,
-            &team_zero_stats,
-            None,
-        );
-        self.warn_for_boost_invariant_violations(
-            "team_one",
-            frame.frame_number,
-            frame.time,
-            &team_one_stats,
-            None,
-        );
-        for (player_id, observed_boost_amount, stats) in player_scopes {
-            self.warn_for_boost_invariant_violations(
-                &format!("player {player_id:?}"),
-                frame.frame_number,
-                frame.time,
-                &stats,
-                observed_boost_amount,
-            );
-        }
-    }
-
     pub(super) fn interval_fraction_in_boost_range(
         start_boost: f32,
         end_boost: f32,
@@ -920,6 +833,62 @@ impl BoostCalculator {
         }
     }
 
+    pub(super) fn resolve_deferred_reported_pickups(
+        &mut self,
+        frame: &FrameInfo,
+        players: &PlayerFrameState,
+    ) {
+        const TOLERANCE: f32 = 1.0;
+
+        let mut remaining_pickups = VecDeque::new();
+        for mut deferred in std::mem::take(&mut self.pending_reported_pickups) {
+            let player = players
+                .players
+                .iter()
+                .find(|player| player.player_id == deferred.pending_pickup.player_id);
+            let observed_boost_amount = player.and_then(|player| player.boost_amount);
+            let previous_sample_boost_amount = self
+                .previous_boost_amounts
+                .get(&deferred.pending_pickup.player_id)
+                .copied()
+                .unwrap_or(deferred.pending_pickup.previous_boost_amount);
+            let gain_is_visible = observed_boost_amount.is_some_and(|boost_amount| {
+                boost_amount > previous_sample_boost_amount + TOLERANCE
+            });
+            let pickup_expired = deferred.pending_pickup.frame + Self::PICKUP_MATCH_FRAME_WINDOW
+                < frame.frame_number;
+
+            if !gain_is_visible && !pickup_expired {
+                remaining_pickups.push_back(deferred);
+                continue;
+            }
+
+            if gain_is_visible || pickup_expired {
+                deferred.pending_pickup.frame = frame.frame_number;
+                deferred.pending_pickup.time = frame.time;
+                deferred.pending_pickup.boost_after = observed_boost_amount;
+                if let Some(position) = player.and_then(|player| player.position()) {
+                    deferred.pending_pickup.player_position = position;
+                }
+            }
+
+            let field_half =
+                self.resolve_pickup(&deferred.pad_id, deferred.pending_pickup, deferred.pad_size);
+            deferred.reported_event.field_half = field_half;
+            self.record_reported_pickup(deferred.reported_event);
+        }
+        self.pending_reported_pickups = remaining_pickups;
+    }
+
+    pub(super) fn flush_deferred_reported_pickups(&mut self) {
+        while let Some(mut deferred) = self.pending_reported_pickups.pop_front() {
+            let field_half =
+                self.resolve_pickup(&deferred.pad_id, deferred.pending_pickup, deferred.pad_size);
+            deferred.reported_event.field_half = field_half;
+            self.record_reported_pickup(deferred.reported_event);
+        }
+    }
+
     pub(super) fn flush_stale_pickup_comparisons(&mut self, current_frame: usize) {
         while self
             .pending_inferred_pickups
@@ -931,6 +900,7 @@ impl BoostCalculator {
     }
 
     pub fn finish_calculation(&mut self) -> SubtrActorResult<()> {
+        self.flush_deferred_reported_pickups();
         self.pending_inferred_pickups.clear();
         Ok(())
     }
