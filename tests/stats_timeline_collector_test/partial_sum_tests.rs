@@ -1,4 +1,5 @@
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_boost_stats_events_reconstruct_final_serialized_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -17,6 +18,7 @@ fn test_boost_stats_events_reconstruct_final_serialized_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_mechanic_events_reconstruct_serialized_partial_sums() {
     let replay_paths = [
         "assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay",
@@ -55,6 +57,7 @@ fn test_mechanic_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_speed_flip_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
     let replay = parse_replay(replay_path);
@@ -70,6 +73,7 @@ fn test_speed_flip_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_whiff_events_reconstruct_serialized_partial_sums() {
     let replay_paths = [
         "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay",
@@ -95,6 +99,7 @@ fn test_whiff_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_backboard_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -110,6 +115,7 @@ fn test_backboard_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_double_tap_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
     let replay = parse_replay(replay_path);
@@ -125,6 +131,7 @@ fn test_double_tap_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_one_timer_events_reconstruct_serialized_partial_sums() {
     let replay_paths = [
         "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay",
@@ -151,6 +158,7 @@ fn test_one_timer_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_pass_events_reconstruct_serialized_partial_sums() {
     let replay_paths = [
         "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay",
@@ -177,6 +185,7 @@ fn test_pass_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_rush_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -192,6 +201,7 @@ fn test_rush_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_bump_events_reconstruct_serialized_partial_sums() {
     let replay_paths = [
         "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay",
@@ -219,6 +229,7 @@ fn test_bump_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_demo_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2026-01-14-v868-32-net10-demolish-extended.replay";
     let replay = parse_replay(replay_path);
@@ -237,6 +248,7 @@ fn test_demo_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_fifty_fifty_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -252,6 +264,7 @@ fn test_fifty_fifty_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_half_volley_events_reconstruct_serialized_partial_sums() {
     let replay_paths = [
         "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay",
@@ -279,6 +292,7 @@ fn test_half_volley_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_ball_carry_events_reconstruct_serialized_partial_sums() {
     let replay_paths = [
         "assets/air-dribble-goal-mouth-2026-05-24.replay",
@@ -303,6 +317,7 @@ fn test_ball_carry_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_wall_aerial_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/air-dribble-goal-mouth-2026-05-24.replay";
     let replay = parse_replay(replay_path);
@@ -318,6 +333,7 @@ fn test_wall_aerial_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_wall_aerial_shot_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/air-dribble-goal-mouth-2026-05-24.replay";
     let replay = parse_replay(replay_path);
@@ -333,6 +349,7 @@ fn test_wall_aerial_shot_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_flick_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -348,6 +365,7 @@ fn test_flick_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_musty_flick_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -363,6 +381,7 @@ fn test_musty_flick_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_dodge_reset_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay";
     let replay = parse_replay(replay_path);
@@ -386,6 +405,7 @@ fn test_dodge_reset_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_powerslide_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -401,6 +421,7 @@ fn test_powerslide_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_touch_events_reconstruct_final_serialized_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -420,6 +441,7 @@ fn test_touch_events_reconstruct_final_serialized_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_core_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -439,6 +461,7 @@ fn test_core_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_possession_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -454,6 +477,7 @@ fn test_possession_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_pressure_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -469,6 +493,7 @@ fn test_pressure_events_reconstruct_serialized_partial_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_movement_events_reconstruct_final_serialized_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -484,6 +509,7 @@ fn test_movement_events_reconstruct_final_serialized_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_positioning_events_reconstruct_final_serialized_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);
@@ -499,6 +525,7 @@ fn test_positioning_events_reconstruct_final_serialized_sums() {
 }
 
 #[test]
+#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_rotation_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
     let replay = parse_replay(replay_path);

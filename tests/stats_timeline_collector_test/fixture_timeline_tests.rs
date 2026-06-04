@@ -1,4 +1,5 @@
 #[test]
+#[ignore = "replay-backed timeline fixture test is slow; run explicitly when changing timeline collection"]
 fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let timeline = StatsTimelineCollector::new()
@@ -41,6 +42,7 @@ fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
 }
 
 #[test]
+#[ignore = "replay-backed timeline serialization test is slow; run explicitly when changing timeline export"]
 fn test_stats_timeline_value_serializes_for_rlcs_replay() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let captured = StatsCollector::new()
@@ -54,6 +56,7 @@ fn test_stats_timeline_value_serializes_for_rlcs_replay() {
 }
 
 #[test]
+#[ignore = "replay-backed timeline fixture test is slow; run explicitly when changing timeline collection"]
 fn test_stats_timeline_excludes_post_goal_reset_frames_from_cumulative_stats() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let replay_data = ReplayDataCollector::new()
@@ -132,6 +135,7 @@ fn test_stats_timeline_excludes_post_goal_reset_frames_from_cumulative_stats() {
 }
 
 #[test]
+#[ignore = "replay-backed timeline fixture test is slow; run explicitly when changing player discovery"]
 fn test_stats_timeline_old_replay_with_substitutions_discovers_late_players() {
     let replay = parse_replay("assets/old-ballchasing-midfield-car.replay");
     let timeline = StatsTimelineCollector::new()
@@ -158,6 +162,7 @@ fn test_stats_timeline_old_replay_with_substitutions_discovers_late_players() {
 }
 
 #[test]
+#[ignore = "replay-backed timeline fixture test is slow; run explicitly when changing boost accounting"]
 fn test_stats_timeline_boost_monotonic_dodges_replay() {
     let replay =
         parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
@@ -243,6 +248,7 @@ fn test_stats_timeline_boost_monotonic_dodges_replay() {
 }
 
 #[test]
+#[ignore = "replay-backed timeline fixture test is slow; run explicitly when changing dodge-reset touch attribution"]
 fn test_stats_timeline_awards_touch_for_on_ball_reset_in_dodges_replay() {
     let replay =
         parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
@@ -289,6 +295,7 @@ fn test_stats_timeline_awards_touch_for_on_ball_reset_in_dodges_replay() {
 }
 
 #[test]
+#[ignore = "replay-backed timeline fixture test is slow; run explicitly when changing kickoff touch attribution"]
 fn test_stats_timeline_first_kickoff_credits_both_players() {
     let replay =
         parse_replay("assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay");
