@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   computeTimelineSegments,
   getReplayPlaybackEndTime,
+  projectReplayTimeToTimeline,
   projectTimelineTimeToReplay,
 } from "../src/player-internals/timeline";
 import type { ReplayModel } from "../src/types";
@@ -48,4 +49,25 @@ test("playback end keeps raw duration when final frames are visible", () => {
 
   assert.deepEqual(segments, [{ startTime: 2, endTime: 4 }]);
   assert.equal(getReplayPlaybackEndTime(replay.duration, segments), 5);
+});
+
+test("timeline projection keeps replay times canonical after skipped ranges", () => {
+  const segments = [{ startTime: 2, endTime: 4 }];
+
+  assert.deepEqual(projectReplayTimeToTimeline(10, segments, 7), {
+    replayTime: 7,
+    timelineTime: 7,
+    seekTime: 7,
+    hiddenBySkip: false,
+  });
+  assert.equal(projectTimelineTimeToReplay(10, 10, segments, 7), 7);
+});
+
+test("timeline projection identifies skipped ranges without compacting them", () => {
+  assert.deepEqual(projectReplayTimeToTimeline(10, [{ startTime: 2, endTime: 4 }], 3), {
+    replayTime: 3,
+    timelineTime: 3,
+    seekTime: 4,
+    hiddenBySkip: true,
+  });
 });

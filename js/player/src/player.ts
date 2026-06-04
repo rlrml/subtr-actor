@@ -85,7 +85,6 @@ export class ReplayPlayer extends EventTarget {
   private readonly kickoffGameState: number | null;
   private timelineSegmentsCacheKey: string | null = null;
   private timelineSegmentsCache: ReplayPlayerTimelineSegment[] = [];
-  private timelineDurationCache = 0;
   private resizeObserver: ResizeObserver | null = null;
   private animationFrameId: number | null = null;
   private disposed = false;
@@ -128,8 +127,6 @@ export class ReplayPlayer extends EventTarget {
     this.skipPostGoalTransitionsEnabled = initialSettings.skipPostGoalTransitionsEnabled;
     this.skipKickoffsEnabled = initialSettings.skipKickoffsEnabled;
     this.setHitboxWireframeVisibility();
-    this.skipPostGoalTransitionIfNeeded();
-    this.skipPastKickoffIfNeeded();
 
     this.installResizeHandling();
     for (const plugin of options.plugins ?? []) {
@@ -150,6 +147,8 @@ export class ReplayPlayer extends EventTarget {
     }
 
     this.playing = true;
+    this.skipPostGoalTransitionIfNeeded();
+    this.skipPastKickoffIfNeeded();
     this.reanchorPlaybackClock();
     this.emitChange();
   }
@@ -255,7 +254,7 @@ export class ReplayPlayer extends EventTarget {
 
   setSkipPostGoalTransitionsEnabled(enabled: boolean): void {
     this.skipPostGoalTransitionsEnabled = enabled;
-    if (enabled) {
+    if (enabled && this.playing) {
       this.skipPostGoalTransitionIfNeeded();
     }
     this.render();
@@ -264,7 +263,7 @@ export class ReplayPlayer extends EventTarget {
 
   setSkipKickoffsEnabled(enabled: boolean): void {
     this.skipKickoffsEnabled = enabled;
-    if (enabled) {
+    if (enabled && this.playing) {
       this.skipPostGoalTransitionIfNeeded();
       this.skipPastKickoffIfNeeded();
     }
@@ -274,8 +273,10 @@ export class ReplayPlayer extends EventTarget {
 
   seek(time: number): void {
     this.currentTime = this.clampReplayTime(time);
-    this.skipPostGoalTransitionIfNeeded();
-    this.skipPastKickoffIfNeeded();
+    if (this.playing) {
+      this.skipPostGoalTransitionIfNeeded();
+      this.skipPastKickoffIfNeeded();
+    }
     if (this.playing) {
       this.reanchorPlaybackClock();
     }
@@ -375,10 +376,10 @@ export class ReplayPlayer extends EventTarget {
       }
     }
     if (this.playing) {
+      this.skipPostGoalTransitionIfNeeded(now);
+      this.skipPastKickoffIfNeeded(now);
       this.reanchorPlaybackClock(now);
     }
-    this.skipPostGoalTransitionIfNeeded(now);
-    this.skipPastKickoffIfNeeded(now);
 
     this.render();
     this.emitChange();
@@ -411,9 +412,7 @@ export class ReplayPlayer extends EventTarget {
   }
 
   getTimelineDuration(): number {
-    return this.getTimelineSegments().length === 0
-      ? this.replay.duration
-      : this.timelineDurationCache;
+    return this.replay.duration;
   }
 
   getTimelineCurrentTime(): number {
@@ -428,14 +427,6 @@ export class ReplayPlayer extends EventTarget {
 
     this.timelineSegmentsCacheKey = cacheKey;
     this.timelineSegmentsCache = this.computeTimelineSegments();
-    this.timelineDurationCache = Math.max(
-      0,
-      this.replay.duration -
-        this.timelineSegmentsCache.reduce(
-          (total, segment) => total + (segment.endTime - segment.startTime),
-          0,
-        ),
-    );
     return this.timelineSegmentsCache;
   }
 
