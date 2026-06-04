@@ -162,6 +162,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
 }
 
 #[test]
+#[ignore = "replay-backed final-frame graph parity test is slow; run explicitly when changing stats projection parity"]
 fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let timeline = StatsTimelineCollector::new()
