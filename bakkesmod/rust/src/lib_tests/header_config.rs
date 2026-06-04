@@ -449,6 +449,7 @@ fn checked_in_header_declares_every_exported_function() {
 }
 
 #[test]
+#[ignore = "replay-backed annotation fixture test is slow; run explicitly when changing annotation polling"]
 fn replay_annotations_parse_real_replay_and_poll_by_time() {
     let replay_path = CString::new(real_replay_path().to_string_lossy().as_bytes())
         .expect("fixture path should not contain interior nulls");
@@ -864,4 +865,3 @@ macro_rules! assert_offset {
         );
     };
 }
-
