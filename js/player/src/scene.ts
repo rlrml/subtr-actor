@@ -389,86 +389,171 @@ function createHitboxWireframe(hitbox: ReplayHitboxSpec, color: string): THREE.G
   return group;
 }
 
-function createHitboxFitCarMesh(color: string, hitbox: ReplayHitboxSpec): THREE.Group {
+function createExampleCarMesh(color: string): THREE.Group {
+  const vertices = [
+    [100, -100, 100],
+    [100, 100, 100],
+    [-100, 100, 100],
+    [-100, -100, 100],
+    [150, -220, 20],
+    [-150, -220, 20],
+    [130, -400, -20],
+    [-130, -400, -20],
+    [140, 170, 25],
+    [-140, 170, 25],
+    [130, 240, 25],
+    [-130, 240, 25],
+    [130, -400, -80],
+    [-130, -400, -80],
+    [150, -220, -80],
+    [-150, -220, -80],
+    [140, 170, -80],
+    [-140, 170, -80],
+    [130, 240, -80],
+    [-130, 240, -80],
+  ];
+  const faces = [
+    [0, 1, 2],
+    [0, 2, 3],
+    [4, 0, 5],
+    [0, 3, 5],
+    [6, 4, 5],
+    [6, 5, 7],
+    [1, 8, 9],
+    [1, 9, 2],
+    [4, 8, 1],
+    [4, 1, 0],
+    [3, 2, 9],
+    [3, 9, 5],
+    [8, 10, 11],
+    [8, 11, 9],
+    [12, 6, 7],
+    [12, 7, 13],
+    [7, 5, 15],
+    [7, 15, 13],
+    [6, 14, 4],
+    [12, 14, 6],
+    [14, 16, 4],
+    [4, 16, 8],
+    [5, 9, 15],
+    [15, 9, 17],
+    [16, 18, 8],
+    [8, 18, 10],
+    [9, 11, 17],
+    [17, 11, 19],
+    [10, 18, 11],
+    [11, 18, 19],
+    [14, 12, 13],
+    [14, 13, 15],
+    [16, 14, 15],
+    [16, 15, 17],
+    [18, 16, 17],
+    [18, 17, 19],
+  ];
+
+  const bodyGeometry = new THREE.BufferGeometry();
+  bodyGeometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices.flat(), 3));
+  bodyGeometry.setIndex(faces.flat());
+  bodyGeometry.computeVertexNormals();
+
   const outer = new THREE.Group();
   const inner = new THREE.Group();
-  inner.rotateY(THREE.MathUtils.degToRad(hitbox.slopeDegrees));
-  outer.add(inner);
-
-  const bodyMaterial = new THREE.MeshLambertMaterial({ color });
-  const accentMaterial = new THREE.MeshPhongMaterial({
-    color: 0x13212e,
-    shininess: 80,
-  });
-  const glassMaterial = new THREE.MeshPhongMaterial({
-    color: 0x88d7ff,
-    transparent: true,
-    opacity: 0.42,
-    shininess: 120,
-  });
-  const wheelMaterial = new THREE.MeshPhongMaterial({
-    color: 0x1f2025,
-    shininess: 48,
-  });
-
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(hitbox.length * 0.94, hitbox.width * 0.88, hitbox.height * 0.44),
-    bodyMaterial,
-  );
-  body.position.z = -hitbox.height * 0.19;
+  const body = new THREE.Mesh(bodyGeometry, new THREE.MeshLambertMaterial({ color }));
   body.castShadow = true;
   inner.add(body);
 
-  const nose = new THREE.Mesh(
-    new THREE.BoxGeometry(hitbox.length * 0.28, hitbox.width * 0.82, hitbox.height * 0.32),
-    bodyMaterial,
+  const windowMaterial = new THREE.MeshPhongMaterial({
+    color: 0x1a1b2e,
+    shininess: 120,
+    transparent: true,
+    opacity: 0.82,
+  });
+  const windowVertices = [
+    [100, -100, 100],
+    [-100, -100, 100],
+    [150, -220, 20],
+    [-150, -220, 20],
+    [100, 100, 100],
+    [-100, 100, 100],
+    [140, 170, 25],
+    [-140, 170, 25],
+    [100, -100, 100],
+    [100, 100, 100],
+    [150, -220, 20],
+    [140, 170, 25],
+    [-100, -100, 100],
+    [-100, 100, 100],
+    [-150, -220, 20],
+    [-140, 170, 25],
+  ];
+  const windowFaces = [
+    [0, 2, 3],
+    [0, 3, 1],
+    [4, 6, 7],
+    [4, 7, 5],
+    [8, 10, 11],
+    [8, 11, 9],
+    [12, 14, 15],
+    [12, 15, 13],
+  ];
+  const windowGeometry = new THREE.BufferGeometry();
+  windowGeometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(windowVertices.flat(), 3),
   );
-  nose.position.set(hitbox.length * 0.31, 0, hitbox.height * 0.02);
-  nose.castShadow = true;
-  inner.add(nose);
+  windowGeometry.setIndex(windowFaces.flat());
+  windowGeometry.computeVertexNormals();
+  const windowMesh = new THREE.Mesh(windowGeometry, windowMaterial);
+  windowMesh.position.z = 1;
+  inner.add(windowMesh);
 
-  const cabin = new THREE.Mesh(
-    new THREE.BoxGeometry(hitbox.length * 0.34, hitbox.width * 0.62, hitbox.height * 0.34),
-    glassMaterial,
+  const windshieldMaterial = new THREE.MeshBasicMaterial({
+    color: 0x88d7ff,
+    transparent: true,
+    opacity: 0.34,
+    side: THREE.DoubleSide,
+  });
+  const windshieldGeometry = new THREE.BufferGeometry();
+  windshieldGeometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(
+      [90, -110, 95, -90, -110, 95, 140, -210, 25, -140, -210, 25],
+      3,
+    ),
   );
-  cabin.position.set(-hitbox.length * 0.06, 0, hitbox.height * 0.16);
-  cabin.castShadow = true;
-  inner.add(cabin);
+  windshieldGeometry.setIndex([0, 2, 3, 0, 3, 1]);
+  windshieldGeometry.computeVertexNormals();
+  const windshieldMesh = new THREE.Mesh(windshieldGeometry, windshieldMaterial);
+  windshieldMesh.position.z = 2;
+  inner.add(windshieldMesh);
 
-  const rearDeck = new THREE.Mesh(
-    new THREE.BoxGeometry(hitbox.length * 0.24, hitbox.width * 0.74, hitbox.height * 0.18),
-    accentMaterial,
-  );
-  rearDeck.position.set(-hitbox.length * 0.35, 0, hitbox.height * 0.03);
-  rearDeck.castShadow = true;
-  inner.add(rearDeck);
-
-  const wheelRadius = Math.max(6, hitbox.height * 0.27);
-  const wheelDepth = Math.max(5, hitbox.width * 0.12);
-  const wheelGeometry = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelDepth, 14);
-  const makeWheel = (x: number, y: number): THREE.Mesh => {
-    const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-    wheel.position.set(x, y, -hitbox.height * 0.39);
+  const wheelMaterial = new THREE.MeshPhongMaterial({
+    color: 0x222222,
+    shininess: 48,
+  });
+  const makeWheel = (x: number, y: number, z: number, width: number): THREE.Mesh => {
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(70, 70, width, 10), wheelMaterial);
+    wheel.rotateZ(Math.PI / 2);
+    wheel.position.set(x, y, z);
     wheel.castShadow = true;
     return wheel;
   };
 
-  const axleX = hitbox.length * 0.32;
-  const wheelY = hitbox.width * 0.5;
-  inner.add(makeWheel(axleX, wheelY));
-  inner.add(makeWheel(axleX, -wheelY));
-  inner.add(makeWheel(-axleX, wheelY));
-  inner.add(makeWheel(-axleX, -wheelY));
-
-  outer.userData.hitboxKind = hitbox.kind;
-  outer.userData.hitboxLabel = hitbox.label;
+  inner.add(makeWheel(120, -300, -60, 50));
+  inner.add(makeWheel(-120, -300, -60, 50));
+  inner.add(makeWheel(120, 150, -60, 70));
+  inner.add(makeWheel(-120, 150, -60, 70));
+  inner.position.set(0, 0, 50);
+  inner.rotateZ(Math.PI / 2);
+  inner.scale.set(0.35, 0.35, 0.35);
+  outer.add(inner);
   return outer;
 }
 
-function createBoostTrail(hitbox: ReplayHitboxSpec): THREE.Group {
+function createBoostTrail(): THREE.Group {
   const trail = new THREE.Group();
   trail.visible = false;
-  trail.position.set(-hitbox.length * 0.55, 0, 0);
+  trail.position.set(-124, 0, 8);
 
   const outerGeometry = new THREE.ConeGeometry(30, 220, 14, 1, true);
   outerGeometry.rotateZ(Math.PI / 2);
@@ -810,13 +895,13 @@ export function createReplayScene(
   const playerBoostMeters = new Map<string, BoostMeter>();
   const playerDemoIndicators = new Map<string, DemoIndicator>();
   for (const player of replay.players) {
-    const mesh = createHitboxFitCarMesh(player.isTeamZero ? "#57a8ff" : "#ff9c40", player.hitbox);
+    const mesh = createExampleCarMesh(player.isTeamZero ? "#57a8ff" : "#ff9c40");
     const hitboxWireframe = createHitboxWireframe(
       player.hitbox,
       player.isTeamZero ? "#b9e0ff" : "#ffd2a3",
     );
     mesh.add(hitboxWireframe);
-    const boostTrail = createBoostTrail(player.hitbox);
+    const boostTrail = createBoostTrail();
     mesh.add(boostTrail);
     const boostMeter = createBoostMeter();
     mesh.add(boostMeter.group);
