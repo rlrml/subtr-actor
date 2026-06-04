@@ -270,6 +270,10 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <input id="hitbox-wireframes" type="checkbox" />
               <span>Show hitboxes</span>
             </label>
+            <label class="toggle">
+              <input id="hitbox-only-mode" type="checkbox" />
+              <span>Hitbox only</span>
+            </label>
             <div class="detail-grid">
               <div>
                 <dt>Time</dt>

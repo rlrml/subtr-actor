@@ -60,6 +60,8 @@ class SaPlayerFrame(ctypes.Structure):
         ("double_jump_active", ctypes.c_uint8),
         ("dodge_active", ctypes.c_uint8),
         ("powerslide_active", ctypes.c_uint8),
+        ("car_body_id", ctypes.c_int32),
+        ("has_car_body_id", ctypes.c_uint8),
         ("has_match_stats", ctypes.c_uint8),
         ("match_goals", ctypes.c_int32),
         ("match_assists", ctypes.c_int32),
@@ -356,6 +358,8 @@ def player(player_index: int, is_team_0: bool, location: SaVec3) -> SaPlayerFram
     value.rigid_body = rigid_body(location)
     value.boost_amount = 33.0
     value.last_boost_amount = 33.0
+    value.car_body_id = 23
+    value.has_car_body_id = 1
     value.has_match_stats = 1
     value.match_goals = player_index
     value.match_assists = player_index + 1

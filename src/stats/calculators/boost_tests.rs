@@ -9,6 +9,7 @@ fn test_player(
     PlayerSample {
         player_id,
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(boxcars::RigidBody {
             sleeping: false,
             location: glam_to_vec(&position),

@@ -252,6 +252,12 @@ impl ProcessorView for SaLiveProcessorView<'_> {
         ))
     }
 
+    fn get_player_car_hitbox(&self, player_id: &PlayerId) -> CarHitbox {
+        self.player(player_id)
+            .map(player_car_hitbox)
+            .unwrap_or_else(|_| default_car_hitbox())
+    }
+
     fn get_interpolated_player_rigid_body(
         &self,
         player_id: &PlayerId,

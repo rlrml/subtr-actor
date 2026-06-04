@@ -23,7 +23,7 @@ import type { TouchEvent } from "./TouchEvent.ts";
  * * `demolish_infos` - Information about all demolition events that occurred during the replay
  * * `boost_pad_events` - Exact boost pad pickup/availability events detected while processing
  * * `boost_pads` - Resolved standard boost pad layout annotated with replay pad ids when known
- * * `touch_events` - Exact team touch events plus attributed player when available
+ * * `touch_events` - Replay-authored team touch markers; player attribution is derived by stats
  * * `dodge_refreshed_events` - Exact counter-derived dodge refresh events from the replay
  * * `player_stat_events` - Exact shot/save/assist counter increment events
  * * `goal_events` - Exact goal explosion events with scorer and cumulative score when available
@@ -72,7 +72,7 @@ boost_pad_events: Array<BoostPadEvent>,
  */
 boost_pads: Array<ResolvedBoostPad>,
 /**
- * Exact touch events observed during the replay
+ * Replay-authored team touch markers observed during the replay
  */
 touch_events: Array<TouchEvent>,
 /**

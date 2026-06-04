@@ -8,16 +8,28 @@ pub struct TouchState {
     pub last_touch_team_is_team_0: Option<bool>,
 }
 
+impl TouchState {
+    pub fn primary_touch_event(&self) -> Option<&TouchEvent> {
+        self.last_touch
+            .as_ref()
+            .filter(|primary| self.touch_events.iter().any(|event| event == *primary))
+            .or_else(|| self.touch_events.last())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum TouchCooldownKey {
     Player(PlayerId),
     Team(bool),
 }
 
+const TOUCH_SCORING: TouchCandidateScoring = TouchCandidateScoring::DEFAULT;
+const TOUCH_CANDIDATE_WINDOW_FRAMES: usize = 4;
+const BALL_GRAVITY_Z: f32 = -650.0;
+
 #[derive(Clone, Default)]
 pub struct TouchStateCalculator {
-    previous_ball_linear_velocity: Option<glam::Vec3>,
-    previous_ball_angular_velocity: Option<glam::Vec3>,
+    previous_ball_rigid_body: Option<(boxcars::RigidBody, f32)>,
     current_last_touch: Option<TouchEvent>,
     recent_touch_candidates: HashMap<PlayerId, TouchEvent>,
     last_touch_times: HashMap<TouchCooldownKey, f32>,
@@ -28,57 +40,47 @@ impl TouchStateCalculator {
         Self::default()
     }
 
-    fn prune_recent_touch_candidates(&mut self, current_frame: usize) {
-        const TOUCH_CANDIDATE_WINDOW_FRAMES: usize = 4;
+    fn accepted_contact_gap(closest_contact_gap: f32, velocity_deviation: f32) -> bool {
+        TOUCH_SCORING.accepts_contact_gap(closest_contact_gap, velocity_deviation)
+    }
 
+    fn touch_candidate_score(closest_contact_gap: f32, dodge_contact: bool) -> f32 {
+        TOUCH_SCORING.score_contact_gap(closest_contact_gap, dodge_contact)
+    }
+
+    fn touch_event_score(event: &TouchEvent) -> f32 {
+        Self::touch_candidate_score(
+            event.closest_approach_distance.unwrap_or(f32::INFINITY),
+            event.dodge_contact,
+        )
+    }
+
+    fn primary_touch_event(touch_events: &[TouchEvent]) -> Option<TouchEvent> {
+        touch_events
+            .iter()
+            .min_by(|left, right| {
+                Self::touch_event_score(left).total_cmp(&Self::touch_event_score(right))
+            })
+            .cloned()
+    }
+
+    fn prune_recent_touch_candidates(&mut self, current_frame: usize) {
         self.recent_touch_candidates.retain(|_, candidate| {
             current_frame.saturating_sub(candidate.frame) <= TOUCH_CANDIDATE_WINDOW_FRAMES
         });
     }
 
-    fn current_ball_angular_velocity(ball: &BallFrameState) -> Option<glam::Vec3> {
-        ball.sample()
-            .map(|ball| {
-                ball.rigid_body
-                    .angular_velocity
-                    .unwrap_or(boxcars::Vector3f {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    })
-            })
-            .map(|velocity| vec_to_glam(&velocity))
-    }
-
-    fn current_ball_linear_velocity(ball: &BallFrameState) -> Option<glam::Vec3> {
-        ball.velocity()
-    }
-
-    fn is_touch_candidate(&self, frame: &FrameInfo, ball: &BallFrameState) -> bool {
-        const BALL_GRAVITY_Z: f32 = -650.0;
-        const TOUCH_LINEAR_IMPULSE_THRESHOLD: f32 = 120.0;
-        const TOUCH_ANGULAR_VELOCITY_DELTA_THRESHOLD: f32 = 0.5;
-
-        let Some(current_linear_velocity) = Self::current_ball_linear_velocity(ball) else {
-            return false;
-        };
-        let Some(previous_linear_velocity) = self.previous_ball_linear_velocity else {
-            return false;
-        };
-        let Some(current_angular_velocity) = Self::current_ball_angular_velocity(ball) else {
-            return false;
-        };
-        let Some(previous_angular_velocity) = self.previous_ball_angular_velocity else {
-            return false;
-        };
-
-        let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * frame.dt.max(0.0));
-        let residual_linear_impulse =
-            current_linear_velocity - previous_linear_velocity - expected_linear_delta;
-        let angular_velocity_delta = current_angular_velocity - previous_angular_velocity;
-
-        residual_linear_impulse.length() > TOUCH_LINEAR_IMPULSE_THRESHOLD
-            || angular_velocity_delta.length() > TOUCH_ANGULAR_VELOCITY_DELTA_THRESHOLD
+    fn ball_velocity_deviation(&self, frame: &FrameInfo, ball: &BallFrameState) -> Option<f32> {
+        let current_ball = ball.sample()?;
+        let (previous_ball, previous_time) = &self.previous_ball_rigid_body?;
+        ball_trajectory_deviation_with_gravity(
+            previous_ball,
+            *previous_time,
+            &current_ball.rigid_body,
+            frame.time,
+            BALL_GRAVITY_Z,
+        )
+        .map(|deviation| deviation.velocity_deviation)
     }
 
     fn proximity_touch_candidates(
@@ -86,60 +88,24 @@ impl TouchStateCalculator {
         frame: &FrameInfo,
         ball: &BallFrameState,
         players: &PlayerFrameState,
-        max_collision_distance: f32,
+        velocity_deviation: f32,
     ) -> Vec<TouchEvent> {
-        const OCTANE_HITBOX_LENGTH: f32 = 118.01;
-        const OCTANE_HITBOX_WIDTH: f32 = 84.2;
-        const OCTANE_HITBOX_HEIGHT: f32 = 36.16;
-        const OCTANE_HITBOX_OFFSET: f32 = 13.88;
-        const OCTANE_HITBOX_ELEVATION: f32 = 17.05;
-
         let Some(ball) = ball.sample() else {
             return Vec::new();
         };
-        let ball_position = vec_to_glam(&ball.rigid_body.location);
 
         let mut candidates = players
             .players
             .iter()
             .filter_map(|player| {
                 let rigid_body = player.rigid_body.as_ref()?;
-                let player_position = vec_to_glam(&rigid_body.location);
-                let local_ball_position = quat_to_glam(&rigid_body.rotation).inverse()
-                    * (ball_position - player_position);
-
-                let x_distance = if local_ball_position.x
-                    < -OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET
-                {
-                    (-OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET) - local_ball_position.x
-                } else if local_ball_position.x > OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET
-                {
-                    local_ball_position.x - (OCTANE_HITBOX_LENGTH / 2.0 + OCTANE_HITBOX_OFFSET)
-                } else {
-                    0.0
-                };
-                let y_distance = if local_ball_position.y < -OCTANE_HITBOX_WIDTH / 2.0 {
-                    (-OCTANE_HITBOX_WIDTH / 2.0) - local_ball_position.y
-                } else if local_ball_position.y > OCTANE_HITBOX_WIDTH / 2.0 {
-                    local_ball_position.y - OCTANE_HITBOX_WIDTH / 2.0
-                } else {
-                    0.0
-                };
-                let z_distance = if local_ball_position.z
-                    < -OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION
-                {
-                    (-OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION) - local_ball_position.z
-                } else if local_ball_position.z
-                    > OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION
-                {
-                    local_ball_position.z - (OCTANE_HITBOX_HEIGHT / 2.0 + OCTANE_HITBOX_ELEVATION)
-                } else {
-                    0.0
-                };
-
-                let collision_distance =
-                    glam::Vec3::new(x_distance, y_distance, z_distance).length();
-                if collision_distance > max_collision_distance {
+                let (closest_contact_gap, _current_contact_gap) =
+                    touch_candidate_contact_gap_rank_with_hitbox(
+                        &ball.rigid_body,
+                        rigid_body,
+                        player.hitbox,
+                    )?;
+                if !Self::accepted_contact_gap(closest_contact_gap, velocity_deviation) {
                     return None;
                 }
 
@@ -149,31 +115,51 @@ impl TouchStateCalculator {
                     team_is_team_0: player.is_team_0,
                     player: Some(player.player_id.clone()),
                     player_position: Some(rigid_body.location),
-                    closest_approach_distance: Some(collision_distance),
+                    closest_approach_distance: Some(closest_contact_gap),
                     dodge_contact: player.dodge_active,
                 })
             })
             .collect::<Vec<_>>();
 
         candidates.sort_by(|left, right| {
-            let left_distance = left.closest_approach_distance.unwrap_or(f32::INFINITY);
-            let right_distance = right.closest_approach_distance.unwrap_or(f32::INFINITY);
-            left_distance.total_cmp(&right_distance)
+            let left_score = Self::touch_candidate_score(
+                left.closest_approach_distance.unwrap_or(f32::INFINITY),
+                left.dodge_contact,
+            );
+            let right_score = Self::touch_candidate_score(
+                right.closest_approach_distance.unwrap_or(f32::INFINITY),
+                right.dodge_contact,
+            );
+            left_score.total_cmp(&right_score)
         });
         candidates
     }
 
-    fn candidate_touch_event(
+    fn candidate_touch_events(
         &self,
         frame: &FrameInfo,
         ball: &BallFrameState,
         players: &PlayerFrameState,
-    ) -> Option<TouchEvent> {
-        const TOUCH_COLLISION_DISTANCE_THRESHOLD: f32 = 300.0;
-
-        self.proximity_touch_candidates(frame, ball, players, TOUCH_COLLISION_DISTANCE_THRESHOLD)
+        velocity_deviation: f32,
+    ) -> Vec<TouchEvent> {
+        let candidates = self.proximity_touch_candidates(frame, ball, players, velocity_deviation);
+        let Some(primary) = candidates.first() else {
+            return Vec::new();
+        };
+        let primary_score = Self::touch_candidate_score(
+            primary.closest_approach_distance.unwrap_or(f32::INFINITY),
+            primary.dodge_contact,
+        );
+        candidates
             .into_iter()
-            .next()
+            .filter(|candidate| {
+                let score = Self::touch_candidate_score(
+                    candidate.closest_approach_distance.unwrap_or(f32::INFINITY),
+                    candidate.dodge_contact,
+                );
+                score <= primary_score + TOUCH_SCORING.simultaneous_touch_score_margin
+            })
+            .collect()
     }
 
     fn update_recent_touch_candidates(
@@ -182,19 +168,24 @@ impl TouchStateCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
     ) {
-        const PROXIMITY_CANDIDATE_DISTANCE_THRESHOLD: f32 = 220.0;
+        let Some(velocity_deviation) = self.ball_velocity_deviation(frame, ball) else {
+            return;
+        };
 
-        for candidate in self.proximity_touch_candidates(
-            frame,
-            ball,
-            players,
-            PROXIMITY_CANDIDATE_DISTANCE_THRESHOLD,
-        ) {
+        for candidate in self.proximity_touch_candidates(frame, ball, players, velocity_deviation) {
             let Some(player_id) = candidate.player.clone() else {
                 continue;
             };
 
-            self.recent_touch_candidates.insert(player_id, candidate);
+            if self
+                .recent_touch_candidates
+                .get(&player_id)
+                .is_none_or(|previous| {
+                    Self::touch_event_score(&candidate) < Self::touch_event_score(previous)
+                })
+            {
+                self.recent_touch_candidates.insert(player_id, candidate);
+            }
         }
     }
 
@@ -207,55 +198,69 @@ impl TouchStateCalculator {
             .values()
             .filter(|candidate| candidate.team_is_team_0 == team_is_team_0)
             .min_by(|left, right| {
-                let left_distance = left.closest_approach_distance.unwrap_or(f32::INFINITY);
-                let right_distance = right.closest_approach_distance.unwrap_or(f32::INFINITY);
-                left_distance.total_cmp(&right_distance)
+                let left_score = Self::touch_candidate_score(
+                    left.closest_approach_distance.unwrap_or(f32::INFINITY),
+                    left.dodge_contact,
+                );
+                let right_score = Self::touch_candidate_score(
+                    right.closest_approach_distance.unwrap_or(f32::INFINITY),
+                    right.dodge_contact,
+                );
+                left_score.total_cmp(&right_score)
             })
             .cloned()
     }
 
-    fn enrich_explicit_touch_event(&self, event: &TouchEvent) -> TouchEvent {
+    fn enrich_explicit_touch_event(&self, event: &TouchEvent) -> Option<TouchEvent> {
         let candidate = if let Some(player_id) = event.player.as_ref() {
             self.candidate_for_player(player_id)
         } else {
             self.best_candidate_for_team(event.team_is_team_0)
         };
-        let Some(candidate) = candidate else {
-            return event.clone();
-        };
+        let candidate = candidate?;
 
-        TouchEvent {
+        Some(TouchEvent {
             player: event.player.clone().or(candidate.player),
             player_position: event.player_position.or(candidate.player_position),
             closest_approach_distance: event
                 .closest_approach_distance
                 .or(candidate.closest_approach_distance),
             dodge_contact: event.dodge_contact || candidate.dodge_contact,
-            ..event.clone()
-        }
+            ..candidate
+        })
     }
 
     fn contested_touch_candidates(&self, primary: &TouchEvent) -> Vec<TouchEvent> {
-        const CONTESTED_TOUCH_DISTANCE_MARGIN: f32 = 80.0;
+        let primary_score = Self::touch_candidate_score(
+            primary.closest_approach_distance.unwrap_or(f32::INFINITY),
+            primary.dodge_contact,
+        );
 
-        let primary_distance = primary.closest_approach_distance.unwrap_or(f32::INFINITY);
-
-        let best_opposing_candidate = self
+        let mut opposing_candidates = self
             .recent_touch_candidates
             .values()
             .filter(|candidate| candidate.team_is_team_0 != primary.team_is_team_0)
             .filter(|candidate| {
-                candidate.closest_approach_distance.unwrap_or(f32::INFINITY)
-                    <= primary_distance + CONTESTED_TOUCH_DISTANCE_MARGIN
+                Self::touch_candidate_score(
+                    candidate.closest_approach_distance.unwrap_or(f32::INFINITY),
+                    candidate.dodge_contact,
+                ) <= primary_score + TOUCH_SCORING.contested_touch_score_margin
             })
-            .min_by(|left, right| {
-                let left_distance = left.closest_approach_distance.unwrap_or(f32::INFINITY);
-                let right_distance = right.closest_approach_distance.unwrap_or(f32::INFINITY);
-                left_distance.total_cmp(&right_distance)
-            })
-            .cloned();
+            .cloned()
+            .collect::<Vec<_>>();
+        opposing_candidates.sort_by(|left, right| {
+            let left_score = Self::touch_candidate_score(
+                left.closest_approach_distance.unwrap_or(f32::INFINITY),
+                left.dodge_contact,
+            );
+            let right_score = Self::touch_candidate_score(
+                right.closest_approach_distance.unwrap_or(f32::INFINITY),
+                right.dodge_contact,
+            );
+            left_score.total_cmp(&right_score)
+        });
 
-        best_opposing_candidate.into_iter().collect()
+        opposing_candidates
     }
 
     fn confirmed_touch_events(
@@ -268,26 +273,44 @@ impl TouchStateCalculator {
         let mut touch_events = Vec::new();
         let mut confirmed_players = HashSet::new();
 
-        for event in &events.touch_events {
-            let event = self.enrich_explicit_touch_event(event);
-            if let Some(player_id) = event.player.clone() {
-                confirmed_players.insert(player_id);
-            }
-            touch_events.push(event);
-        }
-
-        if touch_events.is_empty() && self.is_touch_candidate(frame, ball) {
-            if let Some(candidate) = self.candidate_touch_event(frame, ball, players) {
-                for contested_candidate in self.contested_touch_candidates(&candidate) {
-                    if let Some(player_id) = contested_candidate.player.clone() {
-                        confirmed_players.insert(player_id);
+        if let Some(velocity_deviation) = self.ball_velocity_deviation(frame, ball) {
+            let candidate_events =
+                self.candidate_touch_events(frame, ball, players, velocity_deviation);
+            if let Some(candidate) = candidate_events.first() {
+                for contested_candidate in self.contested_touch_candidates(candidate) {
+                    if let Some(player_id) = contested_candidate.player.as_ref() {
+                        if confirmed_players.contains(player_id) {
+                            continue;
+                        }
+                        confirmed_players.insert(player_id.clone());
                     }
                     touch_events.push(contested_candidate);
                 }
-                if let Some(player_id) = candidate.player.clone() {
+                for candidate in candidate_events {
+                    if let Some(player_id) = candidate.player.clone() {
+                        if confirmed_players.contains(&player_id) {
+                            continue;
+                        }
+                        confirmed_players.insert(player_id);
+                    }
+                    touch_events.push(candidate);
+                }
+            }
+        }
+
+        if touch_events.is_empty() {
+            for event in &events.touch_events {
+                let event = if let Some(event) = self.enrich_explicit_touch_event(event) {
+                    event
+                } else if event.player.is_some() {
+                    event.clone()
+                } else {
+                    continue;
+                };
+                if let Some(player_id) = event.player.clone() {
                     confirmed_players.insert(player_id);
                 }
-                touch_events.push(candidate);
+                touch_events.push(event);
             }
         }
 
@@ -352,11 +375,10 @@ impl TouchStateCalculator {
             Vec::new()
         };
 
-        if let Some(last_touch) = touch_events.last() {
+        if let Some(last_touch) = Self::primary_touch_event(&touch_events) {
             self.current_last_touch = Some(last_touch.clone());
         }
-        self.previous_ball_linear_velocity = Self::current_ball_linear_velocity(ball);
-        self.previous_ball_angular_velocity = Self::current_ball_angular_velocity(ball);
+        self.previous_ball_rigid_body = ball.sample().map(|sample| (sample.rigid_body, frame.time));
 
         TouchState {
             touch_events,

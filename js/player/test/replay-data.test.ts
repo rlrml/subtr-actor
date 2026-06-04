@@ -1,10 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { normalizeReplayData, normalizeReplayDataAsync } from "../src/replay-data";
 import { formatReplayLoadProgress, formatReplayLoadProgressMeta } from "../src/load-ui";
 import { inferReplayHitboxKind, normalizeReplayHitboxKind } from "../src/hitboxes";
 import type { RawReplayFramesData } from "../src/types";
+
+type HitboxKind = "breakout" | "dominus" | "hybrid" | "merc" | "octane" | "plank";
+
+const RUST_HITBOX_FAMILY_TO_KIND: Readonly<Record<string, HitboxKind>> = {
+  Breakout: "breakout",
+  Dominus: "dominus",
+  Hybrid: "hybrid",
+  Merc: "merc",
+  Octane: "octane",
+  Plank: "plank",
+};
 
 function rigidBody(x: number, y: number, z: number) {
   return {
@@ -97,6 +109,64 @@ function assertMonotonicProgress(progressValues: number[]): void {
   for (let index = 1; index < progressValues.length; index += 1) {
     assert.ok(progressValues[index]! >= progressValues[index - 1]!, "expected monotonic progress");
   }
+}
+
+function rustGeometrySource(): string {
+  return readFileSync(new URL("../../../src/util/geometry.rs", import.meta.url), "utf8");
+}
+
+function rustFamilyToHitboxKind(family: string): HitboxKind {
+  const kind = RUST_HITBOX_FAMILY_TO_KIND[family];
+  assert.ok(kind, `unknown Rust hitbox family ${family}`);
+  return kind;
+}
+
+function parseRustBodyIdHitboxes(): Map<number, HitboxKind> {
+  const source = rustGeometrySource();
+  const functionSource = source.match(
+    /pub fn hitbox_family_for_body_id[\s\S]*?\n}\n\npub fn hitbox_family_for_body_name/,
+  )?.[0];
+  assert.ok(functionSource, "expected to find Rust body-id hitbox mapping");
+
+  const out = new Map<number, HitboxKind>();
+  const armPattern =
+    /([0-9\s|]+)=>\s*(?:\{\s*)?Some\(CarHitboxFamily::(Breakout|Dominus|Hybrid|Merc|Octane|Plank)\)/g;
+  for (const match of functionSource.matchAll(armPattern)) {
+    const hitbox = rustFamilyToHitboxKind(match[2]!);
+    for (const rawBodyId of match[1]!.match(/\d+/g) ?? []) {
+      out.set(Number(rawBodyId), hitbox);
+    }
+  }
+
+  assert.ok(out.size > 200, "expected Rust body-id hitbox mapping to be populated");
+  return out;
+}
+
+function parseRustBodyNameHitboxes(): Array<readonly [string, HitboxKind]> {
+  const source = rustGeometrySource();
+  const out: Array<readonly [string, HitboxKind]> = [];
+  const families = [
+    ["BREAKOUT", "breakout"],
+    ["DOMINUS", "dominus"],
+    ["HYBRID", "hybrid"],
+    ["MERC", "merc"],
+    ["OCTANE", "octane"],
+    ["PLANK", "plank"],
+  ] as const;
+
+  for (const [rustPrefix, hitbox] of families) {
+    const bodyArraySource = source.match(
+      new RegExp(`const ${rustPrefix}_HITBOX_BODIES: &\\[&str\\] = &\\[([\\s\\S]*?)\\];`),
+    )?.[1];
+    assert.ok(bodyArraySource, `expected to find Rust ${rustPrefix} body-name mapping`);
+
+    for (const match of bodyArraySource.matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
+      out.push([match[1]!.replace(/\\"/g, '"'), hitbox]);
+    }
+  }
+
+  assert.ok(out.length > 150, "expected Rust body-name hitbox mapping to be populated");
+  return out;
 }
 
 test("normalization progress is reported headlessly at a bounded cadence", () => {
@@ -194,69 +264,7 @@ test("normalization carries inferred player hitbox metadata", () => {
 });
 
 test("hitbox inference covers BakkesMod CARBODY ids", () => {
-  const expected = new Map<number, string>([
-    [21, "octane"],
-    [22, "breakout"],
-    [1416, "breakout"],
-    [23, "octane"],
-    [1568, "octane"],
-    [24, "plank"],
-    [25, "octane"],
-    [1300, "octane"],
-    [26, "octane"],
-    [27, "octane"],
-    [28, "hybrid"],
-    [1159, "hybrid"],
-    [29, "dominus"],
-    [30, "merc"],
-    [31, "hybrid"],
-    [402, "octane"],
-    [1295, "octane"],
-    [403, "dominus"],
-    [1018, "dominus"],
-    [404, "octane"],
-    [523, "octane"],
-    [597, "dominus"],
-    [600, "dominus"],
-    [607, "octane"],
-    [625, "octane"],
-    [723, "octane"],
-    [803, "plank"],
-    [1171, "dominus"],
-    [1172, "octane"],
-    [1286, "dominus"],
-    [1317, "hybrid"],
-    [1475, "octane"],
-    [1478, "octane"],
-    [1533, "octane"],
-    [1603, "plank"],
-    [1623, "octane"],
-    [1624, "hybrid"],
-    [1675, "dominus"],
-    [1691, "plank"],
-    [1856, "hybrid"],
-    [1919, "plank"],
-    [1932, "breakout"],
-    [11315, "dominus"],
-    [4782, "octane"],
-    [8565, "breakout"],
-    [8566, "breakout"],
-    [9140, "dominus"],
-    [9388, "dominus"],
-    [10817, "breakout"],
-    [11095, "dominus"],
-    [11141, "hybrid"],
-    [11336, "dominus"],
-    [12315, "breakout"],
-    [12325, "dominus"],
-    [12335, "merc"],
-    [12382, "dominus"],
-    [12484, "breakout"],
-    [12563, "dominus"],
-    [12569, "hybrid"],
-    [12652, "hybrid"],
-    [12669, "dominus"],
-  ]);
+  const expected = parseRustBodyIdHitboxes();
 
   for (const [bodyId, hitbox] of expected) {
     assert.equal(
@@ -272,9 +280,31 @@ test("hitbox inference covers BakkesMod CARBODY ids", () => {
   }
 });
 
+test("hitbox inference recognizes every Rust body-name mapping", () => {
+  for (const [bodyName, hitbox] of parseRustBodyNameHitboxes()) {
+    assert.equal(normalizeReplayHitboxKind(bodyName), hitbox, bodyName);
+  }
+});
+
+test("hitbox inference prefers explicit family over body id and stats text", () => {
+  assert.equal(
+    inferReplayHitboxKind({
+      remote_id: { Steam: "explicit-family" },
+      stats: {
+        Body: { Str: "Merc" },
+      },
+      name: "Explicit Family",
+      car_body_id: 4284,
+      car_hitbox_family: "Dominus",
+    }),
+    "dominus",
+  );
+});
+
 test("hitbox inference recognizes newer body name aliases", () => {
   assert.equal(normalizeReplayHitboxKind("Aston Martin Valhalla"), "breakout");
   assert.equal(normalizeReplayHitboxKind("BMW M2 Racing"), "dominus");
+  assert.equal(normalizeReplayHitboxKind("Ford Mustang Shelby GT500"), "dominus");
   assert.equal(normalizeReplayHitboxKind("Rivian R1S"), "hybrid");
   assert.equal(normalizeReplayHitboxKind("Pizza Planet Delivery Truck"), "merc");
   assert.equal(normalizeReplayHitboxKind("Psyclops"), "octane");

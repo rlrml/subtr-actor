@@ -11,6 +11,14 @@ export interface ReplayHitboxSpec {
   slopeDegrees: number;
   groundHeightFront: number;
   groundHeightBack: number;
+  offset: number;
+  elevation: number;
+}
+
+export interface ReplayHitboxOverlayTransform {
+  position: readonly [x: number, y: number, z: number];
+  rotationYDegrees: number;
+  dimensions: readonly [x: number, y: number, z: number];
 }
 
 export const DEFAULT_REPLAY_HITBOX_KIND: ReplayHitboxKind = "octane";
@@ -25,6 +33,8 @@ export const REPLAY_HITBOX_SPECS: Readonly<Record<ReplayHitboxKind, ReplayHitbox
     slopeDegrees: -0.9795,
     groundHeightFront: 43.8976,
     groundHeightBack: 46.1454,
+    offset: 13.88,
+    elevation: 17.05,
   },
   dominus: {
     kind: "dominus",
@@ -35,6 +45,8 @@ export const REPLAY_HITBOX_SPECS: Readonly<Record<ReplayHitboxKind, ReplayHitbox
     slopeDegrees: -0.9635,
     groundHeightFront: 47.2238,
     groundHeightBack: 49.3749,
+    offset: 13.88,
+    elevation: 17.05,
   },
   hybrid: {
     kind: "hybrid",
@@ -45,6 +57,8 @@ export const REPLAY_HITBOX_SPECS: Readonly<Record<ReplayHitboxKind, ReplayHitbox
     slopeDegrees: -0.5499,
     groundHeightFront: 54.0982,
     groundHeightBack: 55.3173,
+    offset: 13.88,
+    elevation: 17.05,
   },
   merc: {
     kind: "merc",
@@ -55,6 +69,8 @@ export const REPLAY_HITBOX_SPECS: Readonly<Record<ReplayHitboxKind, ReplayHitbox
     slopeDegrees: 0.28,
     groundHeightFront: 60.76,
     groundHeightBack: 61.35,
+    offset: 13.88,
+    elevation: 17.05,
   },
   octane: {
     kind: "octane",
@@ -65,6 +81,8 @@ export const REPLAY_HITBOX_SPECS: Readonly<Record<ReplayHitboxKind, ReplayHitbox
     slopeDegrees: -0.5518,
     groundHeightFront: 55.1449,
     groundHeightBack: 56.2814,
+    offset: 13.88,
+    elevation: 17.05,
   },
   plank: {
     kind: "plank",
@@ -75,6 +93,8 @@ export const REPLAY_HITBOX_SPECS: Readonly<Record<ReplayHitboxKind, ReplayHitbox
     slopeDegrees: -0.3447,
     groundHeightFront: 44.998,
     groundHeightBack: 45.773,
+    offset: 13.88,
+    elevation: 17.05,
   },
 };
 
@@ -274,6 +294,66 @@ const BODY_HITBOX_BY_NORMALIZED_NAME: Readonly<Record<string, ReplayHitboxKind>>
   volkswagengolfgtirle: "octane",
   xentari: "octane",
   zefira: "dominus",
+  breakoutx: "breakout",
+  nexus: "breakout",
+  nexussc: "breakout",
+  whiplash: "breakout",
+  "007sastonmartindbs": "dominus",
+  "007sastonmartinvalhalla": "dominus",
+  batmobile2022: "dominus",
+  chikara: "dominus",
+  chikarag1: "dominus",
+  chikaragxt: "dominus",
+  ecto1: "dominus",
+  ecto1ghostbusters: "dominus",
+  fastfuriousdodgechargersrthellcat: "dominus",
+  gazellagthotwheels: "dominus",
+  kittknightrider: "dominus",
+  lamborghinihuracnsto: "dominus",
+  mr11hotwheels: "dominus",
+  nascarchevroletcamaro: "dominus",
+  nascarfordmustang: "dominus",
+  nascartoyotacamry: "dominus",
+  nascarnextgenchevroletcamaro: "dominus",
+  nascarnextgenchevroletcamaro2022: "dominus",
+  nascarnextgenfordmustang: "dominus",
+  nascarnextgenfordmustang2022: "dominus",
+  nascarnextgentoyotacamry: "dominus",
+  nascarnextgentoyotacamry2022: "dominus",
+  nemesis: "dominus",
+  peregrinett: "dominus",
+  perigrinett: "dominus",
+  ronin: "dominus",
+  roning1: "dominus",
+  roningxt: "dominus",
+  samusgunship: "dominus",
+  samusgunshipnintendoexclusive: "dominus",
+  tyranno: "dominus",
+  tyrannogxt: "dominus",
+  insidio: "hybrid",
+  jager619: "hybrid",
+  jger619: "hybrid",
+  jger619rs: "hybrid",
+  r3mx: "hybrid",
+  r3mxgxt: "hybrid",
+  tygris: "hybrid",
+  nomad: "merc",
+  nomadgxt: "merc",
+  "007sastonmartindb5": "octane",
+  armadillo: "octane",
+  armadilloxboxexclusive: "octane",
+  boneshaker: "octane",
+  dingo: "octane",
+  fast4wdhotwheels: "octane",
+  harbinger: "octane",
+  harbingergxt: "octane",
+  hogsticker: "octane",
+  hogstickerxboxexclusive: "octane",
+  sweettooth: "octane",
+  sweettoothplaystationexclusive: "octane",
+  thedarkknighttumbler: "octane",
+  batmobile2016: "plank",
+  sentinel: "plank",
 };
 
 function idsToHitboxMap(
@@ -373,6 +453,16 @@ export function normalizeReplayHitboxKind(
 
 export function getReplayHitboxSpec(kind: ReplayHitboxKind): ReplayHitboxSpec {
   return REPLAY_HITBOX_SPECS[kind];
+}
+
+export function getReplayHitboxOverlayTransform(
+  hitbox: ReplayHitboxSpec,
+): ReplayHitboxOverlayTransform {
+  return {
+    position: [hitbox.offset, 0, hitbox.elevation],
+    rotationYDegrees: hitbox.slopeDegrees,
+    dimensions: [hitbox.length, hitbox.width, hitbox.height],
+  };
 }
 
 function collectHeaderPropText(value: unknown, out: string[]): void {

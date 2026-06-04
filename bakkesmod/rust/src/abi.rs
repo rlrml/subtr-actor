@@ -55,6 +55,8 @@ pub struct SaPlayerFrame {
     pub double_jump_active: u8,
     pub dodge_active: u8,
     pub powerslide_active: u8,
+    pub car_body_id: i32,
+    pub has_car_body_id: u8,
     pub has_match_stats: u8,
     pub match_goals: i32,
     pub match_assists: i32,

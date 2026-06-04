@@ -37,6 +37,7 @@ export interface ReplayPlayerInitialSettings {
   boostMeterEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
   hitboxWireframesEnabled: boolean;
+  hitboxOnlyModeEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
@@ -96,6 +97,7 @@ export function resolveInitialPlayerSettings(
     boostMeterEnabled: options.initialBoostMeterEnabled ?? false,
     boostPickupAnimationEnabled: options.initialBoostPickupAnimationEnabled ?? true,
     hitboxWireframesEnabled: options.initialHitboxWireframesEnabled ?? false,
+    hitboxOnlyModeEnabled: options.initialHitboxOnlyModeEnabled ?? false,
     skipPostGoalTransitionsEnabled: options.initialSkipPostGoalTransitionsEnabled ?? true,
     skipKickoffsEnabled: options.initialSkipKickoffsEnabled ?? false,
   };

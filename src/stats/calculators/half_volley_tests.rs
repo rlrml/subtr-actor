@@ -34,6 +34,7 @@ fn player(player_id: PlayerId, z: f32, dodge_active: bool) -> PlayerSample {
     PlayerSample {
         player_id,
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(glam::Vec3::new(0.0, 0.0, z), glam::Vec3::ZERO)),
         boost_amount: None,
         last_boost_amount: None,

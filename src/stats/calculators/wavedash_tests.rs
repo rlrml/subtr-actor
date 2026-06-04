@@ -19,6 +19,7 @@ fn player(id: u64, z: f32, horizontal_speed: f32, dodge_active: bool) -> PlayerS
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(id),
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(
             glam::Vec3::new(0.0, 0.0, z),
             glam::Vec3::new(horizontal_speed, 0.0, 0.0),

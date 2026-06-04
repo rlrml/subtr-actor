@@ -183,6 +183,52 @@ pub fn default_car_hitbox() -> CarHitbox {
 
 pub const BALL_COLLISION_RADIUS: f32 = 92.75;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TouchCandidateScoring {
+    pub strict_contact_gap_threshold: f32,
+    pub relaxed_contact_gap_threshold: f32,
+    pub strict_contact_min_velocity_deviation: f32,
+    pub relaxed_contact_min_velocity_deviation: f32,
+    pub relaxed_contact_score_penalty: f32,
+    pub dodge_contact_score_bonus: f32,
+    pub simultaneous_touch_score_margin: f32,
+    pub contested_touch_score_margin: f32,
+}
+
+impl TouchCandidateScoring {
+    pub const DEFAULT: Self = Self {
+        strict_contact_gap_threshold: 5.0,
+        relaxed_contact_gap_threshold: 25.0,
+        strict_contact_min_velocity_deviation: 50.0,
+        relaxed_contact_min_velocity_deviation: 1000.0,
+        relaxed_contact_score_penalty: 100.0,
+        dodge_contact_score_bonus: 1.0,
+        simultaneous_touch_score_margin: 5.0,
+        contested_touch_score_margin: 5.0,
+    };
+
+    pub fn accepts_contact_gap(self, closest_contact_gap: f32, velocity_deviation: f32) -> bool {
+        (closest_contact_gap <= self.strict_contact_gap_threshold
+            && velocity_deviation >= self.strict_contact_min_velocity_deviation)
+            || (closest_contact_gap <= self.relaxed_contact_gap_threshold
+                && velocity_deviation >= self.relaxed_contact_min_velocity_deviation)
+    }
+
+    pub fn score_contact_gap(self, closest_contact_gap: f32, dodge_contact: bool) -> f32 {
+        let relaxed_penalty = if closest_contact_gap > self.strict_contact_gap_threshold {
+            self.relaxed_contact_score_penalty
+        } else {
+            0.0
+        };
+        closest_contact_gap + relaxed_penalty
+            - if dodge_contact {
+                self.dodge_contact_score_bonus
+            } else {
+                0.0
+            }
+    }
+}
+
 pub fn car_hitbox_for_body_name(body_name: &str) -> Option<CarHitbox> {
     hitbox_family_for_body_name(body_name).map(CarHitbox::for_family)
 }
@@ -532,45 +578,178 @@ const PLANK_HITBOX_BODIES: &[&str] = &[
     "Twin Mill III",
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct CarHitboxContactEstimate {
+    pub distance: f32,
+    pub local_ball_position: glam::Vec3,
+    pub local_contact_point: glam::Vec3,
+}
+
+pub(crate) fn car_hitbox_contact_estimate(
+    ball_position: glam::Vec3,
+    player_body: &boxcars::RigidBody,
+    hitbox: CarHitbox,
+) -> Option<CarHitboxContactEstimate> {
+    let car_local_ball_position = quat_to_glam(&player_body.rotation).inverse()
+        * (ball_position - vec_to_glam(&player_body.location));
+    let hitbox_center = glam::Vec3::new(hitbox.offset, 0.0, hitbox.elevation);
+    let hitbox_rotation = glam::Quat::from_rotation_y(hitbox.angle.to_radians());
+    let local_ball_position = hitbox_rotation.inverse() * (car_local_ball_position - hitbox_center);
+    if !local_ball_position.is_finite() {
+        return None;
+    }
+
+    let x_min = -hitbox.length / 2.0;
+    let x_max = hitbox.length / 2.0;
+    let y_min = -hitbox.width / 2.0;
+    let y_max = hitbox.width / 2.0;
+    let z_min = -hitbox.height / 2.0;
+    let z_max = hitbox.height / 2.0;
+    let local_contact_point = glam::Vec3::new(
+        local_ball_position.x.clamp(x_min, x_max),
+        local_ball_position.y.clamp(y_min, y_max),
+        local_ball_position.z.clamp(z_min, z_max),
+    );
+    let distance = (local_ball_position - local_contact_point).length();
+    if !distance.is_finite() {
+        return None;
+    }
+
+    Some(CarHitboxContactEstimate {
+        distance,
+        local_ball_position,
+        local_contact_point,
+    })
+}
+
+pub(crate) fn car_hitbox_distance(
+    ball_position: glam::Vec3,
+    player_body: &boxcars::RigidBody,
+    hitbox: CarHitbox,
+) -> Option<f32> {
+    car_hitbox_contact_estimate(ball_position, player_body, hitbox)
+        .map(|estimate| estimate.distance)
+}
+
+pub fn car_hitbox_ball_contact_gap(
+    ball_position: glam::Vec3,
+    player_body: &boxcars::RigidBody,
+    hitbox: CarHitbox,
+) -> Option<f32> {
+    car_hitbox_distance(ball_position, player_body, hitbox)
+        .map(|center_distance| (center_distance - BALL_COLLISION_RADIUS).max(0.0))
+}
+
+pub fn touch_candidate_contact_gap_rank_with_hitbox(
+    ball_body: &boxcars::RigidBody,
+    player_body: &boxcars::RigidBody,
+    hitbox: CarHitbox,
+) -> Option<(f32, f32)> {
+    touch_candidate_rank_with_hitbox(ball_body, player_body, hitbox).map(
+        |(closest_center_distance, current_center_distance)| {
+            (
+                (closest_center_distance - BALL_COLLISION_RADIUS).max(0.0),
+                (current_center_distance - BALL_COLLISION_RADIUS).max(0.0),
+            )
+        },
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BallTrajectoryDeviation {
+    pub position_deviation: f32,
+    pub velocity_deviation: f32,
+    pub seconds: f32,
+}
+
+pub fn ball_trajectory_deviation_with_gravity(
+    previous_body: &boxcars::RigidBody,
+    previous_time: f32,
+    actual_body: &boxcars::RigidBody,
+    actual_time: f32,
+    gravity_z: f32,
+) -> Option<BallTrajectoryDeviation> {
+    let seconds = actual_time - previous_time;
+    if !seconds.is_finite() || seconds <= 0.0 {
+        return None;
+    }
+
+    let previous_velocity = vec_to_glam(&previous_body.linear_velocity?);
+    let actual_velocity = vec_to_glam(&actual_body.linear_velocity?);
+    let gravity = glam::Vec3::new(0.0, 0.0, gravity_z);
+    let expected_position = vec_to_glam(&previous_body.location)
+        + previous_velocity * seconds
+        + 0.5 * gravity * seconds * seconds;
+    let expected_velocity = previous_velocity + gravity * seconds;
+    let actual_position = vec_to_glam(&actual_body.location);
+
+    let position_deviation = (actual_position - expected_position).length();
+    let velocity_deviation = (actual_velocity - expected_velocity).length();
+    if !position_deviation.is_finite() || !velocity_deviation.is_finite() {
+        return None;
+    }
+
+    Some(BallTrajectoryDeviation {
+        position_deviation,
+        velocity_deviation,
+        seconds,
+    })
+}
+
 /// Ranks how plausible it is that `player_body` was the car that touched the
-/// ball near the current frame, using constant-velocity closest approach.
+/// ball near the current frame, using constant-velocity closest approach to the
+/// car's oriented hitbox.
 ///
 /// The frame's ball state can already be slightly post-contact, so we do not
-/// just compare current distance. Instead we look for the minimum ball/car
+/// just compare current distance. Instead we look for the minimum ball/hitbox
 /// separation over a short window centered slightly before the frame time.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn touch_candidate_rank(
     ball_body: &boxcars::RigidBody,
     player_body: &boxcars::RigidBody,
 ) -> Option<(f32, f32)> {
+    touch_candidate_rank_with_hitbox(ball_body, player_body, default_car_hitbox())
+}
+
+pub fn touch_candidate_rank_with_hitbox(
+    ball_body: &boxcars::RigidBody,
+    player_body: &boxcars::RigidBody,
+    hitbox: CarHitbox,
+) -> Option<(f32, f32)> {
     const TOUCH_LOOKBACK_SECONDS: f32 = 0.12;
     const TOUCH_LOOKAHEAD_SECONDS: f32 = 0.03;
+    const TOUCH_RANK_SAMPLES: usize = 9;
 
-    let relative_position = vec_to_glam(&player_body.location) - vec_to_glam(&ball_body.location);
-    let current_distance = relative_position.length();
-    if !current_distance.is_finite() {
-        return None;
-    }
+    let ball_velocity = vec_to_glam(&ball_body.linear_velocity.unwrap_or(boxcars::Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    }));
+    let player_velocity = vec_to_glam(&player_body.linear_velocity.unwrap_or(boxcars::Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    }));
+    let current_distance =
+        car_hitbox_distance(vec_to_glam(&ball_body.location), player_body, hitbox)?;
 
-    let relative_velocity =
-        vec_to_glam(&player_body.linear_velocity.unwrap_or(boxcars::Vector3f {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        })) - vec_to_glam(&ball_body.linear_velocity.unwrap_or(boxcars::Vector3f {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        }));
-    let relative_speed_squared = relative_velocity.length_squared();
-    let closest_time = if relative_speed_squared > f32::EPSILON {
-        (-relative_position.dot(relative_velocity) / relative_speed_squared)
-            .clamp(-TOUCH_LOOKBACK_SECONDS, TOUCH_LOOKAHEAD_SECONDS)
-    } else {
-        0.0
-    };
-    let closest_distance = (relative_position + relative_velocity * closest_time).length();
-    if !closest_distance.is_finite() {
-        return None;
+    let mut closest_distance = current_distance;
+    for sample_index in 0..=TOUCH_RANK_SAMPLES {
+        let sample_fraction = sample_index as f32 / TOUCH_RANK_SAMPLES as f32;
+        let sample_time = -TOUCH_LOOKBACK_SECONDS
+            + sample_fraction * (TOUCH_LOOKBACK_SECONDS + TOUCH_LOOKAHEAD_SECONDS);
+        let mut sample_ball_body = *ball_body;
+        let mut sample_player_body = *player_body;
+        sample_ball_body.location =
+            glam_to_vec(&(vec_to_glam(&ball_body.location) + ball_velocity * sample_time));
+        sample_player_body.location =
+            glam_to_vec(&(vec_to_glam(&player_body.location) + player_velocity * sample_time));
+        let sample_distance = car_hitbox_distance(
+            vec_to_glam(&sample_ball_body.location),
+            &sample_player_body,
+            hitbox,
+        )?;
+        closest_distance = closest_distance.min(sample_distance);
     }
 
     Some((closest_distance, current_distance))

@@ -19,6 +19,7 @@ fn player(id: u64, is_team_0: bool, position: glam::Vec3, velocity: glam::Vec3) 
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(id),
         is_team_0,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(position, velocity)),
         boost_amount: None,
         last_boost_amount: None,

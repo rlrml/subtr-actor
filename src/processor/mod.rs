@@ -181,6 +181,7 @@ struct CachedObjectIds {
     unique_id: Option<boxcars::ObjectId>,
     team: Option<boxcars::ObjectId>,
     bot: Option<boxcars::ObjectId>,
+    client_loadouts: Option<boxcars::ObjectId>,
     player_replication: Option<boxcars::ObjectId>,
     vehicle: Option<boxcars::ObjectId>,
     boost_replicated: Option<boxcars::ObjectId>,
@@ -207,6 +208,7 @@ impl CachedObjectIds {
             unique_id: cached(UNIQUE_ID_KEY),
             team: cached(TEAM_KEY),
             bot: cached(BOT_KEY),
+            client_loadouts: cached(CLIENT_LOADOUTS_KEY),
             player_replication: cached(PLAYER_REPLICATION_KEY),
             vehicle: cached(VEHICLE_KEY),
             boost_replicated: cached(BOOST_REPLICATED_KEY),
@@ -281,6 +283,8 @@ pub struct ReplayProcessor<'a> {
     pub team_one: Vec<PlayerId>,
     /// Mapping from player ids to their player-controller actor ids.
     pub player_to_actor_id: HashMap<PlayerId, boxcars::ActorId>,
+    /// Mapping from player-controller actors to their replicated loadouts.
+    pub player_actor_to_loadout: HashMap<boxcars::ActorId, boxcars::TeamLoadout>,
     /// Mapping from player-controller actors to car actors.
     pub player_to_car: HashMap<boxcars::ActorId, boxcars::ActorId>,
     /// Mapping from player-controller actors to team actors.
@@ -400,6 +404,7 @@ impl<'a> ReplayProcessor<'a> {
             player_to_car: HashMap::new(),
             player_to_team: HashMap::new(),
             player_to_actor_id: HashMap::new(),
+            player_actor_to_loadout: HashMap::new(),
             car_to_player: HashMap::new(),
             car_to_boost: HashMap::new(),
             car_to_jump: HashMap::new(),

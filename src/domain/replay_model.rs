@@ -315,6 +315,12 @@ pub struct PlayerInfo {
     pub stats: Option<std::collections::HashMap<String, HeaderProp>>,
     /// The name of the player as represented in the replay.
     pub name: String,
+    /// The replicated car body product id from the player's loadout, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub car_body_id: Option<u32>,
+    /// The resolved standardized hitbox family for the player's car body, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub car_hitbox_family: Option<String>,
 }
 
 #[cfg(test)]

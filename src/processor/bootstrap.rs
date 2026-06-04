@@ -159,10 +159,16 @@ impl<'a> ReplayProcessor<'a> {
                 })
                 .or_else(|| remote_id_display_name(player_id))
                 .unwrap_or_else(|| format!("{player_id:?}"));
+            let car_body_id = self.get_player_loadout_body_id(player_id);
+            let car_hitbox_family = car_body_id
+                .and_then(hitbox_family_for_body_id)
+                .map(|family| format!("{family:?}"));
             Ok(PlayerInfo {
                 name,
                 stats,
                 remote_id: player_id.clone(),
+                car_body_id,
+                car_hitbox_family,
             })
         };
         let team_zero: SubtrActorResult<Vec<PlayerInfo>> =

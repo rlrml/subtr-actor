@@ -367,6 +367,8 @@ SaPlayerFrame player(uint32_t index, bool isTeam0, SaVec3 location) {
   value.rigid_body = rigidBody(location);
   value.boost_amount = 33.0f;
   value.last_boost_amount = 33.0f;
+  value.car_body_id = 23;
+  value.has_car_body_id = 1;
   value.has_match_stats = 1;
   value.match_goals = static_cast<int32_t>(index);
   value.match_assists = static_cast<int32_t>(index + 1);

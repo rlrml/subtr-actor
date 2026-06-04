@@ -31,6 +31,24 @@ fn sample_rigid_body(
     }
 }
 
+fn sample_rotated_rigid_body(x: f32, y: f32, z: f32, rotation: glam::Quat) -> boxcars::RigidBody {
+    boxcars::RigidBody {
+        sleeping: false,
+        location: Vector3f { x, y, z },
+        rotation: glam_to_quat(&rotation),
+        linear_velocity: Some(Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }),
+        angular_velocity: Some(Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }),
+    }
+}
+
 #[test]
 fn interpolates_rigid_body_location() {
     let start_body = boxcars::RigidBody {
@@ -118,6 +136,98 @@ fn touch_candidate_rank_penalizes_unreachable_far_candidates() {
         close_rank < far_rank,
         "expected a far candidate outside the short contact window to rank worse: {close_rank:?} !< {far_rank:?}"
     );
+}
+
+#[test]
+fn ball_trajectory_deviation_with_gravity_is_small_for_expected_gravity_motion() {
+    let start = sample_rigid_body(0.0, 0.0, 1000.0, 100.0, 0.0, 0.0);
+    let actual = sample_rigid_body(10.0, 0.0, 996.75, 100.0, 0.0, -65.0);
+
+    let deviation =
+        ball_trajectory_deviation_with_gravity(&start, 1.0, &actual, 1.1, -650.0).unwrap();
+
+    assert!(deviation.position_deviation < 0.001);
+    assert!(deviation.velocity_deviation < 0.001);
+}
+
+#[test]
+fn ball_trajectory_deviation_with_gravity_detects_impulse_like_motion() {
+    let start = sample_rigid_body(0.0, 0.0, 1000.0, 100.0, 0.0, 0.0);
+    let actual = sample_rigid_body(80.0, 0.0, 996.75, 900.0, 0.0, -65.0);
+
+    let deviation =
+        ball_trajectory_deviation_with_gravity(&start, 1.0, &actual, 1.1, -650.0).unwrap();
+
+    assert!(deviation.position_deviation >= 70.0);
+    assert!(deviation.velocity_deviation > 700.0);
+}
+
+#[test]
+fn touch_candidate_scoring_requires_velocity_deviation_for_contact_gaps() {
+    let scoring = TouchCandidateScoring::DEFAULT;
+
+    assert!(!scoring.accepts_contact_gap(0.0, 0.0));
+    assert!(scoring.accepts_contact_gap(0.0, 50.0));
+    assert!(!scoring.accepts_contact_gap(10.0, 999.0));
+    assert!(scoring.accepts_contact_gap(10.0, 1000.0));
+    assert!(
+        scoring.score_contact_gap(10.0, false) > scoring.score_contact_gap(5.0, false),
+        "relaxed candidates should rank behind strict candidates"
+    );
+}
+
+#[test]
+fn car_hitbox_distance_uses_car_orientation() {
+    let ball_position = glam::Vec3::new(0.0, 70.0, 17.0);
+    let forward_car = sample_rotated_rigid_body(0.0, 0.0, 0.0, glam::Quat::from_rotation_z(0.0));
+    let sideways_car = sample_rotated_rigid_body(
+        0.0,
+        0.0,
+        0.0,
+        glam::Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
+    );
+
+    let forward_distance =
+        car_hitbox_distance(ball_position, &forward_car, default_car_hitbox()).unwrap();
+    let sideways_distance =
+        car_hitbox_distance(ball_position, &sideways_car, default_car_hitbox()).unwrap();
+
+    assert!(
+        sideways_distance < forward_distance,
+        "expected the rotated car's longer axis to make the same ball position closer to its hitbox: {sideways_distance:?} !< {forward_distance:?}"
+    );
+}
+
+#[test]
+fn car_hitbox_ball_contact_gap_subtracts_ball_radius() {
+    let hitbox = default_car_hitbox();
+    let car = sample_rotated_rigid_body(0.0, 0.0, 0.0, glam::Quat::IDENTITY);
+    let hitbox_center = glam::Vec3::new(hitbox.offset, 0.0, hitbox.elevation);
+    let hitbox_rotation = glam::Quat::from_rotation_y(hitbox.angle.to_radians());
+    let front_normal = hitbox_rotation * glam::Vec3::X;
+    let touching_ball_center =
+        hitbox_center + front_normal * (hitbox.length / 2.0 + BALL_COLLISION_RADIUS);
+    let separated_ball_center = touching_ball_center + front_normal * 10.0;
+
+    let touching_gap = car_hitbox_ball_contact_gap(touching_ball_center, &car, hitbox).unwrap();
+    let separated_gap = car_hitbox_ball_contact_gap(separated_ball_center, &car, hitbox).unwrap();
+
+    assert!(touching_gap <= 0.001);
+    assert!((separated_gap - 10.0).abs() <= 0.001);
+}
+
+#[test]
+fn car_hitbox_distance_applies_hitbox_offset_elevation_and_slope() {
+    let hitbox = default_car_hitbox();
+    let car = sample_rotated_rigid_body(0.0, 0.0, 0.0, glam::Quat::IDENTITY);
+    let hitbox_center = glam::Vec3::new(hitbox.offset, 0.0, hitbox.elevation);
+    let hitbox_rotation = glam::Quat::from_rotation_y(hitbox.angle.to_radians());
+    let top_center =
+        hitbox_center + hitbox_rotation * glam::Vec3::new(0.0, 0.0, hitbox.height / 2.0);
+
+    let distance = car_hitbox_distance(top_center, &car, hitbox).unwrap();
+
+    assert!(distance <= 0.001);
 }
 
 #[test]

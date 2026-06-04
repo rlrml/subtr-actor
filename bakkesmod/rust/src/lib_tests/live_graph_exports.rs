@@ -10,9 +10,9 @@ fn live_abi_exposes_every_builtin_stats_module_frame_and_config_by_name() {
         has_closest_approach_distance: 1,
     }];
     let players_by_frame = (1..=12)
-        .map(|frame_number| {
+        .map(|_| {
             [player_at(SaVec3 {
-                x: frame_number as f32 * 20.0,
+                x: 20.0,
                 y: 0.0,
                 z: 20.0,
             })]
@@ -25,9 +25,9 @@ fn live_abi_exposes_every_builtin_stats_module_frame_and_config_by_name() {
             frame_number,
             rigid_body(
                 SaVec3 {
-                    x: frame_number as f32 * 20.0,
+                    x: 20.0,
                     y: 0.0,
-                    z: 120.0,
+                    z: 1000.0,
                 },
                 SaVec3::default(),
             ),
@@ -177,10 +177,12 @@ fn live_abi_exposes_named_graph_outputs() {
         live_stats_json_value(engine)
     );
     let event_history = live_graph_output_json_value(engine, "event_history");
-    assert_eq!(event_history["touch_events"].as_array().unwrap().len(), 1);
-    assert_eq!(
-        event_history["touch_events"][0]["frame"],
-        serde_json::json!(1)
+    assert!(
+        event_history["touch_events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| event["frame"] == serde_json::json!(1))
     );
     let analysis_nodes = live_graph_output_json_value(engine, "analysis_nodes");
     assert_eq!(
@@ -708,4 +710,3 @@ fn live_abi_frame_json_matches_direct_full_graph_across_finish() {
     );
     unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
 }
-

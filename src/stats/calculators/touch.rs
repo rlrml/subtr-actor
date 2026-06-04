@@ -309,6 +309,7 @@ impl TouchCalculator {
         players: &PlayerFrameState,
         vertical_state: &PlayerVerticalState,
         touch_events: &[TouchEvent],
+        primary_touch: Option<&TouchEvent>,
     ) {
         let ball_speed_change = Self::ball_speed_change(frame, ball, self.previous_ball_velocity);
 
@@ -353,7 +354,10 @@ impl TouchCalculator {
             self.events.push(event);
         }
 
-        if let Some(last_touch) = touch_events.last() {
+        let last_touch = primary_touch
+            .filter(|primary| touch_events.iter().any(|event| event == *primary))
+            .or_else(|| touch_events.last());
+        if let Some(last_touch) = last_touch {
             self.last_touch_events.push(TouchLastTouchEvent {
                 time: last_touch.time,
                 frame: last_touch.frame,
@@ -607,6 +611,7 @@ impl TouchCalculator {
             players,
             vertical_state,
             &touch_state.touch_events,
+            touch_state.primary_touch_event(),
         );
         self.credit_ball_movement(
             frame,

@@ -1,5 +1,10 @@
 import * as THREE from "three";
-import { createReplayScene, updateBoostMeter, type ReplayScene } from "./scene";
+import {
+  createReplayScene,
+  setHitboxOverlayOnlyMode,
+  updateBoostMeter,
+  type ReplayScene,
+} from "./scene";
 import { findFrameIndexAtTime } from "./replay-data";
 import {
   DEFAULT_CAMERA_VIEW_MODE,
@@ -102,6 +107,7 @@ export class ReplayPlayer extends EventTarget {
   private boostMeterEnabled: boolean;
   private boostPickupAnimationEnabled: boolean;
   private hitboxWireframesEnabled: boolean;
+  private hitboxOnlyModeEnabled: boolean;
   private skipPostGoalTransitionsEnabled: boolean;
   private skipKickoffsEnabled: boolean;
 
@@ -124,9 +130,10 @@ export class ReplayPlayer extends EventTarget {
     this.boostMeterEnabled = initialSettings.boostMeterEnabled;
     this.boostPickupAnimationEnabled = initialSettings.boostPickupAnimationEnabled;
     this.hitboxWireframesEnabled = initialSettings.hitboxWireframesEnabled;
+    this.hitboxOnlyModeEnabled = initialSettings.hitboxOnlyModeEnabled;
     this.skipPostGoalTransitionsEnabled = initialSettings.skipPostGoalTransitionsEnabled;
     this.skipKickoffsEnabled = initialSettings.skipKickoffsEnabled;
-    this.setHitboxWireframeVisibility();
+    this.setHitboxVisualizationVisibility();
 
     this.installResizeHandling();
     for (const plugin of options.plugins ?? []) {
@@ -247,7 +254,14 @@ export class ReplayPlayer extends EventTarget {
 
   setHitboxWireframesEnabled(enabled: boolean): void {
     this.hitboxWireframesEnabled = enabled;
-    this.setHitboxWireframeVisibility();
+    this.setHitboxVisualizationVisibility();
+    this.render();
+    this.emitChange();
+  }
+
+  setHitboxOnlyModeEnabled(enabled: boolean): void {
+    this.hitboxOnlyModeEnabled = enabled;
+    this.setHitboxVisualizationVisibility();
     this.render();
     this.emitChange();
   }
@@ -354,7 +368,11 @@ export class ReplayPlayer extends EventTarget {
     }
     if (nextState.hitboxWireframesEnabled !== undefined) {
       this.hitboxWireframesEnabled = nextState.hitboxWireframesEnabled;
-      this.setHitboxWireframeVisibility();
+      this.setHitboxVisualizationVisibility();
+    }
+    if (nextState.hitboxOnlyModeEnabled !== undefined) {
+      this.hitboxOnlyModeEnabled = nextState.hitboxOnlyModeEnabled;
+      this.setHitboxVisualizationVisibility();
     }
     if (nextState.skipPostGoalTransitionsEnabled !== undefined) {
       this.skipPostGoalTransitionsEnabled = nextState.skipPostGoalTransitionsEnabled;
@@ -402,6 +420,7 @@ export class ReplayPlayer extends EventTarget {
       boostMeterEnabled: this.boostMeterEnabled,
       boostPickupAnimationEnabled: this.boostPickupAnimationEnabled,
       hitboxWireframesEnabled: this.hitboxWireframesEnabled,
+      hitboxOnlyModeEnabled: this.hitboxOnlyModeEnabled,
       skipPostGoalTransitionsEnabled: this.skipPostGoalTransitionsEnabled,
       skipKickoffsEnabled: this.skipKickoffsEnabled,
     };
@@ -547,9 +566,13 @@ export class ReplayPlayer extends EventTarget {
     this.playbackStartedTime = this.currentTime;
   }
 
-  private setHitboxWireframeVisibility(): void {
+  private setHitboxVisualizationVisibility(): void {
     for (const hitbox of this.sceneState.playerHitboxes.values()) {
-      hitbox.visible = this.hitboxWireframesEnabled;
+      hitbox.visible = this.hitboxWireframesEnabled || this.hitboxOnlyModeEnabled;
+      setHitboxOverlayOnlyMode(hitbox, this.hitboxOnlyModeEnabled);
+    }
+    for (const body of this.sceneState.playerBodyMeshes.values()) {
+      body.visible = !this.hitboxOnlyModeEnabled;
     }
   }
 

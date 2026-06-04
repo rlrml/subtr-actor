@@ -12,6 +12,7 @@ export interface MountEventListenerElements {
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
+  readonly hitboxOnlyMode: HTMLInputElement;
 }
 
 export interface MountEventListenerOptions {
@@ -29,6 +30,7 @@ export interface MountEventListenerOptions {
   setSkipPostGoalTransitionsEnabled(enabled: boolean): void;
   setSkipKickoffsEnabled(enabled: boolean): void;
   setHitboxWireframesEnabled(enabled: boolean): void;
+  setHitboxOnlyModeEnabled(enabled: boolean): void;
 }
 
 export function installMountEventListeners({
@@ -46,6 +48,7 @@ export function installMountEventListeners({
   setSkipPostGoalTransitionsEnabled,
   setSkipKickoffsEnabled,
   setHitboxWireframesEnabled,
+  setHitboxOnlyModeEnabled,
 }: MountEventListenerOptions): void {
   elements.launcherToggle.addEventListener(
     "click",
@@ -149,6 +152,14 @@ export function installMountEventListeners({
     "change",
     () => {
       setHitboxWireframesEnabled(elements.hitboxWireframes.checked);
+    },
+    { signal },
+  );
+
+  elements.hitboxOnlyMode.addEventListener(
+    "change",
+    () => {
+      setHitboxOnlyModeEnabled(elements.hitboxOnlyMode.checked);
     },
     { signal },
   );

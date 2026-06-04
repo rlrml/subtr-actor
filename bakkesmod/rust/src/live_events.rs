@@ -88,6 +88,19 @@ pub(crate) fn player_index(id: &RemoteId) -> u32 {
     }
 }
 
+pub(crate) fn player_car_body_id(player: &SaPlayerFrame) -> Option<u32> {
+    if player.has_car_body_id == 0 {
+        return None;
+    }
+    u32::try_from(player.car_body_id).ok()
+}
+
+pub(crate) fn player_car_hitbox(player: &SaPlayerFrame) -> CarHitbox {
+    player_car_body_id(player)
+        .and_then(car_hitbox_for_body_id)
+        .unwrap_or_else(default_car_hitbox)
+}
+
 pub(crate) fn player_frame_position(
     players: &PlayerFrameState,
     player_id: &PlayerId,
@@ -187,6 +200,7 @@ pub(crate) fn player_state(players: &[SaPlayerFrame]) -> PlayerFrameState {
             .map(|player| PlayerSample {
                 player_id: player_id(player.player_index),
                 is_team_0: player.is_team_0 != 0,
+                hitbox: player_car_hitbox(player),
                 rigid_body: (player.has_rigid_body != 0).then_some(rigid_body(player.rigid_body)),
                 boost_amount: Some(player.boost_amount),
                 last_boost_amount: Some(player.last_boost_amount),
@@ -629,6 +643,20 @@ impl SaLiveEventGenerator {
             touch_events = touch_tracker_events.touch_events.clone();
         }
         let mut dodge_refreshed_events = explicit_dodge_refreshed_events;
+        if touch_events.is_empty() && has_explicit_dodge_refreshed_events {
+            touch_events = dodge_refreshed_events
+                .iter()
+                .map(|event| TouchEvent {
+                    time: event.time,
+                    frame: event.frame,
+                    team_is_team_0: event.is_team_0,
+                    player: Some(event.player.clone()),
+                    player_position: event.player_position.map(|[x, y, z]| Vector3f { x, y, z }),
+                    closest_approach_distance: None,
+                    dodge_contact: true,
+                })
+                .collect();
+        }
         dodge_refreshed_events.sort_by_key(|event| event.counter_value);
 
         (
@@ -735,10 +763,16 @@ pub(crate) fn live_replay_meta(players: &[SaPlayerFrame]) -> ReplayMeta {
     let mut team_one = Vec::new();
     for player in players {
         let player_id = player_id(player.player_index);
+        let car_body_id = player_car_body_id(player);
         let info = PlayerInfo {
             remote_id: player_id.clone(),
             stats: None,
             name: player_name(player).unwrap_or_else(|| default_live_player_name(&player_id)),
+            car_body_id,
+            car_hitbox_family: car_body_id
+                .and_then(hitbox_family_for_body_id)
+                .map(|family| format!("{family:?}"))
+                .or_else(|| Some("Octane".to_owned())),
         };
         if player.is_team_0 != 0 {
             team_zero.push(info);

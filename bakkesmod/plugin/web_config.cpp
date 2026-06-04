@@ -405,6 +405,12 @@ void SubtrActorPlugin::onLoad() {
       "subtr_actor_dump_analysis_node <node_name> [finish]",
       PERMISSION_ALL);
   cvarManager->registerNotifier(
+      "subtr_actor_dump_products",
+      [this](std::vector<std::string> params) { dumpProductsJson(params); },
+      "Writes Rocket League product metadata JSON from BakkesMod's item database. "
+      "Defaults to body products only; pass 'all' to include every slot.",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
       "subtr_actor_verify_graph",
       [this](std::vector<std::string> params) { verifyGraphRuntime(params); },
       "Calls the live graph outputs and every callable analysis node, logging byte sizes. "

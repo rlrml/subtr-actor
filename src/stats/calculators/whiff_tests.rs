@@ -24,6 +24,7 @@ fn player_at(
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(id),
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(position, velocity)),
         boost_amount: None,
         last_boost_amount: None,

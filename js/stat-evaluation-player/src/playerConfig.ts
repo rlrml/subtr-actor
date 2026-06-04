@@ -86,6 +86,7 @@ export interface PlayerOverlayConfig {
   readonly boostPads: boolean;
   readonly boostPickupAnimation: boolean;
   readonly hitboxWireframes: boolean;
+  readonly hitboxOnlyMode: boolean;
 }
 
 export interface RecordingConfig {
@@ -352,6 +353,7 @@ function normalizeOverlayConfig(value: unknown): PlayerOverlayConfig {
     boostPads: booleanValue(record.boostPads) ?? true,
     boostPickupAnimation: booleanValue(record.boostPickupAnimation) ?? false,
     hitboxWireframes: booleanValue(record.hitboxWireframes) ?? false,
+    hitboxOnlyMode: booleanValue(record.hitboxOnlyMode) ?? false,
   };
 }
 

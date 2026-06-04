@@ -25,6 +25,7 @@ fn player(player_id: PlayerId, is_team_0: bool, position: glam::Vec3) -> PlayerS
     PlayerSample {
         player_id,
         is_team_0,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(position)),
         boost_amount: None,
         last_boost_amount: None,

@@ -26,7 +26,7 @@ fn rust_event_abi_layout_matches_plugin_header_expectations() {
     assert_offset!(SaRigidBody, has_angular_velocity, 53);
     assert_offset!(SaRigidBody, sleeping, 54);
 
-    assert_layout!(SaPlayerFrame, size = 112, align = 8);
+    assert_layout!(SaPlayerFrame, size = 120, align = 8);
     assert_offset!(SaPlayerFrame, player_index, 0);
     assert_offset!(SaPlayerFrame, player_name, 8);
     assert_offset!(SaPlayerFrame, is_team_0, 16);
@@ -39,12 +39,14 @@ fn rust_event_abi_layout_matches_plugin_header_expectations() {
     assert_offset!(SaPlayerFrame, double_jump_active, 86);
     assert_offset!(SaPlayerFrame, dodge_active, 87);
     assert_offset!(SaPlayerFrame, powerslide_active, 88);
-    assert_offset!(SaPlayerFrame, has_match_stats, 89);
-    assert_offset!(SaPlayerFrame, match_goals, 92);
-    assert_offset!(SaPlayerFrame, match_assists, 96);
-    assert_offset!(SaPlayerFrame, match_saves, 100);
-    assert_offset!(SaPlayerFrame, match_shots, 104);
-    assert_offset!(SaPlayerFrame, match_score, 108);
+    assert_offset!(SaPlayerFrame, car_body_id, 92);
+    assert_offset!(SaPlayerFrame, has_car_body_id, 96);
+    assert_offset!(SaPlayerFrame, has_match_stats, 97);
+    assert_offset!(SaPlayerFrame, match_goals, 100);
+    assert_offset!(SaPlayerFrame, match_assists, 104);
+    assert_offset!(SaPlayerFrame, match_saves, 108);
+    assert_offset!(SaPlayerFrame, match_shots, 112);
+    assert_offset!(SaPlayerFrame, match_score, 116);
 
     assert_layout!(SaEventTiming, size = 24, align = 8);
     assert_offset!(SaEventTiming, frame_number, 0);
@@ -242,6 +244,8 @@ fn player_at_index(player_index: u32, is_team_0: bool, location: SaVec3) -> SaPl
         double_jump_active: 0,
         dodge_active: 0,
         powerslide_active: 0,
+        car_body_id: 0,
+        has_car_body_id: 0,
         has_match_stats: 1,
         match_goals: player_index as i32,
         match_assists: player_index as i32 + 1,

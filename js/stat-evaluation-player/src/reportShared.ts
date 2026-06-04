@@ -270,6 +270,7 @@ export function getGoalWatchPlayerConfig(
       boostPads: true,
       boostPickupAnimation: false,
       hitboxWireframes: false,
+      hitboxOnlyMode: false,
     },
     recording: {},
     singletonWindows: [],

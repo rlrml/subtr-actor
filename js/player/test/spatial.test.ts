@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 
-import { getReplayHitboxSpec } from "../src/hitboxes";
+import { getReplayHitboxOverlayTransform, getReplayHitboxSpec } from "../src/hitboxes";
 import { interpolateQuaternion, updateAttachedCamera } from "../src/player-internals/spatial";
 import type { ReplayModel } from "../src/types";
 import type { ReplayScene } from "../src/scene";
@@ -112,4 +112,13 @@ test("interpolateQuaternion blends rotation samples instead of holding the previ
   const rotated = new THREE.Vector3(1, 0, 0).applyQuaternion(halfway);
   assert.ok(Math.abs(rotated.x) < 1e-10);
   assert.ok(rotated.y > 0.999);
+});
+
+test("hitbox overlay transform uses Rocket League local axes", () => {
+  const hitbox = getReplayHitboxSpec("octane");
+  const transform = getReplayHitboxOverlayTransform(hitbox);
+
+  assert.deepEqual(transform.position, [hitbox.offset, 0, hitbox.elevation]);
+  assert.equal(transform.rotationYDegrees, hitbox.slopeDegrees);
+  assert.deepEqual(transform.dimensions, [hitbox.length, hitbox.width, hitbox.height]);
 });

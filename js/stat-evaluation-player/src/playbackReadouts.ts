@@ -7,6 +7,7 @@ export interface PlaybackReadoutElements {
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
+  readonly hitboxOnlyMode: HTMLInputElement;
   readonly emptyState: HTMLDivElement;
   readonly timeReadout: HTMLElement;
   readonly frameReadout: HTMLElement;
@@ -29,6 +30,7 @@ export class PlaybackReadoutsController {
     elements.skipPostGoalTransitions.disabled = !enabled;
     elements.skipKickoffs.disabled = !enabled;
     elements.hitboxWireframes.disabled = !enabled;
+    elements.hitboxOnlyMode.disabled = !enabled;
     this.options.getCameraControlsController()?.setTransportEnabled(enabled, state);
   }
 
@@ -44,6 +46,7 @@ export class PlaybackReadoutsController {
     elements.skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
     elements.skipKickoffs.checked = state.skipKickoffsEnabled;
     elements.hitboxWireframes.checked = state.hitboxWireframesEnabled;
+    elements.hitboxOnlyMode.checked = state.hitboxOnlyModeEnabled;
     elements.emptyState.hidden = true;
   }
 }

@@ -181,6 +181,11 @@ SaPlayerFrame SubtrActorPlugin::samplePlayer(CarWrapper car, uint32_t playerInde
   player.dodge_active =
       car.GetDodgeComponent().IsNull() ? 0 : car.GetDodgeComponent().GetbActive();
   player.powerslide_active = car.GetbReplicatedHandbrake() != 0;
+  const int loadoutBody = car.GetLoadoutBody();
+  if (loadoutBody > 0) {
+    player.car_body_id = loadoutBody;
+    player.has_car_body_id = 1;
+  }
 
   BoostWrapper boost = car.GetBoostComponent();
   if (!boost.IsNull()) {
@@ -303,8 +308,6 @@ void SubtrActorPlugin::recordTouch(CarWrapper car) {
         event.is_team_0 = hitTeam == 0 ? 1 : 0;
         hasHitTeam = true;
       }
-      event.closest_approach_distance = (ball.GetLocation() - car.GetLocation()).magnitude();
-      event.has_closest_approach_distance = 1;
     }
   }
   if (!hasHitTeam) {

@@ -44,6 +44,7 @@ fn player(player_id: PlayerId, is_team_0: bool, goals: i32) -> PlayerSample {
     PlayerSample {
         player_id,
         is_team_0,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(glam::Vec3::new(0.0, 0.0, 17.0))),
         boost_amount: Some(33.0),
         last_boost_amount: None,

@@ -48,6 +48,7 @@ pub trait ProcessorView {
     ) -> SubtrActorResult<boxcars::RigidBody>;
 
     fn get_player_name(&self, player_id: &PlayerId) -> SubtrActorResult<String>;
+    fn get_player_car_hitbox(&self, player_id: &PlayerId) -> CarHitbox;
     fn get_player_team_key(&self, player_id: &PlayerId) -> SubtrActorResult<String>;
     fn get_player_is_team_0(&self, player_id: &PlayerId) -> SubtrActorResult<bool>;
     fn get_player_id_from_car_id(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<PlayerId>;
@@ -188,6 +189,10 @@ impl ProcessorView for ReplayProcessor<'_> {
 
     fn get_player_name(&self, player_id: &PlayerId) -> SubtrActorResult<String> {
         ReplayProcessor::get_player_name(self, player_id)
+    }
+
+    fn get_player_car_hitbox(&self, player_id: &PlayerId) -> CarHitbox {
+        ReplayProcessor::get_player_car_hitbox(self, player_id)
     }
 
     fn get_player_team_key(&self, player_id: &PlayerId) -> SubtrActorResult<String> {

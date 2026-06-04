@@ -403,6 +403,7 @@ export interface ReplayPlayerOptions {
   initialBoostMeterEnabled?: boolean;
   initialBoostPickupAnimationEnabled?: boolean;
   initialHitboxWireframesEnabled?: boolean;
+  initialHitboxOnlyModeEnabled?: boolean;
   initialPlaybackRate?: number;
   initialSkipPostGoalTransitionsEnabled?: boolean;
   initialSkipKickoffsEnabled?: boolean;
@@ -432,6 +433,7 @@ export interface ReplayPlayerState {
   boostMeterEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
   hitboxWireframesEnabled: boolean;
+  hitboxOnlyModeEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
@@ -463,6 +465,7 @@ export interface ReplayPlaylistPlayerState {
   ballCamEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
   hitboxWireframesEnabled: boolean;
+  hitboxOnlyModeEnabled: boolean;
   skipPostGoalTransitionsEnabled: boolean;
   skipKickoffsEnabled: boolean;
 }
@@ -484,6 +487,7 @@ export type ReplayPlayerStatePatch = Partial<
     | "boostMeterEnabled"
     | "boostPickupAnimationEnabled"
     | "hitboxWireframesEnabled"
+    | "hitboxOnlyModeEnabled"
     | "skipPostGoalTransitionsEnabled"
     | "skipKickoffsEnabled"
   >

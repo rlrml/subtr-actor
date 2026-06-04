@@ -103,6 +103,7 @@ fn player_frame_state_with_dodge_active(
         players: vec![PlayerSample {
             player_id: player_id.clone(),
             is_team_0: true,
+            hitbox: default_car_hitbox(),
             rigid_body: Some(rigid_body(position, glam::Vec3::ZERO)),
             boost_amount: None,
             last_boost_amount: None,
@@ -563,4 +564,54 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
     assert_eq!(blue_stats.total_ball_advance_distance, 170.0);
     assert_eq!(blue_stats.total_ball_retreat_distance, 0.0);
     assert!(calculator.player_stats().get(&orange_player).is_none());
+}
+
+#[test]
+fn last_touch_event_uses_primary_touch_not_last_contested_candidate() {
+    let primary_player = boxcars::RemoteId::Steam(1);
+    let secondary_player = boxcars::RemoteId::Steam(2);
+    let primary_touch = TouchEvent {
+        time: 0.1,
+        frame: 1,
+        team_is_team_0: true,
+        player: Some(primary_player.clone()),
+        player_position: None,
+        closest_approach_distance: Some(0.0),
+        dodge_contact: false,
+    };
+    let secondary_touch = TouchEvent {
+        time: 0.1,
+        frame: 1,
+        team_is_team_0: false,
+        player: Some(secondary_player),
+        player_position: None,
+        closest_approach_distance: Some(3.0),
+        dodge_contact: false,
+    };
+    let touch_state = TouchState {
+        touch_events: vec![primary_touch.clone(), secondary_touch],
+        last_touch: Some(primary_touch),
+        last_touch_player: Some(primary_player.clone()),
+        last_touch_team_is_team_0: Some(true),
+    };
+    let mut calculator = TouchCalculator::new();
+
+    calculator
+        .update(
+            &frame(1),
+            &ball(0.0, 0.0),
+            &PlayerFrameState::default(),
+            &PlayerVerticalState::default(),
+            &touch_state,
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    let [last_touch] = calculator.new_last_touch_events() else {
+        panic!("expected exactly one last-touch event");
+    };
+    assert_eq!(last_touch.player, Some(primary_player));
+    assert!(last_touch.is_team_0);
 }
