@@ -118,13 +118,17 @@
 //! println!("rush events: {}", timeline.events.rush.len());
 //! ```
 
+#[path = "domain/boost_units.rs"]
+pub mod boost_units;
 pub mod collector;
-pub mod constants;
+#[path = "domain/error.rs"]
 pub mod error;
 pub mod interop;
 pub mod processor;
+#[path = "domain/replay_meta.rs"]
 pub mod replay_meta;
-pub mod replay_types;
+#[path = "domain/replay_model.rs"]
+pub mod replay_model;
 pub mod stats;
 pub mod util;
 
@@ -144,13 +148,13 @@ pub mod actor_state {
 }
 
 pub use crate::actor_state::*;
+pub use crate::boost_units::*;
 pub use crate::collector::*;
-pub use crate::constants::*;
 pub use crate::error::*;
 pub use crate::geometry::*;
 pub use crate::processor::*;
 pub use crate::replay_meta::*;
-pub use crate::replay_types::*;
+pub use crate::replay_model::*;
 pub use crate::search::*;
 pub use crate::stats::*;
 pub(crate) use crate::util::vec_map::*;

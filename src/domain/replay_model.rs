@@ -316,5 +316,5 @@ pub struct PlayerInfo {
 }
 
 #[cfg(test)]
-#[path = "replay_types_tests.rs"]
+#[path = "replay_model_tests.rs"]
 mod tests;

@@ -4,9 +4,11 @@ use std::collections::HashMap;
 
 pub mod actor_state;
 mod boost_pad_resolution;
+mod replay_keys;
 pub mod view;
 pub use actor_state::*;
 pub(crate) use boost_pad_resolution::*;
+pub(crate) use replay_keys::*;
 pub use view::*;
 
 pub(crate) fn attribute_type_name(attribute: &boxcars::Attribute) -> &'static str {
