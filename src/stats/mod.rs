@@ -3,8 +3,6 @@ pub mod analysis_graph;
 pub(crate) mod calculators;
 pub(crate) mod common;
 pub mod export;
-#[cfg(test)]
-pub(crate) mod test_projection;
 pub mod timeline;
 pub mod tuning;
 

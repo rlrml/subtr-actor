@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 pub(crate) use crate::stats::common::*;
 
 pub(crate) use crate::stats::accumulators::*;
-#[cfg(test)]
-pub(crate) use crate::stats::test_projection::*;
 
 mod frame_input;
 pub use frame_input::*;

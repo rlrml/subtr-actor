@@ -6,6 +6,9 @@ pub(crate) use crate::stats::calculators::*;
 pub(crate) use crate::stats::common::*;
 pub(crate) use crate::*;
 
+#[cfg(test)]
+pub(crate) use test_projection::*;
+
 pub mod backboard_stats;
 pub use backboard_stats::*;
 pub mod ball_carry_stats;
@@ -70,3 +73,6 @@ pub mod wavedash_stats;
 pub use wavedash_stats::*;
 pub mod whiff_stats;
 pub use whiff_stats::*;
+
+#[cfg(test)]
+mod test_projection;
