@@ -60,7 +60,7 @@ impl StatsTimelineEventsNode {
             gameplay_state_dependency(),
             live_play_dependency(),
             match_stats_dependency(),
-            stats_projection_dependency(),
+            // Keep compact event transfer independent from full partial-sum projection.
             backboard_dependency(),
             ceiling_shot_dependency(),
             wall_aerial_dependency(),
