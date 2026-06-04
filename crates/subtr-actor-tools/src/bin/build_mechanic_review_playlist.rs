@@ -669,6 +669,55 @@ fn enforce_min_clip_duration(
     (start_time, end_time)
 }
 
+fn frame_index_at_or_after(frames: &[boxcars::Frame], time: f32) -> Option<usize> {
+    if frames.is_empty() || !time.is_finite() {
+        return None;
+    }
+
+    let index = frames.partition_point(|frame| frame.time < time);
+    Some(index.min(frames.len().saturating_sub(1)))
+}
+
+fn playback_bounds_for_clip(
+    replay: &boxcars::Replay,
+    start_time: f32,
+    end_time: f32,
+) -> (PlaybackBound, PlaybackBound) {
+    let frames = replay
+        .network_frames
+        .as_ref()
+        .map(|network_frames| network_frames.frames.as_slice());
+
+    if let Some(frames) = frames {
+        if let (Some(start_frame), Some(end_frame)) = (
+            frame_index_at_or_after(frames, start_time),
+            frame_index_at_or_after(frames, end_time),
+        ) {
+            return (
+                PlaybackBound {
+                    kind: PlaybackBoundKind::Frame,
+                    value: start_frame as f32,
+                },
+                PlaybackBound {
+                    kind: PlaybackBoundKind::Frame,
+                    value: end_frame.max(start_frame.saturating_add(1)) as f32,
+                },
+            );
+        }
+    }
+
+    (
+        PlaybackBound {
+            kind: PlaybackBoundKind::Time,
+            value: start_time,
+        },
+        PlaybackBound {
+            kind: PlaybackBoundKind::Time,
+            value: end_time,
+        },
+    )
+}
+
 fn event_json<T: Serialize>(event: &T) -> Value {
     serde_json::to_value(event).unwrap_or_else(|_| json!({ "serializationError": true }))
 }
@@ -742,18 +791,13 @@ fn build_items_for_source(
             candidate.event_frame,
             candidate.player_id.as_deref().unwrap_or("team")
         );
+        let (start_bound, end_bound) = playback_bounds_for_clip(replay, start_time, end_time);
 
         items.push(PlaylistManifestItem {
             id: id.clone(),
             replay: source.source_id.clone(),
-            start: PlaybackBound {
-                kind: PlaybackBoundKind::Time,
-                value: start_time,
-            },
-            end: PlaybackBound {
-                kind: PlaybackBoundKind::Time,
-                value: end_time,
-            },
+            start: start_bound,
+            end: end_bound,
             label: format!("{}{score} - {player_label}", candidate.mechanic_label),
             meta: json!({
                 "itemId": id,
@@ -872,4 +916,35 @@ fn main() -> anyhow::Result<()> {
         manifest.replays.len()
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn frame(time: f32) -> boxcars::Frame {
+        boxcars::Frame {
+            time,
+            delta: 0.1,
+            new_actors: Vec::new(),
+            deleted_actors: Vec::new(),
+            updated_actors: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn frame_index_at_or_after_clamps_to_available_replay_frames() {
+        let frames = vec![frame(8.0), frame(8.5), frame(9.0), frame(10.0)];
+
+        assert_eq!(frame_index_at_or_after(&frames, 0.0), Some(0));
+        assert_eq!(frame_index_at_or_after(&frames, 8.5), Some(1));
+        assert_eq!(frame_index_at_or_after(&frames, 8.6), Some(2));
+        assert_eq!(frame_index_at_or_after(&frames, 99.0), Some(3));
+    }
+
+    #[test]
+    fn frame_index_at_or_after_rejects_empty_or_invalid_inputs() {
+        assert_eq!(frame_index_at_or_after(&[], 8.0), None);
+        assert_eq!(frame_index_at_or_after(&[frame(8.0)], f32::NAN), None);
+    }
 }
