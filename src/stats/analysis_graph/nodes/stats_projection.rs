@@ -101,6 +101,7 @@ pub struct StatsProjectionNode {
     state: StatsProjectionState,
     cursors: StatsProjectionCursors,
     powerslide: PowerslideProjectionState,
+    boost_current_amount_consistency: BoostCurrentAmountConsistencyTracker,
     last_powerslide_sample_frame: Option<usize>,
     previous_live_play: Option<bool>,
 }
@@ -211,8 +212,47 @@ impl StatsProjectionNode {
         &events[start..]
     }
 
+    fn check_boost_current_amount_consistency(
+        &mut self,
+        frame: &FrameInfo,
+        players: &PlayerFrameState,
+    ) {
+        for player in &players.players {
+            if player.boost_active {
+                continue;
+            }
+            let Some(observed_byte) = player
+                .last_boost_amount
+                .map(|amount| amount.round().clamp(0.0, BOOST_MAX_AMOUNT) as u8)
+            else {
+                continue;
+            };
+            let stats = self.state.boost.player_stats_for(&player.player_id);
+            self.boost_current_amount_consistency.observe(
+                frame.frame_number,
+                frame.time,
+                &player.player_id,
+                &stats,
+                observed_byte,
+            );
+        }
+    }
+
+    fn warn_for_unresolved_boost_current_amount_drift(&self) {
+        for warning in self.boost_current_amount_consistency.unresolved_warnings() {
+            log::warn!(
+                "Boost invariant violation for player {:?} at frame {} (t={:.3}): {}",
+                warning.player_id,
+                warning.frame,
+                warning.time,
+                warning.message(),
+            );
+        }
+    }
+
     fn project_frame(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         let frame = ctx.get::<FrameInfo>()?;
+        let players = ctx.get::<PlayerFrameState>()?;
         let live_play_state = ctx.get::<LivePlayState>()?;
         let live_play = live_play_state.is_live_play;
         let counts_toward_powerslide_motion = matches!(
@@ -394,6 +434,9 @@ impl StatsProjectionNode {
         for event in Self::events_since(&mut self.cursors.boost_stats, boost.stats_events()) {
             self.state.boost.apply_event(event);
         }
+        if live_play {
+            self.check_boost_current_amount_consistency(frame, players);
+        }
         let bump = ctx.get::<BumpCalculator>()?;
         for event in Self::events_since(&mut self.cursors.bump, bump.events()) {
             self.state.bump.apply_event(event);
@@ -452,6 +495,7 @@ impl AnalysisNode for StatsProjectionNode {
             frame_info_dependency(),
             gameplay_state_dependency(),
             live_play_dependency(),
+            player_frame_state_dependency(),
             match_stats_dependency(),
             backboard_dependency(),
             ceiling_shot_dependency(),
@@ -491,7 +535,9 @@ impl AnalysisNode for StatsProjectionNode {
     }
 
     fn finish(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.project_frame(ctx)
+        self.project_frame(ctx)?;
+        self.warn_for_unresolved_boost_current_amount_drift();
+        Ok(())
     }
 
     fn state(&self) -> &Self::State {

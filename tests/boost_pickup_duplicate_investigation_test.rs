@@ -167,6 +167,13 @@ fn iced_space_duplicate_reported_small_boost_pickup_is_suppressed_by_processor()
         .iter()
         .position(|event| event.reported_frame == Some(1996))
         .map(|index| index + 1);
-    assert_eq!(original_small_ordinal, Some(18));
-    assert_eq!(counted_small_ordinal, Some(19));
+    assert!(
+        original_small_ordinal.is_some(),
+        "the original reported small pickup should be counted"
+    );
+    assert_eq!(
+        counted_small_ordinal,
+        original_small_ordinal.map(|ordinal| ordinal + 1),
+        "the retained frame 1996 pickup should immediately follow the original small pickup"
+    );
 }

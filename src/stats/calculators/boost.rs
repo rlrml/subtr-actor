@@ -239,7 +239,6 @@ pub struct BoostCalculator {
     kickoff_respawn_awarded: HashSet<PlayerId>,
     initial_respawn_awarded: HashSet<PlayerId>,
     pending_demo_respawns: HashMap<PlayerId, PendingDemoRespawn>,
-    demo_reset_boost_amounts: HashMap<PlayerId, f32>,
     pending_reported_pickups: VecDeque<DeferredReportedBoostPickup>,
     previous_boost_levels_live: Option<bool>,
 }
@@ -261,6 +260,7 @@ struct BoostLedgerContext {
 #[derive(Debug, Clone, Copy, Default)]
 struct BoostUsageState {
     amount_obtained: f32,
+    amount_removed: f32,
     amount_used: f32,
     amount_used_while_grounded: f32,
     amount_used_while_airborne: f32,
@@ -277,6 +277,21 @@ impl BoostUsageState {
         self.amount_used += delta.amount_used;
         self.amount_used_while_grounded += delta.amount_used_while_grounded;
         self.amount_used_while_airborne += delta.amount_used_while_airborne;
+    }
+
+    fn apply_removed_amount(&mut self, amount: f32) {
+        self.amount_removed += amount;
+    }
+
+    fn inferred_amount_used(self, current_boost_amount: f32) -> f32 {
+        // Boost balance:
+        //   current = obtained - used - removed
+        //
+        // `obtained` contains pickups plus respawn grants. `removed` covers
+        // non-usage losses such as demoing a player with boost. Rearranging the
+        // balance lets us infer cumulative use from the observed current boost:
+        //   used = obtained - removed - current
+        (self.amount_obtained - self.amount_removed - current_boost_amount).max(0.0)
     }
 }
 
@@ -638,7 +653,7 @@ impl BoostCalculator {
         };
         let collected_amount = (BOOST_MAX_AMOUNT - pending_pickup.previous_boost_amount)
             .min(nominal_gain)
-            .max(pending_pickup.pre_applied_collected_amount);
+            .max(0.0);
         let collected_amount_delta = collected_amount - pending_pickup.pre_applied_collected_amount;
         let overfill = (nominal_gain - collected_amount).max(0.0);
         let field_half = if stolen {
@@ -1046,7 +1061,10 @@ impl BoostCalculator {
         }
 
         let small_pad_floor = SMALL_PAD_AMOUNT_RAW - 3.0;
-        let big_pad_floor = SMALL_PAD_AMOUNT_RAW + 5.0;
+        let big_pad_floor = SMALL_PAD_AMOUNT_RAW + TOLERANCE;
+        if delta > big_pad_floor {
+            return vec![BoostIncreaseReason::BigPad];
+        }
         if boost < BOOST_FULL_BAND_MIN_RAW && delta >= small_pad_floor {
             const SMALL_PICKUP_COUNT_TOLERANCE: f32 = 3.0;
             let inferred_small_pickups = ((delta - SMALL_PICKUP_COUNT_TOLERANCE)
@@ -1056,9 +1074,6 @@ impl BoostCalculator {
             return vec![BoostIncreaseReason::SmallPad; inferred_small_pickups];
         }
 
-        if delta > big_pad_floor {
-            return vec![BoostIncreaseReason::BigPad];
-        }
         if boost >= BOOST_MAX_AMOUNT - TOLERANCE {
             return vec![BoostIncreaseReason::AmbiguousPad];
         }
@@ -1159,6 +1174,17 @@ impl BoostCalculator {
                 Some(event),
             );
         } else {
+            if let Some(index) = self
+                .pending_inferred_pickups
+                .iter()
+                .position(|pending_event| {
+                    pending_event.player_id == event.player_id
+                        && pending_event.frame.abs_diff(event.frame)
+                            <= Self::PICKUP_MATCH_FRAME_WINDOW
+                })
+            {
+                self.pending_inferred_pickups.remove(index);
+            }
             self.emit_pickup_comparison_event(BoostPickupComparison::Both, None, Some(event));
         }
     }
@@ -1215,13 +1241,74 @@ impl BoostCalculator {
         }
     }
 
-    fn flush_stale_pickup_comparisons(&mut self, current_frame: usize) {
+    fn inferred_pickup_pad_size(&self, event: &PendingBoostPickupEvent) -> BoostPadSize {
+        match event.pad_type {
+            BoostPickupPadType::Big => BoostPadSize::Big,
+            BoostPickupPadType::Small => BoostPadSize::Small,
+            BoostPickupPadType::Ambiguous => event
+                .player_position
+                .and_then(|position| {
+                    self.guess_pad_size_from_position(
+                        &format!("inferred:{:?}:{}", event.player_id, event.frame),
+                        glam::Vec3::from_array(position),
+                    )
+                })
+                .unwrap_or(BoostPadSize::Big),
+        }
+    }
+
+    fn resolve_inferred_pickup(
+        &mut self,
+        event: PendingBoostPickupEvent,
+        application_frame: &FrameInfo,
+    ) {
+        let Some(boost_before) = event.boost_before else {
+            self.emit_pickup_comparison_event(BoostPickupComparison::Ghost, Some(event), None);
+            return;
+        };
+
+        let pad_size = self.inferred_pickup_pad_size(&event);
+        let player_position = event
+            .player_position
+            .map(glam::Vec3::from_array)
+            .unwrap_or(glam::Vec3::ZERO);
+        let pad_id = format!("inferred:{:?}:{}", event.player_id, event.frame);
+        let field_half = self.resolve_pickup(
+            &pad_id,
+            PendingBoostPickup {
+                frame: application_frame.frame_number,
+                time: application_frame.time,
+                player_id: event.player_id.clone(),
+                is_team_0: event.is_team_0,
+                previous_boost_amount: boost_before,
+                pre_applied_collected_amount: 0.0,
+                pre_applied_pad_size: None,
+                player_position,
+                boost_before: event.boost_before,
+                boost_after: event.boost_after,
+            },
+            pad_size,
+        );
+
+        let mut comparison_event = event;
+        comparison_event.pad_type = pad_size.into();
+        comparison_event.field_half = field_half;
+        self.emit_pickup_comparison_event(
+            BoostPickupComparison::Ghost,
+            Some(comparison_event),
+            None,
+        );
+    }
+
+    fn flush_stale_pickup_comparisons(&mut self, frame: &FrameInfo) {
         while self
             .pending_inferred_pickups
             .front()
-            .is_some_and(|event| event.frame + Self::PICKUP_MATCH_FRAME_WINDOW < current_frame)
+            .is_some_and(|event| event.frame + Self::PICKUP_MATCH_FRAME_WINDOW < frame.frame_number)
         {
-            self.pending_inferred_pickups.pop_front();
+            if let Some(event) = self.pending_inferred_pickups.pop_front() {
+                self.resolve_inferred_pickup(event, frame);
+            }
         }
     }
 
@@ -1318,9 +1405,9 @@ impl BoostCalculator {
             };
             let previous_sample_boost_amount =
                 self.previous_boost_amounts.get(&player.player_id).copied();
-            let previous_boost_amount = player
-                .last_boost_amount
-                .unwrap_or_else(|| previous_sample_boost_amount.unwrap_or(boost_amount));
+            let previous_boost_amount = previous_sample_boost_amount
+                .or(player.last_boost_amount)
+                .unwrap_or(boost_amount);
             let previous_boost_amount = if boost_levels_resumed_this_sample {
                 boost_amount
             } else {
@@ -1351,23 +1438,27 @@ impl BoostCalculator {
                     kickoff_phase_active,
                     demo_respawn_supported,
                 );
-                for reason in &boost_increase_reasons {
-                    if let Ok(pad_type) = BoostPickupPadType::try_from(*reason) {
-                        self.record_inferred_pickup(PendingBoostPickupEvent {
-                            frame: frame.frame_number,
-                            time: frame.time,
-                            player_id: player.player_id.clone(),
-                            player_position: player.position().map(|position| position.to_array()),
-                            is_team_0: player.is_team_0,
-                            pad_type,
-                            field_half: Self::field_half_from_position(
-                                player.is_team_0,
-                                player.position(),
-                            ),
-                            activity: Self::activity_label(live_play),
-                            boost_before: Some(previous_sample_boost_amount),
-                            boost_after: Some(boost_amount),
-                        });
+                if track_boost_levels {
+                    for reason in &boost_increase_reasons {
+                        if let Ok(pad_type) = BoostPickupPadType::try_from(*reason) {
+                            self.record_inferred_pickup(PendingBoostPickupEvent {
+                                frame: frame.frame_number,
+                                time: frame.time,
+                                player_id: player.player_id.clone(),
+                                player_position: player
+                                    .position()
+                                    .map(|position| position.to_array()),
+                                is_team_0: player.is_team_0,
+                                pad_type,
+                                field_half: Self::field_half_from_position(
+                                    player.is_team_0,
+                                    player.position(),
+                                ),
+                                activity: Self::activity_label(live_play),
+                                boost_before: Some(previous_sample_boost_amount),
+                                boost_after: Some(boost_amount),
+                            });
+                        }
                     }
                 }
             }
@@ -1468,14 +1559,16 @@ impl BoostCalculator {
             }
             if demo_respawn_supported || generic_respawn_supported {
                 if let Some(pending) = self.pending_demo_respawns.get(&player.player_id) {
-                    let demo_reset_amount = pending
+                    // A demo removes the victim's pre-demo boost; the respawn
+                    // grant below is a separate obtained amount.
+                    let boost_removed_by_demo_amount = pending
                         .pre_demo_boost_amount
                         .unwrap_or(previous_boost_amount)
                         .max(0.0);
-                    *self
-                        .demo_reset_boost_amounts
+                    self.player_usage_state
                         .entry(player.player_id.clone())
-                        .or_default() += demo_reset_amount;
+                        .or_default()
+                        .apply_removed_amount(boost_removed_by_demo_amount);
                 }
                 respawn_amount += BOOST_KICKOFF_START_AMOUNT;
                 self.pending_demo_respawns.remove(&player.player_id);
@@ -1680,7 +1773,7 @@ impl BoostCalculator {
                             // exceeds what a small pad can provide, the pad must
                             // be big.  Use a margin to avoid float imprecision.
                             if size == BoostPadSize::Small
-                                && pre_applied_collected_amount > SMALL_PAD_AMOUNT_RAW * 1.5
+                                && pre_applied_collected_amount > SMALL_PAD_AMOUNT_RAW + 1.0
                             {
                                 size = BoostPadSize::Big;
                             }
@@ -1739,7 +1832,7 @@ impl BoostCalculator {
                 }
             }
         }
-        self.flush_stale_pickup_comparisons(frame.frame_number);
+        self.flush_stale_pickup_comparisons(frame);
 
         if track_boost_levels {
             for player in &players.players {
@@ -1757,13 +1850,7 @@ impl BoostCalculator {
                 let mut used_ledger_event = None;
                 let usage_state = self.player_usage_state(&player.player_id);
                 let previous_amount_used = usage_state.amount_used;
-                let demo_reset_boost_amount = self
-                    .demo_reset_boost_amounts
-                    .get(&player.player_id)
-                    .copied()
-                    .unwrap_or(0.0);
-                let amount_used_raw =
-                    (usage_state.amount_obtained - demo_reset_boost_amount - boost_amount).max(0.0);
+                let amount_used_raw = usage_state.inferred_amount_used(boost_amount);
                 let amount_used = amount_used_raw.max(usage_state.amount_used);
                 let amount_used_delta = amount_used - previous_amount_used;
                 let mut stats_delta = BoostStats {

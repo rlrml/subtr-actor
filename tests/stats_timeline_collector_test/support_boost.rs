@@ -344,7 +344,7 @@ fn assert_boost_pickup_nominal_amounts_consistent(timeline: &ReplayStatsTimeline
         stats: &BoostStats,
         is_live_play: bool,
     ) {
-        let violations = boost_invariant_violations(stats, None);
+        let violations = boost_invariant_violations(stats);
         let violations = if is_live_play {
             violations
         } else {
