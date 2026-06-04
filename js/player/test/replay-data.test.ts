@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { normalizeReplayData, normalizeReplayDataAsync } from "../src/replay-data";
 import { formatReplayLoadProgress, formatReplayLoadProgressMeta } from "../src/load-ui";
+import { inferReplayHitboxKind, normalizeReplayHitboxKind } from "../src/hitboxes";
 import type { RawReplayFramesData } from "../src/types";
 
 function rigidBody(x: number, y: number, z: number) {
@@ -175,9 +176,11 @@ test("normalization progress report cadence is configurable", () => {
 });
 
 test("normalization carries inferred player hitbox metadata", () => {
-  const raw = buildReplayData(2, 2);
+  const raw = buildReplayData(2, 4);
+  raw.meta.team_zero[0]!.car_hitbox_family = "Dominus";
+  raw.meta.team_zero[1]!.car_body_id = 4284;
   raw.meta.team_zero[0]!.stats = {
-    Body: { Str: "Dominus" },
+    Body: { Str: "Merc" },
   };
   raw.meta.team_one[0]!.stats = {
     LoadoutBody: { Str: "Merc" },
@@ -186,7 +189,95 @@ test("normalization carries inferred player hitbox metadata", () => {
   const replay = normalizeReplayData(raw);
 
   assert.equal(replay.players[0]!.hitbox.kind, "dominus");
-  assert.equal(replay.players[1]!.hitbox.kind, "merc");
+  assert.equal(replay.players[1]!.hitbox.kind, "octane");
+  assert.equal(replay.players[2]!.hitbox.kind, "merc");
+});
+
+test("hitbox inference covers BakkesMod CARBODY ids", () => {
+  const expected = new Map<number, string>([
+    [21, "octane"],
+    [22, "breakout"],
+    [1416, "breakout"],
+    [23, "octane"],
+    [1568, "octane"],
+    [24, "plank"],
+    [25, "octane"],
+    [1300, "octane"],
+    [26, "octane"],
+    [27, "octane"],
+    [28, "hybrid"],
+    [1159, "hybrid"],
+    [29, "dominus"],
+    [30, "merc"],
+    [31, "hybrid"],
+    [402, "octane"],
+    [1295, "octane"],
+    [403, "dominus"],
+    [1018, "dominus"],
+    [404, "octane"],
+    [523, "octane"],
+    [597, "dominus"],
+    [600, "dominus"],
+    [607, "octane"],
+    [625, "octane"],
+    [723, "octane"],
+    [803, "plank"],
+    [1171, "dominus"],
+    [1172, "octane"],
+    [1286, "dominus"],
+    [1317, "hybrid"],
+    [1475, "octane"],
+    [1478, "octane"],
+    [1533, "octane"],
+    [1603, "plank"],
+    [1623, "octane"],
+    [1624, "hybrid"],
+    [1675, "dominus"],
+    [1691, "plank"],
+    [1856, "hybrid"],
+    [1919, "plank"],
+    [1932, "breakout"],
+    [11315, "dominus"],
+    [4782, "octane"],
+    [8565, "breakout"],
+    [8566, "breakout"],
+    [9140, "dominus"],
+    [9388, "dominus"],
+    [10817, "breakout"],
+    [11095, "dominus"],
+    [11141, "hybrid"],
+    [11336, "dominus"],
+    [12315, "breakout"],
+    [12325, "dominus"],
+    [12335, "merc"],
+    [12382, "dominus"],
+    [12484, "breakout"],
+    [12563, "dominus"],
+    [12569, "hybrid"],
+    [12652, "hybrid"],
+    [12669, "dominus"],
+  ]);
+
+  for (const [bodyId, hitbox] of expected) {
+    assert.equal(
+      inferReplayHitboxKind({
+        remote_id: { Steam: `body-${bodyId}` },
+        stats: null,
+        name: `Body ${bodyId}`,
+        car_body_id: bodyId,
+      }),
+      hitbox,
+      `body id ${bodyId}`,
+    );
+  }
+});
+
+test("hitbox inference recognizes newer body name aliases", () => {
+  assert.equal(normalizeReplayHitboxKind("Aston Martin Valhalla"), "breakout");
+  assert.equal(normalizeReplayHitboxKind("BMW M2 Racing"), "dominus");
+  assert.equal(normalizeReplayHitboxKind("Rivian R1S"), "hybrid");
+  assert.equal(normalizeReplayHitboxKind("Pizza Planet Delivery Truck"), "merc");
+  assert.equal(normalizeReplayHitboxKind("Psyclops"), "octane");
 });
 
 test("async normalization can yield without a progress callback", async () => {

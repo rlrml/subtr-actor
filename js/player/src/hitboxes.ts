@@ -88,14 +88,17 @@ const BODY_HITBOX_BY_NORMALIZED_NAME: Readonly<Record<string, ReplayHitboxKind>>
   artemis: "plank",
   artemisg1: "plank",
   artemisgxt: "plank",
+  astonmartinvalhalla: "breakout",
   backfire: "octane",
+  backtothefuturetimemachine: "dominus",
+  batmobile1989: "dominus",
   battlebus: "merc",
   breakout: "breakout",
   breakouttypes: "breakout",
   centio: "plank",
   centiov17: "plank",
   cyclone: "breakout",
-  deloreantimemachine: "octane",
+  deloreantimemachine: "dominus",
   diestro: "dominus",
   dominus: "dominus",
   dominusgt: "dominus",
@@ -135,6 +138,7 @@ const BODY_HITBOX_BY_NORMALIZED_NAME: Readonly<Record<string, ReplayHitboxKind>>
   scarab: "octane",
   takumi: "octane",
   takumirxt: "octane",
+  thedarkknightstumbler: "octane",
   thedarkknightrisestumbler: "octane",
   triton: "octane",
   twinmilliii: "plank",
@@ -145,7 +149,197 @@ const BODY_HITBOX_BY_NORMALIZED_NAME: Readonly<Record<string, ReplayHitboxKind>>
   xdevil: "hybrid",
   xdevilmk2: "hybrid",
   zippy: "octane",
+  "1966cadillacdeville": "breakout",
+  ace: "breakout",
+  admiral: "dominus",
+  azura: "breakout",
+  behemoth: "merc",
+  beskar: "hybrid",
+  bmwm3e30: "dominus",
+  bmwm2racing: "dominus",
+  bmwm4gt3evo: "dominus",
+  bmw1series: "octane",
+  bmw1seriesrle: "octane",
+  bmwm240i: "dominus",
+  bugatticentodieci: "plank",
+  bumblebee: "dominus",
+  bumblebeecar: "dominus",
+  chevroletastro: "merc",
+  chevroletcorvettestingray: "breakout",
+  chevroletcorvettezr1: "breakout",
+  chryslerpacifica: "hybrid",
+  corlay: "octane",
+  cyberpunkquadra: "breakout",
+  defenderd7xr: "merc",
+  diesel: "breakout",
+  dodgechargerdaytonascatpack: "dominus",
+  dodgerchargerdaytonascatpack: "dominus",
+  dominusneon: "dominus",
+  emperor: "breakout",
+  emperorii: "breakout",
+  emperoriifrozen: "breakout",
+  emperoriiscorched: "breakout",
+  fastfuriousdodgecharger: "dominus",
+  fastandfuriousdodgecharger: "dominus",
+  fastandfuriousdodgechargersrthellcat: "dominus",
+  fastfuriousmazdarx7: "breakout",
+  fastandfuriousmazdarx7: "breakout",
+  fastfuriousnissanskyline: "hybrid",
+  fastandfuriousnissanskyline: "hybrid",
+  fastfuriouspontiacfiero: "hybrid",
+  fastandfuriouspontiacfiero: "hybrid",
+  fenneczrf: "octane",
+  ferrari296gtb: "dominus",
+  ferrarif40: "breakout",
+  fordbroncoraptorrle: "merc",
+  fordf150rle: "octane",
+  fordmustanggtd: "dominus",
+  fordmustangshelbygt500: "dominus",
+  fordmustangmacherle: "octane",
+  fordmustangshelbygt350rrle: "dominus",
+  formula12021: "plank",
+  formula12022: "plank",
+  fuse: "breakout",
+  havoc: "breakout",
+  hearse: "hybrid",
+  homerscar: "dominus",
+  hondacivictyper: "octane",
+  hondacivictyperle: "octane",
+  jackal: "octane",
+  jeepwranglerrubicon: "octane",
+  kitt: "dominus",
+  knightindustries2000: "dominus",
+  komodo: "breakout",
+  lamborghinicountachlpi8004: "dominus",
+  lamborghinihuracansto: "dominus",
+  lamborghiniurus: "hybrid",
+  lamborghiniurusse: "hybrid",
+  lightningmcqueen: "dominus",
+  lightningmcqueencar: "dominus",
+  lockjaw: "dominus",
+  luiginsr: "octane",
+  maestro: "dominus",
+  magnifique: "dominus",
+  magnifiquegxt: "dominus",
+  mako: "breakout",
+  mamba: "dominus",
+  mario: "octane",
+  marionsr: "octane",
+  maven: "dominus",
+  mclaren765lt: "dominus",
+  mclarenp1: "dominus",
+  mclarensenna: "breakout",
+  megastar: "breakout",
+  mercedesamggt63s: "dominus",
+  mercedesbenzcla: "dominus",
+  mudcat: "octane",
+  mudcatg1: "octane",
+  mudcatgxt: "octane",
+  nissan350z: "dominus",
+  nissanfairladyz: "dominus",
+  nissanfairladyzrle: "dominus",
+  nissansilvia: "hybrid",
+  nissansilviarle: "hybrid",
+  nissanskylinegtr: "hybrid",
+  nissanskylinegtrr32: "hybrid",
+  nissanzperformance: "dominus",
+  nissanzperformancecar: "dominus",
+  outlaw: "octane",
+  outlawgxt: "octane",
+  pattywagon: "octane",
+  pizzaplanetdeliverytruck: "merc",
+  pontiacfirebird: "breakout",
+  porsche918spyder: "breakout",
+  porsche911gt3rs: "dominus",
+  porsche911turbo: "dominus",
+  porsche911turborle: "dominus",
+  primo: "hybrid",
+  psyclops: "octane",
+  quadraturbor: "breakout",
+  ram1500rho: "hybrid",
+  recoilav: "merc",
+  redline: "breakout",
+  revolver: "breakout",
+  rivianr1s: "hybrid",
+  scorpion: "dominus",
+  shokunin: "octane",
+  shokuningxt: "octane",
+  stampede: "merc",
+  teslacybertruck: "hybrid",
+  themysterymachine: "merc",
+  theincredibile: "breakout",
+  turtlevan: "merc",
+  voidburn: "hybrid",
+  volkswagengolfgti: "octane",
+  volkswagengolfgtirle: "octane",
+  xentari: "octane",
+  zefira: "dominus",
 };
+
+function idsToHitboxMap(
+  entries: ReadonlyArray<readonly [readonly number[], ReplayHitboxKind]>,
+): Readonly<Record<number, ReplayHitboxKind>> {
+  const out: Record<number, ReplayHitboxKind> = {};
+  for (const [bodyIds, hitbox] of entries) {
+    for (const bodyId of bodyIds) {
+      out[bodyId] = hitbox;
+    }
+  }
+  return out;
+}
+
+const BODY_HITBOX_BY_ID: Readonly<Record<number, ReplayHitboxKind>> = idsToHitboxMap([
+  [
+    [
+      22, 1416, 1894, 1932, 3031, 3311, 6243, 6489, 7651, 7696, 7890, 7901,
+      8006, 8360, 8361, 8565, 8566, 8669, 9357, 10697, 10698, 10817, 10822,
+      11038, 11394, 11505, 11677, 11800, 11933, 11949, 12173, 12315, 12361,
+      12484,
+    ],
+    "breakout",
+  ],
+  [
+    [
+      29, 403, 597, 600, 1018, 1171, 1286, 1675, 1689, 1883, 2070, 2268, 2666,
+      2950, 2951, 3155, 3156, 3157, 3265, 3426, 3875, 3879, 3880, 4014, 4155,
+      4367, 4472, 4473, 4745, 4770, 4781, 4861, 4864, 5709, 5773, 5823, 5858,
+      5964, 5979, 6122, 6244, 6247, 6260, 6836, 7211, 7337, 7338, 7341, 7343,
+      7415, 7512, 7532, 7593, 7772, 8454, 9053, 9088, 9089, 9140, 9388, 9894,
+      10094, 10440, 10441, 10694, 10695, 11016, 11095, 11315, 11336, 11534,
+      11941, 11996, 12106, 12142, 12262, 12286, 12325, 12382, 12563, 12669,
+    ],
+    "dominus",
+  ],
+  [
+    [
+      28, 31, 1159, 1317, 1624, 1856, 2269, 3451, 3582, 3702, 5470, 5488,
+      5879, 7012, 9084, 9085, 9427, 10044, 10805, 11138, 11141, 11379, 11932,
+      12569, 12652,
+    ],
+    "hybrid",
+  ],
+  [
+    [
+      30, 4780, 7336, 7477, 7815, 7979, 10689, 11098, 11736, 11905, 11950, 12318,
+      12335,
+    ],
+    "merc",
+  ],
+  [
+    [
+      21, 23, 25, 26, 27, 402, 404, 523, 607, 625, 723, 1172, 1295, 1300, 1475,
+      1478, 1533, 1568, 1623, 2665, 2853, 2919, 2949, 4284, 4318, 4319, 4320,
+      4782, 4906, 5020, 5039, 5188, 5361, 5547, 5713, 5837, 5951, 6939, 7947,
+      7948, 8383, 8806, 8807, 10896, 10897, 10900, 10901, 11314, 11603, 12104,
+      12105,
+    ],
+    "octane",
+  ],
+  [
+    [24, 803, 1603, 1691, 1919, 3594, 3614, 3622, 4268, 5265, 7052, 8524],
+    "plank",
+  ],
+]);
 
 function normalizedText(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -229,6 +423,19 @@ function collectHeaderPropText(value: unknown, out: string[]): void {
 export function inferReplayHitboxKind(
   playerInfo: RawPlayerInfo | null | undefined,
 ): ReplayHitboxKind {
+  const explicitFamily = normalizeReplayHitboxKind(playerInfo?.car_hitbox_family);
+  if (explicitFamily) {
+    return explicitFamily;
+  }
+
+  const bodyId = playerInfo?.car_body_id;
+  if (typeof bodyId === "number") {
+    const hitbox = BODY_HITBOX_BY_ID[bodyId];
+    if (hitbox) {
+      return hitbox;
+    }
+  }
+
   const stats = playerInfo?.stats;
   if (!stats) {
     return DEFAULT_REPLAY_HITBOX_KIND;
