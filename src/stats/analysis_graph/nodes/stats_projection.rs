@@ -339,51 +339,67 @@ impl StatsProjectionNode {
             self.state.fifty_fifty.apply_event(event);
         }
         let possession = ctx.get::<PossessionCalculator>()?;
-        for event in Self::events_since(&mut self.cursors.possession, possession.events()) {
+        let projected_possession_events = possession.projected_events();
+        self.state.possession = PossessionStatsAccumulator::default();
+        for event in projected_possession_events.iter() {
             self.state.possession.apply_event(event);
         }
+        self.cursors.possession = possession.events().len();
         let pressure = ctx.get::<PressureCalculator>()?;
-        for event in Self::events_since(&mut self.cursors.pressure, pressure.events()) {
+        let projected_pressure_events = pressure.projected_events();
+        self.state.pressure = PressureStatsAccumulator::default();
+        for event in projected_pressure_events.iter() {
             self.state.pressure.apply_event(event);
         }
+        self.cursors.pressure = pressure.events().len();
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
-        for event in Self::events_since(
-            &mut self.cursors.territorial_pressure_stats,
-            territorial_pressure.stats_events(),
-        ) {
+        let projected_territorial_pressure_stats_events =
+            territorial_pressure.projected_stats_events();
+        self.state.territorial_pressure = TerritorialPressureStatsAccumulator::default();
+        for event in projected_territorial_pressure_stats_events.iter() {
             self.state.territorial_pressure.apply_event(event);
         }
+        self.cursors.territorial_pressure_stats = territorial_pressure.stats_events().len();
         let rotation = ctx.get::<RotationCalculator>()?;
-        for event in Self::events_since(&mut self.cursors.rotation_player, rotation.player_events())
-        {
+        let projected_rotation_player_events = rotation.projected_player_events();
+        self.state.rotation = RotationStatsAccumulator::default();
+        for event in projected_rotation_player_events.iter() {
             self.state.rotation.apply_player_event(event);
         }
-        for event in Self::events_since(&mut self.cursors.rotation_team, rotation.team_events()) {
+        for event in rotation.team_events() {
             self.state.rotation.apply_team_event(event);
         }
+        self.cursors.rotation_player = rotation.player_events().len();
+        self.cursors.rotation_team = rotation.team_events().len();
         let rush = ctx.get::<RushCalculator>()?;
         for event in Self::events_since(&mut self.cursors.rush, rush.events()) {
             self.state.rush.apply_event(event);
         }
         let touch = ctx.get::<TouchCalculator>()?;
         if live_play {
-            for event in Self::events_since(&mut self.cursors.touch, touch.events()) {
+            self.state.touch = TouchStatsAccumulator::default();
+            for event in touch.events() {
                 self.state.touch.apply_touch_event(event, frame);
             }
-            for event in Self::events_since(
-                &mut self.cursors.touch_last_touch,
-                touch.last_touch_events(),
-            ) {
+            for event in touch.last_touch_events() {
                 self.state
                     .touch
                     .set_current_last_touch_player(event.player.clone());
             }
-        }
-        for event in Self::events_since(
-            &mut self.cursors.touch_ball_movement,
-            touch.ball_movement_events(),
-        ) {
-            self.state.touch.apply_ball_movement_event(event);
+            let projected_touch_ball_movement_events = touch.projected_ball_movement_events();
+            for event in projected_touch_ball_movement_events.iter() {
+                self.state.touch.apply_ball_movement_event(event);
+            }
+            self.cursors.touch = touch.events().len();
+            self.cursors.touch_last_touch = touch.last_touch_events().len();
+            self.cursors.touch_ball_movement = projected_touch_ball_movement_events.len();
+        } else {
+            for event in Self::events_since(
+                &mut self.cursors.touch_ball_movement,
+                touch.ball_movement_events(),
+            ) {
+                self.state.touch.apply_ball_movement_event(event);
+            }
         }
         let whiff = ctx.get::<WhiffCalculator>()?;
         if live_play {
@@ -431,12 +447,15 @@ impl StatsProjectionNode {
             self.state.ball_carry.apply_event(event);
         }
         let boost = ctx.get::<BoostCalculator>()?;
-        for event in Self::events_since(&mut self.cursors.boost_stats, boost.stats_events()) {
+        let projected_boost_stats_events = boost.projected_stats_events();
+        self.state.boost = BoostStatsAccumulator::default();
+        for event in projected_boost_stats_events.iter() {
             self.state.boost.apply_event(event);
         }
         if live_play {
             self.check_boost_current_amount_consistency(frame, players);
         }
+        self.cursors.boost_stats = boost.stats_events().len();
         let bump = ctx.get::<BumpCalculator>()?;
         for event in Self::events_since(&mut self.cursors.bump, bump.events()) {
             self.state.bump.apply_event(event);
@@ -448,14 +467,19 @@ impl StatsProjectionNode {
             }
         }
         let movement = ctx.get::<MovementCalculator>()?;
-        for event in Self::events_since(&mut self.cursors.movement, movement.events()) {
+        let projected_movement_events = movement.projected_events();
+        self.state.movement = MovementStatsAccumulator::default();
+        for event in projected_movement_events.iter() {
             self.state.movement.apply_event(event);
         }
+        self.cursors.movement = movement.events().len();
         let positioning = ctx.get::<PositioningCalculator>()?;
-        self.state.positioning.apply_events(Self::events_since(
-            &mut self.cursors.positioning,
-            positioning.events(),
-        ));
+        let projected_positioning_events = positioning.projected_events();
+        self.state.positioning = PositioningStatsAccumulator::default();
+        self.state
+            .positioning
+            .apply_events(projected_positioning_events.iter());
+        self.cursors.positioning = positioning.events().len();
         let powerslide = ctx.get::<PowerslideCalculator>()?;
         let powerslide_events =
             Self::events_since(&mut self.cursors.powerslide, powerslide.events());

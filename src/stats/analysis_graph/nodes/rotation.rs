@@ -53,6 +53,11 @@ impl AnalysisNode for RotationNode {
         )
     }
 
+    fn finish(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        self.calculator.flush_pending_player_events();
+        Ok(())
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }

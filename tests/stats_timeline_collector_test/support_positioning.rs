@@ -308,6 +308,54 @@ fn assert_movement_events_reconstruct_serialized_partial_sums(
     );
 }
 
+fn assert_movement_events_reconstruct_final_serialized_sums(
+    replay_path: &str,
+    timeline: &ReplayStatsTimeline,
+) {
+    let mut players: HashMap<PlayerId, MovementStats> = HashMap::new();
+    let mut team_zero = MovementStats::default();
+    let mut team_one = MovementStats::default();
+
+    for event in &timeline.events.movement {
+        apply_movement_event_for_derivation(players.entry(event.player.clone()).or_default(), event);
+        if event.is_team_0 {
+            apply_movement_event_for_derivation(&mut team_zero, event);
+        } else {
+            apply_movement_event_for_derivation(&mut team_one, event);
+        }
+    }
+
+    let final_frame = timeline
+        .frames
+        .last()
+        .expect("movement reconstruction requires at least one frame");
+    assert_movement_stats_close(
+        replay_path,
+        "team_zero.movement",
+        final_frame.frame_number,
+        &final_frame.team_zero.movement,
+        &team_zero,
+    );
+    assert_movement_stats_close(
+        replay_path,
+        "team_one.movement",
+        final_frame.frame_number,
+        &final_frame.team_one.movement,
+        &team_one,
+    );
+
+    for player in &final_frame.players {
+        let expected = players.get(&player.player_id).cloned().unwrap_or_default();
+        assert_movement_stats_close(
+            replay_path,
+            &format!("player {} movement", player.name),
+            final_frame.frame_number,
+            &player.movement,
+            &expected,
+        );
+    }
+}
+
 fn apply_positioning_event_for_derivation(stats: &mut PositioningStats, event: &PositioningEvent) {
     stats.active_game_time += event.active_game_time;
     stats.tracked_time += event.tracked_time;
@@ -387,47 +435,32 @@ fn assert_positioning_stats_close(
     );
 }
 
-fn assert_positioning_events_reconstruct_serialized_partial_sums(
+fn assert_positioning_events_reconstruct_final_serialized_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.positioning.clone();
-    events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
-            .then_with(|| left.time.total_cmp(&right.time))
-    });
-
-    let mut event_index = 0;
     let mut players: HashMap<PlayerId, PositioningStats> = HashMap::new();
-
-    for frame in &timeline.frames {
-        while event_index < events.len() && events[event_index].frame <= frame.frame_number {
-            let event = &events[event_index];
-            apply_positioning_event_for_derivation(
-                players.entry(event.player.clone()).or_default(),
-                event,
-            );
-            event_index += 1;
-        }
-
-        for player in &frame.players {
-            let expected = players.get(&player.player_id).cloned().unwrap_or_default();
-            assert_positioning_stats_close(
-                replay_path,
-                &format!("player {} positioning", player.name),
-                frame.frame_number,
-                &player.positioning,
-                &expected,
-            );
-        }
+    for event in &timeline.events.positioning {
+        apply_positioning_event_for_derivation(
+            players.entry(event.player.clone()).or_default(),
+            event,
+        );
     }
 
-    assert_eq!(
-        event_index,
-        events.len(),
-        "{replay_path} unprocessed positioning events"
-    );
+    let final_frame = timeline
+        .frames
+        .last()
+        .expect("positioning reconstruction requires at least one frame");
+    for player in &final_frame.players {
+        let expected = players.get(&player.player_id).cloned().unwrap_or_default();
+        assert_positioning_stats_close(
+            replay_path,
+            &format!("player {} positioning", player.name),
+            final_frame.frame_number,
+            &player.positioning,
+            &expected,
+        );
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -824,4 +857,3 @@ fn apply_fifty_fifty_player_event(
         }
     }
 }
-

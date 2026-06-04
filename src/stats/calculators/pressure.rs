@@ -25,9 +25,19 @@ impl PressureHalfLabel {
 pub struct PressureEvent {
     pub time: f32,
     pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
     pub active: bool,
     pub duration: f32,
     pub field_half: String,
+}
+
+impl PressureEvent {
+    fn absorb_duration(&mut self, frame: &FrameInfo, duration: f32) {
+        self.end_time = frame.time;
+        self.end_frame = frame.frame_number;
+        self.duration += duration;
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,12 +58,19 @@ pub struct PressureCalculator {
     config: PressureCalculatorConfig,
     events: EventStream<PressureEvent>,
     last_emitted_event_state: Option<PressureEventState>,
+    pending_event: Option<PendingPressureEvent>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 struct PressureEventState {
     active: bool,
     field_half: PressureHalfLabel,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct PendingPressureEvent {
+    state: PressureEventState,
+    event: PressureEvent,
 }
 
 impl PressureCalculator {
@@ -76,6 +93,21 @@ impl PressureCalculator {
         self.events.new_events()
     }
 
+    pub fn projected_events(&self) -> Vec<PressureEvent> {
+        let mut events = self.events.all().to_vec();
+        if let Some(pending) = &self.pending_event {
+            events.push(pending.event.clone());
+        }
+        events
+    }
+
+    pub fn flush_pending_event(&mut self) {
+        let Some(pending) = self.pending_event.take() else {
+            return;
+        };
+        self.events.push(pending.event);
+    }
+
     pub fn config(&self) -> &PressureCalculatorConfig {
         &self.config
     }
@@ -94,12 +126,33 @@ impl PressureCalculator {
         let event = PressureEvent {
             time: frame.time,
             frame: frame.frame_number,
+            end_time: frame.time,
+            end_frame: frame.frame_number,
             active,
             duration,
             field_half: field_half.as_label_value().to_owned(),
         };
-        self.events.push(event);
+        self.record_event(event_state, frame, event);
         self.last_emitted_event_state = Some(event_state);
+    }
+
+    fn record_event(&mut self, state: PressureEventState, frame: &FrameInfo, event: PressureEvent) {
+        let Some(pending) = self.pending_event.as_mut() else {
+            self.pending_event = Some(PendingPressureEvent { state, event });
+            return;
+        };
+
+        if pending.state == state {
+            pending.event.absorb_duration(frame, event.duration);
+        } else {
+            let previous = self
+                .pending_event
+                .replace(PendingPressureEvent { state, event });
+            let Some(previous) = previous else {
+                return;
+            };
+            self.events.push(previous.event);
+        }
     }
 
     pub fn update(

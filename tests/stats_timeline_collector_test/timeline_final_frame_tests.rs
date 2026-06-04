@@ -495,107 +495,39 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
     assert_eq!(timeline.events.double_tap, double_tap.events());
 }
 
-fn assert_boost_ledger_reconstructs_serialized_boost_partial_sums(
+fn assert_boost_stats_events_reconstruct_final_serialized_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut ledger_events = timeline.events.boost_ledger.clone();
-    ledger_events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
-            .then_with(|| left.time.total_cmp(&right.time))
-    });
-    let mut state_events = timeline.events.boost_state.clone();
-    state_events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
-            .then_with(|| left.time.total_cmp(&right.time))
-    });
-
-    let mut ledger_event_index = 0;
-    let mut state_event_index = 0;
-    let mut players: HashMap<PlayerId, DerivedBoostLedgerStats> = HashMap::new();
-    let mut team_zero = DerivedBoostLedgerStats::default();
-    let mut team_one = DerivedBoostLedgerStats::default();
-
-    for frame in &timeline.frames {
-        let mut state_event_players_this_frame = Vec::new();
-        while state_event_index < state_events.len()
-            && state_events[state_event_index].frame <= frame.frame_number
-        {
-            let event = &state_events[state_event_index];
-            apply_boost_state_event(players.entry(event.player_id.clone()).or_default(), event);
-            if event.frame == frame.frame_number {
-                state_event_players_this_frame.push((event.player_id.clone(), event.is_team_0));
-            }
-            state_event_index += 1;
-        }
-        while ledger_event_index < ledger_events.len()
-            && ledger_events[ledger_event_index].frame <= frame.frame_number
-        {
-            let event = &ledger_events[ledger_event_index];
-            apply_boost_ledger_event(players.entry(event.player_id.clone()).or_default(), event);
-            apply_boost_ledger_event(
-                if event.is_team_0 {
-                    &mut team_zero
-                } else {
-                    &mut team_one
-                },
-                event,
-            );
-            ledger_event_index += 1;
-        }
-
-        for (player_id, is_team_0) in state_event_players_this_frame {
-            let player_stats = players.entry(player_id).or_default();
-            let Some((previous_boost_amount, boost_amount)) =
-                apply_boost_state_sample(player_stats, frame.dt, frame.frame_number)
-            else {
-                continue;
-            };
-            add_boost_state_sample(
-                if is_team_0 {
-                    &mut team_zero.stats
-                } else {
-                    &mut team_one.stats
-                },
-                previous_boost_amount,
-                boost_amount,
-                frame.dt,
-            );
-        }
-
-        assert_boost_ledger_derived_stats_match(
-            &format!("{replay_path} team_zero frame {}", frame.frame_number),
-            &frame.team_zero.boost,
-            &team_zero.stats,
-        );
-        assert_boost_ledger_derived_stats_match(
-            &format!("{replay_path} team_one frame {}", frame.frame_number),
-            &frame.team_one.boost,
-            &team_one.stats,
-        );
-        for player in &frame.players {
-            let expected = players.get(&player.player_id).map(|stats| &stats.stats);
-            let default_stats = BoostStats::default();
-            assert_boost_ledger_derived_stats_match(
-                &format!(
-                    "{replay_path} player {} frame {}",
-                    player.name, frame.frame_number
-                ),
-                &player.boost,
-                expected.unwrap_or(&default_stats),
-            );
-        }
+    let mut accumulator = BoostStatsAccumulator::default();
+    for event in &timeline.events.boost_stats {
+        accumulator.apply_event(event);
     }
-    assert_eq!(
-        ledger_event_index,
-        ledger_events.len(),
-        "{replay_path} unprocessed boost ledger events"
+
+    let final_frame = timeline
+        .frames
+        .last()
+        .expect("boost reconstruction requires at least one frame");
+    assert_boost_ledger_derived_stats_match(
+        &format!("{replay_path} team_zero final frame"),
+        &final_frame.team_zero.boost,
+        accumulator.team_zero_stats(),
     );
-    assert_eq!(
-        state_event_index,
-        state_events.len(),
-        "{replay_path} unprocessed boost state events"
+    assert_boost_ledger_derived_stats_match(
+        &format!("{replay_path} team_one final frame"),
+        &final_frame.team_one.boost,
+        accumulator.team_one_stats(),
     );
+    for player in &final_frame.players {
+        let expected = accumulator
+            .player_stats()
+            .get(&player.player_id)
+            .cloned()
+            .unwrap_or_default();
+        assert_boost_ledger_derived_stats_match(
+            &format!("{replay_path} player {} final frame", player.name),
+            &player.boost,
+            &expected,
+        );
+    }
 }

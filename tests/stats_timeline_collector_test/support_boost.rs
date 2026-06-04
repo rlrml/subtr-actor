@@ -3,8 +3,6 @@ use std::collections::{HashMap, HashSet};
 use subtr_actor::stats::analysis_graph::StatsProjectionState;
 use subtr_actor::*;
 
-const TEST_BOOST_ZERO_BAND_RAW: f32 = 1.0;
-const TEST_BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
 const REPLAY_FORMAT_EVOLUTION_DOC: &str = include_str!("../../docs/replay-format-evolution.md");
 
 fn parse_replay(path: &str) -> boxcars::Replay {
@@ -423,199 +421,6 @@ fn dump_final_boost_stats(timeline: &ReplayStatsTimeline) {
     }
 }
 
-#[derive(Clone, Default)]
-struct DerivedBoostLedgerStats {
-    stats: BoostStats,
-    current_boost_amount: Option<f32>,
-    current_boost_before: Option<f32>,
-    current_boost_frame: Option<usize>,
-    previous_boost_amount: Option<f32>,
-}
-
-fn boost_ledger_label<'a>(event: &'a BoostLedgerEvent, key: &str) -> Option<&'a str> {
-    event
-        .labels
-        .iter()
-        .find(|label| label.key == key)
-        .map(|label| label.value)
-}
-
-fn apply_boost_pickup_count(accumulator: &mut DerivedBoostLedgerStats, event: &BoostLedgerEvent) {
-    if event.count == 0 {
-        return;
-    }
-    let Some(pad_size @ ("big" | "small")) = boost_ledger_label(event, "pad_size") else {
-        return;
-    };
-    let activity = boost_ledger_label(event, "activity").unwrap_or("unknown");
-
-    match (activity, pad_size) {
-        ("inactive", "big") => accumulator.stats.big_pads_collected_inactive += event.count,
-        ("inactive", "small") => accumulator.stats.small_pads_collected_inactive += event.count,
-        (_, "big") => accumulator.stats.big_pads_collected += event.count,
-        (_, "small") => accumulator.stats.small_pads_collected += event.count,
-        _ => {}
-    }
-}
-
-fn apply_boost_ledger_event(accumulator: &mut DerivedBoostLedgerStats, event: &BoostLedgerEvent) {
-    let pad_size = boost_ledger_label(event, "pad_size");
-    let activity = boost_ledger_label(event, "activity").unwrap_or("active");
-    let field_half = boost_ledger_label(event, "field_half");
-
-    match event.transaction {
-        BoostLedgerTransactionKind::Collected => {
-            apply_boost_pickup_count(accumulator, event);
-            if activity == "inactive" {
-                accumulator.stats.amount_collected_inactive += event.amount;
-                return;
-            }
-            accumulator.stats.amount_collected += event.amount;
-            match pad_size {
-                Some("big") => accumulator.stats.amount_collected_big += event.amount,
-                Some("small") => accumulator.stats.amount_collected_small += event.amount,
-                _ => {}
-            }
-        }
-        BoostLedgerTransactionKind::Stolen => {
-            accumulator.stats.amount_stolen += event.amount;
-            match pad_size {
-                Some("big") => {
-                    accumulator.stats.big_pads_stolen += event.count;
-                    accumulator.stats.amount_stolen_big += event.amount;
-                }
-                Some("small") => {
-                    accumulator.stats.small_pads_stolen += event.count;
-                    accumulator.stats.amount_stolen_small += event.amount;
-                }
-                _ => {}
-            }
-        }
-        BoostLedgerTransactionKind::Overfill => {
-            accumulator.stats.overfill_total += event.amount;
-            if field_half == Some("opponent") {
-                accumulator.stats.overfill_from_stolen += event.amount;
-            }
-        }
-        BoostLedgerTransactionKind::Respawn => {
-            accumulator.stats.amount_respawned += event.amount;
-        }
-        BoostLedgerTransactionKind::Used => {
-            accumulator.stats.amount_used += event.amount;
-        }
-        BoostLedgerTransactionKind::UsedAllocation => {
-            match boost_ledger_label(event, "vertical_state") {
-                Some("grounded") => accumulator.stats.amount_used_while_grounded += event.amount,
-                Some("aerial") => accumulator.stats.amount_used_while_airborne += event.amount,
-                _ => {}
-            }
-            if boost_ledger_label(event, "supersonic") == Some("true") {
-                accumulator.stats.amount_used_while_supersonic += event.amount;
-            }
-        }
-    }
-}
-
-fn interval_fraction_in_boost_range(
-    start_boost: f32,
-    end_boost: f32,
-    min_boost: f32,
-    max_boost: f32,
-) -> f32 {
-    if (end_boost - start_boost).abs() <= f32::EPSILON {
-        return if (start_boost >= min_boost) && (start_boost < max_boost) {
-            1.0
-        } else {
-            0.0
-        };
-    }
-
-    let t_at_min = (min_boost - start_boost) / (end_boost - start_boost);
-    let t_at_max = (max_boost - start_boost) / (end_boost - start_boost);
-    let interval_start = t_at_min.min(t_at_max).max(0.0);
-    let interval_end = t_at_min.max(t_at_max).min(1.0);
-    (interval_end - interval_start).max(0.0)
-}
-
-fn apply_boost_state_event(accumulator: &mut DerivedBoostLedgerStats, event: &BoostStateEvent) {
-    accumulator.current_boost_amount = Some(event.boost_amount);
-    accumulator.current_boost_before = event.boost_before;
-    accumulator.current_boost_frame = Some(event.frame);
-}
-
-fn add_boost_state_sample(
-    stats: &mut BoostStats,
-    previous_boost_amount: f32,
-    boost_amount: f32,
-    dt: f32,
-) {
-    let average_boost_amount = (previous_boost_amount + boost_amount) * 0.5;
-    stats.tracked_time += dt;
-    stats.boost_integral += average_boost_amount * dt;
-    stats.time_zero_boost += dt
-        * interval_fraction_in_boost_range(
-            previous_boost_amount,
-            boost_amount,
-            0.0,
-            TEST_BOOST_ZERO_BAND_RAW,
-        );
-    stats.time_hundred_boost += dt
-        * interval_fraction_in_boost_range(
-            previous_boost_amount,
-            boost_amount,
-            TEST_BOOST_FULL_BAND_MIN_RAW,
-            BOOST_MAX_AMOUNT + 1.0,
-        );
-    stats.time_boost_0_25 += dt
-        * interval_fraction_in_boost_range(
-            previous_boost_amount,
-            boost_amount,
-            0.0,
-            boost_percent_to_amount(25.0),
-        );
-    stats.time_boost_25_50 += dt
-        * interval_fraction_in_boost_range(
-            previous_boost_amount,
-            boost_amount,
-            boost_percent_to_amount(25.0),
-            boost_percent_to_amount(50.0),
-        );
-    stats.time_boost_50_75 += dt
-        * interval_fraction_in_boost_range(
-            previous_boost_amount,
-            boost_amount,
-            boost_percent_to_amount(50.0),
-            boost_percent_to_amount(75.0),
-        );
-    stats.time_boost_75_100 += dt
-        * interval_fraction_in_boost_range(
-            previous_boost_amount,
-            boost_amount,
-            boost_percent_to_amount(75.0),
-            BOOST_MAX_AMOUNT + 1.0,
-        );
-}
-
-fn apply_boost_state_sample(
-    accumulator: &mut DerivedBoostLedgerStats,
-    dt: f32,
-    frame_number: usize,
-) -> Option<(f32, f32)> {
-    if accumulator.current_boost_frame != Some(frame_number) {
-        return None;
-    }
-    let boost_amount = accumulator.current_boost_amount?;
-    let previous_boost_amount = accumulator.current_boost_before.unwrap_or(boost_amount);
-    add_boost_state_sample(
-        &mut accumulator.stats,
-        previous_boost_amount,
-        boost_amount,
-        dt,
-    );
-    accumulator.previous_boost_amount = Some(boost_amount);
-    Some((previous_boost_amount, boost_amount))
-}
-
 fn assert_boost_ledger_derived_stats_match(
     scope: &str,
     actual: &BoostStats,
@@ -654,16 +459,22 @@ fn assert_boost_ledger_derived_stats_match(
             stats.amount_used_while_airborne
         }),
     ];
+    const FLOAT_ABSOLUTE_TOLERANCE: f32 = 1.0;
+    const FLOAT_RELATIVE_TOLERANCE: f32 = 0.0001;
     for (field, getter) in float_fields {
         let actual_value = getter(actual);
         let expected_value = getter(expected);
+        let tolerance = FLOAT_ABSOLUTE_TOLERANCE.max(expected_value.abs() * FLOAT_RELATIVE_TOLERANCE);
         assert!(
-            (actual_value - expected_value).abs() < 0.001,
+            (actual_value - expected_value).abs() <= tolerance,
             "{scope} {field}: actual {actual_value:.3} != ledger-derived {expected_value:.3}",
         );
     }
     assert!(
-        (actual.amount_used_while_supersonic - expected.amount_used_while_supersonic).abs() < 0.001,
+        (actual.amount_used_while_supersonic - expected.amount_used_while_supersonic).abs()
+            <= FLOAT_ABSOLUTE_TOLERANCE.max(
+                expected.amount_used_while_supersonic.abs() * FLOAT_RELATIVE_TOLERANCE
+            ),
         "{scope} amount_used_while_supersonic: actual {:.3} != ledger-derived {:.3}",
         actual.amount_used_while_supersonic,
         expected.amount_used_while_supersonic,

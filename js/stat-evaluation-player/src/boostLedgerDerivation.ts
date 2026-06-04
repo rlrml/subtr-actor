@@ -1,6 +1,7 @@
 import type { BoostLedgerEvent } from "./generated/BoostLedgerEvent.ts";
 import type { BoostStateEvent } from "./generated/BoostStateEvent.ts";
 import type { BoostStats } from "./generated/BoostStats.ts";
+import type { BoostStatsEvent } from "./generated/BoostStatsEvent.ts";
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
@@ -215,6 +216,72 @@ function addLabeledCount(
     JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
   );
   return true;
+}
+
+function addLabeledAmountDelta(
+  stats: EventDerivedBoostStats,
+  labels: NonNullable<BoostLedgerEvent["labels"]>,
+  value: number,
+): boolean {
+  if (value <= 0) {
+    return false;
+  }
+  const entries = (stats.labeled_amounts ??= { entries: [] }).entries;
+  const key = labelSetKey(labels);
+  const existing = entries.find((entry) => labelSetKey(entry.labels) === key);
+  if (existing) {
+    existing.value = addF32(existing.value, value);
+    return true;
+  }
+  entries.push({ labels: cloneLabels(labels), value });
+  entries.sort((left, right) =>
+    JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
+  );
+  return true;
+}
+
+function addLabeledCountDelta(
+  stats: EventDerivedBoostStats,
+  labels: NonNullable<BoostLedgerEvent["labels"]>,
+  count: number,
+): boolean {
+  if (count <= 0) {
+    return false;
+  }
+  const entries = (stats.labeled_counts ??= { entries: [] }).entries;
+  const key = labelSetKey(labels);
+  const existing = entries.find((entry) => labelSetKey(entry.labels) === key);
+  if (existing) {
+    existing.count += count;
+    return true;
+  }
+  entries.push({ labels: cloneLabels(labels), count });
+  entries.sort((left, right) =>
+    JSON.stringify(left.labels).localeCompare(JSON.stringify(right.labels)),
+  );
+  return true;
+}
+
+function applyBoostStatsDelta(accumulator: LedgerAccumulator, delta: BoostStats): void {
+  for (const field of EVENT_DERIVED_BOOST_FIELDS) {
+    accumulator.stats[field] = addF32(accumulator.stats[field], delta[field]);
+  }
+  let labeledAmountsChanged = false;
+  for (const entry of delta.labeled_amounts?.entries ?? []) {
+    labeledAmountsChanged =
+      addLabeledAmountDelta(accumulator.stats, entry.labels, entry.value) || labeledAmountsChanged;
+  }
+  if (labeledAmountsChanged) {
+    accumulator.labeledAmountsVersion += 1;
+  }
+  let labeledCountsChanged = false;
+  for (const entry of delta.labeled_counts?.entries ?? []) {
+    labeledCountsChanged =
+      addLabeledCountDelta(accumulator.stats, entry.labels, entry.count) || labeledCountsChanged;
+  }
+  if (labeledCountsChanged) {
+    accumulator.labeledCountsVersion += 1;
+  }
 }
 
 function boostPercentToAmount(boostPercent: number): number {
@@ -576,6 +643,27 @@ function sortedBoostStateEvents(timeline: MaterializedStatsTimeline): BoostState
   });
 }
 
+function sortedBoostStatsEvents(timeline: MaterializedStatsTimeline): BoostStatsEvent[] {
+  return [...(timeline.events.boost_stats ?? [])].sort((left, right) => {
+    if (left.end_frame !== right.end_frame) {
+      return left.end_frame - right.end_frame;
+    }
+    if (left.end_time !== right.end_time) {
+      return left.end_time - right.end_time;
+    }
+    if (left.frame !== right.frame) {
+      return left.frame - right.frame;
+    }
+    return remoteIdKey(left.player_id as Record<string, unknown>).localeCompare(
+      remoteIdKey(right.player_id as Record<string, unknown>),
+    );
+  });
+}
+
+function hasBoostStatsEvents(timeline: MaterializedStatsTimeline): boolean {
+  return (timeline.events.boost_stats?.length ?? 0) > 0;
+}
+
 export function applyBoostLedgerDerivedStats(
   timeline: MaterializedStatsTimeline,
 ): MaterializedStatsTimeline {
@@ -591,6 +679,10 @@ export function applyBoostLedgerDerivedStats(
 export function createBoostLedgerDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
+  if (hasBoostStatsEvents(timeline)) {
+    return createBoostStatsEventDerivedStatsAccumulator(timeline);
+  }
+
   const ledgerEvents = sortedBoostLedgerEvents(timeline);
   const stateEvents = sortedBoostStateEvents(timeline);
   let ledgerEventIndex = 0;
@@ -654,6 +746,43 @@ export function createBoostLedgerDerivedStatsAccumulator(timeline: MaterializedS
             frame.dt,
           );
         }
+      }
+
+      copyLedgerDerivedBoostStats(frame.team_zero.boost, teamZero);
+      copyLedgerDerivedBoostStats(frame.team_one.boost, teamOne);
+      for (const player of frame.players) {
+        const playerStats = players.get(remoteIdKey(player.player_id as Record<string, unknown>));
+        copyLedgerDerivedBoostStats(player.boost, playerStats);
+      }
+    },
+  };
+}
+
+function createBoostStatsEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+  applyFrame(frame: StatsFrame): void;
+} {
+  const statsEvents = sortedBoostStatsEvents(timeline);
+  let statsEventIndex = 0;
+  const players = new Map<string, LedgerAccumulator>();
+  const teamZero = createLedgerAccumulator();
+  const teamOne = createLedgerAccumulator();
+
+  return {
+    applyFrame(frame: StatsFrame): void {
+      while (
+        statsEventIndex < statsEvents.length &&
+        statsEvents[statsEventIndex]!.end_frame <= frame.frame_number
+      ) {
+        const event = statsEvents[statsEventIndex]!;
+        const playerKey = remoteIdKey(event.player_id as Record<string, unknown>);
+        let player = players.get(playerKey);
+        if (!player) {
+          player = createLedgerAccumulator();
+          players.set(playerKey, player);
+        }
+        applyBoostStatsDelta(player, event.delta);
+        applyBoostStatsDelta(event.is_team_0 ? teamZero : teamOne, event.delta);
+        statsEventIndex += 1;
       }
 
       copyLedgerDerivedBoostStats(frame.team_zero.boost, teamZero);

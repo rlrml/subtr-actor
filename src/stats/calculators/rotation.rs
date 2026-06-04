@@ -32,6 +32,9 @@ pub enum PlayDepthState {
 pub struct RotationPlayerEvent {
     pub time: f32,
     pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
     #[ts(as = "crate::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -68,6 +71,9 @@ impl RotationPlayerEvent {
         Self {
             time: frame.time,
             frame: frame.frame_number,
+            end_time: frame.time,
+            end_frame: frame.frame_number,
+            duration: 0.0,
             player,
             player_position,
             is_team_0,
@@ -104,6 +110,44 @@ impl RotationPlayerEvent {
             || self.first_man_stint_count != 0
             || self.became_first_man_count != 0
             || self.lost_first_man_count != 0
+    }
+
+    fn absorb_delta(&mut self, delta: Self) {
+        self.end_time = delta.time;
+        self.end_frame = delta.frame;
+        self.duration += delta.sample_duration();
+        self.player_position = delta.player_position;
+        self.active_game_time += delta.active_game_time;
+        self.tracked_time += delta.tracked_time;
+        self.time_first_man += delta.time_first_man;
+        self.time_second_man += delta.time_second_man;
+        self.time_third_man += delta.time_third_man;
+        self.time_ambiguous_role += delta.time_ambiguous_role;
+        self.time_behind_play += delta.time_behind_play;
+        self.time_level_with_play += delta.time_level_with_play;
+        self.time_ahead_of_play += delta.time_ahead_of_play;
+        self.longest_first_man_stint_time = self
+            .longest_first_man_stint_time
+            .max(delta.longest_first_man_stint_time);
+        self.first_man_stint_count += delta.first_man_stint_count;
+        self.became_first_man_count += delta.became_first_man_count;
+        self.lost_first_man_count += delta.lost_first_man_count;
+    }
+
+    fn sample_duration(&self) -> f32 {
+        [
+            self.active_game_time,
+            self.tracked_time,
+            self.time_first_man,
+            self.time_second_man,
+            self.time_third_man,
+            self.time_ambiguous_role,
+            self.time_behind_play,
+            self.time_level_with_play,
+            self.time_ahead_of_play,
+        ]
+        .into_iter()
+        .fold(0.0, f32::max)
     }
 }
 
@@ -236,6 +280,12 @@ struct FirstManStintState {
     non_first_man_seconds: f32,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct PendingRotationPlayerEvent {
+    state: RotationPlayerEventState,
+    event: RotationPlayerEvent,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct RotationCalculator {
     config: RotationCalculatorConfig,
@@ -245,6 +295,7 @@ pub struct RotationCalculator {
     team_events: EventStream<RotationTeamEvent>,
     last_emitted_player_states: HashMap<PlayerId, RotationPlayerEventState>,
     first_man_stints: HashMap<PlayerId, FirstManStintState>,
+    pending_player_events: HashMap<PlayerId, PendingRotationPlayerEvent>,
 }
 
 impl RotationCalculator {
@@ -269,6 +320,25 @@ impl RotationCalculator {
 
     pub fn new_player_events(&self) -> &[RotationPlayerEvent] {
         self.player_events.new_events()
+    }
+
+    pub fn projected_player_events(&self) -> Vec<RotationPlayerEvent> {
+        let mut events = self.player_events.all().to_vec();
+        let mut pending = self
+            .pending_player_events
+            .iter()
+            .map(|(player, pending)| (player.clone(), pending.event.clone()))
+            .collect::<Vec<_>>();
+        pending.sort_by(|(left, _), (right, _)| format!("{left:?}").cmp(&format!("{right:?}")));
+        events.extend(pending.into_iter().map(|(_, event)| event));
+        events
+    }
+
+    pub fn flush_pending_player_events(&mut self) {
+        let mut pending = self.pending_player_events.drain().collect::<Vec<_>>();
+        pending.sort_by(|(left, _), (right, _)| format!("{left:?}").cmp(&format!("{right:?}")));
+        self.player_events
+            .extend(pending.into_iter().map(|(_, pending)| pending.event));
     }
 
     pub fn team_events(&self) -> &[RotationTeamEvent] {
@@ -444,9 +514,44 @@ impl RotationCalculator {
         if !state_changed && !event.has_delta() {
             return;
         }
-        self.player_events.push(event);
+        self.record_player_event(state, event);
         self.last_emitted_player_states
             .insert(player_id.clone(), state);
+    }
+
+    fn record_player_event(&mut self, state: RotationPlayerEventState, event: RotationPlayerEvent) {
+        let player = event.player.clone();
+        let Some(pending) = self.pending_player_events.get_mut(&player) else {
+            self.pending_player_events.insert(
+                player,
+                PendingRotationPlayerEvent {
+                    state,
+                    event: Self::new_pending_player_event(event),
+                },
+            );
+            return;
+        };
+
+        if pending.state == state {
+            pending.event.absorb_delta(event);
+        } else {
+            let previous = self.pending_player_events.insert(
+                player,
+                PendingRotationPlayerEvent {
+                    state,
+                    event: Self::new_pending_player_event(event),
+                },
+            );
+            let Some(previous) = previous else {
+                return;
+            };
+            self.player_events.push(previous.event);
+        }
+    }
+
+    fn new_pending_player_event(mut event: RotationPlayerEvent) -> RotationPlayerEvent {
+        event.duration = event.sample_duration();
+        event
     }
 
     fn update_team(
