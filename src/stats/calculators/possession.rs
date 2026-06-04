@@ -190,6 +190,17 @@ impl PossessionTracker {
         }
     }
 
+    fn latest_touch_player_for_team(
+        touch_events: &[TouchEvent],
+        team_is_team_0: bool,
+    ) -> Option<PlayerId> {
+        touch_events
+            .iter()
+            .filter(|touch| touch.team_is_team_0 == team_is_team_0)
+            .max_by(|left, right| TouchEvent::timestamp_ordering(left, right))
+            .and_then(|touch| touch.player.clone())
+    }
+
     pub(crate) fn update(&mut self, time: f32, touch_events: &[TouchEvent]) -> PossessionState {
         self.expire_pending_turnover(time);
         self.expire_loose_ball(time);
@@ -198,16 +209,8 @@ impl PossessionTracker {
         let active_player_before_sample = self.current_player.clone();
         let touched_team_zero = touch_events.iter().any(|touch| touch.team_is_team_0);
         let touched_team_one = touch_events.iter().any(|touch| !touch.team_is_team_0);
-        let touched_team_zero_player = touch_events
-            .iter()
-            .rev()
-            .find(|touch| touch.team_is_team_0)
-            .and_then(|touch| touch.player.clone());
-        let touched_team_one_player = touch_events
-            .iter()
-            .rev()
-            .find(|touch| !touch.team_is_team_0)
-            .and_then(|touch| touch.player.clone());
+        let touched_team_zero_player = Self::latest_touch_player_for_team(touch_events, true);
+        let touched_team_one_player = Self::latest_touch_player_for_team(touch_events, false);
 
         match (touched_team_zero, touched_team_one) {
             (true, true) => self.register_contested_touch(time),
@@ -229,6 +232,10 @@ impl PossessionTracker {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "possession_tests.rs"]
+mod tests;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PossessionCalculator {

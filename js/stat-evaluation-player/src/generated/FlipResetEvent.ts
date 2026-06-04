@@ -12,6 +12,10 @@ confidence: number,
  */
 local_ball_position: Vector3fTs,
 /**
- * Motion-aware closest approach distance used for touch attribution.
+ * Ball-to-car hitbox contact gap in uu used for touch attribution.
+ *
+ * This field keeps its historical name for wire compatibility. A value of
+ * `0.0` means the ball intersects or touches the oriented car hitbox after
+ * subtracting the Rocket League ball collision radius.
  */
 closest_approach_distance: number, };

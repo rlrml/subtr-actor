@@ -5,6 +5,7 @@ import { getReplayHitboxOverlayTransform, type ReplayHitboxSpec } from "./hitbox
 
 const HITBOX_OVERLAY_FILL_OPACITY = 0.08;
 const HITBOX_ONLY_FILL_OPACITY = 0.22;
+const HITBOX_OVERLAY_DARKEN = 0.94;
 
 export interface ReplayScene {
   scene: THREE.Scene;
@@ -64,6 +65,10 @@ function createVerticalWallBox(
   material: THREE.Material,
 ): THREE.Mesh {
   return new THREE.Mesh(new THREE.BoxGeometry(length, thickness, height, 6, 1, 6), material);
+}
+
+export function getHitboxOverlayColor(lineColor: string): THREE.Color {
+  return new THREE.Color(lineColor).lerp(new THREE.Color(0x000000), HITBOX_OVERLAY_DARKEN);
 }
 
 function drawBallLatitudeBand(
@@ -376,6 +381,7 @@ function createExampleSoccarField(scale: number): {
 
 function createHitboxOverlay(hitbox: ReplayHitboxSpec, lineColor: string): THREE.Group {
   const transform = getReplayHitboxOverlayTransform(hitbox);
+  const overlayColor = getHitboxOverlayColor(lineColor);
   const group = new THREE.Group();
   group.name = `${hitbox.kind}-hitbox-overlay`;
   group.visible = false;
@@ -384,7 +390,7 @@ function createHitboxOverlay(hitbox: ReplayHitboxSpec, lineColor: string): THREE
 
   const geometry = new THREE.BoxGeometry(...transform.dimensions);
   const fillMaterial = new THREE.MeshBasicMaterial({
-    color: lineColor,
+    color: overlayColor,
     transparent: true,
     opacity: HITBOX_OVERLAY_FILL_OPACITY,
     depthTest: false,
@@ -398,7 +404,7 @@ function createHitboxOverlay(hitbox: ReplayHitboxSpec, lineColor: string): THREE
 
   const edges = new THREE.EdgesGeometry(geometry);
   const lineMaterial = new THREE.LineBasicMaterial({
-    color: lineColor,
+    color: overlayColor,
     transparent: true,
     opacity: 1,
     depthTest: false,

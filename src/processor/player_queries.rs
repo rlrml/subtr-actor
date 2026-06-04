@@ -185,14 +185,11 @@ impl<'a> ReplayProcessor<'a> {
     }
 
     pub(crate) fn get_player_car_hitbox(&self, player_id: &PlayerId) -> CarHitbox {
-        self.get_player_loadout_body_id(player_id)
-            .and_then(car_hitbox_for_body_id)
-            .or_else(|| {
-                self.get_player_loadout_body_name(player_id)
-                    .as_deref()
-                    .and_then(car_hitbox_for_body_name)
-            })
-            .unwrap_or_else(default_car_hitbox)
+        car_hitbox_for_body_id_or_name(
+            self.get_player_loadout_body_id(player_id),
+            self.get_player_loadout_body_name(player_id).as_deref(),
+        )
+        .unwrap_or_else(default_car_hitbox)
     }
 
     fn get_player_int_stat(

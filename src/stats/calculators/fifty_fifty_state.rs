@@ -63,6 +63,22 @@ impl FiftyFiftyStateCalculator {
         Some(event)
     }
 
+    fn update_active_last_touch_from_continuation(
+        frame: &FrameInfo,
+        active_event: &mut ActiveFiftyFifty,
+        touch_events: &[TouchEvent],
+    ) {
+        let age = (frame.time - active_event.last_touch_time).max(0.0);
+        if age > FIFTY_FIFTY_CONTINUATION_TOUCH_WINDOW_SECONDS {
+            return;
+        }
+        let Some(touch) = active_event.latest_continuation_touch(touch_events) else {
+            return;
+        };
+        active_event.last_touch_time = touch.time;
+        active_event.last_touch_frame = touch.frame;
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
@@ -98,13 +114,11 @@ impl FiftyFiftyStateCalculator {
                 .any(|touch| !touch.team_is_team_0);
 
         if let Some(active_event) = self.active_event.as_mut() {
-            let age = (frame.time - active_event.last_touch_time).max(0.0);
-            if age <= FIFTY_FIFTY_CONTINUATION_TOUCH_WINDOW_SECONDS
-                && active_event.contains_team_touch(&touch_state.touch_events)
-            {
-                active_event.last_touch_time = frame.time;
-                active_event.last_touch_frame = frame.frame_number;
-            }
+            Self::update_active_last_touch_from_continuation(
+                frame,
+                active_event,
+                &touch_state.touch_events,
+            );
         }
 
         let mut resolved_events = Vec::new();
@@ -123,13 +137,11 @@ impl FiftyFiftyStateCalculator {
             }
         } else if has_touch {
             if let Some(active_event) = self.active_event.as_mut() {
-                let age = (frame.time - active_event.last_touch_time).max(0.0);
-                if age <= FIFTY_FIFTY_CONTINUATION_TOUCH_WINDOW_SECONDS
-                    && active_event.contains_team_touch(&touch_state.touch_events)
-                {
-                    active_event.last_touch_time = frame.time;
-                    active_event.last_touch_frame = frame.frame_number;
-                }
+                Self::update_active_last_touch_from_continuation(
+                    frame,
+                    active_event,
+                    &touch_state.touch_events,
+                );
             }
         }
 
@@ -144,3 +156,7 @@ impl FiftyFiftyStateCalculator {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "fifty_fifty_state_tests.rs"]
+mod tests;

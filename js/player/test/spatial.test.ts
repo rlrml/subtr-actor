@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { getReplayHitboxOverlayTransform, getReplayHitboxSpec } from "../src/hitboxes";
 import { interpolateQuaternion, updateAttachedCamera } from "../src/player-internals/spatial";
 import type { ReplayModel } from "../src/types";
-import type { ReplayScene } from "../src/scene";
+import { getHitboxOverlayColor, setHitboxOverlayOnlyMode, type ReplayScene } from "../src/scene";
 
 function buildScene(): ReplayScene {
   const camera = new THREE.PerspectiveCamera(110, 16 / 9, 0.1, 10000);
@@ -121,4 +121,36 @@ test("hitbox overlay transform uses Rocket League local axes", () => {
   assert.deepEqual(transform.position, [hitbox.offset, 0, hitbox.elevation]);
   assert.equal(transform.rotationYDegrees, hitbox.slopeDegrees);
   assert.deepEqual(transform.dimensions, [hitbox.length, hitbox.width, hitbox.height]);
+});
+
+test("hitbox-only mode increases overlay fill without changing line visibility", () => {
+  const group = new THREE.Group();
+  const fill = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({ opacity: 0.08, transparent: true }),
+  );
+  fill.name = "hitbox-overlay-fill";
+  const lines = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
+    new THREE.LineBasicMaterial({ opacity: 1, transparent: true }),
+  );
+  lines.name = "hitbox-overlay-lines";
+  group.add(fill);
+  group.add(lines);
+
+  setHitboxOverlayOnlyMode(group, true);
+
+  assert.equal(fill.material.opacity, 0.22);
+  assert.equal(lines.visible, true);
+
+  setHitboxOverlayOnlyMode(group, false);
+
+  assert.equal(fill.material.opacity, 0.08);
+  assert.equal(lines.visible, true);
+});
+
+test("hitbox overlay color keeps a dark team tint", () => {
+  const overlayColor = getHitboxOverlayColor("#57a8ff");
+
+  assert.equal(overlayColor.getHexString(), "112a45");
 });

@@ -160,14 +160,16 @@ impl<'a> ReplayProcessor<'a> {
                 .or_else(|| remote_id_display_name(player_id))
                 .unwrap_or_else(|| format!("{player_id:?}"));
             let car_body_id = self.get_player_loadout_body_id(player_id);
-            let car_hitbox_family = car_body_id
-                .and_then(hitbox_family_for_body_id)
-                .map(|family| format!("{family:?}"));
+            let car_body_name = self.get_player_loadout_body_name(player_id);
+            let car_hitbox_family =
+                hitbox_family_for_body_id_or_name(car_body_id, car_body_name.as_deref())
+                    .map(|family| format!("{family:?}"));
             Ok(PlayerInfo {
                 name,
                 stats,
                 remote_id: player_id.clone(),
                 car_body_id,
+                car_body_name,
                 car_hitbox_family,
             })
         };

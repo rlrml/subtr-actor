@@ -109,6 +109,62 @@ fn interpolates_rigid_body_location() {
 }
 
 #[test]
+fn apply_velocities_to_rigid_body_applies_and_normalizes_angular_velocity() {
+    let mut body = sample_rigid_body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    body.angular_velocity = Some(Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: std::f32::consts::FRAC_PI_2,
+    });
+
+    let updated = apply_velocities_to_rigid_body(&body, 1.0);
+    let rotation = quat_to_glam(&updated.rotation);
+    let rotated_forward = rotation * glam::Vec3::X;
+
+    assert!((rotation.length() - 1.0).abs() <= 0.001);
+    assert!(rotated_forward.x.abs() <= 0.001);
+    assert!((rotated_forward.y - 1.0).abs() <= 0.001);
+}
+
+#[test]
+fn apply_velocities_to_rigid_body_uses_identity_for_degenerate_rotation() {
+    let mut body = sample_rigid_body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    body.rotation = Quaternion {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        w: 0.0,
+    };
+    body.angular_velocity = Some(Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    });
+
+    let updated = apply_velocities_to_rigid_body(&body, 1.0);
+
+    assert_eq!(updated.rotation, glam_to_quat(&glam::Quat::IDENTITY));
+}
+
+#[test]
+fn quat_to_glam_normalizes_scaled_rotation() {
+    let rotation = glam::Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
+    let scaled_rotation = Quaternion {
+        x: rotation.x * 2.0,
+        y: rotation.y * 2.0,
+        z: rotation.z * 2.0,
+        w: rotation.w * 2.0,
+    };
+
+    let normalized = quat_to_glam(&scaled_rotation);
+    let rotated_forward = normalized * glam::Vec3::X;
+
+    assert!((normalized.length() - 1.0).abs() <= 0.001);
+    assert!(rotated_forward.x.abs() <= 0.001);
+    assert!((rotated_forward.y - 1.0).abs() <= 0.001);
+}
+
+#[test]
 fn touch_candidate_rank_prefers_recent_closest_approach() {
     let ball = sample_rigid_body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     let near_but_static = sample_rigid_body(120.0, 0.0, 0.0, 0.0, 0.0, 0.0);
@@ -139,6 +195,47 @@ fn touch_candidate_rank_penalizes_unreachable_far_candidates() {
 }
 
 #[test]
+fn touch_candidate_rank_applies_car_angular_velocity_to_hitbox_orientation() {
+    let hitbox = default_car_hitbox();
+    let ball_position = glam::Vec3::new(
+        hitbox.length / 2.0 + BALL_COLLISION_RADIUS,
+        0.0,
+        hitbox.elevation,
+    );
+    let ball = sample_rigid_body(
+        ball_position.x,
+        ball_position.y,
+        ball_position.z,
+        0.0,
+        0.0,
+        0.0,
+    );
+    let current_sideways_player = sample_rotated_rigid_body(
+        0.0,
+        0.0,
+        0.0,
+        glam::Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
+    );
+    let mut rotating_player = current_sideways_player;
+    rotating_player.angular_velocity = Some(Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: std::f32::consts::FRAC_PI_2 / 0.1,
+    });
+
+    let static_rank =
+        touch_candidate_contact_gap_rank_with_hitbox(&ball, &current_sideways_player, hitbox)
+            .unwrap();
+    let rotating_rank =
+        touch_candidate_contact_gap_rank_with_hitbox(&ball, &rotating_player, hitbox).unwrap();
+
+    assert!(
+        rotating_rank.0 < static_rank.0,
+        "expected sampled angular velocity to find the earlier hitbox orientation: {rotating_rank:?} !< {static_rank:?}"
+    );
+}
+
+#[test]
 fn ball_trajectory_deviation_with_gravity_is_small_for_expected_gravity_motion() {
     let start = sample_rigid_body(0.0, 0.0, 1000.0, 100.0, 0.0, 0.0);
     let actual = sample_rigid_body(10.0, 0.0, 996.75, 100.0, 0.0, -65.0);
@@ -163,13 +260,15 @@ fn ball_trajectory_deviation_with_gravity_detects_impulse_like_motion() {
 }
 
 #[test]
-fn touch_candidate_scoring_requires_velocity_deviation_for_contact_gaps() {
+fn touch_candidate_scoring_requires_ball_deviation_for_contact_gaps() {
     let scoring = TouchCandidateScoring::DEFAULT;
 
-    assert!(!scoring.accepts_contact_gap(0.0, 0.0));
-    assert!(scoring.accepts_contact_gap(0.0, 50.0));
-    assert!(!scoring.accepts_contact_gap(10.0, 999.0));
-    assert!(scoring.accepts_contact_gap(10.0, 1000.0));
+    assert!(!scoring.accepts_contact_gap(0.0, 0.0, 0.0));
+    assert!(scoring.accepts_contact_gap(0.0, 0.0, 50.0));
+    assert!(scoring.accepts_contact_gap(0.0, 25.0, 0.0));
+    assert!(!scoring.accepts_contact_gap(10.0, 499.0, 999.0));
+    assert!(scoring.accepts_contact_gap(10.0, 0.0, 1000.0));
+    assert!(scoring.accepts_contact_gap(10.0, 500.0, 0.0));
     assert!(
         scoring.score_contact_gap(10.0, false) > scoring.score_contact_gap(5.0, false),
         "relaxed candidates should rank behind strict candidates"
@@ -196,6 +295,26 @@ fn car_hitbox_distance_uses_car_orientation() {
         sideways_distance < forward_distance,
         "expected the rotated car's longer axis to make the same ball position closer to its hitbox: {sideways_distance:?} !< {forward_distance:?}"
     );
+}
+
+#[test]
+fn car_hitbox_distance_normalizes_scaled_car_orientation() {
+    let hitbox = default_car_hitbox();
+    let ball_position = glam::Vec3::new(0.0, 70.0, 17.0);
+    let rotation = glam::Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
+    let unit_car = sample_rotated_rigid_body(0.0, 0.0, 0.0, rotation);
+    let mut scaled_car = unit_car;
+    scaled_car.rotation = Quaternion {
+        x: unit_car.rotation.x * 2.0,
+        y: unit_car.rotation.y * 2.0,
+        z: unit_car.rotation.z * 2.0,
+        w: unit_car.rotation.w * 2.0,
+    };
+
+    let unit_distance = car_hitbox_distance(ball_position, &unit_car, hitbox).unwrap();
+    let scaled_distance = car_hitbox_distance(ball_position, &scaled_car, hitbox).unwrap();
+
+    assert!((unit_distance - scaled_distance).abs() <= 0.001);
 }
 
 #[test]
@@ -226,6 +345,25 @@ fn car_hitbox_distance_applies_hitbox_offset_elevation_and_slope() {
         hitbox_center + hitbox_rotation * glam::Vec3::new(0.0, 0.0, hitbox.height / 2.0);
 
     let distance = car_hitbox_distance(top_center, &car, hitbox).unwrap();
+
+    assert!(distance <= 0.001);
+}
+
+#[test]
+fn car_hitbox_distance_composes_car_rotation_with_hitbox_transform() {
+    let hitbox = default_car_hitbox();
+    let car_position = glam::Vec3::new(1000.0, -500.0, 300.0);
+    let car_rotation = glam::Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
+    let car =
+        sample_rotated_rigid_body(car_position.x, car_position.y, car_position.z, car_rotation);
+    let hitbox_center = glam::Vec3::new(hitbox.offset, 0.0, hitbox.elevation);
+    let hitbox_rotation = glam::Quat::from_rotation_y(hitbox.angle.to_radians());
+    let local_front_top_corner =
+        glam::Vec3::new(hitbox.length / 2.0, hitbox.width / 2.0, hitbox.height / 2.0);
+    let world_corner =
+        car_position + car_rotation * (hitbox_center + hitbox_rotation * local_front_top_corner);
+
+    let distance = car_hitbox_distance(world_corner, &car, hitbox).unwrap();
 
     assert!(distance <= 0.001);
 }
@@ -279,6 +417,23 @@ fn car_hitbox_for_body_name_maps_known_cars_to_hitbox_families() {
     assert_eq!(
         car_hitbox_for_body_name("Psyclops").map(|hitbox| hitbox.family),
         Some(CarHitboxFamily::Octane)
+    );
+}
+
+#[test]
+fn car_hitbox_for_body_id_or_name_prefers_id_and_falls_back_to_name() {
+    assert_eq!(
+        hitbox_family_for_body_id_or_name(Some(23), Some("Dominus GT")),
+        Some(CarHitboxFamily::Octane)
+    );
+    assert_eq!(
+        hitbox_family_for_body_id_or_name(Some(999_999), Some("Dominus GT")),
+        Some(CarHitboxFamily::Dominus)
+    );
+    assert_eq!(hitbox_family_for_body_id_or_name(Some(999_999), None), None);
+    assert_eq!(
+        hitbox_family_for_body_id_or_name(None, Some("unknown body")),
+        None
     );
 }
 

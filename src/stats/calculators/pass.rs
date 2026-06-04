@@ -251,7 +251,7 @@ impl PassCalculator {
             return Ok(());
         };
 
-        for touch in &touch_state.touch_events {
+        for touch in sequential_touch_events(&touch_state.touch_events) {
             let Some(player) = touch.player.clone() else {
                 self.last_touch = None;
                 continue;

@@ -81,6 +81,33 @@ interface ReplayErrorMessage {
 
 type ReplayWorkerMessage = ReplayProgressMessage | ReplayDoneMessage | ReplayErrorMessage;
 
+function errorFromUnknown(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function waitForNextPaint(timeoutMs = 100): Promise<void> {
+  if (typeof requestAnimationFrame !== "function") {
+    return Promise.resolve();
+  }
+  return new Promise((done) => {
+    let finished = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const finish = () => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+      done();
+    };
+
+    timeoutId = setTimeout(finish, timeoutMs);
+    requestAnimationFrame(() => finish());
+  });
+}
+
 async function loadReplayFromBytesWithWorker(
   data: Uint8Array,
   options: ReplayLoadOptions,
@@ -109,23 +136,25 @@ async function loadReplayFromBytesWithWorker(
       }
 
       cleanup();
-      options.onProgress?.({ stage: "decoding-replay", progress: 0 });
-      if (typeof requestAnimationFrame === "function") {
-        await new Promise<void>((done) => requestAnimationFrame(() => done()));
+      try {
+        options.onProgress?.({ stage: "decoding-replay", progress: 0 });
+        await waitForNextPaint();
+        const decoder = new TextDecoder();
+        const raw = JSON.parse(
+          decoder.decode(new Uint8Array(message.rawBuffer)),
+        ) as RawReplayFramesData;
+        options.onProgress?.({ stage: "decoding-replay", progress: 0.5 });
+        const replay = JSON.parse(
+          decoder.decode(new Uint8Array(message.replayBuffer)),
+        ) as ReplayLoadResult["replay"];
+        options.onProgress?.({ stage: "decoding-replay", progress: 1 });
+        resolve({
+          raw,
+          replay,
+        });
+      } catch (error) {
+        reject(errorFromUnknown(error));
       }
-      const decoder = new TextDecoder();
-      const raw = JSON.parse(
-        decoder.decode(new Uint8Array(message.rawBuffer)),
-      ) as RawReplayFramesData;
-      options.onProgress?.({ stage: "decoding-replay", progress: 0.5 });
-      const replay = JSON.parse(
-        decoder.decode(new Uint8Array(message.replayBuffer)),
-      ) as ReplayLoadResult["replay"];
-      options.onProgress?.({ stage: "decoding-replay", progress: 1 });
-      resolve({
-        raw,
-        replay,
-      });
     };
 
     worker.onerror = (event) => {

@@ -691,8 +691,8 @@ define_stats_event!(
     EventCategory::Mechanic,
     summary = "A touch candidate where the ball contacts the underside of an airborne car in flip-reset-like geometry.",
     approach = [
-        "Evaluate touch events using normalized ball and player rigid bodies plus closest-approach distance.",
-        "Require airborne player/ball height, underside alignment, local ball position under the car, and a bounded touch distance.",
+        "Evaluate touch events using normalized ball and player rigid bodies plus hitbox contact gap.",
+        "Require airborne player/ball height, underside alignment, local ball position under the car, and a bounded hitbox contact gap.",
         "Also emit proximity-based candidates when replay touch attribution is missing but the ball/car geometry strongly matches a reset contact.",
     ]
 );

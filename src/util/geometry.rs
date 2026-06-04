@@ -13,7 +13,17 @@ pub fn glam_to_vec(v: &glam::f32::Vec3) -> boxcars::Vector3f {
 }
 
 pub fn quat_to_glam(q: &boxcars::Quaternion) -> glam::Quat {
-    glam::Quat::from_xyzw(q.x, q.y, q.z, q.w)
+    let rotation = glam::Quat::from_xyzw(q.x, q.y, q.z, q.w);
+    if rotation.x.is_finite()
+        && rotation.y.is_finite()
+        && rotation.z.is_finite()
+        && rotation.w.is_finite()
+        && rotation.length_squared() > 0.0
+    {
+        rotation.normalize()
+    } else {
+        glam::Quat::IDENTITY
+    }
 }
 
 pub fn glam_to_quat(rotation: &glam::Quat) -> boxcars::Quaternion {
@@ -187,6 +197,8 @@ pub const BALL_COLLISION_RADIUS: f32 = 92.75;
 pub struct TouchCandidateScoring {
     pub strict_contact_gap_threshold: f32,
     pub relaxed_contact_gap_threshold: f32,
+    pub strict_contact_min_position_deviation: f32,
+    pub relaxed_contact_min_position_deviation: f32,
     pub strict_contact_min_velocity_deviation: f32,
     pub relaxed_contact_min_velocity_deviation: f32,
     pub relaxed_contact_score_penalty: f32,
@@ -199,6 +211,8 @@ impl TouchCandidateScoring {
     pub const DEFAULT: Self = Self {
         strict_contact_gap_threshold: 5.0,
         relaxed_contact_gap_threshold: 25.0,
+        strict_contact_min_position_deviation: 25.0,
+        relaxed_contact_min_position_deviation: 500.0,
         strict_contact_min_velocity_deviation: 50.0,
         relaxed_contact_min_velocity_deviation: 1000.0,
         relaxed_contact_score_penalty: 100.0,
@@ -207,11 +221,18 @@ impl TouchCandidateScoring {
         contested_touch_score_margin: 5.0,
     };
 
-    pub fn accepts_contact_gap(self, closest_contact_gap: f32, velocity_deviation: f32) -> bool {
+    pub fn accepts_contact_gap(
+        self,
+        closest_contact_gap: f32,
+        position_deviation: f32,
+        velocity_deviation: f32,
+    ) -> bool {
         (closest_contact_gap <= self.strict_contact_gap_threshold
-            && velocity_deviation >= self.strict_contact_min_velocity_deviation)
+            && (position_deviation >= self.strict_contact_min_position_deviation
+                || velocity_deviation >= self.strict_contact_min_velocity_deviation))
             || (closest_contact_gap <= self.relaxed_contact_gap_threshold
-                && velocity_deviation >= self.relaxed_contact_min_velocity_deviation)
+                && (position_deviation >= self.relaxed_contact_min_position_deviation
+                    || velocity_deviation >= self.relaxed_contact_min_velocity_deviation))
     }
 
     pub fn score_contact_gap(self, closest_contact_gap: f32, dodge_contact: bool) -> f32 {
@@ -235,6 +256,22 @@ pub fn car_hitbox_for_body_name(body_name: &str) -> Option<CarHitbox> {
 
 pub fn car_hitbox_for_body_id(body_id: u32) -> Option<CarHitbox> {
     hitbox_family_for_body_id(body_id).map(CarHitbox::for_family)
+}
+
+pub fn car_hitbox_for_body_id_or_name(
+    body_id: Option<u32>,
+    body_name: Option<&str>,
+) -> Option<CarHitbox> {
+    hitbox_family_for_body_id_or_name(body_id, body_name).map(CarHitbox::for_family)
+}
+
+pub fn hitbox_family_for_body_id_or_name(
+    body_id: Option<u32>,
+    body_name: Option<&str>,
+) -> Option<CarHitboxFamily> {
+    body_id
+        .and_then(hitbox_family_for_body_id)
+        .or_else(|| body_name.and_then(hitbox_family_for_body_name))
 }
 
 pub fn hitbox_family_for_body_id(body_id: u32) -> Option<CarHitboxFamily> {
@@ -697,8 +734,8 @@ pub fn ball_trajectory_deviation_with_gravity(
 }
 
 /// Ranks how plausible it is that `player_body` was the car that touched the
-/// ball near the current frame, using constant-velocity closest approach to the
-/// car's oriented hitbox.
+/// ball near the current frame, using velocity-applied closest approach to the
+/// car's moving, oriented hitbox.
 ///
 /// The frame's ball state can already be slightly post-contact, so we do not
 /// just compare current distance. Instead we look for the minimum ball/hitbox
@@ -720,16 +757,6 @@ pub fn touch_candidate_rank_with_hitbox(
     const TOUCH_LOOKAHEAD_SECONDS: f32 = 0.03;
     const TOUCH_RANK_SAMPLES: usize = 9;
 
-    let ball_velocity = vec_to_glam(&ball_body.linear_velocity.unwrap_or(boxcars::Vector3f {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    }));
-    let player_velocity = vec_to_glam(&player_body.linear_velocity.unwrap_or(boxcars::Vector3f {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    }));
     let current_distance =
         car_hitbox_distance(vec_to_glam(&ball_body.location), player_body, hitbox)?;
 
@@ -738,12 +765,8 @@ pub fn touch_candidate_rank_with_hitbox(
         let sample_fraction = sample_index as f32 / TOUCH_RANK_SAMPLES as f32;
         let sample_time = -TOUCH_LOOKBACK_SECONDS
             + sample_fraction * (TOUCH_LOOKBACK_SECONDS + TOUCH_LOOKAHEAD_SECONDS);
-        let mut sample_ball_body = *ball_body;
-        let mut sample_player_body = *player_body;
-        sample_ball_body.location =
-            glam_to_vec(&(vec_to_glam(&ball_body.location) + ball_velocity * sample_time));
-        sample_player_body.location =
-            glam_to_vec(&(vec_to_glam(&player_body.location) + player_velocity * sample_time));
+        let sample_ball_body = apply_velocities_to_rigid_body(ball_body, sample_time);
+        let sample_player_body = apply_velocities_to_rigid_body(player_body, sample_time);
         let sample_distance = car_hitbox_distance(
             vec_to_glam(&sample_ball_body.location),
             &sample_player_body,
@@ -756,8 +779,6 @@ pub fn touch_candidate_rank_with_hitbox(
 }
 
 fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> boxcars::Quaternion {
-    // XXX: This approach seems to give some unexpected results. There may be a
-    // unit mismatch or some other type of issue.
     let rbav = rigid_body.angular_velocity.unwrap_or(boxcars::Vector3f {
         x: 0.0,
         y: 0.0,
@@ -779,6 +800,11 @@ fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> b
             glam::Quat::from_axis_angle(angular_velocity_unit_vector, magnitude * time_delta);
         rotation *= delta_rotation;
     }
+    rotation = if rotation.length_squared() > 0.0 {
+        rotation.normalize()
+    } else {
+        glam::Quat::IDENTITY
+    };
 
     boxcars::Quaternion {
         x: rotation.x,

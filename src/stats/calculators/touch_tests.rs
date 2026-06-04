@@ -583,14 +583,14 @@ fn last_touch_event_uses_primary_touch_not_last_contested_candidate() {
         time: 0.1,
         frame: 1,
         team_is_team_0: false,
-        player: Some(secondary_player),
+        player: Some(secondary_player.clone()),
         player_position: None,
         closest_approach_distance: Some(3.0),
         dodge_contact: false,
     };
     let touch_state = TouchState {
-        touch_events: vec![primary_touch.clone(), secondary_touch],
-        last_touch: Some(primary_touch),
+        touch_events: vec![primary_touch.clone(), secondary_touch.clone()],
+        last_touch: Some(secondary_touch),
         last_touch_player: Some(primary_player.clone()),
         last_touch_team_is_team_0: Some(true),
     };
@@ -614,4 +614,61 @@ fn last_touch_event_uses_primary_touch_not_last_contested_candidate() {
     };
     assert_eq!(last_touch.player, Some(primary_player));
     assert!(last_touch.is_team_0);
+    assert_eq!(calculator.new_events().len(), 2);
+    assert!(calculator
+        .new_events()
+        .iter()
+        .any(|event| event.player == last_touch.player.clone().unwrap()));
+    assert!(calculator
+        .new_events()
+        .iter()
+        .any(|event| event.player == secondary_player));
+}
+
+#[test]
+fn touch_classification_events_follow_chronological_touch_event_order() {
+    let player = boxcars::RemoteId::Steam(1);
+    let early_touch = TouchEvent {
+        time: 0.1,
+        frame: 1,
+        team_is_team_0: true,
+        player: Some(player.clone()),
+        player_position: None,
+        closest_approach_distance: Some(2.0),
+        dodge_contact: false,
+    };
+    let late_touch = TouchEvent {
+        time: 0.4,
+        frame: 4,
+        team_is_team_0: true,
+        player: Some(player.clone()),
+        player_position: None,
+        closest_approach_distance: Some(0.0),
+        dodge_contact: false,
+    };
+    let touch_state = TouchState {
+        touch_events: vec![early_touch, late_touch.clone()],
+        last_touch: Some(late_touch),
+        last_touch_player: Some(player.clone()),
+        last_touch_team_is_team_0: Some(true),
+    };
+    let mut calculator = TouchCalculator::new();
+
+    calculator
+        .update(
+            &frame(4),
+            &ball(0.0, 0.0),
+            &player_frame_state(&player, glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z)),
+            &PlayerVerticalState::default(),
+            &touch_state,
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    let events = calculator.new_events();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].frame, 1);
+    assert_eq!(events[1].frame, 4);
 }

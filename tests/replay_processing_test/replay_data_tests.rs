@@ -89,6 +89,16 @@ fn test_replay_data_exposes_powerslide_activity() {
         "Expected replay data to expose exact touch events"
     );
     assert!(
+        replay_data
+            .touch_events
+            .iter()
+            .all(|event| event.player.is_none()
+                && event.player_position.is_none()
+                && event.closest_approach_distance.is_none()
+                && !event.dodge_contact),
+        "Expected replay data touch_events to remain raw replay-authored team markers"
+    );
+    assert!(
         !replay_data.goal_events.is_empty(),
         "Expected replay data to expose exact goal events"
     );
@@ -523,8 +533,9 @@ fn test_processor_extracts_flip_reset_events() {
         tracker
             .flip_reset_events()
             .iter()
-            .all(|event| event.closest_approach_distance <= 220.0),
-        "Expected flip-reset candidates to be backed by close attributed touches in Rocket League units"
+            .all(|event| event.closest_approach_distance
+                <= TouchCandidateScoring::DEFAULT.relaxed_contact_gap_threshold),
+        "Expected flip-reset candidates to report hitbox contact gaps within the relaxed touch threshold"
     );
     assert!(
         tracker.flip_reset_events().iter().all(|event| {
@@ -708,6 +719,6 @@ fn test_touch_attribution_usually_matches_goal_scorer() {
     );
     assert!(
         matched * 2 >= total_with_scorer,
-        "Expected motion-aware touch attribution to match the replay-derived goal scorer for a majority of scorable goals, matched {matched}/{total_with_scorer}"
+        "Expected hitbox-and-trajectory touch attribution to match the replay-derived goal scorer for a majority of scorable goals, matched {matched}/{total_with_scorer}"
     );
 }

@@ -502,7 +502,7 @@ impl WallAerialCalculator {
         self.prune_armed_aerials(frame.time);
 
         let ball_speed_change = Self::ball_speed_change(frame, ball, self.previous_ball_velocity);
-        for touch in &touch_state.touch_events {
+        for touch in chronological_touch_events(&touch_state.touch_events) {
             if let Some(event) = self.controlled_play_event(ball, players, touch, ball_speed_change)
             {
                 if let Some(armed) = self.armed_aerials.get_mut(&event.player) {

@@ -44,10 +44,20 @@ impl ActiveFiftyFifty {
     }
 
     pub fn contains_team_touch(&self, touch_events: &[TouchEvent]) -> bool {
-        touch_events.iter().any(|touch| {
-            (touch.team_is_team_0 && self.team_zero_player.is_some())
-                || (!touch.team_is_team_0 && self.team_one_player.is_some())
-        })
+        self.latest_continuation_touch(touch_events).is_some()
+    }
+
+    pub fn latest_continuation_touch<'a>(
+        &self,
+        touch_events: &'a [TouchEvent],
+    ) -> Option<&'a TouchEvent> {
+        touch_events
+            .iter()
+            .filter(|touch| {
+                (touch.team_is_team_0 && self.team_zero_player.is_some())
+                    || (!touch.team_is_team_0 && self.team_one_player.is_some())
+            })
+            .max_by(|left, right| TouchEvent::timestamp_ordering(left, right))
     }
 }
 
@@ -247,14 +257,24 @@ impl FiftyFiftyCalculator {
         gameplay.kickoff_phase_active()
     }
 
+    fn latest_touch_for_team(
+        touch_events: &[TouchEvent],
+        team_is_team_0: bool,
+    ) -> Option<&TouchEvent> {
+        touch_events
+            .iter()
+            .filter(|touch| touch.team_is_team_0 == team_is_team_0)
+            .max_by(|left, right| TouchEvent::timestamp_ordering(left, right))
+    }
+
     pub(crate) fn contested_touch(
         frame: &FrameInfo,
         players: &PlayerFrameState,
         touch_events: &[TouchEvent],
         is_kickoff: bool,
     ) -> Option<ActiveFiftyFifty> {
-        let team_zero_touch = touch_events.iter().find(|touch| touch.team_is_team_0)?;
-        let team_one_touch = touch_events.iter().find(|touch| !touch.team_is_team_0)?;
+        let team_zero_touch = Self::latest_touch_for_team(touch_events, true)?;
+        let team_one_touch = Self::latest_touch_for_team(touch_events, false)?;
         let team_zero_position = team_zero_touch.player.as_ref().and_then(|player_id| {
             players
                 .players
@@ -278,11 +298,15 @@ impl FiftyFiftyCalculator {
             plane_normal = plane_normal.normalize();
         }
 
+        let last_touch = [team_zero_touch, team_one_touch]
+            .into_iter()
+            .max_by(|left, right| TouchEvent::timestamp_ordering(left, right))?;
+
         Some(ActiveFiftyFifty {
             start_time: frame.time,
             start_frame: frame.frame_number,
-            last_touch_time: frame.time,
-            last_touch_frame: frame.frame_number,
+            last_touch_time: last_touch.time,
+            last_touch_frame: last_touch.frame,
             is_kickoff,
             team_zero_player: team_zero_touch.player.clone(),
             team_one_player: team_one_touch.player.clone(),

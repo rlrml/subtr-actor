@@ -36,7 +36,7 @@ fn test_flip_reset_candidate_detects_airborne_underside_touch() {
     let ball = sample_rigid_body(0.0, 0.0, 6.0, 0.0, 0.0, 0.0);
     let player = sample_rigid_body(0.0, 0.0, 8.5, 0.0, 0.0, 0.0);
 
-    let heuristic = flip_reset_candidate(&ball, &player, 1.2)
+    let heuristic = flip_reset_candidate(&ball, &player, 0.12)
         .expect("expected underside aerial contact to qualify as a flip-reset candidate");
 
     assert!(heuristic.confidence > 0.5);
@@ -49,7 +49,7 @@ fn test_flip_reset_candidate_rejects_front_bumper_like_touch() {
     let player = sample_rigid_body(0.0, 0.0, 8.5, 0.0, 0.0, 0.0);
 
     assert!(
-        flip_reset_candidate(&ball, &player, 1.2).is_none(),
+        flip_reset_candidate(&ball, &player, 0.12).is_none(),
         "expected front-facing touch geometry to be rejected"
     );
 }
@@ -60,7 +60,7 @@ fn test_flip_reset_candidate_rejects_low_ground_touch() {
     let player = sample_rigid_body(0.0, 0.0, 0.2, 0.0, 0.0, 0.0);
 
     assert!(
-        flip_reset_candidate(&ball, &player, 1.2).is_none(),
+        flip_reset_candidate(&ball, &player, 0.12).is_none(),
         "expected grounded touch geometry to be rejected"
     );
 }

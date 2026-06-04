@@ -255,7 +255,7 @@ impl HalfVolleyCalculator {
             self.last_floor_bounce = Some(bounce);
         }
 
-        for touch in &touch_state.touch_events {
+        for touch in chronological_touch_events(&touch_state.touch_events) {
             if let Some(event) = self.event_for_touch(ball, touch) {
                 self.record_half_volley(frame, event);
             }

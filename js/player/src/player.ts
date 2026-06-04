@@ -574,6 +574,14 @@ export class ReplayPlayer extends EventTarget {
     for (const body of this.sceneState.playerBodyMeshes.values()) {
       body.visible = !this.hitboxOnlyModeEnabled;
     }
+    if (this.hitboxOnlyModeEnabled) {
+      for (const boostTrail of this.sceneState.playerBoostTrails.values()) {
+        boostTrail.visible = false;
+      }
+      for (const meter of this.sceneState.playerBoostMeters.values()) {
+        meter.group.visible = false;
+      }
+    }
   }
 
   private syncPlaybackClock(now = performance.now()): boolean {
@@ -776,11 +784,15 @@ export class ReplayPlayer extends EventTarget {
           frame?.boostActive ??
           nextFrame?.boostActive ??
           false;
-        updateBoostTrail(boostTrail, boostActive, boostFraction, this.currentTime, playerIndex);
+        if (this.hitboxOnlyModeEnabled) {
+          boostTrail.visible = false;
+        } else {
+          updateBoostTrail(boostTrail, boostActive, boostFraction, this.currentTime, playerIndex);
+        }
       }
 
       if (boostMeter) {
-        if (this.boostMeterEnabled) {
+        if (this.boostMeterEnabled && !this.hitboxOnlyModeEnabled) {
           boostMeter.group.visible = true;
           updateBoostMeter(
             boostMeter,

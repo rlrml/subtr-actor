@@ -107,6 +107,30 @@ pub use wavedash::*;
 pub mod whiff;
 pub use whiff::*;
 
+pub(crate) fn chronological_touch_events(touch_events: &[TouchEvent]) -> Vec<&TouchEvent> {
+    let mut touch_events = touch_events.iter().collect::<Vec<_>>();
+    touch_events.sort_by(|left, right| {
+        TouchEvent::timestamp_ordering(left, right)
+            .then_with(|| touch_state::touch_event_ordering(left, right))
+    });
+    touch_events
+}
+
+pub(crate) fn sequential_touch_events(touch_events: &[TouchEvent]) -> Vec<&TouchEvent> {
+    let mut touch_events = touch_events.iter().collect::<Vec<_>>();
+    // Sequential calculators often update a single "last touch" slot while iterating.
+    // Put stronger exact-tie contacts later so those assignments retain the primary touch.
+    touch_events.sort_by(|left, right| {
+        TouchEvent::timestamp_ordering(left, right)
+            .then_with(|| touch_state::touch_event_ordering(right, left))
+    });
+    touch_events
+}
+
+#[cfg(test)]
+#[path = "ordering_tests.rs"]
+mod ordering_tests;
+
 fn interval_fraction_in_scalar_range(start: f32, end: f32, min_value: f32, max_value: f32) -> f32 {
     if (end - start).abs() <= f32::EPSILON {
         return ((start >= min_value) && (start < max_value)) as i32 as f32;

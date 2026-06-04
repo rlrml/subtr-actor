@@ -354,10 +354,7 @@ impl TouchCalculator {
             self.events.push(event);
         }
 
-        let last_touch = primary_touch
-            .filter(|primary| touch_events.iter().any(|event| event == *primary))
-            .or_else(|| touch_events.last());
-        if let Some(last_touch) = last_touch {
+        if let Some(last_touch) = primary_touch {
             self.last_touch_events.push(TouchLastTouchEvent {
                 time: last_touch.time,
                 frame: last_touch.frame,

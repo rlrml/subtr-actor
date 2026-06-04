@@ -425,7 +425,7 @@ function normalizedText(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-export function normalizeReplayHitboxKind(
+function normalizeReplayHitboxFamily(
   value: string | null | undefined,
 ): ReplayHitboxKind | null {
   if (!value) {
@@ -447,8 +447,23 @@ export function normalizeReplayHitboxKind(
     case "plank":
       return "plank";
     default:
-      return BODY_HITBOX_BY_NORMALIZED_NAME[normalized] ?? null;
+      return null;
   }
+}
+
+export function inferReplayHitboxKindFromBodyName(
+  bodyName: string | null | undefined,
+): ReplayHitboxKind | null {
+  if (!bodyName) {
+    return null;
+  }
+  return BODY_HITBOX_BY_NORMALIZED_NAME[normalizedText(bodyName)] ?? null;
+}
+
+export function normalizeReplayHitboxKind(
+  value: string | null | undefined,
+): ReplayHitboxKind | null {
+  return normalizeReplayHitboxFamily(value) ?? inferReplayHitboxKindFromBodyName(value);
 }
 
 export function getReplayHitboxSpec(kind: ReplayHitboxKind): ReplayHitboxSpec {
@@ -513,7 +528,7 @@ function collectHeaderPropText(value: unknown, out: string[]): void {
 export function inferReplayHitboxKind(
   playerInfo: RawPlayerInfo | null | undefined,
 ): ReplayHitboxKind {
-  const explicitFamily = normalizeReplayHitboxKind(playerInfo?.car_hitbox_family);
+  const explicitFamily = normalizeReplayHitboxFamily(playerInfo?.car_hitbox_family);
   if (explicitFamily) {
     return explicitFamily;
   }
@@ -524,6 +539,11 @@ export function inferReplayHitboxKind(
     if (hitbox) {
       return hitbox;
     }
+  }
+
+  const explicitBodyName = inferReplayHitboxKindFromBodyName(playerInfo?.car_body_name);
+  if (explicitBodyName) {
+    return explicitBodyName;
   }
 
   const stats = playerInfo?.stats;

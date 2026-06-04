@@ -17,7 +17,11 @@ pub struct FlipResetEvent {
     /// Ball position relative to the car in the car's local frame.
     #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub local_ball_position: boxcars::Vector3f,
-    /// Motion-aware closest approach distance used for touch attribution.
+    /// Ball-to-car hitbox contact gap in uu used for touch attribution.
+    ///
+    /// This field keeps its historical name for wire compatibility. A value of
+    /// `0.0` means the ball intersects or touches the oriented car hitbox after
+    /// subtracting the Rocket League ball collision radius.
     pub closest_approach_distance: f32,
 }
 
@@ -75,7 +79,7 @@ struct FlipResetTouchFeatures {
     ball_position: glam::Vec3,
     center_distance: f32,
     local_ball_position: glam::Vec3,
-    scaled_touch_distance: f32,
+    scaled_contact_gap: f32,
     underside_alignment: f32,
 }
 
@@ -96,7 +100,7 @@ fn scale_factor_for_positions(ball_position: glam::Vec3, player_position: glam::
 fn build_touch_features(
     ball_body: &boxcars::RigidBody,
     player_body: &boxcars::RigidBody,
-    closest_approach_distance: f32,
+    contact_gap: f32,
 ) -> Option<FlipResetTouchFeatures> {
     let raw_ball_position = vec_to_glam(&ball_body.location);
     let raw_player_position = vec_to_glam(&player_body.location);
@@ -114,14 +118,14 @@ fn build_touch_features(
     let local_ball_position = player_rotation.inverse() * relative_ball_position;
     let car_up = (player_rotation * glam::Vec3::Z).normalize_or_zero();
     let underside_alignment = (-car_up).dot(relative_ball_position.normalize_or_zero());
-    let scaled_touch_distance = closest_approach_distance * scale_factor;
+    let scaled_contact_gap = contact_gap * scale_factor;
 
     Some(FlipResetTouchFeatures {
         player_position,
         ball_position,
         center_distance,
         local_ball_position,
-        scaled_touch_distance,
+        scaled_contact_gap,
         underside_alignment,
     })
 }
@@ -129,7 +133,11 @@ fn build_touch_features(
 fn flip_reset_confidence(features: &FlipResetTouchFeatures) -> f32 {
     let below_car_score = (-features.local_ball_position.z / 180.0).clamp(0.0, 1.0);
     let alignment_score = ((features.underside_alignment - 0.45) / 0.50).clamp(0.0, 1.0);
-    let touch_score = (1.0 - ((features.scaled_touch_distance - 20.0) / 220.0)).clamp(0.0, 1.0);
+    let scoring = TouchCandidateScoring::DEFAULT;
+    let touch_score = (1.0
+        - ((features.scaled_contact_gap - scoring.strict_contact_gap_threshold)
+            / (scoring.relaxed_contact_gap_threshold - scoring.strict_contact_gap_threshold)))
+        .clamp(0.0, 1.0);
     let height_score = ((features.player_position.z - 70.0) / 500.0).clamp(0.0, 1.0);
     let footprint_score = (1.0
         - (features.local_ball_position.x.abs() / 260.0).clamp(0.0, 1.0) * 0.5
@@ -147,22 +155,21 @@ fn flip_reset_confidence(features: &FlipResetTouchFeatures) -> f32 {
 pub(crate) fn flip_reset_candidate(
     ball_body: &boxcars::RigidBody,
     player_body: &boxcars::RigidBody,
-    closest_approach_distance: f32,
+    contact_gap: f32,
 ) -> Option<FlipResetHeuristic> {
     const MIN_PLAYER_HEIGHT: f32 = 95.0;
     const MIN_BALL_HEIGHT: f32 = 80.0;
-    const MAX_TOUCH_DISTANCE: f32 = 220.0;
     const MIN_UNDERSIDE_ALIGNMENT: f32 = 0.60;
     const MAX_LOCAL_FORWARD_OFFSET: f32 = 240.0;
     const MAX_LOCAL_LATERAL_OFFSET: f32 = 240.0;
     const MIN_CONFIDENCE: f32 = 0.55;
 
-    let features = build_touch_features(ball_body, player_body, closest_approach_distance)?;
+    let features = build_touch_features(ball_body, player_body, contact_gap)?;
     if features.player_position.z < MIN_PLAYER_HEIGHT || features.ball_position.z < MIN_BALL_HEIGHT
     {
         return None;
     }
-    if features.scaled_touch_distance > MAX_TOUCH_DISTANCE
+    if features.scaled_contact_gap > TouchCandidateScoring::DEFAULT.relaxed_contact_gap_threshold
         || features.underside_alignment < MIN_UNDERSIDE_ALIGNMENT
         || features.local_ball_position.x.abs() > MAX_LOCAL_FORWARD_OFFSET
         || features.local_ball_position.y.abs() > MAX_LOCAL_LATERAL_OFFSET
@@ -188,12 +195,14 @@ pub(crate) fn flip_reset_candidate(
 pub(crate) fn flip_reset_followup_touch_candidate(
     ball_body: &boxcars::RigidBody,
     player_body: &boxcars::RigidBody,
-    closest_approach_distance: f32,
+    contact_gap: f32,
 ) -> Option<FlipResetHeuristic> {
-    let features = build_touch_features(ball_body, player_body, closest_approach_distance)?;
+    let features = build_touch_features(ball_body, player_body, contact_gap)?;
     let confidence = flip_reset_confidence(&features);
 
     if confidence < 0.45
+        || features.scaled_contact_gap
+            > TouchCandidateScoring::DEFAULT.relaxed_contact_gap_threshold
         || features.local_ball_position.z >= 20.0
         || features.underside_alignment < 0.25
     {
@@ -209,6 +218,7 @@ pub(crate) fn flip_reset_followup_touch_candidate(
 fn flip_reset_proximity_candidate(
     ball_body: &boxcars::RigidBody,
     player_body: &boxcars::RigidBody,
+    contact_gap: f32,
 ) -> Option<FlipResetHeuristic> {
     const MIN_PLAYER_HEIGHT: f32 = 95.0;
     const MIN_BALL_HEIGHT: f32 = 80.0;
@@ -218,16 +228,14 @@ fn flip_reset_proximity_candidate(
     const MAX_LOCAL_LATERAL_OFFSET: f32 = 260.0;
     const MIN_CONFIDENCE: f32 = 0.52;
 
-    let raw_ball_position = vec_to_glam(&ball_body.location);
-    let raw_player_position = vec_to_glam(&player_body.location);
-    let scale_factor = scale_factor_for_positions(raw_ball_position, raw_player_position);
-    let center_distance = (raw_ball_position - raw_player_position).length() * scale_factor;
-    let features = build_touch_features(ball_body, player_body, center_distance / scale_factor)?;
+    let features = build_touch_features(ball_body, player_body, contact_gap)?;
     if features.player_position.z < MIN_PLAYER_HEIGHT || features.ball_position.z < MIN_BALL_HEIGHT
     {
         return None;
     }
     if features.center_distance > MAX_CENTER_DISTANCE
+        || features.scaled_contact_gap
+            > TouchCandidateScoring::DEFAULT.relaxed_contact_gap_threshold
         || features.underside_alignment < MIN_UNDERSIDE_ALIGNMENT
         || features.local_ball_position.x.abs() > MAX_LOCAL_FORWARD_OFFSET
         || features.local_ball_position.y.abs() > MAX_LOCAL_LATERAL_OFFSET
@@ -260,6 +268,10 @@ pub struct FlipResetTracker {
     recent_flip_reset_proximity_event_time: HashMap<PlayerId, f32>,
     current_frame_dodge_rising_edges: Vec<PlayerId>,
     previous_dodge_active: HashMap<PlayerId, bool>,
+    frame_input_builder: ReplayFrameInputBuilder,
+    live_play_tracker: LivePlayTracker,
+    touch_state_calculator: TouchStateCalculator,
+    last_sample_time: Option<f32>,
 }
 
 impl FlipResetTracker {
@@ -273,9 +285,32 @@ impl FlipResetTracker {
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
-        self.update_flip_reset_events(processor, frame.time, frame_index)?;
+        let current_time = frame.time;
+        let dt = self
+            .last_sample_time
+            .map(|last_time| (current_time - last_time).max(0.0))
+            .unwrap_or(0.0);
+        let frame_input =
+            self.frame_input_builder
+                .aggregate(processor, frame_index, current_time, dt);
+        let gameplay_state = frame_input.gameplay_state();
+        let frame_events_state = frame_input.frame_events_state();
+        let live_play_state = frame_input.live_play_state().unwrap_or_else(|| {
+            self.live_play_tracker
+                .state_parts(&gameplay_state, &frame_events_state)
+        });
+        let touch_state = self.touch_state_calculator.update(
+            &frame_input.frame_info(),
+            &frame_input.ball_frame_state(),
+            &frame_input.player_frame_state(),
+            &frame_events_state,
+            &live_play_state,
+        );
+        self.last_sample_time = Some(current_time);
+
+        self.update_flip_reset_events(processor, &touch_state, frame.time, frame_index)?;
         self.update_dodge_rising_edges(processor)?;
-        self.update_flip_reset_followup_dodge_events(processor, frame, frame_index)?;
+        self.update_flip_reset_followup_dodge_events(processor, frame, frame_index, &touch_state)?;
         self.update_post_wall_dodge_events(processor, frame, frame_index)?;
         Ok(())
     }
@@ -325,14 +360,10 @@ impl FlipResetTracker {
         frame_index: usize,
     ) -> Option<FlipResetEvent> {
         let player = touch_event.player.as_ref()?;
-        let closest_approach_distance = touch_event.closest_approach_distance?;
+        let contact_gap = touch_event.closest_approach_distance?;
         let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
         let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
-        let heuristic = flip_reset_candidate(
-            &ball_rigid_body,
-            &player_rigid_body,
-            closest_approach_distance,
-        )?;
+        let heuristic = flip_reset_candidate(&ball_rigid_body, &player_rigid_body, contact_gap)?;
 
         Some(FlipResetEvent {
             time: touch_event.time,
@@ -345,36 +376,7 @@ impl FlipResetTracker {
             is_team_0: touch_event.team_is_team_0,
             confidence: heuristic.confidence,
             local_ball_position: glam_to_vec(&heuristic.local_ball_position),
-            closest_approach_distance,
-        })
-    }
-
-    fn build_flip_reset_event_for_player(
-        &self,
-        processor: &dyn ProcessorView,
-        player: &PlayerId,
-        time: f32,
-        frame_index: usize,
-        is_team_0: bool,
-        closest_approach_distance: f32,
-    ) -> Option<FlipResetEvent> {
-        let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
-        let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
-        let heuristic = flip_reset_candidate(
-            &ball_rigid_body,
-            &player_rigid_body,
-            closest_approach_distance,
-        )?;
-
-        Some(FlipResetEvent {
-            time,
-            frame: frame_index,
-            player: player.clone(),
-            player_position: Some(vec_to_glam(&player_rigid_body.location).to_array()),
-            is_team_0,
-            confidence: heuristic.confidence,
-            local_ball_position: glam_to_vec(&heuristic.local_ball_position),
-            closest_approach_distance,
+            closest_approach_distance: contact_gap,
         })
     }
 
@@ -385,48 +387,24 @@ impl FlipResetTracker {
         frame_index: usize,
     ) -> Option<FlipResetEvent> {
         let player = touch_event.player.as_ref()?;
-        let closest_approach_distance = touch_event.closest_approach_distance?;
-        let mut event = self.build_flip_reset_followup_touch_candidate_for_player(
-            processor,
-            player,
-            touch_event.time,
-            frame_index,
-            touch_event.team_is_team_0,
-            closest_approach_distance,
-        )?;
-        event.player_position = touch_event
-            .player_position
-            .map(|position| vec_to_glam(&position).to_array())
-            .or(event.player_position);
-        Some(event)
-    }
-
-    fn build_flip_reset_followup_touch_candidate_for_player(
-        &self,
-        processor: &dyn ProcessorView,
-        player: &PlayerId,
-        time: f32,
-        frame_index: usize,
-        is_team_0: bool,
-        closest_approach_distance: f32,
-    ) -> Option<FlipResetEvent> {
+        let contact_gap = touch_event.closest_approach_distance?;
         let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
         let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
-        let heuristic = flip_reset_followup_touch_candidate(
-            &ball_rigid_body,
-            &player_rigid_body,
-            closest_approach_distance,
-        )?;
+        let heuristic =
+            flip_reset_followup_touch_candidate(&ball_rigid_body, &player_rigid_body, contact_gap)?;
 
         Some(FlipResetEvent {
-            time,
+            time: touch_event.time,
             frame: frame_index,
             player: player.clone(),
-            player_position: Some(vec_to_glam(&player_rigid_body.location).to_array()),
-            is_team_0,
+            player_position: touch_event
+                .player_position
+                .map(|position| vec_to_glam(&position).to_array())
+                .or_else(|| Some(vec_to_glam(&player_rigid_body.location).to_array())),
+            is_team_0: touch_event.team_is_team_0,
             confidence: heuristic.confidence,
             local_ball_position: glam_to_vec(&heuristic.local_ball_position),
-            closest_approach_distance,
+            closest_approach_distance: contact_gap,
         })
     }
 
@@ -439,12 +417,13 @@ impl FlipResetTracker {
     ) -> Option<FlipResetEvent> {
         let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
         let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
-        let heuristic = flip_reset_proximity_candidate(&ball_rigid_body, &player_rigid_body)?;
-        let raw_ball_position = vec_to_glam(&ball_rigid_body.location);
-        let raw_player_position = vec_to_glam(&player_rigid_body.location);
-        let scale_factor = scale_factor_for_positions(raw_ball_position, raw_player_position);
-        let closest_approach_distance =
-            (raw_ball_position - raw_player_position).length() * scale_factor;
+        let contact_gap = car_hitbox_ball_contact_gap(
+            vec_to_glam(&ball_rigid_body.location),
+            &player_rigid_body,
+            processor.get_player_car_hitbox(player),
+        )?;
+        let heuristic =
+            flip_reset_proximity_candidate(&ball_rigid_body, &player_rigid_body, contact_gap)?;
 
         Some(FlipResetEvent {
             time,
@@ -454,52 +433,22 @@ impl FlipResetTracker {
             is_team_0: processor.get_player_is_team_0(player).unwrap_or(false),
             confidence: heuristic.confidence,
             local_ball_position: glam_to_vec(&heuristic.local_ball_position),
-            closest_approach_distance,
+            closest_approach_distance: contact_gap,
         })
     }
 
     fn update_flip_reset_events(
         &mut self,
         processor: &dyn ProcessorView,
+        touch_state: &TouchState,
         current_time: f32,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
         const PROXIMITY_EVENT_DEBOUNCE_SECONDS: f32 = 0.35;
 
         self.current_frame_flip_reset_events.clear();
-        for touch_event in processor.current_frame_touch_events() {
-            let event = self
-                .build_flip_reset_event(processor, touch_event, frame_index)
-                .or_else(|| {
-                    let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
-                    let ball_position = vec_to_glam(&ball_rigid_body.location);
-                    processor
-                        .iter_player_ids_in_order()
-                        .filter(|player| {
-                            processor.get_player_is_team_0(player).ok()
-                                == Some(touch_event.team_is_team_0)
-                        })
-                        .filter_map(|player| {
-                            let player_rigid_body =
-                                processor.get_normalized_player_rigid_body(player).ok()?;
-                            let player_position = vec_to_glam(&player_rigid_body.location);
-                            let fallback_touch_distance =
-                                (ball_position - player_position).length();
-                            self.build_flip_reset_event_for_player(
-                                processor,
-                                player,
-                                touch_event.time,
-                                frame_index,
-                                touch_event.team_is_team_0,
-                                fallback_touch_distance,
-                            )
-                        })
-                        .max_by(|left, right| {
-                            left.confidence
-                                .partial_cmp(&right.confidence)
-                                .unwrap_or(std::cmp::Ordering::Equal)
-                        })
-                });
+        for touch_event in chronological_touch_events(&touch_state.touch_events) {
+            let event = self.build_flip_reset_event(processor, touch_event, frame_index);
             let Some(event) = event else {
                 continue;
             };
@@ -658,6 +607,7 @@ impl FlipResetTracker {
         processor: &dyn ProcessorView,
         frame: &boxcars::Frame,
         frame_index: usize,
+        touch_state: &TouchState,
     ) -> SubtrActorResult<()> {
         const MIN_DELAY_AFTER_CANDIDATE_TOUCH_SECONDS: f32 = 0.05;
         const MAX_DELAY_AFTER_CANDIDATE_TOUCH_SECONDS: f32 = 1.75;
@@ -677,41 +627,9 @@ impl FlipResetTracker {
             }
         }
 
-        for touch_event in processor.current_frame_touch_events() {
-            let event = self
-                .build_flip_reset_followup_touch_candidate(processor, touch_event, frame_index)
-                .or_else(|| {
-                    let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
-                    processor
-                        .iter_player_ids_in_order()
-                        .filter(|player| {
-                            processor.get_player_is_team_0(player).ok()
-                                == Some(touch_event.team_is_team_0)
-                        })
-                        .filter_map(|player| {
-                            let player_rigid_body =
-                                processor.get_normalized_player_rigid_body(player).ok()?;
-                            let (closest_contact_gap, _current_contact_gap) =
-                                touch_candidate_contact_gap_rank_with_hitbox(
-                                    &ball_rigid_body,
-                                    &player_rigid_body,
-                                    processor.get_player_car_hitbox(player),
-                                )?;
-                            self.build_flip_reset_followup_touch_candidate_for_player(
-                                processor,
-                                player,
-                                touch_event.time,
-                                frame_index,
-                                touch_event.team_is_team_0,
-                                closest_contact_gap,
-                            )
-                        })
-                        .max_by(|left, right| {
-                            left.confidence
-                                .partial_cmp(&right.confidence)
-                                .unwrap_or(std::cmp::Ordering::Equal)
-                        })
-                });
+        for touch_event in sequential_touch_events(&touch_state.touch_events) {
+            let event =
+                self.build_flip_reset_followup_touch_candidate(processor, touch_event, frame_index);
             let Some(event) = event else {
                 continue;
             };

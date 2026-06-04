@@ -171,10 +171,18 @@ where
     }
 
     fn track_touch_contacts(&mut self, touches: &[ContinuousBallControlTouch]) {
-        for touch in touches {
-            self.pending_takeoff_touches
-                .retain(|player_id, _| player_id == &touch.player_id);
+        if touches.is_empty() {
+            return;
+        }
 
+        let touched_players = touches
+            .iter()
+            .map(|touch| touch.player_id.clone())
+            .collect::<HashSet<_>>();
+        self.pending_takeoff_touches
+            .retain(|player_id, _| touched_players.contains(player_id));
+
+        for touch in touches {
             if !touch.is_airborne {
                 *self
                     .pending_takeoff_touches
@@ -289,3 +297,7 @@ where
         self.finish_active_sequence(min_duration_for_kind)
     }
 }
+
+#[cfg(test)]
+#[path = "continuous_ball_control_tests.rs"]
+mod tests;

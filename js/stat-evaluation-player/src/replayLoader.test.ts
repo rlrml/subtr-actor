@@ -8,6 +8,7 @@ import {
   getReplayLoadPhaseStates,
   listReplayLoadPhases,
 } from "./replayLoadProgress.ts";
+import { loadReplayBundleInWorker, waitForNextPaint } from "./replayLoader.ts";
 
 function assertApproximatelyEqual(actual: number, expected: number): void {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} !== ${expected}`);
@@ -282,4 +283,69 @@ test("formatReplayLoadProgress reports detailed stats and decode work", () => {
     formatReplayLoadProgress({ stage: "normalizing", progress: 1 }),
     "Normalizing replay model... 100%",
   );
+});
+
+test("waitForNextPaint falls back when animation frames do not fire", async () => {
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+  Object.defineProperty(globalThis, "requestAnimationFrame", {
+    configurable: true,
+    value: () => 1,
+  });
+
+  try {
+    await waitForNextPaint(1);
+  } finally {
+    Object.defineProperty(globalThis, "requestAnimationFrame", {
+      configurable: true,
+      value: originalRequestAnimationFrame,
+    });
+  }
+});
+
+test("loadReplayBundleInWorker rejects malformed worker decode payloads", async () => {
+  const originalWorker = globalThis.Worker;
+  const invalidJsonBuffer = new TextEncoder().encode("{").buffer;
+
+  class MalformedDoneWorker {
+    onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+    onerror: ((event: ErrorEvent) => void) | null = null;
+
+    constructor(_url: URL, _options: WorkerOptions) {}
+
+    postMessage(): void {
+      queueMicrotask(() => {
+        this.onmessage?.({
+          data: {
+            type: "done",
+            replayBuffer: invalidJsonBuffer,
+            statsTimelineParts: {
+              configBuffer: new ArrayBuffer(0),
+              replayMetaBuffer: new ArrayBuffer(0),
+              eventsBuffer: new ArrayBuffer(0),
+              frameChunkBuffers: [],
+            },
+          },
+        } as MessageEvent<unknown>);
+      });
+    }
+
+    terminate(): void {}
+  }
+
+  Object.defineProperty(globalThis, "Worker", {
+    configurable: true,
+    value: MalformedDoneWorker,
+  });
+
+  try {
+    await assert.rejects(
+      () => loadReplayBundleInWorker(new Uint8Array([1, 2, 3])),
+      SyntaxError,
+    );
+  } finally {
+    Object.defineProperty(globalThis, "Worker", {
+      configurable: true,
+      value: originalWorker,
+    });
+  }
 });
