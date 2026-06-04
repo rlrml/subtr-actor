@@ -1396,20 +1396,20 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.confidence * 100)}%`;",
+        "chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.metadata.confidence * 100)}%`;",
         "stats evaluation player goal-label tag confidence chips",
         errors,
     )
     require_contains(
         web_player_main_source,
-        "left.kind.localeCompare(right.kind) || right.confidence - left.confidence",
-        "stats evaluation player sorts goal tags by kind and confidence",
+        "left.kind.localeCompare(right.kind) ||\n          right.metadata.confidence - left.metadata.confidence",
+        "stats evaluation player sorts goal tags by kind and metadata confidence",
         errors,
     )
     require_contains(
         web_player_main_source,
-        "goalIndexes.add(index);",
-        "stats evaluation player keeps tag-only goals in goal-label overview",
+        "const orderedGoalIndexes = goalContexts.map((_, index) => index);",
+        "stats evaluation player derives goal-label overview from embedded goal context tags",
         errors,
     )
     require_contains(

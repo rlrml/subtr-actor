@@ -118,8 +118,7 @@ function renderOverviewPage(
 function orderedGoalTags(tags: readonly GoalTag[] | null | undefined): GoalTag[] {
   return [...(tags ?? [])].sort(
     (left, right) =>
-      left.kind.localeCompare(right.kind) ||
-      right.metadata.confidence - left.metadata.confidence,
+      left.kind.localeCompare(right.kind) || right.metadata.confidence - left.metadata.confidence,
   );
 }
 
