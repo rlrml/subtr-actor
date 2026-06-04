@@ -159,6 +159,8 @@ pub struct GoalContextEvent {
     pub goal_buildup: GoalBuildupKind,
     pub scorer_last_touch: Option<GoalTouchContext>,
     pub players: Vec<GoalPlayerContext>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<GoalTag>,
 }
 
 #[derive(Debug, Clone)]
@@ -839,6 +841,7 @@ impl MatchStatsCalculator {
                     scoring_team_most_back_player.as_ref(),
                     defending_team_most_back_player.as_ref(),
                 ),
+                tags: Vec::new(),
             });
         }
     }

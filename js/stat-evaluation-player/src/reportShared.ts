@@ -18,7 +18,7 @@ export type StatsTarget = PlayerStatsSnapshot | TeamStatsSnapshot;
 export type ChartKind = "bar" | "pie";
 export type ReportPageId = "overview" | "goals" | "boost" | "territory" | "involvement" | "dump";
 export type GoalContextEvent = StatsTimeline["events"]["goal_context"][number];
-export type GoalTagEvent = StatsTimeline["events"]["goal_tags"][number];
+export type GoalTag = NonNullable<GoalContextEvent["tags"]>[number];
 export type GoalPlayerContext = GoalContextEvent["players"][number];
 export type GoalContextPosition = NonNullable<GoalContextEvent["ball_position"]>;
 

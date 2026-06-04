@@ -156,7 +156,7 @@ impl StatsTimelineEventsNode {
         let mut timeline = match_stats.timeline().to_vec();
         timeline.extend(demo.timeline().to_vec());
         timeline.sort_by(|left, right| left.time.total_cmp(&right.time));
-        let goal_tags = combined_goal_tag_events(&[
+        let goal_tag_assignments = combined_goal_tag_assignments(&[
             aerial_goal.events(),
             high_aerial_goal.events(),
             long_distance_goal.events(),
@@ -171,6 +171,8 @@ impl StatsTimelineEventsNode {
             flip_reset_goal.events(),
             half_volley_goal.events(),
         ]);
+        let goal_context =
+            goal_context_events_with_tags(match_stats.goal_context_events(), &goal_tag_assignments);
 
         self.state.events = ReplayStatsTimelineEvents {
             timeline,
@@ -200,7 +202,7 @@ impl StatsTimelineEventsNode {
                 half_volley,
                 wavedash,
             ),
-            goal_context: match_stats.goal_context_events().to_vec(),
+            goal_context,
             backboard: backboard.events().to_vec(),
             ceiling_shot: ceiling_shot.events().to_vec(),
             wall_aerial: wall_aerial.events().to_vec(),
@@ -215,7 +217,6 @@ impl StatsTimelineEventsNode {
             pass_last_completed: pass.last_completed_events().to_vec(),
             ball_carry: ball_carry.carry_events().to_vec(),
             fifty_fifty: fifty_fifty.events().to_vec(),
-            goal_tags,
             rush: rush.events().to_vec(),
             speed_flip: speed_flip.events().to_vec(),
             half_flip: half_flip.events().to_vec(),

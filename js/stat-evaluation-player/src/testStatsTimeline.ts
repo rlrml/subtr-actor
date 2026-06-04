@@ -42,7 +42,6 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       pass: [],
       pass_last_completed: [],
       ball_carry: [],
-      goal_tags: [],
       rush: [],
       speed_flip: [],
       half_flip: [],
@@ -177,7 +176,6 @@ export function createLegacyStatsTimeline(
     one_timer_events?: StatsEvents["one_timer"];
     pass_events?: StatsEvents["pass"];
     ball_carry_events?: StatsEvents["ball_carry"];
-    goal_tag_events?: StatsEvents["goal_tags"];
     mechanic_events?: StatsEvents["mechanics"];
     rush_events?: StatsEvents["rush"];
     speed_flip_events?: StatsEvents["speed_flip"];
@@ -215,7 +213,6 @@ export function createLegacyStatsTimeline(
       one_timer: overrides.one_timer_events ?? overrides.events?.one_timer ?? [],
       pass: overrides.pass_events ?? overrides.events?.pass ?? [],
       ball_carry: overrides.ball_carry_events ?? overrides.events?.ball_carry ?? [],
-      goal_tags: overrides.goal_tag_events ?? overrides.events?.goal_tags ?? [],
       rush: overrides.rush_events ?? overrides.events?.rush ?? [],
       speed_flip: overrides.speed_flip_events ?? overrides.events?.speed_flip ?? [],
       half_flip: overrides.half_flip_events ?? overrides.events?.half_flip ?? [],

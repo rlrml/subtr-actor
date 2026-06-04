@@ -35,13 +35,12 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
         "expected generic mechanics stream to include the double tap"
     );
     assert!(
-        timeline
-            .events
-            .goal_tags
+        timeline.events.goal_context.get(2).is_some_and(|goal| goal
+            .tags
             .iter()
-            .any(|event| event.goal_index == 2 && event.kind == GoalTagKind::DoubleTapGoal),
+            .any(|tag| tag.kind() == GoalTagKind::DoubleTapGoal)),
         "expected third goal to be tagged as a double tap; got {:?}",
-        timeline.events.goal_tags
+        timeline.events.goal_context
     );
 }
 
@@ -76,13 +75,12 @@ fn tags_nuttrback_seventh_goal_as_double_tap() {
         "expected generic mechanics stream to include nuttrback's double tap"
     );
     assert!(
-        timeline
-            .events
-            .goal_tags
+        timeline.events.goal_context.get(6).is_some_and(|goal| goal
+            .tags
             .iter()
-            .any(|event| event.goal_index == 6 && event.kind == GoalTagKind::DoubleTapGoal),
+            .any(|tag| tag.kind() == GoalTagKind::DoubleTapGoal)),
         "expected seventh goal to be tagged as a double tap; got {:?}",
-        timeline.events.goal_tags
+        timeline.events.goal_context
     );
 }
 

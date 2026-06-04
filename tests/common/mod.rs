@@ -275,13 +275,6 @@ fn compare_timeline_events(
             &right.ball_carry,
         )
     })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.goal_tags"),
-            &left.goal_tags,
-            &right.goal_tags,
-        )
-    })
     .or_else(|| compare_serialized_slice(&format!("{label}.rush"), &left.rush, &right.rush))
     .or_else(|| {
         compare_serialized_slice(

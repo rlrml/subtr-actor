@@ -2,7 +2,8 @@
 import type { GoalBuildupKind } from "./GoalBuildupKind.ts";
 import type { GoalContextPosition } from "./GoalContextPosition.ts";
 import type { GoalPlayerContext } from "./GoalPlayerContext.ts";
+import type { GoalTag } from "./GoalTag.ts";
 import type { GoalTouchContext } from "./GoalTouchContext.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type GoalContextEvent = { time: number, frame: number, scoring_team_is_team_0: boolean, scorer: RemoteIdTs | null, scoring_team_most_back_player: RemoteIdTs | null, defending_team_most_back_player: RemoteIdTs | null, ball_position: GoalContextPosition | null, ball_speed_at_goal?: number | null, ball_air_time_before_goal: number | null, goal_buildup: GoalBuildupKind, scorer_last_touch: GoalTouchContext | null, players: Array<GoalPlayerContext>, };
+export type GoalContextEvent = { time: number, frame: number, scoring_team_is_team_0: boolean, scorer: RemoteIdTs | null, scoring_team_most_back_player: RemoteIdTs | null, defending_team_most_back_player: RemoteIdTs | null, ball_position: GoalContextPosition | null, ball_speed_at_goal?: number | null, ball_air_time_before_goal: number | null, goal_buildup: GoalBuildupKind, scorer_last_touch: GoalTouchContext | null, players: Array<GoalPlayerContext>, tags?: Array<GoalTag>, };

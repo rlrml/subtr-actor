@@ -33,7 +33,6 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "pass",
   "pass_last_completed",
   "ball_carry",
-  "goal_tags",
   "rush",
   "speed_flip",
   "half_flip",

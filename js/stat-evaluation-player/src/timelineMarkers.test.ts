@@ -817,19 +817,6 @@ test("buildGoalTagTimelineEvents and buildGoalContextTimelineEvents map goal ana
   } as ReplayModel;
 
   const statsTimeline = createLegacyStatsTimeline({
-    goal_tag_events: [
-      {
-        goal_index: 0,
-        time: 1.2,
-        frame: 1,
-        kind: "half_volley_goal",
-        scoring_team_is_team_0: true,
-        scorer: { Steam: "blue-id" },
-        confidence: 0.88,
-        modifiers: [],
-        evidence: [],
-      },
-    ],
     events: {
       goal_context: [
         {
@@ -843,6 +830,17 @@ test("buildGoalTagTimelineEvents and buildGoalContextTimelineEvents map goal ana
           ball_air_time_before_goal: null,
           scorer_last_touch: null,
           players: [],
+          tags: [
+            {
+              kind: "half_volley_goal",
+              metadata: {
+                confidence: 0.88,
+                modifiers: [],
+                related_events: [],
+                evidence: [],
+              },
+            },
+          ],
         },
       ],
     },

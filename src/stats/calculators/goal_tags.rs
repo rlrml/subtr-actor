@@ -44,6 +44,19 @@ pub enum GoalTagKind {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
+pub enum GoalTagEventStream {
+    Flick,
+    DoubleTap,
+    OneTimer,
+    Pass,
+    BallCarry,
+    DodgeReset,
+    HalfVolley,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum GoalTagEvidenceKind {
     GoalContext,
     ScorerLastTouch,
@@ -77,21 +90,104 @@ pub struct GoalTagEvidence {
     pub player_position: Option<GoalContextPosition>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct GoalTagEventRef {
+    pub stream: GoalTagEventStream,
+    pub index: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct GoalTagEvent {
-    pub goal_index: usize,
-    pub time: f32,
-    pub frame: usize,
-    pub kind: GoalTagKind,
-    pub scoring_team_is_team_0: bool,
-    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
-    pub scorer: Option<PlayerId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub scorer_position: Option<GoalContextPosition>,
+pub struct GoalTagMetadata {
     pub confidence: f32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modifiers: Vec<GoalTagModifier>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub related_events: Vec<GoalTagEventRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<GoalTagEvidence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[serde(tag = "kind", content = "metadata", rename_all = "snake_case")]
+#[ts(export)]
+pub enum GoalTag {
+    AerialGoal(GoalTagMetadata),
+    HighAerialGoal(GoalTagMetadata),
+    LongDistanceGoal(GoalTagMetadata),
+    OwnHalfGoal(GoalTagMetadata),
+    EmptyNetGoal(GoalTagMetadata),
+    CounterAttackGoal(GoalTagMetadata),
+    FlickGoal(GoalTagMetadata),
+    DoubleTapGoal(GoalTagMetadata),
+    OneTimerGoal(GoalTagMetadata),
+    PassingGoal(GoalTagMetadata),
+    AirDribbleGoal(GoalTagMetadata),
+    FlipResetGoal(GoalTagMetadata),
+    HalfVolleyGoal(GoalTagMetadata),
+}
+
+impl GoalTag {
+    pub fn from_parts(kind: GoalTagKind, metadata: GoalTagMetadata) -> Self {
+        match kind {
+            GoalTagKind::AerialGoal => Self::AerialGoal(metadata),
+            GoalTagKind::HighAerialGoal => Self::HighAerialGoal(metadata),
+            GoalTagKind::LongDistanceGoal => Self::LongDistanceGoal(metadata),
+            GoalTagKind::OwnHalfGoal => Self::OwnHalfGoal(metadata),
+            GoalTagKind::EmptyNetGoal => Self::EmptyNetGoal(metadata),
+            GoalTagKind::CounterAttackGoal => Self::CounterAttackGoal(metadata),
+            GoalTagKind::FlickGoal => Self::FlickGoal(metadata),
+            GoalTagKind::DoubleTapGoal => Self::DoubleTapGoal(metadata),
+            GoalTagKind::OneTimerGoal => Self::OneTimerGoal(metadata),
+            GoalTagKind::PassingGoal => Self::PassingGoal(metadata),
+            GoalTagKind::AirDribbleGoal => Self::AirDribbleGoal(metadata),
+            GoalTagKind::FlipResetGoal => Self::FlipResetGoal(metadata),
+            GoalTagKind::HalfVolleyGoal => Self::HalfVolleyGoal(metadata),
+        }
+    }
+
+    pub fn kind(&self) -> GoalTagKind {
+        match self {
+            Self::AerialGoal(_) => GoalTagKind::AerialGoal,
+            Self::HighAerialGoal(_) => GoalTagKind::HighAerialGoal,
+            Self::LongDistanceGoal(_) => GoalTagKind::LongDistanceGoal,
+            Self::OwnHalfGoal(_) => GoalTagKind::OwnHalfGoal,
+            Self::EmptyNetGoal(_) => GoalTagKind::EmptyNetGoal,
+            Self::CounterAttackGoal(_) => GoalTagKind::CounterAttackGoal,
+            Self::FlickGoal(_) => GoalTagKind::FlickGoal,
+            Self::DoubleTapGoal(_) => GoalTagKind::DoubleTapGoal,
+            Self::OneTimerGoal(_) => GoalTagKind::OneTimerGoal,
+            Self::PassingGoal(_) => GoalTagKind::PassingGoal,
+            Self::AirDribbleGoal(_) => GoalTagKind::AirDribbleGoal,
+            Self::FlipResetGoal(_) => GoalTagKind::FlipResetGoal,
+            Self::HalfVolleyGoal(_) => GoalTagKind::HalfVolleyGoal,
+        }
+    }
+
+    pub fn metadata(&self) -> &GoalTagMetadata {
+        match self {
+            Self::AerialGoal(metadata)
+            | Self::HighAerialGoal(metadata)
+            | Self::LongDistanceGoal(metadata)
+            | Self::OwnHalfGoal(metadata)
+            | Self::EmptyNetGoal(metadata)
+            | Self::CounterAttackGoal(metadata)
+            | Self::FlickGoal(metadata)
+            | Self::DoubleTapGoal(metadata)
+            | Self::OneTimerGoal(metadata)
+            | Self::PassingGoal(metadata)
+            | Self::AirDribbleGoal(metadata)
+            | Self::FlipResetGoal(metadata)
+            | Self::HalfVolleyGoal(metadata) => metadata,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GoalTagAssignment {
+    pub goal_index: usize,
+    pub tag: GoalTag,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -269,86 +365,85 @@ impl Default for HalfVolleyGoalCalculatorConfig {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct GoalTaggingContext<'a> {
+struct GoalTaggingContext {
     goal_index: usize,
-    goal: &'a GoalContextEvent,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AerialGoalCalculator {
     config: AerialGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HighAerialGoalCalculator {
     config: HighAerialGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LongDistanceGoalCalculator {
     config: LongDistanceGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OwnHalfGoalCalculator {
     config: OwnHalfGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EmptyNetGoalCalculator {
     config: EmptyNetGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CounterAttackGoalCalculator {
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlickGoalCalculator {
     config: FlickGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoubleTapGoalCalculator {
     config: DoubleTapGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OneTimerGoalCalculator {
     config: OneTimerGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PassingGoalCalculator {
     config: PassingGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AirDribbleGoalCalculator {
     config: AirDribbleGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlipResetGoalCalculator {
     config: FlipResetGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HalfVolleyGoalCalculator {
     config: HalfVolleyGoalCalculatorConfig,
-    events: EventStream<GoalTagEvent>,
+    events: EventStream<GoalTagAssignment>,
 }
 
 macro_rules! impl_goal_tag_calculator {
@@ -375,11 +470,11 @@ macro_rules! impl_goal_tag_calculator {
                 &self.config
             }
 
-            pub fn events(&self) -> &[GoalTagEvent] {
+            pub fn events(&self) -> &[GoalTagAssignment] {
                 self.events.all()
             }
 
-            pub fn new_events(&self) -> &[GoalTagEvent] {
+            pub fn new_events(&self) -> &[GoalTagAssignment] {
                 self.events.new_events()
             }
         }
@@ -411,11 +506,11 @@ impl CounterAttackGoalCalculator {
         }
     }
 
-    pub fn events(&self) -> &[GoalTagEvent] {
+    pub fn events(&self) -> &[GoalTagAssignment] {
         self.events.all()
     }
 
-    pub fn new_events(&self) -> &[GoalTagEvent] {
+    pub fn new_events(&self) -> &[GoalTagAssignment] {
         self.events.new_events()
     }
 }
@@ -442,11 +537,11 @@ impl HalfVolleyGoalCalculator {
         &self.config
     }
 
-    pub fn events(&self) -> &[GoalTagEvent] {
+    pub fn events(&self) -> &[GoalTagAssignment] {
         self.events.all()
     }
 
-    pub fn new_events(&self) -> &[GoalTagEvent] {
+    pub fn new_events(&self) -> &[GoalTagAssignment] {
         self.events.new_events()
     }
 }
@@ -458,7 +553,7 @@ impl AerialGoalCalculator {
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
+    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
         tag_goals_by_height(goals, GoalTagKind::AerialGoal, self.config.min_ball_z)
     }
 }
@@ -470,7 +565,7 @@ impl HighAerialGoalCalculator {
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
+    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
         tag_goals_by_height(goals, GoalTagKind::HighAerialGoal, self.config.min_ball_z)
     }
 }
@@ -482,7 +577,7 @@ impl LongDistanceGoalCalculator {
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
+    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
         tag_goals_by_attacking_y(
             goals,
             GoalTagKind::LongDistanceGoal,
@@ -498,7 +593,7 @@ impl OwnHalfGoalCalculator {
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
+    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
         tag_goals_by_recent_attacking_y(
             goals,
             GoalTagKind::OwnHalfGoal,
@@ -515,10 +610,10 @@ impl EmptyNetGoalCalculator {
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
+    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
         let mut tags = Vec::new();
         for (goal_index, goal) in goals.iter().enumerate() {
-            let ctx = GoalTaggingContext { goal_index, goal };
+            let ctx = GoalTaggingContext { goal_index };
             let Some(touch) = goal.scorer_last_touch.as_ref() else {
                 continue;
             };
@@ -582,14 +677,14 @@ impl CounterAttackGoalCalculator {
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
+    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
         goals
             .iter()
             .enumerate()
             .filter(|(_, goal)| goal.goal_buildup == GoalBuildupKind::CounterAttack)
             .map(|(goal_index, goal)| {
                 goal_tag(
-                    GoalTaggingContext { goal_index, goal },
+                    GoalTaggingContext { goal_index },
                     GoalTagKind::CounterAttackGoal,
                     1.0,
                     vec![goal_buildup_evidence(goal), goal_context_evidence(goal)],
@@ -611,7 +706,11 @@ impl FlickGoalCalculator {
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent], events: &[FlickEvent]) -> Vec<GoalTagEvent> {
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        events: &[FlickEvent],
+    ) -> Vec<GoalTagAssignment> {
         tag_goals_by_point_mechanic_event(
             goals,
             events,
@@ -633,7 +732,11 @@ impl OneTimerGoalCalculator {
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent], events: &[OneTimerEvent]) -> Vec<GoalTagEvent> {
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        events: &[OneTimerEvent],
+    ) -> Vec<GoalTagAssignment> {
         tag_goals_by_point_mechanic_event(
             goals,
             events,
@@ -655,18 +758,24 @@ impl PassingGoalCalculator {
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent], events: &[PassEvent]) -> Vec<GoalTagEvent> {
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        events: &[PassEvent],
+    ) -> Vec<GoalTagAssignment> {
         let mut tags = Vec::new();
         for (goal_index, goal) in goals.iter().enumerate() {
-            let ctx = GoalTaggingContext { goal_index, goal };
-            let Some(event) = events
+            let ctx = GoalTaggingContext { goal_index };
+            let Some((event_index, event)) = events
                 .iter()
-                .filter(|event| pass_event_matches_goal(event, goal))
-                .filter(|event| goal.time - event.time <= self.config.max_pass_to_goal_seconds)
+                .enumerate()
+                .filter(|(_, event)| pass_event_matches_goal(event, goal))
+                .filter(|(_, event)| goal.time - event.time <= self.config.max_pass_to_goal_seconds)
                 .max_by(|left, right| {
-                    left.time
-                        .total_cmp(&right.time)
-                        .then_with(|| left.frame.cmp(&right.frame))
+                    left.1
+                        .time
+                        .total_cmp(&right.1.time)
+                        .then_with(|| left.1.frame.cmp(&right.1.frame))
                 })
             else {
                 continue;
@@ -678,6 +787,10 @@ impl PassingGoalCalculator {
                 1.0,
                 mechanic_goal_modifiers(goal, &event.receiver),
                 mechanic_goal_evidence(goal, pass_evidence(event)),
+                vec![GoalTagEventRef {
+                    stream: GoalTagEventStream::Pass,
+                    index: event_index,
+                }],
             ));
         }
         tags
@@ -700,7 +813,7 @@ impl DoubleTapGoalCalculator {
         &self,
         goals: &[GoalContextEvent],
         events: &[DoubleTapEvent],
-    ) -> Vec<GoalTagEvent> {
+    ) -> Vec<GoalTagAssignment> {
         tag_goals_by_point_mechanic_event(
             goals,
             events,
@@ -726,7 +839,7 @@ impl AirDribbleGoalCalculator {
         &self,
         goals: &[GoalContextEvent],
         events: &[BallCarryEvent],
-    ) -> Vec<GoalTagEvent> {
+    ) -> Vec<GoalTagAssignment> {
         tag_goals_by_air_dribble_event(goals, events, self.config.max_end_to_goal_seconds)
     }
 }
@@ -748,7 +861,7 @@ impl FlipResetGoalCalculator {
         &self,
         goals: &[GoalContextEvent],
         events: &[ConfirmedFlipResetEvent],
-    ) -> Vec<GoalTagEvent> {
+    ) -> Vec<GoalTagAssignment> {
         tag_goals_by_point_mechanic_event(
             goals,
             events,
@@ -774,11 +887,12 @@ impl HalfVolleyGoalCalculator {
         &self,
         goals: &[GoalContextEvent],
         half_volley_events: &[HalfVolleyEvent],
-    ) -> Vec<GoalTagEvent> {
+    ) -> Vec<GoalTagAssignment> {
         let mut tags = Vec::new();
         for (goal_index, goal) in goals.iter().enumerate() {
-            let ctx = GoalTaggingContext { goal_index, goal };
-            let Some(candidate) = self.tag_goals_by_half_volley_event(goal, half_volley_events)
+            let ctx = GoalTaggingContext { goal_index };
+            let Some((candidate_index, candidate)) =
+                self.tag_goals_by_half_volley_event(goal, half_volley_events)
             else {
                 continue;
             };
@@ -789,6 +903,10 @@ impl HalfVolleyGoalCalculator {
                 1.0,
                 mechanic_goal_modifiers(goal, &candidate.player),
                 mechanic_goal_evidence(goal, half_volley_evidence(candidate)),
+                vec![GoalTagEventRef {
+                    stream: GoalTagEventStream::HalfVolley,
+                    index: candidate_index,
+                }],
             ));
         }
         tags
@@ -798,14 +916,16 @@ impl HalfVolleyGoalCalculator {
         &self,
         goal: &GoalContextEvent,
         half_volley_events: &'a [HalfVolleyEvent],
-    ) -> Option<&'a HalfVolleyEvent> {
+    ) -> Option<(usize, &'a HalfVolleyEvent)> {
         half_volley_events
             .iter()
-            .filter(|candidate| self.candidate_matches_goal(candidate, goal))
+            .enumerate()
+            .filter(|(_, candidate)| self.candidate_matches_goal(candidate, goal))
             .max_by(|left, right| {
-                left.time
-                    .total_cmp(&right.time)
-                    .then_with(|| left.frame.cmp(&right.frame))
+                left.1
+                    .time
+                    .total_cmp(&right.1.time)
+                    .then_with(|| left.1.frame.cmp(&right.1.frame))
             })
     }
 
@@ -835,6 +955,14 @@ trait GoalMechanicPointEvent {
     fn event_team_is_team_0(&self) -> bool;
     fn event_confidence(&self) -> f32;
     fn evidence_kind(&self) -> GoalTagEvidenceKind;
+    fn event_stream(&self) -> GoalTagEventStream;
+
+    fn event_ref(&self, index: usize) -> GoalTagEventRef {
+        GoalTagEventRef {
+            stream: self.event_stream(),
+            index,
+        }
+    }
 }
 
 impl GoalMechanicPointEvent for FlickEvent {
@@ -860,6 +988,10 @@ impl GoalMechanicPointEvent for FlickEvent {
 
     fn evidence_kind(&self) -> GoalTagEvidenceKind {
         GoalTagEvidenceKind::Flick
+    }
+
+    fn event_stream(&self) -> GoalTagEventStream {
+        GoalTagEventStream::Flick
     }
 }
 
@@ -887,6 +1019,10 @@ impl GoalMechanicPointEvent for OneTimerEvent {
     fn evidence_kind(&self) -> GoalTagEvidenceKind {
         GoalTagEvidenceKind::OneTimer
     }
+
+    fn event_stream(&self) -> GoalTagEventStream {
+        GoalTagEventStream::OneTimer
+    }
 }
 
 impl GoalMechanicPointEvent for DoubleTapEvent {
@@ -912,6 +1048,10 @@ impl GoalMechanicPointEvent for DoubleTapEvent {
 
     fn evidence_kind(&self) -> GoalTagEvidenceKind {
         GoalTagEvidenceKind::DoubleTap
+    }
+
+    fn event_stream(&self) -> GoalTagEventStream {
+        GoalTagEventStream::DoubleTap
     }
 }
 
@@ -939,21 +1079,51 @@ impl GoalMechanicPointEvent for ConfirmedFlipResetEvent {
     fn evidence_kind(&self) -> GoalTagEvidenceKind {
         GoalTagEvidenceKind::FlipReset
     }
+
+    fn event_stream(&self) -> GoalTagEventStream {
+        GoalTagEventStream::DodgeReset
+    }
 }
 
-pub fn combined_goal_tag_events(calculators: &[&[GoalTagEvent]]) -> Vec<GoalTagEvent> {
-    let mut events: Vec<_> = calculators
+pub fn combined_goal_tag_assignments(
+    calculators: &[&[GoalTagAssignment]],
+) -> Vec<GoalTagAssignment> {
+    let mut assignments: Vec<_> = calculators
         .iter()
         .flat_map(|events| events.iter().cloned())
         .collect();
-    events.sort_by(|left, right| {
-        left.time
-            .total_cmp(&right.time)
-            .then_with(|| left.frame.cmp(&right.frame))
-            .then_with(|| left.goal_index.cmp(&right.goal_index))
-            .then_with(|| format!("{:?}", left.kind).cmp(&format!("{:?}", right.kind)))
+    assignments.sort_by(|left, right| {
+        left.goal_index
+            .cmp(&right.goal_index)
+            .then_with(|| format!("{:?}", left.tag.kind()).cmp(&format!("{:?}", right.tag.kind())))
     });
-    events
+    assignments
+}
+
+pub fn goal_context_events_with_tags(
+    goals: &[GoalContextEvent],
+    assignments: &[GoalTagAssignment],
+) -> Vec<GoalContextEvent> {
+    let mut goals_with_tags = goals.to_vec();
+    for assignment in assignments {
+        let Some(goal) = goals_with_tags.get_mut(assignment.goal_index) else {
+            continue;
+        };
+        goal.tags.push(assignment.tag.clone());
+    }
+    for goal in &mut goals_with_tags {
+        goal.tags.sort_by(|left, right| {
+            format!("{:?}", left.kind())
+                .cmp(&format!("{:?}", right.kind()))
+                .then_with(|| {
+                    right
+                        .metadata()
+                        .confidence
+                        .total_cmp(&left.metadata().confidence)
+                })
+        });
+    }
+    goals_with_tags
 }
 
 #[cfg(test)]

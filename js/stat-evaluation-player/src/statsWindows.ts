@@ -632,23 +632,7 @@ export class StatsWindowsController {
     const goalContexts = [...(timeline.events.goal_context ?? [])].sort(
       (left, right) => left.time - right.time,
     );
-    const tagsByGoalIndex = new Map<number, typeof timeline.events.goal_tags>();
-    for (const tag of timeline.events.goal_tags ?? []) {
-      const group = tagsByGoalIndex.get(tag.goal_index) ?? [];
-      group.push(tag);
-      tagsByGoalIndex.set(tag.goal_index, group);
-    }
-    for (const group of tagsByGoalIndex.values()) {
-      group.sort(
-        (left, right) => left.kind.localeCompare(right.kind) || right.confidence - left.confidence,
-      );
-    }
-
-    const goalIndexes = new Set<number>(goalContexts.map((_, index) => index));
-    for (const index of tagsByGoalIndex.keys()) {
-      goalIndexes.add(index);
-    }
-    const orderedGoalIndexes = [...goalIndexes].sort((left, right) => left - right);
+    const orderedGoalIndexes = goalContexts.map((_, index) => index);
     if (orderedGoalIndexes.length === 0) {
       this.appendStatsWindowEmpty(statsWindow, "No goals loaded.");
       return;
@@ -658,16 +642,18 @@ export class StatsWindowsController {
     list.className = "goal-label-list";
     for (const goalIndex of orderedGoalIndexes) {
       const context = goalContexts[goalIndex] ?? null;
-      const tags = tagsByGoalIndex.get(goalIndex) ?? [];
-      const firstTag = tags[0] ?? null;
-      const time = context?.time ?? firstTag?.time ?? 0;
-      const scorer = context?.scorer ?? firstTag?.scorer ?? null;
+      const tags = [...(context?.tags ?? [])].sort(
+        (left, right) =>
+          left.kind.localeCompare(right.kind) ||
+          right.metadata.confidence - left.metadata.confidence,
+      );
+      const time = context?.time ?? 0;
+      const scorer = context?.scorer ?? null;
       const scorerId = scorer ? playerIdToString(scorer) : null;
       const scorerName = scorer
         ? (replay.players.find((player) => player.id === scorerId)?.name ?? scorerId)
         : "Unknown scorer";
-      const isTeamZero =
-        context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
+      const isTeamZero = context?.scoring_team_is_team_0 ?? null;
 
       const item = document.createElement("section");
       item.className = "goal-label-item";
@@ -693,7 +679,7 @@ export class StatsWindowsController {
         for (const tag of tags) {
           const chip = document.createElement("span");
           chip.className = "goal-label-tag";
-          chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.confidence * 100)}%`;
+          chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.metadata.confidence * 100)}%`;
           labels.append(chip);
         }
       }

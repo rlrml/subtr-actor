@@ -23,7 +23,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
 
     pub(in crate::collector::stats::playback) fn goal_tag_events_typed(
         &self,
-    ) -> SubtrActorResult<Vec<GoalTagEvent>> {
+    ) -> SubtrActorResult<Vec<GoalTagAssignment>> {
         let mut events = Vec::new();
         for module_name in [
             "aerial_goal",
@@ -47,11 +47,9 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             )?);
         }
         events.sort_by(|left, right| {
-            left.time
-                .total_cmp(&right.time)
-                .then_with(|| left.frame.cmp(&right.frame))
-                .then_with(|| left.goal_index.cmp(&right.goal_index))
-                .then_with(|| format!("{:?}", left.kind).cmp(&format!("{:?}", right.kind)))
+            left.goal_index.cmp(&right.goal_index).then_with(|| {
+                format!("{:?}", left.tag.kind()).cmp(&format!("{:?}", right.tag.kind()))
+            })
         });
         Ok(events)
     }
@@ -255,36 +253,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         Ok(events)
     }
 
-    pub(in crate::collector::stats::playback) fn goal_tag_events_value(&self) -> Vec<Value> {
-        let mut events = Vec::new();
-        for module_name in [
-            "aerial_goal",
-            "high_aerial_goal",
-            "long_distance_goal",
-            "own_half_goal",
-            "empty_net_goal",
-            "counter_attack_goal",
-            "flick_goal",
-            "double_tap_goal",
-            "one_timer_goal",
-            "passing_goal",
-            "air_dribble_goal",
-            "flip_reset_goal",
-            "half_volley_goal",
-        ] {
-            events.extend(self.module_array(module_name, "events"));
-        }
-        events.sort_by(|left, right| {
-            let left_time = left.get("time").and_then(Value::as_f64).unwrap_or(0.0);
-            let right_time = right.get("time").and_then(Value::as_f64).unwrap_or(0.0);
-            left_time.total_cmp(&right_time)
-        });
-        events
-    }
-
     pub(in crate::collector::stats::playback) fn timeline_event_sets_typed(
         &self,
     ) -> SubtrActorResult<ReplayStatsTimelineEvents> {
+        let goal_context =
+            self.module_player_events("core", "goal_context", parse_goal_context_event)?;
+        let goal_tag_assignments = self.goal_tag_events_typed()?;
+        let goal_context = goal_context_events_with_tags(&goal_context, &goal_tag_assignments);
+
         Ok(ReplayStatsTimelineEvents {
             timeline: self.timeline_events_typed()?,
             core_player: self.module_player_events(
@@ -325,11 +301,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_rotation_team_event,
             )?,
             mechanics: self.mechanic_events_typed()?,
-            goal_context: self.module_player_events(
-                "core",
-                "goal_context",
-                parse_goal_context_event,
-            )?,
+            goal_context,
             backboard: self.module_player_events("backboard", "events", parse_backboard_event)?,
             ceiling_shot: self.module_player_events(
                 "ceiling_shot",
@@ -380,7 +352,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_ball_carry_event,
             )?,
-            goal_tags: self.goal_tag_events_typed()?,
             rush: self.module_typed_array("rush", "events")?,
             speed_flip: self.module_player_events(
                 "speed_flip",
@@ -506,10 +477,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "pass".to_owned(),
             Value::Array(self.module_array("pass", "events")),
-        );
-        events.insert(
-            "goal_tags".to_owned(),
-            Value::Array(self.goal_tag_events_value()),
         );
         events.insert(
             "fifty_fifty".to_owned(),

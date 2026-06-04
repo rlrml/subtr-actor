@@ -523,25 +523,27 @@ export function buildGoalTagTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.goal_tags.map((event, index) => {
-    const scorerId = event.scorer ? playerIdToString(event.scorer) : null;
-    const scorerName = scorerId ? getReplayPlayerName(replay, scorerId) : null;
-    const eventTime = getReplayFrameTime(replay, event.frame, event.time);
-    const tagLabel = formatGoalTagKind(event.kind);
-    const confidencePercent = Math.round(event.confidence * 100);
+  return (statsTimeline.events.goal_context ?? []).flatMap((goal, goalIndex) => {
+    return (goal.tags ?? []).map((tag, tagIndex) => {
+      const scorerId = goal.scorer ? playerIdToString(goal.scorer) : null;
+      const scorerName = scorerId ? getReplayPlayerName(replay, scorerId) : null;
+      const eventTime = getReplayFrameTime(replay, goal.frame, goal.time);
+      const tagLabel = formatGoalTagKind(tag.kind);
+      const confidencePercent = Math.round(tag.metadata.confidence * 100);
 
-    return {
-      id: `goal-tag:${event.goal_index}:${event.kind}:${index}`,
-      time: eventTime,
-      frame: event.frame,
-      kind: "goal-tag",
-      label: `${scorerName ?? "Goal"} ${tagLabel.toLowerCase()} goal ${confidencePercent}%`,
-      shortLabel: "GT",
-      playerId: scorerId,
-      playerName: scorerName,
-      isTeamZero: event.scoring_team_is_team_0,
-      color: event.scoring_team_is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-    };
+      return {
+        id: `goal-tag:${goalIndex}:${tag.kind}:${tagIndex}`,
+        time: eventTime,
+        frame: goal.frame,
+        kind: "goal-tag",
+        label: `${scorerName ?? "Goal"} ${tagLabel.toLowerCase()} goal ${confidencePercent}%`,
+        shortLabel: "GT",
+        playerId: scorerId,
+        playerName: scorerName,
+        isTeamZero: goal.scoring_team_is_team_0,
+        color: goal.scoring_team_is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+      };
+    });
   });
 }
 

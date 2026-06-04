@@ -205,7 +205,6 @@ async function main() {
         "    pass: [],",
         "    pass_last_completed: [],",
         "    ball_carry: [],",
-        "    goal_tags: [],",
         "    rush: [],",
         "    speed_flip: [],",
         "    half_flip: [],",

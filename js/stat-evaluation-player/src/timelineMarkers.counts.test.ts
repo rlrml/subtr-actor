@@ -242,19 +242,34 @@ test("countEnabledTimelineEvents includes enabled custom module markers", () => 
         pass_kind: "direct",
       },
     ],
-    goal_tag_events: [
-      {
-        goal_index: 0,
-        time: 1.1,
-        frame: 1,
-        kind: "one_timer_goal",
-        scoring_team_is_team_0: true,
-        scorer: { Steam: "blue-id" },
-        confidence: 0.8,
-        modifiers: [],
-        evidence: [],
-      },
-    ],
+    events: {
+      goal_context: [
+        {
+          time: 1.1,
+          frame: 1,
+          scoring_team_is_team_0: true,
+          scorer: { Steam: "blue-id" },
+          scoring_team_most_back_player: null,
+          defending_team_most_back_player: null,
+          ball_position: null,
+          ball_air_time_before_goal: null,
+          goal_buildup: "unknown",
+          scorer_last_touch: null,
+          players: [],
+          tags: [
+            {
+              kind: "one_timer_goal",
+              metadata: {
+                confidence: 0.8,
+                modifiers: [],
+                related_events: [],
+                evidence: [],
+              },
+            },
+          ],
+        },
+      ],
+    },
     speed_flip_events: [
       {
         time: 1.1,

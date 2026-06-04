@@ -87,7 +87,6 @@ fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, us
         ("pass", events.pass.len()),
         ("pass_last_completed", events.pass_last_completed.len()),
         ("ball_carry", events.ball_carry.len()),
-        ("goal_tags", events.goal_tags.len()),
         ("rush", events.rush.len()),
         ("speed_flip", events.speed_flip.len()),
         ("half_flip", events.half_flip.len()),

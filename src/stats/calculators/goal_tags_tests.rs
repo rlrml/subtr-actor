@@ -58,20 +58,21 @@ fn goal_with_touch(
         goal_buildup: GoalBuildupKind::Other,
         scorer_last_touch: Some(scorer_touch(touch_position, players.clone())),
         players,
+        tags: Vec::new(),
     }
 }
 
-fn tag_kinds(events: &[GoalTagEvent]) -> Vec<GoalTagKind> {
-    let mut kinds: Vec<_> = events.iter().map(|event| event.kind).collect();
+fn tag_kinds(events: &[GoalTagAssignment]) -> Vec<GoalTagKind> {
+    let mut kinds: Vec<_> = events.iter().map(|event| event.tag.kind()).collect();
     kinds.sort_by_key(|kind| format!("{kind:?}"));
     kinds
 }
 
-fn has_modifier(event: &GoalTagEvent, modifier: GoalTagModifier) -> bool {
-    event.modifiers.contains(&modifier)
+fn has_modifier(event: &GoalTagAssignment, modifier: GoalTagModifier) -> bool {
+    event.tag.metadata().modifiers.contains(&modifier)
 }
 
-fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
+fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
     let aerial = AerialGoalCalculator::new();
     let high_aerial = HighAerialGoalCalculator::new();
     let long_distance = LongDistanceGoalCalculator::new();
@@ -85,7 +86,7 @@ fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagEvent> {
     let empty_net_events = empty_net.tag_goals(goals);
     let counter_attack_events = counter_attack.tag_goals(goals);
 
-    combined_goal_tag_events(&[
+    combined_goal_tag_assignments(&[
         &aerial_events,
         &high_aerial_events,
         &long_distance_events,
@@ -365,6 +366,8 @@ fn counter_attack_goal_tags_goal_with_counter_attack_buildup() {
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::CounterAttackGoal]);
     assert!(events[0]
+        .tag
+        .metadata()
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::GoalBuildup));
@@ -386,9 +389,11 @@ fn flick_goal_tags_matching_scorer_flick_before_last_touch() {
         FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(9.3, 93, player_id(1))]);
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlickGoal]);
-    assert_eq!(events[0].confidence, 0.82);
+    assert_eq!(events[0].tag.metadata().confidence, 0.82);
     assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
     assert!(events[0]
+        .tag
+        .metadata()
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::Flick));
@@ -413,6 +418,8 @@ fn flick_goal_can_be_created_by_scoring_teammate() {
     assert!(!has_modifier(&events[0], GoalTagModifier::ByScorer));
     assert_eq!(
         events[0]
+            .tag
+            .metadata()
             .evidence
             .iter()
             .find(|evidence| evidence.kind == GoalTagEvidenceKind::Flick)
@@ -430,6 +437,8 @@ fn one_timer_goal_tags_matching_one_timer_before_last_touch() {
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::OneTimerGoal]);
     assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
     assert!(events[0]
+        .tag
+        .metadata()
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::OneTimer));
@@ -445,6 +454,8 @@ fn passing_goal_tags_pass_received_by_scorer_on_last_touch() {
     assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
     assert_eq!(
         events[0]
+            .tag
+            .metadata()
             .evidence
             .iter()
             .find(|evidence| evidence.kind == GoalTagEvidenceKind::Pass)
@@ -471,6 +482,8 @@ fn double_tap_goal_tags_matching_double_tap_before_goal() {
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::DoubleTapGoal]);
     assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
     assert!(events[0]
+        .tag
+        .metadata()
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::DoubleTap));
@@ -492,6 +505,8 @@ fn air_dribble_goal_tags_air_dribble_control_that_reaches_last_touch() {
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::AirDribbleGoal]);
     assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
     assert!(events[0]
+        .tag
+        .metadata()
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::AirDribble));
@@ -541,6 +556,8 @@ fn flip_reset_goal_tags_matching_on_ball_reset_before_last_touch() {
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlipResetGoal]);
     assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
     assert!(events[0]
+        .tag
+        .metadata()
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::FlipReset));
@@ -557,6 +574,8 @@ fn half_volley_goal_tags_scorer_last_touch_after_floor_bounce() {
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::HalfVolleyGoal]);
     assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
     assert!(events[0]
+        .tag
+        .metadata()
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::HalfVolley));

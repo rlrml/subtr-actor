@@ -122,7 +122,6 @@ pub struct ReplayStatsTimelineEvents {
     pub pass: Vec<PassEvent>,
     pub pass_last_completed: Vec<PassLastCompletedEvent>,
     pub ball_carry: Vec<BallCarryEvent>,
-    pub goal_tags: Vec<GoalTagEvent>,
     pub rush: Vec<RushEvent>,
     pub speed_flip: Vec<SpeedFlipEvent>,
     pub half_flip: Vec<HalfFlipEvent>,

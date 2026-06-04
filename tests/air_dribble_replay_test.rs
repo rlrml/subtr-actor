@@ -43,12 +43,11 @@ fn does_not_tag_sixth_goal_as_half_volley() {
         timeline.events.goal_context
     );
     assert!(
-        !timeline
-            .events
-            .goal_tags
+        !timeline.events.goal_context.get(5).is_some_and(|goal| goal
+            .tags
             .iter()
-            .any(|event| event.goal_index == 5 && event.kind == GoalTagKind::HalfVolleyGoal),
+            .any(|tag| tag.kind() == GoalTagKind::HalfVolleyGoal)),
         "expected sixth goal not to be tagged as a half volley; got {:?}",
-        timeline.events.goal_tags
+        timeline.events.goal_context
     );
 }

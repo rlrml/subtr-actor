@@ -101,11 +101,10 @@ fn post_eac_ranked_standard_second_goal_is_not_own_half_goal() {
         "expected second goal scorer touch to be in the orange attacking half"
     );
     assert!(
-        !timeline
-            .events
-            .goal_tags
+        !timeline.events.goal_context.get(1).is_some_and(|goal| goal
+            .tags
             .iter()
-            .any(|event| { event.goal_index == 1 && event.kind == GoalTagKind::OwnHalfGoal }),
+            .any(|tag| tag.kind() == GoalTagKind::OwnHalfGoal)),
         "second goal should not be tagged as own-half"
     );
 }
@@ -129,11 +128,10 @@ fn post_eac_ranked_standard_third_goal_is_not_aerial_goal() {
         .map(|position| position.z);
 
     assert!(
-        !timeline
-            .events
-            .goal_tags
+        !timeline.events.goal_context.get(2).is_some_and(|goal| goal
+            .tags
             .iter()
-            .any(|event| { event.goal_index == 2 && event.kind == GoalTagKind::AerialGoal }),
+            .any(|tag| tag.kind() == GoalTagKind::AerialGoal)),
         "third goal should not be tagged as aerial; last-touch ball z was {last_touch_z:?}"
     );
 }

@@ -43,7 +43,7 @@ import {
   type ChartSpec,
   type GoalContextEvent,
   type GoalPlayerContext,
-  type GoalTagEvent,
+  type GoalTag,
   type NumberRow,
   type ReportPageId,
   type ReportState,
@@ -115,33 +115,15 @@ function renderOverviewPage(
   return page;
 }
 
-function groupGoalTagsByGoalIndex(goalTags: GoalTagEvent[]): Map<number, GoalTagEvent[]> {
-  const groups = new Map<number, GoalTagEvent[]>();
-  for (const tag of goalTags) {
-    const group = groups.get(tag.goal_index) ?? [];
-    group.push(tag);
-    groups.set(tag.goal_index, group);
-  }
-  for (const group of groups.values()) {
-    group.sort(
-      (left, right) => left.kind.localeCompare(right.kind) || right.confidence - left.confidence,
-    );
-  }
-  return groups;
+function orderedGoalTags(tags: readonly GoalTag[] | null | undefined): GoalTag[] {
+  return [...(tags ?? [])].sort(
+    (left, right) =>
+      left.kind.localeCompare(right.kind) ||
+      right.metadata.confidence - left.metadata.confidence,
+  );
 }
 
-function getOrderedGoalIndexes(
-  goalContexts: GoalContextEvent[],
-  tagsByGoalIndex: Map<number, GoalTagEvent[]>,
-): number[] {
-  const goalIndexes = new Set<number>(goalContexts.map((_, index) => index));
-  for (const goalIndex of tagsByGoalIndex.keys()) {
-    goalIndexes.add(goalIndex);
-  }
-  return [...goalIndexes].sort((left, right) => left - right);
-}
-
-function getGoalTagCounts(goalTags: GoalTagEvent[]): NumberRow[] {
+function getGoalTagCounts(goalTags: GoalTag[]): NumberRow[] {
   const counts = new Map<string, number>();
   for (const tag of goalTags) {
     counts.set(tag.kind, (counts.get(tag.kind) ?? 0) + 1);
@@ -170,7 +152,7 @@ function createDetailList(items: { label: string; value: string }[]): HTMLElemen
   return list;
 }
 
-function renderGoalTagChips(tags: GoalTagEvent[]): HTMLElement {
+function renderGoalTagChips(tags: GoalTag[]): HTMLElement {
   const list = el("div", { className: "stats-report-goal-tags" });
   if (tags.length === 0) {
     list.append(
@@ -183,12 +165,15 @@ function renderGoalTagChips(tags: GoalTagEvent[]): HTMLElement {
   }
 
   for (const tag of tags) {
+    const metadata = tag.metadata;
     const modifiers =
-      tag.modifiers.length > 0 ? ` - ${tag.modifiers.map(formatMechanicKind).join(", ")}` : "";
+      metadata.modifiers && metadata.modifiers.length > 0
+        ? ` - ${metadata.modifiers.map(formatMechanicKind).join(", ")}`
+        : "";
     list.append(
       el("span", {
         className: "stats-report-goal-tag",
-        text: `${formatMechanicKind(tag.kind)} ${Math.round(tag.confidence * 100)}%${modifiers}`,
+        text: `${formatMechanicKind(tag.kind)} ${Math.round(metadata.confidence * 100)}%${modifiers}`,
       }),
     );
   }
@@ -237,14 +222,12 @@ function renderGoalCard(
   replayUrl: URL | null,
   goalIndex: number,
   context: GoalContextEvent | null,
-  tags: GoalTagEvent[],
+  tags: GoalTag[],
 ): HTMLElement {
-  const firstTag = tags[0] ?? null;
-  const scoringTeamIsTeamZero =
-    context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? null;
-  const scorer = context?.scorer ?? firstTag?.scorer ?? null;
-  const time = context?.time ?? firstTag?.time ?? null;
-  const frame = context?.frame ?? firstTag?.frame ?? null;
+  const scoringTeamIsTeamZero = context?.scoring_team_is_team_0 ?? null;
+  const scorer = context?.scorer ?? null;
+  const time = context?.time ?? null;
+  const frame = context?.frame ?? null;
   const watchRequest = getGoalWatchRequest(replayUrl, time, scorer);
   const card = el("section", { className: "stats-report-goal-card" });
   if (scoringTeamIsTeamZero !== null) {
@@ -333,10 +316,9 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
   const goalContexts = [...(state.statsTimeline.events.goal_context ?? [])].sort(
     (left, right) => left.time - right.time,
   );
-  const goalTags = [...(state.statsTimeline.events.goal_tags ?? [])];
-  const tagsByGoalIndex = groupGoalTagsByGoalIndex(goalTags);
-  const goalIndexes = getOrderedGoalIndexes(goalContexts, tagsByGoalIndex);
-  const taggedGoalCount = [...tagsByGoalIndex.values()].filter((tags) => tags.length > 0).length;
+  const goalTags = goalContexts.flatMap((goal) => goal.tags ?? []);
+  const goalIndexes = goalContexts.map((_, index) => index);
+  const taggedGoalCount = goalContexts.filter((goal) => (goal.tags ?? []).length > 0).length;
   const tagRows = getGoalTagCounts(goalTags);
   const topTag = tagRows[0];
 
@@ -372,10 +354,8 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
       renderBarChartRows(
         goalIndexes.map((goalIndex) => {
           const context = goalContexts[goalIndex] ?? null;
-          const firstTag = tagsByGoalIndex.get(goalIndex)?.[0] ?? null;
-          const value = context?.time ?? firstTag?.time ?? 0;
-          const scoringTeamIsTeamZero =
-            context?.scoring_team_is_team_0 ?? firstTag?.scoring_team_is_team_0 ?? true;
+          const value = context?.time ?? 0;
+          const scoringTeamIsTeamZero = context?.scoring_team_is_team_0 ?? true;
           return {
             label: `Goal ${goalIndex + 1}`,
             value,
@@ -397,7 +377,7 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
         state.replayUrl,
         goalIndex,
         goalContexts[goalIndex] ?? null,
-        tagsByGoalIndex.get(goalIndex) ?? [],
+        orderedGoalTags(goalContexts[goalIndex]?.tags),
       ),
     );
   }

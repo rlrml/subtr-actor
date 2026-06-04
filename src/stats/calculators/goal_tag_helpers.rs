@@ -4,7 +4,7 @@ pub(super) fn tag_goals_by_height(
     goals: &[GoalContextEvent],
     kind: GoalTagKind,
     min_ball_z: f32,
-) -> Vec<GoalTagEvent> {
+) -> Vec<GoalTagAssignment> {
     let mut tags = Vec::new();
     for (goal_index, goal) in goals.iter().enumerate() {
         let Some(touch) = goal.scorer_last_touch.as_ref() else {
@@ -17,7 +17,7 @@ pub(super) fn tag_goals_by_height(
             continue;
         }
         tags.push(goal_tag(
-            GoalTaggingContext { goal_index, goal },
+            GoalTaggingContext { goal_index },
             kind,
             1.0,
             vec![last_touch_evidence(touch)],
@@ -30,7 +30,7 @@ pub(super) fn tag_goals_by_attacking_y(
     goals: &[GoalContextEvent],
     kind: GoalTagKind,
     max_attacking_y: f32,
-) -> Vec<GoalTagEvent> {
+) -> Vec<GoalTagAssignment> {
     tag_goals_by_recent_attacking_y(goals, kind, max_attacking_y, f32::INFINITY)
 }
 
@@ -39,7 +39,7 @@ pub(super) fn tag_goals_by_recent_attacking_y(
     kind: GoalTagKind,
     max_attacking_y: f32,
     max_touch_to_goal_seconds: f32,
-) -> Vec<GoalTagEvent> {
+) -> Vec<GoalTagAssignment> {
     let mut tags = Vec::new();
     for (goal_index, goal) in goals.iter().enumerate() {
         let Some(touch) = goal.scorer_last_touch.as_ref() else {
@@ -56,7 +56,7 @@ pub(super) fn tag_goals_by_recent_attacking_y(
             continue;
         }
         tags.push(goal_tag(
-            GoalTaggingContext { goal_index, goal },
+            GoalTaggingContext { goal_index },
             kind,
             1.0,
             vec![last_touch_evidence(touch)],
@@ -70,18 +70,20 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
     events: &[E],
     kind: GoalTagKind,
     max_event_to_goal_seconds: f32,
-) -> Vec<GoalTagEvent> {
+) -> Vec<GoalTagAssignment> {
     let mut tags = Vec::new();
     for (goal_index, goal) in goals.iter().enumerate() {
-        let ctx = GoalTaggingContext { goal_index, goal };
-        let Some(event) = events
+        let ctx = GoalTaggingContext { goal_index };
+        let Some((event_index, event)) = events
             .iter()
-            .filter(|event| point_event_matches_goal(*event, goal))
-            .filter(|event| goal.time - event.event_time() <= max_event_to_goal_seconds)
+            .enumerate()
+            .filter(|(_, event)| point_event_matches_goal(*event, goal))
+            .filter(|(_, event)| goal.time - event.event_time() <= max_event_to_goal_seconds)
             .max_by(|left, right| {
-                left.event_time()
-                    .total_cmp(&right.event_time())
-                    .then_with(|| left.event_frame().cmp(&right.event_frame()))
+                left.1
+                    .event_time()
+                    .total_cmp(&right.1.event_time())
+                    .then_with(|| left.1.event_frame().cmp(&right.1.event_frame()))
             })
         else {
             continue;
@@ -93,6 +95,7 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
             event.event_confidence(),
             mechanic_goal_modifiers(goal, event.event_player()),
             mechanic_goal_evidence(goal, point_mechanic_evidence(event)),
+            vec![event.event_ref(event_index)],
         ));
     }
     tags
@@ -126,18 +129,20 @@ pub(super) fn tag_goals_by_air_dribble_event(
     goals: &[GoalContextEvent],
     events: &[BallCarryEvent],
     max_end_to_goal_seconds: f32,
-) -> Vec<GoalTagEvent> {
+) -> Vec<GoalTagAssignment> {
     let mut tags = Vec::new();
     for (goal_index, goal) in goals.iter().enumerate() {
-        let ctx = GoalTaggingContext { goal_index, goal };
-        let Some(event) = events
+        let ctx = GoalTaggingContext { goal_index };
+        let Some((event_index, event)) = events
             .iter()
-            .filter(|event| air_dribble_event_matches_goal(event, goal))
-            .filter(|event| goal.time - event.end_time <= max_end_to_goal_seconds)
+            .enumerate()
+            .filter(|(_, event)| air_dribble_event_matches_goal(event, goal))
+            .filter(|(_, event)| goal.time - event.end_time <= max_end_to_goal_seconds)
             .max_by(|left, right| {
-                left.end_time
-                    .total_cmp(&right.end_time)
-                    .then_with(|| left.end_frame.cmp(&right.end_frame))
+                left.1
+                    .end_time
+                    .total_cmp(&right.1.end_time)
+                    .then_with(|| left.1.end_frame.cmp(&right.1.end_frame))
             })
         else {
             continue;
@@ -149,6 +154,10 @@ pub(super) fn tag_goals_by_air_dribble_event(
             1.0,
             mechanic_goal_modifiers(goal, &event.player_id),
             mechanic_goal_evidence(goal, air_dribble_evidence(event)),
+            vec![GoalTagEventRef {
+                stream: GoalTagEventStream::BallCarry,
+                index: event_index,
+            }],
         ));
     }
     tags
@@ -305,37 +314,30 @@ pub(super) fn mechanic_goal_evidence(
 }
 
 pub(super) fn goal_tag(
-    ctx: GoalTaggingContext<'_>,
+    ctx: GoalTaggingContext,
     kind: GoalTagKind,
     confidence: f32,
     evidence: Vec<GoalTagEvidence>,
-) -> GoalTagEvent {
-    goal_tag_with_modifiers(ctx, kind, confidence, Vec::new(), evidence)
+) -> GoalTagAssignment {
+    goal_tag_with_modifiers(ctx, kind, confidence, Vec::new(), evidence, Vec::new())
 }
 
 pub(super) fn goal_tag_with_modifiers(
-    ctx: GoalTaggingContext<'_>,
+    ctx: GoalTaggingContext,
     kind: GoalTagKind,
     confidence: f32,
     modifiers: Vec<GoalTagModifier>,
     evidence: Vec<GoalTagEvidence>,
-) -> GoalTagEvent {
-    GoalTagEvent {
-        goal_index: ctx.goal_index,
-        time: ctx.goal.time,
-        frame: ctx.goal.frame,
-        kind,
-        scoring_team_is_team_0: ctx.goal.scoring_team_is_team_0,
-        scorer: ctx.goal.scorer.clone(),
-        scorer_position: ctx.goal.scorer.as_ref().and_then(|scorer| {
-            ctx.goal
-                .players
-                .iter()
-                .find(|player| &player.player == scorer)
-                .and_then(|player| player.position)
-        }),
+    related_events: Vec<GoalTagEventRef>,
+) -> GoalTagAssignment {
+    let metadata = GoalTagMetadata {
         confidence,
         modifiers,
+        related_events,
         evidence,
+    };
+    GoalTagAssignment {
+        goal_index: ctx.goal_index,
+        tag: GoalTag::from_parts(kind, metadata),
     }
 }
