@@ -223,9 +223,10 @@ impl PositioningCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         events: &FrameEventsState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
         possession_player_before_sample: Option<&PlayerId>,
     ) -> SubtrActorResult<()> {
+        let live_play = live_play_state.is_live_play;
         if frame.dt == 0.0 {
             if let Some(ball) = ball.sample() {
                 self.previous_ball_position = Some(ball.position());
@@ -547,7 +548,7 @@ impl PositioningCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         events: &FrameEventsState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
         possession_player_before_sample: Option<&PlayerId>,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
@@ -557,7 +558,7 @@ impl PositioningCalculator {
             ball,
             players,
             events,
-            live_play,
+            live_play_state,
             possession_player_before_sample,
         )
     }

@@ -19,6 +19,7 @@ fn player(player_id: PlayerId, is_team_0: bool, position: glam::Vec3) -> PlayerS
     PlayerSample {
         player_id,
         is_team_0,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(position)),
         boost_amount: None,
         last_boost_amount: None,
@@ -42,6 +43,18 @@ fn touch(player_id: PlayerId, is_team_0: bool, dodge_contact: bool) -> TouchEven
         player_position: None,
         closest_approach_distance: Some(0.0),
         dodge_contact,
+    }
+}
+
+fn touch_at(player_id: PlayerId, is_team_0: bool, time: f32, frame: usize) -> TouchEvent {
+    TouchEvent {
+        time,
+        frame,
+        team_is_team_0: is_team_0,
+        player: Some(player_id),
+        player_position: None,
+        closest_approach_distance: Some(0.0),
+        dodge_contact: false,
     }
 }
 
@@ -80,6 +93,53 @@ fn contested_touch_links_initial_touch_events_and_dodge_contact_tags() {
     assert_eq!(active.team_one_touch_time, Some(1.0));
     assert_eq!(active.team_one_touch_frame, Some(10));
     assert!(!active.team_one_dodge_contact);
+}
+
+#[test]
+fn contested_touch_uses_latest_touch_for_each_team() {
+    let early_blue_player = boxcars::RemoteId::Steam(1);
+    let late_blue_player = boxcars::RemoteId::Steam(2);
+    let orange_player = boxcars::RemoteId::Steam(3);
+    let active = FiftyFiftyCalculator::contested_touch(
+        &FrameInfo {
+            frame_number: 4,
+            time: 0.4,
+            dt: 0.1,
+            seconds_remaining: None,
+        },
+        &PlayerFrameState {
+            players: vec![
+                player(
+                    early_blue_player.clone(),
+                    true,
+                    glam::Vec3::new(0.0, -100.0, 0.0),
+                ),
+                player(
+                    late_blue_player.clone(),
+                    true,
+                    glam::Vec3::new(0.0, -80.0, 0.0),
+                ),
+                player(
+                    orange_player.clone(),
+                    false,
+                    glam::Vec3::new(0.0, 100.0, 0.0),
+                ),
+            ],
+        },
+        &[
+            touch_at(early_blue_player, true, 0.1, 1),
+            touch_at(orange_player.clone(), false, 0.2, 2),
+            touch_at(late_blue_player.clone(), true, 0.4, 4),
+        ],
+        false,
+    )
+    .unwrap();
+
+    assert_eq!(active.team_zero_player, Some(late_blue_player));
+    assert_eq!(active.team_zero_touch_time, Some(0.4));
+    assert_eq!(active.team_zero_touch_frame, Some(4));
+    assert_eq!(active.team_one_player, Some(orange_player));
+    assert_eq!(active.team_one_touch_frame, Some(2));
 }
 
 #[test]

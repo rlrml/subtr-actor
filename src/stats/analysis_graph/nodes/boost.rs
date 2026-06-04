@@ -45,7 +45,7 @@ impl_analysis_node! {
             player_frame_state,
             frame_events_state,
             player_vertical_state,
-            live_play_state.counts_toward_player_motion(),
+            live_play_state,
         )
     },
     finish = |node| {

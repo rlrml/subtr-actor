@@ -206,6 +206,7 @@ impl DodgeResetCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         events: &FrameEventsState,
+        touch_state: &TouchState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         self.on_ball_events.begin_update();
@@ -232,7 +233,7 @@ impl DodgeResetCalculator {
             self.events.push(event);
         }
         self.update_pending_reset_dodges(players);
-        for touch_event in &events.touch_events {
+        for touch_event in chronological_touch_events(&touch_state.touch_events) {
             self.apply_confirmed_flip_reset_touch(players, touch_event);
         }
         Ok(())

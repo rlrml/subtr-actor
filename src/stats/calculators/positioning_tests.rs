@@ -25,6 +25,7 @@ fn player(id: u64, is_team_0: bool, position: glam::Vec3) -> PlayerSample {
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(id),
         is_team_0,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(position)),
         boost_amount: None,
         last_boost_amount: None,
@@ -100,7 +101,7 @@ fn positioning_events_emit_state_change_spans() {
                 &ball,
                 &players,
                 &FrameEventsState::default(),
-                true,
+                &LivePlayState::active_play(),
                 None,
             )
             .expect("positioning update should succeed");

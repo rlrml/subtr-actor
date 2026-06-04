@@ -271,7 +271,7 @@ impl RotationCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         events: &FrameEventsState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.player_events.begin_update();
         self.team_events.begin_update();
@@ -285,7 +285,7 @@ impl RotationCalculator {
             return Ok(());
         };
 
-        if !live_play || !events.goal_events.is_empty() {
+        if !live_play_state.is_live_play || !events.goal_events.is_empty() {
             self.reset_trackers();
             self.emit_inactive_player_events(frame, players);
             return Ok(());

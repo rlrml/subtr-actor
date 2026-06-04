@@ -128,6 +128,177 @@ pub enum GoalTag {
     HalfVolleyGoal(GoalTagMetadata),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct GoalTagDefinition {
+    pub kind: GoalTagKind,
+    pub id: &'static str,
+    pub label: &'static str,
+    pub summary: &'static str,
+    pub approach: &'static [&'static str],
+}
+
+pub const fn goal_tag_definition(
+    kind: GoalTagKind,
+    id: &'static str,
+    label: &'static str,
+    summary: &'static str,
+    approach: &'static [&'static str],
+) -> GoalTagDefinition {
+    GoalTagDefinition {
+        kind,
+        id,
+        label,
+        summary,
+        approach,
+    }
+}
+
+pub const ALL_GOAL_TAG_DEFINITIONS: &[GoalTagDefinition] = &[
+    goal_tag_definition(
+        GoalTagKind::AerialGoal,
+        "aerial_goal",
+        "Aerial Goal",
+        "A goal whose scorer last touched the ball while it was high in the air.",
+        &[
+            "Inspect each goal context and its scorer-last-touch evidence.",
+            "Require the last-touch ball height to meet the aerial-goal threshold.",
+            "Attach goal-context and last-touch evidence to the goal tag metadata.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::HighAerialGoal,
+        "high_aerial_goal",
+        "High Aerial Goal",
+        "A stricter aerial-goal tag for goals scored from a higher last-touch ball height.",
+        &[
+            "Inspect each goal context and its scorer-last-touch evidence.",
+            "Require the last-touch ball height to meet the high-aerial threshold.",
+            "Allow the regular aerial-goal tag to also apply when both thresholds are met.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::LongDistanceGoal,
+        "long_distance_goal",
+        "Long-Distance Goal",
+        "A goal where the scorer's last touch started from deep enough in the attacking team's half-space.",
+        &[
+            "Use the scorer-last-touch ball position from goal context.",
+            "Normalize field direction by scoring team and compare the touch y-position to the long-distance threshold.",
+            "Attach goal-context and last-touch evidence to the goal tag metadata.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::OwnHalfGoal,
+        "own_half_goal",
+        "Own-Half Goal",
+        "A long-distance goal where the scorer's last touch came from their own half and close enough in time to the goal.",
+        &[
+            "Use the scorer-last-touch ball position and time from goal context.",
+            "Require the touch to be in the scoring team's own half and within the own-half touch-to-goal window.",
+            "Allow the long-distance goal tag to also apply when both distance thresholds are met.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::EmptyNetGoal,
+        "empty_net_goal",
+        "Empty Net Goal",
+        "A goal where defenders are judged too far or too poorly positioned to cover the net.",
+        &[
+            "Inspect defending-player positions in the goal context.",
+            "Compare defender depth and distance against the empty-net thresholds.",
+            "Avoid tagging very deep attacking touches as empty nets when the touch position is outside the configured range.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::CounterAttackGoal,
+        "counter_attack_goal",
+        "Counter-Attack Goal",
+        "A goal whose buildup was classified as a counterattack.",
+        &[
+            "Use the goal-buildup classification computed in goal context.",
+            "Tag goals whose buildup kind is counterattack.",
+            "Attach goal-buildup evidence to the goal tag metadata.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::FlickGoal,
+        "flick_goal",
+        "Flick Goal",
+        "A goal linked to a recent flick event.",
+        &[
+            "Compare recent flick events against each goal's scorer-last-touch context.",
+            "Require the flick to fall within the configured event-to-goal window.",
+            "Prefer by-scorer evidence when the flick player matches the scorer's last touch.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::DoubleTapGoal,
+        "double_tap_goal",
+        "Double-Tap Goal",
+        "A goal linked to a recent double-tap event.",
+        &[
+            "Compare recent double-tap events against each goal's scorer-last-touch context.",
+            "Require the double tap to fall within the configured event-to-goal window.",
+            "Attach a related-event reference and mechanic evidence to the goal tag metadata.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::OneTimerGoal,
+        "one_timer_goal",
+        "One-Timer Goal",
+        "A goal linked to a recent one-timer event.",
+        &[
+            "Compare recent one-timer events against each goal's scorer-last-touch context.",
+            "Require the one timer to fall within the configured event-to-goal window.",
+            "Prefer by-scorer evidence when the one-timer receiver matches the scorer's last touch.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::PassingGoal,
+        "passing_goal",
+        "Passing Goal",
+        "A goal where a completed pass is linked to the scoring touch.",
+        &[
+            "Compare pass events against each goal's scorer-last-touch context.",
+            "Require the pass receiver to match the scorer's last touch within the pass-to-goal window.",
+            "Attach a related pass-event reference and pass evidence to the goal tag metadata.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::AirDribbleGoal,
+        "air_dribble_goal",
+        "Air-Dribble Goal",
+        "A goal linked to an air-dribble ball-carry sequence that reaches the scoring touch.",
+        &[
+            "Inspect completed ball-carry events whose kind is air dribble.",
+            "Match air-dribble sequences to goals by timing and scorer-last-touch context.",
+            "Attach a related ball-carry event reference and air-dribble evidence to the goal tag metadata.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::FlipResetGoal,
+        "flip_reset_goal",
+        "Flip-Reset Goal",
+        "A goal linked to a recent on-ball dodge reset or flip-reset event.",
+        &[
+            "Compare reset-related mechanic events against each goal's scorer-last-touch context.",
+            "Require the reset evidence to fall within the configured event-to-goal window.",
+            "Prefer by-scorer evidence when the reset player matches the scorer's last touch.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::HalfVolleyGoal,
+        "half_volley_goal",
+        "Half-Volley Goal",
+        "A goal where the scorer's last touch matches a recent half-volley candidate.",
+        &[
+            "Compare half-volley events against each goal's scorer-last-touch context.",
+            "Require the half-volley touch to be close enough to the goal and sufficiently aligned toward goal.",
+            "Attach a related half-volley event reference and half-volley evidence to the goal tag metadata.",
+        ],
+    ),
+];
+
 impl GoalTag {
     pub fn from_parts(kind: GoalTagKind, metadata: GoalTagMetadata) -> Self {
         match kind {

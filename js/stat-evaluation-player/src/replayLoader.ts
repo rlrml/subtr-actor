@@ -47,6 +47,10 @@ interface TransferableStatsTimelineParts {
 
 type ReplayWorkerMessage = ReplayProgressMessage | ReplayDoneMessage | ReplayErrorMessage;
 
+function errorFromUnknown(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 function parseJsonBuffer<T>(decoder: TextDecoder, buffer: ArrayBuffer): T {
   return JSON.parse(decoder.decode(new Uint8Array(buffer))) as T;
 }
@@ -93,11 +97,27 @@ async function parseStatsTimelineParts(
   };
 }
 
-function waitForNextPaint(): Promise<void> {
+export function waitForNextPaint(timeoutMs = 100): Promise<void> {
   if (typeof requestAnimationFrame !== "function") {
     return Promise.resolve();
   }
-  return new Promise((done) => requestAnimationFrame(() => done()));
+  return new Promise((done) => {
+    let finished = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const finish = () => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+      done();
+    };
+
+    timeoutId = setTimeout(finish, timeoutMs);
+    requestAnimationFrame(() => finish());
+  });
 }
 
 export async function loadReplayBundleInWorker(
@@ -137,23 +157,27 @@ export async function loadReplayBundleInWorker(
       }
 
       cleanup();
-      const decoder = new TextDecoder();
-      options.onProgress?.({ stage: "decoding-replay", progress: 0 });
-      await waitForNextPaint();
-      const replay = parseJsonBuffer<ReplayModel>(decoder, message.replayBuffer);
-      options.onProgress?.({ stage: "decoding-replay", progress: 1 });
-      await waitForNextPaint();
-      const statsTimeline = await parseStatsTimelineParts(
-        decoder,
-        message.statsTimelineParts,
-        options.onProgress,
-      );
-      const statsFrameLookup = createStatsFrameLookup(statsTimeline);
-      resolve({
-        replay,
-        statsTimeline,
-        statsFrameLookup,
-      });
+      try {
+        const decoder = new TextDecoder();
+        options.onProgress?.({ stage: "decoding-replay", progress: 0 });
+        await waitForNextPaint();
+        const replay = parseJsonBuffer<ReplayModel>(decoder, message.replayBuffer);
+        options.onProgress?.({ stage: "decoding-replay", progress: 1 });
+        await waitForNextPaint();
+        const statsTimeline = await parseStatsTimelineParts(
+          decoder,
+          message.statsTimelineParts,
+          options.onProgress,
+        );
+        const statsFrameLookup = createStatsFrameLookup(statsTimeline);
+        resolve({
+          replay,
+          statsTimeline,
+          statsFrameLookup,
+        });
+      } catch (error) {
+        reject(errorFromUnknown(error));
+      }
     };
 
     worker.onerror = (event) => {

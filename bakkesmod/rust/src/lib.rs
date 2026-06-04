@@ -21,23 +21,27 @@ use subtr_actor::ReplayFrameInputBuilder;
 use subtr_actor::{
     boost_amount_to_percent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
     builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
-    builtin_stats_module_names, default_stats_timeline_config,
+    builtin_stats_module_names, car_hitbox_for_body_id, default_car_hitbox,
+    default_stats_timeline_config,
     geometry::apply_velocities_to_rigid_body,
+    hitbox_family_for_body_id,
     stats::analysis_graph::{
         builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
         AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
     },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
-    BoostPickupComparisonEvent, BumpEvent, CorePlayerScoreboardEvent, DemoEventSample,
+    BoostPickupComparisonEvent, BumpEvent, CarHitbox, CorePlayerScoreboardEvent, DemoEventSample,
     DemolishAttribute, DemolishInfo, DodgeRefreshedEvent, FiftyFiftyEvent, FrameEventsState,
     FrameInfo, FrameInput, GameplayPhase, GameplayState, GoalBuildupKind, GoalContextEvent,
-    GoalEvent, GoalTag, GoalTagKind, GoalTagMetadata, LivePlayState, PlayerFrameState, PlayerId,
-    PlayerInfo, PlayerSample, PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayMeta,
-    ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
-    StatsEventTiming, StatsTimelineCollector, StatsTimelineEventCollector, StatsTimelineTagEvent,
-    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
-    TouchEvent, TouchStateCalculator, WhiffEvent,
+    GoalEvent, GoalTagKind, LivePlayState, PlayerFrameState, PlayerId, PlayerInfo, PlayerSample,
+    PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayMeta, ReplayStatsFrame,
+    ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata, StatsEventTiming,
+    StatsTimelineCollector, StatsTimelineEventCollector, StatsTimelineTagEvent, SubtrActorError,
+    SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent,
+    TouchStateCalculator, WhiffEvent,
 };
+#[cfg(test)]
+use subtr_actor::{GoalTag, GoalTagMetadata};
 
 mod abi;
 mod ffi;

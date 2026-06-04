@@ -632,6 +632,8 @@ fn checked_in_header_matches_event_abi_struct_field_types() {
                 ("uint8_t", "double_jump_active"),
                 ("uint8_t", "dodge_active"),
                 ("uint8_t", "powerslide_active"),
+                ("int32_t", "car_body_id"),
+                ("uint8_t", "has_car_body_id"),
                 ("uint8_t", "has_match_stats"),
                 ("int32_t", "match_goals"),
                 ("int32_t", "match_assists"),

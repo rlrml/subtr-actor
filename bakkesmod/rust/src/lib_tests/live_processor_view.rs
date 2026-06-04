@@ -30,6 +30,44 @@ fn live_processor_view_exposes_sampled_jump_state() {
 }
 
 #[test]
+fn live_processor_view_resolves_player_hitbox_from_car_body_id() {
+    let mut player = player_at_index(
+        3,
+        true,
+        SaVec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 120.0,
+        },
+    );
+    player.car_body_id = 403;
+    player.has_car_body_id = 1;
+    let players = [player];
+    let frame = live_frame(1, SaRigidBody::default(), &players);
+    let event_history = SaLiveEventHistory::default();
+    let view = SaLiveProcessorView::new(
+        None,
+        &frame,
+        &players,
+        FrameEventsState::default(),
+        &event_history,
+    );
+    let expected = car_hitbox_for_body_id(403).expect("fixture car body should map to hitbox");
+
+    assert_eq!(
+        view.get_player_car_hitbox(&RemoteId::SplitScreen(3)).family,
+        expected.family
+    );
+    assert_eq!(player_state(&players).players[0].hitbox.family, expected.family);
+    let replay_meta = live_replay_meta(&players);
+    assert_eq!(replay_meta.team_zero[0].car_body_id, Some(403));
+    assert_eq!(
+        replay_meta.team_zero[0].car_hitbox_family.as_deref(),
+        Some("Dominus")
+    );
+}
+
+#[test]
 fn live_processor_view_satisfies_processor_surface_from_live_frame() {
     let blue_name = std::ffi::CString::new("Blue View").unwrap();
     let orange_name = std::ffi::CString::new("Orange View").unwrap();

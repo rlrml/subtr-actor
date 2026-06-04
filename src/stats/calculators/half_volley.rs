@@ -232,10 +232,10 @@ impl HalfVolleyCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         touch_state: &TouchState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.last_floor_bounce = None;
             self.last_ground_contacts.clear();
             self.recent_dodge_starts.clear();
@@ -255,7 +255,7 @@ impl HalfVolleyCalculator {
             self.last_floor_bounce = Some(bounce);
         }
 
-        for touch in &touch_state.touch_events {
+        for touch in chronological_touch_events(&touch_state.touch_events) {
             if let Some(event) = self.event_for_touch(ball, touch) {
                 self.record_half_volley(frame, event);
             }

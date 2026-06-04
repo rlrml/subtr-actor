@@ -15,6 +15,29 @@ fn rigid_body(position: glam::Vec3, velocity: Option<glam::Vec3>) -> boxcars::Ri
     }
 }
 
+fn touch_event(frame: usize, time: f32) -> TouchEvent {
+    TouchEvent {
+        time,
+        frame,
+        team_is_team_0: true,
+        player: None,
+        player_position: None,
+        closest_approach_distance: None,
+        dodge_contact: false,
+    }
+}
+
+#[test]
+fn touch_event_timestamp_ordering_uses_frame_then_time() {
+    let earlier = touch_event(10, 1.0);
+    let later_frame = touch_event(11, 0.9);
+    let later_time_same_frame = touch_event(10, 1.1);
+
+    assert!(TouchEvent::timestamp_ordering(&earlier, &later_frame).is_lt());
+    assert!(TouchEvent::timestamp_ordering(&earlier, &later_time_same_frame).is_lt());
+    assert!(TouchEvent::timestamp_ordering(&later_frame, &earlier).is_gt());
+}
+
 #[test]
 fn shot_event_metadata_calculates_speed_distance_and_goal_alignment() {
     let ball = rigid_body(

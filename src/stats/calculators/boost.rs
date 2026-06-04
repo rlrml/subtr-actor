@@ -1428,11 +1428,12 @@ impl BoostCalculator {
         players: &PlayerFrameState,
         events: &FrameEventsState,
         vertical_state: &PlayerVerticalState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.pickup_comparison_events.begin_update();
         self.ledger_events.begin_update();
         self.state_events.begin_update();
+        let live_play = live_play_state.counts_toward_player_motion();
         let boost_levels_live = Self::boost_levels_live(live_play);
         let track_boost_levels = Self::tracks_boost_levels(boost_levels_live);
         let track_boost_pickups = Self::tracks_boost_pickups(gameplay, live_play);

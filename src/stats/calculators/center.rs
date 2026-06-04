@@ -162,10 +162,10 @@ impl CenterCalculator {
         ball: &BallFrameState,
         touch_state: &TouchState,
         frame_events: &FrameEventsState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.pending_touch = None;
             return Ok(());
         }
@@ -177,7 +177,7 @@ impl CenterCalculator {
         self.clear_disqualified_pending_center(frame_events);
         self.update_pending_center(frame, ball_position);
 
-        for touch in &touch_state.touch_events {
+        for touch in sequential_touch_events(&touch_state.touch_events) {
             let Some(player) = touch.player.clone() else {
                 self.pending_touch = None;
                 continue;

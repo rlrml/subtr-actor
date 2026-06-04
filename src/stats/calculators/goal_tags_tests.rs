@@ -605,3 +605,25 @@ fn half_volley_goal_rejects_stale_touches() {
 
     assert!(events.is_empty());
 }
+
+#[test]
+fn goal_tag_definitions_are_unique_and_documented() {
+    let mut ids = std::collections::BTreeSet::new();
+    for definition in ALL_GOAL_TAG_DEFINITIONS {
+        assert!(
+            ids.insert(definition.id),
+            "duplicate goal tag definition id {}",
+            definition.id
+        );
+        assert!(
+            !definition.summary.is_empty(),
+            "{} should describe what the goal tag means",
+            definition.id
+        );
+        assert!(
+            !definition.approach.is_empty(),
+            "{} should describe how the goal tag is assigned",
+            definition.id
+        );
+    }
+}

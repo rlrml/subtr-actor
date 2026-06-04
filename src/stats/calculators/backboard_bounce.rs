@@ -12,6 +12,10 @@ pub struct BackboardBounceEvent {
     pub is_team_0: bool,
 }
 
+#[cfg(test)]
+#[path = "backboard_bounce_tests.rs"]
+mod tests;
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BackboardBounceState {
     pub bounce_events: Vec<BackboardBounceEvent>,
@@ -117,8 +121,8 @@ impl BackboardBounceCalculator {
             self.last_bounce_event = Some(last_bounce_event.clone());
         }
 
-        if let Some(last_touch) = touch_state.touch_events.last() {
-            self.last_touch = Some(last_touch.clone());
+        if !touch_state.touch_events.is_empty() {
+            self.last_touch = touch_state.primary_touch_event().cloned();
         }
         self.previous_ball_velocity = ball.velocity();
 

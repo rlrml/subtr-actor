@@ -41,6 +41,7 @@ fn player(
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(id),
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(
             glam::Vec3::new(0.0, 0.0, 20.0),
             velocity,
@@ -84,7 +85,7 @@ fn counts_backward_dodge_that_reorients_forward() {
         .update(
             &frame(1, 1.00),
             &players(player(1, glam::Vec3::new(-600.0, 0.0, 0.0), 0.0, 0.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -97,7 +98,7 @@ fn counts_backward_dodge_that_reorients_forward() {
                 std::f32::consts::FRAC_PI_2,
                 true,
             )),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -110,7 +111,7 @@ fn counts_backward_dodge_that_reorients_forward() {
                 0.0,
                 true,
             )),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -132,14 +133,14 @@ fn rejects_forward_dodge_start() {
         .update(
             &frame(1, 1.00),
             &players(player(1, glam::Vec3::new(900.0, 0.0, 0.0), 0.0, 0.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
         .update(
             &frame(15, 1.70),
             &players(player(1, glam::Vec3::new(1300.0, 0.0, 0.0), 0.0, 0.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -156,7 +157,7 @@ fn rejects_backward_dodge_without_reorientation() {
         .update(
             &frame(1, 1.00),
             &players(player(1, glam::Vec3::new(-600.0, 0.0, 0.0), 0.0, 0.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -174,7 +175,7 @@ fn rejects_backward_dodge_without_reorientation() {
                 }),
                 ..player(1, glam::Vec3::new(-900.0, 0.0, 0.0), 0.0, 0.0, true)
             }),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 

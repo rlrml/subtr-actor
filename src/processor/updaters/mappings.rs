@@ -10,6 +10,7 @@ struct MappingUpdateContext {
     unique_id_object_id: boxcars::ObjectId,
     team_object_id: boxcars::ObjectId,
     bot_object_id: Option<boxcars::ObjectId>,
+    client_loadouts_object_id: Option<boxcars::ObjectId>,
     player_replication_object_id: boxcars::ObjectId,
     vehicle_object_id: boxcars::ObjectId,
 }
@@ -59,6 +60,7 @@ impl<'a> ReplayProcessor<'a> {
             unique_id_object_id,
             team_object_id,
             bot_object_id: cached.bot,
+            client_loadouts_object_id: cached.client_loadouts,
             player_replication_object_id,
             vehicle_object_id,
         })
@@ -177,6 +179,15 @@ impl<'a> ReplayProcessor<'a> {
                             update.actor_id,
                         );
                     }
+                }
+                object_id
+                    if Some(object_id) == ctx.client_loadouts_object_id
+                        && ctx.player_type_actor_ids.contains(&update.actor_id) =>
+                {
+                    let loadout =
+                        attribute_match!(&update.attribute, boxcars::Attribute::TeamLoadout)?;
+                    self.player_actor_to_loadout
+                        .insert(update.actor_id, **loadout);
                 }
                 object_id if object_id == ctx.player_replication_object_id => {
                     maintain_actor_link!(self.player_to_car, ctx.car_type_actor_ids);

@@ -138,6 +138,60 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
+    fn player_stats_headers(&self) -> Option<&Vec<Vec<(String, boxcars::HeaderProp)>>> {
+        self.replay
+            .properties
+            .iter()
+            .find_map(|(key, value)| match (key.as_str(), value) {
+                ("PlayerStats", boxcars::HeaderProp::Array(player_stats)) => Some(player_stats),
+                _ => None,
+            })
+    }
+
+    fn player_header_stats(
+        &self,
+        player_id: &PlayerId,
+    ) -> Option<std::collections::HashMap<String, boxcars::HeaderProp>> {
+        let player_stats = self.player_stats_headers()?;
+        let fallback_name = String::new();
+        self.get_player_name(player_id)
+            .ok()
+            .and_then(|name| {
+                crate::replay_meta::find_player_stats(player_id, &name, player_stats).ok()
+            })
+            .or_else(|| {
+                crate::replay_meta::find_player_stats(player_id, &fallback_name, player_stats).ok()
+            })
+    }
+
+    pub(crate) fn get_player_loadout_body_name(&self, player_id: &PlayerId) -> Option<String> {
+        self.player_header_stats(player_id)?
+            .get("LoadoutBody")
+            .and_then(|property| match property {
+                boxcars::HeaderProp::Str(body_name) => Some(body_name.clone()),
+                _ => None,
+            })
+    }
+
+    pub(crate) fn get_player_loadout_body_id(&self, player_id: &PlayerId) -> Option<u32> {
+        let player_actor_id = self.get_player_actor_id(player_id).ok()?;
+        let loadout = self.player_actor_to_loadout.get(&player_actor_id)?;
+        match self.get_player_is_team_0(player_id).ok() {
+            Some(true) => Some(loadout.blue.body),
+            Some(false) => Some(loadout.orange.body),
+            None if loadout.blue.body == loadout.orange.body => Some(loadout.blue.body),
+            None => Some(loadout.blue.body),
+        }
+    }
+
+    pub(crate) fn get_player_car_hitbox(&self, player_id: &PlayerId) -> CarHitbox {
+        car_hitbox_for_body_id_or_name(
+            self.get_player_loadout_body_id(player_id),
+            self.get_player_loadout_body_name(player_id).as_deref(),
+        )
+        .unwrap_or_else(default_car_hitbox)
+    }
+
     fn get_player_int_stat(
         &self,
         player_id: &PlayerId,

@@ -21,4 +21,16 @@ stats: { [key in string]?: HeaderPropTs } | null,
 /**
  * The name of the player as represented in the replay.
  */
-name: string, };
+name: string,
+/**
+ * The replicated car body product id from the player's loadout, when present.
+ */
+car_body_id?: number | null,
+/**
+ * The car body name from replay header player stats, when present.
+ */
+car_body_name?: string | null,
+/**
+ * The resolved standardized hitbox family for the player's car body, when known.
+ */
+car_hitbox_family?: string | null, };

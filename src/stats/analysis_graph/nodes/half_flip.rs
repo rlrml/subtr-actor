@@ -39,7 +39,7 @@ impl AnalysisNode for HalfFlipNode {
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
             ctx.get::<PlayerFrameState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            ctx.get::<LivePlayState>()?,
         )
     }
 

@@ -236,11 +236,11 @@ impl PassCalculator {
         touch_state: &TouchState,
         backboard_bounce_state: &BackboardBounceState,
         fifty_fifty_state: &FiftyFiftyState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         self.last_completed_events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.last_touch = None;
             self.emit_last_completed_event(frame, None, None);
             return Ok(());
@@ -251,7 +251,7 @@ impl PassCalculator {
             return Ok(());
         };
 
-        for touch in &touch_state.touch_events {
+        for touch in sequential_touch_events(&touch_state.touch_events) {
             let Some(player) = touch.player.clone() else {
                 self.last_touch = None;
                 continue;

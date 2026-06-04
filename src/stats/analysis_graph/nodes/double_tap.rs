@@ -43,7 +43,7 @@ impl AnalysisNode for DoubleTapNode {
             ctx.get::<BallFrameState>()?,
             ctx.get::<TouchState>()?,
             ctx.get::<BackboardBounceState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            ctx.get::<LivePlayState>()?,
         )
     }
 

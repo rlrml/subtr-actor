@@ -103,6 +103,7 @@ fn player_frame_state_with_dodge_active(
         players: vec![PlayerSample {
             player_id: player_id.clone(),
             is_team_0: true,
+            hitbox: default_car_hitbox(),
             rigid_body: Some(rigid_body(position, glam::Vec3::ZERO)),
             boost_amount: None,
             last_boost_amount: None,
@@ -131,7 +132,7 @@ fn touch_stats_at_height(height: f32) -> TouchStats {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -178,7 +179,7 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -190,7 +191,7 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -215,7 +216,7 @@ fn dodge_active_hit_counts_as_dodge_hit() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -227,7 +228,7 @@ fn dodge_active_hit_counts_as_dodge_hit() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -263,7 +264,7 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -275,7 +276,7 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
             &dodge_contact_touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -299,7 +300,7 @@ fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -314,7 +315,7 @@ fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -342,7 +343,7 @@ fn touch_on_wall_gets_wall_surface_classification() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -374,7 +375,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -386,7 +387,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -398,7 +399,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -427,7 +428,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -439,7 +440,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &touch_state,
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -451,7 +452,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -524,7 +525,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 active_event: Some(active_fifty.clone()),
                 ..FiftyFiftyState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -539,7 +540,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 active_event: Some(active_fifty),
                 ..FiftyFiftyState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -554,7 +555,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 resolved_events: vec![resolved_fifty],
                 ..FiftyFiftyState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -563,4 +564,111 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
     assert_eq!(blue_stats.total_ball_advance_distance, 170.0);
     assert_eq!(blue_stats.total_ball_retreat_distance, 0.0);
     assert!(calculator.player_stats().get(&orange_player).is_none());
+}
+
+#[test]
+fn last_touch_event_uses_primary_touch_not_last_contested_candidate() {
+    let primary_player = boxcars::RemoteId::Steam(1);
+    let secondary_player = boxcars::RemoteId::Steam(2);
+    let primary_touch = TouchEvent {
+        time: 0.1,
+        frame: 1,
+        team_is_team_0: true,
+        player: Some(primary_player.clone()),
+        player_position: None,
+        closest_approach_distance: Some(0.0),
+        dodge_contact: false,
+    };
+    let secondary_touch = TouchEvent {
+        time: 0.1,
+        frame: 1,
+        team_is_team_0: false,
+        player: Some(secondary_player.clone()),
+        player_position: None,
+        closest_approach_distance: Some(3.0),
+        dodge_contact: false,
+    };
+    let touch_state = TouchState {
+        touch_events: vec![primary_touch.clone(), secondary_touch.clone()],
+        last_touch: Some(secondary_touch),
+        last_touch_player: Some(primary_player.clone()),
+        last_touch_team_is_team_0: Some(true),
+    };
+    let mut calculator = TouchCalculator::new();
+
+    calculator
+        .update(
+            &frame(1),
+            &ball(0.0, 0.0),
+            &PlayerFrameState::default(),
+            &PlayerVerticalState::default(),
+            &touch_state,
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    let [last_touch] = calculator.new_last_touch_events() else {
+        panic!("expected exactly one last-touch event");
+    };
+    assert_eq!(last_touch.player, Some(primary_player));
+    assert!(last_touch.is_team_0);
+    assert_eq!(calculator.new_events().len(), 2);
+    assert!(calculator
+        .new_events()
+        .iter()
+        .any(|event| event.player == last_touch.player.clone().unwrap()));
+    assert!(calculator
+        .new_events()
+        .iter()
+        .any(|event| event.player == secondary_player));
+}
+
+#[test]
+fn touch_classification_events_follow_chronological_touch_event_order() {
+    let player = boxcars::RemoteId::Steam(1);
+    let early_touch = TouchEvent {
+        time: 0.1,
+        frame: 1,
+        team_is_team_0: true,
+        player: Some(player.clone()),
+        player_position: None,
+        closest_approach_distance: Some(2.0),
+        dodge_contact: false,
+    };
+    let late_touch = TouchEvent {
+        time: 0.4,
+        frame: 4,
+        team_is_team_0: true,
+        player: Some(player.clone()),
+        player_position: None,
+        closest_approach_distance: Some(0.0),
+        dodge_contact: false,
+    };
+    let touch_state = TouchState {
+        touch_events: vec![early_touch, late_touch.clone()],
+        last_touch: Some(late_touch),
+        last_touch_player: Some(player.clone()),
+        last_touch_team_is_team_0: Some(true),
+    };
+    let mut calculator = TouchCalculator::new();
+
+    calculator
+        .update(
+            &frame(4),
+            &ball(0.0, 0.0),
+            &player_frame_state(&player, glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z)),
+            &PlayerVerticalState::default(),
+            &touch_state,
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    let events = calculator.new_events();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].frame, 1);
+    assert_eq!(events[1].frame, 4);
 }

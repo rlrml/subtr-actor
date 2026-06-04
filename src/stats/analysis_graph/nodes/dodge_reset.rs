@@ -32,6 +32,7 @@ impl AnalysisNode for DodgeResetNode {
             ball_frame_state_dependency(),
             player_frame_state_dependency(),
             frame_events_state_dependency(),
+            touch_state_dependency(),
         ]
     }
 
@@ -40,6 +41,7 @@ impl AnalysisNode for DodgeResetNode {
             ctx.get::<BallFrameState>()?,
             ctx.get::<PlayerFrameState>()?,
             ctx.get::<FrameEventsState>()?,
+            ctx.get::<TouchState>()?,
         )
     }
 

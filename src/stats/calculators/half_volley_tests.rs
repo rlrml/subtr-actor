@@ -34,6 +34,7 @@ fn player(player_id: PlayerId, z: f32, dodge_active: bool) -> PlayerSample {
     PlayerSample {
         player_id,
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(glam::Vec3::new(0.0, 0.0, z), glam::Vec3::ZERO)),
         boost_amount: None,
         last_boost_amount: None,
@@ -77,7 +78,7 @@ fn records_half_volley_touch_after_floor_bounce() {
             &ball(BALL_RADIUS_Z + 200.0, glam::Vec3::new(0.0, 0.0, -900.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD, false),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -86,7 +87,7 @@ fn records_half_volley_touch_after_floor_bounce() {
             &ball(BALL_RADIUS_Z + 5.0, glam::Vec3::new(0.0, 0.0, 400.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD + 25.0, true),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -98,7 +99,7 @@ fn records_half_volley_touch_after_floor_bounce() {
                 touch_events: vec![touch(4, player_id.clone())],
                 ..TouchState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -121,7 +122,7 @@ fn rejects_slow_post_bounce_touches() {
             &ball(BALL_RADIUS_Z + 200.0, glam::Vec3::new(0.0, 0.0, -900.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD, false),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -130,7 +131,7 @@ fn rejects_slow_post_bounce_touches() {
             &ball(BALL_RADIUS_Z + 5.0, glam::Vec3::new(0.0, 0.0, 400.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD + 25.0, true),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -142,7 +143,7 @@ fn rejects_slow_post_bounce_touches() {
                 touch_events: vec![touch(3, player_id)],
                 ..TouchState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -163,7 +164,7 @@ fn rejects_stale_bounces() {
             &ball(BALL_RADIUS_Z + 200.0, glam::Vec3::new(0.0, 0.0, -900.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD, false),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -172,7 +173,7 @@ fn rejects_stale_bounces() {
             &ball(BALL_RADIUS_Z + 5.0, glam::Vec3::new(0.0, 0.0, 400.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD + 25.0, true),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -184,7 +185,7 @@ fn rejects_stale_bounces() {
                 touch_events: vec![touch(6, player_id)],
                 ..TouchState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -202,7 +203,7 @@ fn rejects_post_bounce_touch_without_dodge() {
             &ball(BALL_RADIUS_Z + 200.0, glam::Vec3::new(0.0, 0.0, -900.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD, false),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -211,7 +212,7 @@ fn rejects_post_bounce_touch_without_dodge() {
             &ball(BALL_RADIUS_Z + 5.0, glam::Vec3::new(0.0, 0.0, 400.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD + 25.0, false),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -223,7 +224,7 @@ fn rejects_post_bounce_touch_without_dodge() {
                 touch_events: vec![touch(4, player_id)],
                 ..TouchState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -241,7 +242,7 @@ fn rejects_dodge_without_recent_ground_contact() {
             &ball(BALL_RADIUS_Z + 200.0, glam::Vec3::new(0.0, 0.0, -900.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD + 120.0, false),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -250,7 +251,7 @@ fn rejects_dodge_without_recent_ground_contact() {
             &ball(BALL_RADIUS_Z + 5.0, glam::Vec3::new(0.0, 0.0, 400.0)),
             &players(player_id.clone(), PLAYER_GROUND_Z_THRESHOLD + 120.0, true),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -262,7 +263,7 @@ fn rejects_dodge_without_recent_ground_contact() {
                 touch_events: vec![touch(4, player_id)],
                 ..TouchState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 

@@ -1,9 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { normalizeReplayData, normalizeReplayDataAsync } from "../src/replay-data";
 import { formatReplayLoadProgress, formatReplayLoadProgressMeta } from "../src/load-ui";
+import {
+  getReplayHitboxSpec,
+  inferReplayHitboxKind,
+  inferReplayHitboxKindFromBodyName,
+} from "../src/hitboxes";
 import type { RawReplayFramesData } from "../src/types";
+
+type HitboxKind = "breakout" | "dominus" | "hybrid" | "merc" | "octane" | "plank";
+
+const RUST_HITBOX_FAMILY_TO_KIND: Readonly<Record<string, HitboxKind>> = {
+  Breakout: "breakout",
+  Dominus: "dominus",
+  Hybrid: "hybrid",
+  Merc: "merc",
+  Octane: "octane",
+  Plank: "plank",
+};
 
 function rigidBody(x: number, y: number, z: number) {
   return {
@@ -98,6 +115,113 @@ function assertMonotonicProgress(progressValues: number[]): void {
   }
 }
 
+function rustGeometrySource(): string {
+  return readFileSync(new URL("../../../src/util/geometry.rs", import.meta.url), "utf8");
+}
+
+function rustFamilyToHitboxKind(family: string): HitboxKind {
+  const kind = RUST_HITBOX_FAMILY_TO_KIND[family];
+  assert.ok(kind, `unknown Rust hitbox family ${family}`);
+  return kind;
+}
+
+function parseRustBodyIdHitboxes(): Map<number, HitboxKind> {
+  const source = rustGeometrySource();
+  const functionSource = source.match(
+    /pub fn hitbox_family_for_body_id[\s\S]*?\n}\n\npub fn hitbox_family_for_body_name/,
+  )?.[0];
+  assert.ok(functionSource, "expected to find Rust body-id hitbox mapping");
+
+  const out = new Map<number, HitboxKind>();
+  const armPattern =
+    /([0-9\s|]+)=>\s*(?:\{\s*)?Some\(CarHitboxFamily::(Breakout|Dominus|Hybrid|Merc|Octane|Plank)\)/g;
+  for (const match of functionSource.matchAll(armPattern)) {
+    const hitbox = rustFamilyToHitboxKind(match[2]!);
+    for (const rawBodyId of match[1]!.match(/\d+/g) ?? []) {
+      out.set(Number(rawBodyId), hitbox);
+    }
+  }
+
+  assert.ok(out.size > 200, "expected Rust body-id hitbox mapping to be populated");
+  return out;
+}
+
+function parseRustBodyNameHitboxes(): Array<readonly [string, HitboxKind]> {
+  const source = rustGeometrySource();
+  const out: Array<readonly [string, HitboxKind]> = [];
+  const families = [
+    ["BREAKOUT", "breakout"],
+    ["DOMINUS", "dominus"],
+    ["HYBRID", "hybrid"],
+    ["MERC", "merc"],
+    ["OCTANE", "octane"],
+    ["PLANK", "plank"],
+  ] as const;
+
+  for (const [rustPrefix, hitbox] of families) {
+    const bodyArraySource = source.match(
+      new RegExp(`const ${rustPrefix}_HITBOX_BODIES: &\\[&str\\] = &\\[([\\s\\S]*?)\\];`),
+    )?.[1];
+    assert.ok(bodyArraySource, `expected to find Rust ${rustPrefix} body-name mapping`);
+
+    for (const match of bodyArraySource.matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
+      out.push([match[1]!.replace(/\\"/g, '"'), hitbox]);
+    }
+  }
+
+  assert.ok(out.length > 150, "expected Rust body-name hitbox mapping to be populated");
+  return out;
+}
+
+interface RustHitboxSpec {
+  kind: HitboxKind;
+  length: number;
+  width: number;
+  height: number;
+  slopeDegrees: number;
+  groundHeightFront: number;
+  groundHeightBack: number;
+  offset: number;
+  elevation: number;
+}
+
+function parseRustHitboxSpecs(): Map<HitboxKind, RustHitboxSpec> {
+  const source = rustGeometrySource();
+  const defaultOffset = Number(source.match(/const DEFAULT_OFFSET: f32 = ([\d.-]+);/)?.[1]);
+  const defaultElevation = Number(source.match(/const DEFAULT_ELEVATION: f32 = ([\d.-]+);/)?.[1]);
+  assert.ok(Number.isFinite(defaultOffset), "expected Rust default hitbox offset");
+  assert.ok(Number.isFinite(defaultElevation), "expected Rust default hitbox elevation");
+
+  const specs = new Map<HitboxKind, RustHitboxSpec>();
+  const presetPattern =
+    /pub const fn (breakout|dominus|hybrid|merc|octane|plank)\(\) -> Self \{\s*Self::from_preset\(\s*CarHitboxFamily::(Breakout|Dominus|Hybrid|Merc|Octane|Plank),\s*([\d.-]+),\s*([\d.-]+),\s*([\d.-]+),\s*([\d.-]+),\s*([\d.-]+),\s*([\d.-]+),\s*\)\s*\}/g;
+  for (const match of source.matchAll(presetPattern)) {
+    const kind = match[1] as HitboxKind;
+    assert.equal(rustFamilyToHitboxKind(match[2]!), kind);
+    specs.set(kind, {
+      kind,
+      length: Number(match[3]),
+      width: Number(match[4]),
+      height: Number(match[5]),
+      slopeDegrees: Number(match[6]),
+      groundHeightFront: Number(match[7]),
+      groundHeightBack: Number(match[8]),
+      offset: defaultOffset,
+      elevation: defaultElevation,
+    });
+  }
+
+  assert.equal(specs.size, 6, "expected every Rust hitbox preset to be parsed");
+  return specs;
+}
+
+function assertNearlyEqual(actual: number, expected: number, label: string): void {
+  assert.ok(
+    Math.abs(actual - expected) < 0.000_001,
+    `${label}: expected ${expected}, got ${actual}`,
+  );
+}
+
 test("normalization progress is reported headlessly at a bounded cadence", () => {
   const progressValues: number[] = [];
   const frameCounts: number[] = [];
@@ -175,9 +299,13 @@ test("normalization progress report cadence is configurable", () => {
 });
 
 test("normalization carries inferred player hitbox metadata", () => {
-  const raw = buildReplayData(2, 2);
+  const raw = buildReplayData(2, 4);
+  raw.meta.team_zero[0]!.car_hitbox_family = "Dominus";
+  raw.meta.team_zero[1]!.car_body_id = 4284;
+  raw.meta.team_one[0]!.car_body_id = 999_999;
+  raw.meta.team_one[0]!.car_body_name = "Ford Mustang Shelby GT500";
   raw.meta.team_zero[0]!.stats = {
-    Body: { Str: "Dominus" },
+    Body: { Str: "Merc" },
   };
   raw.meta.team_one[0]!.stats = {
     LoadoutBody: { Str: "Merc" },
@@ -186,7 +314,108 @@ test("normalization carries inferred player hitbox metadata", () => {
   const replay = normalizeReplayData(raw);
 
   assert.equal(replay.players[0]!.hitbox.kind, "dominus");
-  assert.equal(replay.players[1]!.hitbox.kind, "merc");
+  assert.equal(replay.players[1]!.hitbox.kind, "octane");
+  assert.equal(replay.players[2]!.hitbox.kind, "dominus");
+});
+
+test("hitbox inference covers BakkesMod CARBODY ids", () => {
+  const expected = parseRustBodyIdHitboxes();
+
+  for (const [bodyId, hitbox] of expected) {
+    assert.equal(
+      inferReplayHitboxKind({
+        remote_id: { Steam: `body-${bodyId}` },
+        stats: null,
+        name: `Body ${bodyId}`,
+        car_body_id: bodyId,
+      }),
+      hitbox,
+      `body id ${bodyId}`,
+    );
+  }
+});
+
+test("viewer hitbox specs match Rust hitbox presets", () => {
+  for (const [kind, expected] of parseRustHitboxSpecs()) {
+    const actual = getReplayHitboxSpec(kind);
+    assert.equal(actual.kind, expected.kind);
+    assertNearlyEqual(actual.length, expected.length, `${kind} length`);
+    assertNearlyEqual(actual.width, expected.width, `${kind} width`);
+    assertNearlyEqual(actual.height, expected.height, `${kind} height`);
+    assertNearlyEqual(actual.slopeDegrees, expected.slopeDegrees, `${kind} slope`);
+    assertNearlyEqual(
+      actual.groundHeightFront,
+      expected.groundHeightFront,
+      `${kind} front ground height`,
+    );
+    assertNearlyEqual(
+      actual.groundHeightBack,
+      expected.groundHeightBack,
+      `${kind} back ground height`,
+    );
+    assertNearlyEqual(actual.offset, expected.offset, `${kind} offset`);
+    assertNearlyEqual(actual.elevation, expected.elevation, `${kind} elevation`);
+  }
+});
+
+test("hitbox inference recognizes every Rust body-name mapping", () => {
+  for (const [bodyName, hitbox] of parseRustBodyNameHitboxes()) {
+    assert.equal(inferReplayHitboxKindFromBodyName(bodyName), hitbox, bodyName);
+  }
+});
+
+test("hitbox inference prefers explicit family over body id and stats text", () => {
+  assert.equal(
+    inferReplayHitboxKind({
+      remote_id: { Steam: "explicit-family" },
+      stats: {
+        Body: { Str: "Merc" },
+      },
+      name: "Explicit Family",
+      car_body_id: 4284,
+      car_body_name: "Merc",
+      car_hitbox_family: "Dominus",
+    }),
+    "dominus",
+  );
+});
+
+test("hitbox inference uses explicit body name before stats text", () => {
+  assert.equal(
+    inferReplayHitboxKind({
+      remote_id: { Steam: "explicit-body-name" },
+      stats: {
+        Body: { Str: "Merc" },
+      },
+      name: "Explicit Body Name",
+      car_body_id: 999_999,
+      car_body_name: "Ford Mustang Shelby GT500",
+    }),
+    "dominus",
+  );
+});
+
+test("hitbox inference treats explicit family as a family label, not a body name", () => {
+  assert.equal(
+    inferReplayHitboxKind({
+      remote_id: { Steam: "malformed-explicit-family" },
+      stats: null,
+      name: "Malformed Explicit Family",
+      car_body_id: 4284,
+      car_body_name: "Merc",
+      car_hitbox_family: "Ford Mustang Shelby GT500",
+    }),
+    "octane",
+  );
+});
+
+test("hitbox inference recognizes newer body name aliases", () => {
+  assert.equal(inferReplayHitboxKindFromBodyName("Aston Martin Valhalla"), "breakout");
+  assert.equal(inferReplayHitboxKindFromBodyName("BMW M2 Racing"), "dominus");
+  assert.equal(inferReplayHitboxKindFromBodyName("Ford Mustang Shelby GT500"), "dominus");
+  assert.equal(inferReplayHitboxKindFromBodyName("Rivian R1S"), "hybrid");
+  assert.equal(inferReplayHitboxKindFromBodyName("Pizza Planet Delivery Truck"), "merc");
+  assert.equal(inferReplayHitboxKindFromBodyName("Psyclops"), "octane");
 });
 
 test("async normalization can yield without a progress callback", async () => {

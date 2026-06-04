@@ -47,6 +47,19 @@ fn touch(
     }
 }
 
+fn touch_with_gap(
+    frame_number: usize,
+    time: f32,
+    player_id: Option<PlayerId>,
+    is_team_0: bool,
+    contact_gap: f32,
+) -> TouchEvent {
+    TouchEvent {
+        closest_approach_distance: Some(contact_gap),
+        ..touch(frame_number, time, player_id, is_team_0)
+    }
+}
+
 fn update(
     calculator: &mut PassCalculator,
     frame: FrameInfo,
@@ -81,7 +94,7 @@ fn update_with_context(
             },
             &backboard_bounce_state,
             &fifty_fifty_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 }
@@ -163,6 +176,66 @@ fn counts_completed_teammate_pass_after_meaningful_ball_travel() {
     assert_eq!(calculator.events().len(), 1);
     assert_eq!(calculator.events()[0].ball_advance_distance, 800.0);
     assert_eq!(calculator.events()[0].pass_kind, PassKind::Direct);
+}
+
+#[test]
+fn uses_latest_touch_as_pending_passer_when_aggregate_events_are_out_of_order() {
+    let earlier_player = PlayerId::Steam(1);
+    let latest_passer = PlayerId::Steam(2);
+    let receiver = PlayerId::Steam(3);
+    let mut calculator = PassCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(20, 2.0),
+        ball(0.0),
+        vec![
+            touch(20, 2.0, Some(latest_passer.clone()), true),
+            touch(10, 1.0, Some(earlier_player), true),
+        ],
+    );
+    update(
+        &mut calculator,
+        frame(30, 3.0),
+        ball(800.0),
+        vec![touch(30, 3.0, Some(receiver.clone()), true)],
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+    let pass = &calculator.events()[0];
+    assert_eq!(pass.passer, latest_passer);
+    assert_eq!(pass.receiver, receiver);
+    assert_eq!(pass.start_time, 2.0);
+    assert_eq!(pass.time, 3.0);
+}
+
+#[test]
+fn uses_best_contact_as_pending_passer_when_aggregate_events_have_same_timestamp() {
+    let best_passer = PlayerId::Steam(1);
+    let weaker_contact = PlayerId::Steam(2);
+    let receiver = PlayerId::Steam(3);
+    let mut calculator = PassCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(20, 2.0),
+        ball(0.0),
+        vec![
+            touch_with_gap(20, 2.0, Some(best_passer.clone()), true, 0.0),
+            touch_with_gap(20, 2.0, Some(weaker_contact), true, 20.0),
+        ],
+    );
+    update(
+        &mut calculator,
+        frame(30, 3.0),
+        ball(800.0),
+        vec![touch(30, 3.0, Some(receiver.clone()), true)],
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+    let pass = &calculator.events()[0];
+    assert_eq!(pass.passer, best_passer);
+    assert_eq!(pass.receiver, receiver);
 }
 
 #[test]

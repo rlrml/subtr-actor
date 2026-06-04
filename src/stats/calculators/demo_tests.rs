@@ -5,6 +5,7 @@ fn player(id: u32, is_team_0: bool) -> PlayerSample {
     PlayerSample {
         player_id: RemoteId::SplitScreen(id),
         is_team_0,
+        hitbox: default_car_hitbox(),
         rigid_body: None,
         boost_amount: None,
         last_boost_amount: None,

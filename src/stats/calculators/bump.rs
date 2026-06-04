@@ -70,14 +70,14 @@ impl BumpCalculator {
         frame: &FrameInfo,
         players: &PlayerFrameState,
         events: &FrameEventsState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.update_with_fifty_fifty_state(
             frame,
             players,
             events,
             &FiftyFiftyState::default(),
-            live_play,
+            live_play_state,
         )
     }
 
@@ -87,11 +87,11 @@ impl BumpCalculator {
         players: &PlayerFrameState,
         events: &FrameEventsState,
         fifty_fifty_state: &FiftyFiftyState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
 
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.previous_players.clear();
             return Ok(());
         }

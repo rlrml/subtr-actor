@@ -1,66 +1,37 @@
 use super::*;
 
-#[derive(Debug, Clone)]
-struct TouchingPlayerEstimate {
-    player_id: PlayerId,
-    closest_approach_distance: f32,
-    player_position: boxcars::Vector3f,
-}
-
 impl<'a> ReplayProcessor<'a> {
-    fn estimate_touching_player(
+    fn build_touch_event(
         &self,
-        touch_team_is_team_0: bool,
-        target_time: f32,
-    ) -> Option<TouchingPlayerEstimate> {
-        const TOUCH_PLAYER_DISTANCE_THRESHOLD: f32 = 700.0;
-
-        let ball_rigid_body = self
-            .get_velocity_applied_ball_rigid_body(target_time)
-            .ok()?;
-        self.iter_player_ids_in_order()
-            .filter(|player_id| {
-                self.get_player_is_team_0(player_id).ok() == Some(touch_team_is_team_0)
-            })
-            .filter_map(|player_id| {
-                self.get_velocity_applied_player_rigid_body(player_id, target_time)
-                    .ok()
-                    .and_then(|rigid_body| {
-                        touch_candidate_rank(&ball_rigid_body, &rigid_body)
-                            .map(|rank| (player_id.clone(), rigid_body.location, rank))
-                    })
-            })
-            .min_by(|(_, _, a), (_, _, b)| a.partial_cmp(b).unwrap())
-            .and_then(
-                |(player_id, player_position, (closest_distance, _current_distance))| {
-                    (closest_distance <= TOUCH_PLAYER_DISTANCE_THRESHOLD).then_some(
-                        TouchingPlayerEstimate {
-                            player_id,
-                            closest_approach_distance: closest_distance,
-                            player_position,
-                        },
-                    )
-                },
-            )
+        frame: &boxcars::Frame,
+        frame_index: usize,
+        team_is_team_0: bool,
+    ) -> TouchEvent {
+        TouchEvent {
+            time: frame.time,
+            frame: frame_index,
+            team_is_team_0,
+            player: None,
+            player_position: None,
+            closest_approach_distance: None,
+            dodge_contact: false,
+        }
     }
 
-    /// Detects ball touch events and estimates the responsible player when possible.
+    /// Records replay-replicated ball touch events.
     pub(crate) fn update_touch_events(
         &mut self,
         frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
         self.current_frame_touch_events.clear();
-        let hit_team_num_key = self.required_cached_object_id(
-            self.cached_object_ids.ball_hit_team_num,
-            BALL_HIT_TEAM_NUM_KEY,
-        )?;
+        let hit_team_num_key = self.cached_object_ids.ball_hit_team_num;
 
-        for update in &frame.updated_actors {
-            if update.object_id != hit_team_num_key {
-                continue;
-            }
-
+        for update in frame
+            .updated_actors
+            .iter()
+            .filter(|update| hit_team_num_key == Some(update.object_id))
+        {
             let boxcars::Attribute::Byte(team_num) = update.attribute else {
                 continue;
             };
@@ -69,24 +40,7 @@ impl<'a> ReplayProcessor<'a> {
                 1 => false,
                 _ => continue,
             };
-            let estimated_player = self.estimate_touching_player(team_is_team_0, frame.time);
-            let dodge_contact = estimated_player.as_ref().is_some_and(|estimate| {
-                self.get_dodge_active(&estimate.player_id).unwrap_or(0) % 2 == 1
-            });
-            let event = TouchEvent {
-                time: frame.time,
-                frame: frame_index,
-                team_is_team_0,
-                player: estimated_player
-                    .as_ref()
-                    .map(|estimate| estimate.player_id.clone()),
-                player_position: estimated_player
-                    .as_ref()
-                    .map(|estimate| estimate.player_position),
-                closest_approach_distance: estimated_player
-                    .map(|estimate| estimate.closest_approach_distance),
-                dodge_contact,
-            };
+            let event = self.build_touch_event(frame, frame_index, team_is_team_0);
             self.current_frame_touch_events.push(event.clone());
             self.touch_events.push(event);
         }

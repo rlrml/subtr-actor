@@ -25,6 +25,7 @@ impl BallSample {
 pub struct PlayerSample {
     pub player_id: PlayerId,
     pub is_team_0: bool,
+    pub hitbox: CarHitbox,
     pub rigid_body: Option<boxcars::RigidBody>,
     pub boost_amount: Option<f32>,
     pub last_boost_amount: Option<f32>,

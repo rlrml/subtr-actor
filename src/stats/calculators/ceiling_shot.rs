@@ -305,10 +305,10 @@ impl CeilingShotCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         touch_events: &[TouchEvent],
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.reset_live_play_state(ball);
             return Ok(());
         }

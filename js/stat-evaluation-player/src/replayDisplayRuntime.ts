@@ -28,6 +28,7 @@ export interface ReplayDisplayElements {
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
+  readonly hitboxOnlyMode: HTMLInputElement;
 }
 
 export interface ReplayDisplayRuntimeOptions {
@@ -144,6 +145,8 @@ export async function loadReplayBundleForDisplay(
       initialBoostPickupAnimationEnabled: config?.overlays.boostPickupAnimation ?? false,
       initialHitboxWireframesEnabled:
         config?.overlays.hitboxWireframes ?? elements.hitboxWireframes.checked,
+      initialHitboxOnlyModeEnabled:
+        config?.overlays.hitboxOnlyMode ?? elements.hitboxOnlyMode.checked,
       initialSkipPostGoalTransitionsEnabled: elements.skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: elements.skipKickoffs.checked,
       plugins: [

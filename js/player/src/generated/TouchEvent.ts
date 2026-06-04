@@ -2,4 +2,12 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { Vector3fTs } from "./Vector3fTs.ts";
 
-export type TouchEvent = { time: number, frame: number, team_is_team_0: boolean, player: RemoteIdTs | null, player_position?: Vector3fTs | null, closest_approach_distance: number | null, dodge_contact: boolean, };
+export type TouchEvent = { time: number, frame: number, team_is_team_0: boolean, player: RemoteIdTs | null, player_position?: Vector3fTs | null,
+/**
+ * Ball-to-car hitbox contact gap in uu for attributed touches, when estimated.
+ *
+ * This field keeps its historical name for wire compatibility. A value of
+ * `0.0` means the ball intersects or touches the oriented car hitbox after
+ * subtracting the Rocket League ball collision radius.
+ */
+closest_approach_distance: number | null, dodge_contact: boolean, };

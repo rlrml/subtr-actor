@@ -19,6 +19,7 @@ fn player(velocity: glam::Vec3, dodge_active: bool) -> PlayerSample {
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(1),
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(
             glam::Vec3::new(-2048.0, -2560.0, 17.0),
             velocity,
@@ -149,7 +150,7 @@ fn kickoff_approach_waits_for_player_motion_even_when_not_live_play() {
             &gameplay,
             &BallFrameState::default(),
             &PlayerFrameState::default(),
-            false,
+            &LivePlayState::default(),
         )
         .unwrap();
 
@@ -170,7 +171,7 @@ fn kickoff_approach_waits_for_player_motion_even_when_not_live_play() {
             &PlayerFrameState {
                 players: vec![player(glam::Vec3::new(150.0, 0.0, 0.0), false)],
             },
-            false,
+            &LivePlayState::default(),
         )
         .unwrap();
 

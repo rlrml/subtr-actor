@@ -28,6 +28,7 @@ fn player_at(position: glam::Vec3) -> PlayerSample {
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(1),
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(position, glam::Vec3::ZERO)),
         boost_amount: None,
         last_boost_amount: None,
@@ -76,7 +77,7 @@ fn records_wall_aerial_shot_without_requiring_prior_control() {
             &frame(1, 0.0),
             &players(glam::Vec3::new(3650.0, 0.0, 260.0)),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -84,7 +85,7 @@ fn records_wall_aerial_shot_without_requiring_prior_control() {
             &frame(2, 0.2),
             &players(glam::Vec3::new(3350.0, 0.0, 330.0)),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -100,7 +101,7 @@ fn records_wall_aerial_shot_without_requiring_prior_control() {
                 player_stat_events: vec![shot_event(3, 0.4, &shot_ball)],
                 ..FrameEventsState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -122,7 +123,7 @@ fn rejects_wall_aerial_shot_after_returning_low_from_wall() {
             &frame(1, 0.0),
             &players(glam::Vec3::new(3650.0, 0.0, 260.0)),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -130,7 +131,7 @@ fn rejects_wall_aerial_shot_after_returning_low_from_wall() {
             &frame(2, 0.2),
             &players(glam::Vec3::new(2500.0, 0.0, 80.0)),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -146,7 +147,7 @@ fn rejects_wall_aerial_shot_after_returning_low_from_wall() {
                 player_stat_events: vec![shot_event(3, 0.4, &shot_ball)],
                 ..FrameEventsState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -164,7 +165,7 @@ fn rejects_wall_aerial_shot_from_stale_wall_contact() {
             &frame(1, 0.0),
             &players(glam::Vec3::new(3650.0, 0.0, 260.0)),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -172,7 +173,7 @@ fn rejects_wall_aerial_shot_from_stale_wall_contact() {
             &frame(2, 2.6),
             &players(glam::Vec3::new(3350.0, 0.0, 330.0)),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -188,7 +189,7 @@ fn rejects_wall_aerial_shot_from_stale_wall_contact() {
                 player_stat_events: vec![shot_event(3, 2.8, &shot_ball)],
                 ..FrameEventsState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -213,7 +214,7 @@ fn rejects_wall_aerial_shot_without_wall_takeoff() {
                 player_stat_events: vec![shot_event(1, 0.0, &shot_ball)],
                 ..FrameEventsState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 

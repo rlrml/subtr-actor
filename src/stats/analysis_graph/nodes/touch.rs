@@ -50,7 +50,7 @@ impl AnalysisNode for TouchNode {
             touch_state,
             ctx.get::<PossessionState>()?,
             ctx.get::<FiftyFiftyState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            ctx.get::<LivePlayState>()?,
         )
     }
 

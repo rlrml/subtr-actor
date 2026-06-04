@@ -19,6 +19,7 @@ fn player(player_id: PlayerId, dodge_active: bool) -> PlayerSample {
     PlayerSample {
         player_id,
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(glam::Vec3::new(0.0, 0.0, 100.0))),
         boost_amount: None,
         last_boost_amount: None,
@@ -68,6 +69,25 @@ fn touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
     }
 }
 
+fn raw_team_touch_event(time: f32, frame: usize) -> TouchEvent {
+    TouchEvent {
+        time,
+        frame,
+        team_is_team_0: true,
+        player: None,
+        player_position: None,
+        closest_approach_distance: None,
+        dodge_contact: false,
+    }
+}
+
+fn touch_state(touch_events: Vec<TouchEvent>) -> TouchState {
+    TouchState {
+        touch_events,
+        ..TouchState::default()
+    }
+}
+
 #[test]
 fn on_ball_reset_alone_is_not_confirmed_flip_reset() {
     let player_id = boxcars::RemoteId::Steam(1);
@@ -81,6 +101,7 @@ fn on_ball_reset_alone_is_not_confirmed_flip_reset() {
                 dodge_refreshed_events: vec![reset_event(player_id.clone())],
                 ..FrameEventsState::default()
             },
+            &TouchState::default(),
         )
         .unwrap();
 
@@ -101,6 +122,7 @@ fn touch_after_reset_requires_dodge_to_confirm_flip_reset() {
                 dodge_refreshed_events: vec![reset_event(player_id.clone())],
                 ..FrameEventsState::default()
             },
+            &TouchState::default(),
         )
         .unwrap();
     calculator
@@ -108,9 +130,49 @@ fn touch_after_reset_requires_dodge_to_confirm_flip_reset() {
             &ball(),
             &players(player_id.clone(), false),
             &FrameEventsState {
-                touch_events: vec![touch_event(player_id.clone(), 1.2, 12)],
+                touch_events: vec![raw_team_touch_event(1.2, 12)],
                 ..FrameEventsState::default()
             },
+            &touch_state(vec![touch_event(player_id.clone(), 1.2, 12)]),
+        )
+        .unwrap();
+
+    assert!(calculator.confirmed_flip_reset_events().is_empty());
+}
+
+#[test]
+fn raw_replay_touch_after_reset_does_not_confirm_without_attributed_touch_state() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    calculator
+        .update(
+            &ball(),
+            &players(player_id.clone(), false),
+            &FrameEventsState {
+                dodge_refreshed_events: vec![reset_event(player_id.clone())],
+                ..FrameEventsState::default()
+            },
+            &TouchState::default(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &ball(),
+            &players(player_id, true),
+            &FrameEventsState::default(),
+            &TouchState::default(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &ball(),
+            &players(boxcars::RemoteId::Steam(1), true),
+            &FrameEventsState {
+                touch_events: vec![raw_team_touch_event(1.3, 13)],
+                ..FrameEventsState::default()
+            },
+            &TouchState::default(),
         )
         .unwrap();
 
@@ -130,6 +192,7 @@ fn dodge_touch_after_on_ball_reset_confirms_flip_reset() {
                 dodge_refreshed_events: vec![reset_event(player_id.clone())],
                 ..FrameEventsState::default()
             },
+            &TouchState::default(),
         )
         .unwrap();
     calculator
@@ -137,6 +200,7 @@ fn dodge_touch_after_on_ball_reset_confirms_flip_reset() {
             &ball(),
             &players(player_id.clone(), true),
             &FrameEventsState::default(),
+            &TouchState::default(),
         )
         .unwrap();
     calculator
@@ -144,9 +208,10 @@ fn dodge_touch_after_on_ball_reset_confirms_flip_reset() {
             &ball(),
             &players(player_id.clone(), true),
             &FrameEventsState {
-                touch_events: vec![touch_event(player_id.clone(), 1.3, 13)],
+                touch_events: vec![raw_team_touch_event(1.3, 13)],
                 ..FrameEventsState::default()
             },
+            &touch_state(vec![touch_event(player_id.clone(), 1.3, 13)]),
         )
         .unwrap();
 

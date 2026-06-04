@@ -22,6 +22,7 @@ pub(crate) static BALL_EXPLOSION_DATA_KEY: &str = "TAGame.Ball_TA:ReplicatedExpl
 pub(crate) static BALL_EXPLOSION_DATA_EXTENDED_KEY: &str =
     "TAGame.Ball_TA:ReplicatedExplosionDataExtended";
 pub(crate) static BOT_KEY: &str = "Engine.PlayerReplicationInfo:bBot";
+pub(crate) static CLIENT_LOADOUTS_KEY: &str = "TAGame.PRI_TA:ClientLoadouts";
 pub(crate) static COMPONENT_ACTIVE_KEY: &str = "TAGame.CarComponent_TA:ReplicatedActive";
 pub(crate) static DEMOLISH_EXTENDED_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishExtended";
 pub(crate) static DEMOLISH_GOAL_EXPLOSION_KEY: &str =

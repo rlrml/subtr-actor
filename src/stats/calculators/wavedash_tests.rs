@@ -19,6 +19,7 @@ fn player(id: u64, z: f32, horizontal_speed: f32, dodge_active: bool) -> PlayerS
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(id),
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(
             glam::Vec3::new(0.0, 0.0, z),
             glam::Vec3::new(horizontal_speed, 0.0, 0.0),
@@ -60,14 +61,14 @@ fn counts_air_dodge_that_lands_quickly() {
         .update(
             &frame(1, 1.00),
             &players(player(1, 55.0, 700.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
         .update(
             &frame(2, 1.14),
             &players(player(1, 17.0, 1300.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -88,14 +89,14 @@ fn rejects_late_landing_after_air_dodge() {
         .update(
             &frame(1, 1.00),
             &players(player(1, 80.0, 700.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
         .update(
             &frame(2, 1.42),
             &players(player(1, 17.0, 1500.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -112,14 +113,14 @@ fn rejects_grounded_dodge_start() {
         .update(
             &frame(1, 1.00),
             &players(player(1, 17.0, 700.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
         .update(
             &frame(2, 1.08),
             &players(player(1, 17.0, 1500.0, true)),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 

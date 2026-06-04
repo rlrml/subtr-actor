@@ -132,6 +132,7 @@ export function getStatsPlayerConfigSnapshot({
       boostPads: boostPadOverlayEnabled,
       boostPickupAnimation: replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
       hitboxWireframes: replayPlayer?.getState().hitboxWireframesEnabled ?? false,
+      hitboxOnlyMode: replayPlayer?.getState().hitboxOnlyModeEnabled ?? false,
     },
     recording,
     singletonWindows,
@@ -156,6 +157,7 @@ export function getReplayPlayerStatePatchFromConfig(
     ballCamEnabled: camera.ballCam,
     boostPickupAnimationEnabled: config.overlays.boostPickupAnimation,
     hitboxWireframesEnabled: config.overlays.hitboxWireframes,
+    hitboxOnlyModeEnabled: config.overlays.hitboxOnlyMode,
     skipPostGoalTransitionsEnabled: playback.skipPostGoalTransitions,
     skipKickoffsEnabled: playback.skipKickoffs,
   };

@@ -73,6 +73,7 @@ export {
   REPLAY_HITBOX_SPECS,
   getReplayHitboxSpec,
   inferReplayHitboxKind,
+  inferReplayHitboxKindFromBodyName,
   normalizeReplayHitboxKind,
 } from "./hitboxes";
 export type { ReplayHitboxKind, ReplayHitboxSpec } from "./hitboxes";

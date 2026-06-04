@@ -104,16 +104,13 @@ impl DoubleTapCalculator {
                 return true;
             }
 
-            let matching_touch = touch_events.iter().find(|touch| {
-                touch.team_is_team_0 == pending.is_team_0
-                    && touch.player.as_ref() == Some(&pending.player_id)
-            });
+            let matching_touch = Self::latest_matching_touch(touch_events, pending);
 
             if let Some(matching_touch) = matching_touch {
                 if Self::followup_touch_projects_on_goal_mouth(ball, pending.is_team_0) {
                     completed_events.push(DoubleTapEvent {
-                        time: frame.time,
-                        frame: frame.frame_number,
+                        time: matching_touch.time,
+                        frame: matching_touch.frame,
                         player: pending.player_id.clone(),
                         player_position: matching_touch
                             .player_position
@@ -130,6 +127,19 @@ impl DoubleTapCalculator {
         for event in completed_events {
             self.record_double_tap(frame, event);
         }
+    }
+
+    fn latest_matching_touch<'a>(
+        touch_events: &'a [TouchEvent],
+        pending: &PendingBackboardBounce,
+    ) -> Option<&'a TouchEvent> {
+        touch_events
+            .iter()
+            .filter(|touch| {
+                touch.team_is_team_0 == pending.is_team_0
+                    && touch.player.as_ref() == Some(&pending.player_id)
+            })
+            .max_by(|left, right| TouchEvent::timestamp_ordering(left, right))
     }
 
     fn record_double_tap(&mut self, _frame: &FrameInfo, event: DoubleTapEvent) {
@@ -175,10 +185,10 @@ impl DoubleTapCalculator {
         ball: &BallFrameState,
         touch_state: &TouchState,
         backboard_bounce_state: &BackboardBounceState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.pending_backboard_bounces.clear();
         }
 

@@ -1,7 +1,11 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { ReplayModel } from "./types";
-import type { ReplayHitboxSpec } from "./hitboxes";
+import { getReplayHitboxOverlayTransform, type ReplayHitboxSpec } from "./hitboxes";
+
+const HITBOX_OVERLAY_FILL_OPACITY = 0.08;
+const HITBOX_ONLY_FILL_OPACITY = 0.22;
+const HITBOX_OVERLAY_DARKEN = 0.94;
 
 export interface ReplayScene {
   scene: THREE.Scene;
@@ -13,6 +17,7 @@ export interface ReplayScene {
   dispose: () => void;
   ballMesh: THREE.Mesh;
   playerMeshes: Map<string, THREE.Object3D>;
+  playerBodyMeshes: Map<string, THREE.Object3D>;
   playerHitboxes: Map<string, THREE.Object3D>;
   playerBoostTrails: Map<string, THREE.Group>;
   playerBoostMeters: Map<string, BoostMeter>;
@@ -60,6 +65,10 @@ function createVerticalWallBox(
   material: THREE.Material,
 ): THREE.Mesh {
   return new THREE.Mesh(new THREE.BoxGeometry(length, thickness, height, 6, 1, 6), material);
+}
+
+export function getHitboxOverlayColor(lineColor: string): THREE.Color {
+  return new THREE.Color(lineColor).lerp(new THREE.Color(0x000000), HITBOX_OVERLAY_DARKEN);
 }
 
 function drawBallLatitudeBand(
@@ -370,23 +379,51 @@ function createExampleSoccarField(scale: number): {
   return { stadium, wallPanels };
 }
 
-function createHitboxWireframe(hitbox: ReplayHitboxSpec, color: string): THREE.Group {
+function createHitboxOverlay(hitbox: ReplayHitboxSpec, lineColor: string): THREE.Group {
+  const transform = getReplayHitboxOverlayTransform(hitbox);
+  const overlayColor = getHitboxOverlayColor(lineColor);
   const group = new THREE.Group();
-  group.name = `${hitbox.kind}-hitbox-wireframe`;
+  group.name = `${hitbox.kind}-hitbox-overlay`;
   group.visible = false;
-  group.rotateY(THREE.MathUtils.degToRad(hitbox.slopeDegrees));
+  group.position.set(...transform.position);
+  group.rotateY(THREE.MathUtils.degToRad(transform.rotationYDegrees));
 
-  const geometry = new THREE.BoxGeometry(hitbox.length, hitbox.width, hitbox.height);
-  const edges = new THREE.EdgesGeometry(geometry);
-  const material = new THREE.LineBasicMaterial({
-    color,
+  const geometry = new THREE.BoxGeometry(...transform.dimensions);
+  const fillMaterial = new THREE.MeshBasicMaterial({
+    color: overlayColor,
     transparent: true,
-    opacity: 0.92,
+    opacity: HITBOX_OVERLAY_FILL_OPACITY,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const fill = new THREE.Mesh(geometry, fillMaterial);
+  fill.name = "hitbox-overlay-fill";
+  fill.renderOrder = 9;
+  group.add(fill);
+
+  const edges = new THREE.EdgesGeometry(geometry);
+  const lineMaterial = new THREE.LineBasicMaterial({
+    color: overlayColor,
+    transparent: true,
+    opacity: 1,
+    depthTest: false,
     depthWrite: false,
   });
-  const lines = new THREE.LineSegments(edges, material);
+  const lines = new THREE.LineSegments(edges, lineMaterial);
+  lines.name = "hitbox-overlay-lines";
+  lines.renderOrder = 10;
   group.add(lines);
   return group;
+}
+
+export function setHitboxOverlayOnlyMode(hitbox: THREE.Object3D, enabled: boolean): void {
+  const fill = hitbox.getObjectByName("hitbox-overlay-fill") as
+    | THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
+    | undefined;
+  if (fill) {
+    fill.material.opacity = enabled ? HITBOX_ONLY_FILL_OPACITY : HITBOX_OVERLAY_FILL_OPACITY;
+  }
 }
 
 function createExampleCarMesh(color: string): THREE.Group {
@@ -890,16 +927,17 @@ export function createReplayScene(
   replayRoot.add(ballMesh);
 
   const playerMeshes = new Map<string, THREE.Object3D>();
+  const playerBodyMeshes = new Map<string, THREE.Object3D>();
   const playerHitboxes = new Map<string, THREE.Object3D>();
   const playerBoostTrails = new Map<string, THREE.Group>();
   const playerBoostMeters = new Map<string, BoostMeter>();
   const playerDemoIndicators = new Map<string, DemoIndicator>();
   for (const player of replay.players) {
-    const mesh = createExampleCarMesh(player.isTeamZero ? "#57a8ff" : "#ff9c40");
-    const hitboxWireframe = createHitboxWireframe(
-      player.hitbox,
-      player.isTeamZero ? "#b9e0ff" : "#ffd2a3",
-    );
+    const mesh = new THREE.Group();
+    const teamColor = player.isTeamZero ? "#57a8ff" : "#ff9c40";
+    const bodyMesh = createExampleCarMesh(teamColor);
+    const hitboxWireframe = createHitboxOverlay(player.hitbox, teamColor);
+    mesh.add(bodyMesh);
     mesh.add(hitboxWireframe);
     const boostTrail = createBoostTrail();
     mesh.add(boostTrail);
@@ -909,6 +947,7 @@ export function createReplayScene(
     replayRoot.add(mesh);
     replayRoot.add(demoIndicator.group);
     playerMeshes.set(player.id, mesh);
+    playerBodyMeshes.set(player.id, bodyMesh);
     playerHitboxes.set(player.id, hitboxWireframe);
     playerBoostTrails.set(player.id, boostTrail);
     playerBoostMeters.set(player.id, boostMeter);
@@ -969,6 +1008,7 @@ export function createReplayScene(
     dispose,
     ballMesh,
     playerMeshes,
+    playerBodyMeshes,
     playerHitboxes,
     playerBoostTrails,
     playerBoostMeters,

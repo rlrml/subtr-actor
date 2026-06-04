@@ -89,6 +89,16 @@ fn test_replay_data_exposes_powerslide_activity() {
         "Expected replay data to expose exact touch events"
     );
     assert!(
+        replay_data
+            .touch_events
+            .iter()
+            .all(|event| event.player.is_none()
+                && event.player_position.is_none()
+                && event.closest_approach_distance.is_none()
+                && !event.dodge_contact),
+        "Expected replay data touch_events to remain raw replay-authored team markers"
+    );
+    assert!(
         !replay_data.goal_events.is_empty(),
         "Expected replay data to expose exact goal events"
     );
@@ -470,29 +480,32 @@ fn test_processor_extracts_touch_events() {
 
     assert!(
         processor.touch_events.len() > 100,
-        "Expected many touch events from HitTeamNum updates"
+        "Expected many raw touch events from HitTeamNum updates"
     );
     assert!(
         processor
             .touch_events
             .iter()
-            .any(|event| event.player.is_some()),
-        "Expected at least some touch events to resolve to a player"
+            .all(|event| event.player.is_none()
+                && event.player_position.is_none()
+                && event.closest_approach_distance.is_none()
+                && !event.dodge_contact),
+        "Expected processor-level replay touch events to remain raw team-only events"
     );
     assert!(
         processor
             .touch_events
             .iter()
-            .filter_map(|event| event.closest_approach_distance)
-            .all(|distance| distance <= 700.0),
-        "Expected attributed touch distances to respect the heuristic threshold"
+            .any(|event| event.team_is_team_0)
+            && processor.touch_events.iter().any(|event| !event.team_is_team_0),
+        "Expected raw replay touch events to include both teams"
     );
     assert!(
         processor
             .touch_events
             .windows(2)
             .any(|window| window[0].team_is_team_0 == window[1].team_is_team_0),
-        "Expected same-team consecutive touch events, not just team changes"
+        "Expected raw replay touch events to preserve same-team consecutive HitTeamNum updates"
     );
 }
 
@@ -520,8 +533,9 @@ fn test_processor_extracts_flip_reset_events() {
         tracker
             .flip_reset_events()
             .iter()
-            .all(|event| event.closest_approach_distance <= 220.0),
-        "Expected flip-reset candidates to be backed by close attributed touches in Rocket League units"
+            .all(|event| event.closest_approach_distance
+                <= TouchCandidateScoring::DEFAULT.relaxed_contact_gap_threshold),
+        "Expected flip-reset candidates to report hitbox contact gaps within the relaxed touch threshold"
     );
     assert!(
         tracker.flip_reset_events().iter().all(|event| {
@@ -671,7 +685,10 @@ fn test_touch_attribution_usually_matches_goal_scorer() {
     let mut counter = FrameCounter::new();
     processor
         .process(&mut counter)
-        .expect("Failed to process replay for touch attribution quality");
+        .expect("Failed to process replay for goal scorer comparison");
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
+        .expect("Failed to process stats timeline events for touch attribution quality");
 
     let mut matched = 0usize;
     let mut total_with_scorer = 0usize;
@@ -681,9 +698,9 @@ fn test_touch_attribution_usually_matches_goal_scorer() {
         .filter(|event| event.player.is_some())
     {
         total_with_scorer += 1;
-        let last_touch = processor.touch_events.iter().rev().find(|touch| {
+        let last_touch = timeline.events.touch_last_touch.iter().rev().find(|touch| {
             touch.frame <= goal_event.frame
-                && touch.team_is_team_0 == goal_event.scoring_team_is_team_0
+                && touch.is_team_0 == goal_event.scoring_team_is_team_0
                 && touch.player.is_some()
         });
         if last_touch
@@ -702,7 +719,6 @@ fn test_touch_attribution_usually_matches_goal_scorer() {
     );
     assert!(
         matched * 2 >= total_with_scorer,
-        "Expected motion-aware touch attribution to match the replay-derived goal scorer for a majority of scorable goals, matched {matched}/{total_with_scorer}"
+        "Expected hitbox-and-trajectory touch attribution to match the replay-derived goal scorer for a majority of scorable goals, matched {matched}/{total_with_scorer}"
     );
 }
-

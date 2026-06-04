@@ -33,6 +33,7 @@
 #include "bakkesmod/wrappers/GameEvent/ReplayWrapper.h"
 #include "bakkesmod/wrappers/ReplayServerWrapper.h"
 #include "bakkesmod/wrappers/canvaswrapper.h"
+#include "bakkesmod/wrappers/items/ItemsWrapper.h"
 #include "subtr_actor_bakkesmod.h"
 
 class SubtrActorPlugin : public BakkesMod::Plugin::BakkesModPlugin,
@@ -680,6 +681,7 @@ private:
   void dumpStatsModuleConfigJson(std::vector<std::string> params);
   void dumpGraphOutputJson(std::vector<std::string> params);
   void dumpAnalysisNodeJson(std::vector<std::string> params);
+  void dumpProductsJson(std::vector<std::string> params);
   void verifyGraphRuntime(std::vector<std::string> params);
   void selfTestGraphRuntime(std::vector<std::string> params);
   void pushGoalEventMessage(const SaGoalEvent &event);

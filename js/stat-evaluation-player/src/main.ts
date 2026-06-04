@@ -218,6 +218,7 @@ let skipPostGoalTransitions!: HTMLInputElement;
 let replayLoadModal: ReplayLoadModalController | null = null;
 let skipKickoffs!: HTMLInputElement;
 let hitboxWireframes!: HTMLInputElement;
+let hitboxOnlyMode!: HTMLInputElement;
 let currentMountCleanup: (() => void) | null = null;
 let statRegistry: StatDefinition[] = createStatRegistry(null);
 let cameraControlsController: CameraControlsController | null = null;
@@ -473,6 +474,7 @@ async function loadReplayBundleForDisplay(
       skipPostGoalTransitions,
       skipKickoffs,
       hitboxWireframes,
+      hitboxOnlyMode,
     },
     defaultCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
     getReplayLoadModal: () => replayLoadModal,
@@ -764,6 +766,7 @@ export function mountStatEvaluationPlayer(
   skipPostGoalTransitions = mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions");
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
   hitboxWireframes = mustElement<HTMLInputElement>(root, "#hitbox-wireframes");
+  hitboxOnlyMode = mustElement<HTMLInputElement>(root, "#hitbox-only-mode");
   playbackReadoutsController = createPlaybackReadoutsController({
     elements: {
       togglePlayback,
@@ -771,6 +774,7 @@ export function mountStatEvaluationPlayer(
       skipPostGoalTransitions,
       skipKickoffs,
       hitboxWireframes,
+      hitboxOnlyMode,
       emptyState,
       timeReadout,
       frameReadout,
@@ -807,6 +811,7 @@ export function mountStatEvaluationPlayer(
     skipPostGoalTransitions,
     skipKickoffs,
     hitboxWireframes,
+    hitboxOnlyMode,
     getReplayPlayer: () => replayPlayer,
     getCameraControlsController: () => cameraControlsController,
     getRecordingWindowController: () => recordingWindowController,
@@ -907,6 +912,7 @@ export function mountStatEvaluationPlayer(
       skipPostGoalTransitions,
       skipKickoffs,
       hitboxWireframes,
+      hitboxOnlyMode,
     },
     signal: listeners.signal,
     setLauncherOpen: windowCommands.setLauncherOpen,
@@ -943,6 +949,10 @@ export function mountStatEvaluationPlayer(
     },
     setHitboxWireframesEnabled(enabled) {
       replayPlayer?.setHitboxWireframesEnabled(enabled);
+      scheduleConfigUrlUpdate();
+    },
+    setHitboxOnlyModeEnabled(enabled) {
+      replayPlayer?.setHitboxOnlyModeEnabled(enabled);
       scheduleConfigUrlUpdate();
     },
   });

@@ -32,6 +32,7 @@ export interface PlayerConfigBindingsOptions {
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
+  readonly hitboxOnlyMode: HTMLInputElement;
   getReplayPlayer(): ReplayPlayer | null;
   getCameraControlsController(): CameraControlsController | null;
   getRecordingWindowController(): RecordingWindowController | null;
@@ -125,6 +126,7 @@ export function createPlayerConfigBindings(
         config.playback.skipPostGoalTransitions ?? options.skipPostGoalTransitions.checked;
       options.skipKickoffs.checked = config.playback.skipKickoffs ?? options.skipKickoffs.checked;
       options.hitboxWireframes.checked = config.overlays.hitboxWireframes;
+      options.hitboxOnlyMode.checked = config.overlays.hitboxOnlyMode;
       if (config.playback.rate !== undefined) {
         options.playbackRate.value = `${config.playback.rate}`;
       }

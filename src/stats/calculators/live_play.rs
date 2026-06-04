@@ -34,6 +34,17 @@ pub struct LivePlayState {
 }
 
 impl LivePlayState {
+    pub fn new(gameplay_phase: GameplayPhase) -> Self {
+        Self {
+            gameplay_phase,
+            is_live_play: gameplay_phase.is_live_play(),
+        }
+    }
+
+    pub fn active_play() -> Self {
+        Self::new(GameplayPhase::ActivePlay)
+    }
+
     pub fn counts_toward_player_motion(&self) -> bool {
         self.gameplay_phase.counts_toward_player_motion()
     }
@@ -96,10 +107,7 @@ impl LivePlayTracker {
         events: &FrameEventsState,
     ) -> LivePlayState {
         let gameplay_phase = self.gameplay_phase_internal(gameplay, events);
-        LivePlayState {
-            gameplay_phase,
-            is_live_play: gameplay_phase.is_live_play(),
-        }
+        LivePlayState::new(gameplay_phase)
     }
 }
 

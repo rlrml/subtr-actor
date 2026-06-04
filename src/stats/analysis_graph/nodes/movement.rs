@@ -42,7 +42,7 @@ impl AnalysisNode for MovementNode {
             ctx.get::<FrameInfo>()?,
             ctx.get::<PlayerFrameState>()?,
             ctx.get::<PlayerVerticalState>()?,
-            live_play_state.counts_toward_player_motion(),
+            live_play_state,
         )
     }
 

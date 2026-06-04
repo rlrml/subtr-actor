@@ -242,6 +242,7 @@ impl FrameInput {
             players.push(PlayerSample {
                 player_id: player_id.clone(),
                 is_team_0,
+                hitbox: processor.get_player_car_hitbox(player_id),
                 rigid_body: processor
                     .get_interpolated_player_rigid_body(player_id, current_time, 0.0)
                     .ok()

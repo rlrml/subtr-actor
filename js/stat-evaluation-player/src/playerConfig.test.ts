@@ -44,6 +44,7 @@ const CONFIG: StatsPlayerConfig = {
     boostPads: false,
     boostPickupAnimation: true,
     hitboxWireframes: true,
+    hitboxOnlyMode: true,
   },
   recording: {
     fps: 60,

@@ -77,7 +77,7 @@ fn update(
                 ..TouchState::default()
             },
             &backboard_bounce_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 }
@@ -138,6 +138,41 @@ fn counts_matching_followup_even_with_same_frame_other_touch() {
 
     assert_eq!(calculator.events().len(), 1);
     assert_eq!(calculator.events()[0].player, shooter);
+}
+
+#[test]
+fn aggregate_followup_uses_latest_matching_touch_time() {
+    let shooter = PlayerId::Steam(1);
+    let mut calculator = DoubleTapCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(
+            glam::Vec3::new(0.0, 5000.0, 700.0),
+            glam::Vec3::new(0.0, -1000.0, 0.0),
+        ),
+        Vec::new(),
+        backboard_bounce(10, 1.0, shooter.clone(), true),
+    );
+    update(
+        &mut calculator,
+        frame(30, 1.4),
+        ball(
+            glam::Vec3::new(0.0, 4500.0, 400.0),
+            glam::Vec3::new(0.0, 1600.0, 0.0),
+        ),
+        vec![
+            touch(20, 1.2, shooter.clone(), true),
+            touch(25, 1.3, shooter.clone(), true),
+        ],
+        BackboardBounceState::default(),
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+    assert_eq!(calculator.events()[0].player, shooter);
+    assert_eq!(calculator.events()[0].frame, 25);
+    assert_eq!(calculator.events()[0].time, 1.3);
 }
 
 #[test]

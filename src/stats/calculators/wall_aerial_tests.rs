@@ -34,6 +34,7 @@ fn player_at(position: glam::Vec3) -> PlayerSample {
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(1),
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(position, glam::Vec3::ZERO)),
         boost_amount: None,
         last_boost_amount: None,
@@ -102,7 +103,7 @@ fn records_controlled_wall_aerial_play_after_wall_carry_setup() {
             ),
             &players(glam::Vec3::new(3650.0, 0.0, 250.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -114,7 +115,7 @@ fn records_controlled_wall_aerial_play_after_wall_carry_setup() {
             ),
             &players(glam::Vec3::new(3650.0, 0.0, 270.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -126,7 +127,7 @@ fn records_controlled_wall_aerial_play_after_wall_carry_setup() {
             ),
             &players(glam::Vec3::new(3350.0, 0.0, 320.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -138,7 +139,7 @@ fn records_controlled_wall_aerial_play_after_wall_carry_setup() {
             ),
             &players(glam::Vec3::new(3250.0, 0.0, 350.0)),
             &touch_state_with_touch(4, 0.8),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -165,7 +166,7 @@ fn records_soft_controlled_wall_aerial_continuation_after_wall_setup() {
             ),
             &players(glam::Vec3::new(3650.0, 0.0, 250.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -177,7 +178,7 @@ fn records_soft_controlled_wall_aerial_continuation_after_wall_setup() {
             ),
             &players(glam::Vec3::new(3650.0, 0.0, 270.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -189,7 +190,7 @@ fn records_soft_controlled_wall_aerial_continuation_after_wall_setup() {
             ),
             &players(glam::Vec3::new(3350.0, 0.0, 320.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -201,7 +202,7 @@ fn records_soft_controlled_wall_aerial_continuation_after_wall_setup() {
             ),
             &players(glam::Vec3::new(3250.0, 0.0, 350.0)),
             &touch_state_with_touch(4, 0.8),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -231,7 +232,7 @@ fn rejects_low_wall_setup_touch_that_never_becomes_aerial_continuation() {
             ),
             &players(glam::Vec3::new(3650.0, 0.0, 220.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -243,7 +244,7 @@ fn rejects_low_wall_setup_touch_that_never_becomes_aerial_continuation() {
             ),
             &players(glam::Vec3::new(3650.0, 0.0, 240.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -255,7 +256,7 @@ fn rejects_low_wall_setup_touch_that_never_becomes_aerial_continuation() {
             ),
             &players(glam::Vec3::new(3350.0, 0.0, 260.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -267,7 +268,7 @@ fn rejects_low_wall_setup_touch_that_never_becomes_aerial_continuation() {
             ),
             &players(glam::Vec3::new(3250.0, 0.0, 280.0)),
             &touch_state_with_touch(4, 0.8),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -289,7 +290,7 @@ fn consumes_wall_setup_after_first_aerial_attempt() {
             ),
             &players(glam::Vec3::new(3650.0, 0.0, 250.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -301,7 +302,7 @@ fn consumes_wall_setup_after_first_aerial_attempt() {
             ),
             &players(glam::Vec3::new(3650.0, 0.0, 270.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -313,7 +314,7 @@ fn consumes_wall_setup_after_first_aerial_attempt() {
             ),
             &players(glam::Vec3::new(3350.0, 0.0, 320.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -325,7 +326,7 @@ fn consumes_wall_setup_after_first_aerial_attempt() {
             ),
             &players(glam::Vec3::new(3250.0, 0.0, 350.0)),
             &touch_state_with_touch(4, 0.8),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -337,7 +338,7 @@ fn consumes_wall_setup_after_first_aerial_attempt() {
             ),
             &players(glam::Vec3::new(3150.0, 0.0, 520.0)),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -349,7 +350,7 @@ fn consumes_wall_setup_after_first_aerial_attempt() {
             ),
             &players(glam::Vec3::new(3050.0, 0.0, 580.0)),
             &touch_state_with_touch(6, 2.8),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -372,7 +373,7 @@ fn preserves_completed_wall_setup_while_sliding_off_wall() {
             ),
             &players(glam::Vec3::new(4080.0, 0.0, 300.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -384,7 +385,7 @@ fn preserves_completed_wall_setup_while_sliding_off_wall() {
             ),
             &players(glam::Vec3::new(4080.0, 0.0, 480.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -396,7 +397,7 @@ fn preserves_completed_wall_setup_while_sliding_off_wall() {
             ),
             &players(glam::Vec3::new(3850.0, 0.0, 760.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -408,7 +409,7 @@ fn preserves_completed_wall_setup_while_sliding_off_wall() {
             ),
             &players(glam::Vec3::new(3500.0, 0.0, 860.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -420,7 +421,7 @@ fn preserves_completed_wall_setup_while_sliding_off_wall() {
             ),
             &players(glam::Vec3::new(2800.0, 0.0, 760.0)),
             &touch_state_with_touch(5, 1.2),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -446,7 +447,7 @@ fn records_wall_aerial_when_first_continuation_touch_is_delayed() {
             ),
             &players(glam::Vec3::new(4080.0, 0.0, 300.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -458,7 +459,7 @@ fn records_wall_aerial_when_first_continuation_touch_is_delayed() {
             ),
             &players(glam::Vec3::new(4080.0, 0.0, 480.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -470,7 +471,7 @@ fn records_wall_aerial_when_first_continuation_touch_is_delayed() {
             ),
             &players(glam::Vec3::new(3500.0, 0.0, 720.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -482,7 +483,7 @@ fn records_wall_aerial_when_first_continuation_touch_is_delayed() {
             ),
             &players(glam::Vec3::new(2500.0, 0.0, 780.0)),
             &touch_state_with_touch(4, 2.4),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -508,7 +509,7 @@ fn rejects_stale_wall_contact_that_arms_much_later() {
             ),
             &players(glam::Vec3::new(4080.0, 0.0, 300.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -520,7 +521,7 @@ fn rejects_stale_wall_contact_that_arms_much_later() {
             ),
             &players(glam::Vec3::new(4080.0, 0.0, 480.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -532,7 +533,7 @@ fn rejects_stale_wall_contact_that_arms_much_later() {
             ),
             &players(glam::Vec3::new(2800.0, 0.0, 760.0)),
             &controlled_touch_state(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -544,7 +545,7 @@ fn rejects_stale_wall_contact_that_arms_much_later() {
             ),
             &players(glam::Vec3::new(2700.0, 0.0, 760.0)),
             &touch_state_with_touch(4, 2.2),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -566,7 +567,7 @@ fn rejects_wall_aerial_play_without_wall_control_setup() {
             ),
             &players(glam::Vec3::new(3650.0, 0.0, 260.0)),
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -578,7 +579,7 @@ fn rejects_wall_aerial_play_without_wall_control_setup() {
             ),
             &players(glam::Vec3::new(3250.0, 0.0, 350.0)),
             &touch_state_with_touch(2, 0.2),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 

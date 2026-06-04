@@ -19,6 +19,7 @@ pub(crate) fn player(position: glam::Vec3, velocity: glam::Vec3) -> PlayerSample
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(1),
         is_team_0: true,
+        hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(position, velocity)),
         boost_amount: None,
         last_boost_amount: None,
@@ -98,12 +99,7 @@ impl BallCarryHarness {
         live_play_state: &LivePlayState,
     ) {
         let candidate = if frame.dt > 0.0 {
-            BallCarryCalculator::control_candidate(
-                ball,
-                players,
-                live_play_state.is_live_play,
-                touch_state,
-            )
+            BallCarryCalculator::control_candidate(ball, players, live_play_state, touch_state)
         } else {
             None
         };

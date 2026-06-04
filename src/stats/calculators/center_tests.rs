@@ -47,6 +47,19 @@ fn touch(
     }
 }
 
+fn touch_with_gap(
+    frame_number: usize,
+    time: f32,
+    player_id: Option<PlayerId>,
+    is_team_0: bool,
+    contact_gap: f32,
+) -> TouchEvent {
+    TouchEvent {
+        closest_approach_distance: Some(contact_gap),
+        ..touch(frame_number, time, player_id, is_team_0)
+    }
+}
+
 fn shot_event(
     frame_number: usize,
     time: f32,
@@ -112,7 +125,7 @@ fn update_with_events(
                 ..TouchState::default()
             },
             &frame_events,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 }
@@ -141,6 +154,61 @@ fn counts_wide_touch_that_moves_ball_into_central_attacking_lane() {
     assert_eq!(calculator.player_stats().get(&player).unwrap().count, 1);
     assert_eq!(calculator.events()[0].lateral_centering_distance, 1700.0);
     assert_eq!(calculator.events()[0].ball_advance_distance, 400.0);
+}
+
+#[test]
+fn uses_latest_touch_as_pending_center_when_aggregate_events_are_out_of_order() {
+    let earlier_player = PlayerId::Steam(1);
+    let latest_player = PlayerId::Steam(2);
+    let mut calculator = CenterCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(20, 2.0),
+        ball(glam::Vec3::new(2600.0, 2600.0, BALL_RADIUS_Z)),
+        vec![
+            touch(20, 2.0, Some(latest_player.clone()), true),
+            touch(10, 1.0, Some(earlier_player), true),
+        ],
+    );
+    update(
+        &mut calculator,
+        frame(30, 2.8),
+        ball(glam::Vec3::new(900.0, 3000.0, BALL_RADIUS_Z)),
+        vec![],
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+    let center = &calculator.events()[0];
+    assert_eq!(center.player, latest_player);
+    assert_eq!(center.start_time, 2.0);
+    assert_eq!(center.time, 2.8);
+}
+
+#[test]
+fn uses_best_contact_as_pending_center_when_aggregate_events_have_same_timestamp() {
+    let best_contact = PlayerId::Steam(1);
+    let weaker_contact = PlayerId::Steam(2);
+    let mut calculator = CenterCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(20, 2.0),
+        ball(glam::Vec3::new(2600.0, 2600.0, BALL_RADIUS_Z)),
+        vec![
+            touch_with_gap(20, 2.0, Some(best_contact.clone()), true, 0.0),
+            touch_with_gap(20, 2.0, Some(weaker_contact), true, 20.0),
+        ],
+    );
+    update(
+        &mut calculator,
+        frame(30, 2.8),
+        ball(glam::Vec3::new(900.0, 3000.0, BALL_RADIUS_Z)),
+        vec![],
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+    assert_eq!(calculator.events()[0].player, best_contact);
 }
 
 #[test]

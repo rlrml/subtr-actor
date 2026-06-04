@@ -263,9 +263,24 @@ pub struct TouchEvent {
     #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<boxcars::Vector3f>,
+    /// Ball-to-car hitbox contact gap in uu for attributed touches, when estimated.
+    ///
+    /// This field keeps its historical name for wire compatibility. A value of
+    /// `0.0` means the ball intersects or touches the oriented car hitbox after
+    /// subtracting the Rocket League ball collision radius.
     pub closest_approach_distance: Option<f32>,
     pub dodge_contact: bool,
 }
+
+impl TouchEvent {
+    pub(crate) fn timestamp_ordering(left: &Self, right: &Self) -> std::cmp::Ordering {
+        left.frame
+            .cmp(&right.frame)
+            .then_with(|| left.time.total_cmp(&right.time))
+    }
+}
+
+pub(crate) const TOUCH_RATE_LIMIT_SECONDS: f32 = 0.25;
 
 /// [`ReplayMeta`] struct represents metadata about the replay being processed.
 ///
@@ -313,6 +328,15 @@ pub struct PlayerInfo {
     pub stats: Option<std::collections::HashMap<String, HeaderProp>>,
     /// The name of the player as represented in the replay.
     pub name: String,
+    /// The replicated car body product id from the player's loadout, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub car_body_id: Option<u32>,
+    /// The car body name from replay header player stats, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub car_body_name: Option<String>,
+    /// The resolved standardized hitbox family for the player's car body, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub car_hitbox_family: Option<String>,
 }
 
 #[cfg(test)]
