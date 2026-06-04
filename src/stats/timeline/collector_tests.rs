@@ -174,6 +174,10 @@ fn event_timeline_graph_does_not_build_full_stats_frame_snapshots() {
         !node_names.contains(&"stats_timeline_frame"),
         "event timeline transfer should not evaluate the full partial-sum frame node"
     );
+    assert!(
+        !node_names.contains(&"stats_projection"),
+        "event timeline transfer should not evaluate full partial-sum projections"
+    );
 }
 
 fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(replay_path: &str) {
