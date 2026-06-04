@@ -769,6 +769,7 @@ pub(crate) fn live_replay_meta(players: &[SaPlayerFrame]) -> ReplayMeta {
             stats: None,
             name: player_name(player).unwrap_or_else(|| default_live_player_name(&player_id)),
             car_body_id,
+            car_body_name: None,
             car_hitbox_family: car_body_id
                 .and_then(hitbox_family_for_body_id)
                 .map(|family| format!("{family:?}"))

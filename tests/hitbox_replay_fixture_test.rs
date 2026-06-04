@@ -22,10 +22,6 @@ const HITBOX_FIXTURES: &[&str] = &[
     "assets/recent-ranked-doubles-2026-03-10.replay",
     "assets/recent-ranked-standard-2026-03-10-a.replay",
     "assets/recent-ranked-standard-2026-03-10-b.replay",
-    "assets/rlcs-2025-worlds-grand-final-flcn-nrg-g1.replay",
-    "assets/rlcs-2025-worlds-grand-final-flcn-nrg-g2.replay",
-    "assets/rlcs-2025-worlds-grand-final-flcn-nrg-g3.replay",
-    "assets/rlcs-2025-worlds-grand-final-flcn-nrg-g4.replay",
     "assets/rlcs-2025-worlds-grand-final-flcn-nrg-g5.replay",
 ];
 

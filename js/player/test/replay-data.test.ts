@@ -187,12 +187,8 @@ interface RustHitboxSpec {
 
 function parseRustHitboxSpecs(): Map<HitboxKind, RustHitboxSpec> {
   const source = rustGeometrySource();
-  const defaultOffset = Number(
-    source.match(/const DEFAULT_OFFSET: f32 = ([\d.-]+);/)?.[1],
-  );
-  const defaultElevation = Number(
-    source.match(/const DEFAULT_ELEVATION: f32 = ([\d.-]+);/)?.[1],
-  );
+  const defaultOffset = Number(source.match(/const DEFAULT_OFFSET: f32 = ([\d.-]+);/)?.[1]);
+  const defaultElevation = Number(source.match(/const DEFAULT_ELEVATION: f32 = ([\d.-]+);/)?.[1]);
   assert.ok(Number.isFinite(defaultOffset), "expected Rust default hitbox offset");
   assert.ok(Number.isFinite(defaultElevation), "expected Rust default hitbox elevation");
 

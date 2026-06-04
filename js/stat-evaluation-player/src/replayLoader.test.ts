@@ -338,10 +338,7 @@ test("loadReplayBundleInWorker rejects malformed worker decode payloads", async 
   });
 
   try {
-    await assert.rejects(
-      () => loadReplayBundleInWorker(new Uint8Array([1, 2, 3])),
-      SyntaxError,
-    );
+    await assert.rejects(() => loadReplayBundleInWorker(new Uint8Array([1, 2, 3])), SyntaxError);
   } finally {
     Object.defineProperty(globalThis, "Worker", {
       configurable: true,
