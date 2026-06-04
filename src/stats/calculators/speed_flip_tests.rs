@@ -149,7 +149,7 @@ fn kickoff_approach_waits_for_player_motion_even_when_not_live_play() {
             &gameplay,
             &BallFrameState::default(),
             &PlayerFrameState::default(),
-            false,
+            &LivePlayState::default(),
         )
         .unwrap();
 
@@ -170,7 +170,7 @@ fn kickoff_approach_waits_for_player_motion_even_when_not_live_play() {
             &PlayerFrameState {
                 players: vec![player(glam::Vec3::new(150.0, 0.0, 0.0), false)],
             },
-            false,
+            &LivePlayState::default(),
         )
         .unwrap();
 

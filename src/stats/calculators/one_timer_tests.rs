@@ -58,7 +58,7 @@ fn update_pass(
             },
             &BackboardBounceState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 }
@@ -70,7 +70,12 @@ fn update_one_timer(
     ball: BallFrameState,
 ) {
     calculator
-        .update(&frame, &ball, pass_calculator, true)
+        .update(
+            &frame,
+            &ball,
+            pass_calculator,
+            &LivePlayState::active_play(),
+        )
         .unwrap();
 }
 

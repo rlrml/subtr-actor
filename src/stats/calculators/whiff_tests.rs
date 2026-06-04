@@ -83,7 +83,7 @@ fn counts_near_miss_after_player_exits_ball_area() {
                 players: vec![player(1, -210.0, false)],
             },
             &touch_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -94,7 +94,7 @@ fn counts_near_miss_after_player_exits_ball_area() {
                 players: vec![player(1, 460.0, false)],
             },
             &touch_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -118,7 +118,7 @@ fn touch_cancels_active_whiff_candidate() {
                 players: vec![player(1, -210.0, false)],
             },
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -140,7 +140,7 @@ fn touch_cancels_active_whiff_candidate() {
                 }],
                 ..TouchState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -163,7 +163,7 @@ fn opponent_touch_counts_as_beaten_to_ball_not_whiff() {
                 players: vec![player(1, -210.0, false)],
             },
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -185,7 +185,7 @@ fn opponent_touch_counts_as_beaten_to_ball_not_whiff() {
                 }],
                 ..TouchState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -211,7 +211,7 @@ fn teammate_touch_cancels_active_whiff_candidate() {
                 players: vec![player(1, -210.0, false)],
             },
             &TouchState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -233,7 +233,7 @@ fn teammate_touch_cancels_active_whiff_candidate() {
                 }],
                 ..TouchState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -261,7 +261,7 @@ fn lateral_drive_by_is_not_a_whiff() {
                 )],
             },
             &touch_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -277,7 +277,7 @@ fn lateral_drive_by_is_not_a_whiff() {
                 )],
             },
             &touch_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -305,7 +305,7 @@ fn matching_ball_velocity_is_not_a_whiff_attempt() {
                 )],
             },
             &touch_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -321,7 +321,7 @@ fn matching_ball_velocity_is_not_a_whiff_attempt() {
                 )],
             },
             &touch_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -349,7 +349,7 @@ fn side_dodge_is_not_a_whiff_attempt() {
                 )],
             },
             &touch_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -365,7 +365,7 @@ fn side_dodge_is_not_a_whiff_attempt() {
                 )],
             },
             &touch_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 

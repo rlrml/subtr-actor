@@ -85,7 +85,7 @@ fn update_team_zero(
                 ],
             },
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("rotation update should succeed");
 }

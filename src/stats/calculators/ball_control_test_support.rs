@@ -98,12 +98,7 @@ impl BallCarryHarness {
         live_play_state: &LivePlayState,
     ) {
         let candidate = if frame.dt > 0.0 {
-            BallCarryCalculator::control_candidate(
-                ball,
-                players,
-                live_play_state.is_live_play,
-                touch_state,
-            )
+            BallCarryCalculator::control_candidate(ball, players, live_play_state, touch_state)
         } else {
             None
         };

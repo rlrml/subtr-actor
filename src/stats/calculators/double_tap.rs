@@ -175,10 +175,10 @@ impl DoubleTapCalculator {
         ball: &BallFrameState,
         touch_state: &TouchState,
         backboard_bounce_state: &BackboardBounceState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.pending_backboard_bounces.clear();
         }
 

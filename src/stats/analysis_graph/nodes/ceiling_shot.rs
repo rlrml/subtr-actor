@@ -48,7 +48,7 @@ impl AnalysisNode for CeilingShotNode {
             ball,
             players,
             &touch_state.touch_events,
-            live_play_state.is_live_play,
+            live_play_state,
         )
     }
 

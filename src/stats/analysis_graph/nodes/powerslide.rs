@@ -40,7 +40,7 @@ impl AnalysisNode for PowerslideNode {
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
             ctx.get::<PlayerFrameState>()?,
-            live_play_state.counts_toward_player_motion(),
+            live_play_state,
         )
     }
 

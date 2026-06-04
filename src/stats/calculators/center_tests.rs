@@ -112,7 +112,7 @@ fn update_with_events(
                 ..TouchState::default()
             },
             &frame_events,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 }

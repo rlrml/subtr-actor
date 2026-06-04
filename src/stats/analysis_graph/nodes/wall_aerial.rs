@@ -43,13 +43,8 @@ impl AnalysisNode for WallAerialNode {
         let players = ctx.get::<PlayerFrameState>()?;
         let touch_state = ctx.get::<TouchState>()?;
         let live_play_state = ctx.get::<LivePlayState>()?;
-        self.calculator.update(
-            frame,
-            ball,
-            players,
-            touch_state,
-            live_play_state.is_live_play,
-        )
+        self.calculator
+            .update(frame, ball, players, touch_state, live_play_state)
     }
 
     fn state(&self) -> &Self::State {

@@ -131,7 +131,7 @@ fn touch_stats_at_height(height: f32) -> TouchStats {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -178,7 +178,7 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -190,7 +190,7 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -215,7 +215,7 @@ fn dodge_active_hit_counts_as_dodge_hit() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -227,7 +227,7 @@ fn dodge_active_hit_counts_as_dodge_hit() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -263,7 +263,7 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -275,7 +275,7 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
             &dodge_contact_touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -299,7 +299,7 @@ fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -314,7 +314,7 @@ fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -342,7 +342,7 @@ fn touch_on_wall_gets_wall_surface_classification() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -374,7 +374,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -386,7 +386,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -398,7 +398,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -427,7 +427,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -439,7 +439,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &touch_state,
             &PossessionState::default(),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -451,7 +451,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -524,7 +524,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 active_event: Some(active_fifty.clone()),
                 ..FiftyFiftyState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -539,7 +539,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 active_event: Some(active_fifty),
                 ..FiftyFiftyState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
     calculator
@@ -554,7 +554,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 resolved_events: vec![resolved_fifty],
                 ..FiftyFiftyState::default()
             },
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 

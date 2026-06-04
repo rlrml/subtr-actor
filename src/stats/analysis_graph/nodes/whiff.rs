@@ -43,7 +43,7 @@ impl AnalysisNode for WhiffNode {
             ctx.get::<BallFrameState>()?,
             ctx.get::<PlayerFrameState>()?,
             ctx.get::<TouchState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            ctx.get::<LivePlayState>()?,
         )
     }
 

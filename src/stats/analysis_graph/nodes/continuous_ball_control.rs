@@ -47,7 +47,7 @@ impl AnalysisNode for ContinuousBallControlNode {
             BallCarryCalculator::control_candidate(
                 ctx.get::<BallFrameState>()?,
                 players,
-                ctx.get::<LivePlayState>()?.is_live_play,
+                ctx.get::<LivePlayState>()?,
                 touch_state,
             )
         } else {

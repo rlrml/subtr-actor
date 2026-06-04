@@ -517,10 +517,10 @@ impl TouchCalculator {
         players: &PlayerFrameState,
         possession_state: &PossessionState,
         fifty_fifty_state: &FiftyFiftyState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) {
         let current_ball_position = ball.position();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.flush_pending_ball_movement_event();
             self.previous_ball_position = current_ball_position;
             self.pending_fifty_fifty_movement = None;
@@ -589,12 +589,12 @@ impl TouchCalculator {
         touch_state: &TouchState,
         possession_state: &PossessionState,
         fifty_fifty_state: &FiftyFiftyState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         self.ball_movement_events.begin_update();
         self.last_touch_events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.flush_pending_ball_movement_event();
             self.previous_ball_velocity = ball.velocity();
             self.previous_ball_position = ball.position();
@@ -614,7 +614,7 @@ impl TouchCalculator {
             players,
             possession_state,
             fifty_fifty_state,
-            live_play,
+            live_play_state,
         );
         self.previous_ball_velocity = ball.velocity();
 

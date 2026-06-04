@@ -149,10 +149,10 @@ impl BallCarryCalculator {
     pub(crate) fn control_candidate(
         ball: &BallFrameState,
         players: &PlayerFrameState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
         touch_state: &TouchState,
     ) -> Option<ContinuousBallControlCandidate<BallCarryKind>> {
-        if !live_play {
+        if !live_play_state.is_live_play {
             return None;
         }
         let ball = ball.sample()?;

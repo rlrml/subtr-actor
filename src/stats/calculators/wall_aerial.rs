@@ -482,10 +482,10 @@ impl WallAerialCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         touch_state: &TouchState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.active_wall_controls.clear();
             self.recent_wall_contacts.clear();
             self.armed_aerials.clear();

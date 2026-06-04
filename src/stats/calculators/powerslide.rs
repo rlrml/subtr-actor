@@ -44,7 +44,7 @@ impl PowerslideCalculator {
         &mut self,
         frame: &FrameInfo,
         players: &PlayerFrameState,
-        _live_play: bool,
+        _live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         for player in &players.players {

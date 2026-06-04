@@ -77,7 +77,7 @@ fn update(
                 ..TouchState::default()
             },
             &backboard_bounce_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 }

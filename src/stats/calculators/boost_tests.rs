@@ -78,7 +78,7 @@ fn records_inactive_pickup_without_active_collection() {
                 ..FrameEventsState::default()
             },
             &PlayerVerticalState::default(),
-            false,
+            &LivePlayState::default(),
         )
         .expect("inactive boost update should succeed");
 
@@ -134,7 +134,7 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
             },
             &FrameEventsState::default(),
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("initial boost update should succeed");
 
@@ -152,7 +152,7 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
             },
             &FrameEventsState::default(),
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("boost use update should succeed");
 
@@ -185,7 +185,7 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
                 ..FrameEventsState::default()
             },
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("boost collection update should succeed");
 
@@ -260,7 +260,7 @@ fn reported_small_pickup_while_boosting_infers_same_sample_use() {
             },
             &FrameEventsState::default(),
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("initial boost update should succeed");
 
@@ -293,7 +293,7 @@ fn reported_small_pickup_while_boosting_infers_same_sample_use() {
                 ..FrameEventsState::default()
             },
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("small pad pickup update should succeed");
 
@@ -346,7 +346,7 @@ fn demo_reset_does_not_count_removed_boost_as_used() {
                 },
                 &events,
                 &PlayerVerticalState::default(),
-                true,
+                &LivePlayState::active_play(),
             )
             .expect("boost update should succeed");
     };
@@ -453,7 +453,7 @@ fn counts_reused_pickup_sequence_after_pad_respawn() {
                 ..FrameEventsState::default()
             },
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("first boost update should succeed");
 
@@ -481,7 +481,7 @@ fn counts_reused_pickup_sequence_after_pad_respawn() {
                 ..FrameEventsState::default()
             },
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("pad availability update should succeed");
 
@@ -509,7 +509,7 @@ fn counts_reused_pickup_sequence_after_pad_respawn() {
                 ..FrameEventsState::default()
             },
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("second boost update should succeed");
 
@@ -568,7 +568,7 @@ fn counts_pickup_after_respawn_without_available_event() {
                     ..FrameEventsState::default()
                 },
                 &PlayerVerticalState::default(),
-                true,
+                &LivePlayState::active_play(),
             )
             .expect("boost update should succeed");
     }
@@ -615,7 +615,7 @@ fn skips_inactive_pickup_without_observed_boost_gain() {
                 ..FrameEventsState::default()
             },
             &PlayerVerticalState::default(),
-            false,
+            &LivePlayState::default(),
         )
         .expect("boost update should succeed");
 
@@ -670,7 +670,7 @@ fn stale_unreported_boost_increase_is_counted_as_ghost_pickup() {
                 },
                 &FrameEventsState::default(),
                 &PlayerVerticalState::default(),
-                true,
+                &LivePlayState::active_play(),
             )
             .expect("boost update should succeed");
     }
@@ -737,7 +737,7 @@ fn non_live_boost_increase_is_not_counted_as_ghost_pickup() {
                 },
                 &FrameEventsState::default(),
                 &PlayerVerticalState::default(),
-                false,
+                &LivePlayState::default(),
             )
             .expect("boost update should succeed");
     }
@@ -784,7 +784,7 @@ fn reported_pickup_without_observed_boost_increase_is_emitted_as_counted_pickup(
             },
             &FrameEventsState::default(),
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("first boost update should succeed");
 
@@ -817,7 +817,7 @@ fn reported_pickup_without_observed_boost_increase_is_emitted_as_counted_pickup(
                 ..FrameEventsState::default()
             },
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("second boost update should succeed");
 
@@ -874,7 +874,7 @@ fn matches_two_small_pickups_from_one_observed_boost_increase() {
             },
             &FrameEventsState::default(),
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("first boost update should succeed");
 
@@ -917,7 +917,7 @@ fn matches_two_small_pickups_from_one_observed_boost_increase() {
                 ..FrameEventsState::default()
             },
             &PlayerVerticalState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .expect("second boost update should succeed");
 

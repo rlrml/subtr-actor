@@ -95,10 +95,10 @@ impl OneTimerCalculator {
         frame: &FrameInfo,
         ball: &BallFrameState,
         pass_calculator: &PassCalculator,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.processed_pass_events = pass_calculator.events().len();
             return Ok(());
         }

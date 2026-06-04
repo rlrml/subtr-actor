@@ -95,7 +95,7 @@ fn bump_detector_credits_player_with_clear_directional_impulse() {
                 ),
             ]),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -117,7 +117,7 @@ fn bump_detector_credits_player_with_clear_directional_impulse() {
                 ),
             ]),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -169,7 +169,7 @@ fn bump_detector_requires_clear_victim_impulse() {
                 ),
             ]),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -191,7 +191,7 @@ fn bump_detector_requires_clear_victim_impulse() {
                 ),
             ]),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -221,7 +221,7 @@ fn bump_detector_requires_initiator_slowdown() {
                 ),
             ]),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -243,7 +243,7 @@ fn bump_detector_requires_initiator_slowdown() {
                 ),
             ]),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -276,7 +276,7 @@ fn bump_detector_suppresses_active_fifty_fifty_pair() {
             ]),
             &FrameEventsState::default(),
             &active_fifty_fifty(initiator_id.clone(), victim_id.clone()),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -299,7 +299,7 @@ fn bump_detector_suppresses_active_fifty_fifty_pair() {
             ]),
             &FrameEventsState::default(),
             &active_fifty_fifty(initiator_id, victim_id),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -329,7 +329,7 @@ fn bump_detector_ignores_ambiguous_or_weak_contacts() {
                 ),
             ]),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -351,7 +351,7 @@ fn bump_detector_ignores_ambiguous_or_weak_contacts() {
                 ),
             ]),
             &FrameEventsState::default(),
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 
@@ -397,7 +397,7 @@ fn bump_detector_suppresses_same_pair_repeats() {
                     player(2, false, victim_position, victim_velocity),
                 ]),
                 &FrameEventsState::default(),
-                true,
+                &LivePlayState::active_play(),
             )
             .unwrap();
     }

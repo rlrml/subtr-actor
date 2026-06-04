@@ -140,10 +140,10 @@ impl MovementCalculator {
         frame: &FrameInfo,
         players: &PlayerFrameState,
         vertical_state: &PlayerVerticalState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play {
+        if !live_play_state.counts_toward_player_motion() {
             self.flush_pending_events();
             for player in &players.players {
                 if let Some(position) = player.position() {

@@ -81,7 +81,7 @@ fn update_with_context(
             },
             &backboard_bounce_state,
             &fifty_fifty_state,
-            true,
+            &LivePlayState::active_play(),
         )
         .unwrap();
 }

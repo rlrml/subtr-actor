@@ -45,7 +45,7 @@ impl AnalysisNode for PassNode {
             ctx.get::<TouchState>()?,
             ctx.get::<BackboardBounceState>()?,
             ctx.get::<FiftyFiftyState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            ctx.get::<LivePlayState>()?,
         )
     }
 

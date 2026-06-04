@@ -100,7 +100,7 @@ fn positioning_events_emit_state_change_spans() {
                 &ball,
                 &players,
                 &FrameEventsState::default(),
-                true,
+                &LivePlayState::active_play(),
                 None,
             )
             .expect("positioning update should succeed");

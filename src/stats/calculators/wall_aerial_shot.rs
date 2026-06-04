@@ -227,10 +227,10 @@ impl WallAerialShotCalculator {
         frame: &FrameInfo,
         players: &PlayerFrameState,
         frame_events: &FrameEventsState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play {
+        if !live_play_state.is_live_play {
             self.recent_wall_contacts.clear();
             self.armed_shots.clear();
             return Ok(());

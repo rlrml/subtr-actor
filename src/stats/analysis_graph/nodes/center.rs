@@ -43,7 +43,7 @@ impl AnalysisNode for CenterNode {
             ctx.get::<BallFrameState>()?,
             ctx.get::<TouchState>()?,
             ctx.get::<FrameEventsState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            ctx.get::<LivePlayState>()?,
         )
     }
 

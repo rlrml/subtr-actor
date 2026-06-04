@@ -202,7 +202,7 @@ impl SpeedFlipCalculator {
         gameplay: &GameplayState,
         ball: &BallFrameState,
         player: &PlayerSample,
-        _live_play: bool,
+        _live_play_state: &LivePlayState,
     ) {
         let was_dodge_active = self
             .previous_dodge_active
@@ -452,11 +452,11 @@ impl SpeedFlipCalculator {
         gameplay: &GameplayState,
         ball: &BallFrameState,
         players: &PlayerFrameState,
-        live_play: bool,
+        live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         let kickoff_approach_active = Self::kickoff_approach_active(gameplay);
-        if !live_play && !kickoff_approach_active {
+        if !live_play_state.is_live_play && !kickoff_approach_active {
             self.active_candidates.clear();
             self.current_kickoff_start_time = None;
             self.kickoff_approach_active_last_frame = false;
@@ -470,7 +470,7 @@ impl SpeedFlipCalculator {
         self.update_kickoff_start_time(frame, kickoff_approach_active, players);
 
         for player in &players.players {
-            self.maybe_start_candidate(frame, gameplay, ball, player, live_play);
+            self.maybe_start_candidate(frame, gameplay, ball, player, live_play_state);
         }
 
         for (player_id, candidate) in &mut self.active_candidates {

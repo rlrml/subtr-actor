@@ -41,7 +41,7 @@ impl AnalysisNode for OneTimerNode {
             ctx.get::<FrameInfo>()?,
             ctx.get::<BallFrameState>()?,
             ctx.get::<PassCalculator>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            ctx.get::<LivePlayState>()?,
         )
     }
 

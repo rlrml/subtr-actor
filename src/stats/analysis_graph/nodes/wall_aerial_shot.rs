@@ -42,7 +42,7 @@ impl AnalysisNode for WallAerialShotNode {
         let frame_events = ctx.get::<FrameEventsState>()?;
         let live_play_state = ctx.get::<LivePlayState>()?;
         self.calculator
-            .update(frame, players, frame_events, live_play_state.is_live_play)
+            .update(frame, players, frame_events, live_play_state)
     }
 
     fn state(&self) -> &Self::State {

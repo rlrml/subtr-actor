@@ -51,7 +51,7 @@ impl AnalysisNode for PositioningNode {
             ctx.get::<BallFrameState>()?,
             ctx.get::<PlayerFrameState>()?,
             ctx.get::<FrameEventsState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            ctx.get::<LivePlayState>()?,
             possession_state.active_player_before_sample.as_ref(),
         )
     }

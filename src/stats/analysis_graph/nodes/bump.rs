@@ -43,7 +43,7 @@ impl AnalysisNode for BumpNode {
             ctx.get::<PlayerFrameState>()?,
             ctx.get::<FrameEventsState>()?,
             ctx.get::<FiftyFiftyState>()?,
-            ctx.get::<LivePlayState>()?.is_live_play,
+            ctx.get::<LivePlayState>()?,
         )
     }
 
