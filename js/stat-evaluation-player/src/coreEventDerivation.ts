@@ -100,7 +100,10 @@ function applyCorePlayerScoreboardEvent(
   stats.shots += event.shots_delta;
 }
 
-function applyScoringGoalContextToTeam(stats: CoreTeamStats, event: CorePlayerGoalContextEvent): void {
+function applyScoringGoalContextToTeam(
+  stats: CoreTeamStats,
+  event: CorePlayerGoalContextEvent,
+): void {
   if (event.time_after_kickoff != null) {
     const time = Math.max(0, event.time_after_kickoff);
     if (time < 10) {
@@ -162,8 +165,7 @@ function applyCorePlayerGoalContextEvent(
       stats.cumulative_min_boost_in_goal_against_leadup,
       event.goal_against_min_boost_in_leadup,
     );
-    stats.last_average_boost_in_goal_against_leadup =
-      event.goal_against_average_boost_in_leadup;
+    stats.last_average_boost_in_goal_against_leadup = event.goal_against_average_boost_in_leadup;
     stats.last_min_boost_in_goal_against_leadup = event.goal_against_min_boost_in_leadup;
   }
   if (event.goal_against_position != null) {
