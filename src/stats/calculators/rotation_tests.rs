@@ -249,9 +249,8 @@ fn rotation_player_events_emit_state_change_spans() {
     assert_eq!(first_man.frame, 1);
     assert_eq!(first_man.end_frame, 3);
     assert!((first_man.duration - 0.3).abs() < 1e-6);
-    assert!((first_man.active_game_time - 0.3).abs() < 1e-6);
-    assert!((first_man.time_first_man - 0.3).abs() < 1e-6);
-    assert!((first_man.time_behind_play - 0.3).abs() < 1e-6);
+    assert_eq!(first_man.current_role_state, RoleState::FirstMan);
+    assert_eq!(first_man.current_depth_state, PlayDepthState::BehindPlay);
 
     let second_man = player_events
         .iter()
@@ -260,9 +259,8 @@ fn rotation_player_events_emit_state_change_spans() {
     assert_eq!(second_man.frame, 1);
     assert_eq!(second_man.end_frame, 3);
     assert!((second_man.duration - 0.3).abs() < 1e-6);
-    assert!((second_man.active_game_time - 0.3).abs() < 1e-6);
-    assert!((second_man.time_second_man - 0.3).abs() < 1e-6);
-    assert!((second_man.time_ahead_of_play - 0.3).abs() < 1e-6);
+    assert_eq!(second_man.current_role_state, RoleState::SecondMan);
+    assert_eq!(second_man.current_depth_state, PlayDepthState::AheadOfPlay);
 }
 
 #[test]

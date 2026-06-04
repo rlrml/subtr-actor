@@ -218,8 +218,11 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
     );
 
     let mut reconstructed = BoostStatsAccumulator::new();
-    for event in calculator.projected_stats_events() {
-        reconstructed.apply_event(&event);
+    for event in calculator.projected_state_events() {
+        reconstructed.apply_state_event(&event);
+    }
+    for event in calculator.projected_ledger_events() {
+        reconstructed.apply_ledger_event(&event);
     }
     assert_eq!(reconstructed.player_stats(), calculator.player_stats());
     assert_eq!(

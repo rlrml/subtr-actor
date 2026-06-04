@@ -2,33 +2,6 @@ import type { PositioningEvent } from "./generated/PositioningEvent.ts";
 import type { PositioningStats } from "./generated/PositioningStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
-const FLOAT_POSITIONING_FIELDS = [
-  "active_game_time",
-  "tracked_time",
-  "sum_distance_to_teammates",
-  "sum_distance_to_ball",
-  "sum_distance_to_ball_has_possession",
-  "time_has_possession",
-  "sum_distance_to_ball_no_possession",
-  "time_no_possession",
-  "time_demolished",
-  "time_no_teammates",
-  "time_most_back",
-  "time_most_forward",
-  "time_mid_role",
-  "time_other_role",
-  "time_defensive_third",
-  "time_neutral_third",
-  "time_offensive_third",
-  "time_defensive_half",
-  "time_offensive_half",
-  "time_closest_to_ball",
-  "time_farthest_from_ball",
-  "time_behind_ball",
-  "time_level_with_ball",
-  "time_in_front_of_ball",
-] as const;
-
 function addF32(left: number, right: number): number {
   return Math.fround(Math.fround(left) + Math.fround(right));
 }
@@ -90,11 +63,99 @@ function sortPositioningEvents(events: readonly PositioningEvent[]): Positioning
 }
 
 function applyPositioningEvent(stats: PositioningStats, event: PositioningEvent): void {
-  for (const field of FLOAT_POSITIONING_FIELDS) {
-    stats[field] = addF32(stats[field], event[field]);
+  if (event.active) {
+    stats.active_game_time = addF32(stats.active_game_time, event.duration);
   }
-  stats.times_caught_ahead_of_play_on_conceded_goals +=
-    event.times_caught_ahead_of_play_on_conceded_goals;
+  if (event.tracked) {
+    stats.tracked_time = addF32(stats.tracked_time, event.duration);
+    if (event.distance_to_teammates != null) {
+      stats.sum_distance_to_teammates = addF32(
+        stats.sum_distance_to_teammates,
+        event.distance_to_teammates * event.duration,
+      );
+    }
+    if (event.distance_to_ball != null) {
+      const distanceIntegral = event.distance_to_ball * event.duration;
+      stats.sum_distance_to_ball = addF32(stats.sum_distance_to_ball, distanceIntegral);
+      if (event.possession_state === "has_possession") {
+        stats.sum_distance_to_ball_has_possession = addF32(
+          stats.sum_distance_to_ball_has_possession,
+          distanceIntegral,
+        );
+      } else if (event.possession_state === "no_possession") {
+        stats.sum_distance_to_ball_no_possession = addF32(
+          stats.sum_distance_to_ball_no_possession,
+          distanceIntegral,
+        );
+      }
+    }
+    if (event.possession_state === "has_possession") {
+      stats.time_has_possession = addF32(stats.time_has_possession, event.duration);
+    } else if (event.possession_state === "no_possession") {
+      stats.time_no_possession = addF32(stats.time_no_possession, event.duration);
+    }
+    switch (event.teammate_role) {
+      case "no_teammates":
+        stats.time_no_teammates = addF32(stats.time_no_teammates, event.duration);
+        break;
+      case "most_back":
+        stats.time_most_back = addF32(stats.time_most_back, event.duration);
+        break;
+      case "most_forward":
+        stats.time_most_forward = addF32(stats.time_most_forward, event.duration);
+        break;
+      case "mid":
+        stats.time_mid_role = addF32(stats.time_mid_role, event.duration);
+        break;
+      case "other":
+        stats.time_other_role = addF32(stats.time_other_role, event.duration);
+        break;
+    }
+    stats.time_defensive_third = addF32(
+      stats.time_defensive_third,
+      event.duration * event.defensive_zone_fraction,
+    );
+    stats.time_neutral_third = addF32(
+      stats.time_neutral_third,
+      event.duration * event.neutral_zone_fraction,
+    );
+    stats.time_offensive_third = addF32(
+      stats.time_offensive_third,
+      event.duration * event.offensive_zone_fraction,
+    );
+    stats.time_defensive_half = addF32(
+      stats.time_defensive_half,
+      event.duration * event.defensive_half_fraction,
+    );
+    stats.time_offensive_half = addF32(
+      stats.time_offensive_half,
+      event.duration * event.offensive_half_fraction,
+    );
+    if (event.closest_to_ball) {
+      stats.time_closest_to_ball = addF32(stats.time_closest_to_ball, event.duration);
+    }
+    if (event.farthest_from_ball) {
+      stats.time_farthest_from_ball = addF32(stats.time_farthest_from_ball, event.duration);
+    }
+    stats.time_behind_ball = addF32(
+      stats.time_behind_ball,
+      event.duration * event.behind_ball_fraction,
+    );
+    stats.time_level_with_ball = addF32(
+      stats.time_level_with_ball,
+      event.duration * event.level_with_ball_fraction,
+    );
+    stats.time_in_front_of_ball = addF32(
+      stats.time_in_front_of_ball,
+      event.duration * event.in_front_of_ball_fraction,
+    );
+  }
+  if (event.demolished) {
+    stats.time_demolished = addF32(stats.time_demolished, event.duration);
+  }
+  if (event.caught_ahead_of_play_on_conceded_goal) {
+    stats.times_caught_ahead_of_play_on_conceded_goals += 1;
+  }
 }
 
 function assignPositioningStats(

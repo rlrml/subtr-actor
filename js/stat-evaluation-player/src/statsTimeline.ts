@@ -5,8 +5,8 @@ import type { BoostLedgerTransactionKind } from "./generated/BoostLedgerTransact
 import type { BoostPickupComparisonEvent } from "./generated/BoostPickupComparisonEvent.ts";
 import type { BumpEvent } from "./generated/BumpEvent.ts";
 import type { CeilingShotEvent } from "./generated/CeilingShotEvent.ts";
-import type { CorePlayerStatsEvent } from "./generated/CorePlayerStatsEvent.ts";
-import type { CoreTeamStatsEvent } from "./generated/CoreTeamStatsEvent.ts";
+import type { CorePlayerGoalContextEvent } from "./generated/CorePlayerGoalContextEvent.ts";
+import type { CorePlayerScoreboardEvent } from "./generated/CorePlayerScoreboardEvent.ts";
 import type { DodgeResetEvent } from "./generated/DodgeResetEvent.ts";
 import type { DoubleTapEvent } from "./generated/DoubleTapEvent.ts";
 import type { FiftyFiftyEvent } from "./generated/FiftyFiftyEvent.ts";
@@ -45,7 +45,7 @@ import type { TeamStatsSnapshot as GeneratedTeamStatsSnapshot } from "./generate
 import type { TimelineEvent } from "./generated/TimelineEvent.ts";
 import type { TouchBallMovementEvent } from "./generated/TouchBallMovementEvent.ts";
 import type { TouchLastTouchEvent } from "./generated/TouchLastTouchEvent.ts";
-import type { TouchStatsEvent } from "./generated/TouchStatsEvent.ts";
+import type { TouchClassificationEvent } from "./generated/TouchClassificationEvent.ts";
 import type { HalfFlipEvent } from "./generated/HalfFlipEvent.ts";
 import type { HalfVolleyEvent } from "./generated/HalfVolleyEvent.ts";
 import type { WavedashEvent } from "./generated/WavedashEvent.ts";
@@ -102,7 +102,7 @@ export type {
   TimelineEvent,
   TouchBallMovementEvent,
   TouchLastTouchEvent,
-  TouchStatsEvent,
+  TouchClassificationEvent,
   HalfFlipEvent,
   HalfVolleyEvent,
   WavedashEvent,
@@ -113,8 +113,8 @@ export type {
   BoostLedgerTransactionKind,
   BoostPickupComparisonEvent,
   BumpEvent,
-  CorePlayerStatsEvent,
-  CoreTeamStatsEvent,
+  CorePlayerGoalContextEvent,
+  CorePlayerScoreboardEvent,
   DodgeResetEvent,
 };
 

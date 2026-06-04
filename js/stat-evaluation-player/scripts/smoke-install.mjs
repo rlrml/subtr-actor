@@ -181,7 +181,7 @@ async function main() {
         "  events: {",
         "    timeline: [],",
         "    core_player: [],",
-        "    core_team: [],",
+        "    core_player_goal_context: [],",
         "    possession: [],",
         "    pressure: [],",
         "    territorial_pressure: [],",

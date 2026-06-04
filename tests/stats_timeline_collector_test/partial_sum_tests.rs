@@ -429,11 +429,11 @@ fn test_core_events_reconstruct_serialized_partial_sums() {
 
     assert!(
         !timeline.events.core_player.is_empty(),
-        "expected core fixture to contain player stat events"
+        "expected core fixture to contain player scoreboard events"
     );
     assert!(
-        !timeline.events.core_team.is_empty(),
-        "expected core fixture to contain team stat events"
+        !timeline.events.core_player_goal_context.is_empty(),
+        "expected core fixture to contain player goal-context events"
     );
     assert_core_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
 }

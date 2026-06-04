@@ -30,29 +30,60 @@ pub(in crate::collector::stats::playback) fn parse_powerslide_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_core_player_stats_event(
+pub(in crate::collector::stats::playback) fn parse_core_player_scoreboard_event(
     value: &Value,
-) -> SubtrActorResult<CorePlayerStatsEvent> {
-    let object = json_object(value, "core player stats event")?;
-    Ok(CorePlayerStatsEvent {
+) -> SubtrActorResult<CorePlayerScoreboardEvent> {
+    let object = json_object(value, "core player scoreboard event")?;
+    Ok(CorePlayerScoreboardEvent {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
         player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        delta: decode_json_value(json_required_value(object, "delta")?.clone())?,
+        score_delta: json_required_i32(object, "score_delta")?,
+        goals_delta: json_required_i32(object, "goals_delta")?,
+        assists_delta: json_required_i32(object, "assists_delta")?,
+        saves_delta: json_required_i32(object, "saves_delta")?,
+        shots_delta: json_required_i32(object, "shots_delta")?,
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_core_team_stats_event(
+pub(in crate::collector::stats::playback) fn parse_core_player_goal_context_event(
     value: &Value,
-) -> SubtrActorResult<CoreTeamStatsEvent> {
-    let object = json_object(value, "core team stats event")?;
-    Ok(CoreTeamStatsEvent {
+) -> SubtrActorResult<CorePlayerGoalContextEvent> {
+    let object = json_object(value, "core player goal context event")?;
+    Ok(CorePlayerGoalContextEvent {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        delta: decode_json_value(json_required_value(object, "delta")?.clone())?,
+        scoring_team_is_team_0: json_required_bool(object, "scoring_team_is_team_0")?,
+        goals_conceded_while_last_defender: json_required_bool(
+            object,
+            "goals_conceded_while_last_defender",
+        )?,
+        goals_for_while_most_back: json_required_bool(object, "goals_for_while_most_back")?,
+        goals_against_while_most_back: json_required_bool(object, "goals_against_while_most_back")?,
+        goal_against_boost_amount: json_optional_f32(object.get("goal_against_boost_amount"))?,
+        goal_against_average_boost_in_leadup: json_optional_f32(
+            object.get("goal_against_average_boost_in_leadup"),
+        )?,
+        goal_against_min_boost_in_leadup: json_optional_f32(
+            object.get("goal_against_min_boost_in_leadup"),
+        )?,
+        goal_against_position: json_optional_goal_context_position(
+            object.get("goal_against_position"),
+        )?,
+        scoring_goal_last_touch_position: json_optional_goal_context_position(
+            object.get("scoring_goal_last_touch_position"),
+        )?,
+        time_after_kickoff: json_optional_f32(object.get("time_after_kickoff"))?,
+        goal_buildup: object
+            .get("goal_buildup")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?,
+        ball_air_time_before_goal: json_optional_f32(object.get("ball_air_time_before_goal"))?,
     })
 }
 
@@ -137,40 +168,30 @@ pub(in crate::collector::stats::playback) fn parse_positioning_event(
         player: json_required_remote_id(object, "player")?,
         player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        active_game_time: json_required_f32(object, "active_game_time")?,
-        tracked_time: json_required_f32(object, "tracked_time")?,
-        sum_distance_to_teammates: json_required_f32(object, "sum_distance_to_teammates")?,
-        sum_distance_to_ball: json_required_f32(object, "sum_distance_to_ball")?,
-        sum_distance_to_ball_has_possession: json_required_f32(
-            object,
-            "sum_distance_to_ball_has_possession",
+        active: json_required_bool(object, "active")?,
+        tracked: json_required_bool(object, "tracked")?,
+        distance_to_teammates: json_optional_f32(object.get("distance_to_teammates"))?,
+        distance_to_ball: json_optional_f32(object.get("distance_to_ball"))?,
+        possession_state: decode_json_value(
+            json_required_value(object, "possession_state")?.clone(),
         )?,
-        time_has_possession: json_required_f32(object, "time_has_possession")?,
-        sum_distance_to_ball_no_possession: json_required_f32(
+        demolished: json_required_bool(object, "demolished")?,
+        no_teammates: json_required_bool(object, "no_teammates")?,
+        teammate_role: decode_json_value(json_required_value(object, "teammate_role")?.clone())?,
+        defensive_zone_fraction: json_required_f32(object, "defensive_zone_fraction")?,
+        neutral_zone_fraction: json_required_f32(object, "neutral_zone_fraction")?,
+        offensive_zone_fraction: json_required_f32(object, "offensive_zone_fraction")?,
+        defensive_half_fraction: json_required_f32(object, "defensive_half_fraction")?,
+        offensive_half_fraction: json_required_f32(object, "offensive_half_fraction")?,
+        closest_to_ball: json_required_bool(object, "closest_to_ball")?,
+        farthest_from_ball: json_required_bool(object, "farthest_from_ball")?,
+        behind_ball_fraction: json_required_f32(object, "behind_ball_fraction")?,
+        level_with_ball_fraction: json_required_f32(object, "level_with_ball_fraction")?,
+        in_front_of_ball_fraction: json_required_f32(object, "in_front_of_ball_fraction")?,
+        caught_ahead_of_play_on_conceded_goal: json_required_bool(
             object,
-            "sum_distance_to_ball_no_possession",
+            "caught_ahead_of_play_on_conceded_goal",
         )?,
-        time_no_possession: json_required_f32(object, "time_no_possession")?,
-        time_demolished: json_required_f32(object, "time_demolished")?,
-        time_no_teammates: json_required_f32(object, "time_no_teammates")?,
-        time_most_back: json_required_f32(object, "time_most_back")?,
-        time_most_forward: json_required_f32(object, "time_most_forward")?,
-        time_mid_role: json_required_f32(object, "time_mid_role")?,
-        time_other_role: json_required_f32(object, "time_other_role")?,
-        time_defensive_zone: json_required_f32(object, "time_defensive_third")?,
-        time_neutral_zone: json_required_f32(object, "time_neutral_third")?,
-        time_offensive_zone: json_required_f32(object, "time_offensive_third")?,
-        time_defensive_half: json_required_f32(object, "time_defensive_half")?,
-        time_offensive_half: json_required_f32(object, "time_offensive_half")?,
-        time_closest_to_ball: json_required_f32(object, "time_closest_to_ball")?,
-        time_farthest_from_ball: json_required_f32(object, "time_farthest_from_ball")?,
-        time_behind_ball: json_required_f32(object, "time_behind_ball")?,
-        time_level_with_ball: json_required_f32(object, "time_level_with_ball")?,
-        time_in_front_of_ball: json_required_f32(object, "time_in_front_of_ball")?,
-        times_caught_ahead_of_play_on_conceded_goals: json_required_usize(
-            object,
-            "times_caught_ahead_of_play_on_conceded_goals",
-        )? as u32,
     })
 }
 
@@ -190,19 +211,6 @@ pub(in crate::collector::stats::playback) fn parse_rotation_player_event(
         player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         active: json_required_bool(object, "active")?,
-        active_game_time: json_required_f32(object, "active_game_time")?,
-        tracked_time: json_required_f32(object, "tracked_time")?,
-        time_first_man: json_required_f32(object, "time_first_man")?,
-        time_second_man: json_required_f32(object, "time_second_man")?,
-        time_third_man: json_required_f32(object, "time_third_man")?,
-        time_ambiguous_role: json_required_f32(object, "time_ambiguous_role")?,
-        time_behind_play: json_required_f32(object, "time_behind_play")?,
-        time_level_with_play: json_required_f32(object, "time_level_with_play")?,
-        time_ahead_of_play: json_required_f32(object, "time_ahead_of_play")?,
-        longest_first_man_stint_time: json_required_f32(object, "longest_first_man_stint_time")?,
-        first_man_stint_count: json_required_usize(object, "first_man_stint_count")? as u32,
-        became_first_man_count: json_required_usize(object, "became_first_man_count")? as u32,
-        lost_first_man_count: json_required_usize(object, "lost_first_man_count")? as u32,
         current_role_state: decode_json_value(
             json_required_value(object, "current_role_state")?.clone(),
         )?,
@@ -220,19 +228,18 @@ pub(in crate::collector::stats::playback) fn parse_rotation_team_event(
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        first_man_changes_for_team: json_required_usize(object, "first_man_changes_for_team")?
-            as u32,
-        rotation_count: json_required_usize(object, "rotation_count")? as u32,
+        previous_first_man: json_required_remote_id(object, "previous_first_man")?,
+        next_first_man: json_required_remote_id(object, "next_first_man")?,
     })
 }
 
 pub(in crate::collector::stats::playback) fn parse_touch_stats_event(
     value: &Value,
-) -> SubtrActorResult<TouchStatsEvent> {
-    let object = json_object(value, "touch stats event")?;
+) -> SubtrActorResult<TouchClassificationEvent> {
+    let object = json_object(value, "touch classification event")?;
     let time = json_required_f32(object, "time")?;
     let frame = json_required_usize(object, "frame")?;
-    Ok(TouchStatsEvent {
+    Ok(TouchClassificationEvent {
         time,
         frame,
         sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
@@ -1009,22 +1016,5 @@ pub(in crate::collector::stats::playback) fn parse_boost_state_event(
         is_team_0: json_required_bool(object, "is_team_0")?,
         boost_amount: json_required_f32(object, "boost_amount")?,
         boost_before: json_optional_f32(object.get("boost_before"))?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_boost_stats_event(
-    value: &Value,
-) -> SubtrActorResult<BoostStatsEvent> {
-    let object = json_object(value, "boost stats event")?;
-    let frame = json_required_usize(object, "frame")?;
-    let time = json_required_f32(object, "time")?;
-    Ok(BoostStatsEvent {
-        frame,
-        time,
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        player_id: json_required_remote_id(object, "player_id")?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        delta: decode_json_value(json_required_value(object, "delta")?.clone())?,
     })
 }

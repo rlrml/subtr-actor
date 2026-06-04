@@ -140,14 +140,14 @@ impl BallCarryStatsAccumulator {
                     .player_air_dribble_stats
                     .entry(event.player_id.clone())
                     .or_default();
-                AirDribblePolicy::apply_event(player_stats, event);
+                player_stats.apply_event(event);
 
                 let team_stats = if event.is_team_0 {
                     &mut self.team_zero_air_dribble_stats
                 } else {
                     &mut self.team_one_air_dribble_stats
                 };
-                AirDribblePolicy::apply_event(team_stats, event);
+                team_stats.apply_event(event);
             }
         }
     }

@@ -11,6 +11,8 @@ pub(crate) use test_projection::*;
 
 pub mod backboard_stats;
 pub use backboard_stats::*;
+pub mod air_dribble_stats;
+pub use air_dribble_stats::*;
 pub mod ball_carry_stats;
 pub use ball_carry_stats::*;
 pub mod boost_stats;

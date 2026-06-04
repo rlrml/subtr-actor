@@ -139,7 +139,7 @@ fn touch_label_for_derivation(key: &'static str, value: &str) -> StatLabel {
 
 fn apply_touch_stats_event_for_derivation(
     stats: &mut TouchStats,
-    event: &TouchStatsEvent,
+    event: &TouchClassificationEvent,
     frame: &ReplayStatsFrame,
 ) {
     stats.touch_count += 1;
@@ -310,56 +310,49 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
             .cmp(&right.frame)
             .then_with(|| left.time.total_cmp(&right.time))
     });
-    let mut team_events = timeline.events.core_team.clone();
-    team_events.sort_by(|left, right| {
+    let mut goal_context_events = timeline.events.core_player_goal_context.clone();
+    goal_context_events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
             .then_with(|| left.time.total_cmp(&right.time))
     });
 
     let mut player_event_index = 0;
-    let mut team_event_index = 0;
-    let mut players: HashMap<PlayerId, CorePlayerStats> = HashMap::new();
-    let mut team_zero = CoreTeamStats::default();
-    let mut team_one = CoreTeamStats::default();
+    let mut goal_context_event_index = 0;
+    let mut accumulator = CoreStatsAccumulator::new();
 
     for frame in &timeline.frames {
         while player_event_index < player_events.len()
             && player_events[player_event_index].frame <= frame.frame_number
         {
             let event = &player_events[player_event_index];
-            apply_core_player_delta(
-                players.entry(event.player.clone()).or_default(),
-                &event.delta,
-            );
+            accumulator.apply_scoreboard_event(event);
             player_event_index += 1;
         }
 
-        while team_event_index < team_events.len()
-            && team_events[team_event_index].frame <= frame.frame_number
+        while goal_context_event_index < goal_context_events.len()
+            && goal_context_events[goal_context_event_index].frame <= frame.frame_number
         {
-            let event = &team_events[team_event_index];
-            if event.is_team_0 {
-                apply_core_team_delta(&mut team_zero, &event.delta);
-            } else {
-                apply_core_team_delta(&mut team_one, &event.delta);
-            }
-            team_event_index += 1;
+            let event = &goal_context_events[goal_context_event_index];
+            accumulator.apply_goal_context_event(event);
+            goal_context_event_index += 1;
         }
 
         assert_eq!(
-            frame.team_zero.core, team_zero,
+            frame.team_zero.core,
+            accumulator.team_zero_stats(),
             "{replay_path} team_zero core frame {}",
             frame.frame_number
         );
         assert_eq!(
-            frame.team_one.core, team_one,
+            frame.team_one.core,
+            accumulator.team_one_stats(),
             "{replay_path} team_one core frame {}",
             frame.frame_number
         );
 
         for player in &frame.players {
-            let expected = players.get(&player.player_id).cloned().unwrap_or_default();
+            let expected = accumulator.player_stats_for(&player.player_id);
             assert_eq!(
                 player.core, expected,
                 "{replay_path} player {} core frame {}",
@@ -374,174 +367,9 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
         "{replay_path} unprocessed core player events"
     );
     assert_eq!(
-        team_event_index,
-        team_events.len(),
-        "{replay_path} unprocessed core team events"
-    );
-}
-
-fn apply_goal_after_kickoff_delta(
-    stats: &mut GoalAfterKickoffStats,
-    delta: &GoalAfterKickoffStats,
-) {
-    if delta.goal_times().is_empty() {
-        stats.kickoff_goal_count += delta.kickoff_goal_count;
-        stats.short_goal_count += delta.short_goal_count;
-        stats.medium_goal_count += delta.medium_goal_count;
-        stats.long_goal_count += delta.long_goal_count;
-    } else {
-        for time in delta.goal_times() {
-            stats.record_goal(*time);
-        }
-    }
-}
-
-fn apply_goal_buildup_delta(stats: &mut GoalBuildupStats, delta: &GoalBuildupStats) {
-    stats.counter_attack_goal_count += delta.counter_attack_goal_count;
-    stats.sustained_pressure_goal_count += delta.sustained_pressure_goal_count;
-    stats.other_buildup_goal_count += delta.other_buildup_goal_count;
-}
-
-fn apply_goal_ball_air_time_delta(stats: &mut GoalBallAirTimeStats, delta: &GoalBallAirTimeStats) {
-    if delta.goal_ball_air_times().is_empty() {
-        stats.goal_ball_air_time_sample_count += delta.goal_ball_air_time_sample_count;
-        stats.cumulative_goal_ball_air_time += delta.cumulative_goal_ball_air_time;
-        if delta.last_goal_ball_air_time.is_some() {
-            stats.last_goal_ball_air_time = delta.last_goal_ball_air_time;
-        }
-    } else {
-        let previous_last_goal_ball_air_time = stats.last_goal_ball_air_time;
-        for time in delta.goal_ball_air_times() {
-            stats.record_goal(*time);
-        }
-        stats.last_goal_ball_air_time = delta
-            .last_goal_ball_air_time
-            .or(previous_last_goal_ball_air_time);
-    }
-}
-
-fn apply_core_team_delta(stats: &mut CoreTeamStats, delta: &CoreTeamStats) {
-    stats.score += delta.score;
-    stats.goals += delta.goals;
-    stats.assists += delta.assists;
-    stats.saves += delta.saves;
-    stats.shots += delta.shots;
-    apply_goal_after_kickoff_delta(
-        &mut stats.scoring_context.goal_after_kickoff,
-        &delta.scoring_context.goal_after_kickoff,
-    );
-    apply_goal_buildup_delta(
-        &mut stats.scoring_context.goal_buildup,
-        &delta.scoring_context.goal_buildup,
-    );
-    apply_goal_ball_air_time_delta(
-        &mut stats.scoring_context.goal_ball_air_time,
-        &delta.scoring_context.goal_ball_air_time,
-    );
-}
-
-fn apply_core_player_delta(stats: &mut CorePlayerStats, delta: &CorePlayerStats) {
-    stats.score += delta.score;
-    stats.goals += delta.goals;
-    stats.assists += delta.assists;
-    stats.saves += delta.saves;
-    stats.shots += delta.shots;
-    stats.scoring_context.goals_conceded_while_last_defender +=
-        delta.scoring_context.goals_conceded_while_last_defender;
-    stats.scoring_context.goals_for_while_most_back +=
-        delta.scoring_context.goals_for_while_most_back;
-    stats.scoring_context.goals_against_while_most_back +=
-        delta.scoring_context.goals_against_while_most_back;
-    stats.scoring_context.goal_against_boost_sample_count +=
-        delta.scoring_context.goal_against_boost_sample_count;
-    stats.scoring_context.cumulative_boost_on_goals_against +=
-        delta.scoring_context.cumulative_boost_on_goals_against;
-    if delta.scoring_context.last_boost_on_goal_against.is_some() {
-        stats.scoring_context.last_boost_on_goal_against =
-            delta.scoring_context.last_boost_on_goal_against;
-    }
-    stats.scoring_context.goal_against_boost_leadup_sample_count +=
-        delta.scoring_context.goal_against_boost_leadup_sample_count;
-    stats
-        .scoring_context
-        .cumulative_average_boost_in_goal_against_leadup += delta
-        .scoring_context
-        .cumulative_average_boost_in_goal_against_leadup;
-    stats
-        .scoring_context
-        .cumulative_min_boost_in_goal_against_leadup += delta
-        .scoring_context
-        .cumulative_min_boost_in_goal_against_leadup;
-    if delta
-        .scoring_context
-        .last_average_boost_in_goal_against_leadup
-        .is_some()
-    {
-        stats
-            .scoring_context
-            .last_average_boost_in_goal_against_leadup = delta
-            .scoring_context
-            .last_average_boost_in_goal_against_leadup;
-    }
-    if delta
-        .scoring_context
-        .last_min_boost_in_goal_against_leadup
-        .is_some()
-    {
-        stats.scoring_context.last_min_boost_in_goal_against_leadup =
-            delta.scoring_context.last_min_boost_in_goal_against_leadup;
-    }
-    stats.scoring_context.goal_against_position_sample_count +=
-        delta.scoring_context.goal_against_position_sample_count;
-    stats.scoring_context.cumulative_goal_against_position_x +=
-        delta.scoring_context.cumulative_goal_against_position_x;
-    stats.scoring_context.cumulative_goal_against_position_y +=
-        delta.scoring_context.cumulative_goal_against_position_y;
-    stats.scoring_context.cumulative_goal_against_position_z +=
-        delta.scoring_context.cumulative_goal_against_position_z;
-    if delta.scoring_context.last_goal_against_position.is_some() {
-        stats.scoring_context.last_goal_against_position =
-            delta.scoring_context.last_goal_against_position;
-    }
-    stats
-        .scoring_context
-        .scoring_goal_last_touch_position_sample_count += delta
-        .scoring_context
-        .scoring_goal_last_touch_position_sample_count;
-    stats
-        .scoring_context
-        .cumulative_scoring_goal_last_touch_position_x += delta
-        .scoring_context
-        .cumulative_scoring_goal_last_touch_position_x;
-    stats
-        .scoring_context
-        .cumulative_scoring_goal_last_touch_position_y += delta
-        .scoring_context
-        .cumulative_scoring_goal_last_touch_position_y;
-    stats
-        .scoring_context
-        .cumulative_scoring_goal_last_touch_position_z += delta
-        .scoring_context
-        .cumulative_scoring_goal_last_touch_position_z;
-    if delta
-        .scoring_context
-        .last_scoring_goal_last_touch_position
-        .is_some()
-    {
-        stats.scoring_context.last_scoring_goal_last_touch_position =
-            delta.scoring_context.last_scoring_goal_last_touch_position;
-    }
-    apply_goal_after_kickoff_delta(
-        &mut stats.scoring_context.goal_after_kickoff,
-        &delta.scoring_context.goal_after_kickoff,
-    );
-    apply_goal_buildup_delta(
-        &mut stats.scoring_context.goal_buildup,
-        &delta.scoring_context.goal_buildup,
-    );
-    apply_goal_ball_air_time_delta(
-        &mut stats.scoring_context.goal_ball_air_time,
-        &delta.scoring_context.goal_ball_air_time,
+        goal_context_event_index,
+        goal_context_events.len(),
+        "{replay_path} unprocessed core goal-context events"
     );
 }
 

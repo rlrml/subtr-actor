@@ -290,12 +290,12 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             core_player: self.module_player_events(
                 "core",
                 "player_events",
-                parse_core_player_stats_event,
+                parse_core_player_scoreboard_event,
             )?,
-            core_team: self.module_player_events(
+            core_player_goal_context: self.module_player_events(
                 "core",
-                "team_events",
-                parse_core_team_stats_event,
+                "player_goal_context_events",
+                parse_core_player_goal_context_event,
             )?,
             possession: self.module_player_events(
                 "possession",
@@ -426,11 +426,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "state_events",
                 parse_boost_state_event,
             )?,
-            boost_stats: self.module_player_events(
-                "boost",
-                "stats_events",
-                parse_boost_stats_event,
-            )?,
             bump: self.module_player_events("bump", "events", parse_bump_event)?,
         })
     }
@@ -445,8 +440,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             Value::Array(self.module_array("core", "player_events")),
         );
         events.insert(
-            "core_team".to_owned(),
-            Value::Array(self.module_array("core", "team_events")),
+            "core_player_goal_context".to_owned(),
+            Value::Array(self.module_array("core", "player_goal_context_events")),
         );
         events.insert(
             "possession".to_owned(),
@@ -567,10 +562,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "boost_state".to_owned(),
             Value::Array(self.module_array("boost", "state_events")),
-        );
-        events.insert(
-            "boost_stats".to_owned(),
-            Value::Array(self.module_array("boost", "stats_events")),
         );
         events.insert(
             "bump".to_owned(),

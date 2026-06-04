@@ -71,7 +71,7 @@ struct TouchClassification {
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct TouchStatsEvent {
+pub struct TouchClassificationEvent {
     pub time: f32,
     pub frame: usize,
     pub sample_time: f32,
@@ -148,7 +148,7 @@ struct PendingTouchBallMovementEvent {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchCalculator {
-    events: EventStream<TouchStatsEvent>,
+    events: EventStream<TouchClassificationEvent>,
     ball_movement_events: EventStream<TouchBallMovementEvent>,
     last_touch_events: EventStream<TouchLastTouchEvent>,
     pending_ball_movement_event: Option<PendingTouchBallMovementEvent>,
@@ -162,11 +162,11 @@ impl TouchCalculator {
         Self::default()
     }
 
-    pub fn events(&self) -> &[TouchStatsEvent] {
+    pub fn events(&self) -> &[TouchClassificationEvent] {
         self.events.all()
     }
 
-    pub fn new_events(&self) -> &[TouchStatsEvent] {
+    pub fn new_events(&self) -> &[TouchClassificationEvent] {
         self.events.new_events()
     }
 
@@ -330,7 +330,7 @@ impl TouchCalculator {
                 ball_speed_change,
                 controlled_touch_kind,
             );
-            let event = TouchStatsEvent {
+            let event = TouchClassificationEvent {
                 time: touch_event.time,
                 frame: touch_event.frame,
                 sample_time: frame.time,

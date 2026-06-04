@@ -84,24 +84,33 @@ pub(crate) trait BoostTestProjection {
 impl BoostTestProjection for BoostCalculator {
     fn player_stats(&self) -> &HashMap<PlayerId, BoostStats> {
         let mut stats = BoostStatsAccumulator::default();
-        for event in self.projected_stats_events() {
-            stats.apply_event(&event);
+        for event in self.projected_state_events() {
+            stats.apply_state_event(&event);
+        }
+        for event in self.projected_ledger_events() {
+            stats.apply_ledger_event(&event);
         }
         leak_test_stats(stats.player_stats().clone())
     }
 
     fn team_zero_stats(&self) -> &BoostStats {
         let mut stats = BoostStatsAccumulator::default();
-        for event in self.projected_stats_events() {
-            stats.apply_event(&event);
+        for event in self.projected_state_events() {
+            stats.apply_state_event(&event);
+        }
+        for event in self.projected_ledger_events() {
+            stats.apply_ledger_event(&event);
         }
         leak_test_stats(stats.team_zero_stats().clone())
     }
 
     fn team_one_stats(&self) -> &BoostStats {
         let mut stats = BoostStatsAccumulator::default();
-        for event in self.projected_stats_events() {
-            stats.apply_event(&event);
+        for event in self.projected_state_events() {
+            stats.apply_state_event(&event);
+        }
+        for event in self.projected_ledger_events() {
+            stats.apply_ledger_event(&event);
         }
         leak_test_stats(stats.team_one_stats().clone())
     }
@@ -348,7 +357,10 @@ impl MatchStatsTestProjection for MatchStatsCalculator {
     fn player_stats(&self) -> &HashMap<PlayerId, CorePlayerStats> {
         let mut stats = CoreStatsAccumulator::default();
         for event in self.core_player_events() {
-            stats.apply_player_event(event);
+            stats.apply_scoreboard_event(event);
+        }
+        for event in self.core_player_goal_context_events() {
+            stats.apply_goal_context_event(event);
         }
         leak_test_stats(stats.player_stats().clone())
     }
@@ -356,7 +368,10 @@ impl MatchStatsTestProjection for MatchStatsCalculator {
     fn team_zero_stats(&self) -> CoreTeamStats {
         let mut stats = CoreStatsAccumulator::default();
         for event in self.core_player_events() {
-            stats.apply_player_event(event);
+            stats.apply_scoreboard_event(event);
+        }
+        for event in self.core_player_goal_context_events() {
+            stats.apply_goal_context_event(event);
         }
         stats.team_zero_stats()
     }
@@ -364,7 +379,10 @@ impl MatchStatsTestProjection for MatchStatsCalculator {
     fn team_one_stats(&self) -> CoreTeamStats {
         let mut stats = CoreStatsAccumulator::default();
         for event in self.core_player_events() {
-            stats.apply_player_event(event);
+            stats.apply_scoreboard_event(event);
+        }
+        for event in self.core_player_goal_context_events() {
+            stats.apply_goal_context_event(event);
         }
         stats.team_one_stats()
     }
@@ -460,7 +478,9 @@ pub(crate) trait RotationTestProjection {
 
 impl RotationTestProjection for RotationCalculator {
     fn player_stats(&self) -> &HashMap<PlayerId, RotationPlayerStats> {
-        let mut stats = RotationStatsAccumulator::default();
+        let mut stats = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
+            self.config().first_man_debounce_seconds,
+        );
         let projected_player_events = self.projected_player_events();
         for event in &projected_player_events {
             stats.apply_player_event(event);
@@ -472,7 +492,9 @@ impl RotationTestProjection for RotationCalculator {
     }
 
     fn team_zero_stats(&self) -> &RotationTeamStats {
-        let mut stats = RotationStatsAccumulator::default();
+        let mut stats = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
+            self.config().first_man_debounce_seconds,
+        );
         let projected_player_events = self.projected_player_events();
         for event in &projected_player_events {
             stats.apply_player_event(event);
@@ -484,7 +506,9 @@ impl RotationTestProjection for RotationCalculator {
     }
 
     fn team_one_stats(&self) -> &RotationTeamStats {
-        let mut stats = RotationStatsAccumulator::default();
+        let mut stats = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
+            self.config().first_man_debounce_seconds,
+        );
         let projected_player_events = self.projected_player_events();
         for event in &projected_player_events {
             stats.apply_player_event(event);
@@ -531,8 +555,8 @@ pub(crate) trait TerritorialPressureTestProjection {
 impl TerritorialPressureTestProjection for TerritorialPressureCalculator {
     fn stats(&self) -> &TerritorialPressureStats {
         let mut stats = TerritorialPressureStatsAccumulator::default();
-        for event in self.stats_events() {
-            stats.apply_event(event);
+        for event in self.projected_events() {
+            stats.apply_event(&event);
         }
         leak_test_stats(stats.stats().clone())
     }

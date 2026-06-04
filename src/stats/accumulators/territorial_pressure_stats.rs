@@ -105,39 +105,69 @@ impl TerritorialPressureStatsAccumulator {
         &self.stats
     }
 
-    pub fn apply_event(&mut self, event: &TerritorialPressureStatsEvent) {
-        self.apply_delta(&event.delta);
+    pub fn set_tracked_time(&mut self, tracked_time: f32) {
+        self.stats.tracked_time = tracked_time;
     }
 
-    fn apply_delta(&mut self, delta: &TerritorialPressureStats) {
-        self.stats.tracked_time += delta.tracked_time;
-        self.stats.team_zero_session_count += delta.team_zero_session_count;
-        self.stats.team_one_session_count += delta.team_one_session_count;
-        self.stats.team_zero_session_time += delta.team_zero_session_time;
-        self.stats.team_one_session_time += delta.team_one_session_time;
-        self.stats.team_zero_offensive_half_time += delta.team_zero_offensive_half_time;
-        self.stats.team_one_offensive_half_time += delta.team_one_offensive_half_time;
-        self.stats.team_zero_offensive_third_time += delta.team_zero_offensive_third_time;
-        self.stats.team_one_offensive_third_time += delta.team_one_offensive_third_time;
-        self.stats.team_zero_longest_session_time = self
-            .stats
-            .team_zero_longest_session_time
-            .max(delta.team_zero_longest_session_time);
-        self.stats.team_one_longest_session_time = self
-            .stats
-            .team_one_longest_session_time
-            .max(delta.team_one_longest_session_time);
-        for entry in &delta.labeled_session_counts.entries {
-            for _ in 0..entry.count {
-                self.stats
-                    .labeled_session_counts
-                    .increment(entry.labels.clone());
-            }
+    pub fn add_tracked_time(&mut self, dt: f32) {
+        self.stats.tracked_time += dt;
+    }
+
+    pub fn apply_event(&mut self, event: &TerritorialPressureEvent) {
+        let pressure_team_label = Self::pressure_team_label(event.team_is_team_0);
+        self.stats
+            .labeled_session_counts
+            .increment([pressure_team_label.clone()]);
+
+        let offensive_half_only_time =
+            (event.offensive_half_time - event.offensive_third_time).max(0.0);
+        let relief_time = (event.duration - event.offensive_half_time).max(0.0);
+        self.stats.labeled_time.add(
+            [
+                pressure_team_label.clone(),
+                StatLabel::new("territory", "offensive_half"),
+            ],
+            offensive_half_only_time,
+        );
+        self.stats.labeled_time.add(
+            [
+                pressure_team_label.clone(),
+                StatLabel::new("territory", "offensive_third"),
+            ],
+            event.offensive_third_time,
+        );
+        self.stats.labeled_time.add(
+            [pressure_team_label, StatLabel::new("territory", "relief")],
+            relief_time,
+        );
+
+        if event.team_is_team_0 {
+            self.stats.team_zero_session_count += 1;
+            self.stats.team_zero_session_time += event.duration;
+            self.stats.team_zero_offensive_half_time += event.offensive_half_time;
+            self.stats.team_zero_offensive_third_time += event.offensive_third_time;
+            self.stats.team_zero_longest_session_time = self
+                .stats
+                .team_zero_longest_session_time
+                .max(event.duration);
+        } else {
+            self.stats.team_one_session_count += 1;
+            self.stats.team_one_session_time += event.duration;
+            self.stats.team_one_offensive_half_time += event.offensive_half_time;
+            self.stats.team_one_offensive_third_time += event.offensive_third_time;
+            self.stats.team_one_longest_session_time =
+                self.stats.team_one_longest_session_time.max(event.duration);
         }
-        for entry in &delta.labeled_time.entries {
-            self.stats
-                .labeled_time
-                .add(entry.labels.clone(), entry.value);
-        }
+    }
+
+    fn pressure_team_label(team_is_team_0: bool) -> StatLabel {
+        StatLabel::new(
+            "pressure_team",
+            if team_is_team_0 {
+                "team_zero"
+            } else {
+                "team_one"
+            },
+        )
     }
 }

@@ -122,8 +122,8 @@ struct CoreStatsExport<'a> {
     player_stats: Vec<PlayerStatsEntry<'a, CorePlayerStats>>,
     timeline: &'a [TimelineEvent],
     goal_context: &'a [GoalContextEvent],
-    player_events: &'a [CorePlayerStatsEvent],
-    team_events: &'a [CoreTeamStatsEvent],
+    player_events: &'a [CorePlayerScoreboardEvent],
+    player_goal_context_events: &'a [CorePlayerGoalContextEvent],
 }
 
 #[derive(Serialize)]
@@ -458,7 +458,7 @@ pub(crate) fn builtin_module_json(
                 timeline: calculator.timeline(),
                 goal_context: calculator.goal_context_events(),
                 player_events: calculator.core_player_events(),
-                team_events: &projection.core_team_events,
+                player_goal_context_events: calculator.core_player_goal_context_events(),
             })
         }
         "backboard" => {
@@ -654,7 +654,6 @@ pub(crate) fn builtin_module_json(
             serialize_to_json_value(&serde_json::json!({
                 "stats": projection.territorial_pressure.stats(),
                 "events": calculator.events(),
-                "stats_events": calculator.stats_events(),
             }))
         }
         "rotation" => {
@@ -780,7 +779,6 @@ pub(crate) fn builtin_module_json(
                 "events": calculator.pickup_comparison_events(),
                 "ledger_events": calculator.ledger_events(),
                 "state_events": calculator.state_events(),
-                "stats_events": calculator.stats_events(),
             }))
         }
         "bump" => {

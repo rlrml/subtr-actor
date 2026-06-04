@@ -109,7 +109,6 @@ impl StatsTimelineEventsNode {
 
     fn capture_events(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         let match_stats = ctx.get::<MatchStatsCalculator>()?;
-        let stats_projection = ctx.get::<StatsProjectionState>()?;
         let possession = ctx.get::<PossessionCalculator>()?;
         let pressure = ctx.get::<PressureCalculator>()?;
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
@@ -176,7 +175,7 @@ impl StatsTimelineEventsNode {
         self.state.events = ReplayStatsTimelineEvents {
             timeline,
             core_player: match_stats.core_player_events().to_vec(),
-            core_team: stats_projection.core_team_events.clone(),
+            core_player_goal_context: match_stats.core_player_goal_context_events().to_vec(),
             possession: possession.events().to_vec(),
             pressure: pressure.events().to_vec(),
             territorial_pressure: territorial_pressure.events().to_vec(),
@@ -230,7 +229,6 @@ impl StatsTimelineEventsNode {
             boost_pickups: boost.pickup_comparison_events().to_vec(),
             boost_ledger: boost.ledger_events().to_vec(),
             boost_state: boost.state_events().to_vec(),
-            boost_stats: boost.stats_events().to_vec(),
             bump: bump.events().to_vec(),
         };
         Ok(())

@@ -7,7 +7,6 @@ use crate::{PlayerId, SubtrActorResult};
 #[derive(Debug, Clone, Default)]
 pub struct StatsProjectionState {
     pub core: CoreStatsAccumulator,
-    pub core_team_events: Vec<CoreTeamStatsEvent>,
     pub backboard: BackboardStatsAccumulator,
     pub ceiling_shot: CeilingShotStatsAccumulator,
     pub wall_aerial: WallAerialStatsAccumulator,
@@ -103,12 +102,14 @@ pub struct StatsProjectionNode {
     powerslide: PowerslideProjectionState,
     boost_current_amount_consistency: BoostCurrentAmountConsistencyTracker,
     last_powerslide_sample_frame: Option<usize>,
+    territorial_pressure_tracked_time: f32,
     previous_live_play: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default)]
 struct StatsProjectionCursors {
     core_player: usize,
+    core_player_goal_context: usize,
     backboard: usize,
     ceiling_shot: usize,
     wall_aerial: usize,
@@ -120,7 +121,6 @@ struct StatsProjectionCursors {
     fifty_fifty: usize,
     possession: usize,
     pressure: usize,
-    territorial_pressure_stats: usize,
     rotation_player: usize,
     rotation_team: usize,
     rush: usize,
@@ -135,7 +135,6 @@ struct StatsProjectionCursors {
     musty_flick: usize,
     dodge_reset: usize,
     ball_carry: usize,
-    boost_stats: usize,
     bump: usize,
     half_volley: usize,
     movement: usize,
@@ -270,17 +269,13 @@ impl StatsProjectionNode {
             &mut self.cursors.core_player,
             match_stats.core_player_events(),
         ) {
-            let previous_team_stats = self.state.core.team_stats_for_side(event.is_team_0);
-            self.state.core.apply_player_event(event);
-            let current_team_stats = self.state.core.team_stats_for_side(event.is_team_0);
-            if current_team_stats != previous_team_stats {
-                self.state.core_team_events.push(CoreTeamStatsEvent {
-                    time: event.time,
-                    frame: event.frame,
-                    is_team_0: event.is_team_0,
-                    delta: core_team_stats_delta(&current_team_stats, &previous_team_stats),
-                });
-            }
+            self.state.core.apply_scoreboard_event(event);
+        }
+        for event in Self::events_since(
+            &mut self.cursors.core_player_goal_context,
+            match_stats.core_player_goal_context_events(),
+        ) {
+            self.state.core.apply_goal_context_event(event);
         }
 
         let backboard = ctx.get::<BackboardCalculator>()?;
@@ -353,16 +348,22 @@ impl StatsProjectionNode {
         }
         self.cursors.pressure = pressure.events().len();
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
-        let projected_territorial_pressure_stats_events =
-            territorial_pressure.projected_stats_events();
+        if live_play {
+            self.territorial_pressure_tracked_time += frame.dt;
+        }
+        let projected_territorial_pressure_events = territorial_pressure.projected_events();
         self.state.territorial_pressure = TerritorialPressureStatsAccumulator::default();
-        for event in projected_territorial_pressure_stats_events.iter() {
+        self.state
+            .territorial_pressure
+            .set_tracked_time(self.territorial_pressure_tracked_time);
+        for event in projected_territorial_pressure_events.iter() {
             self.state.territorial_pressure.apply_event(event);
         }
-        self.cursors.territorial_pressure_stats = territorial_pressure.stats_events().len();
         let rotation = ctx.get::<RotationCalculator>()?;
         let projected_rotation_player_events = rotation.projected_player_events();
-        self.state.rotation = RotationStatsAccumulator::default();
+        self.state.rotation = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
+            rotation.config().first_man_debounce_seconds,
+        );
         for event in projected_rotation_player_events.iter() {
             self.state.rotation.apply_player_event(event);
         }
@@ -447,15 +448,18 @@ impl StatsProjectionNode {
             self.state.ball_carry.apply_event(event);
         }
         let boost = ctx.get::<BoostCalculator>()?;
-        let projected_boost_stats_events = boost.projected_stats_events();
         self.state.boost = BoostStatsAccumulator::default();
-        for event in projected_boost_stats_events.iter() {
-            self.state.boost.apply_event(event);
+        let projected_boost_state_events = boost.projected_state_events();
+        for event in projected_boost_state_events.iter() {
+            self.state.boost.apply_state_event(event);
+        }
+        let projected_boost_ledger_events = boost.projected_ledger_events();
+        for event in projected_boost_ledger_events.iter() {
+            self.state.boost.apply_ledger_event(event);
         }
         if live_play {
             self.check_boost_current_amount_consistency(frame, players);
         }
-        self.cursors.boost_stats = boost.stats_events().len();
         let bump = ctx.get::<BumpCalculator>()?;
         for event in Self::events_since(&mut self.cursors.bump, bump.events()) {
             self.state.bump.apply_event(event);

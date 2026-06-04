@@ -23,6 +23,19 @@ frame samples, pending touch windows, or boost reconciliation state. The public
 stats shape should avoid hand-maintaining independent cartesian counters when
 the same information is naturally represented as labels on an observation.
 
+The boundary is not "calculators have no state." Span-based and inferred events
+usually require state: a calculator may keep the active candidate, previous
+sample, lookback buffer, pending reconciliation, or projected in-progress event
+needed to decide when a domain event starts, updates, and ends. That state is
+part of detection.
+
+The boundary is "calculators do not own report accumulation." Counts, sums,
+averages, maxima, compatibility fields, and labeled projections belong in
+accumulators whenever they can be derived from emitted events. If calculator
+state would be unchanged by removing the final report fields, it is probably
+detection state. If the state exists only to answer "what is the current total,"
+it belongs in an accumulator.
+
 Use these observation shapes:
 
 - Discrete events: touches, whiffs, rushes, flicks, goal tags, demos.
@@ -42,19 +55,23 @@ example, a rush count is one stat with labels such as `team=team_zero`,
 
 ### `src/stats/calculators/`
 
-This layer owns the domain logic.
+This layer owns the domain event logic.
 
 - Shared frame-level inputs such as `FrameInput`, `FrameInfo`,
   `GameplayState`, `BallFrameState`, `PlayerFrameState`, and
   `FrameEventsState` live in the top-level calculator modules.
 - Per-stat files such as `pressure.rs`, `rush.rs`, `positioning.rs`, and
-  `boost.rs` define the calculators and their stat/event/state types.
+  `boost.rs` define calculators and the event/state types needed to detect
+  domain observations.
 - Some files expose intermediate state calculators rather than exported stats,
   for example `touch_state.rs`, `possession_state.rs`, and
   `fifty_fifty_state.rs`.
 
-Rule of thumb: if the change is about stat semantics, thresholds, event
-generation, counters, or owned state, it usually belongs in a calculator.
+Rule of thumb: if the change is about thresholds, event semantics, event
+generation, candidate tracking, or frame-to-frame detection state, it usually
+belongs in a calculator. If the change is about counting, summing, averaging,
+max tracking, or projecting labeled compatibility fields from those events, it
+usually belongs in an accumulator.
 
 ### `src/stats/analysis_graph/`
 

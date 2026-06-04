@@ -61,7 +61,10 @@ fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, us
     vec![
         ("timeline", events.timeline.len()),
         ("core_player", events.core_player.len()),
-        ("core_team", events.core_team.len()),
+        (
+            "core_player_goal_context",
+            events.core_player_goal_context.len(),
+        ),
         ("possession", events.possession.len()),
         ("pressure", events.pressure.len()),
         ("movement", events.movement.len()),
@@ -98,7 +101,6 @@ fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, us
         ("boost_pickups", events.boost_pickups.len()),
         ("boost_ledger", events.boost_ledger.len()),
         ("boost_state", events.boost_state.len()),
-        ("boost_stats", events.boost_stats.len()),
         ("bump", events.bump.len()),
     ]
 }

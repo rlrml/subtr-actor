@@ -1,7 +1,7 @@
 import type { CorePlayerStats } from "./generated/CorePlayerStats.ts";
-import type { CorePlayerStatsEvent } from "./generated/CorePlayerStatsEvent.ts";
+import type { CorePlayerGoalContextEvent } from "./generated/CorePlayerGoalContextEvent.ts";
+import type { CorePlayerScoreboardEvent } from "./generated/CorePlayerScoreboardEvent.ts";
 import type { CoreTeamStats } from "./generated/CoreTeamStats.ts";
-import type { CoreTeamStatsEvent } from "./generated/CoreTeamStatsEvent.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
@@ -89,100 +89,116 @@ function assignCoreTeamStats(target: CoreTeamStats, source: CoreTeamStats): void
   Object.assign(target, source);
 }
 
-function applyOptionalPositionDelta<T extends { x: number; y: number; z: number }>(
-  current: T | null,
-  delta: T | null,
-): T | null {
-  return delta == null ? current : { ...delta };
+function applyCorePlayerScoreboardEvent(
+  stats: CorePlayerStats,
+  event: CorePlayerScoreboardEvent,
+): void {
+  stats.score += event.score_delta;
+  stats.goals += event.goals_delta;
+  stats.assists += event.assists_delta;
+  stats.saves += event.saves_delta;
+  stats.shots += event.shots_delta;
 }
 
-function applyCoreTeamDelta(stats: CoreTeamStats, delta: CoreTeamStats): void {
-  stats.score += delta.score;
-  stats.goals += delta.goals;
-  stats.assists += delta.assists;
-  stats.saves += delta.saves;
-  stats.shots += delta.shots;
-  stats.kickoff_goal_count += delta.kickoff_goal_count;
-  stats.short_goal_count += delta.short_goal_count;
-  stats.medium_goal_count += delta.medium_goal_count;
-  stats.long_goal_count += delta.long_goal_count;
-  stats.counter_attack_goal_count += delta.counter_attack_goal_count;
-  stats.sustained_pressure_goal_count += delta.sustained_pressure_goal_count;
-  stats.other_buildup_goal_count += delta.other_buildup_goal_count;
-  stats.goal_ball_air_time_sample_count += delta.goal_ball_air_time_sample_count;
-  stats.cumulative_goal_ball_air_time = addF32(
-    stats.cumulative_goal_ball_air_time,
-    delta.cumulative_goal_ball_air_time,
-  );
-  if (delta.last_goal_ball_air_time != null) {
-    stats.last_goal_ball_air_time = delta.last_goal_ball_air_time;
+function applyScoringGoalContextToTeam(stats: CoreTeamStats, event: CorePlayerGoalContextEvent): void {
+  if (event.time_after_kickoff != null) {
+    const time = Math.max(0, event.time_after_kickoff);
+    if (time < 10) {
+      stats.kickoff_goal_count += 1;
+    } else if (time < 20) {
+      stats.short_goal_count += 1;
+    } else if (time < 40) {
+      stats.medium_goal_count += 1;
+    } else {
+      stats.long_goal_count += 1;
+    }
+  }
+  if (event.goal_buildup === "counter_attack") {
+    stats.counter_attack_goal_count += 1;
+  } else if (event.goal_buildup === "sustained_pressure") {
+    stats.sustained_pressure_goal_count += 1;
+  } else if (event.goal_buildup != null) {
+    stats.other_buildup_goal_count += 1;
+  }
+  if (event.ball_air_time_before_goal != null) {
+    const airTime = Math.max(0, event.ball_air_time_before_goal);
+    stats.goal_ball_air_time_sample_count += 1;
+    stats.cumulative_goal_ball_air_time = addF32(stats.cumulative_goal_ball_air_time, airTime);
+    stats.last_goal_ball_air_time = airTime;
   }
 }
 
-function applyCorePlayerDelta(stats: CorePlayerStats, delta: CorePlayerStats): void {
-  applyCoreTeamDelta(stats, delta);
-  stats.goals_conceded_while_last_defender += delta.goals_conceded_while_last_defender;
-  stats.goals_for_while_most_back += delta.goals_for_while_most_back;
-  stats.goals_against_while_most_back += delta.goals_against_while_most_back;
-  stats.goal_against_boost_sample_count += delta.goal_against_boost_sample_count;
-  stats.cumulative_boost_on_goals_against = addF32(
-    stats.cumulative_boost_on_goals_against,
-    delta.cumulative_boost_on_goals_against,
-  );
-  if (delta.last_boost_on_goal_against != null) {
-    stats.last_boost_on_goal_against = delta.last_boost_on_goal_against;
+function applyCorePlayerGoalContextEvent(
+  stats: CorePlayerStats,
+  event: CorePlayerGoalContextEvent,
+): void {
+  if (event.goals_conceded_while_last_defender) {
+    stats.goals_conceded_while_last_defender += 1;
   }
-  stats.goal_against_boost_leadup_sample_count += delta.goal_against_boost_leadup_sample_count;
-  stats.cumulative_average_boost_in_goal_against_leadup = addF32(
-    stats.cumulative_average_boost_in_goal_against_leadup,
-    delta.cumulative_average_boost_in_goal_against_leadup,
-  );
-  stats.cumulative_min_boost_in_goal_against_leadup = addF32(
-    stats.cumulative_min_boost_in_goal_against_leadup,
-    delta.cumulative_min_boost_in_goal_against_leadup,
-  );
-  if (delta.last_average_boost_in_goal_against_leadup != null) {
+  if (event.goals_for_while_most_back) {
+    stats.goals_for_while_most_back += 1;
+  }
+  if (event.goals_against_while_most_back) {
+    stats.goals_against_while_most_back += 1;
+  }
+  if (event.goal_against_boost_amount != null) {
+    stats.goal_against_boost_sample_count += 1;
+    stats.cumulative_boost_on_goals_against = addF32(
+      stats.cumulative_boost_on_goals_against,
+      event.goal_against_boost_amount,
+    );
+    stats.last_boost_on_goal_against = event.goal_against_boost_amount;
+  }
+  if (
+    event.goal_against_average_boost_in_leadup != null &&
+    event.goal_against_min_boost_in_leadup != null
+  ) {
+    stats.goal_against_boost_leadup_sample_count += 1;
+    stats.cumulative_average_boost_in_goal_against_leadup = addF32(
+      stats.cumulative_average_boost_in_goal_against_leadup,
+      event.goal_against_average_boost_in_leadup,
+    );
+    stats.cumulative_min_boost_in_goal_against_leadup = addF32(
+      stats.cumulative_min_boost_in_goal_against_leadup,
+      event.goal_against_min_boost_in_leadup,
+    );
     stats.last_average_boost_in_goal_against_leadup =
-      delta.last_average_boost_in_goal_against_leadup;
+      event.goal_against_average_boost_in_leadup;
+    stats.last_min_boost_in_goal_against_leadup = event.goal_against_min_boost_in_leadup;
   }
-  if (delta.last_min_boost_in_goal_against_leadup != null) {
-    stats.last_min_boost_in_goal_against_leadup = delta.last_min_boost_in_goal_against_leadup;
+  if (event.goal_against_position != null) {
+    stats.goal_against_position_sample_count += 1;
+    stats.cumulative_goal_against_position_x = addF32(
+      stats.cumulative_goal_against_position_x,
+      event.goal_against_position.x,
+    );
+    stats.cumulative_goal_against_position_y = addF32(
+      stats.cumulative_goal_against_position_y,
+      event.goal_against_position.y,
+    );
+    stats.cumulative_goal_against_position_z = addF32(
+      stats.cumulative_goal_against_position_z,
+      event.goal_against_position.z,
+    );
+    stats.last_goal_against_position = { ...event.goal_against_position };
   }
-  stats.goal_against_position_sample_count += delta.goal_against_position_sample_count;
-  stats.cumulative_goal_against_position_x = addF32(
-    stats.cumulative_goal_against_position_x,
-    delta.cumulative_goal_against_position_x,
-  );
-  stats.cumulative_goal_against_position_y = addF32(
-    stats.cumulative_goal_against_position_y,
-    delta.cumulative_goal_against_position_y,
-  );
-  stats.cumulative_goal_against_position_z = addF32(
-    stats.cumulative_goal_against_position_z,
-    delta.cumulative_goal_against_position_z,
-  );
-  stats.last_goal_against_position = applyOptionalPositionDelta(
-    stats.last_goal_against_position,
-    delta.last_goal_against_position,
-  );
-  stats.scoring_goal_last_touch_position_sample_count +=
-    delta.scoring_goal_last_touch_position_sample_count;
-  stats.cumulative_scoring_goal_last_touch_position_x = addF32(
-    stats.cumulative_scoring_goal_last_touch_position_x,
-    delta.cumulative_scoring_goal_last_touch_position_x,
-  );
-  stats.cumulative_scoring_goal_last_touch_position_y = addF32(
-    stats.cumulative_scoring_goal_last_touch_position_y,
-    delta.cumulative_scoring_goal_last_touch_position_y,
-  );
-  stats.cumulative_scoring_goal_last_touch_position_z = addF32(
-    stats.cumulative_scoring_goal_last_touch_position_z,
-    delta.cumulative_scoring_goal_last_touch_position_z,
-  );
-  stats.last_scoring_goal_last_touch_position = applyOptionalPositionDelta(
-    stats.last_scoring_goal_last_touch_position,
-    delta.last_scoring_goal_last_touch_position,
-  );
+  if (event.scoring_goal_last_touch_position != null) {
+    stats.scoring_goal_last_touch_position_sample_count += 1;
+    stats.cumulative_scoring_goal_last_touch_position_x = addF32(
+      stats.cumulative_scoring_goal_last_touch_position_x,
+      event.scoring_goal_last_touch_position.x,
+    );
+    stats.cumulative_scoring_goal_last_touch_position_y = addF32(
+      stats.cumulative_scoring_goal_last_touch_position_y,
+      event.scoring_goal_last_touch_position.y,
+    );
+    stats.cumulative_scoring_goal_last_touch_position_z = addF32(
+      stats.cumulative_scoring_goal_last_touch_position_z,
+      event.scoring_goal_last_touch_position.z,
+    );
+    stats.last_scoring_goal_last_touch_position = { ...event.scoring_goal_last_touch_position };
+  }
+  applyScoringGoalContextToTeam(stats, event);
 }
 
 export function applyCoreEventDerivedStats(
@@ -201,10 +217,10 @@ export function createCoreEventDerivedStatsAccumulator(timeline: MaterializedSta
   applyFrame(frame: StatsFrame): void;
 } {
   const playerEvents = sortCoreEvents(timeline.events.core_player ?? []);
-  const teamEvents = sortCoreEvents(timeline.events.core_team ?? []);
+  const goalContextEvents = sortCoreEvents(timeline.events.core_player_goal_context ?? []);
 
   let playerEventIndex = 0;
-  let teamEventIndex = 0;
+  let goalContextEventIndex = 0;
   const players = new Map<string, CorePlayerStats>();
   const teamZero = defaultCoreTeamStats();
   const teamOne = defaultCoreTeamStats();
@@ -215,25 +231,33 @@ export function createCoreEventDerivedStatsAccumulator(timeline: MaterializedSta
         playerEventIndex < playerEvents.length &&
         playerEvents[playerEventIndex]!.frame <= frame.frame_number
       ) {
-        const event = playerEvents[playerEventIndex] as CorePlayerStatsEvent;
+        const event = playerEvents[playerEventIndex] as CorePlayerScoreboardEvent;
         const playerKey = remoteIdKey(event.player);
         const stats = players.get(playerKey) ?? defaultCorePlayerStats();
         players.set(playerKey, stats);
-        applyCorePlayerDelta(stats, event.delta);
+        applyCorePlayerScoreboardEvent(stats, event);
+        const teamStats = event.is_team_0 ? teamZero : teamOne;
+        applyCorePlayerScoreboardEvent(teamStats as CorePlayerStats, event);
         playerEventIndex += 1;
       }
 
       while (
-        teamEventIndex < teamEvents.length &&
-        teamEvents[teamEventIndex]!.frame <= frame.frame_number
+        goalContextEventIndex < goalContextEvents.length &&
+        goalContextEvents[goalContextEventIndex]!.frame <= frame.frame_number
       ) {
-        const event = teamEvents[teamEventIndex] as CoreTeamStatsEvent;
-        if (event.is_team_0) {
-          applyCoreTeamDelta(teamZero, event.delta);
-        } else {
-          applyCoreTeamDelta(teamOne, event.delta);
+        const event = goalContextEvents[goalContextEventIndex] as CorePlayerGoalContextEvent;
+        const playerKey = remoteIdKey(event.player);
+        const stats = players.get(playerKey) ?? defaultCorePlayerStats();
+        players.set(playerKey, stats);
+        applyCorePlayerGoalContextEvent(stats, event);
+        if (
+          event.time_after_kickoff != null ||
+          event.goal_buildup != null ||
+          event.ball_air_time_before_goal != null
+        ) {
+          applyScoringGoalContextToTeam(event.is_team_0 ? teamZero : teamOne, event);
         }
-        teamEventIndex += 1;
+        goalContextEventIndex += 1;
       }
 
       assignCoreTeamStats(frame.team_zero.core, teamZero);

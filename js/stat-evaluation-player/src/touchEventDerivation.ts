@@ -2,7 +2,7 @@ import type { StatLabel } from "./generated/StatLabel.ts";
 import type { TouchBallMovementEvent } from "./generated/TouchBallMovementEvent.ts";
 import type { TouchLastTouchEvent } from "./generated/TouchLastTouchEvent.ts";
 import type { TouchStats } from "./generated/TouchStats.ts";
-import type { TouchStatsEvent } from "./generated/TouchStatsEvent.ts";
+import type { TouchClassificationEvent } from "./generated/TouchClassificationEvent.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 const TOUCH_KINDS = ["control", "hard_hit", "medium_hit"] as const;
@@ -175,9 +175,9 @@ function cloneLabeledTouchCounts(
   };
 }
 
-function applyTouchStatsEvent(
+function applyTouchClassificationEvent(
   accumulator: TouchAccumulator,
-  event: TouchStatsEvent,
+  event: TouchClassificationEvent,
   frame: StatsFrame,
 ): void {
   const stats = accumulator.stats;
@@ -290,11 +290,11 @@ export function createTouchEventDerivedStatsAccumulator(timeline: MaterializedSt
           (touchEvents[touchEventIndex]!.sample_frame ?? touchEvents[touchEventIndex]!.frame) <=
             frame.frame_number
         ) {
-          const event = touchEvents[touchEventIndex] as TouchStatsEvent;
+          const event = touchEvents[touchEventIndex] as TouchClassificationEvent;
           const playerKey = remoteIdKey(event.player);
           const accumulator = players.get(playerKey) ?? createTouchAccumulator();
           players.set(playerKey, accumulator);
-          applyTouchStatsEvent(accumulator, event, frame);
+          applyTouchClassificationEvent(accumulator, event, frame);
           touchEventIndex += 1;
         }
 

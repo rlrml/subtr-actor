@@ -141,9 +141,9 @@ fn compare_timeline_events(
     })
     .or_else(|| {
         compare_serialized_slice(
-            &format!("{label}.core_team"),
-            &left.core_team,
-            &right.core_team,
+            &format!("{label}.core_player_goal_context"),
+            &left.core_player_goal_context,
+            &right.core_player_goal_context,
         )
     })
     .or_else(|| {
@@ -353,13 +353,6 @@ fn compare_timeline_events(
             &format!("{label}.boost_state"),
             &left.boost_state,
             &right.boost_state,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.boost_stats"),
-            &left.boost_stats,
-            &right.boost_stats,
         )
     })
     .or_else(|| compare_serialized_slice(&format!("{label}.bump"), &left.bump, &right.bump))

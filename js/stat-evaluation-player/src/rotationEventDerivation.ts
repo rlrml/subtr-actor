@@ -77,8 +77,6 @@ function applyRotationPlayerEvent(state: RotationPlayerState, event: RotationPla
     state.nonFirstManSeconds = 0;
   }
   const stats = state.stats;
-  stats.became_first_man_count += event.became_first_man_count;
-  stats.lost_first_man_count += event.lost_first_man_count;
   stats.current_role_state = event.current_role_state;
   stats.current_depth_state = event.current_depth_state;
 }
@@ -158,9 +156,31 @@ function updateNonFirstManStintState(
   }
 }
 
-function applyRotationTeamEvent(stats: RotationTeamStats, event: RotationTeamEvent): void {
-  stats.first_man_changes_for_team += event.first_man_changes_for_team;
-  stats.rotation_count += event.rotation_count;
+function getRotationPlayerState(
+  players: Map<string, RotationPlayerState>,
+  playerId: unknown,
+): RotationPlayerState {
+  const playerKey = remoteIdKey(playerId);
+  const playerState = players.get(playerKey) ?? {
+    active: false,
+    firstManStintActive: false,
+    currentFirstManStintTime: 0,
+    nonFirstManSeconds: 0,
+    stats: defaultRotationPlayerStats(),
+  };
+  players.set(playerKey, playerState);
+  return playerState;
+}
+
+function applyRotationTeamEvent(
+  stats: RotationTeamStats,
+  players: Map<string, RotationPlayerState>,
+  event: RotationTeamEvent,
+): void {
+  stats.first_man_changes_for_team += 1;
+  stats.rotation_count += 1;
+  getRotationPlayerState(players, event.previous_first_man).stats.lost_first_man_count += 1;
+  getRotationPlayerState(players, event.next_first_man).stats.became_first_man_count += 1;
 }
 
 function assignRotationPlayerStats(
@@ -206,15 +226,7 @@ export function createRotationEventDerivedStatsAccumulator(timeline: Materialize
         playerEvents[playerEventIndex]!.frame <= frame.frame_number
       ) {
         const event = playerEvents[playerEventIndex] as RotationPlayerEvent;
-        const playerKey = remoteIdKey(event.player);
-        const playerState = players.get(playerKey) ?? {
-          active: false,
-          firstManStintActive: false,
-          currentFirstManStintTime: 0,
-          nonFirstManSeconds: 0,
-          stats: defaultRotationPlayerStats(),
-        };
-        players.set(playerKey, playerState);
+        const playerState = getRotationPlayerState(players, event.player);
         applyRotationPlayerEvent(playerState, event);
         playerEventIndex += 1;
       }
@@ -224,7 +236,7 @@ export function createRotationEventDerivedStatsAccumulator(timeline: Materialize
         teamEvents[teamEventIndex]!.frame <= frame.frame_number
       ) {
         const event = teamEvents[teamEventIndex] as RotationTeamEvent;
-        applyRotationTeamEvent(event.is_team_0 ? teamZero : teamOne, event);
+        applyRotationTeamEvent(event.is_team_0 ? teamZero : teamOne, players, event);
         teamEventIndex += 1;
       }
 

@@ -97,8 +97,8 @@ pub struct ReplayStatsPlayerIdentity {
 #[ts(export)]
 pub struct ReplayStatsTimelineEvents {
     pub timeline: Vec<TimelineEvent>,
-    pub core_player: Vec<CorePlayerStatsEvent>,
-    pub core_team: Vec<CoreTeamStatsEvent>,
+    pub core_player: Vec<CorePlayerScoreboardEvent>,
+    pub core_player_goal_context: Vec<CorePlayerGoalContextEvent>,
     pub possession: Vec<PossessionEvent>,
     pub pressure: Vec<PressureEvent>,
     pub territorial_pressure: Vec<TerritorialPressureEvent>,
@@ -130,13 +130,12 @@ pub struct ReplayStatsTimelineEvents {
     pub wavedash: Vec<WavedashEvent>,
     pub whiff: Vec<WhiffEvent>,
     pub powerslide: Vec<PowerslideEvent>,
-    pub touch: Vec<TouchStatsEvent>,
+    pub touch: Vec<TouchClassificationEvent>,
     pub touch_ball_movement: Vec<TouchBallMovementEvent>,
     pub touch_last_touch: Vec<TouchLastTouchEvent>,
     pub boost_pickups: Vec<BoostPickupComparisonEvent>,
     pub boost_ledger: Vec<BoostLedgerEvent>,
     pub boost_state: Vec<BoostStateEvent>,
-    pub boost_stats: Vec<BoostStatsEvent>,
     pub bump: Vec<BumpEvent>,
 }
 

@@ -157,7 +157,7 @@ impl TouchStatsAccumulator {
         }
     }
 
-    pub fn apply_touch_event(&mut self, event: &TouchStatsEvent, frame: &FrameInfo) {
+    pub fn apply_touch_event(&mut self, event: &TouchClassificationEvent, frame: &FrameInfo) {
         let stats = self.player_stats.entry(event.player.clone()).or_default();
         stats.touch_count += 1;
         match event.height_band.as_str() {

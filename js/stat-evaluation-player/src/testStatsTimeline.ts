@@ -18,7 +18,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
     {
       timeline: [],
       core_player: [],
-      core_team: [],
+      core_player_goal_context: [],
       possession: [],
       pressure: [],
       territorial_pressure: [],
@@ -56,7 +56,6 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       boost_pickups: [],
       boost_ledger: [],
       boost_state: [],
-      boost_stats: [],
       bump: [],
     },
     overrides,

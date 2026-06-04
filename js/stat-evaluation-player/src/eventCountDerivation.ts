@@ -9,7 +9,7 @@ import type {
 export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "timeline",
   "core_player",
-  "core_team",
+  "core_player_goal_context",
   "possession",
   "pressure",
   "territorial_pressure",

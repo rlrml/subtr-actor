@@ -65,7 +65,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
         events: ReplayStatsTimelineEvents {
             timeline: Vec::new(),
             core_player: Vec::new(),
-            core_team: Vec::new(),
+            core_player_goal_context: Vec::new(),
             possession: Vec::new(),
             pressure: Vec::new(),
             territorial_pressure: Vec::new(),
@@ -103,7 +103,6 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             boost_pickups: Vec::new(),
             boost_ledger: Vec::new(),
             boost_state: Vec::new(),
-            boost_stats: Vec::new(),
             bump: Vec::new(),
         },
         frames: vec![
@@ -500,8 +499,11 @@ fn assert_boost_stats_events_reconstruct_final_serialized_sums(
     timeline: &ReplayStatsTimeline,
 ) {
     let mut accumulator = BoostStatsAccumulator::default();
-    for event in &timeline.events.boost_stats {
-        accumulator.apply_event(event);
+    for event in &timeline.events.boost_ledger {
+        accumulator.apply_ledger_event(event);
+    }
+    for event in &timeline.events.boost_state {
+        accumulator.apply_state_event(event);
     }
 
     let final_frame = timeline

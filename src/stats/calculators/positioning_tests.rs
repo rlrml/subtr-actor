@@ -108,24 +108,30 @@ fn positioning_events_emit_state_change_spans() {
     calculator.flush_pending_events();
 
     let events = calculator.events();
-    assert_eq!(events.len(), 2);
+    assert_eq!(events.len(), 6);
     let back_event = events
         .iter()
         .find(|event| event.player == boxcars::RemoteId::Steam(1))
         .expect("back player event should be emitted");
     assert_eq!(back_event.frame, 0);
-    assert_eq!(back_event.end_frame, 2);
-    assert!((back_event.duration - 0.3).abs() < 1e-6);
-    assert!((back_event.active_game_time - 0.3).abs() < 1e-6);
-    assert!((back_event.time_most_back - 0.3).abs() < 1e-6);
+    assert_eq!(back_event.end_frame, 0);
+    assert!((back_event.duration - 0.1).abs() < 1e-6);
+    assert!(back_event.active);
+    assert_eq!(
+        back_event.teammate_role,
+        PositioningTeammateRoleState::MostBack
+    );
 
     let forward_event = events
         .iter()
         .find(|event| event.player == boxcars::RemoteId::Steam(2))
         .expect("forward player event should be emitted");
     assert_eq!(forward_event.frame, 0);
-    assert_eq!(forward_event.end_frame, 2);
-    assert!((forward_event.duration - 0.3).abs() < 1e-6);
-    assert!((forward_event.active_game_time - 0.3).abs() < 1e-6);
-    assert!((forward_event.time_most_forward - 0.3).abs() < 1e-6);
+    assert_eq!(forward_event.end_frame, 0);
+    assert!((forward_event.duration - 0.1).abs() < 1e-6);
+    assert!(forward_event.active);
+    assert_eq!(
+        forward_event.teammate_role,
+        PositioningTeammateRoleState::MostForward
+    );
 }

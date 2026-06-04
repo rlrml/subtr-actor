@@ -5,6 +5,7 @@ import { applyRotationEventDerivedStats } from "./rotationEventDerivation.ts";
 import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
 
 const playerId = { Steam: "rotation-player" } as Record<string, unknown>;
+const nextPlayerId = { Steam: "rotation-next-player" } as Record<string, unknown>;
 
 function assertClose(actual: number | undefined, expected: number): void {
   assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
@@ -20,8 +21,6 @@ test("rotation event derivation populates compacted player and team stats", () =
           player: playerId,
           is_team_0: true,
           active: true,
-          became_first_man_count: 1,
-          lost_first_man_count: 0,
           current_role_state: "first_man",
           current_depth_state: "ahead_of_play",
         },
@@ -31,8 +30,6 @@ test("rotation event derivation populates compacted player and team stats", () =
           player: playerId,
           is_team_0: true,
           active: true,
-          became_first_man_count: 0,
-          lost_first_man_count: 1,
           current_role_state: "second_man",
           current_depth_state: "behind_play",
         },
@@ -42,8 +39,8 @@ test("rotation event derivation populates compacted player and team stats", () =
           time: 1,
           frame: 10,
           is_team_0: true,
-          first_man_changes_for_team: 1,
-          rotation_count: 1,
+          previous_first_man: playerId,
+          next_first_man: nextPlayerId,
         },
       ],
     },
@@ -116,8 +113,6 @@ test("rotation event derivation keeps first man stint through brief interruption
           player: playerId,
           is_team_0: true,
           active: true,
-          became_first_man_count: 0,
-          lost_first_man_count: 0,
           current_role_state: "first_man",
           current_depth_state: "level_with_play",
         },
@@ -127,8 +122,6 @@ test("rotation event derivation keeps first man stint through brief interruption
           player: playerId,
           is_team_0: true,
           active: true,
-          became_first_man_count: 0,
-          lost_first_man_count: 0,
           current_role_state: "ambiguous",
           current_depth_state: "level_with_play",
         },
@@ -138,8 +131,6 @@ test("rotation event derivation keeps first man stint through brief interruption
           player: playerId,
           is_team_0: true,
           active: true,
-          became_first_man_count: 0,
-          lost_first_man_count: 0,
           current_role_state: "first_man",
           current_depth_state: "level_with_play",
         },
@@ -149,8 +140,6 @@ test("rotation event derivation keeps first man stint through brief interruption
           player: playerId,
           is_team_0: true,
           active: true,
-          became_first_man_count: 0,
-          lost_first_man_count: 0,
           current_role_state: "ambiguous",
           current_depth_state: "level_with_play",
         },
@@ -160,8 +149,6 @@ test("rotation event derivation keeps first man stint through brief interruption
           player: playerId,
           is_team_0: true,
           active: true,
-          became_first_man_count: 0,
-          lost_first_man_count: 0,
           current_role_state: "first_man",
           current_depth_state: "level_with_play",
         },
