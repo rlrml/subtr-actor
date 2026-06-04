@@ -2,9 +2,8 @@ mod common;
 
 use serde_json::Value;
 use subtr_actor::{
-    builtin_stats_module_names, evaluate_replay_plausibility, Collector, FrameRateDecorator,
-    GoalTagKind, NDArrayCollector, PlayerFrame, ReplayDataCollector, StatsCollector,
-    StatsFrameResolution, StatsTimelineCollector,
+    builtin_stats_module_names, Collector, FrameRateDecorator, GoalTagKind, NDArrayCollector,
+    PlayerFrame, ReplayDataCollector, StatsCollector, StatsFrameResolution, StatsTimelineCollector,
 };
 
 struct PostEacFixture {
@@ -413,37 +412,5 @@ fn post_eac_replays_emit_stats_outputs() {
                 )
             });
         assert_finite_json(&playback_value, fixture.path);
-    }
-}
-
-#[test]
-fn post_eac_replay_motion_plausibility_passes() {
-    for fixture in POST_EAC_FIXTURES {
-        let replay = common::parse_replay(fixture.path);
-        let replay_data = ReplayDataCollector::new()
-            .get_replay_data(&replay)
-            .unwrap_or_else(|error| {
-                panic!(
-                    "failed to collect replay data for {}: {error:?}",
-                    fixture.path
-                )
-            });
-        let report = evaluate_replay_plausibility(&replay_data);
-
-        assert!(
-            report.all_motion_consistent(),
-            "{} should have plausible velocity/displacement consistency",
-            fixture.path
-        );
-        assert!(
-            report.all_field_bounds_plausible(),
-            "{} should stay within plausible field and speed bounds",
-            fixture.path
-        );
-        assert!(
-            report.all_quaternion_norms_plausible(),
-            "{} should expose unit-length rotations",
-            fixture.path
-        );
     }
 }

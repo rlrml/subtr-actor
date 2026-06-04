@@ -3,11 +3,9 @@ use std::collections::BTreeMap;
 use clap::{Parser, ValueEnum};
 mod replay_probe_rotation;
 use replay_probe_rotation::LegacyRotationProbe;
+use subtr_actor_tools::replay_plausibility::evaluate_replay_plausibility;
 
-use subtr_actor::{
-    evaluate_replay_plausibility, Collector, PlayerFrame, ReplayDataCollector,
-    StatsTimelineCollector,
-};
+use subtr_actor::{Collector, PlayerFrame, ReplayDataCollector, StatsTimelineCollector};
 
 const DEFAULT_REPLAY_PATH: &str =
     "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";

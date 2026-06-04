@@ -1,17 +1,54 @@
-mod common;
-
 use glam::{Quat, Vec3};
-use subtr_actor::{
-    evaluate_replay_plausibility, quat_to_glam, vec_to_glam, PlayerFrame, ReplayDataCollector,
-    ReplayPlausibilityReport,
+use subtr_actor::{quat_to_glam, vec_to_glam, PlayerFrame, ReplayDataCollector};
+use subtr_actor_tools::replay_plausibility::{
+    evaluate_replay_plausibility, ReplayPlausibilityReport,
 };
 
 const MIN_ANGULAR_VELOCITY_SPEED: f32 = 30.0;
 const MIN_DERIVED_ORIENTATION_SPEED: f32 = 0.5;
 const MAX_ORIENTATION_PAIR_DT_SECONDS: f32 = 0.2;
 
+struct PostEacFixture {
+    path: &'static str,
+}
+
+const POST_EAC_FIXTURES: &[PostEacFixture] = &[
+    PostEacFixture {
+        path: "post-eac-ranked-duel-2026-04-28-a.replay",
+    },
+    PostEacFixture {
+        path: "post-eac-ranked-duel-2026-04-28-b.replay",
+    },
+    PostEacFixture {
+        path: "post-eac-ranked-doubles-2026-04-28.replay",
+    },
+    PostEacFixture {
+        path: "post-eac-ranked-standard-2026-04-28.replay",
+    },
+];
+
+fn asset_path(path: &str) -> std::path::PathBuf {
+    let relative_path = std::path::Path::new(path)
+        .strip_prefix("assets")
+        .unwrap_or_else(|_| std::path::Path::new(path));
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../assets")
+        .join(relative_path)
+}
+
+fn parse_replay(path: &str) -> boxcars::Replay {
+    let replay_path = asset_path(path);
+    let data = std::fs::read(&replay_path)
+        .unwrap_or_else(|_| panic!("failed to read replay file: {}", replay_path.display()));
+    boxcars::ParserBuilder::new(&data)
+        .must_parse_network_data()
+        .on_error_check_crc()
+        .parse()
+        .unwrap_or_else(|_| panic!("failed to parse replay file: {}", replay_path.display()))
+}
+
 fn plausibility_report(path: &str) -> ReplayPlausibilityReport {
-    let replay = common::parse_replay(path);
+    let replay = parse_replay(path);
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)
         .unwrap_or_else(|_| panic!("failed to collect replay data for {path}"));
@@ -93,7 +130,7 @@ fn legacy_replay_rigid_body_normalization_passes() {
 #[test]
 fn legacy_replay_rotation_roll_matches_angular_velocity() {
     let path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
-    let replay = common::parse_replay(path);
+    let replay = parse_replay(path);
     let replay_data = ReplayDataCollector::new()
         .get_replay_data(&replay)
         .unwrap_or_else(|_| panic!("failed to collect replay data for {path}"));
@@ -186,6 +223,31 @@ fn legacy_replay_rotation_roll_matches_angular_velocity() {
         positive_fraction > 0.95,
         "expected {path} orientation deltas to be consistently signed with angular velocity, got positive fraction {positive_fraction}"
     );
+}
+
+#[test]
+fn post_eac_replay_motion_plausibility_passes() {
+    for fixture in POST_EAC_FIXTURES {
+        let path = format!("assets/{}", fixture.path);
+        let replay = parse_replay(&path);
+        let replay_data = ReplayDataCollector::new()
+            .get_replay_data(&replay)
+            .unwrap_or_else(|error| panic!("failed to collect replay data for {path}: {error:?}"));
+        let report = evaluate_replay_plausibility(&replay_data);
+
+        assert!(
+            report.all_motion_consistent(),
+            "{path} should have plausible velocity/displacement consistency"
+        );
+        assert!(
+            report.all_field_bounds_plausible(),
+            "{path} should stay within plausible field and speed bounds"
+        );
+        assert!(
+            report.all_quaternion_norms_plausible(),
+            "{path} should expose unit-length rotations"
+        );
+    }
 }
 
 fn derive_world_angular_velocity(

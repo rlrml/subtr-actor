@@ -1,5 +1,5 @@
-use crate::collector::replay_data::{BallFrame, PlayerFrame, ReplayData};
-use crate::geometry::{quat_to_glam, vec_to_glam};
+use subtr_actor::collector::replay_data::{BallFrame, PlayerFrame, ReplayData};
+use subtr_actor::geometry::{quat_to_glam, vec_to_glam};
 
 const MAX_PAIR_DT_SECONDS: f32 = 0.2;
 const MIN_DISPLACEMENT_SPEED: f32 = 100.0;
