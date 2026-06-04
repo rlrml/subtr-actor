@@ -63,9 +63,9 @@ pub struct FiftyFiftyEvent {
     pub resolve_time: f32,
     pub resolve_frame: usize,
     pub is_kickoff: bool,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub team_zero_player: Option<PlayerId>,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub team_one_player: Option<PlayerId>,
     pub team_zero_touch_time: Option<f32>,
     pub team_zero_touch_frame: Option<usize>,

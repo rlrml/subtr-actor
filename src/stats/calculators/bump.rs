@@ -16,9 +16,9 @@ const BUMP_FIFTY_FIFTY_SUPPRESSION_WINDOW_SECONDS: f32 = 0.35;
 pub struct BumpEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub initiator: PlayerId,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub victim: PlayerId,
     pub initiator_is_team_0: bool,
     pub victim_is_team_0: bool,

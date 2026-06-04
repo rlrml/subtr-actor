@@ -9,11 +9,11 @@ const GOAL_CENTER_Y: f32 = 5120.0;
 pub struct OneTimerEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub passer: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub passer_position: Option<[f32; 3]>,

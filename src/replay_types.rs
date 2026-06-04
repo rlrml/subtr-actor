@@ -70,23 +70,23 @@ pub struct DemolishInfo {
     /// The frame number at which the demolition occurred.
     pub frame: usize,
     /// The [`PlayerId`] of the player who initiated the demolition.
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub attacker: PlayerId,
     /// The [`PlayerId`] of the player who was demolished.
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub victim: PlayerId,
     /// The velocity of the attacker at the time of demolition.
-    #[ts(as = "crate::ts_bindings::Vector3fTs")]
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub attacker_velocity: boxcars::Vector3f,
     /// The velocity of the victim at the time of demolition.
-    #[ts(as = "crate::ts_bindings::Vector3fTs")]
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub victim_velocity: boxcars::Vector3f,
     /// The location of the attacker at the time of demolition.
-    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attacker_location: Option<boxcars::Vector3f>,
     /// The location of the victim at the time of demolition.
-    #[ts(as = "crate::ts_bindings::Vector3fTs")]
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub victim_location: boxcars::Vector3f,
 }
 
@@ -110,9 +110,9 @@ pub struct BoostPadEvent {
     pub time: f32,
     pub frame: usize,
     pub pad_id: String,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
-    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<boxcars::Vector3f>,
     pub kind: BoostPadEventKind,
@@ -124,7 +124,7 @@ pub struct ResolvedBoostPad {
     pub index: usize,
     pub pad_id: Option<String>,
     pub size: BoostPadSize,
-    #[ts(as = "crate::ts_bindings::Vector3fTs")]
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub position: boxcars::Vector3f,
 }
 
@@ -134,9 +134,9 @@ pub struct GoalEvent {
     pub time: f32,
     pub frame: usize,
     pub scoring_team_is_team_0: bool,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
-    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<boxcars::Vector3f>,
     pub team_zero_score: Option<i32>,
@@ -170,18 +170,18 @@ const SHOT_TARGET_GOAL_CENTER_Y: f32 = 5120.0;
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ShotEventMetadata {
-    #[ts(as = "crate::ts_bindings::Vector3fTs")]
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub ball_position: boxcars::Vector3f,
-    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
     pub ball_velocity: Option<boxcars::Vector3f>,
     pub ball_speed: Option<f32>,
-    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
     pub player_position: Option<boxcars::Vector3f>,
-    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
     pub player_velocity: Option<boxcars::Vector3f>,
     pub player_speed: Option<f32>,
     pub player_distance_to_ball: Option<f32>,
-    #[ts(as = "crate::ts_bindings::Vector3fTs")]
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub target_goal_position: boxcars::Vector3f,
     pub distance_to_goal_center: f32,
     pub distance_to_goal_line: f32,
@@ -241,9 +241,9 @@ impl ShotEventMetadata {
 pub struct PlayerStatEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
-    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<boxcars::Vector3f>,
     pub is_team_0: bool,
@@ -258,9 +258,9 @@ pub struct TouchEvent {
     pub time: f32,
     pub frame: usize,
     pub team_is_team_0: bool,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
-    #[ts(as = "Option<crate::ts_bindings::Vector3fTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<boxcars::Vector3f>,
     pub closest_approach_distance: Option<f32>,
@@ -278,7 +278,7 @@ pub struct ReplayMeta {
     /// A vector of [`PlayerInfo`] instances representing the players on team one.
     pub team_one: Vec<PlayerInfo>,
     /// A vector of tuples containing the names and properties of all the headers in the replay.
-    #[ts(as = "Vec<(String, crate::ts_bindings::HeaderPropTs)>")]
+    #[ts(as = "Vec<(String, crate::interop::ts_bindings::HeaderPropTs)>")]
     pub all_headers: Vec<(String, HeaderProp)>,
 }
 
@@ -302,12 +302,14 @@ impl ReplayMeta {
 #[ts(export)]
 pub struct PlayerInfo {
     /// The unique remote ID of the player. This could be their online ID or local ID.
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub remote_id: RemoteId,
     /// An optional HashMap containing player-specific stats.
     /// The keys of this HashMap are the names of the stats,
     /// and the values are the corresponding `HeaderProp` instances.
-    #[ts(as = "Option<std::collections::HashMap<String, crate::ts_bindings::HeaderPropTs>>")]
+    #[ts(
+        as = "Option<std::collections::HashMap<String, crate::interop::ts_bindings::HeaderPropTs>>"
+    )]
     pub stats: Option<std::collections::HashMap<String, HeaderProp>>,
     /// The name of the player as represented in the replay.
     pub name: String,

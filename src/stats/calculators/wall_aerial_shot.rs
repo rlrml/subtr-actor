@@ -13,7 +13,7 @@ const WALL_AERIAL_SHOT_GROUND_CONTACT_MAX_PLAYER_Z: f32 = 80.0;
 pub struct WallAerialShotEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub wall: WallAerialWall,

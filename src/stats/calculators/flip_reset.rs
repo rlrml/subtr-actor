@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub struct FlipResetEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
@@ -15,7 +15,7 @@ pub struct FlipResetEvent {
     /// Heuristic confidence in the range `[0.0, 1.0]`.
     pub confidence: f32,
     /// Ball position relative to the car in the car's local frame.
-    #[ts(as = "crate::ts_bindings::Vector3fTs")]
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub local_ball_position: boxcars::Vector3f,
     /// Motion-aware closest approach distance used for touch attribution.
     pub closest_approach_distance: f32,
@@ -26,7 +26,7 @@ pub struct FlipResetEvent {
 pub struct DodgeRefreshedEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
@@ -39,7 +39,7 @@ pub struct DodgeRefreshedEvent {
 pub struct PostWallDodgeEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
@@ -53,7 +53,7 @@ pub struct PostWallDodgeEvent {
 pub struct FlipResetFollowupDodgeEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,

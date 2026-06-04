@@ -91,7 +91,7 @@ pub struct WallAerialEvent {
     pub frame: usize,
     pub sample_time: f32,
     pub sample_frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub wall: WallAerialWall,

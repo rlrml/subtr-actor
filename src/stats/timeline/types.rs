@@ -87,7 +87,7 @@ pub struct ReplayStatsFrameScaffold {
 #[ts(export)]
 pub struct ReplayStatsPlayerIdentity {
     #[serde(rename = "player_id")]
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
     pub name: String,
     pub is_team_0: bool,
@@ -178,7 +178,7 @@ pub struct StatsEventProperty {
 pub struct StatsTimelineTagEvent {
     pub id: String,
     pub kind: String,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
@@ -246,7 +246,7 @@ pub struct TeamStatsSnapshot {
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PlayerStatsSnapshot {
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player_id: PlayerId,
     pub name: String,
     pub is_team_0: bool,

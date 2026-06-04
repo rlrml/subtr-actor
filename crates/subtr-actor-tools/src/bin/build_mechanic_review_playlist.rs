@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 mod build_mechanic_review_playlist_candidates;
 use build_mechanic_review_playlist_candidates::extract_candidates;
 use subtr_actor::{
-    playlist_generation::{
+    interop::player::{
         PlaybackBound, PlaybackBoundKind, PlaylistAdvanceMode, PlaylistEndMode, PlaylistManifest,
         PlaylistManifestItem, PlaylistManifestReplay, PlaylistManifestReplayLocator,
         PlaylistPlaybackOptions,

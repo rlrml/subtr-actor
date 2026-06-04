@@ -59,7 +59,7 @@ pub enum BallFrame {
     /// Frame containing the ball's rigid body physics data
     Data {
         /// The ball's rigid body containing position, rotation, and velocity information
-        #[ts(as = "crate::ts_bindings::RigidBodyTs")]
+        #[ts(as = "crate::interop::ts_bindings::RigidBodyTs")]
         rigid_body: boxcars::RigidBody,
     },
 }
@@ -126,7 +126,7 @@ pub enum PlayerFrame {
     /// Frame containing the player's complete state data
     Data {
         /// The player's rigid body containing position, rotation, and velocity information
-        #[ts(as = "crate::ts_bindings::RigidBodyTs")]
+        #[ts(as = "crate::interop::ts_bindings::RigidBodyTs")]
         rigid_body: boxcars::RigidBody,
         /// The player's current boost amount in raw replay units (0.0 to 255.0)
         boost_amount: f32,
@@ -479,7 +479,7 @@ pub struct FrameData {
     /// All ball state information across all frames
     pub ball_data: BallData,
     /// Player data for each player, indexed by PlayerId
-    #[ts(as = "Vec<(crate::ts_bindings::RemoteIdTs, PlayerData)>")]
+    #[ts(as = "Vec<(crate::interop::ts_bindings::RemoteIdTs, PlayerData)>")]
     pub players: Vec<(PlayerId, PlayerData)>,
     /// Game metadata for each frame including timing information
     pub metadata_frames: Vec<MetadataFrame>,

@@ -71,7 +71,7 @@ pub struct GoalTagEvidence {
     pub kind: GoalTagEvidenceKind,
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub player: Option<PlayerId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<GoalContextPosition>,
@@ -85,7 +85,7 @@ pub struct GoalTagEvent {
     pub frame: usize,
     pub kind: GoalTagKind,
     pub scoring_team_is_team_0: bool,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub scorer: Option<PlayerId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scorer_position: Option<GoalContextPosition>,

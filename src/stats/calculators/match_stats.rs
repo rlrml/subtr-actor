@@ -471,7 +471,7 @@ impl CoreTeamStats {
 pub struct CorePlayerStatsEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
@@ -506,7 +506,7 @@ pub struct TimelineEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub frame: Option<usize>,
     pub kind: TimelineEventKind,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub player_id: Option<PlayerId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
@@ -761,7 +761,7 @@ pub(crate) fn player_id_sort_key(player_id: &PlayerId) -> String {
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalPlayerContext {
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub position: Option<GoalContextPosition>,
@@ -776,7 +776,7 @@ pub struct GoalPlayerContext {
 pub struct GoalTouchContext {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub ball_position: Option<GoalContextPosition>,
@@ -792,11 +792,11 @@ pub struct GoalContextEvent {
     pub time: f32,
     pub frame: usize,
     pub scoring_team_is_team_0: bool,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub scorer: Option<PlayerId>,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub scoring_team_most_back_player: Option<PlayerId>,
-    #[ts(as = "Option<crate::ts_bindings::RemoteIdTs>")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub defending_team_most_back_player: Option<PlayerId>,
     pub ball_position: Option<GoalContextPosition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

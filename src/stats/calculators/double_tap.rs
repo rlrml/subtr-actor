@@ -8,7 +8,7 @@ const DOUBLE_TAP_TOUCH_WINDOW_SECONDS: f32 = 2.5;
 pub struct DoubleTapEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,

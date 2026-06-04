@@ -18,7 +18,7 @@ pub struct SpeedFlipEvent {
     pub frame: usize,
     pub resolved_time: f32,
     pub resolved_frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub time_since_kickoff_start: f32,

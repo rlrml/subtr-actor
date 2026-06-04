@@ -12,7 +12,7 @@ const WAVEDASH_MIN_CONFIDENCE: f32 = 0.45;
 pub struct WavedashEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::ts_bindings::RemoteIdTs")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
     pub dodge_time: f32,
