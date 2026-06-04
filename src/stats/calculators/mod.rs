@@ -15,6 +15,8 @@ mod frame_components;
 pub use frame_components::*;
 mod event_stream;
 pub use event_stream::*;
+mod event_definition;
+pub use event_definition::*;
 mod continuous_ball_control;
 pub use continuous_ball_control::*;
 #[cfg(test)]

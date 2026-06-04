@@ -1,4 +1,13 @@
 use super::*;
+use std::collections::BTreeSet;
+
+use crate::stats::analysis_graph::{
+    builtin_analysis_node_names, graph_with_builtin_analysis_nodes, nodes::DoubleTapNode,
+};
+use crate::stats::calculators::{
+    ApproachConfidenceLevel, EventCategory, FrameInput, StatsEvent, DOUBLE_TAP_EVENT_DEFINITION,
+    UNKNOWN_DETECTION_CONFIDENCE,
+};
 
 #[derive(Debug, Default, PartialEq, Eq)]
 struct BaseState(usize);
@@ -297,4 +306,98 @@ fn renders_shared_dependencies_as_references() {
     assert!(rendered.contains("quadrupled"));
     assert_eq!(rendered.matches("base").count(), 1);
     assert!(rendered.contains("root:usize"));
+}
+
+#[test]
+fn discovers_static_event_metadata_from_analysis_nodes() {
+    let mut graph = AnalysisGraph::new()
+        .with_input_state_type::<FrameInput>()
+        .with_node(DoubleTapNode::new());
+    let emitted_events = graph
+        .emitted_events()
+        .expect("graph should resolve emitted event metadata");
+
+    let emitted = emitted_events
+        .iter()
+        .find(|emitted| emitted.event.id == "double_tap")
+        .expect("double tap node should emit double tap metadata");
+    assert_eq!(emitted.event.id, "double_tap");
+    assert_eq!(emitted.event.category, EventCategory::Mechanic);
+    assert_eq!(
+        emitted.event.confidence.approach,
+        ApproachConfidenceLevel::Unknown
+    );
+    assert_eq!(emitted.event.confidence, UNKNOWN_DETECTION_CONFIDENCE);
+    assert_eq!(emitted.producer.node_name, "double_tap");
+    assert_eq!(emitted.producer.node_type, "DoubleTapNode");
+    assert_eq!(emitted.producer.calculator_type, "DoubleTapCalculator");
+    assert_eq!(
+        <crate::stats::calculators::DoubleTapEvent as StatsEvent>::DEFINITION,
+        DOUBLE_TAP_EVENT_DEFINITION
+    );
+}
+
+#[test]
+fn builtin_event_metadata_contains_emitted_event_payloads() {
+    let mut graph =
+        graph_with_builtin_analysis_nodes(builtin_analysis_node_names().iter().copied())
+            .expect("builtin graph should build");
+    let emitted_events = graph
+        .emitted_events()
+        .expect("builtin graph should resolve emitted event metadata");
+
+    let actual_ids = emitted_events
+        .iter()
+        .map(|event| event.event.id)
+        .collect::<BTreeSet<_>>();
+    let expected_ids = BTreeSet::from([
+        "backboard_bounce",
+        "ball_carry",
+        "boost_ledger",
+        "boost_pickups",
+        "boost_state",
+        "bump",
+        "ceiling_shot",
+        "center",
+        "confirmed_flip_reset",
+        "core_player_goal_context",
+        "core_player_scoreboard",
+        "dodge_refreshed",
+        "dodge_reset",
+        "double_tap",
+        "fifty_fifty",
+        "flick",
+        "goal_context",
+        "half_flip",
+        "half_volley",
+        "mechanics",
+        "movement",
+        "musty_flick",
+        "one_timer",
+        "pass",
+        "pass_last_completed",
+        "positioning",
+        "possession",
+        "powerslide",
+        "pressure",
+        "rotation_player",
+        "rotation_team",
+        "rush",
+        "speed_flip",
+        "territorial_pressure",
+        "timeline",
+        "touch",
+        "touch_ball_movement",
+        "touch_last_touch",
+        "wall_aerial",
+        "wall_aerial_shot",
+        "wavedash",
+        "whiff",
+    ]);
+
+    assert_eq!(actual_ids, expected_ids);
+    assert!(emitted_events.iter().all(|event| {
+        event.event.confidence == UNKNOWN_DETECTION_CONFIDENCE
+            && event.producer.implementation_notes.is_empty()
+    }));
 }

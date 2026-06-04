@@ -3,6 +3,7 @@
 use std::any::{type_name, Any, TypeId};
 use std::collections::{HashMap, HashSet};
 
+use crate::stats::calculators::{event_producers, EmittedEvent};
 use crate::*;
 
 #[derive(Clone, Copy)]
@@ -438,6 +439,25 @@ impl AnalysisGraph {
 
     pub fn node_names(&self) -> impl Iterator<Item = &'static str> + '_ {
         self.nodes.iter().map(|node| node.name())
+    }
+
+    pub fn emitted_events(&mut self) -> SubtrActorResult<Vec<EmittedEvent>> {
+        self.resolve()?;
+        let node_names = self
+            .nodes
+            .iter()
+            .map(|node| node.name())
+            .collect::<HashSet<_>>();
+        Ok(self
+            .event_producers()
+            .iter()
+            .filter(|producer| node_names.contains(producer.node_name))
+            .flat_map(|producer| producer.emitted_events.iter().copied())
+            .collect())
+    }
+
+    fn event_producers(&self) -> &'static [crate::stats::calculators::EventProducerDefinition] {
+        event_producers()
     }
 
     fn provider_index_by_type(&self) -> SubtrActorResult<HashMap<TypeId, usize>> {
