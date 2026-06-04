@@ -1,6 +1,6 @@
 # subtr-actor
 
-[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![Docs.rs](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Unreleased commits](https://img.shields.io/github/commits-since/rlrml/subtr-actor/latest?style=flat-square&label=unreleased)](https://github.com/rlrml/subtr-actor/releases/latest) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
+[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![Docs.rs](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Unreleased commits](https://img.shields.io/github/commits-since/rlrml/subtr-actor/latest?style=flat-square&label=unreleased)](https://github.com/rlrml/subtr-actor/compare/v0.12.0...master) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
 
 [![Rust version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square&label=rust)](https://crates.io/crates/subtr-actor)
 
