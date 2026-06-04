@@ -270,7 +270,7 @@ pub(crate) fn push_timeline_events_from_timeline(
 pub(crate) fn push_repeated_core_player_stat_events(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
-    event: &CorePlayerStatsEvent,
+    event: &CorePlayerScoreboardEvent,
     kind: SaMechanicKind,
     count: i32,
 ) {
@@ -300,7 +300,7 @@ pub(crate) fn push_repeated_core_player_stat_events(
 pub(crate) fn push_core_player_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
-    core_player: &[CorePlayerStatsEvent],
+    core_player: &[CorePlayerScoreboardEvent],
 ) {
     for event in core_player {
         push_repeated_core_player_stat_events(
@@ -308,21 +308,21 @@ pub(crate) fn push_core_player_events_from_timeline(
             emitted_mechanic_ids,
             event,
             SaMechanicKind::Shot,
-            event.delta.shots,
+            event.shots_delta,
         );
         push_repeated_core_player_stat_events(
             pending_events,
             emitted_mechanic_ids,
             event,
             SaMechanicKind::Save,
-            event.delta.saves,
+            event.saves_delta,
         );
         push_repeated_core_player_stat_events(
             pending_events,
             emitted_mechanic_ids,
             event,
             SaMechanicKind::Assist,
-            event.delta.assists,
+            event.assists_delta,
         );
     }
 }
@@ -701,9 +701,9 @@ pub(crate) fn replay_annotations_from_timeline(
 
     for event in &timeline.core_player {
         for (kind, count) in [
-            (SaMechanicKind::Shot, event.delta.shots),
-            (SaMechanicKind::Save, event.delta.saves),
-            (SaMechanicKind::Assist, event.delta.assists),
+            (SaMechanicKind::Shot, event.shots_delta),
+            (SaMechanicKind::Save, event.saves_delta),
+            (SaMechanicKind::Assist, event.assists_delta),
         ] {
             for index in 0..count.max(0) {
                 push_replay_annotation(

@@ -356,10 +356,14 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_finish(engine: *mut SaEngine) -> 
     if !engine.live_replay_meta_initialized {
         return 0;
     }
+    if engine.live_graph_finished {
+        return 0;
+    }
     if engine.graph.finish().is_err() {
         return -2;
     }
     refresh_timeline_graph_state(engine);
+    engine.live_graph_finished = true;
     0
 }
 
@@ -418,6 +422,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
 
     engine.live_events = live_events;
     engine.live_event_history = live_event_history;
+    engine.live_graph_finished = false;
     refresh_timeline_graph_state(engine);
     0
 }
