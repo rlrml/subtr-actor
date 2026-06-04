@@ -386,31 +386,33 @@ pub(crate) fn goal_tag_kind(kind: GoalTagKind) -> SaMechanicKind {
 pub(crate) fn push_goal_tag_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
-    goal_tags: &[GoalTagEvent],
+    goal_context: &[GoalContextEvent],
 ) {
-    for event in goal_tags {
+    for (goal_index, event) in goal_context.iter().enumerate() {
         let Some(scorer) = event.scorer.as_ref() else {
             continue;
         };
-        push_pending_graph_event(
-            pending_events,
-            emitted_mechanic_ids,
-            PendingGraphEvent {
-                id: format!(
-                    "goal_tag:{}:{}:{:?}:{}",
-                    event.goal_index,
-                    event.frame,
-                    event.kind,
-                    player_index(scorer)
-                ),
-                kind: goal_tag_kind(event.kind),
-                player_id: scorer.clone(),
-                is_team_0: event.scoring_team_is_team_0,
-                frame_number: event.frame,
-                time: event.time,
-                confidence: event.confidence,
-            },
-        );
+        for tag in &event.tags {
+            push_pending_graph_event(
+                pending_events,
+                emitted_mechanic_ids,
+                PendingGraphEvent {
+                    id: format!(
+                        "goal_tag:{}:{}:{:?}:{}",
+                        goal_index,
+                        event.frame,
+                        tag.kind(),
+                        player_index(scorer)
+                    ),
+                    kind: goal_tag_kind(tag.kind()),
+                    player_id: scorer.clone(),
+                    is_team_0: event.scoring_team_is_team_0,
+                    frame_number: event.frame,
+                    time: event.time,
+                    confidence: tag.metadata().confidence,
+                },
+            );
+        }
     }
 }
 
@@ -762,30 +764,32 @@ pub(crate) fn replay_annotations_from_timeline(
         );
     }
 
-    for event in &timeline.goal_tags {
+    for (goal_index, event) in timeline.goal_context.iter().enumerate() {
         let Some(scorer) = event.scorer.as_ref() else {
             continue;
         };
-        push_replay_annotation(
-            &mut events,
-            &mut emitted_ids,
-            &index_map,
-            PendingGraphEvent {
-                id: format!(
-                    "replay_goal_tag:{}:{}:{:?}:{}",
-                    event.goal_index,
-                    event.frame,
-                    event.kind,
-                    replay_player_index(&index_map, scorer)
-                ),
-                kind: goal_tag_kind(event.kind),
-                player_id: scorer.clone(),
-                is_team_0: event.scoring_team_is_team_0,
-                frame_number: event.frame,
-                time: event.time,
-                confidence: event.confidence,
-            },
-        );
+        for tag in &event.tags {
+            push_replay_annotation(
+                &mut events,
+                &mut emitted_ids,
+                &index_map,
+                PendingGraphEvent {
+                    id: format!(
+                        "replay_goal_tag:{}:{}:{:?}:{}",
+                        goal_index,
+                        event.frame,
+                        tag.kind(),
+                        replay_player_index(&index_map, scorer)
+                    ),
+                    kind: goal_tag_kind(tag.kind()),
+                    player_id: scorer.clone(),
+                    is_team_0: event.scoring_team_is_team_0,
+                    frame_number: event.frame,
+                    time: event.time,
+                    confidence: tag.metadata().confidence,
+                },
+            );
+        }
     }
 
     events.sort_by(|left, right| {
@@ -827,7 +831,7 @@ pub(crate) fn push_drainable_events_from_timeline(
         emitted_mechanic_ids,
         &events.fifty_fifty,
     );
-    push_goal_tag_events_from_timeline(pending_events, emitted_mechanic_ids, &events.goal_tags);
+    push_goal_tag_events_from_timeline(pending_events, emitted_mechanic_ids, &events.goal_context);
     push_rush_events_from_timeline(pending_team_events, emitted_team_event_ids, &events.rush);
     push_goal_context_events_from_timeline(
         pending_goal_context_events,

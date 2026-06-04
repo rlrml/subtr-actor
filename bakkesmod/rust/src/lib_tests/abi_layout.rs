@@ -362,19 +362,16 @@ fn fifty_fifty_event(
     }
 }
 
-fn goal_tag_event(kind: GoalTagKind, scorer: Option<RemoteId>) -> GoalTagEvent {
-    GoalTagEvent {
-        goal_index: 0,
-        time: 1.36,
-        frame: 13,
+fn goal_tag(kind: GoalTagKind) -> GoalTag {
+    GoalTag::from_parts(
         kind,
-        scoring_team_is_team_0: false,
-        scorer,
-        scorer_position: None,
-        confidence: 0.72,
-        modifiers: Vec::new(),
-        evidence: Vec::new(),
-    }
+        GoalTagMetadata {
+            confidence: 0.72,
+            modifiers: Vec::new(),
+            related_events: Vec::new(),
+            evidence: Vec::new(),
+        },
+    )
 }
 
 fn rush_event(start_frame: usize, end_frame: usize, end_time: f32, is_team_0: bool) -> RushEvent {
@@ -407,6 +404,7 @@ fn goal_context_event(frame: usize, time: f32) -> GoalContextEvent {
         goal_buildup: GoalBuildupKind::CounterAttack,
         scorer_last_touch: None,
         players: Vec::new(),
+        tags: Vec::new(),
     }
 }
 

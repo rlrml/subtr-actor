@@ -608,7 +608,10 @@ fn drains_player_owned_events_from_timeline_events() {
                 is_team_0: Some(false),
             },
         ],
-        goal_context: vec![goal_context_event(10, 1.09)],
+        goal_context: vec![GoalContextEvent {
+            tags: vec![goal_tag(GoalTagKind::FlickGoal)],
+            ..goal_context_event(10, 1.09)
+        }],
         mechanics: vec![normalized_mechanic(
             "speed_flip:15:0",
             "speed_flip",
@@ -620,10 +623,6 @@ fn drains_player_owned_events_from_timeline_events() {
         boost_pickups: vec![boost_pickup_event(125, 1.25)],
         bump: vec![bump_event(13, 1.3, 0.42)],
         fifty_fifty: vec![fifty_fifty_event(9, 14, 1.4)],
-        goal_tags: vec![
-            goal_tag_event(GoalTagKind::FlickGoal, Some(RemoteId::SplitScreen(1))),
-            goal_tag_event(GoalTagKind::AerialGoal, None),
-        ],
         rush: vec![rush_event(8, 16, 1.6, true)],
         ..ReplayStatsTimelineEvents::default()
     };
@@ -651,34 +650,34 @@ fn drains_player_owned_events_from_timeline_events() {
     assert_eq!(pending_events[3].kind, SaMechanicKind::Assist);
     assert_eq!(pending_events[3].frame_number, 10);
     assert_eq!(pending_events[3].player_index, 0);
-    assert_eq!(pending_events[4].kind, SaMechanicKind::Backboard);
-    assert_eq!(pending_events[4].frame_number, 11);
-    assert_eq!(pending_events[4].player_index, 0);
-    assert_eq!(pending_events[5].kind, SaMechanicKind::Whiff);
-    assert_eq!(pending_events[5].frame_number, 12);
+    assert_eq!(pending_events[4].kind, SaMechanicKind::FlickGoal);
+    assert_eq!(pending_events[4].time, 1.09);
+    assert_eq!(pending_events[4].frame_number, 10);
+    assert_eq!(pending_events[4].player_index, 1);
+    assert_eq!(pending_events[4].is_team_0, 0);
+    assert_eq!(pending_events[4].confidence, 0.72);
+    assert_eq!(pending_events[5].kind, SaMechanicKind::Backboard);
+    assert_eq!(pending_events[5].frame_number, 11);
     assert_eq!(pending_events[5].player_index, 0);
-    assert_eq!(pending_events[6].kind, SaMechanicKind::BoostPickup);
-    assert_eq!(pending_events[6].frame_number, 125);
+    assert_eq!(pending_events[6].kind, SaMechanicKind::Whiff);
+    assert_eq!(pending_events[6].frame_number, 12);
     assert_eq!(pending_events[6].player_index, 0);
-    assert_eq!(pending_events[7].kind, SaMechanicKind::Bump);
-    assert_eq!(pending_events[7].frame_number, 13);
+    assert_eq!(pending_events[7].kind, SaMechanicKind::BoostPickup);
+    assert_eq!(pending_events[7].frame_number, 125);
     assert_eq!(pending_events[7].player_index, 0);
-    assert_eq!(pending_events[7].confidence, 0.42);
-    assert_eq!(pending_events[8].kind, SaMechanicKind::Demo);
-    assert_eq!(pending_events[8].time, 1.35);
+    assert_eq!(pending_events[8].kind, SaMechanicKind::Bump);
     assert_eq!(pending_events[8].frame_number, 13);
     assert_eq!(pending_events[8].player_index, 0);
-    assert_eq!(pending_events[9].kind, SaMechanicKind::Death);
+    assert_eq!(pending_events[8].confidence, 0.42);
+    assert_eq!(pending_events[9].kind, SaMechanicKind::Demo);
     assert_eq!(pending_events[9].time, 1.35);
     assert_eq!(pending_events[9].frame_number, 13);
-    assert_eq!(pending_events[9].player_index, 1);
-    assert_eq!(pending_events[9].is_team_0, 0);
-    assert_eq!(pending_events[10].kind, SaMechanicKind::FlickGoal);
-    assert_eq!(pending_events[10].time, 1.36);
+    assert_eq!(pending_events[9].player_index, 0);
+    assert_eq!(pending_events[10].kind, SaMechanicKind::Death);
+    assert_eq!(pending_events[10].time, 1.35);
     assert_eq!(pending_events[10].frame_number, 13);
     assert_eq!(pending_events[10].player_index, 1);
     assert_eq!(pending_events[10].is_team_0, 0);
-    assert_eq!(pending_events[10].confidence, 0.72);
     assert_eq!(pending_events[11].kind, SaMechanicKind::FiftyFifty);
     assert_eq!(pending_events[11].frame_number, 14);
     assert_eq!(pending_events[11].player_index, 1);

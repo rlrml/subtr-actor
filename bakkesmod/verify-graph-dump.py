@@ -51,7 +51,6 @@ DEFAULT_GRAPH_EVENT_FIELDS = (
     "one_timer",
     "pass",
     "pass_last_completed",
-    "goal_tags",
     "rush",
     "speed_flip",
     "half_flip",
