@@ -8,12 +8,19 @@ pub struct TouchState {
     pub last_touch_team_is_team_0: Option<bool>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum TouchCooldownKey {
+    Player(PlayerId),
+    Team(bool),
+}
+
 #[derive(Clone, Default)]
 pub struct TouchStateCalculator {
     previous_ball_linear_velocity: Option<glam::Vec3>,
     previous_ball_angular_velocity: Option<glam::Vec3>,
     current_last_touch: Option<TouchEvent>,
     recent_touch_candidates: HashMap<PlayerId, TouchEvent>,
+    last_touch_times: HashMap<TouchCooldownKey, f32>,
 }
 
 impl TouchStateCalculator {
@@ -297,6 +304,34 @@ impl TouchStateCalculator {
         touch_events
     }
 
+    fn touch_cooldown_key(event: &TouchEvent) -> TouchCooldownKey {
+        event
+            .player
+            .clone()
+            .map(TouchCooldownKey::Player)
+            .unwrap_or(TouchCooldownKey::Team(event.team_is_team_0))
+    }
+
+    fn touch_cooldown_allows(&mut self, event: &TouchEvent) -> bool {
+        const FLOAT_EPSILON: f32 = 0.0001;
+
+        let key = Self::touch_cooldown_key(event);
+        let allowed = self.last_touch_times.get(&key).is_none_or(|last_time| {
+            event.time - last_time + FLOAT_EPSILON >= TOUCH_RATE_LIMIT_SECONDS
+        });
+        if allowed {
+            self.last_touch_times.insert(key, event.time);
+        }
+        allowed
+    }
+
+    fn apply_touch_cooldown(&mut self, touch_events: Vec<TouchEvent>) -> Vec<TouchEvent> {
+        touch_events
+            .into_iter()
+            .filter(|event| self.touch_cooldown_allows(event))
+            .collect()
+    }
+
     pub fn update(
         &mut self,
         frame: &FrameInfo,
@@ -308,10 +343,12 @@ impl TouchStateCalculator {
         let touch_events = if live_play_state.is_live_play {
             self.prune_recent_touch_candidates(frame.frame_number);
             self.update_recent_touch_candidates(frame, ball, players);
-            self.confirmed_touch_events(frame, ball, players, events)
+            let touch_events = self.confirmed_touch_events(frame, ball, players, events);
+            self.apply_touch_cooldown(touch_events)
         } else {
             self.current_last_touch = None;
             self.recent_touch_candidates.clear();
+            self.last_touch_times.clear();
             Vec::new()
         };
 

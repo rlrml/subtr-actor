@@ -267,6 +267,8 @@ pub struct TouchEvent {
     pub dodge_contact: bool,
 }
 
+pub(crate) const TOUCH_RATE_LIMIT_SECONDS: f32 = 0.25;
+
 /// [`ReplayMeta`] struct represents metadata about the replay being processed.
 ///
 /// This includes information about the players in the match and all replay headers.

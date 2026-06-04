@@ -54,7 +54,7 @@ fn players(player_id: PlayerId) -> PlayerFrameState {
 }
 
 #[test]
-fn emits_consecutive_same_player_touch_candidates_without_cooldown() {
+fn suppresses_same_player_touch_candidates_inside_cooldown() {
     let player_id = boxcars::RemoteId::Steam(1);
     let players = players(player_id.clone());
     let mut calculator = TouchStateCalculator::new();
@@ -84,15 +84,25 @@ fn emits_consecutive_same_player_touch_candidates_without_cooldown() {
         &FrameEventsState::default(),
         &live_play,
     );
+    let third_touch = calculator.update(
+        &frame(4),
+        &ball(glam::Vec3::new(1000.0, 0.0, 0.0)),
+        &players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
 
     assert_eq!(first_touch.touch_events.len(), 1);
     assert_eq!(first_touch.touch_events[0].player, Some(player_id.clone()));
     assert_eq!(first_touch.touch_events[0].frame, 1);
 
-    assert_eq!(second_touch.touch_events.len(), 1);
-    assert_eq!(second_touch.touch_events[0].player, Some(player_id.clone()));
-    assert_eq!(second_touch.touch_events[0].frame, 2);
-    assert_eq!(second_touch.last_touch_player, Some(player_id));
+    assert!(second_touch.touch_events.is_empty());
+    assert_eq!(second_touch.last_touch_player, Some(player_id.clone()));
+
+    assert_eq!(third_touch.touch_events.len(), 1);
+    assert_eq!(third_touch.touch_events[0].player, Some(player_id.clone()));
+    assert_eq!(third_touch.touch_events[0].frame, 4);
+    assert_eq!(third_touch.last_touch_player, Some(player_id));
 }
 
 #[test]
@@ -129,6 +139,79 @@ fn explicit_touch_events_feed_touch_state_without_velocity_candidate() {
     assert_eq!(touch_state.touch_events[0].player, Some(player_id.clone()));
     assert_eq!(touch_state.touch_events[0].frame, 1);
     assert_eq!(touch_state.last_touch_player, Some(player_id));
+}
+
+#[test]
+fn explicit_touch_events_respect_same_player_cooldown() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let players = players(player_id.clone());
+    let mut calculator = TouchStateCalculator::new();
+    let live_play = LivePlayState {
+        gameplay_phase: GameplayPhase::ActivePlay,
+        is_live_play: true,
+    };
+
+    let first_touch = calculator.update(
+        &frame(1),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &FrameEventsState {
+            touch_events: vec![TouchEvent {
+                time: 0.1,
+                frame: 1,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: None,
+                dodge_contact: false,
+            }],
+            ..FrameEventsState::default()
+        },
+        &live_play,
+    );
+    let suppressed_touch = calculator.update(
+        &frame(2),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &FrameEventsState {
+            touch_events: vec![TouchEvent {
+                time: 0.2,
+                frame: 2,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: None,
+                dodge_contact: false,
+            }],
+            ..FrameEventsState::default()
+        },
+        &live_play,
+    );
+    let allowed_touch = calculator.update(
+        &frame(4),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &FrameEventsState {
+            touch_events: vec![TouchEvent {
+                time: 0.4,
+                frame: 4,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: None,
+                dodge_contact: false,
+            }],
+            ..FrameEventsState::default()
+        },
+        &live_play,
+    );
+
+    assert_eq!(first_touch.touch_events.len(), 1);
+    assert!(suppressed_touch.touch_events.is_empty());
+    assert_eq!(suppressed_touch.last_touch_player, Some(player_id.clone()));
+    assert_eq!(allowed_touch.touch_events.len(), 1);
+    assert_eq!(allowed_touch.touch_events[0].frame, 4);
+    assert_eq!(allowed_touch.last_touch_player, Some(player_id));
 }
 
 #[test]
