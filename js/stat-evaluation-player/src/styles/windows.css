@@ -84,6 +84,10 @@
 .mechanics-review-window-body {
   display: grid;
   gap: var(--ui-gap-md);
+  max-height: min(74dvh, 42rem);
+  min-height: 0;
+  overflow: hidden auto;
+  scrollbar-width: thin;
 }
 
 .event-playlist-window-body {
@@ -354,6 +358,8 @@
 .replay-loading-window-body {
   display: grid;
   gap: var(--ui-gap-sm);
+  max-height: min(72dvh, 40rem);
+  min-height: 0;
 }
 
 .replay-loading-summary {
@@ -463,9 +469,12 @@
 }
 
 .mechanics-review-list {
+  max-height: min(22rem, calc(100dvh - 27rem));
   display: grid;
   gap: var(--ui-gap-xs);
-  overflow: visible;
+  overflow: auto;
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
 }
 
 .mechanics-review-item {

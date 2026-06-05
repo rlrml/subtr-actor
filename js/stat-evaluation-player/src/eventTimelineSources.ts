@@ -200,7 +200,7 @@ export function getEventTimelineSources({
       playlistId: `mechanic:${kind}`,
       timelineKey: `mechanic:${kind}`,
       timelineId: `mechanic:${kind}`,
-      group: "Mechanics",
+      group: "Event types",
       label: formatMechanicKind(kind),
       count,
       active: activeMechanicTimelineKinds.has(kind),

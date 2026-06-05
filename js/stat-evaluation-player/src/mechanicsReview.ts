@@ -30,6 +30,8 @@ export interface MechanicsReviewReplay {
 export interface MechanicsReviewItemMeta {
   confidence?: number | null;
   eventId?: string;
+  eventType?: string;
+  eventTypeLabel?: string;
   mechanic?: string;
   mechanicLabel?: string;
   playerId?: string;
@@ -464,7 +466,12 @@ export function formatMechanicsReviewEventDetails(item: MechanicsReviewItem): st
 }
 
 export function getMechanicsReviewItemLabel(item: MechanicsReviewItem, index: number): string {
-  return item.label ?? item.meta?.mechanicLabel ?? `Review item ${index + 1}`;
+  return (
+    item.label ??
+    item.meta?.eventTypeLabel ??
+    item.meta?.mechanicLabel ??
+    `Review item ${index + 1}`
+  );
 }
 
 export function getMechanicsReviewPlayerId(item: MechanicsReviewItem): string | null {
@@ -478,14 +485,18 @@ export function getMechanicsReviewPlayerId(item: MechanicsReviewItem): string | 
 }
 
 export function getMechanicsReviewMechanicLabel(item: MechanicsReviewItem): string {
+  if (typeof item.meta?.eventTypeLabel === "string" && item.meta.eventTypeLabel.trim()) {
+    return item.meta.eventTypeLabel;
+  }
   if (typeof item.meta?.mechanicLabel === "string" && item.meta.mechanicLabel.trim()) {
     return item.meta.mechanicLabel;
   }
-  return typeof item.meta?.mechanic === "string" ? formatMechanicKind(item.meta.mechanic) : "--";
+  const eventType = item.meta?.eventType ?? item.meta?.mechanic;
+  return typeof eventType === "string" ? formatMechanicKind(eventType) : "--";
 }
 
 export function getMechanicsReviewMechanicKind(item: MechanicsReviewItem): string | null {
-  const mechanic = item.meta?.mechanic;
+  const mechanic = item.meta?.eventType ?? item.meta?.mechanic;
   return typeof mechanic === "string" && mechanic.trim()
     ? mechanic.trim().replaceAll("-", "_")
     : null;

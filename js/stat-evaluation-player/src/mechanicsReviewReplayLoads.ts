@@ -82,17 +82,19 @@ export class MechanicsReviewReplayLoadsController {
     }
   }
 
-  preload(review: ActiveMechanicsReview, currentReplayId: string): void {
+  preload(review: ActiveMechanicsReview, currentIndex: number): void {
     if (review.preloading) {
+      return;
+    }
+    const items = this.getNextReplayItems(review, currentIndex);
+    if (items.length === 0) {
       return;
     }
     review.preloading = true;
     void (async () => {
       try {
-        for (const [replayId, item] of this.getReplayItems(review)) {
-          if (replayId === currentReplayId) {
-            continue;
-          }
+        for (const item of items) {
+          const replayId = item.replay;
           const state = review.replayLoadStates.get(replayId);
           if (state?.status === "loaded" || state?.status === "loading") {
             continue;
@@ -274,6 +276,27 @@ export class MechanicsReviewReplayLoadsController {
       counts.set(item.replay, (counts.get(item.replay) ?? 0) + 1);
     }
     return counts;
+  }
+
+  private getNextReplayItems(
+    review: ActiveMechanicsReview,
+    currentIndex: number,
+  ): MechanicsReviewItem[] {
+    const currentReplayId = review.manifest.items[currentIndex]?.replay;
+    const seenReplayIds = new Set<string>(currentReplayId ? [currentReplayId] : []);
+    const items: MechanicsReviewItem[] = [];
+
+    for (let index = currentIndex + 1; index < review.manifest.items.length; index += 1) {
+      const item = review.manifest.items[index];
+      if (!item || seenReplayIds.has(item.replay)) {
+        continue;
+      }
+      seenReplayIds.add(item.replay);
+      items.push(item);
+      break;
+    }
+
+    return items;
   }
 
   private replayLoadStatusText(state: MechanicsReviewReplayLoadState): string {
