@@ -1,7 +1,7 @@
 use super::*;
 
-/// Maximum time between the attributed backboard bounce and the follow-up touch.
-const DOUBLE_TAP_TOUCH_WINDOW_SECONDS: f32 = 2.5;
+const SOCCAR_CEILING_Z: f32 = 2044.0;
+const CEILING_CONTACT_MAX_GAP: f32 = 90.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -33,9 +33,10 @@ struct PendingBackboardBounce {
 ///    last touched the ball before the bounce. The exact backboard geometry and
 ///    attribution thresholds live in [`BackboardBounceCalculator`].
 /// 2. The touch that armed the backboard bounce must be airborne.
-/// 3. The same player must touch the ball again within
-///    [`DOUBLE_TAP_TOUCH_WINDOW_SECONDS`] while the replay is in live play.
-/// 4. The ball's post-touch constant-velocity trajectory must project into or
+/// 3. The same player must remain off ground, wall, and ceiling surfaces.
+/// 4. The same player must make the next attributed ball touch while the replay
+///    is in live play.
+/// 5. The ball's post-touch constant-velocity trajectory must project into or
 ///    close to the opponent goal mouth.
 ///
 /// The detector intentionally does not aim at the center of the goal. Near-post
@@ -58,11 +59,6 @@ impl DoubleTapCalculator {
 
     pub fn new_events(&self) -> &[DoubleTapEvent] {
         self.events.new_events()
-    }
-
-    fn prune_pending_backboard_bounces(&mut self, current_time: f32) {
-        self.pending_backboard_bounces
-            .retain(|entry| current_time - entry.time <= DOUBLE_TAP_TOUCH_WINDOW_SECONDS);
     }
 
     fn record_backboard_bounces(&mut self, state: &BackboardBounceState) {
@@ -99,58 +95,75 @@ impl DoubleTapCalculator {
             .is_some_and(|position| PlayerVerticalBand::from_height(position[2]).is_grounded())
     }
 
+    fn player_is_on_ceiling(position: glam::Vec3) -> bool {
+        SOCCAR_CEILING_Z - position.z <= CEILING_CONTACT_MAX_GAP
+    }
+
+    fn player_is_touching_surface(position: glam::Vec3) -> bool {
+        PlayerVerticalBand::from_height(position.z).is_grounded()
+            || player_is_on_wall(position)
+            || Self::player_is_on_ceiling(position)
+    }
+
+    fn prune_surface_contacts(&mut self, players: &PlayerFrameState) {
+        self.pending_backboard_bounces.retain(|pending| {
+            let Some(position) = players
+                .player_position(&pending.player_id)
+                .map(glam::Vec3::from_array)
+            else {
+                return true;
+            };
+
+            !Self::player_is_touching_surface(position)
+        });
+    }
+
     fn resolve_double_tap_touches(
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
-        touch_events: &[TouchEvent],
+        touch_state: &TouchState,
     ) {
-        if touch_events.is_empty() || self.pending_backboard_bounces.is_empty() {
+        if self.pending_backboard_bounces.is_empty() {
             return;
         }
 
+        let Some(touch) = touch_state.primary_touch_event() else {
+            return;
+        };
+
         let mut completed_events = Vec::new();
         self.pending_backboard_bounces.retain(|pending| {
-            if frame.time <= pending.time {
+            if touch.time <= pending.time {
                 return true;
             }
 
-            let matching_touch = Self::latest_matching_touch(touch_events, pending);
-
-            if let Some(matching_touch) = matching_touch {
-                if Self::followup_touch_projects_on_goal_mouth(ball, pending.is_team_0) {
-                    completed_events.push(DoubleTapEvent {
-                        time: matching_touch.time,
-                        frame: matching_touch.frame,
-                        player: pending.player_id.clone(),
-                        player_position: matching_touch
-                            .player_position
-                            .map(|position| vec_to_glam(&position).to_array()),
-                        is_team_0: pending.is_team_0,
-                        backboard_time: pending.time,
-                        backboard_frame: pending.frame,
-                    });
-                }
+            let is_matching_followup = touch.team_is_team_0 == pending.is_team_0
+                && touch.player.as_ref() == Some(&pending.player_id);
+            if !is_matching_followup {
+                return false;
             }
+
+            if Self::followup_touch_projects_on_goal_mouth(ball, pending.is_team_0) {
+                completed_events.push(DoubleTapEvent {
+                    time: touch.time,
+                    frame: touch.frame,
+                    player: pending.player_id.clone(),
+                    player_position: touch
+                        .player_position
+                        .map(|position| vec_to_glam(&position).to_array()),
+                    is_team_0: pending.is_team_0,
+                    backboard_time: pending.time,
+                    backboard_frame: pending.frame,
+                });
+            }
+
             false
         });
 
         for event in completed_events {
             self.record_double_tap(frame, event);
         }
-    }
-
-    fn latest_matching_touch<'a>(
-        touch_events: &'a [TouchEvent],
-        pending: &PendingBackboardBounce,
-    ) -> Option<&'a TouchEvent> {
-        touch_events
-            .iter()
-            .filter(|touch| {
-                touch.team_is_team_0 == pending.is_team_0
-                    && touch.player.as_ref() == Some(&pending.player_id)
-            })
-            .max_by(|left, right| TouchEvent::timestamp_ordering(left, right))
     }
 
     fn record_double_tap(&mut self, _frame: &FrameInfo, event: DoubleTapEvent) {
@@ -194,6 +207,7 @@ impl DoubleTapCalculator {
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
+        players: &PlayerFrameState,
         touch_state: &TouchState,
         backboard_bounce_state: &BackboardBounceState,
         live_play_state: &LivePlayState,
@@ -203,9 +217,9 @@ impl DoubleTapCalculator {
             self.pending_backboard_bounces.clear();
         }
 
-        self.prune_pending_backboard_bounces(frame.time);
         self.record_backboard_bounces(backboard_bounce_state);
-        self.resolve_double_tap_touches(frame, ball, &touch_state.touch_events);
+        self.prune_surface_contacts(players);
+        self.resolve_double_tap_touches(frame, ball, touch_state);
         Ok(())
     }
 }
