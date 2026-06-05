@@ -313,7 +313,7 @@ export class MechanicsReviewWindowController {
         await this.options.loadReplayBundleForDisplay(source, replayBundlePromise);
         review.currentReplayId = item.replay;
       }
-      this.options.replayLoads.preload(review, item.replay);
+      this.options.replayLoads.preload(review, index);
 
       const timeBase = review.manifest.playback?.timeBase;
       const startTime = Math.max(0, this.getBoundTime(item, item.start, timeBase));
@@ -481,7 +481,7 @@ function getMechanicsReviewDecisionEndpoint(item: MechanicsReviewItem | null): s
   }
   const eventId =
     typeof item.meta?.eventId === "string" && item.meta.eventId ? item.meta.eventId : item.id;
-  return eventId ? `/api/v1/mechanics/events/${encodeURIComponent(eventId)}/reviews` : null;
+  return eventId ? `/api/v1/events/${encodeURIComponent(eventId)}/reviews` : null;
 }
 
 function mechanicsReviewAuthHeaders(): Record<string, string> {
