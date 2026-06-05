@@ -421,16 +421,14 @@ impl MetadataFrame {
     ///
     /// # Errors
     ///
-    /// Returns a [`SubtrActorError`] if the seconds remaining cannot be retrieved
-    /// from the processor.
+    /// Missing replay metadata fields default to 0 so frame export can continue
+    /// for replays whose metadata actor does not carry every optional property.
     fn new_from_processor(processor: &dyn ProcessorView, time: f32) -> SubtrActorResult<Self> {
         Ok(Self::new(
             time,
-            processor.get_seconds_remaining()?,
-            processor.get_replicated_state_name().unwrap_or(0),
-            processor
-                .get_replicated_game_state_time_remaining()
-                .unwrap_or(0),
+            metadata_i32_or_default(processor.get_seconds_remaining()),
+            metadata_i32_or_default(processor.get_replicated_state_name()),
+            metadata_i32_or_default(processor.get_replicated_game_state_time_remaining()),
         ))
     }
 
@@ -461,6 +459,14 @@ impl MetadataFrame {
         }
     }
 }
+
+fn metadata_i32_or_default(value: SubtrActorResult<i32>) -> i32 {
+    value.unwrap_or(0)
+}
+
+#[cfg(test)]
+#[path = "replay_data_tests.rs"]
+mod replay_data_tests;
 
 /// Contains all frame-by-frame data for a Rocket League replay.
 ///
