@@ -48,11 +48,21 @@ fn backboard_bounce(
     player: PlayerId,
     is_team_0: bool,
 ) -> BackboardBounceState {
+    backboard_bounce_with_position(frame_number, time, player, is_team_0, None)
+}
+
+fn backboard_bounce_with_position(
+    frame_number: usize,
+    time: f32,
+    player: PlayerId,
+    is_team_0: bool,
+    player_position: Option<glam::Vec3>,
+) -> BackboardBounceState {
     let event = BackboardBounceEvent {
         time,
         frame: frame_number,
         player,
-        player_position: None,
+        player_position: player_position.map(|position| position.to_array()),
         is_team_0,
     };
     BackboardBounceState {
@@ -176,7 +186,7 @@ fn aggregate_followup_uses_latest_matching_touch_time() {
 }
 
 #[test]
-fn rejects_followup_touch_after_double_tap_window() {
+fn rejects_backboard_touch_from_grounded_player() {
     let shooter = PlayerId::Steam(1);
     let mut calculator = DoubleTapCalculator::new();
 
@@ -188,16 +198,22 @@ fn rejects_followup_touch_after_double_tap_window() {
             glam::Vec3::new(0.0, -1000.0, 0.0),
         ),
         Vec::new(),
-        backboard_bounce(10, 1.0, shooter.clone(), true),
+        backboard_bounce_with_position(
+            10,
+            1.0,
+            shooter.clone(),
+            true,
+            Some(glam::Vec3::new(0.0, 0.0, PLAYER_GROUND_Z_THRESHOLD)),
+        ),
     );
     update(
         &mut calculator,
-        frame(40, 1.8),
+        frame(20, 1.2),
         ball(
             glam::Vec3::new(0.0, 4500.0, 400.0),
             glam::Vec3::new(0.0, 1600.0, 0.0),
         ),
-        vec![touch(40, 1.8, shooter, true)],
+        vec![touch(20, 1.2, shooter, true)],
         BackboardBounceState::default(),
     );
 

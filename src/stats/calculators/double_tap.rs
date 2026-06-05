@@ -1,7 +1,7 @@
 use super::*;
 
 /// Maximum time between the attributed backboard bounce and the follow-up touch.
-const DOUBLE_TAP_TOUCH_WINDOW_SECONDS: f32 = 0.65;
+const DOUBLE_TAP_TOUCH_WINDOW_SECONDS: f32 = 2.5;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -32,9 +32,10 @@ struct PendingBackboardBounce {
 /// 1. A [`BackboardBounceEvent`] arms a pending double tap for the player who
 ///    last touched the ball before the bounce. The exact backboard geometry and
 ///    attribution thresholds live in [`BackboardBounceCalculator`].
-/// 2. The same player must touch the ball again within
+/// 2. The touch that armed the backboard bounce must be airborne.
+/// 3. The same player must touch the ball again within
 ///    [`DOUBLE_TAP_TOUCH_WINDOW_SECONDS`] while the replay is in live play.
-/// 3. The ball's post-touch constant-velocity trajectory must project into or
+/// 4. The ball's post-touch constant-velocity trajectory must project into or
 ///    close to the opponent goal mouth.
 ///
 /// The detector intentionally does not aim at the center of the goal. Near-post
@@ -66,6 +67,10 @@ impl DoubleTapCalculator {
 
     fn record_backboard_bounces(&mut self, state: &BackboardBounceState) {
         for event in &state.bounce_events {
+            if Self::backboard_touch_was_grounded(event) {
+                continue;
+            }
+
             if let Some(existing) = self
                 .pending_backboard_bounces
                 .iter_mut()
@@ -86,6 +91,12 @@ impl DoubleTapCalculator {
                 });
             }
         }
+    }
+
+    fn backboard_touch_was_grounded(event: &BackboardBounceEvent) -> bool {
+        event
+            .player_position
+            .is_some_and(|position| PlayerVerticalBand::from_height(position[2]).is_grounded())
     }
 
     fn resolve_double_tap_touches(
