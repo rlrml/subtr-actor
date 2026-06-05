@@ -176,6 +176,35 @@ fn aggregate_followup_uses_latest_matching_touch_time() {
 }
 
 #[test]
+fn rejects_followup_touch_after_double_tap_window() {
+    let shooter = PlayerId::Steam(1);
+    let mut calculator = DoubleTapCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(10, 1.0),
+        ball(
+            glam::Vec3::new(0.0, 5000.0, 700.0),
+            glam::Vec3::new(0.0, -1000.0, 0.0),
+        ),
+        Vec::new(),
+        backboard_bounce(10, 1.0, shooter.clone(), true),
+    );
+    update(
+        &mut calculator,
+        frame(40, 1.8),
+        ball(
+            glam::Vec3::new(0.0, 4500.0, 400.0),
+            glam::Vec3::new(0.0, 1600.0, 0.0),
+        ),
+        vec![touch(40, 1.8, shooter, true)],
+        BackboardBounceState::default(),
+    );
+
+    assert!(calculator.events().is_empty());
+}
+
+#[test]
 fn followup_touch_rejects_trajectory_moving_away_from_goal_line() {
     let state = ball(
         glam::Vec3::new(0.0, 4200.0, 400.0),

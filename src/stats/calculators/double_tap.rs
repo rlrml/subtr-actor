@@ -1,7 +1,7 @@
 use super::*;
 
 /// Maximum time between the attributed backboard bounce and the follow-up touch.
-const DOUBLE_TAP_TOUCH_WINDOW_SECONDS: f32 = 2.5;
+const DOUBLE_TAP_TOUCH_WINDOW_SECONDS: f32 = 0.65;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
