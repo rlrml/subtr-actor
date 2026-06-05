@@ -73,9 +73,11 @@ test("flick event derivation can populate compacted player stats", () => {
           ball_impulse: [220, -120, 80],
           impulse_away_alignment: 0.7,
           vertical_impulse: 80,
-          kind: "reverse_90",
+          kind: "reverse",
           local_ball_position: [20, 110, 160],
-          reverse_angle_degrees: 90,
+          local_ball_impulse: [1200, 0, 520],
+          backflip_pitch_rate: 5,
+          rotation_under_ball_degrees: 20,
           confidence: 0.7,
         },
       ],
@@ -145,8 +147,5 @@ test("flick event derivation can populate compacted player stats", () => {
   assert.equal(timeline.frames[2]?.players[1]?.flick.is_last_flick, true);
   assertClose(timeline.frames[2]?.players[1]?.flick.cumulative_setup_duration, 0.5);
   assert.equal(timeline.frames[2]?.players[1]?.flick.cumulative_ball_speed_change, 350);
-  assert.equal(
-    labeledCount(timeline.frames[2]?.players[1]?.flick ?? {}, "kind", "reverse_90"),
-    1,
-  );
+  assert.equal(labeledCount(timeline.frames[2]?.players[1]?.flick ?? {}, "kind", "reverse"), 1);
 });

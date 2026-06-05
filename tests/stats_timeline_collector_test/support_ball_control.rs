@@ -652,8 +652,7 @@ fn vertical_state_label_for_derivation(aerial: bool) -> StatLabel {
 
 fn flick_kind_label_for_derivation(value: &str) -> StatLabel {
     match value {
-        "reverse_45" => StatLabel::new("kind", "reverse_45"),
-        "reverse_90" => StatLabel::new("kind", "reverse_90"),
+        "reverse" => StatLabel::new("kind", "reverse"),
         _ => StatLabel::new("kind", "other"),
     }
 }

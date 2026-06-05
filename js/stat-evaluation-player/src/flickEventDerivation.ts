@@ -106,8 +106,8 @@ function countWithConfidenceLabel(stats: FlickStatsWithLabels, value: "standard"
   );
 }
 
-function flickKindLabelValue(value: unknown): "other" | "reverse_45" | "reverse_90" {
-  return value === "reverse_45" || value === "reverse_90" ? value : "other";
+function flickKindLabelValue(value: unknown): "other" | "reverse" {
+  return value === "reverse" ? value : "other";
 }
 
 function totalLabeledCount(stats: FlickStatsWithLabels): number {

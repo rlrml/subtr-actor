@@ -15,33 +15,27 @@ const FLICK_MAX_LOCAL_X_BEHIND: f32 = 95.0;
 const FLICK_MAX_LOCAL_X_FRONT: f32 = 210.0;
 const FLICK_MAX_LOCAL_Y: f32 = 170.0;
 const FLICK_MIN_IMPULSE_AWAY_ALIGNMENT: f32 = 0.15;
-const REVERSE_FLICK_MAX_LOCAL_X: f32 = 80.0;
-const REVERSE_FLICK_MIN_LOCAL_Y: f32 = 50.0;
-const REVERSE_FLICK_45_MIN_DEGREES: f32 = 28.0;
-const REVERSE_FLICK_45_MAX_DEGREES: f32 = 62.0;
-const REVERSE_FLICK_90_MIN_DEGREES: f32 = 65.0;
-const REVERSE_FLICK_90_MAX_DEGREES: f32 = 115.0;
-const REVERSE_FLICK_MIN_REAR_OR_SIDE_IMPULSE_ALIGNMENT: f32 = 0.35;
+const REVERSE_FLICK_MIN_BACKFLIP_PITCH_RATE: f32 = 2.5;
+const REVERSE_FLICK_MIN_FORWARD_IMPULSE: f32 = 450.0;
+const REVERSE_FLICK_MIN_FORWARD_IMPULSE_ALIGNMENT: f32 = 0.55;
+const REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES: f32 = 15.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlickKind {
     Other,
-    Reverse45,
-    Reverse90,
+    Reverse,
 }
 
-pub(crate) const FLICK_KIND_LABELS: [StatLabel; 3] = [
+pub(crate) const FLICK_KIND_LABELS: [StatLabel; 2] = [
     StatLabel::new("kind", "other"),
-    StatLabel::new("kind", "reverse_45"),
-    StatLabel::new("kind", "reverse_90"),
+    StatLabel::new("kind", "reverse"),
 ];
 
 impl FlickKind {
     pub fn as_label_value(self) -> &'static str {
         match self {
             Self::Other => "other",
-            Self::Reverse45 => "reverse_45",
-            Self::Reverse90 => "reverse_90",
+            Self::Reverse => "reverse",
         }
     }
 
@@ -52,8 +46,7 @@ impl FlickKind {
 
 pub(crate) fn flick_kind_label(value: &str) -> StatLabel {
     match value {
-        "reverse_45" => StatLabel::new("kind", "reverse_45"),
-        "reverse_90" => StatLabel::new("kind", "reverse_90"),
+        "reverse" => StatLabel::new("kind", "reverse"),
         _ => StatLabel::new("kind", "other"),
     }
 }
@@ -85,7 +78,9 @@ pub struct FlickEvent {
     pub vertical_impulse: f32,
     pub kind: String,
     pub local_ball_position: [f32; 3],
-    pub reverse_angle_degrees: Option<f32>,
+    pub local_ball_impulse: [f32; 3],
+    pub backflip_pitch_rate: f32,
+    pub rotation_under_ball_degrees: f32,
     pub confidence: f32,
 }
 
@@ -106,6 +101,8 @@ struct ActiveFlickSetup {
     horizontal_gap_integral: f32,
     vertical_gap_integral: f32,
     touch_count: u32,
+    start_forward: Option<glam::Vec3>,
+    max_horizontal_rotation_degrees: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -119,6 +116,7 @@ struct FlickSetupSummary {
     average_horizontal_gap: f32,
     average_vertical_gap: f32,
     touch_count: u32,
+    rotation_under_ball_degrees: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -126,6 +124,7 @@ struct RecentDodgeStart {
     time: f32,
     frame: usize,
     setup: FlickSetupSummary,
+    rotation_at_dodge: Option<glam::Quat>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -235,6 +234,7 @@ impl FlickCalculator {
                 / setup.duration.max(f32::EPSILON),
             average_vertical_gap: setup.vertical_gap_integral / setup.duration.max(f32::EPSILON),
             touch_count: setup.touch_count,
+            rotation_under_ball_degrees: setup.max_horizontal_rotation_degrees,
         }
     }
 
@@ -244,41 +244,49 @@ impl FlickCalculator {
 
     fn classify_kind(
         player_rotation: glam::Quat,
+        player_angular_velocity: glam::Vec3,
+        rotation_at_dodge: Option<glam::Quat>,
+        rotation_under_ball_degrees: f32,
         relative_ball_position: glam::Vec3,
-        impulse_direction: glam::Vec3,
-    ) -> (FlickKind, glam::Vec3, Option<f32>) {
+        ball_impulse: glam::Vec3,
+    ) -> (FlickKind, glam::Vec3, glam::Vec3, f32) {
         let local_ball_position = player_rotation.inverse() * relative_ball_position;
-        let local_impulse_direction = player_rotation.inverse() * impulse_direction;
-        let side_impulse_alignment = local_impulse_direction.y.abs();
-        let rear_impulse_alignment = (-local_impulse_direction.x).max(0.0);
-        let reverse_impulse_alignment = side_impulse_alignment.max(rear_impulse_alignment);
-
-        if local_ball_position.x > REVERSE_FLICK_MAX_LOCAL_X
-            || local_ball_position.y.abs() < REVERSE_FLICK_MIN_LOCAL_Y
-            || reverse_impulse_alignment < REVERSE_FLICK_MIN_REAR_OR_SIDE_IMPULSE_ALIGNMENT
+        let impulse_reference_rotation = rotation_at_dodge.unwrap_or(player_rotation);
+        let local_ball_impulse = impulse_reference_rotation.inverse() * ball_impulse;
+        let local_angular_velocity = player_rotation.inverse() * player_angular_velocity;
+        let backflip_pitch_rate = (-local_angular_velocity.y).max(0.0);
+        let forward_impulse_alignment = ball_impulse
+            .normalize_or_zero()
+            .dot(impulse_reference_rotation * glam::Vec3::X);
+        let kind = if backflip_pitch_rate >= REVERSE_FLICK_MIN_BACKFLIP_PITCH_RATE
+            && local_ball_impulse.x >= REVERSE_FLICK_MIN_FORWARD_IMPULSE
+            && forward_impulse_alignment >= REVERSE_FLICK_MIN_FORWARD_IMPULSE_ALIGNMENT
+            && rotation_under_ball_degrees >= REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES
         {
-            return (FlickKind::Other, local_ball_position, None);
-        }
-
-        let rear_component = (-local_ball_position.x).max(0.0);
-        let reverse_angle_degrees = local_ball_position
-            .y
-            .abs()
-            .atan2(rear_component)
-            .to_degrees();
-        let kind = if (REVERSE_FLICK_45_MIN_DEGREES..=REVERSE_FLICK_45_MAX_DEGREES)
-            .contains(&reverse_angle_degrees)
-        {
-            FlickKind::Reverse45
-        } else if (REVERSE_FLICK_90_MIN_DEGREES..=REVERSE_FLICK_90_MAX_DEGREES)
-            .contains(&reverse_angle_degrees)
-        {
-            FlickKind::Reverse90
+            FlickKind::Reverse
         } else {
             FlickKind::Other
         };
 
-        (kind, local_ball_position, Some(reverse_angle_degrees))
+        (
+            kind,
+            local_ball_position,
+            local_ball_impulse,
+            backflip_pitch_rate,
+        )
+    }
+
+    fn horizontal_rotation_degrees(
+        start_forward: Option<glam::Vec3>,
+        current_forward: Option<glam::Vec3>,
+    ) -> Option<f32> {
+        let start = start_forward?.truncate().normalize_or_zero();
+        let current = current_forward?.truncate().normalize_or_zero();
+        if start.length_squared() <= f32::EPSILON || current.length_squared() <= f32::EPSILON {
+            return None;
+        }
+
+        Some(start.dot(current).clamp(-1.0, 1.0).acos().to_degrees())
     }
 
     fn store_recent_setup(&mut self, player_id: PlayerId, setup: FlickSetupSummary) {
@@ -332,6 +340,10 @@ impl FlickCalculator {
                 continue;
             };
             observed_players.insert(player.player_id.clone());
+            let current_forward = player
+                .rigid_body
+                .as_ref()
+                .map(|rigid_body| quat_to_glam(&rigid_body.rotation) * glam::Vec3::X);
             let setup = self
                 .active_setups
                 .entry(player.player_id.clone())
@@ -345,6 +357,8 @@ impl FlickCalculator {
                     horizontal_gap_integral: observation.horizontal_gap * frame.dt.max(0.0),
                     vertical_gap_integral: observation.vertical_gap * frame.dt.max(0.0),
                     touch_count: 0,
+                    start_forward: current_forward,
+                    max_horizontal_rotation_degrees: 0.0,
                 });
 
             if setup.last_frame != frame.frame_number {
@@ -353,6 +367,12 @@ impl FlickCalculator {
                 setup.duration += frame.dt.max(0.0);
                 setup.horizontal_gap_integral += observation.horizontal_gap * frame.dt.max(0.0);
                 setup.vertical_gap_integral += observation.vertical_gap * frame.dt.max(0.0);
+                if let Some(degrees) =
+                    Self::horizontal_rotation_degrees(setup.start_forward, current_forward)
+                {
+                    setup.max_horizontal_rotation_degrees =
+                        setup.max_horizontal_rotation_degrees.max(degrees);
+                }
             }
         }
 
@@ -399,6 +419,10 @@ impl FlickCalculator {
                     time: frame.time,
                     frame: frame.frame_number,
                     setup,
+                    rotation_at_dodge: player
+                        .rigid_body
+                        .as_ref()
+                        .map(|rigid_body| quat_to_glam(&rigid_body.rotation)),
                 },
             );
         }
@@ -447,11 +471,20 @@ impl FlickCalculator {
 
         let vertical_impulse = ball_impulse.z.max(0.0);
         let player_rotation = quat_to_glam(&player_rigid_body.rotation);
-        let (kind, local_ball_position, reverse_angle_degrees) = Self::classify_kind(
-            player_rotation,
-            ball.position() - player_position,
-            impulse_direction,
-        );
+        let player_angular_velocity = player_rigid_body
+            .angular_velocity
+            .as_ref()
+            .map(vec_to_glam)
+            .unwrap_or(glam::Vec3::ZERO);
+        let (kind, local_ball_position, local_ball_impulse, backflip_pitch_rate) =
+            Self::classify_kind(
+                player_rotation,
+                player_angular_velocity,
+                dodge_start.rotation_at_dodge,
+                dodge_start.setup.rotation_under_ball_degrees,
+                ball.position() - player_position,
+                ball_impulse,
+            );
         let setup = &dodge_start.setup;
         let timing_score =
             1.0 - (time_since_dodge / FLICK_MAX_DODGE_TO_TOUCH_SECONDS).clamp(0.0, 1.0);
@@ -505,7 +538,9 @@ impl FlickCalculator {
             vertical_impulse,
             kind: kind.as_label_value().to_owned(),
             local_ball_position: local_ball_position.to_array(),
-            reverse_angle_degrees,
+            local_ball_impulse: local_ball_impulse.to_array(),
+            backflip_pitch_rate,
+            rotation_under_ball_degrees: setup.rotation_under_ball_degrees,
             confidence,
         })
     }

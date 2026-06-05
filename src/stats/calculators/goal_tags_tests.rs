@@ -120,7 +120,9 @@ fn flick_event(time: f32, frame: usize, player: PlayerId) -> FlickEvent {
         vertical_impulse: 0.0,
         kind: "other".to_owned(),
         local_ball_position: [60.0, 0.0, 95.0],
-        reverse_angle_degrees: None,
+        local_ball_impulse: [0.0, 600.0, 0.0],
+        backflip_pitch_rate: 0.0,
+        rotation_under_ball_degrees: 0.0,
         confidence: 0.82,
     }
 }
