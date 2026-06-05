@@ -25,6 +25,9 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       movement: [],
       positioning: [],
       rotation_player: [],
+      rotation_role_span: [],
+      rotation_depth_span: [],
+      rotation_first_man_stint: [],
       rotation_team: [],
       mechanics: [],
       goal_context: [],
@@ -186,6 +189,9 @@ export function createLegacyStatsTimeline(
     powerslide_events?: StatsEvents["powerslide"];
     positioning_events?: StatsEvents["positioning"];
     rotation_player_events?: StatsEvents["rotation_player"];
+    rotation_role_span_events?: StatsEvents["rotation_role_span"];
+    rotation_depth_span_events?: StatsEvents["rotation_depth_span"];
+    rotation_first_man_stint_events?: StatsEvents["rotation_first_man_stint"];
     rotation_team_events?: StatsEvents["rotation_team"];
     boost_pickups?: StatsEvents["boost_pickups"];
     boost_ledger?: StatsEvents["boost_ledger"];
@@ -222,6 +228,14 @@ export function createLegacyStatsTimeline(
       powerslide: overrides.powerslide_events ?? overrides.events?.powerslide ?? [],
       positioning: overrides.positioning_events ?? overrides.events?.positioning ?? [],
       rotation_player: overrides.rotation_player_events ?? overrides.events?.rotation_player ?? [],
+      rotation_role_span:
+        overrides.rotation_role_span_events ?? overrides.events?.rotation_role_span ?? [],
+      rotation_depth_span:
+        overrides.rotation_depth_span_events ?? overrides.events?.rotation_depth_span ?? [],
+      rotation_first_man_stint:
+        overrides.rotation_first_man_stint_events ??
+        overrides.events?.rotation_first_man_stint ??
+        [],
       rotation_team: overrides.rotation_team_events ?? overrides.events?.rotation_team ?? [],
       boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],
       boost_ledger: overrides.boost_ledger ?? overrides.events?.boost_ledger ?? [],

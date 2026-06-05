@@ -295,6 +295,21 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "player_events",
                 parse_rotation_player_event,
             )?,
+            rotation_role_span: self.module_player_events(
+                "rotation",
+                "role_span_events",
+                parse_rotation_role_span_event,
+            )?,
+            rotation_depth_span: self.module_player_events(
+                "rotation",
+                "depth_span_events",
+                parse_rotation_depth_span_event,
+            )?,
+            rotation_first_man_stint: self.module_player_events(
+                "rotation",
+                "first_man_stint_events",
+                parse_rotation_first_man_stint_event,
+            )?,
             rotation_team: self.module_player_events(
                 "rotation",
                 "team_events",

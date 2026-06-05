@@ -265,6 +265,80 @@ fn rotation_player_events_emit_state_change_spans() {
 }
 
 #[test]
+fn derived_rotation_events_split_role_depth_and_stints() {
+    let mut calculator = RotationCalculator::with_config(RotationCalculatorConfig {
+        first_man_debounce_seconds: 0.25,
+        first_man_ambiguity_margin: 50.0,
+        ..RotationCalculatorConfig::default()
+    });
+
+    update_team_zero(
+        &mut calculator,
+        1,
+        0.1,
+        glam::Vec3::new(0.0, -300.0, 0.0),
+        glam::Vec3::new(1000.0, 0.0, 0.0),
+    );
+    update_team_zero(
+        &mut calculator,
+        2,
+        0.2,
+        glam::Vec3::new(0.0, 300.0, 0.0),
+        glam::Vec3::new(1000.0, 0.0, 0.0),
+    );
+    update_team_zero(
+        &mut calculator,
+        3,
+        0.3,
+        glam::Vec3::new(0.0, 300.0, 0.0),
+        glam::Vec3::new(1000.0, 0.0, 0.0),
+    );
+    calculator.flush_pending_player_events();
+
+    let player_one_raw = calculator
+        .player_events()
+        .iter()
+        .filter(|event| event.player == PlayerId::Steam(1) && event.active)
+        .collect::<Vec<_>>();
+    let player_one_role_spans = calculator
+        .role_span_events()
+        .into_iter()
+        .filter(|event| event.player == PlayerId::Steam(1))
+        .collect::<Vec<_>>();
+    let player_one_depth_spans = calculator
+        .depth_span_events()
+        .into_iter()
+        .filter(|event| event.player == PlayerId::Steam(1))
+        .collect::<Vec<_>>();
+    let player_one_stints = calculator
+        .first_man_stint_events()
+        .into_iter()
+        .filter(|event| event.player == PlayerId::Steam(1))
+        .collect::<Vec<_>>();
+
+    assert_eq!(player_one_raw.len(), 2);
+    assert_eq!(player_one_role_spans.len(), 1);
+    assert_eq!(
+        player_one_role_spans[0].current_role_state,
+        RoleState::FirstMan
+    );
+    assert!((player_one_role_spans[0].duration - 0.3).abs() < 1e-6);
+    assert_eq!(player_one_depth_spans.len(), 2);
+    assert_eq!(
+        player_one_depth_spans[0].current_depth_state,
+        PlayDepthState::BehindPlay
+    );
+    assert_eq!(
+        player_one_depth_spans[1].current_depth_state,
+        PlayDepthState::AheadOfPlay
+    );
+    assert_eq!(player_one_stints.len(), 1);
+    assert_eq!(player_one_stints[0].frame, 1);
+    assert_eq!(player_one_stints[0].end_frame, 3);
+    assert!((player_one_stints[0].duration - 0.3).abs() < 1e-6);
+}
+
+#[test]
 fn first_man_stints_survive_brief_interruptions() {
     let mut calculator = RotationCalculator::with_config(RotationCalculatorConfig {
         first_man_debounce_seconds: 0.25,

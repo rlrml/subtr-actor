@@ -12,7 +12,8 @@ use super::{
     DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipResetEvent, FlipResetFollowupDodgeEvent,
     GoalContextEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
     OneTimerEvent, PassEvent, PassLastCompletedEvent, PositioningEvent, PossessionEvent,
-    PostWallDodgeEvent, PowerslideEvent, PressureEvent, RotationPlayerEvent, RotationTeamEvent,
+    PostWallDodgeEvent, PowerslideEvent, PressureEvent, RotationDepthSpanEvent,
+    RotationFirstManStintEvent, RotationPlayerEvent, RotationRoleSpanEvent, RotationTeamEvent,
     RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent, TouchBallMovementEvent,
     TouchClassificationEvent, TouchLastTouchEvent, WallAerialEvent, WallAerialShotEvent,
     WavedashEvent, WhiffEvent,
@@ -674,6 +675,27 @@ define_stats_event!(
     ROTATION_PLAYER_EVENT_DEFINITION,
     "rotation_player",
     "Player Rotation",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    RotationRoleSpanEvent,
+    ROTATION_ROLE_SPAN_EVENT_DEFINITION,
+    "rotation_role_span",
+    "Rotation Role Span",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    RotationDepthSpanEvent,
+    ROTATION_DEPTH_SPAN_EVENT_DEFINITION,
+    "rotation_depth_span",
+    "Rotation Depth Span",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    RotationFirstManStintEvent,
+    ROTATION_FIRST_MAN_STINT_EVENT_DEFINITION,
+    "rotation_first_man_stint",
+    "First Man Stint",
     EventCategory::Positioning
 );
 define_stats_event!(

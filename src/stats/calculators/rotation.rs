@@ -3,6 +3,7 @@ use super::*;
 const DEFAULT_ROLE_DEPTH_MARGIN: f32 = 150.0;
 const DEFAULT_FIRST_MAN_AMBIGUITY_MARGIN: f32 = 250.0;
 const DEFAULT_FIRST_MAN_DEBOUNCE_SECONDS: f32 = 0.35;
+const DEFAULT_FIRST_MAN_STINT_END_GRACE_SECONDS: f32 = 0.35;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
@@ -80,6 +81,53 @@ impl RotationPlayerEvent {
         self.duration += delta.duration;
         self.player_position = delta.player_position;
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct RotationRoleSpanEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    pub current_role_state: RoleState,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct RotationDepthSpanEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    pub current_depth_state: PlayDepthState,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct RotationFirstManStintEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -240,6 +288,18 @@ impl RotationCalculator {
         pending.sort_by(|(left, _), (right, _)| format!("{left:?}").cmp(&format!("{right:?}")));
         events.extend(pending.into_iter().map(|(_, event)| event));
         events
+    }
+
+    pub fn role_span_events(&self) -> Vec<RotationRoleSpanEvent> {
+        rotation_role_span_events(self.player_events())
+    }
+
+    pub fn depth_span_events(&self) -> Vec<RotationDepthSpanEvent> {
+        rotation_depth_span_events(self.player_events())
+    }
+
+    pub fn first_man_stint_events(&self) -> Vec<RotationFirstManStintEvent> {
+        rotation_first_man_stint_events(self.player_events())
     }
 
     pub fn flush_pending_player_events(&mut self) {
@@ -597,6 +657,190 @@ fn play_depth_state(
     } else {
         PlayDepthState::LevelWithPlay
     }
+}
+
+fn rotation_events_by_player(events: &[RotationPlayerEvent]) -> Vec<Vec<&RotationPlayerEvent>> {
+    let mut by_player = HashMap::<PlayerId, Vec<&RotationPlayerEvent>>::new();
+    for event in events {
+        by_player
+            .entry(event.player.clone())
+            .or_default()
+            .push(event);
+    }
+    let mut groups = by_player.into_values().collect::<Vec<_>>();
+    for group in &mut groups {
+        group.sort_by(|left, right| {
+            left.time
+                .partial_cmp(&right.time)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| left.frame.cmp(&right.frame))
+        });
+    }
+    groups.sort_by(|left, right| {
+        format!("{:?}", left[0].player).cmp(&format!("{:?}", right[0].player))
+    });
+    groups
+}
+
+fn rotation_role_span_events(events: &[RotationPlayerEvent]) -> Vec<RotationRoleSpanEvent> {
+    let mut derived = Vec::new();
+    for group in rotation_events_by_player(events) {
+        let mut current: Option<RotationRoleSpanEvent> = None;
+        for event in group {
+            if !event.active || event.duration <= 0.0 {
+                if let Some(span) = current.take() {
+                    derived.push(span);
+                }
+                continue;
+            }
+            if let Some(span) = current.as_mut() {
+                if span.current_role_state == event.current_role_state {
+                    span.end_time = event.end_time;
+                    span.end_frame = event.end_frame;
+                    span.duration += event.duration;
+                    span.player_position = event.player_position;
+                    continue;
+                }
+                derived.push(current.take().expect("current role span"));
+            }
+            current = Some(RotationRoleSpanEvent {
+                time: event.time,
+                frame: event.frame,
+                end_time: event.end_time,
+                end_frame: event.end_frame,
+                duration: event.duration,
+                player: event.player.clone(),
+                player_position: event.player_position,
+                is_team_0: event.is_team_0,
+                current_role_state: event.current_role_state,
+            });
+        }
+        if let Some(span) = current {
+            derived.push(span);
+        }
+    }
+    sort_rotation_role_spans(&mut derived);
+    derived
+}
+
+fn rotation_depth_span_events(events: &[RotationPlayerEvent]) -> Vec<RotationDepthSpanEvent> {
+    let mut derived = Vec::new();
+    for group in rotation_events_by_player(events) {
+        let mut current: Option<RotationDepthSpanEvent> = None;
+        for event in group {
+            if !event.active || event.duration <= 0.0 {
+                if let Some(span) = current.take() {
+                    derived.push(span);
+                }
+                continue;
+            }
+            if let Some(span) = current.as_mut() {
+                if span.current_depth_state == event.current_depth_state {
+                    span.end_time = event.end_time;
+                    span.end_frame = event.end_frame;
+                    span.duration += event.duration;
+                    span.player_position = event.player_position;
+                    continue;
+                }
+                derived.push(current.take().expect("current depth span"));
+            }
+            current = Some(RotationDepthSpanEvent {
+                time: event.time,
+                frame: event.frame,
+                end_time: event.end_time,
+                end_frame: event.end_frame,
+                duration: event.duration,
+                player: event.player.clone(),
+                player_position: event.player_position,
+                is_team_0: event.is_team_0,
+                current_depth_state: event.current_depth_state,
+            });
+        }
+        if let Some(span) = current {
+            derived.push(span);
+        }
+    }
+    sort_rotation_depth_spans(&mut derived);
+    derived
+}
+
+fn rotation_first_man_stint_events(
+    events: &[RotationPlayerEvent],
+) -> Vec<RotationFirstManStintEvent> {
+    let mut derived = Vec::new();
+    for group in rotation_events_by_player(events) {
+        let mut current: Option<RotationFirstManStintEvent> = None;
+        let mut non_first_man_seconds = 0.0;
+        for event in group {
+            if event.active
+                && event.current_role_state == RoleState::FirstMan
+                && event.duration > 0.0
+            {
+                if let Some(span) = current.as_mut() {
+                    span.end_time = event.end_time;
+                    span.end_frame = event.end_frame;
+                    span.duration += event.duration;
+                    span.player_position = event.player_position;
+                } else {
+                    current = Some(RotationFirstManStintEvent {
+                        time: event.time,
+                        frame: event.frame,
+                        end_time: event.end_time,
+                        end_frame: event.end_frame,
+                        duration: event.duration,
+                        player: event.player.clone(),
+                        player_position: event.player_position,
+                        is_team_0: event.is_team_0,
+                    });
+                }
+                non_first_man_seconds = 0.0;
+                continue;
+            }
+
+            if current.is_some() {
+                non_first_man_seconds += event.duration.max(0.0);
+                if non_first_man_seconds > DEFAULT_FIRST_MAN_STINT_END_GRACE_SECONDS {
+                    derived.push(current.take().expect("current first-man stint"));
+                    non_first_man_seconds = 0.0;
+                }
+            }
+        }
+        if let Some(span) = current {
+            derived.push(span);
+        }
+    }
+    sort_rotation_first_man_stints(&mut derived);
+    derived
+}
+
+fn sort_rotation_role_spans(events: &mut [RotationRoleSpanEvent]) {
+    events.sort_by(|left, right| {
+        left.time
+            .partial_cmp(&right.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| left.frame.cmp(&right.frame))
+            .then_with(|| format!("{:?}", left.player).cmp(&format!("{:?}", right.player)))
+    });
+}
+
+fn sort_rotation_depth_spans(events: &mut [RotationDepthSpanEvent]) {
+    events.sort_by(|left, right| {
+        left.time
+            .partial_cmp(&right.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| left.frame.cmp(&right.frame))
+            .then_with(|| format!("{:?}", left.player).cmp(&format!("{:?}", right.player)))
+    });
+}
+
+fn sort_rotation_first_man_stints(events: &mut [RotationFirstManStintEvent]) {
+    events.sort_by(|left, right| {
+        left.time
+            .partial_cmp(&right.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| left.frame.cmp(&right.frame))
+            .then_with(|| format!("{:?}", left.player).cmp(&format!("{:?}", right.player)))
+    });
 }
 
 #[cfg(test)]

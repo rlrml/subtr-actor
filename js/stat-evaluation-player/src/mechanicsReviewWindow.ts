@@ -5,14 +5,16 @@ import {
   getMechanicsReviewItemLabel,
   getMechanicsReviewMechanicLabel,
   getMechanicsReviewPlayerId,
-  getMechanicsReviewTargetTime,
   parseMechanicsReviewPlaylistJson,
+  resolveMechanicsReviewBoundTime,
+  resolveMechanicsReviewTargetTime,
   resolveMechanicsReviewUrl,
   type ActiveMechanicsReview,
   type MechanicsReviewItem,
   type MechanicsReviewPlaybackBound,
   type MechanicsReviewPlaylist,
   type MechanicsReviewReplay,
+  type MechanicsReviewTimeBase,
 } from "./mechanicsReview.ts";
 import type { MechanicsReviewReplayLoadsController } from "./mechanicsReviewReplayLoads.ts";
 import type { ReplayLoadBundle } from "./replayLoader.ts";
@@ -313,10 +315,11 @@ export class MechanicsReviewWindowController {
       }
       this.options.replayLoads.preload(review, item.replay);
 
-      const startTime = Math.max(0, this.getBoundTime(item.start));
+      const timeBase = review.manifest.playback?.timeBase;
+      const startTime = Math.max(0, this.getBoundTime(item, item.start, timeBase));
       const endTime = Math.min(
         this.options.getReplayPlayer()?.getState().duration ?? Number.POSITIVE_INFINITY,
-        Math.max(startTime, this.getBoundTime(item.end)),
+        Math.max(startTime, this.getBoundTime(item, item.end, timeBase)),
       );
       if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) {
         throw new Error("Review item has an empty playback range.");
@@ -331,7 +334,10 @@ export class MechanicsReviewWindowController {
       }
 
       this.options.resetReplayTransitionControls();
-      const targetTime = getMechanicsReviewTargetTime(item);
+      const targetTime =
+        activeReplayPlayer === null
+          ? null
+          : resolveMechanicsReviewTargetTime(item, activeReplayPlayer.replay, timeBase);
       review.currentClip = { startTime, endTime, targetTime };
       this.options.activateTimelineSource(item);
       this.options.getReplayPlayer()?.setState({
@@ -438,15 +444,16 @@ export class MechanicsReviewWindowController {
     return true;
   }
 
-  private getBoundTime(bound: MechanicsReviewPlaybackBound): number {
-    if (bound.kind === "time") {
-      return bound.value;
-    }
+  private getBoundTime(
+    item: MechanicsReviewItem,
+    bound: MechanicsReviewPlaybackBound,
+    timeBase: MechanicsReviewTimeBase | undefined,
+  ): number {
     const replayPlayer = this.options.getReplayPlayer();
-    const frameIndex = Math.max(0, Math.trunc(bound.value));
-    return (
-      replayPlayer?.replay.frames[frameIndex]?.time ?? replayPlayer?.replay.frames.at(-1)?.time ?? 0
-    );
+    if (!replayPlayer) {
+      return bound.kind === "time" ? bound.value : 0;
+    }
+    return resolveMechanicsReviewBoundTime(item, bound, replayPlayer.replay, timeBase);
   }
 
   private getPlayerName(item: MechanicsReviewItem): string {

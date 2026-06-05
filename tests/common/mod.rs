@@ -183,6 +183,27 @@ fn compare_timeline_events(
     })
     .or_else(|| {
         compare_serialized_slice(
+            &format!("{label}.rotation_role_span"),
+            &left.rotation_role_span,
+            &right.rotation_role_span,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.rotation_depth_span"),
+            &left.rotation_depth_span,
+            &right.rotation_depth_span,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.rotation_first_man_stint"),
+            &left.rotation_first_man_stint,
+            &right.rotation_first_man_stint,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
             &format!("{label}.rotation_team"),
             &left.rotation_team,
             &right.rotation_team,

@@ -192,6 +192,7 @@ export interface ReplayBoostPad {
 export interface ReplayModel {
   frameCount: number;
   duration: number;
+  rawStartTime: number;
   frames: PlaybackFrame[];
   ballFrames: BallSample[];
   boostPads: ReplayBoostPad[];
