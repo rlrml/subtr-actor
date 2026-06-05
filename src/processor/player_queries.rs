@@ -71,9 +71,7 @@ impl<'a> ReplayProcessor<'a> {
     /// Returns the current ball rigid body from live actor state.
     pub fn get_ball_rigid_body(&self) -> SubtrActorResult<&boxcars::RigidBody> {
         self.ball_actor_id
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::BallActorNotFound,
-            ))
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::BallActorNotFound))
             .and_then(|actor_id| self.get_actor_rigid_body(&actor_id).map(|v| v.0))
     }
 
@@ -96,9 +94,7 @@ impl<'a> ReplayProcessor<'a> {
         &self,
     ) -> SubtrActorResult<(&boxcars::RigidBody, &usize)> {
         self.ball_actor_id
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::BallActorNotFound,
-            ))
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::BallActorNotFound))
             .and_then(|actor_id| {
                 get_attribute_and_updated!(
                     self,
@@ -251,7 +247,7 @@ impl<'a> ReplayProcessor<'a> {
         } else {
             self.team_one.first()
         }
-        .ok_or(SubtrActorError::new(SubtrActorErrorVariant::NoGameActor))?;
+        .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoGameActor))?;
 
         self.player_to_team
             .get(&self.get_player_actor_id(player_id)?)

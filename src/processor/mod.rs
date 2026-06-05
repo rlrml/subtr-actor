@@ -601,9 +601,7 @@ impl<'a> ReplayProcessor<'a> {
             .replay
             .network_frames
             .as_ref()
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::NoNetworkFrames,
-            ))?
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoNetworkFrames))?
             .frames
             .iter()
             .enumerate()
@@ -660,9 +658,7 @@ impl<'a> ReplayProcessor<'a> {
             .replay
             .network_frames
             .as_ref()
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::NoNetworkFrames,
-            ))?
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoNetworkFrames))?
             .frames
             .iter()
             .enumerate()

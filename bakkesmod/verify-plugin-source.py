@@ -3121,7 +3121,12 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        'return item.label ?? item.meta?.mechanicLabel ?? `Review item ${index + 1}`;',
+        "return (\n"
+        "    item.label ??\n"
+        "    item.meta?.eventTypeLabel ??\n"
+        "    item.meta?.mechanicLabel ??\n"
+        "    `Review item ${index + 1}`\n"
+        "  );",
         "stats evaluation player mechanics review item labels have mechanic fallback",
         errors,
     )
@@ -3281,7 +3286,8 @@ def main() -> int:
         )
     require_contains(
         web_player_main_source,
-        'return typeof item.meta?.mechanic === "string" ? formatMechanicKind(item.meta.mechanic) : "--";',
+        "const eventType = item.meta?.eventType ?? item.meta?.mechanic;\n"
+        '  return typeof eventType === "string" ? formatMechanicKind(eventType) : "--";',
         "stats evaluation player mechanics review formats mechanic ids",
         errors,
     )

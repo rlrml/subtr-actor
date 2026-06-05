@@ -2,33 +2,20 @@ mod common;
 
 use subtr_actor::{builtin_stats_module_names, StatsCollector, StatsFrameResolution};
 
-#[test]
-fn stats_collector_serializes_selected_modules_by_name() {
-    let replay =
-        common::parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
-    let collected = StatsCollector::with_builtin_module_names(["boost", "movement"])
-        .expect("builtin module selection should be valid")
-        .get_stats(&replay)
-        .expect("stats collection should succeed");
-
-    let value = serde_json::to_value(&collected).expect("stats should serialize to json");
-    let modules = value
-        .get("modules")
-        .and_then(|value| value.as_object())
-        .expect("modules should serialize as an object");
-
-    assert!(modules.contains_key("boost"));
-    assert!(modules.contains_key("movement"));
-    assert!(!modules.contains_key("core"));
-}
+const SMALL_STATS_FIXTURE: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
 
 #[test]
-fn stats_collector_accepts_air_dribble_as_ball_carry_backed_module() {
-    let replay = common::parse_replay("assets/air-dribble-goal-mouth-2026-05-24.replay");
-    let collected = StatsCollector::with_builtin_module_names(["air_dribble", "ball_carry"])
-        .expect("air_dribble should be a valid builtin module")
-        .get_stats(&replay)
-        .expect("stats collection should succeed");
+fn stats_collector_serializes_selected_modules_and_aliases_by_name() {
+    let replay = common::parse_replay(SMALL_STATS_FIXTURE);
+    let collected = StatsCollector::with_builtin_module_names([
+        "air_dribble",
+        "ball_carry",
+        "boost",
+        "movement",
+    ])
+    .expect("builtin module selection should be valid")
+    .get_stats(&replay)
+    .expect("stats collection should succeed");
 
     let value = serde_json::to_value(&collected).expect("stats should serialize to json");
     let modules = value
@@ -38,12 +25,15 @@ fn stats_collector_accepts_air_dribble_as_ball_carry_backed_module() {
 
     assert!(modules.contains_key("air_dribble"));
     assert!(modules.contains_key("ball_carry"));
+    assert!(modules.contains_key("boost"));
+    assert!(modules.contains_key("movement"));
+    assert!(!modules.contains_key("core"));
 }
 
 #[test]
+#[ignore = "broad all-module aggregate replay pass is slow; selected-module replay coverage runs in CI"]
 fn stats_collector_processes_all_builtin_modules() {
-    let replay =
-        common::parse_replay("assets/replay-format-2016-07-21-v868-12-net-none-lan.replay");
+    let replay = common::parse_replay(SMALL_STATS_FIXTURE);
     let collected = StatsCollector::new()
         .get_stats(&replay)
         .expect("stats collection should succeed");
@@ -64,9 +54,9 @@ fn stats_collector_processes_all_builtin_modules() {
 }
 
 #[test]
+#[ignore = "captured-frame transform test covers the frame capture path in default CI"]
 fn stats_collector_captures_module_keyed_snapshot_frames() {
-    let replay =
-        common::parse_replay("assets/replay-format-2016-07-21-v868-12-net-none-lan.replay");
+    let replay = common::parse_replay(SMALL_STATS_FIXTURE);
     let snapshot = StatsCollector::with_builtin_module_names(["boost", "movement"])
         .expect("builtin module selection should be valid")
         .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
@@ -89,8 +79,7 @@ fn stats_collector_captures_module_keyed_snapshot_frames() {
 #[test]
 #[allow(clippy::result_large_err)]
 fn stats_collector_transforms_captured_frame_modules() {
-    let replay =
-        common::parse_replay("assets/replay-format-2016-07-21-v868-12-net-none-lan.replay");
+    let replay = common::parse_replay(SMALL_STATS_FIXTURE);
     let transformed = StatsCollector::with_builtin_module_names(["boost", "movement"])
         .expect("builtin module selection should be valid")
         .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })

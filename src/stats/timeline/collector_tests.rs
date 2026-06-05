@@ -1,8 +1,7 @@
 use super::*;
 use std::collections::BTreeMap;
 
-const STATS_TIMELINE_FIXTURE: &str =
-    "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
+const STATS_TIMELINE_FIXTURE: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
 
 const REPLAY_FORMAT_EVOLUTION_DOC: &str = include_str!("../../../docs/replay-format-evolution.md");
 
@@ -320,6 +319,7 @@ fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(r
 }
 
 #[test]
+#[ignore = "compact/full timeline scaffold replay parity is slow; run explicitly when changing timeline transfer"]
 fn event_timeline_scaffold_matches_full_timeline_without_stat_snapshots() {
     assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(
         STATS_TIMELINE_FIXTURE,

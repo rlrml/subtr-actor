@@ -1,4 +1,4 @@
-use subtr_actor::{PlayerId, StatsTimelineCollector};
+use subtr_actor::{PlayerId, ReplayMeta, StatsTimelineEventCollector};
 
 const COLONELPANIC_NO_SPEED_FLIP_REPLAY: &str =
     "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
@@ -12,15 +12,11 @@ fn parse_replay(path: &str) -> boxcars::Replay {
         .unwrap_or_else(|_| panic!("Failed to parse replay: {path}"))
 }
 
-fn player_ids_by_name<'a>(
-    timeline: &'a subtr_actor::ReplayStatsTimeline,
-    name: &str,
-) -> Vec<&'a PlayerId> {
-    timeline
-        .replay_meta
+fn player_ids_by_name<'a>(replay_meta: &'a ReplayMeta, name: &str) -> Vec<&'a PlayerId> {
+    replay_meta
         .team_zero
         .iter()
-        .chain(timeline.replay_meta.team_one.iter())
+        .chain(replay_meta.team_one.iter())
         .filter(|player| player.name == name)
         .map(|player| &player.remote_id)
         .collect()
@@ -29,10 +25,10 @@ fn player_ids_by_name<'a>(
 #[test]
 fn colonelpanic_replay_has_no_speed_flip_at_normalized_28_1_seconds() {
     let replay = parse_replay(COLONELPANIC_NO_SPEED_FLIP_REPLAY);
-    let timeline = StatsTimelineCollector::new()
-        .get_legacy_replay_stats_timeline(&replay)
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
         .expect("stats timeline should build");
-    let colonelpanic_ids = player_ids_by_name(&timeline, "colonelpanic8");
+    let colonelpanic_ids = player_ids_by_name(&timeline.replay_meta, "colonelpanic8");
     assert!(
         !colonelpanic_ids.is_empty(),
         "fixture should contain colonelpanic8"
