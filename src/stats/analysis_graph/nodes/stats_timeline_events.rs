@@ -184,6 +184,9 @@ impl StatsTimelineEventsNode {
             movement: movement.events().to_vec(),
             positioning: positioning.events().to_vec(),
             rotation_player: rotation.player_events().to_vec(),
+            rotation_role_span: rotation.role_span_events(),
+            rotation_depth_span: rotation.depth_span_events(),
+            rotation_first_man_stint: rotation.first_man_stint_events(),
             rotation_team: rotation.team_events().to_vec(),
             mechanics: build_mechanic_events(
                 ball_carry,

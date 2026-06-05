@@ -220,6 +220,66 @@ pub(in crate::collector::stats::playback) fn parse_rotation_player_event(
     })
 }
 
+pub(in crate::collector::stats::playback) fn parse_rotation_role_span_event(
+    value: &Value,
+) -> SubtrActorResult<RotationRoleSpanEvent> {
+    let object = json_object(value, "rotation role span event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
+    Ok(RotationRoleSpanEvent {
+        time,
+        frame,
+        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
+        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
+        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
+        player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        current_role_state: decode_json_value(
+            json_required_value(object, "current_role_state")?.clone(),
+        )?,
+    })
+}
+
+pub(in crate::collector::stats::playback) fn parse_rotation_depth_span_event(
+    value: &Value,
+) -> SubtrActorResult<RotationDepthSpanEvent> {
+    let object = json_object(value, "rotation depth span event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
+    Ok(RotationDepthSpanEvent {
+        time,
+        frame,
+        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
+        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
+        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
+        player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        current_depth_state: decode_json_value(
+            json_required_value(object, "current_depth_state")?.clone(),
+        )?,
+    })
+}
+
+pub(in crate::collector::stats::playback) fn parse_rotation_first_man_stint_event(
+    value: &Value,
+) -> SubtrActorResult<RotationFirstManStintEvent> {
+    let object = json_object(value, "rotation first man stint event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
+    Ok(RotationFirstManStintEvent {
+        time,
+        frame,
+        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
+        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
+        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
+        player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+    })
+}
+
 pub(in crate::collector::stats::playback) fn parse_rotation_team_event(
     value: &Value,
 ) -> SubtrActorResult<RotationTeamEvent> {

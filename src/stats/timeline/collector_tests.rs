@@ -70,6 +70,12 @@ fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, us
         ("movement", events.movement.len()),
         ("positioning", events.positioning.len()),
         ("rotation_player", events.rotation_player.len()),
+        ("rotation_role_span", events.rotation_role_span.len()),
+        ("rotation_depth_span", events.rotation_depth_span.len()),
+        (
+            "rotation_first_man_stint",
+            events.rotation_first_man_stint.len(),
+        ),
         ("rotation_team", events.rotation_team.len()),
         ("mechanics", events.mechanics.len()),
         ("goal_context", events.goal_context.len()),
