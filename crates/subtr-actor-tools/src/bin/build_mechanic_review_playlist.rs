@@ -518,13 +518,45 @@ fn player_id_string(player_id: &PlayerId) -> String {
     match serde_json::to_value(player_id) {
         Ok(Value::Object(map)) if map.len() == 1 => {
             let (kind, value) = map.into_iter().next().expect("map has one value");
-            match value {
-                Value::String(value) => format!("{kind}:{value}"),
-                other => format!("{kind}:{other}"),
-            }
+            let platform = player_id_platform_label(&kind);
+            let id = player_id_value_text(&value);
+            format!("{platform}:{id}")
         }
         Ok(value) => value.to_string(),
         Err(_) => format!("{player_id:?}"),
+    }
+}
+
+fn player_id_platform_label(kind: &str) -> &str {
+    match kind {
+        "PlayStation" => "ps4",
+        "PsyNet" => "psynet",
+        "SplitScreen" => "splitscreen",
+        "Steam" => "steam",
+        "Switch" => "switch",
+        "Xbox" => "xbox",
+        "QQ" => "qq",
+        "Epic" => "epic",
+        other => other,
+    }
+}
+
+fn player_id_value_text(value: &Value) -> String {
+    if let Some(online_id) = value
+        .as_object()
+        .and_then(|object| object.get("online_id"))
+        .and_then(json_scalar_text)
+    {
+        return online_id;
+    }
+    json_scalar_text(value).unwrap_or_else(|| value.to_string())
+}
+
+fn json_scalar_text(value: &Value) -> Option<String> {
+    match value {
+        Value::String(value) => Some(value.clone()),
+        Value::Number(value) => Some(value.to_string()),
+        _ => None,
     }
 }
 
@@ -946,5 +978,24 @@ mod tests {
     fn frame_index_at_or_after_rejects_empty_or_invalid_inputs() {
         assert_eq!(frame_index_at_or_after(&[], 8.0), None);
         assert_eq!(frame_index_at_or_after(&[frame(8.0)], f32::NAN), None);
+    }
+
+    #[test]
+    fn player_id_string_extracts_online_id_from_platform_objects() {
+        assert_eq!(
+            player_id_string(&PlayerId::PlayStation(boxcars::Ps4Id {
+                online_id: 6788998483854448235,
+                name: "KvonUnknown".to_owned(),
+                unknown1: vec![98, 50, 117],
+            })),
+            "ps4:6788998483854448235"
+        );
+        assert_eq!(
+            player_id_string(&PlayerId::Switch(boxcars::SwitchId {
+                online_id: 123456789,
+                unknown1: vec![1, 2, 3],
+            })),
+            "switch:123456789"
+        );
     }
 }
