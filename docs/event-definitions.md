@@ -462,11 +462,10 @@ A dodge-powered touch following a short controlled carry setup.
 - Track controlled setup windows where the current controlling player keeps the ball close above the car within local-position and gap thresholds.
 - Record dodge starts that happen immediately after, or during, a qualifying setup.
 - Emit on a same-player touch shortly after the dodge when the ball impulse is large and directed away from the player, with confidence from setup duration, timing, impulse, and separation.
-- Label emitted flick counts by `kind`: `other` or `reverse`. The `reverse` label requires backflip-direction local pitch, a forward ball impulse relative to the car orientation at dodge start, and meaningful car rotation under the ball during the controlled setup.
 
 **Limitations**
 
-- Reverse labels are heuristic review signals rather than validated ground truth.
+_None documented._
 
 **Known Issues**
 
@@ -1399,3 +1398,4 @@ A goal where the scorer's last touch matches a recent half-volley candidate.
 - Compare half-volley events against each goal's scorer-last-touch context.
 - Require the half-volley touch to be close enough to the goal and sufficiently aligned toward goal.
 - Attach a related half-volley event reference and half-volley evidence to the goal tag metadata.
+
