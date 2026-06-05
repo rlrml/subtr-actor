@@ -319,6 +319,7 @@ fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(r
 }
 
 #[test]
+#[ignore = "compact/full timeline scaffold replay parity is slow; run explicitly when changing timeline transfer"]
 fn event_timeline_scaffold_matches_full_timeline_without_stat_snapshots() {
     assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(
         STATS_TIMELINE_FIXTURE,

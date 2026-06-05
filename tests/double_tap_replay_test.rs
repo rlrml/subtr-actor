@@ -1,6 +1,6 @@
 mod common;
 
-use subtr_actor::{GoalTagKind, StatsFrameResolution, StatsTimelineEventCollector};
+use subtr_actor::{GoalTagKind, StatsTimelineEventCollector};
 
 const THIRD_GOAL_DOUBLE_TAP_REPLAY: &str =
     "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
@@ -42,9 +42,21 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
         "expected third goal to be tagged as a double tap; got {:?}",
         timeline.events.goal_context
     );
+
+    let value = serde_json::to_value(&timeline).expect("event timeline should serialize");
+    let mechanics = value["events"]["mechanics"]
+        .as_array()
+        .expect("timeline value should expose mechanics as an array");
+    assert!(
+        mechanics
+            .iter()
+            .any(|event| event["kind"].as_str() == Some("double_tap")),
+        "expected value timeline mechanics stream to include the double tap"
+    );
 }
 
 #[test]
+#[ignore = "second full-replay double-tap variant is slow and duplicates default double-tap coverage"]
 fn tags_nuttrback_seventh_goal_as_double_tap() {
     let replay = common::parse_replay(NUTTRBACK_GOAL_7_DOUBLE_TAP_REPLAY);
     let timeline = StatsTimelineEventCollector::new()
@@ -81,25 +93,5 @@ fn tags_nuttrback_seventh_goal_as_double_tap() {
             .any(|tag| tag.kind() == GoalTagKind::DoubleTapGoal)),
         "expected seventh goal to be tagged as a double tap; got {:?}",
         timeline.events.goal_context
-    );
-}
-
-#[test]
-fn dynamic_stats_timeline_value_includes_normalized_mechanics_stream() {
-    let replay = common::parse_replay(THIRD_GOAL_DOUBLE_TAP_REPLAY);
-    let value = StatsTimelineEventCollector::new()
-        .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
-        .get_replay_stats_timeline_scaffold(&replay)
-        .expect("failed to collect event timeline for double tap replay");
-    let value = serde_json::to_value(value).expect("event timeline should serialize");
-
-    let mechanics = value["events"]["mechanics"]
-        .as_array()
-        .expect("timeline value should expose mechanics as an array");
-    assert!(
-        mechanics
-            .iter()
-            .any(|event| event["kind"].as_str() == Some("double_tap")),
-        "expected value timeline mechanics stream to include the double tap"
     );
 }

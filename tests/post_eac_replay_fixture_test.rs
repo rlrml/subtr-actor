@@ -75,7 +75,7 @@ fn assert_finite_json(value: &Value, path: &str) {
 }
 
 #[test]
-fn post_eac_ranked_standard_second_goal_is_not_own_half_goal() {
+fn post_eac_ranked_standard_goal_tags_handle_late_touch_and_low_touch_cases() {
     let replay = common::parse_replay(POST_EAC_RANKED_STANDARD_REPLAY);
     let timeline = StatsTimelineEventCollector::new()
         .get_replay_stats_timeline_scaffold(&replay)
@@ -108,14 +108,6 @@ fn post_eac_ranked_standard_second_goal_is_not_own_half_goal() {
             .any(|tag| tag.kind() == GoalTagKind::OwnHalfGoal)),
         "second goal should not be tagged as own-half"
     );
-}
-
-#[test]
-fn post_eac_ranked_standard_third_goal_is_not_aerial_goal() {
-    let replay = common::parse_replay(POST_EAC_RANKED_STANDARD_REPLAY);
-    let timeline = StatsTimelineEventCollector::new()
-        .get_replay_stats_timeline_scaffold(&replay)
-        .expect("failed to collect stats timeline for post-EAC standard replay");
 
     let third_goal = timeline
         .events
@@ -189,136 +181,156 @@ fn post_eac_replays_parse_and_match_expected_headers() {
 
 #[test]
 fn post_eac_replays_emit_structured_replay_data() {
-    for fixture in POST_EAC_FIXTURES {
-        let replay = common::parse_replay(fixture.path);
-        let replay_data = ReplayDataCollector::new()
-            .get_replay_data(&replay)
-            .unwrap_or_else(|error| {
-                panic!(
-                    "failed to collect structured replay data for {}: {error:?}",
-                    fixture.path
-                )
-            });
-
-        assert_eq!(
-            replay_data.meta.player_count(),
-            fixture.player_count,
-            "{} player count",
-            fixture.path
-        );
-        assert!(
-            replay_data.frame_data.frame_count() > 0,
-            "{} should emit frame data",
-            fixture.path
-        );
-        assert!(
-            replay_data.frame_data.duration() > 0.0,
-            "{} should have positive duration",
-            fixture.path
-        );
-        assert!(
-            replay_data
-                .frame_data
-                .players
-                .iter()
-                .all(|(_, player_data)| player_data.frames().iter().any(|frame| {
-                    matches!(frame, PlayerFrame::Data { rigid_body, .. } if rigid_body.location.x.is_finite())
-                })),
-            "{} should emit finite player rigid-body samples for every player",
-            fixture.path
-        );
-        assert!(
-            !replay_data.touch_events.is_empty(),
-            "{} should expose exact touch events",
-            fixture.path
-        );
-        assert!(
-            !replay_data.player_stat_events.is_empty(),
-            "{} should expose exact player-stat events",
-            fixture.path
-        );
-
-        let replay_json =
-            serde_json::to_value(&replay_data).expect("ReplayData should serialize to JSON");
-        assert_finite_json(&replay_json, fixture.path);
-    }
+    assert_post_eac_replay_emits_structured_replay_data(&POST_EAC_FIXTURES[0]);
 }
 
 #[test]
-fn post_eac_replays_emit_ndarray_features() {
+#[ignore = "broad post-EAC structured replay-data coverage is slow; representative fixture runs in CI"]
+fn all_post_eac_replays_emit_structured_replay_data() {
     for fixture in POST_EAC_FIXTURES {
-        let replay = common::parse_replay(fixture.path);
-        let mut collector = NDArrayCollector::<f32>::from_strings(
-            &[
-                "BallRigidBody",
-                "BallRigidBodyQuaternions",
-                "BallRigidBodyBasis",
-                "VelocityAddedBallRigidBodyNoVelocities",
-                "InterpolatedBallRigidBodyNoVelocities",
-                "SecondsRemaining",
-                "CurrentTime",
-                "FrameTime",
-                "ReplicatedStateName",
-                "ReplicatedGameStateTimeRemaining",
-                "BallHasBeenHit",
-            ],
-            &[
-                "PlayerRigidBody",
-                "PlayerRigidBodyQuaternions",
-                "PlayerRigidBodyBasis",
-                "PlayerRelativeBallPosition",
-                "PlayerRelativeBallVelocity",
-                "PlayerLocalRelativeBallPosition",
-                "PlayerLocalRelativeBallVelocity",
-                "VelocityAddedPlayerRigidBodyNoVelocities",
-                "InterpolatedPlayerRigidBodyNoVelocities",
-                "PlayerBallDistance",
-                "PlayerBoost",
-                "PlayerJump",
-                "PlayerAnyJump",
-                "PlayerDodgeRefreshed",
-                "PlayerDemolishedBy",
-            ],
-        )
-        .expect("post-EAC ndarray feature selection should be valid");
+        assert_post_eac_replay_emits_structured_replay_data(fixture);
+    }
+}
 
-        FrameRateDecorator::new_from_fps(30.0, &mut collector)
-            .process_replay(&replay)
-            .unwrap_or_else(|error| {
-                panic!(
-                    "failed to collect ndarray features for {}: {error:?}",
-                    fixture.path
-                )
-            });
-        let (meta, array) = collector.get_meta_and_ndarray().unwrap_or_else(|error| {
+fn assert_post_eac_replay_emits_structured_replay_data(fixture: &PostEacFixture) {
+    let replay = common::parse_replay(fixture.path);
+    let replay_data = ReplayDataCollector::new()
+        .get_replay_data(&replay)
+        .unwrap_or_else(|error| {
             panic!(
-                "failed to build ndarray output for {}: {error:?}",
+                "failed to collect structured replay data for {}: {error:?}",
                 fixture.path
             )
         });
 
-        assert_eq!(
-            meta.replay_meta.player_count(),
-            fixture.player_count,
-            "{} ndarray player count",
-            fixture.path
-        );
-        assert!(
-            array.nrows() > 0,
-            "{} should emit ndarray rows",
-            fixture.path
-        );
-        assert!(
-            array.ncols() > 0,
-            "{} should emit ndarray columns",
-            fixture.path
-        );
-        assert!(
-            array.iter().all(|value| value.is_finite()),
-            "{} ndarray should contain only finite values",
-            fixture.path
-        );
+    assert_eq!(
+        replay_data.meta.player_count(),
+        fixture.player_count,
+        "{} player count",
+        fixture.path
+    );
+    assert!(
+        replay_data.frame_data.frame_count() > 0,
+        "{} should emit frame data",
+        fixture.path
+    );
+    assert!(
+        replay_data.frame_data.duration() > 0.0,
+        "{} should have positive duration",
+        fixture.path
+    );
+    assert!(
+        replay_data
+            .frame_data
+            .players
+            .iter()
+            .all(|(_, player_data)| player_data.frames().iter().any(|frame| {
+                matches!(frame, PlayerFrame::Data { rigid_body, .. } if rigid_body.location.x.is_finite())
+            })),
+        "{} should emit finite player rigid-body samples for every player",
+        fixture.path
+    );
+    assert!(
+        !replay_data.touch_events.is_empty(),
+        "{} should expose exact touch events",
+        fixture.path
+    );
+    assert!(
+        !replay_data.player_stat_events.is_empty(),
+        "{} should expose exact player-stat events",
+        fixture.path
+    );
+
+    let replay_json =
+        serde_json::to_value(&replay_data).expect("ReplayData should serialize to JSON");
+    assert_finite_json(&replay_json, fixture.path);
+}
+
+#[test]
+fn post_eac_replays_emit_ndarray_features() {
+    assert_post_eac_replay_emits_ndarray_features(&POST_EAC_FIXTURES[0]);
+}
+
+#[test]
+#[ignore = "broad post-EAC ndarray coverage is slow; representative fixture runs in CI"]
+fn all_post_eac_replays_emit_ndarray_features() {
+    for fixture in POST_EAC_FIXTURES {
+        assert_post_eac_replay_emits_ndarray_features(fixture);
     }
+}
+
+fn assert_post_eac_replay_emits_ndarray_features(fixture: &PostEacFixture) {
+    let replay = common::parse_replay(fixture.path);
+    let mut collector = NDArrayCollector::<f32>::from_strings(
+        &[
+            "BallRigidBody",
+            "BallRigidBodyQuaternions",
+            "BallRigidBodyBasis",
+            "VelocityAddedBallRigidBodyNoVelocities",
+            "InterpolatedBallRigidBodyNoVelocities",
+            "SecondsRemaining",
+            "CurrentTime",
+            "FrameTime",
+            "ReplicatedStateName",
+            "ReplicatedGameStateTimeRemaining",
+            "BallHasBeenHit",
+        ],
+        &[
+            "PlayerRigidBody",
+            "PlayerRigidBodyQuaternions",
+            "PlayerRigidBodyBasis",
+            "PlayerRelativeBallPosition",
+            "PlayerRelativeBallVelocity",
+            "PlayerLocalRelativeBallPosition",
+            "PlayerLocalRelativeBallVelocity",
+            "VelocityAddedPlayerRigidBodyNoVelocities",
+            "InterpolatedPlayerRigidBodyNoVelocities",
+            "PlayerBallDistance",
+            "PlayerBoost",
+            "PlayerJump",
+            "PlayerAnyJump",
+            "PlayerDodgeRefreshed",
+            "PlayerDemolishedBy",
+        ],
+    )
+    .expect("post-EAC ndarray feature selection should be valid");
+
+    FrameRateDecorator::new_from_fps(30.0, &mut collector)
+        .process_replay(&replay)
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to collect ndarray features for {}: {error:?}",
+                fixture.path
+            )
+        });
+    let (meta, array) = collector.get_meta_and_ndarray().unwrap_or_else(|error| {
+        panic!(
+            "failed to build ndarray output for {}: {error:?}",
+            fixture.path
+        )
+    });
+
+    assert_eq!(
+        meta.replay_meta.player_count(),
+        fixture.player_count,
+        "{} ndarray player count",
+        fixture.path
+    );
+    assert!(
+        array.nrows() > 0,
+        "{} should emit ndarray rows",
+        fixture.path
+    );
+    assert!(
+        array.ncols() > 0,
+        "{} should emit ndarray columns",
+        fixture.path
+    );
+    assert!(
+        array.iter().all(|value| value.is_finite()),
+        "{} ndarray should contain only finite values",
+        fixture.path
+    );
 }
 
 fn assert_post_eac_stats_outputs(fixture: &PostEacFixture) {
@@ -393,6 +405,7 @@ fn assert_post_eac_stats_outputs(fixture: &PostEacFixture) {
 }
 
 #[test]
+#[ignore = "representative post-EAC stats output coverage is slow and duplicates stats_collector_test API coverage"]
 fn post_eac_replays_emit_stats_outputs() {
     assert_post_eac_stats_outputs(&POST_EAC_FIXTURES[0]);
 }

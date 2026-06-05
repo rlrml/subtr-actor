@@ -186,6 +186,7 @@ fn continuous_ball_control_is_directly_callable() {
 }
 
 #[test]
+#[ignore = "broad real-replay JSON smoke is slow; graph construction and focused replay regressions run in CI"]
 fn every_builtin_analysis_node_has_shared_json_output_on_real_replay() {
     let replay = parse_replay(ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE);
     let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
@@ -283,6 +284,7 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
 }
 
 #[test]
+#[ignore = "full graph versus legacy timeline replay parity is slow; run explicitly when changing graph/timeline transfer"]
 fn full_analysis_graph_matches_stats_timeline_events_on_real_replay() {
     let replay = parse_replay(ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE);
     let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())

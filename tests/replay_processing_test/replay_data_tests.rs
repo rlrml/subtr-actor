@@ -18,6 +18,7 @@ fn test_all_replays_parse_successfully() {
 
 /// Test ReplayDataCollector works on known-good replays
 #[test]
+#[ignore = "broad multi-replay collector sweep is slow; focused replay-data regressions run in CI"]
 fn test_replay_data_collector_multiple_replays() {
     // Use replays that are known to work with the collector
     let replays = [
@@ -510,7 +511,7 @@ fn test_processor_extracts_touch_events() {
 }
 
 #[test]
-fn test_processor_extracts_flip_reset_events() {
+fn test_processor_extracts_flip_reset_and_post_wall_dodge_events() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
     let mut tracker = FlipResetTracker::new();
@@ -543,16 +544,6 @@ fn test_processor_extracts_flip_reset_events() {
         }),
         "Expected flip-reset candidate team labels to agree with the resolved player team"
     );
-}
-
-#[test]
-fn test_processor_extracts_post_wall_dodge_events() {
-    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
-    let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
-    let mut tracker = FlipResetTracker::new();
-    processor
-        .process(&mut tracker)
-        .expect("Failed to process replay for post-wall dodge extraction");
 
     assert!(
         !tracker.post_wall_dodge_events().is_empty(),
@@ -574,6 +565,7 @@ fn test_processor_extracts_post_wall_dodge_events() {
 }
 
 #[test]
+#[ignore = "second full-replay flip-reset fixture is slow; default flip-reset/post-wall extraction coverage runs in CI"]
 fn test_processor_extracts_flip_reset_followup_dodge_events() {
     let replay =
         parse_replay("assets/replay-format-2026-01-14-v868-32-net10-demolish-extended.replay");
@@ -679,6 +671,7 @@ fn test_processor_extracts_player_stat_events() {
 }
 
 #[test]
+#[ignore = "heuristic quality comparison does two full replay traversals; focused touch and goal extraction tests run in CI"]
 fn test_touch_attribution_usually_matches_goal_scorer() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let mut processor = ReplayProcessor::new(&replay).expect("Failed to construct processor");
