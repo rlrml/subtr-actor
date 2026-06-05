@@ -466,7 +466,12 @@ export function formatMechanicsReviewEventDetails(item: MechanicsReviewItem): st
 }
 
 export function getMechanicsReviewItemLabel(item: MechanicsReviewItem, index: number): string {
-  return item.label ?? item.meta?.eventTypeLabel ?? item.meta?.mechanicLabel ?? `Review item ${index + 1}`;
+  return (
+    item.label ??
+    item.meta?.eventTypeLabel ??
+    item.meta?.mechanicLabel ??
+    `Review item ${index + 1}`
+  );
 }
 
 export function getMechanicsReviewPlayerId(item: MechanicsReviewItem): string | null {
