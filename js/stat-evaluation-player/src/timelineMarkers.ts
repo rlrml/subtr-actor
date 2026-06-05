@@ -670,6 +670,32 @@ export function buildSpeedFlipTimelineEvents(
   });
 }
 
+export function buildFlipImpulseTimelineEvents(
+  statsTimeline: StatsTimeline,
+  replay: ReplayModel,
+): ReplayTimelineEvent[] {
+  return (statsTimeline.events.flip_impulse ?? []).map((event, index) => {
+    const playerId = playerIdToString(event.player);
+    const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
+    const eventTime = getReplayFrameTime(replay, event.frame, event.time);
+    const confidencePercent = Math.round(event.confidence * 100);
+    const directionLabel = event.direction_label.replaceAll("_", " ");
+
+    return {
+      id: `flip-impulse:${event.frame}:${playerId}:${index}`,
+      time: eventTime,
+      frame: event.frame,
+      kind: "flip-impulse",
+      label: `${playerName} flip impulse ${directionLabel} ${confidencePercent}%`,
+      shortLabel: "FI",
+      playerId,
+      playerName,
+      isTeamZero: event.is_team_0,
+      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+    };
+  });
+}
+
 export function buildHalfFlipTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
@@ -874,6 +900,10 @@ export function countEnabledTimelineEvents(
 
   if (active.has("speed-flip")) {
     count += buildSpeedFlipTimelineEvents(statsTimeline, replay).length;
+  }
+
+  if (active.has("flip-impulse")) {
+    count += buildFlipImpulseTimelineEvents(statsTimeline, replay).length;
   }
 
   if (active.has("half-flip")) {

@@ -13,6 +13,7 @@ const RENDER_EFFECT_MODULE_IDS = new Set([
   "pressure",
   RELATIVE_POSITIONING_MODULE_ID,
   "absolute-positioning",
+  "flip-impulse",
   "speed-flip",
   "touch",
 ]);
@@ -219,6 +220,7 @@ function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string
     "dodge-reset:events": "Dodge refresh",
     "double-tap:events": "Double tap",
     "fifty-fifty:events": "50/50",
+    "flip-impulse:events": "Flip impulse",
     "half-flip:events": "Half flip",
     "musty-flick:events": "Musty flick",
     "possession:ranges": "Possession",
@@ -233,6 +235,7 @@ function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string
     "absolute-positioning": "Position zones",
     "ceiling-shot": "Ceiling shot labels",
     "fifty-fifty": "50/50 labels",
+    "flip-impulse": "Flip impulse arrows",
     pressure: "Half control",
     "relative-positioning": "Player roles",
     "speed-flip": "Speed flip labels",

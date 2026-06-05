@@ -46,17 +46,30 @@ fn strong_candidate(boost_alignment_sample_count: u32) -> ActiveSpeedFlipCandida
         start_frame: 10,
         start_position: [0.0, 0.0, 17.0],
         end_position: [450.0, 0.0, 50.0],
+        start_velocity: glam::Vec3::new(900.0, 0.0, 0.0),
         start_velocity_xy: glam::Vec2::new(900.0, 0.0),
         start_forward_xy: glam::Vec2::X,
+        local_forward: glam::Vec3::X,
+        local_right: glam::Vec3::Y,
+        local_up: glam::Vec3::Z,
         start_speed: 900.0,
         max_speed: 1800.0,
         best_alignment: 0.98,
+        initial_boost_alignment: (boost_alignment_sample_count > 0).then_some(0.91),
         best_boost_alignment: 0.98,
         boost_alignment_sample_count,
+        dodge_delay_after_ground_leave_seconds: 0.045,
+        dodge_boost_compensation: glam::Vec3::ZERO,
         best_dodge_forward_delta: 320.0,
         best_dodge_delta_alignment: 0.72,
+        best_estimated_dodge_impulse_magnitude: 340.0,
+        best_estimated_dodge_impulse_forward_component: 0.72,
+        best_estimated_dodge_impulse_side_component: 0.42,
+        best_estimated_dodge_impulse_up_component: 0.08,
         dodge_acceleration_sample_count: 2,
         best_diagonal_score: 1.0,
+        max_forward_rotation_degrees: 24.0,
+        max_up_rotation_degrees: 120.0,
         min_forward_z: -0.16,
         latest_forward_z: 0.02,
         latest_time: 1.32,
@@ -91,6 +104,18 @@ fn candidate_event_requires_boost_aligned_sample() {
 }
 
 #[test]
+fn candidate_event_exports_alignment_and_dodge_timing_metadata() {
+    let player_id = boxcars::RemoteId::Steam(1);
+
+    let event = SpeedFlipCalculator::candidate_event(&player_id, strong_candidate(2)).unwrap();
+
+    assert_eq!(event.initial_boost_alignment, 0.91);
+    assert_eq!(event.best_boost_alignment, 0.98);
+    assert_eq!(event.boost_alignment_sample_count, 2);
+    assert_eq!(event.dodge_delay_after_ground_leave_seconds, 0.045);
+}
+
+#[test]
 fn candidate_event_rejects_sideways_dodge_acceleration() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut sideways_candidate = strong_candidate(2);
@@ -101,13 +126,69 @@ fn candidate_event_rejects_sideways_dodge_acceleration() {
 }
 
 #[test]
-fn update_candidate_tracks_early_forward_dodge_acceleration() {
+fn candidate_event_rejects_frontflip_like_candidate_without_diagonal_rotation() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut frontflip_candidate = strong_candidate(2);
+    frontflip_candidate.best_estimated_dodge_impulse_forward_component = 0.98;
+    frontflip_candidate.best_estimated_dodge_impulse_side_component = 0.04;
+    frontflip_candidate.best_estimated_dodge_impulse_up_component = 0.10;
+    frontflip_candidate.best_diagonal_score = 0.10;
+
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, frontflip_candidate).is_none());
+}
+
+#[test]
+fn candidate_event_rejects_sideflip_like_impulse_without_forward_component() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut sideflip_candidate = strong_candidate(2);
+    sideflip_candidate.best_estimated_dodge_impulse_forward_component = 0.12;
+    sideflip_candidate.best_estimated_dodge_impulse_side_component = 0.96;
+    sideflip_candidate.best_estimated_dodge_impulse_up_component = 0.10;
+
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, sideflip_candidate).is_none());
+}
+
+#[test]
+fn candidate_event_rejects_vertical_dominant_wavedash_like_impulse() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut wavedash_candidate = strong_candidate(2);
+    wavedash_candidate.best_estimated_dodge_impulse_forward_component = 0.45;
+    wavedash_candidate.best_estimated_dodge_impulse_side_component = 0.24;
+    wavedash_candidate.best_estimated_dodge_impulse_up_component = -0.86;
+
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, wavedash_candidate).is_none());
+}
+
+#[test]
+fn candidate_event_rejects_wavedash_like_candidate_without_full_rotation_progress() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut wavedash_candidate = strong_candidate(2);
+    wavedash_candidate.max_forward_rotation_degrees = 12.0;
+    wavedash_candidate.max_up_rotation_degrees = 24.0;
+
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, wavedash_candidate).is_none());
+}
+
+#[test]
+fn update_candidate_tracks_early_forward_diagonal_dodge_impulse() {
     let mut candidate = strong_candidate(1);
+    candidate.start_velocity = glam::Vec3::new(900.0, 0.0, 0.0);
     candidate.start_velocity_xy = glam::Vec2::new(900.0, 0.0);
     candidate.start_forward_xy = glam::Vec2::X;
+    candidate.local_forward = glam::Vec3::X;
+    candidate.local_right = glam::Vec3::Y;
+    candidate.local_up = glam::Vec3::Z;
+    candidate.dodge_boost_compensation = glam::Vec3::ZERO;
     candidate.best_dodge_forward_delta = 0.0;
     candidate.best_dodge_delta_alignment = -1.0;
+    candidate.best_estimated_dodge_impulse_magnitude = 0.0;
+    candidate.best_estimated_dodge_impulse_forward_component = -1.0;
+    candidate.best_estimated_dodge_impulse_side_component = 0.0;
+    candidate.best_estimated_dodge_impulse_up_component = 1.0;
     candidate.dodge_acceleration_sample_count = 0;
+    candidate.initial_boost_alignment = None;
+    candidate.best_boost_alignment = 0.5;
+    candidate.boost_alignment_sample_count = 0;
     let frame = FrameInfo {
         frame_number: 12,
         time: candidate.start_time + 0.10,
@@ -128,6 +209,12 @@ fn update_candidate_tracks_early_forward_dodge_acceleration() {
     assert_eq!(candidate.dodge_acceleration_sample_count, 1);
     assert!(candidate.best_dodge_forward_delta >= 299.0);
     assert!(candidate.best_dodge_delta_alignment > 0.9);
+    assert!(candidate.best_estimated_dodge_impulse_magnitude >= 270.0);
+    assert!(candidate.best_estimated_dodge_impulse_forward_component > 0.9);
+    assert!(candidate.best_estimated_dodge_impulse_side_component > 0.3);
+    assert!(candidate.initial_boost_alignment.unwrap() > 0.99);
+    assert!(candidate.best_boost_alignment > 0.99);
+    assert_eq!(candidate.boost_alignment_sample_count, 1);
 }
 
 #[test]

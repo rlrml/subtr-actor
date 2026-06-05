@@ -77,6 +77,7 @@ impl StatsTimelineEventsNode {
             touch_dependency(),
             whiff_dependency(),
             wavedash_dependency(),
+            flip_impulse_dependency(),
             speed_flip_dependency(),
             half_flip_dependency(),
             flick_dependency(),
@@ -143,6 +144,7 @@ impl StatsTimelineEventsNode {
         let flip_reset_goal = ctx.get::<FlipResetGoalCalculator>()?;
         let half_volley_goal = ctx.get::<HalfVolleyGoalCalculator>()?;
         let rush = ctx.get::<RushCalculator>()?;
+        let flip_impulse = ctx.get::<FlipImpulseCalculator>()?;
         let speed_flip = ctx.get::<SpeedFlipCalculator>()?;
         let half_flip = ctx.get::<HalfFlipCalculator>()?;
         let half_volley = ctx.get::<HalfVolleyCalculator>()?;
@@ -221,6 +223,7 @@ impl StatsTimelineEventsNode {
             ball_carry: ball_carry.carry_events().to_vec(),
             fifty_fifty: fifty_fifty.events().to_vec(),
             rush: rush.events().to_vec(),
+            flip_impulse: flip_impulse.events().to_vec(),
             speed_flip: speed_flip.events().to_vec(),
             half_flip: half_flip.events().to_vec(),
             half_volley: half_volley.events().to_vec(),

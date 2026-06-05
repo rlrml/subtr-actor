@@ -9,10 +9,10 @@ use super::{
     BackboardBounceEvent, BallCarryEvent, BoostLedgerEvent, BoostPickupComparisonEvent,
     BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent, ConfirmedFlipResetEvent,
     CorePlayerGoalContextEvent, CorePlayerScoreboardEvent, DodgeRefreshedEvent, DodgeResetEvent,
-    DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipResetEvent, FlipResetFollowupDodgeEvent,
-    GoalContextEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
-    OneTimerEvent, PassEvent, PassLastCompletedEvent, PositioningEvent, PossessionEvent,
-    PostWallDodgeEvent, PowerslideEvent, PressureEvent, RotationDepthSpanEvent,
+    DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipImpulseEvent, FlipResetEvent,
+    FlipResetFollowupDodgeEvent, GoalContextEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
+    MustyFlickEvent, OneTimerEvent, PassEvent, PassLastCompletedEvent, PositioningEvent,
+    PossessionEvent, PostWallDodgeEvent, PowerslideEvent, PressureEvent, RotationDepthSpanEvent,
     RotationFirstManStintEvent, RotationPlayerEvent, RotationRoleSpanEvent, RotationTeamEvent,
     RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent, TouchBallMovementEvent,
     TouchClassificationEvent, TouchLastTouchEvent, WallAerialEvent, WallAerialShotEvent,
@@ -509,6 +509,19 @@ define_stats_event!(
     ]
 );
 define_stats_event!(
+    FlipImpulseEvent,
+    FLIP_IMPULSE_EVENT_DEFINITION,
+    "flip_impulse",
+    "Flip Impulse",
+    EventCategory::Movement,
+    summary = "A dodge-start event with a rough estimated direction of the velocity impulse produced during the flip.",
+    approach = [
+        "Start on the replay's dodge-active rising edge for each player.",
+        "Sample the player's velocity change over the early dodge window and subtract an approximate forward boost contribution when boost is active.",
+        "Classify the resulting direction in car-local space while retaining the raw and compensated world-space vectors for visualization and downstream mechanic detectors.",
+    ]
+);
+define_stats_event!(
     SpeedFlipEvent,
     SPEED_FLIP_EVENT_DEFINITION,
     "speed_flip",
@@ -780,6 +793,7 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &BALL_CARRY_EVENT_DEFINITION,
     &FIFTY_FIFTY_EVENT_DEFINITION,
     &RUSH_EVENT_DEFINITION,
+    &FLIP_IMPULSE_EVENT_DEFINITION,
     &SPEED_FLIP_EVENT_DEFINITION,
     &HALF_FLIP_EVENT_DEFINITION,
     &HALF_VOLLEY_EVENT_DEFINITION,
@@ -953,6 +967,13 @@ const RUSH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "rush",
     "RushNode",
     "RushCalculator",
+)];
+
+const FLIP_IMPULSE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &FLIP_IMPULSE_EVENT_DEFINITION,
+    "flip_impulse",
+    "FlipImpulseNode",
+    "FlipImpulseCalculator",
 )];
 
 const SPEED_FLIP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
@@ -1163,6 +1184,11 @@ register_event_producer!(
     FIFTY_FIFTY_EMITTED_EVENTS
 );
 register_event_producer!(RUSH_EVENT_PRODUCER, "rush", RUSH_EMITTED_EVENTS);
+register_event_producer!(
+    FLIP_IMPULSE_EVENT_PRODUCER,
+    "flip_impulse",
+    FLIP_IMPULSE_EMITTED_EVENTS
+);
 register_event_producer!(
     SPEED_FLIP_EVENT_PRODUCER,
     "speed_flip",

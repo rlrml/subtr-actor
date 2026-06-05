@@ -11,6 +11,7 @@ import type { DodgeResetEvent } from "./generated/DodgeResetEvent.ts";
 import type { DoubleTapEvent } from "./generated/DoubleTapEvent.ts";
 import type { FiftyFiftyEvent } from "./generated/FiftyFiftyEvent.ts";
 import type { FlickEvent } from "./generated/FlickEvent.ts";
+import type { FlipImpulseEvent } from "./generated/FlipImpulseEvent.ts";
 import type { LabeledCountEntry } from "./generated/LabeledCountEntry.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { LabeledFloatSumEntry } from "./generated/LabeledFloatSumEntry.ts";
@@ -74,6 +75,7 @@ export type {
   DoubleTapEvent,
   FiftyFiftyEvent,
   FlickEvent,
+  FlipImpulseEvent,
   LabeledCountEntry,
   LabeledCounts,
   LabeledFloatSumEntry,

@@ -5,11 +5,21 @@ const SPEED_FLIP_EVALUATION_SECONDS: f32 = 0.32;
 const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.55;
 const SPEED_FLIP_MAX_GROUND_Z: f32 = 80.0;
 const SPEED_FLIP_KICKOFF_MOTION_SPEED: f32 = 100.0;
+const SPEED_FLIP_MAX_START_SPEED: f32 = 1800.0;
 const SPEED_FLIP_MIN_ALIGNMENT: f32 = 0.72;
 const SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS: f32 = 0.18;
 const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA: f32 = 80.0;
 const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT: f32 = 0.35;
+const SPEED_FLIP_MIN_ESTIMATED_DODGE_IMPULSE_MAGNITUDE: f32 = 90.0;
+const SPEED_FLIP_MIN_ESTIMATED_DODGE_FORWARD_COMPONENT: f32 = 0.35;
+const SPEED_FLIP_MIN_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.88;
+const SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.95;
+const SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT: f32 = 0.82;
+const SPEED_FLIP_MIN_DIAGONAL_SCORE: f32 = 0.35;
+const SPEED_FLIP_MIN_STRONG_DIAGONAL_SCORE: f32 = 0.90;
+const SPEED_FLIP_MIN_UP_ROTATION_DEGREES: f32 = 90.0;
 const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
+const BOOST_ACCELERATION_UU_PER_SECOND_SQUARED: f32 = 991.6667;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -27,7 +37,23 @@ pub struct SpeedFlipEvent {
     pub start_speed: f32,
     pub max_speed: f32,
     pub best_alignment: f32,
+    #[serde(default)]
+    pub initial_boost_alignment: f32,
+    #[serde(default)]
+    pub best_boost_alignment: f32,
+    #[serde(default)]
+    pub boost_alignment_sample_count: u32,
+    #[serde(default)]
+    pub dodge_delay_after_ground_leave_seconds: f32,
     pub diagonal_score: f32,
+    #[serde(default)]
+    pub estimated_dodge_impulse_magnitude: f32,
+    #[serde(default)]
+    pub estimated_dodge_impulse_forward_component: f32,
+    #[serde(default)]
+    pub estimated_dodge_impulse_side_component: f32,
+    #[serde(default)]
+    pub estimated_dodge_impulse_up_component: f32,
     pub cancel_score: f32,
     pub speed_score: f32,
     pub confidence: f32,
@@ -42,17 +68,30 @@ struct ActiveSpeedFlipCandidate {
     start_frame: usize,
     start_position: [f32; 3],
     end_position: [f32; 3],
+    start_velocity: glam::Vec3,
     start_velocity_xy: glam::Vec2,
     start_forward_xy: glam::Vec2,
+    local_forward: glam::Vec3,
+    local_right: glam::Vec3,
+    local_up: glam::Vec3,
     start_speed: f32,
     max_speed: f32,
     best_alignment: f32,
+    initial_boost_alignment: Option<f32>,
     best_boost_alignment: f32,
     boost_alignment_sample_count: u32,
+    dodge_delay_after_ground_leave_seconds: f32,
+    dodge_boost_compensation: glam::Vec3,
     best_dodge_forward_delta: f32,
     best_dodge_delta_alignment: f32,
+    best_estimated_dodge_impulse_magnitude: f32,
+    best_estimated_dodge_impulse_forward_component: f32,
+    best_estimated_dodge_impulse_side_component: f32,
+    best_estimated_dodge_impulse_up_component: f32,
     dodge_acceleration_sample_count: u32,
     best_diagonal_score: f32,
+    max_forward_rotation_degrees: f32,
+    max_up_rotation_degrees: f32,
     min_forward_z: f32,
     latest_forward_z: f32,
     latest_time: f32,
@@ -64,6 +103,7 @@ pub struct SpeedFlipCalculator {
     events: EventStream<SpeedFlipEvent>,
     active_candidates: HashMap<PlayerId, ActiveSpeedFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
+    last_ground_contacts: HashMap<PlayerId, f32>,
     kickoff_approach_active_last_frame: bool,
     current_kickoff_start_time: Option<f32>,
 }
@@ -154,6 +194,21 @@ impl SpeedFlipCalculator {
             .flatten()
     }
 
+    fn update_ground_contacts(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
+        for player in &players.players {
+            if player
+                .position()
+                .is_some_and(|position| position.z <= PLAYER_GROUND_Z_THRESHOLD)
+            {
+                self.last_ground_contacts
+                    .insert(player.player_id.clone(), frame.time);
+            }
+        }
+
+        self.last_ground_contacts
+            .retain(|_, ground_contact_time| frame.time - *ground_contact_time <= 2.0);
+    }
+
     fn candidate_alignment(
         _ball: &BallFrameState,
         player: &PlayerSample,
@@ -236,6 +291,9 @@ impl SpeedFlipCalculator {
         }
 
         let start_speed = player.speed().unwrap_or(0.0);
+        if start_speed > SPEED_FLIP_MAX_START_SPEED {
+            return;
+        }
 
         let Some(best_alignment) = Self::candidate_alignment(ball, player, is_kickoff) else {
             return;
@@ -243,12 +301,18 @@ impl SpeedFlipCalculator {
         if best_alignment < SPEED_FLIP_MIN_ALIGNMENT {
             return;
         }
-        let Some(start_velocity_xy) = player.velocity().map(|velocity| velocity.truncate()) else {
+        let Some(start_velocity) = player.velocity() else {
             return;
         };
+        let start_velocity_xy = start_velocity.truncate();
         let Some(start_forward_xy) = Self::forward_xy(player) else {
             return;
         };
+        let dodge_delay_after_ground_leave_seconds = self
+            .last_ground_contacts
+            .get(&player.player_id)
+            .map(|ground_contact_time| (frame.time - *ground_contact_time).max(0.0))
+            .unwrap_or(0.0);
 
         let rotation = quat_to_glam(&rigid_body.rotation);
         let local_angular_velocity = rigid_body
@@ -259,6 +323,7 @@ impl SpeedFlipCalculator {
             .unwrap_or(glam::Vec3::ZERO);
         let best_diagonal_score = Self::diagonal_score(local_angular_velocity);
         let forward_z = (rotation * glam::Vec3::X).z;
+        let initial_boost_alignment = Self::boost_alignment(player);
 
         self.active_candidates.insert(
             player.player_id.clone(),
@@ -270,17 +335,30 @@ impl SpeedFlipCalculator {
                 start_frame: frame.frame_number,
                 start_position: player_position.to_array(),
                 end_position: player_position.to_array(),
+                start_velocity,
                 start_velocity_xy,
                 start_forward_xy,
+                local_forward: rotation * glam::Vec3::X,
+                local_right: rotation * glam::Vec3::Y,
+                local_up: rotation * glam::Vec3::Z,
                 start_speed,
                 max_speed: start_speed,
                 best_alignment,
-                best_boost_alignment: Self::boost_alignment(player).unwrap_or(best_alignment),
-                boost_alignment_sample_count: u32::from(player.boost_active),
+                initial_boost_alignment,
+                best_boost_alignment: initial_boost_alignment.unwrap_or(best_alignment),
+                boost_alignment_sample_count: u32::from(initial_boost_alignment.is_some()),
+                dodge_delay_after_ground_leave_seconds,
+                dodge_boost_compensation: glam::Vec3::ZERO,
                 best_dodge_forward_delta: 0.0,
                 best_dodge_delta_alignment: -1.0,
+                best_estimated_dodge_impulse_magnitude: 0.0,
+                best_estimated_dodge_impulse_forward_component: -1.0,
+                best_estimated_dodge_impulse_side_component: 0.0,
+                best_estimated_dodge_impulse_up_component: 1.0,
                 dodge_acceleration_sample_count: 0,
                 best_diagonal_score,
+                max_forward_rotation_degrees: 0.0,
+                max_up_rotation_degrees: 0.0,
                 min_forward_z: forward_z,
                 latest_forward_z: forward_z,
                 latest_time: frame.time,
@@ -307,6 +385,9 @@ impl SpeedFlipCalculator {
             candidate.best_alignment = candidate.best_alignment.max(alignment);
         }
         if let Some(boost_alignment) = Self::boost_alignment(player) {
+            if candidate.initial_boost_alignment.is_none() {
+                candidate.initial_boost_alignment = Some(boost_alignment);
+            }
             candidate.best_boost_alignment = candidate.best_boost_alignment.max(boost_alignment);
             candidate.boost_alignment_sample_count += 1;
         }
@@ -314,6 +395,11 @@ impl SpeedFlipCalculator {
             && frame.time - candidate.start_time <= SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS
         {
             if let Some(velocity) = player.velocity() {
+                if player.boost_active {
+                    candidate.dodge_boost_compensation += candidate.local_forward
+                        * BOOST_ACCELERATION_UU_PER_SECOND_SQUARED
+                        * frame.dt;
+                }
                 let velocity_delta = velocity.truncate() - candidate.start_velocity_xy;
                 let delta_length = velocity_delta.length();
                 if delta_length > f32::EPSILON {
@@ -324,6 +410,27 @@ impl SpeedFlipCalculator {
                         .best_dodge_delta_alignment
                         .max(forward_delta / delta_length);
                     candidate.dodge_acceleration_sample_count += 1;
+                }
+
+                let estimated_delta =
+                    velocity - candidate.start_velocity - candidate.dodge_boost_compensation;
+                let estimated_horizontal_magnitude = estimated_delta.truncate().length();
+                if estimated_horizontal_magnitude > f32::EPSILON {
+                    let estimated_magnitude = estimated_delta.length();
+                    let estimated_direction = estimated_delta / estimated_magnitude;
+                    let forward_component = estimated_direction.dot(candidate.local_forward);
+                    if estimated_horizontal_magnitude
+                        > candidate.best_estimated_dodge_impulse_magnitude
+                    {
+                        candidate.best_estimated_dodge_impulse_magnitude =
+                            estimated_horizontal_magnitude;
+                        candidate.best_estimated_dodge_impulse_forward_component =
+                            forward_component;
+                        candidate.best_estimated_dodge_impulse_side_component =
+                            estimated_direction.dot(candidate.local_right);
+                        candidate.best_estimated_dodge_impulse_up_component =
+                            estimated_direction.dot(candidate.local_up);
+                    }
                 }
             }
         }
@@ -338,6 +445,18 @@ impl SpeedFlipCalculator {
         candidate.best_diagonal_score = candidate
             .best_diagonal_score
             .max(Self::diagonal_score(local_angular_velocity));
+
+        let current_forward = rotation * glam::Vec3::X;
+        let current_up = rotation * glam::Vec3::Z;
+        candidate.max_forward_rotation_degrees = candidate.max_forward_rotation_degrees.max(
+            candidate
+                .local_forward
+                .angle_between(current_forward)
+                .to_degrees(),
+        );
+        candidate.max_up_rotation_degrees = candidate
+            .max_up_rotation_degrees
+            .max(candidate.local_up.angle_between(current_up).to_degrees());
 
         let forward_z = (rotation * glam::Vec3::X).z;
         candidate.min_forward_z = candidate.min_forward_z.min(forward_z);
@@ -378,6 +497,36 @@ impl SpeedFlipCalculator {
         {
             return None;
         }
+        if candidate.max_up_rotation_degrees < SPEED_FLIP_MIN_UP_ROTATION_DEGREES {
+            return None;
+        }
+        let estimated_dodge_side_component =
+            candidate.best_estimated_dodge_impulse_side_component.abs();
+        let estimated_dodge_up_component =
+            candidate.best_estimated_dodge_impulse_up_component.abs();
+        let has_meaningful_impulse = candidate.best_estimated_dodge_impulse_magnitude
+            >= SPEED_FLIP_MIN_ESTIMATED_DODGE_IMPULSE_MAGNITUDE;
+        let has_incompatible_meaningful_impulse = has_meaningful_impulse
+            && (candidate.best_estimated_dodge_impulse_forward_component
+                < SPEED_FLIP_MIN_ESTIMATED_DODGE_FORWARD_COMPONENT
+                || estimated_dodge_side_component > SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT
+                || estimated_dodge_up_component > SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT);
+        if has_incompatible_meaningful_impulse {
+            return None;
+        }
+        let has_strong_diagonal_rotation =
+            candidate.best_diagonal_score >= SPEED_FLIP_MIN_STRONG_DIAGONAL_SCORE;
+        let has_diagonal_impulse = has_meaningful_impulse
+            && candidate.best_estimated_dodge_impulse_forward_component
+                >= SPEED_FLIP_MIN_ESTIMATED_DODGE_FORWARD_COMPONENT
+            && (SPEED_FLIP_MIN_ESTIMATED_DODGE_SIDE_COMPONENT
+                ..=SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT)
+                .contains(&estimated_dodge_side_component)
+            && estimated_dodge_up_component <= SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT
+            && candidate.best_diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
+        if !(has_strong_diagonal_rotation || has_diagonal_impulse) {
+            return None;
+        }
         let boost_alignment_score =
             Self::normalize_score(candidate.best_boost_alignment, 0.82, 0.99);
         let confidence = 0.30 * candidate.best_diagonal_score
@@ -407,7 +556,21 @@ impl SpeedFlipCalculator {
             start_speed: candidate.start_speed,
             max_speed: candidate.max_speed,
             best_alignment: candidate.best_alignment,
+            initial_boost_alignment: candidate
+                .initial_boost_alignment
+                .unwrap_or(candidate.best_boost_alignment),
+            best_boost_alignment: candidate.best_boost_alignment,
+            boost_alignment_sample_count: candidate.boost_alignment_sample_count,
+            dodge_delay_after_ground_leave_seconds: candidate
+                .dodge_delay_after_ground_leave_seconds,
             diagonal_score: candidate.best_diagonal_score,
+            estimated_dodge_impulse_magnitude: candidate.best_estimated_dodge_impulse_magnitude,
+            estimated_dodge_impulse_forward_component: candidate
+                .best_estimated_dodge_impulse_forward_component,
+            estimated_dodge_impulse_side_component: candidate
+                .best_estimated_dodge_impulse_side_component,
+            estimated_dodge_impulse_up_component: candidate
+                .best_estimated_dodge_impulse_up_component,
             cancel_score,
             speed_score,
             confidence,
@@ -460,6 +623,7 @@ impl SpeedFlipCalculator {
             self.active_candidates.clear();
             self.current_kickoff_start_time = None;
             self.kickoff_approach_active_last_frame = false;
+            self.last_ground_contacts.clear();
             return Ok(());
         }
 
@@ -468,6 +632,7 @@ impl SpeedFlipCalculator {
         }
 
         self.update_kickoff_start_time(frame, kickoff_approach_active, players);
+        self.update_ground_contacts(frame, players);
 
         for player in &players.players {
             self.maybe_start_candidate(frame, gameplay, ball, player, live_play_state);

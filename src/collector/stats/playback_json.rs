@@ -281,6 +281,20 @@ pub(in crate::collector::stats::playback) fn json_required_usize(
         })
 }
 
+pub(in crate::collector::stats::playback) fn json_required_u32(
+    object: &serde_json::Map<String, Value>,
+    field: &str,
+) -> SubtrActorResult<u32> {
+    json_required_value(object, field)?
+        .as_u64()
+        .and_then(|number| u32::try_from(number).ok())
+        .ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
+                "Expected JSON field '{field}' to be an unsigned 32-bit integer"
+            )))
+        })
+}
+
 pub(in crate::collector::stats::playback) fn json_required_i32(
     object: &serde_json::Map<String, Value>,
     field: &str,
@@ -354,6 +368,23 @@ pub(in crate::collector::stats::playback) fn json_optional_usize(
     }
 }
 
+pub(in crate::collector::stats::playback) fn json_optional_u32(
+    value: Option<&Value>,
+) -> SubtrActorResult<Option<u32>> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => value
+            .as_u64()
+            .and_then(|number| u32::try_from(number).ok())
+            .map(Some)
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+                    "Expected optional JSON value to be an unsigned 32-bit integer".to_owned(),
+                ))
+            }),
+    }
+}
+
 pub(in crate::collector::stats::playback) fn json_goal_context_position(
     value: &Value,
 ) -> SubtrActorResult<GoalContextPosition> {
@@ -404,6 +435,36 @@ pub(in crate::collector::stats::playback) fn json_required_vec3(
         json_f32(&array[2]).ok_or_else(|| {
             SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
                 "Expected JSON field '{field}[2]' to be a float"
+            )))
+        })?,
+    ])
+}
+
+pub(in crate::collector::stats::playback) fn json_required_vec2(
+    object: &serde_json::Map<String, Value>,
+    field: &str,
+) -> SubtrActorResult<[f32; 2]> {
+    let array = json_required_value(object, field)?
+        .as_array()
+        .ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
+                "Expected JSON field '{field}' to be a 2-element array"
+            )))
+        })?;
+    if array.len() != 2 {
+        return SubtrActorError::new_result(SubtrActorErrorVariant::StatsSerializationError(
+            format!("Expected JSON field '{field}' to contain exactly 2 elements"),
+        ));
+    }
+    Ok([
+        json_f32(&array[0]).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
+                "Expected JSON field '{field}[0]' to be a float"
+            )))
+        })?,
+        json_f32(&array[1]).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
+                "Expected JSON field '{field}[1]' to be a float"
             )))
         })?,
     ])
