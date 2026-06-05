@@ -47,9 +47,10 @@ impl FlickStats {
     }
 
     fn record_event(&mut self, event: &FlickEvent) {
-        self.labeled_event_counts.increment([confidence_band_label(
-            event.confidence >= FLICK_HIGH_CONFIDENCE,
-        )]);
+        self.labeled_event_counts.increment([
+            confidence_band_label(event.confidence >= FLICK_HIGH_CONFIDENCE),
+            flick_kind_label(&event.kind),
+        ]);
         self.sync_legacy_counts();
         self.last_flick_time = Some(event.time);
         self.last_flick_frame = Some(event.frame);
@@ -66,7 +67,7 @@ impl FlickStats {
 
     pub fn complete_labeled_event_counts(&self) -> LabeledCounts {
         LabeledCounts::complete_from_label_sets(
-            &[&CONFIDENCE_BAND_LABELS],
+            &[&CONFIDENCE_BAND_LABELS, &FLICK_KIND_LABELS],
             &self.labeled_event_counts,
         )
     }

@@ -118,6 +118,9 @@ fn flick_event(time: f32, frame: usize, player: PlayerId) -> FlickEvent {
         ball_impulse: [0.0, 600.0, 0.0],
         impulse_away_alignment: 0.8,
         vertical_impulse: 0.0,
+        kind: "other".to_owned(),
+        local_ball_position: [60.0, 0.0, 95.0],
+        reverse_angle_degrees: None,
         confidence: 0.82,
     }
 }

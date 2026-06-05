@@ -650,14 +650,23 @@ fn vertical_state_label_for_derivation(aerial: bool) -> StatLabel {
     }
 }
 
+fn flick_kind_label_for_derivation(value: &str) -> StatLabel {
+    match value {
+        "reverse_45" => StatLabel::new("kind", "reverse_45"),
+        "reverse_90" => StatLabel::new("kind", "reverse_90"),
+        _ => StatLabel::new("kind", "other"),
+    }
+}
+
 fn apply_flick_event(stats: &mut FlickStats, event: &FlickEvent) {
     const FLICK_HIGH_CONFIDENCE: f32 = 0.80;
 
-    stats
-        .labeled_event_counts
-        .increment([confidence_band_label_for_derivation(
+    stats.labeled_event_counts.increment([
+        confidence_band_label_for_derivation(
             event.confidence >= FLICK_HIGH_CONFIDENCE,
-        )]);
+        ),
+        flick_kind_label_for_derivation(&event.kind),
+    ]);
     stats.count = stats.labeled_event_counts.total();
     stats.high_confidence_count = stats
         .labeled_event_counts
@@ -901,4 +910,3 @@ struct DerivedPowerslideState {
     active: bool,
     is_team_0: bool,
 }
-
