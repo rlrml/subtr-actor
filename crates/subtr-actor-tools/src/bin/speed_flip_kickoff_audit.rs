@@ -207,12 +207,44 @@ fn player_id_string(player_id: &PlayerId) -> String {
     match serde_json::to_value(player_id) {
         Ok(serde_json::Value::Object(map)) if map.len() == 1 => {
             let (kind, value) = map.into_iter().next().expect("map has one value");
-            match value {
-                serde_json::Value::String(value) => format!("{kind}:{value}"),
-                other => format!("{kind}:{other}"),
-            }
+            let platform = player_id_platform_label(&kind);
+            let id = player_id_value_text(&value);
+            format!("{platform}:{id}")
         }
         Ok(value) => value.to_string(),
         Err(_) => format!("{player_id:?}"),
+    }
+}
+
+fn player_id_platform_label(kind: &str) -> &str {
+    match kind {
+        "PlayStation" => "ps4",
+        "PsyNet" => "psynet",
+        "SplitScreen" => "splitscreen",
+        "Steam" => "steam",
+        "Switch" => "switch",
+        "Xbox" => "xbox",
+        "QQ" => "qq",
+        "Epic" => "epic",
+        other => other,
+    }
+}
+
+fn player_id_value_text(value: &serde_json::Value) -> String {
+    if let Some(online_id) = value
+        .as_object()
+        .and_then(|object| object.get("online_id"))
+        .and_then(json_scalar_text)
+    {
+        return online_id;
+    }
+    json_scalar_text(value).unwrap_or_else(|| value.to_string())
+}
+
+fn json_scalar_text(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::Number(value) => Some(value.to_string()),
+        _ => None,
     }
 }
