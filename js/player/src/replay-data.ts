@@ -877,6 +877,7 @@ export function normalizeReplayData(
   return {
     frameCount: frames.length,
     duration: frames.at(-1)?.time ?? 0,
+    rawStartTime: startTime,
     frames,
     ballFrames,
     boostPads,
@@ -911,6 +912,7 @@ export async function normalizeReplayDataAsync(
   return {
     frameCount: frames.length,
     duration: frames.at(-1)?.time ?? 0,
+    rawStartTime: startTime,
     frames,
     ballFrames,
     boostPads,

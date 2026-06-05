@@ -6,6 +6,19 @@ export type MechanicsReviewPlaybackBound =
   | { kind: "time"; value: number }
   | { kind: "frame"; value: number };
 
+export type MechanicsReviewTimeBase = "playback" | "rawReplay";
+
+export interface MechanicsReviewTimingReplay {
+  duration: number;
+  rawStartTime?: number;
+  frames: readonly { time: number }[];
+}
+
+export interface MechanicsReviewPlaybackConfig {
+  timeBase?: MechanicsReviewTimeBase;
+  [key: string]: unknown;
+}
+
 export interface MechanicsReviewReplay {
   id: string;
   path?: string;
@@ -43,7 +56,7 @@ export interface MechanicsReviewPlaylist {
   replays?: MechanicsReviewReplay[];
   items: MechanicsReviewItem[];
   page?: PlaylistManifestPage;
-  playback?: unknown;
+  playback?: MechanicsReviewPlaybackConfig;
   meta?: unknown;
 }
 
@@ -139,6 +152,26 @@ function parseMechanicsReviewPage(value: unknown): PlaylistManifestPage | undefi
   };
 }
 
+function parseMechanicsReviewPlayback(value: unknown): MechanicsReviewPlaybackConfig | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!isRecord(value)) {
+    throw new Error("Review playlist playback must be an object.");
+  }
+  if (
+    value.timeBase !== undefined &&
+    value.timeBase !== "playback" &&
+    value.timeBase !== "rawReplay"
+  ) {
+    throw new Error('Review playlist playback timeBase must be "playback" or "rawReplay".');
+  }
+  return {
+    ...value,
+    timeBase: value.timeBase,
+  };
+}
+
 export function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPlaylist {
   if (!isRecord(value) || !Array.isArray(value.items)) {
     throw new Error("Review playlist must contain an items array.");
@@ -185,7 +218,7 @@ export function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPla
     replays,
     items,
     page: parseMechanicsReviewPage(value.page),
-    playback: value.playback,
+    playback: parseMechanicsReviewPlayback(value.playback),
     meta: value.meta,
   };
 }
@@ -307,6 +340,81 @@ export function getMechanicsReviewTargetFrame(
   }
   const value = item.meta.target[key];
   return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : null;
+}
+
+function getMechanicsReviewRawTimeOffset(
+  item: MechanicsReviewItem,
+  replay: MechanicsReviewTimingReplay,
+): number {
+  for (const [timeKey, frameKey] of [
+    ["eventTime", "eventFrame"],
+    ["startTime", "startFrame"],
+    ["endTime", "endFrame"],
+  ] as const) {
+    const targetTime = getMechanicsReviewTargetNumber(item, timeKey);
+    const targetFrame = getMechanicsReviewTargetFrame(item, frameKey);
+    const replayFrameTime = targetFrame === null ? null : replay.frames[targetFrame]?.time;
+    if (
+      targetTime !== null &&
+      typeof replayFrameTime === "number" &&
+      Number.isFinite(replayFrameTime)
+    ) {
+      return targetTime - replayFrameTime;
+    }
+  }
+  return 0;
+}
+
+function getMechanicsReviewTimeOffset(
+  item: MechanicsReviewItem,
+  replay: MechanicsReviewTimingReplay,
+  timeBase: MechanicsReviewTimeBase | undefined,
+): number {
+  if (timeBase === "playback") {
+    return 0;
+  }
+  if (
+    timeBase === "rawReplay" &&
+    typeof replay.rawStartTime === "number" &&
+    Number.isFinite(replay.rawStartTime)
+  ) {
+    return replay.rawStartTime;
+  }
+  return getMechanicsReviewRawTimeOffset(item, replay);
+}
+
+function clampMechanicsReviewTime(value: number, duration: number): number {
+  return Math.min(Math.max(0, value), Math.max(0, duration));
+}
+
+export function resolveMechanicsReviewBoundTime(
+  item: MechanicsReviewItem,
+  bound: MechanicsReviewPlaybackBound,
+  replay: MechanicsReviewTimingReplay,
+  timeBase?: MechanicsReviewTimeBase,
+): number {
+  if (bound.kind === "frame") {
+    const frameIndex = Math.max(0, Math.trunc(bound.value));
+    return clampMechanicsReviewTime(replay.frames[frameIndex]?.time ?? 0, replay.duration);
+  }
+
+  const timeOffset = getMechanicsReviewTimeOffset(item, replay, timeBase);
+  return clampMechanicsReviewTime(bound.value - timeOffset, replay.duration);
+}
+
+export function resolveMechanicsReviewTargetTime(
+  item: MechanicsReviewItem,
+  replay: MechanicsReviewTimingReplay,
+  timeBase?: MechanicsReviewTimeBase,
+): number | null {
+  const targetTime = getMechanicsReviewTargetTime(item);
+  if (targetTime === null) {
+    return null;
+  }
+  return clampMechanicsReviewTime(
+    targetTime - getMechanicsReviewTimeOffset(item, replay, timeBase),
+    replay.duration,
+  );
 }
 
 export function formatMechanicsReviewClipDetails(item: MechanicsReviewItem): string {
