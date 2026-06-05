@@ -13,9 +13,7 @@ impl<'a> ReplayProcessor<'a> {
             .replay
             .network_frames
             .as_ref()
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::NoNetworkFrames,
-            ))?;
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoNetworkFrames))?;
         match direction {
             SearchDirection::Forward => {
                 for index in (current_index + 1)..frames.frames.len() {
@@ -201,14 +199,10 @@ impl<'a> ReplayProcessor<'a> {
         self.replay
             .network_frames
             .as_ref()
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::NoNetworkFrames,
-            ))?
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoNetworkFrames))?
             .frames
             .get(frame_index)
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::FrameIndexOutOfBounds,
-            ))
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::FrameIndexOutOfBounds))
     }
 
     pub(crate) fn velocities_applied_rigid_body(
@@ -368,9 +362,8 @@ impl<'a> ReplayProcessor<'a> {
 
     /// Returns the tracked actor id for the replay ball.
     pub fn get_ball_actor_id(&self) -> SubtrActorResult<boxcars::ActorId> {
-        self.ball_actor_id.ok_or(SubtrActorError::new(
-            SubtrActorErrorVariant::BallActorNotFound,
-        ))
+        self.ball_actor_id
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::BallActorNotFound))
     }
 
     /// Returns the main game metadata actor id.

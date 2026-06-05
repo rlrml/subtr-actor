@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::Serialize;
 use serde_json::Value;
 use subtr_actor::{
-    CoreTeamStats, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
+    CoreTeamStats, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
     StatsEventPropertyValue, StatsEventTiming, StatsTimelineTagEvent, TeamStatsSnapshot,
 };
 
@@ -35,11 +35,60 @@ pub fn mechanic_event_player_name<'a>(
     timeline: &'a ReplayStatsTimeline,
     event: &StatsTimelineTagEvent,
 ) -> Option<&'a str> {
-    timeline
-        .replay_meta
+    mechanic_event_player_name_in_meta(&timeline.replay_meta, event)
+}
+
+#[allow(dead_code)]
+pub fn mechanic_event_player_name_in_meta<'a>(
+    replay_meta: &'a ReplayMeta,
+    event: &StatsTimelineTagEvent,
+) -> Option<&'a str> {
+    replay_meta
         .player_order()
         .find(|player| player.remote_id == event.player_id)
         .map(|player| player.name.as_str())
+}
+
+#[allow(dead_code)]
+pub fn assert_mechanic_event_roughly_at_in_meta<'a>(
+    replay_meta: &'a ReplayMeta,
+    events: &'a [StatsTimelineTagEvent],
+    kind: &str,
+    player_name: &str,
+    expected_start_time: f32,
+    expected_end_time: f32,
+    tolerance_seconds: f32,
+) -> &'a StatsTimelineTagEvent {
+    let event = events.iter().find(|event| {
+        if event.kind != kind {
+            return false;
+        }
+        if mechanic_event_player_name_in_meta(replay_meta, event) != Some(player_name) {
+            return false;
+        }
+        let (start_time, end_time) = mechanic_event_time_span(event);
+        (start_time - expected_start_time).abs() <= tolerance_seconds
+            && (end_time - expected_end_time).abs() <= tolerance_seconds
+    });
+
+    event.unwrap_or_else(|| {
+        let candidates = events
+            .iter()
+            .filter(|event| event.kind == kind)
+            .map(|event| {
+                let (start_time, end_time) = mechanic_event_time_span(event);
+                let player =
+                    mechanic_event_player_name_in_meta(replay_meta, event).unwrap_or("<unknown>");
+                format!("{kind} by {player} at {start_time:.3}-{end_time:.3}s")
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        panic!(
+            "expected {kind} by {player_name} around \
+             {expected_start_time:.3}-{expected_end_time:.3}s (+/- {tolerance_seconds:.3}s); \
+             candidates: [{candidates}]"
+        );
+    })
 }
 
 #[allow(dead_code)]
@@ -51,37 +100,15 @@ pub fn assert_mechanic_event_roughly_at<'a>(
     expected_end_time: f32,
     tolerance_seconds: f32,
 ) -> &'a StatsTimelineTagEvent {
-    let event = timeline.events.mechanics.iter().find(|event| {
-        if event.kind != kind {
-            return false;
-        }
-        if mechanic_event_player_name(timeline, event) != Some(player_name) {
-            return false;
-        }
-        let (start_time, end_time) = mechanic_event_time_span(event);
-        (start_time - expected_start_time).abs() <= tolerance_seconds
-            && (end_time - expected_end_time).abs() <= tolerance_seconds
-    });
-
-    event.unwrap_or_else(|| {
-        let candidates = timeline
-            .events
-            .mechanics
-            .iter()
-            .filter(|event| event.kind == kind)
-            .map(|event| {
-                let (start_time, end_time) = mechanic_event_time_span(event);
-                let player = mechanic_event_player_name(timeline, event).unwrap_or("<unknown>");
-                format!("{kind} by {player} at {start_time:.3}-{end_time:.3}s")
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        panic!(
-            "expected {kind} by {player_name} around \
-             {expected_start_time:.3}-{expected_end_time:.3}s (+/- {tolerance_seconds:.3}s); \
-             candidates: [{candidates}]"
-        );
-    })
+    assert_mechanic_event_roughly_at_in_meta(
+        &timeline.replay_meta,
+        &timeline.events.mechanics,
+        kind,
+        player_name,
+        expected_start_time,
+        expected_end_time,
+        tolerance_seconds,
+    )
 }
 
 #[allow(dead_code)]

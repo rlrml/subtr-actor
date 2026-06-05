@@ -133,7 +133,11 @@ pub struct SubtrActorError {
 impl SubtrActorError {
     pub fn new(variant: SubtrActorErrorVariant) -> Self {
         Self {
-            backtrace: Backtrace::capture(),
+            backtrace: if std::env::var_os("SUBTR_ACTOR_ERROR_BACKTRACE").is_some() {
+                Backtrace::capture()
+            } else {
+                Backtrace::disabled()
+            },
             variant,
         }
     }

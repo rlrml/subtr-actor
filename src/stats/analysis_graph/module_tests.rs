@@ -14,6 +14,8 @@ use std::any::TypeId;
 use std::collections::HashSet;
 use std::path::Path;
 
+const ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
+
 fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
     let data = std::fs::read(&replay_path)
@@ -185,9 +187,11 @@ fn continuous_ball_control_is_directly_callable() {
 
 #[test]
 fn every_builtin_analysis_node_has_shared_json_output_on_real_replay() {
-    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
+    let replay = parse_replay(ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE);
     let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
         .expect("graph should evaluate a real replay");
+
+    assert_all_reducer_states_are_present(&graph);
 
     for name in builtin_analysis_node_names() {
         let value = builtin_analysis_node_json(name, &graph)
@@ -237,12 +241,7 @@ fn every_builtin_analysis_node_has_shared_json_output_on_real_replay() {
     );
 }
 
-#[test]
-fn evaluates_all_reducer_nodes_against_a_real_replay() {
-    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
-    let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
-        .expect("graph should evaluate a real replay");
-
+fn assert_all_reducer_states_are_present(graph: &AnalysisGraph) {
     assert!(graph.state::<PlayerVerticalState>().is_some());
     assert!(graph.state::<TouchState>().is_some());
     assert!(graph.state::<PossessionState>().is_some());
@@ -274,8 +273,18 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
 }
 
 #[test]
+#[ignore = "covered by every_builtin_analysis_node_has_shared_json_output_on_real_replay; run explicitly when debugging graph state materialization"]
+fn evaluates_all_reducer_nodes_against_a_real_replay() {
+    let replay = parse_replay(ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE);
+    let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
+        .expect("graph should evaluate a real replay");
+
+    assert_all_reducer_states_are_present(&graph);
+}
+
+#[test]
 fn full_analysis_graph_matches_stats_timeline_events_on_real_replay() {
-    let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
+    let replay = parse_replay(ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE);
     let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
         .expect("full graph should evaluate a real replay");
     let graph_events = graph

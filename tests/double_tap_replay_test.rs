@@ -1,6 +1,6 @@
 mod common;
 
-use subtr_actor::{GoalTagKind, StatsCollector, StatsFrameResolution, StatsTimelineCollector};
+use subtr_actor::{GoalTagKind, StatsFrameResolution, StatsTimelineEventCollector};
 
 const THIRD_GOAL_DOUBLE_TAP_REPLAY: &str =
     "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
@@ -10,8 +10,8 @@ const NUTTRBACK_GOAL_7_DOUBLE_TAP_REPLAY: &str =
 #[test]
 fn tags_colonelpanic8_third_goal_as_double_tap() {
     let replay = common::parse_replay(THIRD_GOAL_DOUBLE_TAP_REPLAY);
-    let timeline = StatsTimelineCollector::new()
-        .get_legacy_replay_stats_timeline(&replay)
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
         .expect("failed to collect stats timeline for double tap replay");
 
     assert!(
@@ -47,8 +47,8 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
 #[test]
 fn tags_nuttrback_seventh_goal_as_double_tap() {
     let replay = common::parse_replay(NUTTRBACK_GOAL_7_DOUBLE_TAP_REPLAY);
-    let timeline = StatsTimelineCollector::new()
-        .get_legacy_replay_stats_timeline(&replay)
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
         .expect("failed to collect stats timeline for double tap replay");
 
     assert!(
@@ -87,13 +87,11 @@ fn tags_nuttrback_seventh_goal_as_double_tap() {
 #[test]
 fn dynamic_stats_timeline_value_includes_normalized_mechanics_stream() {
     let replay = common::parse_replay(THIRD_GOAL_DOUBLE_TAP_REPLAY);
-    let value = StatsCollector::new()
+    let value = StatsTimelineEventCollector::new()
         .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
-        .capture_frames()
-        .get_captured_data(&replay)
-        .expect("failed to capture stats frames for double tap replay")
-        .into_legacy_stats_timeline_value()
-        .expect("failed to convert captured stats frames to timeline value");
+        .get_replay_stats_timeline_scaffold(&replay)
+        .expect("failed to collect event timeline for double tap replay");
+    let value = serde_json::to_value(value).expect("event timeline should serialize");
 
     let mechanics = value["events"]["mechanics"]
         .as_array()

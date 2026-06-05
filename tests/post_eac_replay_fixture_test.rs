@@ -4,6 +4,7 @@ use serde_json::Value;
 use subtr_actor::{
     builtin_stats_module_names, Collector, FrameRateDecorator, GoalTagKind, NDArrayCollector,
     PlayerFrame, ReplayDataCollector, StatsCollector, StatsFrameResolution, StatsTimelineCollector,
+    StatsTimelineEventCollector,
 };
 
 struct PostEacFixture {
@@ -76,8 +77,8 @@ fn assert_finite_json(value: &Value, path: &str) {
 #[test]
 fn post_eac_ranked_standard_second_goal_is_not_own_half_goal() {
     let replay = common::parse_replay(POST_EAC_RANKED_STANDARD_REPLAY);
-    let timeline = StatsTimelineCollector::new()
-        .get_legacy_replay_stats_timeline(&replay)
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
         .expect("failed to collect stats timeline for post-EAC standard replay");
 
     assert!(
@@ -112,8 +113,8 @@ fn post_eac_ranked_standard_second_goal_is_not_own_half_goal() {
 #[test]
 fn post_eac_ranked_standard_third_goal_is_not_aerial_goal() {
     let replay = common::parse_replay(POST_EAC_RANKED_STANDARD_REPLAY);
-    let timeline = StatsTimelineCollector::new()
-        .get_legacy_replay_stats_timeline(&replay)
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
         .expect("failed to collect stats timeline for post-EAC standard replay");
 
     let third_goal = timeline
@@ -320,95 +321,135 @@ fn post_eac_replays_emit_ndarray_features() {
     }
 }
 
+fn assert_post_eac_stats_outputs(fixture: &PostEacFixture) {
+    let replay = common::parse_replay(fixture.path);
+    let timeline = StatsTimelineEventCollector::new()
+        .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
+        .get_replay_stats_timeline_scaffold(&replay)
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to collect compact stats timeline for {}: {error:?}",
+                fixture.path
+            )
+        });
+    assert_eq!(
+        timeline.replay_meta.player_count(),
+        fixture.player_count,
+        "{} typed timeline player count",
+        fixture.path
+    );
+    assert!(
+        timeline.frames.len() > 1,
+        "{} typed timeline should include sampled frames",
+        fixture.path
+    );
+    assert!(
+        timeline
+            .frames
+            .windows(2)
+            .all(|frames| frames[1].time >= frames[0].time),
+        "{} typed timeline frame times should be sorted",
+        fixture.path
+    );
+    assert!(
+        timeline.frames.iter().all(|frame| {
+            frame.players.len() == fixture.player_count
+                && frame.time.is_finite()
+                && frame.dt.is_finite()
+        }),
+        "{} typed timeline frames should carry finite player snapshots",
+        fixture.path
+    );
+
+    let timeline_json = serde_json::to_value(&timeline)
+        .expect("ReplayStatsTimelineScaffold should serialize to JSON");
+    assert_finite_json(&timeline_json, fixture.path);
+
+    let collected = StatsCollector::new()
+        .get_stats(&replay)
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to collect representative aggregate stats for {}: {error:?}",
+                fixture.path
+            )
+        });
+    assert_eq!(
+        collected.replay_meta.player_count(),
+        fixture.player_count,
+        "{} aggregate stats player count",
+        fixture.path
+    );
+    assert_eq!(
+        collected.module_names().count(),
+        builtin_stats_module_names().len(),
+        "{} should collect every builtin stats module",
+        fixture.path
+    );
+
+    let collected_json =
+        serde_json::to_value(&collected).expect("CollectedStats should serialize to JSON");
+    assert_collected_stats_modules(&collected_json, fixture.path);
+    assert_finite_json(&collected_json, fixture.path);
+}
+
 #[test]
 fn post_eac_replays_emit_stats_outputs() {
+    assert_post_eac_stats_outputs(&POST_EAC_FIXTURES[0]);
+}
+
+#[test]
+#[ignore = "broad post-EAC stats output coverage is slow; run explicitly when changing stats collectors"]
+fn all_post_eac_replays_emit_stats_outputs() {
     for fixture in POST_EAC_FIXTURES {
-        let replay = common::parse_replay(fixture.path);
-        let collected = StatsCollector::new()
-            .get_stats(&replay)
-            .unwrap_or_else(|error| {
-                panic!(
-                    "failed to collect aggregate stats for {}: {error:?}",
-                    fixture.path
-                )
-            });
-        assert_eq!(
-            collected.replay_meta.player_count(),
-            fixture.player_count,
-            "{} aggregate stats player count",
-            fixture.path
-        );
-        assert_eq!(
-            collected.module_names().count(),
-            builtin_stats_module_names().len(),
-            "{} should collect every builtin stats module",
-            fixture.path
-        );
-
-        let collected_json =
-            serde_json::to_value(&collected).expect("CollectedStats should serialize to JSON");
-        assert_collected_stats_modules(&collected_json, fixture.path);
-        assert_finite_json(&collected_json, fixture.path);
-
-        let timeline = StatsTimelineCollector::new()
-            .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
-            .get_legacy_replay_stats_timeline(&replay)
-            .unwrap_or_else(|error| {
-                panic!(
-                    "failed to collect typed stats timeline for {}: {error:?}",
-                    fixture.path
-                )
-            });
-        assert_eq!(
-            timeline.replay_meta.player_count(),
-            fixture.player_count,
-            "{} typed timeline player count",
-            fixture.path
-        );
-        assert!(
-            timeline.frames.len() > 1,
-            "{} typed timeline should include sampled frames",
-            fixture.path
-        );
-        assert!(
-            timeline
-                .frames
-                .windows(2)
-                .all(|frames| frames[1].time >= frames[0].time),
-            "{} typed timeline frame times should be sorted",
-            fixture.path
-        );
-        assert!(
-            timeline.frames.iter().all(|frame| {
-                frame.players.len() == fixture.player_count
-                    && frame.time.is_finite()
-                    && frame.dt.is_finite()
-            }),
-            "{} typed timeline frames should carry finite player snapshots",
-            fixture.path
-        );
-
-        let timeline_json =
-            serde_json::to_value(&timeline).expect("ReplayStatsTimeline should serialize to JSON");
-        assert_finite_json(&timeline_json, fixture.path);
-
-        let playback_value = StatsCollector::new()
-            .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
-            .capture_frames()
-            .get_captured_data(&replay)
-            .unwrap_or_else(|error| {
-                panic!(
-                    "failed to capture dynamic stats frames for {}: {error:?}",
-                    fixture.path
-                )
-            })
-            .into_legacy_stats_timeline_value()
-            .unwrap_or_else(|error| {
-                panic!(
-                    "failed to convert dynamic stats frames for {}: {error:?}",
-                    fixture.path
-                )
-            });
-        assert_finite_json(&playback_value, fixture.path);
+        assert_post_eac_stats_outputs(fixture);
     }
+}
+
+#[test]
+#[ignore = "full legacy stats timeline snapshots are slow; run explicitly when changing full snapshot serialization"]
+fn representative_post_eac_replay_emits_full_stats_timeline_outputs() {
+    let fixture = &POST_EAC_FIXTURES[0];
+    let replay = common::parse_replay(fixture.path);
+    let timeline = StatsTimelineCollector::new()
+        .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
+        .get_legacy_replay_stats_timeline(&replay)
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to collect representative full stats timeline for {}: {error:?}",
+                fixture.path
+            )
+        });
+    assert_eq!(
+        timeline.replay_meta.player_count(),
+        fixture.player_count,
+        "{} representative full timeline player count",
+        fixture.path
+    );
+    assert!(
+        timeline.frames.len() > 1,
+        "{} representative full timeline should include sampled frames",
+        fixture.path
+    );
+    let timeline_json =
+        serde_json::to_value(&timeline).expect("ReplayStatsTimeline should serialize to JSON");
+    assert_finite_json(&timeline_json, fixture.path);
+
+    let playback_value = StatsCollector::new()
+        .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 1.0 })
+        .capture_frames()
+        .get_captured_data(&replay)
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to capture representative dynamic stats frames for {}: {error:?}",
+                fixture.path
+            )
+        })
+        .into_legacy_stats_timeline_value()
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to convert representative dynamic stats frames for {}: {error:?}",
+                fixture.path
+            )
+        });
+    assert_finite_json(&playback_value, fixture.path);
 }

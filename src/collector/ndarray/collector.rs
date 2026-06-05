@@ -125,9 +125,9 @@ impl<F> NDArrayCollector<F> {
         let column_headers = self.get_column_headers();
         Ok((
             ReplayMetaWithHeaders {
-                replay_meta: self.replay_meta.ok_or(SubtrActorError::new(
-                    SubtrActorErrorVariant::CouldNotBuildReplayMeta,
-                ))?,
+                replay_meta: self.replay_meta.ok_or_else(|| {
+                    SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta)
+                })?,
                 column_headers,
             },
             ndarray::Array2::from_shape_vec((self.frames_added, features_per_row), self.data)
@@ -148,9 +148,9 @@ impl<F> NDArrayCollector<F> {
             replay_meta: self
                 .replay_meta
                 .as_ref()
-                .ok_or(SubtrActorError::new(
-                    SubtrActorErrorVariant::CouldNotBuildReplayMeta,
-                ))?
+                .ok_or_else(|| {
+                    SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta)
+                })?
                 .clone(),
             column_headers: self.get_column_headers(),
         })
@@ -160,9 +160,7 @@ impl<F> NDArrayCollector<F> {
         let player_count = self
             .replay_meta
             .as_ref()
-            .ok_or(SubtrActorError::new(
-                SubtrActorErrorVariant::CouldNotBuildReplayMeta,
-            ))?
+            .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?
             .player_count();
         let global_feature_count: usize = self
             .feature_adders
