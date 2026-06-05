@@ -397,6 +397,14 @@ pub(in crate::collector::stats::playback) fn parse_flick_event(
         ball_impulse: json_required_vec3(object, "ball_impulse")?,
         impulse_away_alignment: json_required_f32(object, "impulse_away_alignment")?,
         vertical_impulse: json_required_f32(object, "vertical_impulse")?,
+        kind: object
+            .get("kind")
+            .and_then(Value::as_str)
+            .unwrap_or("other")
+            .to_owned(),
+        local_ball_position: json_optional_vec3(object.get("local_ball_position"))?
+            .unwrap_or([0.0, 0.0, 0.0]),
+        reverse_angle_degrees: json_optional_f32(object.get("reverse_angle_degrees"))?,
         confidence: json_required_f32(object, "confidence")?,
     })
 }

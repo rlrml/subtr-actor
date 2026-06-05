@@ -205,6 +205,7 @@ These are useful when working through the Python or JavaScript bindings:
 - Python package README: [python/PYTHON-README.md](./python/PYTHON-README.md)
 - JavaScript package README: [js/README.md](./js/README.md)
 - JavaScript player README: [js/player/README.md](./js/player/README.md)
+- Stat definitions: [docs/event-definitions.md](./docs/event-definitions.md)
 - Statistic confidence: [docs/stat-confidence.md](./docs/stat-confidence.md)
 - Release notes and process: [docs/RELEASING.md](./docs/RELEASING.md)
 

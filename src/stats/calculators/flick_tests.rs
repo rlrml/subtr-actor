@@ -123,6 +123,121 @@ fn counts_controlled_dodge_touch_with_large_ball_impulse() {
     assert_eq!(calculator.events().len(), 1);
     assert!(calculator.events()[0].setup_duration >= FLICK_MIN_SETUP_SECONDS);
     assert!(calculator.events()[0].ball_speed_change >= FLICK_MIN_BALL_SPEED_CHANGE);
+    assert_eq!(calculator.events()[0].kind, "other");
+}
+
+#[test]
+fn labels_reverse_45_flicks() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    for (frame_number, time) in [(1, 0.1), (2, 0.2), (3, 0.3)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &ball(glam::Vec3::new(45.0, 0.0, 112.0), glam::Vec3::ZERO),
+                &players(frame_number == 3),
+                &touch_state(Vec::new()),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    calculator
+        .update(
+            &frame(4, 0.4),
+            &ball(
+                glam::Vec3::new(-75.0, 75.0, 160.0),
+                glam::Vec3::new(-900.0, 900.0, 520.0),
+            ),
+            &players(true),
+            &touch_state(vec![TouchEvent {
+                time: 0.4,
+                frame: 4,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: Some(0.0),
+                dodge_contact: false,
+            }]),
+            &live_play,
+        )
+        .unwrap();
+
+    let event = calculator.events().first().unwrap();
+    assert_eq!(event.kind, "reverse_45");
+    assert!(
+        (REVERSE_FLICK_45_MIN_DEGREES..=REVERSE_FLICK_45_MAX_DEGREES)
+            .contains(&event.reverse_angle_degrees.unwrap())
+    );
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(
+        stats.event_count_with_labels(&[StatLabel::new("kind", "reverse_45")]),
+        1
+    );
+    assert_eq!(
+        stats.event_count_with_labels(&[StatLabel::new("kind", "reverse_90")]),
+        0
+    );
+}
+
+#[test]
+fn labels_reverse_90_flicks() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    for (frame_number, time) in [(1, 0.1), (2, 0.2), (3, 0.3)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &ball(glam::Vec3::new(45.0, 0.0, 112.0), glam::Vec3::ZERO),
+                &players(frame_number == 3),
+                &touch_state(Vec::new()),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    calculator
+        .update(
+            &frame(4, 0.4),
+            &ball(
+                glam::Vec3::new(20.0, 110.0, 160.0),
+                glam::Vec3::new(250.0, 1200.0, 520.0),
+            ),
+            &players(true),
+            &touch_state(vec![TouchEvent {
+                time: 0.4,
+                frame: 4,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: Some(0.0),
+                dodge_contact: false,
+            }]),
+            &live_play,
+        )
+        .unwrap();
+
+    let event = calculator.events().first().unwrap();
+    assert_eq!(event.kind, "reverse_90");
+    assert!(
+        (REVERSE_FLICK_90_MIN_DEGREES..=REVERSE_FLICK_90_MAX_DEGREES)
+            .contains(&event.reverse_angle_degrees.unwrap())
+    );
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(
+        stats.event_count_with_labels(&[StatLabel::new("kind", "reverse_90")]),
+        1
+    );
+    assert_eq!(
+        stats.event_count_with_labels(&[StatLabel::new("kind", "reverse_45")]),
+        0
+    );
 }
 
 #[test]

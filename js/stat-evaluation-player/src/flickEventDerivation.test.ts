@@ -11,6 +11,22 @@ function assertClose(actual: number | undefined, expected: number): void {
   assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 }
 
+function labeledCount(
+  stats: {
+    labeled_event_counts?: {
+      entries: Array<{ labels: Array<{ key: string; value: string }>; count: number }>;
+    };
+  },
+  key: string,
+  value: string,
+): number {
+  return (
+    stats.labeled_event_counts?.entries
+      .filter((entry) => entry.labels.some((label) => label.key === key && label.value === value))
+      .reduce((total, entry) => total + entry.count, 0) ?? 0
+  );
+}
+
 test("flick event derivation can populate compacted player stats", () => {
   const timeline = createStatsTimeline({
     events: {
@@ -57,6 +73,9 @@ test("flick event derivation can populate compacted player stats", () => {
           ball_impulse: [220, -120, 80],
           impulse_away_alignment: 0.7,
           vertical_impulse: 80,
+          kind: "reverse_90",
+          local_ball_position: [20, 110, 160],
+          reverse_angle_degrees: 90,
           confidence: 0.7,
         },
       ],
@@ -113,6 +132,7 @@ test("flick event derivation can populate compacted player stats", () => {
       .labeled_event_counts != null,
     true,
   );
+  assert.equal(labeledCount(timeline.frames[0]?.players[0]?.flick ?? {}, "kind", "other"), 1);
 
   assert.equal(timeline.frames[1]?.players[0]?.flick.is_last_flick, true);
   assert.equal(timeline.frames[1]?.players[0]?.flick.frames_since_last_flick, 0);
@@ -125,4 +145,8 @@ test("flick event derivation can populate compacted player stats", () => {
   assert.equal(timeline.frames[2]?.players[1]?.flick.is_last_flick, true);
   assertClose(timeline.frames[2]?.players[1]?.flick.cumulative_setup_duration, 0.5);
   assert.equal(timeline.frames[2]?.players[1]?.flick.cumulative_ball_speed_change, 350);
+  assert.equal(
+    labeledCount(timeline.frames[2]?.players[1]?.flick ?? {}, "kind", "reverse_90"),
+    1,
+  );
 });

@@ -96,7 +96,7 @@ function incrementLabels(stats: FlickStatsWithLabels, labels: StatLabel[]): void
   }
 }
 
-function countWithLabel(stats: FlickStatsWithLabels, value: "standard" | "high"): number {
+function countWithConfidenceLabel(stats: FlickStatsWithLabels, value: "standard" | "high"): number {
   return (
     stats.labeled_event_counts?.entries
       .filter((entry) =>
@@ -104,6 +104,10 @@ function countWithLabel(stats: FlickStatsWithLabels, value: "standard" | "high")
       )
       .reduce((total, entry) => total + entry.count, 0) ?? 0
   );
+}
+
+function flickKindLabelValue(value: unknown): "other" | "reverse_45" | "reverse_90" {
+  return value === "reverse_45" || value === "reverse_90" ? value : "other";
 }
 
 function totalLabeledCount(stats: FlickStatsWithLabels): number {
@@ -143,9 +147,13 @@ function applyFlickEvent(
       key: "confidence_band",
       value: event.confidence >= FLICK_HIGH_CONFIDENCE ? "high" : "standard",
     },
+    {
+      key: "kind",
+      value: flickKindLabelValue(event.kind),
+    },
   ]);
   stats.count = totalLabeledCount(stats);
-  stats.high_confidence_count = countWithLabel(stats, "high");
+  stats.high_confidence_count = countWithConfidenceLabel(stats, "high");
   stats.is_last_flick = true;
   stats.last_flick_time = event.time;
   stats.last_flick_frame = event.frame;

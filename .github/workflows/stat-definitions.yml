@@ -1,0 +1,77 @@
+name: Stat Definitions
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - .github/workflows/stat-definitions.yml
+      - Cargo.lock
+      - Cargo.toml
+      - crates/subtr-actor-tools/**
+      - docs/event-definitions.md
+      - src/**
+  pull_request:
+    branches: [master, main]
+    paths:
+      - .github/workflows/stat-definitions.yml
+      - Cargo.lock
+      - Cargo.toml
+      - crates/subtr-actor-tools/**
+      - docs/event-definitions.md
+      - src/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stat-definitions-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  STAT_DEFINITIONS_DOC: docs/event-definitions.md
+
+jobs:
+  generate:
+    name: Generate stat definitions
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+
+      - name: Generate stat definition docs
+        run: |
+          cargo run --package subtr-actor-tools --bin generate_event_docs -- \
+            --output "${STAT_DEFINITIONS_DOC}"
+
+      - name: Check generated docs are committed
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code -- "${STAT_DEFINITIONS_DOC}"
+
+      - name: Commit generated docs
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- "${STAT_DEFINITIONS_DOC}"; then
+            echo "Stat definition docs are already up to date."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git add "${STAT_DEFINITIONS_DOC}"
+          git commit -m "Update generated stat definitions [skip-release]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
