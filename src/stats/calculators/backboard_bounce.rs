@@ -103,6 +103,7 @@ impl BackboardBounceCalculator {
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
+        players: &PlayerFrameState,
         touch_state: &TouchState,
         live_play_state: &LivePlayState,
     ) -> BackboardBounceState {
@@ -111,6 +112,16 @@ impl BackboardBounceCalculator {
             self.last_touch = None;
             self.last_bounce_event = None;
             return BackboardBounceState::default();
+        }
+
+        if self
+            .last_touch
+            .as_ref()
+            .and_then(|touch| touch.player.as_ref())
+            .and_then(|player_id| players.player(player_id))
+            .is_some_and(player_sample_is_touching_surface)
+        {
+            self.last_touch = None;
         }
 
         let bounce_events: Vec<_> = self

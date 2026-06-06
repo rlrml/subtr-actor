@@ -23,6 +23,7 @@ impl_analysis_node! {
     dependencies = [
         frame_info_dependency() => FrameInfo,
         ball_frame_state_dependency() => BallFrameState,
+        player_frame_state_dependency() => PlayerFrameState,
         touch_state_dependency() => TouchState,
         live_play_dependency() => LivePlayState,
     ],

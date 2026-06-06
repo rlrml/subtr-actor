@@ -1,8 +1,5 @@
 use super::*;
 
-const SOCCAR_CEILING_Z: f32 = 2044.0;
-const CEILING_CONTACT_MAX_GAP: f32 = 90.0;
-
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DoubleTapEvent {
@@ -95,26 +92,11 @@ impl DoubleTapCalculator {
             .is_some_and(|position| PlayerVerticalBand::from_height(position[2]).is_grounded())
     }
 
-    fn player_is_on_ceiling(position: glam::Vec3) -> bool {
-        SOCCAR_CEILING_Z - position.z <= CEILING_CONTACT_MAX_GAP
-    }
-
-    fn player_is_touching_surface(position: glam::Vec3) -> bool {
-        PlayerVerticalBand::from_height(position.z).is_grounded()
-            || player_is_on_wall(position)
-            || Self::player_is_on_ceiling(position)
-    }
-
     fn prune_surface_contacts(&mut self, players: &PlayerFrameState) {
         self.pending_backboard_bounces.retain(|pending| {
-            let Some(position) = players
-                .player_position(&pending.player_id)
-                .map(glam::Vec3::from_array)
-            else {
-                return true;
-            };
-
-            !Self::player_is_touching_surface(position)
+            !players
+                .player(&pending.player_id)
+                .is_some_and(player_sample_is_touching_surface)
         });
     }
 
