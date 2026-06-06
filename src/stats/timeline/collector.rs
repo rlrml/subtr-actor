@@ -70,6 +70,10 @@ pub fn default_stats_timeline_config() -> StatsTimelineConfig {
             .max_end_to_goal_seconds,
         flip_reset_goal_max_event_to_goal_seconds: FlipResetGoalCalculatorConfig::default()
             .max_event_to_goal_seconds,
+        bump_goal_max_event_to_goal_seconds: BumpGoalCalculatorConfig::default()
+            .max_event_to_goal_seconds,
+        demo_goal_max_event_to_goal_seconds: DemoGoalCalculatorConfig::default()
+            .max_event_to_goal_seconds,
         half_volley_max_bounce_to_touch_seconds: HalfVolleyCalculatorConfig::default()
             .max_bounce_to_touch_seconds,
         half_volley_min_ball_speed: HalfVolleyCalculatorConfig::default().min_ball_speed,

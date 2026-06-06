@@ -234,6 +234,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             .config
             .get("flip_reset_goal")
             .and_then(Value::as_object);
+        let bump_goal_config = self.config.get("bump_goal").and_then(Value::as_object);
+        let demo_goal_config = self.config.get("demo_goal").and_then(Value::as_object);
         let half_volley_config = self.config.get("half_volley").and_then(Value::as_object);
         let half_volley_goal_config = self
             .config
@@ -361,6 +363,18 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "flip_reset_goal_max_event_to_touch_seconds",
             )
             .unwrap_or(FlipResetGoalCalculatorConfig::default().max_event_to_goal_seconds),
+            bump_goal_max_event_to_goal_seconds: json_config_f32(
+                bump_goal_config,
+                "bump_goal_max_event_to_goal_seconds",
+                "bump_goal_max_event_to_touch_seconds",
+            )
+            .unwrap_or(BumpGoalCalculatorConfig::default().max_event_to_goal_seconds),
+            demo_goal_max_event_to_goal_seconds: json_config_f32(
+                demo_goal_config,
+                "demo_goal_max_event_to_goal_seconds",
+                "demo_goal_max_event_to_touch_seconds",
+            )
+            .unwrap_or(DemoGoalCalculatorConfig::default().max_event_to_goal_seconds),
             half_volley_max_bounce_to_touch_seconds: half_volley_config
                 .and_then(|config| config.get("half_volley_max_bounce_to_touch_seconds"))
                 .and_then(json_f32)
@@ -414,6 +428,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             .config
             .get("flip_reset_goal")
             .and_then(Value::as_object);
+        let bump_goal_config = self.config.get("bump_goal").and_then(Value::as_object);
+        let demo_goal_config = self.config.get("demo_goal").and_then(Value::as_object);
         let half_volley_config = self.config.get("half_volley").and_then(Value::as_object);
         let half_volley_goal_config = self
             .config
@@ -610,6 +626,16 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 flip_reset_goal_config,
                 "flip_reset_goal_max_event_to_goal_seconds",
                 FlipResetGoalCalculatorConfig::default().max_event_to_goal_seconds,
+            ),
+            (
+                bump_goal_config,
+                "bump_goal_max_event_to_goal_seconds",
+                BumpGoalCalculatorConfig::default().max_event_to_goal_seconds,
+            ),
+            (
+                demo_goal_config,
+                "demo_goal_max_event_to_goal_seconds",
+                DemoGoalCalculatorConfig::default().max_event_to_goal_seconds,
             ),
             (
                 half_volley_config,

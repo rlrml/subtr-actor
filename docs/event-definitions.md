@@ -1416,6 +1416,32 @@ A goal linked to a recent on-ball dodge reset or flip-reset event.
 - Require the reset evidence to fall within the configured event-to-goal window.
 - Prefer by-scorer evidence when the reset player matches the scorer's last touch.
 
+### Bump Goal (`bump_goal`)
+
+
+**Summary**
+
+A goal linked to a recent scoring-team bump on an opponent.
+
+**Approach**
+
+- Compare non-team bump events against each goal's timing and scoring team.
+- Require the bump initiator to be on the scoring team and within the configured event-to-goal window.
+- Attach a related bump-event reference and bump evidence, even when the initiator is not the scorer.
+
+### Demo Goal (`demo_goal`)
+
+
+**Summary**
+
+A goal linked to a recent scoring-team demolition.
+
+**Approach**
+
+- Compare demolition kill events against each goal's timing and scoring team.
+- Require the demo attacker to be on the scoring team and within the configured event-to-goal window.
+- Attach a related demo-event reference and demo evidence, even when the attacker is not the scorer.
+
 ### Half-Volley Goal (`half_volley_goal`)
 
 
@@ -1428,4 +1454,3 @@ A goal where the scorer's last touch matches a recent half-volley candidate.
 - Compare half-volley events against each goal's scorer-last-touch context.
 - Require the half-volley touch to be close enough to the goal and sufficiently aligned toward goal.
 - Attach a related half-volley event reference and half-volley evidence to the goal tag metadata.
-

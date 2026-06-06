@@ -149,6 +149,20 @@ mechanic_goal_tag_node!(
     dodge_reset_dependency,
     DodgeResetCalculator
 );
+mechanic_goal_tag_node!(
+    BumpGoalNode,
+    BumpGoalCalculator,
+    "bump_goal",
+    bump_dependency,
+    BumpCalculator
+);
+mechanic_goal_tag_node!(
+    DemoGoalNode,
+    DemoGoalCalculator,
+    "demo_goal",
+    demo_dependency,
+    DemoCalculator
+);
 
 pub struct HalfVolleyGoalNode {
     calculator: HalfVolleyGoalCalculator,
@@ -237,6 +251,14 @@ pub(crate) fn boxed_air_dribble_goal() -> Box<dyn AnalysisNodeDyn> {
 
 pub(crate) fn boxed_flip_reset_goal() -> Box<dyn AnalysisNodeDyn> {
     Box::new(FlipResetGoalNode::new())
+}
+
+pub(crate) fn boxed_bump_goal() -> Box<dyn AnalysisNodeDyn> {
+    Box::new(BumpGoalNode::new())
+}
+
+pub(crate) fn boxed_demo_goal() -> Box<dyn AnalysisNodeDyn> {
+    Box::new(DemoGoalNode::new())
 }
 
 pub(crate) fn boxed_half_volley_goal() -> Box<dyn AnalysisNodeDyn> {

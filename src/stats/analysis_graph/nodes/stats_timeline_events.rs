@@ -104,6 +104,8 @@ impl StatsTimelineEventsNode {
             passing_goal_dependency(),
             air_dribble_goal_dependency(),
             flip_reset_goal_dependency(),
+            bump_goal_dependency(),
+            demo_goal_dependency(),
             half_volley_goal_dependency(),
         ]
     }
@@ -142,6 +144,8 @@ impl StatsTimelineEventsNode {
         let passing_goal = ctx.get::<PassingGoalCalculator>()?;
         let air_dribble_goal = ctx.get::<AirDribbleGoalCalculator>()?;
         let flip_reset_goal = ctx.get::<FlipResetGoalCalculator>()?;
+        let bump_goal = ctx.get::<BumpGoalCalculator>()?;
+        let demo_goal = ctx.get::<DemoGoalCalculator>()?;
         let half_volley_goal = ctx.get::<HalfVolleyGoalCalculator>()?;
         let rush = ctx.get::<RushCalculator>()?;
         let flip_impulse = ctx.get::<FlipImpulseCalculator>()?;
@@ -171,6 +175,8 @@ impl StatsTimelineEventsNode {
             passing_goal.events(),
             air_dribble_goal.events(),
             flip_reset_goal.events(),
+            bump_goal.events(),
+            demo_goal.events(),
             half_volley_goal.events(),
         ]);
         let goal_context =

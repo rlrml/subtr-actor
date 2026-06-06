@@ -33,7 +33,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     graph.resolve().expect("graph should resolve");
 
     let names: HashSet<_> = graph.node_names().collect();
-    assert_eq!(names.len(), 61);
+    assert_eq!(names.len(), 63);
     assert!(names.contains("player_vertical_state"));
     assert!(names.contains("touch_state"));
     assert!(names.contains("possession_state"));
@@ -69,6 +69,8 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     assert!(names.contains("passing_goal"));
     assert!(names.contains("air_dribble_goal"));
     assert!(names.contains("flip_reset_goal"));
+    assert!(names.contains("bump_goal"));
+    assert!(names.contains("demo_goal"));
     assert!(names.contains("half_volley_goal"));
     assert!(names.contains("stats_timeline_frame"));
     assert!(names.contains("stats_timeline_events"));

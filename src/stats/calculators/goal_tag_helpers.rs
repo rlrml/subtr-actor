@@ -176,6 +176,25 @@ pub(super) fn air_dribble_event_matches_goal(
         && event.end_frame <= goal.frame
 }
 
+pub(super) fn bump_event_matches_goal(event: &BumpEvent, goal: &GoalContextEvent) -> bool {
+    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
+
+    !event.is_team_bump
+        && event.initiator_is_team_0 == goal.scoring_team_is_team_0
+        && event.time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
+        && event.frame <= goal.frame
+}
+
+pub(super) fn demo_event_matches_goal(event: &TimelineEvent, goal: &GoalContextEvent) -> bool {
+    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
+
+    event.kind == TimelineEventKind::Kill
+        && event.is_team_0 == Some(goal.scoring_team_is_team_0)
+        && event.time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
+        && event.frame.is_some_and(|frame| frame <= goal.frame)
+        && event.player_id.is_some()
+}
+
 pub(super) fn position_to_vec(position: GoalContextPosition) -> glam::Vec3 {
     glam::Vec3::new(position.x, position.y, position.z)
 }
@@ -267,6 +286,34 @@ pub(super) fn air_dribble_evidence(event: &BallCarryEvent) -> GoalTagEvidence {
             x: event.end_position[0],
             y: event.end_position[1],
             z: event.end_position[2],
+        }),
+    }
+}
+
+pub(super) fn bump_evidence(event: &BumpEvent) -> GoalTagEvidence {
+    GoalTagEvidence {
+        kind: GoalTagEvidenceKind::Bump,
+        time: event.time,
+        frame: event.frame,
+        player: Some(event.initiator.clone()),
+        player_position: Some(GoalContextPosition {
+            x: event.initiator_position[0],
+            y: event.initiator_position[1],
+            z: event.initiator_position[2],
+        }),
+    }
+}
+
+pub(super) fn demo_evidence(event: &TimelineEvent) -> GoalTagEvidence {
+    GoalTagEvidence {
+        kind: GoalTagEvidenceKind::Demo,
+        time: event.time,
+        frame: event.frame.unwrap_or_default(),
+        player: event.player_id.clone(),
+        player_position: event.player_position.map(|position| GoalContextPosition {
+            x: position[0],
+            y: position[1],
+            z: position[2],
         }),
     }
 }

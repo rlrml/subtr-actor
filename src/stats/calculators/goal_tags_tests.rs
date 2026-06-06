@@ -225,6 +225,36 @@ fn confirmed_flip_reset_event(
     }
 }
 
+fn bump_event(time: f32, frame: usize, initiator: PlayerId, victim: PlayerId) -> BumpEvent {
+    BumpEvent {
+        time,
+        frame,
+        initiator,
+        victim,
+        initiator_is_team_0: true,
+        victim_is_team_0: false,
+        is_team_bump: false,
+        strength: 800.0,
+        confidence: 0.76,
+        contact_distance: 100.0,
+        closing_speed: 900.0,
+        victim_impulse: 600.0,
+        initiator_position: [10.0, 1200.0, 20.0],
+        victim_position: [30.0, 1180.0, 20.0],
+    }
+}
+
+fn demo_event(time: f32, frame: usize, attacker: PlayerId) -> TimelineEvent {
+    TimelineEvent {
+        time,
+        frame: Some(frame),
+        kind: TimelineEventKind::Kill,
+        player_id: Some(attacker),
+        player_position: Some([10.0, 1200.0, 20.0]),
+        is_team_0: Some(true),
+    }
+}
+
 fn half_volley_event(time: f32, frame: usize, player: PlayerId) -> HalfVolleyEvent {
     HalfVolleyEvent {
         time,
@@ -566,6 +596,103 @@ fn flip_reset_goal_tags_matching_on_ball_reset_before_last_touch() {
         .evidence
         .iter()
         .any(|evidence| evidence.kind == GoalTagEvidenceKind::FlipReset));
+}
+
+#[test]
+fn bump_goal_can_be_created_by_non_scorer_teammate() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let events = BumpGoalCalculator::new()
+        .tag_goals(&[goal], &[bump_event(9.1, 91, player_id(2), player_id(3))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::BumpGoal]);
+    assert_eq!(events[0].tag.metadata().confidence, 0.76);
+    assert!(!has_modifier(&events[0], GoalTagModifier::ByScorer));
+    assert_eq!(
+        events[0]
+            .tag
+            .metadata()
+            .evidence
+            .iter()
+            .find(|evidence| evidence.kind == GoalTagEvidenceKind::Bump)
+            .and_then(|evidence| evidence.player.as_ref()),
+        Some(&player_id(2))
+    );
+}
+
+#[test]
+fn bump_goal_marks_by_scorer_when_scorer_inflicts_bump() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let events = BumpGoalCalculator::new()
+        .tag_goals(&[goal], &[bump_event(9.1, 91, player_id(1), player_id(3))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::BumpGoal]);
+    assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
+}
+
+#[test]
+fn bump_goal_rejects_team_bumps_and_opponent_bumps() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let mut team_bump = bump_event(9.1, 91, player_id(2), player_id(4));
+    team_bump.victim_is_team_0 = true;
+    team_bump.is_team_bump = true;
+    let mut opponent_bump = bump_event(9.1, 91, player_id(3), player_id(2));
+    opponent_bump.initiator_is_team_0 = false;
+    opponent_bump.victim_is_team_0 = true;
+
+    let events = BumpGoalCalculator::new().tag_goals(&[goal], &[team_bump, opponent_bump]);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn bump_goal_rejects_stale_bumps() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let events = BumpGoalCalculator::new()
+        .tag_goals(&[goal], &[bump_event(6.5, 65, player_id(2), player_id(3))]);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn demo_goal_can_be_created_by_non_scorer_teammate() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let events = DemoGoalCalculator::new().tag_goals(&[goal], &[demo_event(9.1, 91, player_id(2))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::DemoGoal]);
+    assert!(!has_modifier(&events[0], GoalTagModifier::ByScorer));
+    assert_eq!(
+        events[0]
+            .tag
+            .metadata()
+            .evidence
+            .iter()
+            .find(|evidence| evidence.kind == GoalTagEvidenceKind::Demo)
+            .and_then(|evidence| evidence.player.as_ref()),
+        Some(&player_id(2))
+    );
+}
+
+#[test]
+fn demo_goal_marks_by_scorer_when_scorer_gets_demo() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let events = DemoGoalCalculator::new().tag_goals(&[goal], &[demo_event(9.1, 91, player_id(1))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::DemoGoal]);
+    assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
+}
+
+#[test]
+fn demo_goal_rejects_deaths_opponent_demos_and_stale_demos() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let mut death = demo_event(9.1, 91, player_id(2));
+    death.kind = TimelineEventKind::Death;
+    let mut opponent_demo = demo_event(9.1, 91, player_id(3));
+    opponent_demo.is_team_0 = Some(false);
+    let stale_demo = demo_event(6.5, 65, player_id(2));
+
+    let events = DemoGoalCalculator::new().tag_goals(&[goal], &[death, opponent_demo, stale_demo]);
+
+    assert!(events.is_empty());
 }
 
 #[test]
