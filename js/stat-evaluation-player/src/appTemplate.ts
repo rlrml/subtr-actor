@@ -29,10 +29,10 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <button type="button" data-window-toggle="mechanics">Events</button>
               <button type="button" data-window-toggle="event-playlist">Event playlist</button>
               <button type="button" data-window-toggle="mechanics-review">Events review</button>
-              <button type="button" data-window-toggle="shot-visualization">Shot chart</button>
               <button type="button" data-window-toggle="replay-loading">Replay loading</button>
               <button type="button" data-window-toggle="boost-pickups">Boost pickup filters</button>
               <button type="button" data-window-toggle="touch-controls">Touch controls</button>
+              <button type="button" data-window-toggle="shot-visualization">Shot chart</button>
               <button type="button" data-create-stats-window="player">New player stats</button>
               <button type="button" data-create-stats-window="team">New team stats</button>
               <button type="button" data-create-stats-window="all-players">New all players stats</button>
