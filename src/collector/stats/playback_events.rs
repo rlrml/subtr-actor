@@ -38,6 +38,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "passing_goal",
             "air_dribble_goal",
             "flip_reset_goal",
+            "bump_goal",
+            "demo_goal",
             "half_volley_goal",
         ] {
             events.extend(self.module_player_events(

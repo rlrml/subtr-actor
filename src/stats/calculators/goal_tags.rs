@@ -19,6 +19,8 @@ const DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_PASSING_GOAL_MAX_PASS_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_AIR_DRIBBLE_GOAL_MAX_END_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_FLIP_RESET_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 8.0;
+const DEFAULT_BUMP_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
+const DEFAULT_DEMO_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_HALF_VOLLEY_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_HALF_VOLLEY_GOAL_MIN_GOAL_ALIGNMENT: f32 = 0.55;
 
@@ -38,6 +40,8 @@ pub enum GoalTagKind {
     PassingGoal,
     AirDribbleGoal,
     FlipResetGoal,
+    BumpGoal,
+    DemoGoal,
     HalfVolleyGoal,
 }
 
@@ -51,6 +55,8 @@ pub enum GoalTagEventStream {
     Pass,
     BallCarry,
     DodgeReset,
+    Bump,
+    Demo,
     HalfVolley,
 }
 
@@ -68,6 +74,8 @@ pub enum GoalTagEvidenceKind {
     Pass,
     AirDribble,
     FlipReset,
+    Bump,
+    Demo,
     HalfVolley,
 }
 
@@ -125,6 +133,8 @@ pub enum GoalTag {
     PassingGoal(GoalTagMetadata),
     AirDribbleGoal(GoalTagMetadata),
     FlipResetGoal(GoalTagMetadata),
+    BumpGoal(GoalTagMetadata),
+    DemoGoal(GoalTagMetadata),
     HalfVolleyGoal(GoalTagMetadata),
 }
 
@@ -287,6 +297,28 @@ pub const ALL_GOAL_TAG_DEFINITIONS: &[GoalTagDefinition] = &[
         ],
     ),
     goal_tag_definition(
+        GoalTagKind::BumpGoal,
+        "bump_goal",
+        "Bump Goal",
+        "A goal linked to a recent scoring-team bump on an opponent.",
+        &[
+            "Compare non-team bump events against each goal's timing and scoring team.",
+            "Require the bump initiator to be on the scoring team and within the configured event-to-goal window.",
+            "Attach a related bump-event reference and bump evidence, even when the initiator is not the scorer.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::DemoGoal,
+        "demo_goal",
+        "Demo Goal",
+        "A goal linked to a recent scoring-team demolition.",
+        &[
+            "Compare demolition kill events against each goal's timing and scoring team.",
+            "Require the demo attacker to be on the scoring team and within the configured event-to-goal window.",
+            "Attach a related demo-event reference and demo evidence, even when the attacker is not the scorer.",
+        ],
+    ),
+    goal_tag_definition(
         GoalTagKind::HalfVolleyGoal,
         "half_volley_goal",
         "Half-Volley Goal",
@@ -314,6 +346,8 @@ impl GoalTag {
             GoalTagKind::PassingGoal => Self::PassingGoal(metadata),
             GoalTagKind::AirDribbleGoal => Self::AirDribbleGoal(metadata),
             GoalTagKind::FlipResetGoal => Self::FlipResetGoal(metadata),
+            GoalTagKind::BumpGoal => Self::BumpGoal(metadata),
+            GoalTagKind::DemoGoal => Self::DemoGoal(metadata),
             GoalTagKind::HalfVolleyGoal => Self::HalfVolleyGoal(metadata),
         }
     }
@@ -332,6 +366,8 @@ impl GoalTag {
             Self::PassingGoal(_) => GoalTagKind::PassingGoal,
             Self::AirDribbleGoal(_) => GoalTagKind::AirDribbleGoal,
             Self::FlipResetGoal(_) => GoalTagKind::FlipResetGoal,
+            Self::BumpGoal(_) => GoalTagKind::BumpGoal,
+            Self::DemoGoal(_) => GoalTagKind::DemoGoal,
             Self::HalfVolleyGoal(_) => GoalTagKind::HalfVolleyGoal,
         }
     }
@@ -350,6 +386,8 @@ impl GoalTag {
             | Self::PassingGoal(metadata)
             | Self::AirDribbleGoal(metadata)
             | Self::FlipResetGoal(metadata)
+            | Self::BumpGoal(metadata)
+            | Self::DemoGoal(metadata)
             | Self::HalfVolleyGoal(metadata) => metadata,
         }
     }
@@ -521,6 +559,34 @@ impl Default for FlipResetGoalCalculatorConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
+pub struct BumpGoalCalculatorConfig {
+    pub max_event_to_goal_seconds: f32,
+}
+
+impl Default for BumpGoalCalculatorConfig {
+    fn default() -> Self {
+        Self {
+            max_event_to_goal_seconds: DEFAULT_BUMP_GOAL_MAX_EVENT_TO_GOAL_SECONDS,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct DemoGoalCalculatorConfig {
+    pub max_event_to_goal_seconds: f32,
+}
+
+impl Default for DemoGoalCalculatorConfig {
+    fn default() -> Self {
+        Self {
+            max_event_to_goal_seconds: DEFAULT_DEMO_GOAL_MAX_EVENT_TO_GOAL_SECONDS,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct HalfVolleyGoalCalculatorConfig {
     pub max_touch_to_goal_seconds: f32,
     pub min_goal_alignment: f32,
@@ -612,6 +678,18 @@ pub struct FlipResetGoalCalculator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct BumpGoalCalculator {
+    config: BumpGoalCalculatorConfig,
+    events: EventStream<GoalTagAssignment>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DemoGoalCalculator {
+    config: DemoGoalCalculatorConfig,
+    events: EventStream<GoalTagAssignment>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct HalfVolleyGoalCalculator {
     config: HalfVolleyGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
@@ -663,6 +741,8 @@ impl_goal_tag_calculator!(OneTimerGoalCalculator, OneTimerGoalCalculatorConfig);
 impl_goal_tag_calculator!(PassingGoalCalculator, PassingGoalCalculatorConfig);
 impl_goal_tag_calculator!(AirDribbleGoalCalculator, AirDribbleGoalCalculatorConfig);
 impl_goal_tag_calculator!(FlipResetGoalCalculator, FlipResetGoalCalculatorConfig);
+impl_goal_tag_calculator!(BumpGoalCalculator, BumpGoalCalculatorConfig);
+impl_goal_tag_calculator!(DemoGoalCalculator, DemoGoalCalculatorConfig);
 
 impl Default for CounterAttackGoalCalculator {
     fn default() -> Self {
@@ -1039,6 +1119,118 @@ impl FlipResetGoalCalculator {
             GoalTagKind::FlipResetGoal,
             self.config.max_event_to_goal_seconds,
         )
+    }
+}
+
+impl BumpGoalCalculator {
+    pub fn update(
+        &mut self,
+        match_stats: &MatchStatsCalculator,
+        bump: &BumpCalculator,
+    ) -> SubtrActorResult<()> {
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), bump.events()),
+        );
+        Ok(())
+    }
+
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        bump_events: &[BumpEvent],
+    ) -> Vec<GoalTagAssignment> {
+        let mut tags = Vec::new();
+        for (goal_index, goal) in goals.iter().enumerate() {
+            let ctx = GoalTaggingContext { goal_index };
+            let Some((event_index, event)) = bump_events
+                .iter()
+                .enumerate()
+                .filter(|(_, event)| bump_event_matches_goal(event, goal))
+                .filter(|(_, event)| {
+                    goal.time - event.time <= self.config.max_event_to_goal_seconds
+                })
+                .max_by(|left, right| {
+                    left.1
+                        .time
+                        .total_cmp(&right.1.time)
+                        .then_with(|| left.1.frame.cmp(&right.1.frame))
+                })
+            else {
+                continue;
+            };
+
+            tags.push(goal_tag_with_modifiers(
+                ctx,
+                GoalTagKind::BumpGoal,
+                event.confidence,
+                mechanic_goal_modifiers(goal, &event.initiator),
+                mechanic_goal_evidence(goal, bump_evidence(event)),
+                vec![GoalTagEventRef {
+                    stream: GoalTagEventStream::Bump,
+                    index: event_index,
+                }],
+            ));
+        }
+        tags
+    }
+}
+
+impl DemoGoalCalculator {
+    pub fn update(
+        &mut self,
+        match_stats: &MatchStatsCalculator,
+        demo: &DemoCalculator,
+    ) -> SubtrActorResult<()> {
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), demo.timeline()),
+        );
+        Ok(())
+    }
+
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        demo_events: &[TimelineEvent],
+    ) -> Vec<GoalTagAssignment> {
+        let mut tags = Vec::new();
+        for (goal_index, goal) in goals.iter().enumerate() {
+            let ctx = GoalTaggingContext { goal_index };
+            let Some((event_index, event)) = demo_events
+                .iter()
+                .enumerate()
+                .filter(|(_, event)| demo_event_matches_goal(event, goal))
+                .filter(|(_, event)| {
+                    goal.time - event.time <= self.config.max_event_to_goal_seconds
+                })
+                .max_by(|left, right| {
+                    left.1.time.total_cmp(&right.1.time).then_with(|| {
+                        left.1
+                            .frame
+                            .unwrap_or_default()
+                            .cmp(&right.1.frame.unwrap_or_default())
+                    })
+                })
+            else {
+                continue;
+            };
+
+            let Some(attacker) = event.player_id.as_ref() else {
+                continue;
+            };
+
+            tags.push(goal_tag_with_modifiers(
+                ctx,
+                GoalTagKind::DemoGoal,
+                1.0,
+                mechanic_goal_modifiers(goal, attacker),
+                mechanic_goal_evidence(goal, demo_evidence(event)),
+                vec![GoalTagEventRef {
+                    stream: GoalTagEventStream::Demo,
+                    index: event_index,
+                }],
+            ));
+        }
+        tags
     }
 }
 

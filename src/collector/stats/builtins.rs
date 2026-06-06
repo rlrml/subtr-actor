@@ -399,6 +399,8 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "passing_goal",
         "air_dribble_goal",
         "flip_reset_goal",
+        "bump_goal",
+        "demo_goal",
         "half_volley_goal",
         "fifty_fifty",
         "possession",
@@ -614,6 +616,18 @@ pub(crate) fn builtin_module_json(
         }
         "flip_reset_goal" => {
             let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "bump_goal" => {
+            let calculator = graph_state::<BumpGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "demo_goal" => {
+            let calculator = graph_state::<DemoGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
@@ -1262,6 +1276,8 @@ pub(crate) fn builtin_snapshot_frame_json(
         | "passing_goal"
         | "air_dribble_goal"
         | "flip_reset_goal"
+        | "bump_goal"
+        | "demo_goal"
         | "half_volley_goal" => serialize_to_json_value(&serde_json::json!({}))?,
         "fifty_fifty" => {
             let projection = projected_stats(graph, module_name)?;
@@ -1551,6 +1567,18 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "flip_reset_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "bump_goal" => {
+            let calculator = graph_state::<BumpGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "bump_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "demo_goal" => {
+            let calculator = graph_state::<DemoGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "demo_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
             }))?)
         }
         "half_volley_goal" => {
