@@ -110,6 +110,10 @@ function flickKindLabelValue(value: unknown): "other" | "reverse" {
   return value === "reverse" ? value : "other";
 }
 
+function setupRotationDirectionLabelValue(value: unknown): "unknown" | "left" | "right" {
+  return value === "left" || value === "right" ? value : "unknown";
+}
+
 function totalLabeledCount(stats: FlickStatsWithLabels): number {
   return stats.labeled_event_counts?.entries.reduce((total, entry) => total + entry.count, 0) ?? 0;
 }
@@ -150,6 +154,10 @@ function applyFlickEvent(
     {
       key: "kind",
       value: flickKindLabelValue(event.kind),
+    },
+    {
+      key: "setup_rotation_direction",
+      value: setupRotationDirectionLabelValue(event.setup_rotation_direction),
     },
   ]);
   stats.count = totalLabeledCount(stats);

@@ -331,6 +331,21 @@ fn mechanic_event_unsigned_property(key: &str, value: u32) -> StatsEventProperty
     }
 }
 
+fn mechanic_event_float_property(key: &str, value: f32) -> StatsEventProperty {
+    StatsEventProperty {
+        key: key.to_owned(),
+        value: StatsEventPropertyValue::Float(value),
+    }
+}
+
+fn flick_mechanic_event_properties(event: &FlickEvent) -> Vec<StatsEventProperty> {
+    vec![
+        mechanic_event_text_property("flick_kind", &event.kind),
+        mechanic_event_text_property("setup_rotation_direction", &event.setup_rotation_direction),
+        mechanic_event_float_property("setup_rotation_degrees", event.setup_rotation_degrees),
+    ]
+}
+
 fn ball_carry_mechanic_event_properties(event: &BallCarryEvent) -> Vec<StatsEventProperty> {
     let mut properties = Vec::new();
     if let Some(origin) = event.air_dribble_origin {
@@ -481,7 +496,7 @@ fn build_mechanic_events(
     }
 
     for (index, event) in flick.events().iter().enumerate() {
-        events.push(span_mechanic_event(
+        let mut mechanic_event = span_mechanic_event(
             MECHANIC_FLICK,
             index,
             event.setup_start_frame,
@@ -491,7 +506,9 @@ fn build_mechanic_events(
             event.player.clone(),
             event.player_position,
             event.is_team_0,
-        ));
+        );
+        mechanic_event.properties = flick_mechanic_event_properties(event);
+        events.push(mechanic_event);
     }
 
     for (index, event) in musty_flick.events().iter().enumerate() {

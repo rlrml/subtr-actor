@@ -362,6 +362,7 @@ define_stats_event!(
     summary = "A dodge-powered touch following a short controlled carry setup.",
     approach = [
         "Track controlled setup windows where the current controlling player keeps the ball close above the car within local-position and gap thresholds.",
+        "Measure signed horizontal setup rotation so reverse flicks can be labeled as left or right based on the direction the car rotated before the flick.",
         "Record dodge starts that happen immediately after, or during, a qualifying setup.",
         "Emit on a same-player touch shortly after the dodge when the ball impulse is large and directed away from the player, with confidence from setup duration, timing, impulse, and separation.",
     ]

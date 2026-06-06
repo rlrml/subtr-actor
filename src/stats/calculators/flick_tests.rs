@@ -212,6 +212,8 @@ fn labels_reverse_flicks_with_backflip_pitch_forward_impulse_and_rotation_under_
 
     let event = calculator.events().first().unwrap();
     assert_eq!(event.kind, "reverse");
+    assert_eq!(event.setup_rotation_direction, "right");
+    assert!(event.setup_rotation_degrees > 0.0);
     assert!(event.backflip_pitch_rate >= REVERSE_FLICK_MIN_BACKFLIP_PITCH_RATE);
     assert!(event.local_ball_impulse[0] >= REVERSE_FLICK_MIN_FORWARD_IMPULSE);
     assert!(event.rotation_under_ball_degrees >= REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES);
@@ -222,8 +224,78 @@ fn labels_reverse_flicks_with_backflip_pitch_forward_impulse_and_rotation_under_
         1
     );
     assert_eq!(
+        stats.event_count_with_labels(&[StatLabel::new("setup_rotation_direction", "right")]),
+        1
+    );
+    assert_eq!(
         stats.event_count_with_labels(&[StatLabel::new("kind", "other")]),
         0
+    );
+}
+
+#[test]
+fn labels_left_reverse_flicks_from_negative_setup_rotation() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+    let final_yaw = -0.35;
+
+    for (frame_number, time, yaw) in [(1, 0.1, 0.0), (2, 0.2, -0.18), (3, 0.3, final_yaw)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &ball_at_local(yaw, glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
+                &players_with_yaw_and_angular_velocity(
+                    frame_number == 3,
+                    yaw,
+                    glam::Vec3::new(0.0, 0.0, 0.0),
+                ),
+                &touch_state(Vec::new()),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    let rotation_at_dodge = glam::Quat::from_rotation_z(final_yaw);
+    let forward_impulse = rotation_at_dodge * glam::Vec3::new(1350.0, 0.0, 520.0);
+    calculator
+        .update(
+            &frame(4, 0.4),
+            &ball_at_local(
+                final_yaw,
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                forward_impulse,
+            ),
+            &players_with_yaw_and_angular_velocity(
+                true,
+                final_yaw,
+                glam::Vec3::new(0.0, -5.0, 0.0),
+            ),
+            &touch_state(vec![TouchEvent {
+                time: 0.4,
+                frame: 4,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: Some(0.0),
+                dodge_contact: false,
+            }]),
+            &live_play,
+        )
+        .unwrap();
+
+    let event = calculator.events().first().unwrap();
+    assert_eq!(event.kind, "reverse");
+    assert_eq!(event.setup_rotation_direction, "left");
+    assert!(event.setup_rotation_degrees < 0.0);
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(
+        stats.event_count_with_labels(&[
+            StatLabel::new("kind", "reverse"),
+            StatLabel::new("setup_rotation_direction", "left"),
+        ]),
+        1
     );
 }
 

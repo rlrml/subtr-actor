@@ -26,9 +26,22 @@ pub enum FlickKind {
     Reverse,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlickSetupRotationDirection {
+    Unknown,
+    Left,
+    Right,
+}
+
 pub(crate) const FLICK_KIND_LABELS: [StatLabel; 2] = [
     StatLabel::new("kind", "other"),
     StatLabel::new("kind", "reverse"),
+];
+
+pub(crate) const FLICK_SETUP_ROTATION_DIRECTION_LABELS: [StatLabel; 3] = [
+    StatLabel::new("setup_rotation_direction", "unknown"),
+    StatLabel::new("setup_rotation_direction", "left"),
+    StatLabel::new("setup_rotation_direction", "right"),
 ];
 
 impl FlickKind {
@@ -44,10 +57,28 @@ impl FlickKind {
     }
 }
 
+impl FlickSetupRotationDirection {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::Left => "left",
+            Self::Right => "right",
+        }
+    }
+}
+
 pub(crate) fn flick_kind_label(value: &str) -> StatLabel {
     match value {
         "reverse" => StatLabel::new("kind", "reverse"),
         _ => StatLabel::new("kind", "other"),
+    }
+}
+
+pub(crate) fn flick_setup_rotation_direction_label(value: &str) -> StatLabel {
+    match value {
+        "left" => StatLabel::new("setup_rotation_direction", "left"),
+        "right" => StatLabel::new("setup_rotation_direction", "right"),
+        _ => StatLabel::new("setup_rotation_direction", "unknown"),
     }
 }
 
@@ -81,6 +112,8 @@ pub struct FlickEvent {
     pub local_ball_impulse: [f32; 3],
     pub backflip_pitch_rate: f32,
     pub rotation_under_ball_degrees: f32,
+    pub setup_rotation_degrees: f32,
+    pub setup_rotation_direction: String,
     pub confidence: f32,
 }
 
@@ -103,6 +136,7 @@ struct ActiveFlickSetup {
     touch_count: u32,
     start_forward: Option<glam::Vec3>,
     max_horizontal_rotation_degrees: f32,
+    signed_horizontal_rotation_degrees: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -117,6 +151,7 @@ struct FlickSetupSummary {
     average_vertical_gap: f32,
     touch_count: u32,
     rotation_under_ball_degrees: f32,
+    setup_rotation_degrees: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -235,6 +270,7 @@ impl FlickCalculator {
             average_vertical_gap: setup.vertical_gap_integral / setup.duration.max(f32::EPSILON),
             touch_count: setup.touch_count,
             rotation_under_ball_degrees: setup.max_horizontal_rotation_degrees,
+            setup_rotation_degrees: setup.signed_horizontal_rotation_degrees,
         }
     }
 
@@ -276,7 +312,7 @@ impl FlickCalculator {
         )
     }
 
-    fn horizontal_rotation_degrees(
+    fn signed_horizontal_rotation_degrees(
         start_forward: Option<glam::Vec3>,
         current_forward: Option<glam::Vec3>,
     ) -> Option<f32> {
@@ -286,7 +322,18 @@ impl FlickCalculator {
             return None;
         }
 
-        Some(start.dot(current).clamp(-1.0, 1.0).acos().to_degrees())
+        let cross_z = start.x * current.y - start.y * current.x;
+        Some(cross_z.atan2(start.dot(current)).to_degrees())
+    }
+
+    fn setup_rotation_direction(signed_degrees: f32) -> FlickSetupRotationDirection {
+        if signed_degrees.abs() < REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES {
+            FlickSetupRotationDirection::Unknown
+        } else if signed_degrees > 0.0 {
+            FlickSetupRotationDirection::Right
+        } else {
+            FlickSetupRotationDirection::Left
+        }
     }
 
     fn store_recent_setup(&mut self, player_id: PlayerId, setup: FlickSetupSummary) {
@@ -359,6 +406,7 @@ impl FlickCalculator {
                     touch_count: 0,
                     start_forward: current_forward,
                     max_horizontal_rotation_degrees: 0.0,
+                    signed_horizontal_rotation_degrees: 0.0,
                 });
 
             if setup.last_frame != frame.frame_number {
@@ -367,11 +415,14 @@ impl FlickCalculator {
                 setup.duration += frame.dt.max(0.0);
                 setup.horizontal_gap_integral += observation.horizontal_gap * frame.dt.max(0.0);
                 setup.vertical_gap_integral += observation.vertical_gap * frame.dt.max(0.0);
-                if let Some(degrees) =
-                    Self::horizontal_rotation_degrees(setup.start_forward, current_forward)
+                if let Some(signed_degrees) =
+                    Self::signed_horizontal_rotation_degrees(setup.start_forward, current_forward)
                 {
-                    setup.max_horizontal_rotation_degrees =
-                        setup.max_horizontal_rotation_degrees.max(degrees);
+                    let degrees = signed_degrees.abs();
+                    if degrees > setup.max_horizontal_rotation_degrees {
+                        setup.max_horizontal_rotation_degrees = degrees;
+                        setup.signed_horizontal_rotation_degrees = signed_degrees;
+                    }
                 }
             }
         }
@@ -486,6 +537,7 @@ impl FlickCalculator {
                 ball_impulse,
             );
         let setup = &dodge_start.setup;
+        let setup_rotation_direction = Self::setup_rotation_direction(setup.setup_rotation_degrees);
         let timing_score =
             1.0 - (time_since_dodge / FLICK_MAX_DODGE_TO_TOUCH_SECONDS).clamp(0.0, 1.0);
         let setup_duration_score =
@@ -541,6 +593,8 @@ impl FlickCalculator {
             local_ball_impulse: local_ball_impulse.to_array(),
             backflip_pitch_rate,
             rotation_under_ball_degrees: setup.rotation_under_ball_degrees,
+            setup_rotation_degrees: setup.setup_rotation_degrees,
+            setup_rotation_direction: setup_rotation_direction.as_label_value().to_owned(),
             confidence,
         })
     }
