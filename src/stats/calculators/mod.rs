@@ -352,6 +352,9 @@ fn build_standard_soccar_boost_pad_layout() -> Vec<(glam::Vec3, BoostPadSize)> {
 static STANDARD_SOCCAR_BOOST_PAD_LAYOUT: LazyLock<Vec<(glam::Vec3, BoostPadSize)>> =
     LazyLock::new(build_standard_soccar_boost_pad_layout);
 
+const SOCCAR_CEILING_Z: f32 = 2044.0;
+const CEILING_CONTACT_MAX_GAP: f32 = 90.0;
+
 pub fn standard_soccar_boost_pad_layout() -> &'static [(glam::Vec3, BoostPadSize)] {
     STANDARD_SOCCAR_BOOST_PAD_LAYOUT.as_slice()
 }
@@ -374,6 +377,24 @@ fn player_is_on_wall(position: glam::Vec3) -> bool {
         && position.x.abs() > BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X;
 
     position.z >= WALL_CONTACT_MIN_PLAYER_Z && (is_side_wall || is_back_wall)
+}
+
+fn player_is_on_ceiling(position: glam::Vec3) -> bool {
+    SOCCAR_CEILING_Z - position.z <= CEILING_CONTACT_MAX_GAP
+}
+
+fn player_sample_is_touching_surface(player: &PlayerSample) -> bool {
+    let Some(position) = player.position() else {
+        return false;
+    };
+
+    player
+        .rigid_body
+        .as_ref()
+        .is_some_and(|body| car_hitbox_touches_floor(body, player.hitbox))
+        || PlayerVerticalBand::from_height(position.z).is_grounded()
+        || player_is_on_wall(position)
+        || player_is_on_ceiling(position)
 }
 
 fn standard_soccar_boost_pad_position(index: usize) -> glam::Vec3 {

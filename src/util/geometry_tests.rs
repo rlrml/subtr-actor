@@ -369,6 +369,17 @@ fn car_hitbox_distance_composes_car_rotation_with_hitbox_transform() {
 }
 
 #[test]
+fn car_hitbox_floor_contact_uses_hitbox_bottom() {
+    let hitbox = default_car_hitbox();
+    let grounded_car = sample_rotated_rigid_body(0.0, 0.0, 0.0, glam::Quat::IDENTITY);
+    let airborne_car = sample_rotated_rigid_body(0.0, 0.0, 100.0, glam::Quat::IDENTITY);
+
+    assert!(car_hitbox_min_world_z(&grounded_car, hitbox).unwrap() <= 5.0);
+    assert!(car_hitbox_touches_floor(&grounded_car, hitbox));
+    assert!(!car_hitbox_touches_floor(&airborne_car, hitbox));
+}
+
+#[test]
 fn car_hitbox_for_body_name_maps_known_cars_to_hitbox_families() {
     assert_eq!(
         car_hitbox_for_body_name("Fennec").map(|hitbox| hitbox.family),

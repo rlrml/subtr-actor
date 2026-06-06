@@ -99,10 +99,14 @@ pub struct PlayerFrameState {
 }
 
 impl PlayerFrameState {
-    pub fn player_position(&self, player_id: &PlayerId) -> Option<[f32; 3]> {
+    pub fn player(&self, player_id: &PlayerId) -> Option<&PlayerSample> {
         self.players
             .iter()
             .find(|player| &player.player_id == player_id)
+    }
+
+    pub fn player_position(&self, player_id: &PlayerId) -> Option<[f32; 3]> {
+        self.player(player_id)
             .and_then(PlayerSample::position)
             .map(|position| position.to_array())
     }

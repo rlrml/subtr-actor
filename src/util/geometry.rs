@@ -677,6 +677,36 @@ pub fn car_hitbox_ball_contact_gap(
         .map(|center_distance| (center_distance - BALL_COLLISION_RADIUS).max(0.0))
 }
 
+pub fn car_hitbox_min_world_z(player_body: &boxcars::RigidBody, hitbox: CarHitbox) -> Option<f32> {
+    let car_position = vec_to_glam(&player_body.location);
+    let car_rotation = quat_to_glam(&player_body.rotation);
+    let hitbox_center = glam::Vec3::new(hitbox.offset, 0.0, hitbox.elevation);
+    let hitbox_rotation = glam::Quat::from_rotation_y(hitbox.angle.to_radians());
+    let mut min_z: Option<f32> = None;
+
+    for x in [-hitbox.length / 2.0, hitbox.length / 2.0] {
+        for y in [-hitbox.width / 2.0, hitbox.width / 2.0] {
+            for z in [-hitbox.height / 2.0, hitbox.height / 2.0] {
+                let local_corner = glam::Vec3::new(x, y, z);
+                let world_corner =
+                    car_position + car_rotation * (hitbox_center + hitbox_rotation * local_corner);
+                if !world_corner.z.is_finite() {
+                    return None;
+                }
+                min_z = Some(min_z.map_or(world_corner.z, |current| current.min(world_corner.z)));
+            }
+        }
+    }
+
+    min_z
+}
+
+pub fn car_hitbox_touches_floor(player_body: &boxcars::RigidBody, hitbox: CarHitbox) -> bool {
+    const FLOOR_CONTACT_MAX_Z: f32 = 5.0;
+
+    car_hitbox_min_world_z(player_body, hitbox).is_some_and(|min_z| min_z <= FLOOR_CONTACT_MAX_Z)
+}
+
 pub fn touch_candidate_contact_gap_rank_with_hitbox(
     ball_body: &boxcars::RigidBody,
     player_body: &boxcars::RigidBody,
