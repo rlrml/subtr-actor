@@ -37,17 +37,6 @@ pub struct PassEvent {
     pub pass_kind: PassKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct PassLastCompletedEvent {
-    pub time: f32,
-    pub frame: usize,
-    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
-    pub player: Option<PlayerId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-}
-
 #[derive(Debug, Clone)]
 struct PendingPassTouch {
     player: PlayerId,
@@ -62,9 +51,7 @@ struct PendingPassTouch {
 #[derive(Debug, Clone, Default)]
 pub struct PassCalculator {
     events: EventStream<PassEvent>,
-    last_completed_events: EventStream<PassLastCompletedEvent>,
     last_touch: Option<PendingPassTouch>,
-    emitted_last_completed_pass_player: Option<PlayerId>,
 }
 
 impl PassCalculator {
@@ -78,14 +65,6 @@ impl PassCalculator {
 
     pub fn new_events(&self) -> &[PassEvent] {
         self.events.new_events()
-    }
-
-    pub fn last_completed_events(&self) -> &[PassLastCompletedEvent] {
-        self.last_completed_events.all()
-    }
-
-    pub fn new_last_completed_events(&self) -> &[PassLastCompletedEvent] {
-        self.last_completed_events.new_events()
     }
 
     fn pass_event_for_touch(
@@ -211,24 +190,6 @@ impl PassCalculator {
         self.events.push(event);
     }
 
-    fn emit_last_completed_event(
-        &mut self,
-        frame: &FrameInfo,
-        player: Option<PlayerId>,
-        player_position: Option<[f32; 3]>,
-    ) {
-        if self.emitted_last_completed_pass_player == player {
-            return;
-        }
-        self.emitted_last_completed_pass_player = player.clone();
-        self.last_completed_events.push(PassLastCompletedEvent {
-            time: frame.time,
-            frame: frame.frame_number,
-            player,
-            player_position,
-        });
-    }
-
     pub fn update(
         &mut self,
         frame: &FrameInfo,
@@ -239,15 +200,12 @@ impl PassCalculator {
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.last_completed_events.begin_update();
         if !live_play_state.is_live_play {
             self.last_touch = None;
-            self.emit_last_completed_event(frame, None, None);
             return Ok(());
         }
 
         let Some(ball_position) = ball.position() else {
-            self.emit_last_completed_event(frame, None, None);
             return Ok(());
         };
 
@@ -275,17 +233,6 @@ impl PassCalculator {
                 from_fifty_fifty: Self::touch_from_fifty_fifty(touch, fifty_fifty_state),
             });
         }
-        let current_last_completed_pass_event = self.events.iter().next_back();
-        let current_last_completed_pass_player =
-            current_last_completed_pass_event.map(|event| event.passer.clone());
-        let current_last_completed_pass_position =
-            current_last_completed_pass_event.and_then(|event| event.passer_position);
-        self.emit_last_completed_event(
-            frame,
-            current_last_completed_pass_player,
-            current_last_completed_pass_position,
-        );
-
         Ok(())
     }
 }

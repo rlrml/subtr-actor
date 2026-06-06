@@ -1,5 +1,4 @@
 # Stat Definitions
-
 Generated from static Rust metadata. Do not edit by hand.
 
 ## Events
@@ -738,36 +737,6 @@ _None documented._
 
 _None documented._
 
-### Pass Last Completed (`pass_last_completed`)
-
-- Category: `mechanic`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `pass` via `PassNode` / `PassCalculator`
-
-**Summary**
-
-A state-change marker for the most recent player to complete a pass reception.
-
-**Approach**
-
-- Emit when the pass calculator's last completed receiver changes.
-- Reset to no player when play is not live or when ball/player attribution is unavailable.
-- Use this as a compact timeline/state event derived from completed pass detections.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
 ### Positioning (`positioning`)
 
 - Category: `positioning`
@@ -1111,34 +1080,6 @@ _None documented._
 
 _None documented._
 
-### Touch Last Touch (`touch_last_touch`)
-
-- Category: `contact`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `touch` via `TouchNode` / `TouchCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
 ### Wall Aerial (`wall_aerial`)
 
 - Category: `mechanic`
@@ -1455,4 +1396,3 @@ A goal where the scorer's last touch matches a recent half-volley candidate.
 - Compare half-volley events against each goal's scorer-last-touch context.
 - Require the half-volley touch to be close enough to the goal and sufficiently aligned toward goal.
 - Attach a related half-volley event reference and half-volley evidence to the goal tag metadata.
-

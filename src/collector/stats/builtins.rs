@@ -703,7 +703,6 @@ pub(crate) fn builtin_module_json(
                 "player_stats": player_stats_entries(projection.touch.player_stats()),
                 "events": calculator.events(),
                 "ball_movement_events": calculator.ball_movement_events(),
-                "last_touch_events": calculator.last_touch_events(),
             }))
         }
         "whiff" => {

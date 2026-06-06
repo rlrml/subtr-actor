@@ -567,65 +567,6 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
 }
 
 #[test]
-fn last_touch_event_uses_primary_touch_not_last_contested_candidate() {
-    let primary_player = boxcars::RemoteId::Steam(1);
-    let secondary_player = boxcars::RemoteId::Steam(2);
-    let primary_touch = TouchEvent {
-        time: 0.1,
-        frame: 1,
-        team_is_team_0: true,
-        player: Some(primary_player.clone()),
-        player_position: None,
-        closest_approach_distance: Some(0.0),
-        dodge_contact: false,
-    };
-    let secondary_touch = TouchEvent {
-        time: 0.1,
-        frame: 1,
-        team_is_team_0: false,
-        player: Some(secondary_player.clone()),
-        player_position: None,
-        closest_approach_distance: Some(3.0),
-        dodge_contact: false,
-    };
-    let touch_state = TouchState {
-        touch_events: vec![primary_touch.clone(), secondary_touch.clone()],
-        last_touch: Some(secondary_touch),
-        last_touch_player: Some(primary_player.clone()),
-        last_touch_team_is_team_0: Some(true),
-    };
-    let mut calculator = TouchCalculator::new();
-
-    calculator
-        .update(
-            &frame(1),
-            &ball(0.0, 0.0),
-            &PlayerFrameState::default(),
-            &PlayerVerticalState::default(),
-            &touch_state,
-            &PossessionState::default(),
-            &FiftyFiftyState::default(),
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    let [last_touch] = calculator.new_last_touch_events() else {
-        panic!("expected exactly one last-touch event");
-    };
-    assert_eq!(last_touch.player, Some(primary_player));
-    assert!(last_touch.is_team_0);
-    assert_eq!(calculator.new_events().len(), 2);
-    assert!(calculator
-        .new_events()
-        .iter()
-        .any(|event| event.player == last_touch.player.clone().unwrap()));
-    assert!(calculator
-        .new_events()
-        .iter()
-        .any(|event| event.player == secondary_player));
-}
-
-#[test]
 fn touch_classification_events_follow_chronological_touch_event_order() {
     let player = boxcars::RemoteId::Steam(1);
     let early_touch = TouchEvent {

@@ -43,11 +43,6 @@ test("pass event derivation can populate compacted player and team stats", () =>
           pass_kind: "backboard",
         },
       ],
-      pass_last_completed: [
-        { time: 2.2, frame: 22, player: passer },
-        { time: 2.4, frame: 24, player: null },
-        { time: 3, frame: 30, player: orangePasser },
-      ],
     },
     frames: [
       createStatsFrame({
@@ -116,7 +111,7 @@ test("pass event derivation can populate compacted player and team stats", () =>
   assert.equal(timeline.frames[1]?.players[0]?.pass.is_last_completed_pass, true);
   assert.equal(timeline.frames[1]?.players[1]?.pass.received_pass_count, 1);
 
-  assert.equal(timeline.frames[2]?.players[0]?.pass.is_last_completed_pass, false);
+  assert.equal(timeline.frames[2]?.players[0]?.pass.is_last_completed_pass, true);
   assert.equal(timeline.frames[2]?.players[0]?.pass.frames_since_last_completed_pass, 5);
 
   assert.equal(timeline.frames[3]?.team_one.pass.completed_pass_count, 1);

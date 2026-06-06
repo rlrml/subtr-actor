@@ -190,6 +190,7 @@ impl TouchStatsAccumulator {
         stats.last_ball_speed_change = Some(event.ball_speed_change);
         stats.max_ball_speed_change = stats.max_ball_speed_change.max(event.ball_speed_change);
         stats.cumulative_ball_speed_change += event.ball_speed_change;
+        self.current_last_touch_player = Some(event.player.clone());
     }
 
     pub fn apply_ball_movement_event(&mut self, event: &TouchBallMovementEvent) {

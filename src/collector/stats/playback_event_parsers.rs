@@ -374,23 +374,6 @@ pub(in crate::collector::stats::playback) fn parse_touch_ball_movement_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_touch_last_touch_event(
-    value: &Value,
-) -> SubtrActorResult<TouchLastTouchEvent> {
-    let object = json_object(value, "touch last-touch event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(TouchLastTouchEvent {
-        time,
-        frame,
-        sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
-        sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        player: json_optional_remote_id(object.get("player"))?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-    })
-}
-
 pub(in crate::collector::stats::playback) fn parse_flick_mechanic_event(
     value: &Value,
     index: usize,
@@ -734,18 +717,6 @@ pub(in crate::collector::stats::playback) fn parse_pass_event(
         ball_travel_distance: json_required_f32(object, "ball_travel_distance")?,
         ball_advance_distance: json_required_f32(object, "ball_advance_distance")?,
         pass_kind: parse_pass_kind(object.get("pass_kind"))?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_pass_last_completed_event(
-    value: &Value,
-) -> SubtrActorResult<PassLastCompletedEvent> {
-    let object = json_object(value, "pass last completed event")?;
-    Ok(PassLastCompletedEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
-        player: json_optional_remote_id(object.get("player"))?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
     })
 }
 

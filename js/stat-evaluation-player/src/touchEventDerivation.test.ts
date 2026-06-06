@@ -39,16 +39,6 @@ test("touch event derivation uses sample frame for accumulation and touch frame 
           ball_speed_change: 950,
         },
       ],
-      touch_last_touch: [
-        {
-          time: 1,
-          frame: 10,
-          sample_time: 1.2,
-          sample_frame: 12,
-          is_team_0: true,
-          player: bluePlayer,
-        },
-      ],
       touch_ball_movement: [
         {
           time: 1.2,

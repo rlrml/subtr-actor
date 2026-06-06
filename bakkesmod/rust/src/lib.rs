@@ -153,7 +153,6 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "musty_flick",
     "one_timer",
     "pass",
-    "pass_last_completed",
     "rush",
     "flip_impulse",
     "speed_flip",
@@ -168,7 +167,6 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "boost_state",
     "bump",
     "touch",
-    "touch_last_touch",
     "touch_ball_movement",
 ];
 const REQUIRED_GRAPH_EVENT_FIELD_NAMES: &[&str] = &["timeline", "goal_context", "boost_pickups"];

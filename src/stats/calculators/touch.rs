@@ -118,20 +118,6 @@ impl TouchBallMovementEvent {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct TouchLastTouchEvent {
-    pub time: f32,
-    pub frame: usize,
-    pub sample_time: f32,
-    pub sample_frame: usize,
-    pub is_team_0: bool,
-    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
-    pub player: Option<PlayerId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-}
-
 #[derive(Debug, Clone, Default, PartialEq)]
 struct PendingFiftyFiftyMovement {
     start_frame: usize,
@@ -150,7 +136,6 @@ struct PendingTouchBallMovementEvent {
 pub struct TouchCalculator {
     events: EventStream<TouchClassificationEvent>,
     ball_movement_events: EventStream<TouchBallMovementEvent>,
-    last_touch_events: EventStream<TouchLastTouchEvent>,
     pending_ball_movement_event: Option<PendingTouchBallMovementEvent>,
     previous_ball_velocity: Option<glam::Vec3>,
     previous_ball_position: Option<glam::Vec3>,
@@ -191,14 +176,6 @@ impl TouchCalculator {
             return;
         };
         self.ball_movement_events.push(pending.event);
-    }
-
-    pub fn last_touch_events(&self) -> &[TouchLastTouchEvent] {
-        self.last_touch_events.all()
-    }
-
-    pub fn new_last_touch_events(&self) -> &[TouchLastTouchEvent] {
-        self.last_touch_events.new_events()
     }
 
     fn ball_speed_change(
@@ -309,7 +286,7 @@ impl TouchCalculator {
         players: &PlayerFrameState,
         vertical_state: &PlayerVerticalState,
         touch_events: &[TouchEvent],
-        primary_touch: Option<&TouchEvent>,
+        _primary_touch: Option<&TouchEvent>,
     ) {
         let ball_speed_change = Self::ball_speed_change(frame, ball, self.previous_ball_velocity);
 
@@ -352,27 +329,6 @@ impl TouchCalculator {
                 ball_speed_change,
             };
             self.events.push(event);
-        }
-
-        if let Some(last_touch) = primary_touch {
-            self.last_touch_events.push(TouchLastTouchEvent {
-                time: last_touch.time,
-                frame: last_touch.frame,
-                sample_time: frame.time,
-                sample_frame: frame.frame_number,
-                is_team_0: last_touch.team_is_team_0,
-                player: last_touch.player.clone(),
-                player_position: last_touch
-                    .player_position
-                    .map(|position| vec_to_glam(&position).to_array())
-                    .or_else(|| {
-                        last_touch
-                            .player
-                            .as_ref()
-                            .and_then(|player_id| Self::player_position(players, player_id))
-                            .map(|position| position.to_array())
-                    }),
-            });
         }
     }
 
@@ -594,7 +550,6 @@ impl TouchCalculator {
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         self.ball_movement_events.begin_update();
-        self.last_touch_events.begin_update();
         if !live_play_state.is_live_play {
             self.flush_pending_ball_movement_event();
             self.previous_ball_velocity = ball.velocity();

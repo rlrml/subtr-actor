@@ -117,7 +117,6 @@ struct StatsProjectionCursors {
     double_tap: usize,
     one_timer: usize,
     pass: usize,
-    pass_last_completed: usize,
     fifty_fifty: usize,
     possession: usize,
     pressure: usize,
@@ -125,7 +124,6 @@ struct StatsProjectionCursors {
     rotation_team: usize,
     rush: usize,
     touch: usize,
-    touch_last_touch: usize,
     touch_ball_movement: usize,
     whiff: usize,
     wavedash: usize,
@@ -321,14 +319,6 @@ impl StatsProjectionNode {
                 self.state.pass.apply_event(frame, event);
             }
         }
-        for event in Self::events_since(
-            &mut self.cursors.pass_last_completed,
-            pass.last_completed_events(),
-        ) {
-            self.state
-                .pass
-                .set_current_last_completed_pass_player(event.player.clone());
-        }
         let fifty_fifty = ctx.get::<FiftyFiftyCalculator>()?;
         for event in Self::events_since(&mut self.cursors.fifty_fifty, fifty_fifty.events()) {
             self.state.fifty_fifty.apply_event(event);
@@ -382,17 +372,11 @@ impl StatsProjectionNode {
             for event in touch.events() {
                 self.state.touch.apply_touch_event(event, frame);
             }
-            for event in touch.last_touch_events() {
-                self.state
-                    .touch
-                    .set_current_last_touch_player(event.player.clone());
-            }
             let projected_touch_ball_movement_events = touch.projected_ball_movement_events();
             for event in projected_touch_ball_movement_events.iter() {
                 self.state.touch.apply_ball_movement_event(event);
             }
             self.cursors.touch = touch.events().len();
-            self.cursors.touch_last_touch = touch.last_touch_events().len();
             self.cursors.touch_ball_movement = projected_touch_ball_movement_events.len();
         } else {
             for event in Self::events_since(
