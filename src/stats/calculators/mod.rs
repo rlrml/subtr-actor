@@ -56,6 +56,8 @@ pub mod fifty_fifty_state;
 pub use fifty_fifty_state::*;
 pub mod flick;
 pub use flick::*;
+pub mod flip_impulse;
+pub use flip_impulse::*;
 pub mod goal_tags;
 pub use goal_tags::*;
 pub mod half_flip;

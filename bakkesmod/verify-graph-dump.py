@@ -55,6 +55,7 @@ DEFAULT_GRAPH_EVENT_FIELDS = (
     "pass",
     "pass_last_completed",
     "rush",
+    "flip_impulse",
     "speed_flip",
     "half_flip",
     "half_volley",

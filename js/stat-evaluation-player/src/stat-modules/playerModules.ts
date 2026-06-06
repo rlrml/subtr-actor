@@ -1,18 +1,21 @@
 import { renderMovementStats } from "../movementFormatting.ts";
 import type { MovementBreakdownClass } from "../movementFormatting.ts";
 import { CeilingShotOverlay } from "../ceilingShotOverlay.ts";
+import { FlipImpulseOverlay } from "../flipImpulseOverlay.ts";
 import { SpeedFlipOverlay } from "../speedFlipOverlay.ts";
 import { createBoostPickupFilterController } from "../boostPickupFilters.ts";
 import type { BoostPickupFilterController } from "../boostPickupFilters.ts";
 import {
   buildBackboardTimelineEvents,
   buildBumpTimelineEvents,
+  buildFlipImpulseTimelineEvents,
   buildPowerslideTimelineEvents,
   buildWavedashTimelineEvents,
   buildWhiffTimelineEvents,
 } from "../timelineMarkers.ts";
 import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
+import { playerIdToString } from "../touchOverlay.ts";
 import { createPlayerStatsModule } from "./playerStatsModule.ts";
 import {
   renderBackboardStats,
@@ -40,6 +43,7 @@ import {
 } from "./renderers.ts";
 import {
   getStatsPlayerSnapshot,
+  getTeamClass,
   renderGroupedPlayerCards,
   renderPlayerCard,
   type StatModule,
@@ -427,6 +431,101 @@ export function createSpeedFlipModule(): StatModule {
       if (!player) return "";
 
       return renderSpeedFlipStats(player.speed_flip);
+    },
+  };
+}
+
+export function createFlipImpulseModule(): StatModule {
+  let overlay: FlipImpulseOverlay | null = null;
+
+  return {
+    id: "flip-impulse",
+    label: "Flip Impulse",
+
+    setup(ctx) {
+      overlay = new FlipImpulseOverlay(
+        ctx.player.sceneState,
+        ctx.player.container,
+        ctx.replay,
+        ctx.statsTimeline,
+      );
+    },
+
+    teardown() {
+      overlay?.dispose();
+      overlay = null;
+    },
+
+    onBeforeRender(info) {
+      overlay?.update(info.currentTime);
+    },
+
+    getTimelineEvents(ctx) {
+      return buildFlipImpulseTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    renderStats(_frameIndex, ctx) {
+      const eventsByPlayer = new Map<
+        string,
+        { name: string; isTeamZero: boolean; count: number }
+      >();
+      for (const replayPlayer of ctx.replay.players) {
+        eventsByPlayer.set(replayPlayer.id, {
+          name: replayPlayer.name,
+          isTeamZero: replayPlayer.isTeamZero,
+          count: 0,
+        });
+      }
+      for (const event of ctx.statsTimeline.events.flip_impulse ?? []) {
+        const id = playerIdToString(event.player);
+        const player = ctx.replay.players.find((candidate) => candidate.id === id) ?? null;
+        const entry = eventsByPlayer.get(id) ?? {
+          name: player?.name ?? id,
+          isTeamZero: event.is_team_0,
+          count: 0,
+        };
+        entry.count += 1;
+        eventsByPlayer.set(id, entry);
+      }
+
+      const entries = [...eventsByPlayer.values()].filter((entry) => entry.count > 0);
+      if (entries.length === 0) {
+        return "";
+      }
+
+      return `<div class="player-team-stack">${([true, false] as const)
+        .map((isTeamZero) => {
+          const teamEntries = entries.filter((entry) => entry.isTeamZero === isTeamZero);
+          if (teamEntries.length === 0) {
+            return "";
+          }
+          const teamName = isTeamZero ? "Blue" : "Orange";
+          return `<section class="player-team-group ${getTeamClass(isTeamZero)}">
+            <div class="player-team-header">
+              <h3>${teamName} team</h3>
+              <span>${teamEntries.length} player${teamEntries.length === 1 ? "" : "s"}</span>
+            </div>
+            <div class="player-stats-grid">
+              ${teamEntries
+                .map((entry) =>
+                  renderPlayerCard(
+                    entry.name,
+                    entry.isTeamZero,
+                    `<div class="stat-grid"><div class="stat-row"><span class="label">Events</span><span class="value">${entry.count}</span></div></div>`,
+                  ),
+                )
+                .join("")}
+            </div>
+          </section>`;
+        })
+        .join("")}</div>`;
+    },
+
+    renderFocusedPlayerStats(playerId, _frameIndex, ctx) {
+      const count = (ctx.statsTimeline.events.flip_impulse ?? []).filter((event) => {
+        return playerIdToString(event.player) === playerId;
+      }).length;
+      return `<div class="stat-grid"><div class="stat-row"><span class="label">Events</span><span class="value">${count}</span></div></div>`;
     },
   };
 }

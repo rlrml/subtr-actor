@@ -131,6 +131,44 @@ pub(in crate::collector::stats::playback) fn parse_territorial_pressure_event(
     decode_json_value(value.clone())
 }
 
+pub(in crate::collector::stats::playback) fn parse_flip_impulse_event(
+    value: &Value,
+) -> SubtrActorResult<FlipImpulseEvent> {
+    let object = json_object(value, "flip impulse event")?;
+    Ok(FlipImpulseEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        resolved_time: json_required_f32(object, "resolved_time")?,
+        resolved_frame: json_required_usize(object, "resolved_frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        start_position: json_required_vec3(object, "start_position")?,
+        end_position: json_required_vec3(object, "end_position")?,
+        start_speed: json_required_f32(object, "start_speed")?,
+        end_speed: json_required_f32(object, "end_speed")?,
+        raw_velocity_delta: json_required_vec3(object, "raw_velocity_delta")?,
+        estimated_impulse_delta: json_required_vec3(object, "estimated_impulse_delta")?,
+        estimated_direction: json_required_vec3(object, "estimated_direction")?,
+        estimated_horizontal_direction: json_required_vec2(
+            object,
+            "estimated_horizontal_direction",
+        )?,
+        estimated_impulse_magnitude: json_required_f32(object, "estimated_impulse_magnitude")?,
+        estimated_horizontal_impulse_magnitude: json_required_f32(
+            object,
+            "estimated_horizontal_impulse_magnitude",
+        )?,
+        local_forward_component: json_required_f32(object, "local_forward_component")?,
+        local_right_component: json_required_f32(object, "local_right_component")?,
+        local_up_component: json_required_f32(object, "local_up_component")?,
+        direction_label: json_required_str(object, "direction_label")?.to_owned(),
+        boost_sample_count: json_required_u32(object, "boost_sample_count")?,
+        sample_count: json_required_u32(object, "sample_count")?,
+        boost_compensation_magnitude: json_required_f32(object, "boost_compensation_magnitude")?,
+        confidence: json_required_f32(object, "confidence")?,
+    })
+}
+
 pub(in crate::collector::stats::playback) fn parse_movement_event(
     value: &Value,
 ) -> SubtrActorResult<MovementEvent> {
@@ -947,7 +985,34 @@ pub(in crate::collector::stats::playback) fn parse_speed_flip_event(
         start_speed: json_required_f32(object, "start_speed")?,
         max_speed: json_required_f32(object, "max_speed")?,
         best_alignment: json_required_f32(object, "best_alignment")?,
+        initial_boost_alignment: json_optional_f32(object.get("initial_boost_alignment"))?
+            .unwrap_or(0.0),
+        best_boost_alignment: json_optional_f32(object.get("best_boost_alignment"))?.unwrap_or(0.0),
+        boost_alignment_sample_count: json_optional_u32(
+            object.get("boost_alignment_sample_count"),
+        )?
+        .unwrap_or(0),
+        dodge_delay_after_ground_leave_seconds: json_optional_f32(
+            object.get("dodge_delay_after_ground_leave_seconds"),
+        )?
+        .unwrap_or(0.0),
         diagonal_score: json_required_f32(object, "diagonal_score")?,
+        estimated_dodge_impulse_magnitude: json_optional_f32(
+            object.get("estimated_dodge_impulse_magnitude"),
+        )?
+        .unwrap_or(0.0),
+        estimated_dodge_impulse_forward_component: json_optional_f32(
+            object.get("estimated_dodge_impulse_forward_component"),
+        )?
+        .unwrap_or(0.0),
+        estimated_dodge_impulse_side_component: json_optional_f32(
+            object.get("estimated_dodge_impulse_side_component"),
+        )?
+        .unwrap_or(0.0),
+        estimated_dodge_impulse_up_component: json_optional_f32(
+            object.get("estimated_dodge_impulse_up_component"),
+        )?
+        .unwrap_or(0.0),
         cancel_score: json_required_f32(object, "cancel_score")?,
         speed_score: json_required_f32(object, "speed_score")?,
         confidence: json_required_f32(object, "confidence")?,

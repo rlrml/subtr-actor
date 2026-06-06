@@ -5,15 +5,15 @@ use crate::stats::calculators::{
     CenterCalculator, ContinuousBallControlState, CounterAttackGoalCalculator, DemoCalculator,
     DodgeResetCalculator, DoubleTapCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator,
     FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator, FlickGoalCalculator,
-    FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState, HalfFlipCalculator,
-    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator, LivePlayState,
-    LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator, MustyFlickCalculator,
-    OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator,
-    PassingGoalCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
-    PossessionCalculator, PossessionState, PowerslideCalculator, PressureCalculator,
-    RotationCalculator, RushCalculator, SpeedFlipCalculator, TerritorialPressureCalculator,
-    TouchCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
-    WavedashCalculator, WhiffCalculator,
+    FlipImpulseCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState,
+    HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
+    LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator,
+    MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
+    PassCalculator, PassingGoalCalculator, PlayerFrameState, PlayerVerticalState,
+    PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
+    PressureCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
+    TerritorialPressureCalculator, TouchCalculator, TouchState, WallAerialCalculator,
+    WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -31,6 +31,7 @@ pub(crate) mod double_tap;
 pub(crate) mod fifty_fifty;
 pub(crate) mod fifty_fifty_state;
 pub(crate) mod flick;
+pub(crate) mod flip_impulse;
 pub(crate) mod frame_events_state;
 pub(crate) mod frame_info;
 pub(crate) mod gameplay_state;
@@ -95,6 +96,8 @@ pub use fifty_fifty::FiftyFiftyNode;
 pub use fifty_fifty_state::FiftyFiftyStateNode;
 #[allow(unused_imports)]
 pub use flick::FlickNode;
+#[allow(unused_imports)]
+pub use flip_impulse::FlipImpulseNode;
 #[allow(unused_imports)]
 pub use frame_events_state::FrameEventsStateNode;
 #[allow(unused_imports)]
@@ -214,6 +217,10 @@ pub(crate) fn possession_state_dependency() -> AnalysisDependency {
 
 pub(crate) fn live_play_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<LivePlayState>(live_play::boxed_default)
+}
+
+pub(crate) fn flip_impulse_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<FlipImpulseCalculator>(flip_impulse::boxed_default)
 }
 
 pub(crate) fn backboard_bounce_state_dependency() -> AnalysisDependency {
