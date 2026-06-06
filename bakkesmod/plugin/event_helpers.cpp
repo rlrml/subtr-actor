@@ -179,6 +179,10 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Whiff";
   case SaMechanicKindBump:
     return "Bump";
+  case SaMechanicKindBumpGoal:
+    return "Bump goal";
+  case SaMechanicKindDemoGoal:
+    return "Demo goal";
   default:
     return "Mechanic";
   }
