@@ -16,6 +16,9 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "movement",
   "positioning",
   "rotation_player",
+  "rotation_role_span",
+  "rotation_depth_span",
+  "rotation_first_man_stint",
   "rotation_team",
   "mechanics",
   "goal_context",
@@ -33,6 +36,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "pass",
   "ball_carry",
   "rush",
+  "flip_impulse",
   "speed_flip",
   "half_flip",
   "half_volley",
@@ -46,6 +50,11 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "boost_state",
   "bump",
 ] as const satisfies readonly (keyof StatsEvents)[];
+
+type AssertNever<T extends never> = T;
+type _StatsEventStreamCountTypesCoverAll = AssertNever<
+  Exclude<keyof StatsEvents, (typeof STATS_EVENT_STREAM_COUNT_TYPES)[number]>
+>;
 
 export const STATS_MECHANIC_EVENT_COUNT_TYPES = [
   "air_dribble",
