@@ -751,6 +751,7 @@ export function mountStatEvaluationPlayer(
     modules: MODULES,
     boostPickupFilters,
     getContext: getModuleContext,
+    getTimelineSources: () => getEventTimelineSources(getModuleContext()),
     getActiveModules: () => activeModulesRuntime.getActiveModules(),
     getActiveCapabilityIds,
     getBoostPickupAnimationEnabled: () =>
@@ -766,6 +767,10 @@ export function mountStatEvaluationPlayer(
       scheduleConfigUrlUpdate();
     },
     toggleBoostPadOverlay,
+    syncTimelineEvents,
+    syncTimelineRanges,
+    renderTimelineEventCount,
+    requestConfigSync: scheduleConfigUrlUpdate,
   });
   timeReadout = mustElement<HTMLElement>(root, "#time-readout");
   frameReadout = mustElement<HTMLElement>(root, "#frame-readout");
