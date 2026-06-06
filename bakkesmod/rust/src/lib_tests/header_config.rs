@@ -412,6 +412,14 @@ fn checked_in_header_matches_event_abi_enums() {
                 "SaMechanicKindDeath".to_owned(),
                 SaMechanicKind::Death as i32,
             ),
+            (
+                "SaMechanicKindBumpGoal".to_owned(),
+                SaMechanicKind::BumpGoal as i32,
+            ),
+            (
+                "SaMechanicKindDemoGoal".to_owned(),
+                SaMechanicKind::DemoGoal as i32,
+            ),
         ])
     );
     assert_eq!(

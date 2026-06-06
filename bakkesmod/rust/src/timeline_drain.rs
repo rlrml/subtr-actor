@@ -380,6 +380,8 @@ pub(crate) fn goal_tag_kind(kind: GoalTagKind) -> SaMechanicKind {
         GoalTagKind::AirDribbleGoal => SaMechanicKind::AirDribbleGoal,
         GoalTagKind::FlipResetGoal => SaMechanicKind::FlipResetGoal,
         GoalTagKind::HalfVolleyGoal => SaMechanicKind::HalfVolleyGoal,
+        GoalTagKind::BumpGoal => SaMechanicKind::BumpGoal,
+        GoalTagKind::DemoGoal => SaMechanicKind::DemoGoal,
     }
 }
 

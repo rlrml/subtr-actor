@@ -1454,3 +1454,4 @@ A goal where the scorer's last touch matches a recent half-volley candidate.
 - Compare half-volley events against each goal's scorer-last-touch context.
 - Require the half-volley touch to be close enough to the goal and sufficiently aligned toward goal.
 - Attach a related half-volley event reference and half-volley evidence to the goal tag metadata.
+

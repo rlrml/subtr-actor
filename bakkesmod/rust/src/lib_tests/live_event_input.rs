@@ -888,4 +888,12 @@ fn maps_goal_tag_kinds_to_abi_kinds() {
         goal_tag_kind(GoalTagKind::HalfVolleyGoal),
         SaMechanicKind::HalfVolleyGoal
     );
+    assert_eq!(
+        goal_tag_kind(GoalTagKind::BumpGoal),
+        SaMechanicKind::BumpGoal
+    );
+    assert_eq!(
+        goal_tag_kind(GoalTagKind::DemoGoal),
+        SaMechanicKind::DemoGoal
+    );
 }
