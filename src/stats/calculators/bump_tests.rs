@@ -113,7 +113,7 @@ fn bump_detector_credits_player_with_clear_directional_impulse() {
                 player(
                     2,
                     false,
-                    glam::Vec3::new(300.0, 0.0, 17.0),
+                    glam::Vec3::new(245.0, 0.0, 17.0),
                     glam::Vec3::new(700.0, 0.0, 0.0),
                 ),
             ]),
@@ -187,7 +187,7 @@ fn bump_detector_requires_clear_victim_impulse() {
                 player(
                     2,
                     false,
-                    glam::Vec3::new(280.0, 0.0, 17.0),
+                    glam::Vec3::new(235.0, 0.0, 17.0),
                     glam::Vec3::new(150.0, 0.0, 0.0),
                 ),
             ]),
@@ -235,6 +235,58 @@ fn bump_detector_requires_initiator_slowdown() {
                     true,
                     glam::Vec3::new(120.0, 0.0, 17.0),
                     glam::Vec3::new(1200.0, 0.0, 0.0),
+                ),
+                player(
+                    2,
+                    false,
+                    glam::Vec3::new(245.0, 0.0, 17.0),
+                    glam::Vec3::new(700.0, 0.0, 0.0),
+                ),
+            ]),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    assert!(calculator.events().is_empty());
+    assert!(calculator.player_stats().is_empty());
+}
+
+#[test]
+fn bump_detector_rejects_center_near_cars_with_separated_hitboxes() {
+    let mut calculator = BumpCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &players(vec![
+                player(
+                    1,
+                    true,
+                    glam::Vec3::new(0.0, 0.0, 17.0),
+                    glam::Vec3::new(1200.0, 0.0, 0.0),
+                ),
+                player(
+                    2,
+                    false,
+                    glam::Vec3::new(260.0, 0.0, 17.0),
+                    glam::Vec3::ZERO,
+                ),
+            ]),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(1, 0.1),
+            &players(vec![
+                player(
+                    1,
+                    true,
+                    glam::Vec3::new(120.0, 0.0, 17.0),
+                    glam::Vec3::new(650.0, 0.0, 0.0),
                 ),
                 player(
                     2,
@@ -294,7 +346,7 @@ fn bump_detector_suppresses_active_fifty_fifty_pair() {
                 player(
                     2,
                     false,
-                    glam::Vec3::new(300.0, 0.0, 17.0),
+                    glam::Vec3::new(245.0, 0.0, 17.0),
                     glam::Vec3::new(700.0, 0.0, 0.0),
                 ),
             ]),
@@ -374,13 +426,13 @@ fn bump_detector_suppresses_same_pair_repeats() {
         (
             glam::Vec3::new(120.0, 0.0, 17.0),
             glam::Vec3::new(1200.0, 0.0, 0.0),
-            glam::Vec3::new(300.0, 0.0, 17.0),
+            glam::Vec3::new(245.0, 0.0, 17.0),
             glam::Vec3::new(700.0, 0.0, 0.0),
         ),
         (
             glam::Vec3::new(240.0, 0.0, 17.0),
             glam::Vec3::new(650.0, 0.0, 0.0),
-            glam::Vec3::new(420.0, 0.0, 17.0),
+            glam::Vec3::new(365.0, 0.0, 17.0),
             glam::Vec3::new(1400.0, 0.0, 0.0),
         ),
     ];
