@@ -1,14 +1,47 @@
 import type { ReplayPlayerTrack, ReplayTimelineEvent, ReplayTimelineRange } from "@rlrml/player";
+import {
+  STATS_EVENT_STREAM_COUNT_TYPES,
+  STATS_MECHANIC_EVENT_COUNT_TYPES,
+} from "./eventCountDerivation.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
+import type { StatsEvents } from "./statsTimeline.ts";
 import {
   buildMechanicPlaylistEvents,
   buildMechanicTimelineEvents,
   formatMechanicKind,
   getMechanicKinds,
+  isVisibleMechanicKind,
 } from "./timelineMarkers.ts";
 import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
 
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
+const CURATED_STATS_EVENT_STREAM_IDS = new Set<keyof StatsEvents>([
+  "timeline",
+  "mechanics",
+  "backboard",
+  "ceiling_shot",
+  "wall_aerial",
+  "wall_aerial_shot",
+  "center",
+  "flick",
+  "musty_flick",
+  "dodge_reset",
+  "double_tap",
+  "fifty_fifty",
+  "one_timer",
+  "pass",
+  "ball_carry",
+  "rush",
+  "flip_impulse",
+  "speed_flip",
+  "half_flip",
+  "half_volley",
+  "wavedash",
+  "whiff",
+  "powerslide",
+  "touch",
+  "bump",
+]);
 const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#3b82f6",
   "#06b6d4",
@@ -93,6 +126,202 @@ const REPLAY_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [
 
 const EXTRA_EVENT_SOURCE_DEFINITIONS: EventWindowSourceDefinition[] = [];
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function numberField(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function stringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function boolField(record: Record<string, unknown>, key: string): boolean | undefined {
+  const value = record[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function remoteIdToString(value: unknown): string | null {
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const [kind, id] = Object.entries(value)[0] ?? [];
+  if (!kind || id == null) {
+    return null;
+  }
+  if (typeof id === "string" || typeof id === "number") {
+    return `${kind}:${id}`;
+  }
+  return `${kind}:${JSON.stringify(id)}`;
+}
+
+function getGenericEventTiming(
+  event: Record<string, unknown>,
+): { time: number; frame?: number } | null {
+  const timing = event.timing;
+  if (isRecord(timing)) {
+    const time =
+      numberField(timing, "end_time") ??
+      numberField(timing, "time") ??
+      numberField(timing, "start_time");
+    if (time != null) {
+      return {
+        time,
+        frame:
+          numberField(timing, "end_frame") ??
+          numberField(timing, "frame") ??
+          numberField(timing, "start_frame"),
+      };
+    }
+  }
+
+  const time =
+    numberField(event, "end_time") ??
+    numberField(event, "resolve_time") ??
+    numberField(event, "time") ??
+    numberField(event, "start_time");
+  if (time == null) {
+    return null;
+  }
+  return {
+    time,
+    frame:
+      numberField(event, "end_frame") ??
+      numberField(event, "resolve_frame") ??
+      numberField(event, "frame") ??
+      numberField(event, "start_frame"),
+  };
+}
+
+function getGenericEventPlayerId(event: Record<string, unknown>): string | null {
+  return (
+    remoteIdToString(event.player) ??
+    remoteIdToString(event.player_id) ??
+    remoteIdToString(event.initiator) ??
+    remoteIdToString(event.scorer)
+  );
+}
+
+function getGenericEventTeam(event: Record<string, unknown>): boolean | null {
+  return (
+    boolField(event, "is_team_0") ??
+    boolField(event, "initiator_is_team_0") ??
+    boolField(event, "scoring_team_is_team_0") ??
+    boolField(event, "team_is_team_0") ??
+    null
+  );
+}
+
+function eventStreamShortLabel(streamId: string): string {
+  return (
+    streamId
+      .split(/[_-]+/)
+      .filter((part) => part.length > 0)
+      .map((part) => part.slice(0, 1).toUpperCase())
+      .join("")
+      .slice(0, 3) || "E"
+  );
+}
+
+function buildGenericStatsEventTimelineEvents(
+  ctx: StatModuleContext,
+  streamId: keyof StatsEvents,
+  events: readonly unknown[],
+): ReplayTimelineEvent[] {
+  const streamLabel = formatMechanicKind(streamId);
+  const playerNames = new Map(ctx.replay.players.map((player) => [player.id, player.name]));
+
+  return events.flatMap((event, index) => {
+    if (!isRecord(event)) {
+      return [];
+    }
+    const timing = getGenericEventTiming(event);
+    if (!timing) {
+      return [];
+    }
+
+    const playerId = getGenericEventPlayerId(event);
+    const playerName = playerId ? (playerNames.get(playerId) ?? playerId) : null;
+    const isTeamZero = getGenericEventTeam(event);
+    const eventId =
+      stringField(event, "id") ?? `${streamId}:${timing.frame ?? timing.time}:${index}`;
+
+    return [
+      {
+        id: `stats-stream:${eventId}`,
+        time: ctx.replay.frames[timing.frame ?? -1]?.time ?? timing.time,
+        frame: timing.frame,
+        kind: streamId,
+        label: playerName ? `${playerName} ${streamLabel.toLowerCase()}` : streamLabel,
+        shortLabel: eventStreamShortLabel(streamId),
+        playerId,
+        playerName,
+        isTeamZero,
+        color:
+          isTeamZero == null
+            ? EVENT_PLAYLIST_NEUTRAL_COLOR
+            : isTeamZero
+              ? EVENT_PLAYLIST_PLAYER_COLORS[0]
+              : EVENT_PLAYLIST_PLAYER_COLORS[4],
+      },
+    ];
+  });
+}
+
+function buildGenericStatsEventSources(
+  ctx: StatModuleContext,
+  activeTimelineEventSourceIds: ReadonlySet<string>,
+  toggleEventSource: (id: string, enabled: boolean) => void,
+): EventTimelineSource[] {
+  return STATS_EVENT_STREAM_COUNT_TYPES.flatMap((streamId) => {
+    const events = ctx.statsTimeline.events[streamId] ?? [];
+    if (CURATED_STATS_EVENT_STREAM_IDS.has(streamId) && events.length > 0) {
+      return [];
+    }
+
+    const timelineEvents = buildGenericStatsEventTimelineEvents(ctx, streamId, events);
+
+    return [
+      {
+        id: `stats-stream:${streamId}`,
+        playlistId: `stats-stream:${streamId}`,
+        timelineKey: `stats-stream:${streamId}`,
+        timelineId: `stats-stream:${streamId}`,
+        group: "Event streams",
+        label: formatMechanicKind(streamId),
+        count: timelineEvents.length,
+        active: activeTimelineEventSourceIds.has(`stats-stream:${streamId}`),
+        buildTimelineEvents() {
+          return timelineEvents;
+        },
+        buildPlaylistEvents() {
+          return timelineEvents;
+        },
+        setActive(enabled) {
+          toggleEventSource(`stats-stream:${streamId}`, enabled);
+        },
+      },
+    ];
+  });
+}
+
+function getEventTimelineMechanicKinds(ctx: StatModuleContext): string[] {
+  return [
+    ...new Set([
+      ...STATS_MECHANIC_EVENT_COUNT_TYPES.filter(isVisibleMechanicKind),
+      ...getMechanicKinds(ctx.statsTimeline),
+    ]),
+  ].sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
+}
+
 export function getEventTimelineSources({
   ctx,
   modules,
@@ -109,9 +338,6 @@ export function getEventTimelineSources({
   for (const source of REPLAY_EVENT_SOURCE_DEFINITIONS) {
     const events = source.buildEvents(ctx);
     const count = events.length;
-    if (count === 0) {
-      continue;
-    }
     sources.push({
       id: source.id,
       playlistId: `replay:${source.id}`,
@@ -136,9 +362,6 @@ export function getEventTimelineSources({
   for (const mod of modules.filter((module) => module.getTimelineEvents)) {
     const events = mod.getTimelineEvents?.(ctx) ?? [];
     const count = events.length;
-    if (count === 0) {
-      continue;
-    }
     sources.push({
       id: mod.id,
       playlistId: `module:${mod.id}`,
@@ -163,9 +386,6 @@ export function getEventTimelineSources({
   for (const source of EXTRA_EVENT_SOURCE_DEFINITIONS) {
     const events = source.buildEvents(ctx);
     const count = events.length;
-    if (count === 0) {
-      continue;
-    }
     sources.push({
       id: source.id,
       playlistId: `extra:${source.id}`,
@@ -187,14 +407,15 @@ export function getEventTimelineSources({
     });
   }
 
-  for (const kind of getMechanicKinds(ctx.statsTimeline)) {
+  sources.push(
+    ...buildGenericStatsEventSources(ctx, activeTimelineEventSourceIds, toggleEventSource),
+  );
+
+  for (const kind of getEventTimelineMechanicKinds(ctx)) {
     const timelineEvents = buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]);
     const playlistEvents = buildMechanicPlaylistEvents(ctx.statsTimeline, ctx.replay, [kind]);
     const timelineRanges = buildMechanicTimelineRanges(ctx.statsTimeline, ctx.replay, [kind]);
     const count = timelineEvents.length + timelineRanges.length;
-    if (count === 0) {
-      continue;
-    }
     sources.push({
       id: `mechanic:${kind}`,
       playlistId: `mechanic:${kind}`,
@@ -237,16 +458,14 @@ export function getEventPlaylistSources(
       label: "Goals",
       events: ctx.replay.timelineEvents.filter((event) => event.kind === "goal"),
     },
-  ].filter((source) => source.events.length > 0);
+  ];
 
-  const timelineSources = eventSources
-    .map((source) => ({
-      id: source.playlistId,
-      group: source.group,
-      label: source.label,
-      events: source.buildPlaylistEvents(),
-    }))
-    .filter((source) => source.events.length > 0);
+  const timelineSources = eventSources.map((source) => ({
+    id: source.playlistId,
+    group: source.group,
+    label: source.label,
+    events: source.buildPlaylistEvents(),
+  }));
 
   return [...replaySources, ...timelineSources];
 }

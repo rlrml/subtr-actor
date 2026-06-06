@@ -154,7 +154,10 @@ export class EventPlaylistWindowController {
     if (items.length === 0) {
       const empty = document.createElement("p");
       empty.className = "stat-window-empty";
-      empty.textContent = "No event types selected.";
+      empty.textContent =
+        selectedSourceIds.size === 0
+          ? "No event types selected."
+          : "No events in selected event types.";
       list.append(empty);
     } else {
       for (const item of items) {
