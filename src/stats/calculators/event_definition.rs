@@ -11,12 +11,11 @@ use super::{
     CorePlayerGoalContextEvent, CorePlayerScoreboardEvent, DodgeRefreshedEvent, DodgeResetEvent,
     DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipImpulseEvent, FlipResetEvent,
     FlipResetFollowupDodgeEvent, GoalContextEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
-    MustyFlickEvent, OneTimerEvent, PassEvent, PassLastCompletedEvent, PositioningEvent,
-    PossessionEvent, PostWallDodgeEvent, PowerslideEvent, PressureEvent, RotationDepthSpanEvent,
+    MustyFlickEvent, OneTimerEvent, PassEvent, PositioningEvent, PossessionEvent,
+    PostWallDodgeEvent, PowerslideEvent, PressureEvent, RotationDepthSpanEvent,
     RotationFirstManStintEvent, RotationPlayerEvent, RotationRoleSpanEvent, RotationTeamEvent,
     RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent, TouchBallMovementEvent,
-    TouchClassificationEvent, TouchLastTouchEvent, WallAerialEvent, WallAerialShotEvent,
-    WavedashEvent, WhiffEvent,
+    TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::StatsTimelineTagEvent;
 
@@ -457,19 +456,6 @@ define_stats_event!(
     ]
 );
 define_stats_event!(
-    PassLastCompletedEvent,
-    PASS_LAST_COMPLETED_EVENT_DEFINITION,
-    "pass_last_completed",
-    "Pass Last Completed",
-    EventCategory::Mechanic,
-    summary = "A state-change marker for the most recent player to complete a pass reception.",
-    approach = [
-        "Emit when the pass calculator's last completed receiver changes.",
-        "Reset to no player when play is not live or when ball/player attribution is unavailable.",
-        "Use this as a compact timeline/state event derived from completed pass detections.",
-    ]
-);
-define_stats_event!(
     BallCarryEvent,
     BALL_CARRY_EVENT_DEFINITION,
     "ball_carry",
@@ -611,13 +597,6 @@ define_stats_event!(
     TOUCH_BALL_MOVEMENT_EVENT_DEFINITION,
     "touch_ball_movement",
     "Touch Ball Movement",
-    EventCategory::Contact
-);
-define_stats_event!(
-    TouchLastTouchEvent,
-    TOUCH_LAST_TOUCH_EVENT_DEFINITION,
-    "touch_last_touch",
-    "Touch Last Touch",
     EventCategory::Contact
 );
 define_stats_event!(
@@ -789,7 +768,6 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &DOUBLE_TAP_EVENT_DEFINITION,
     &ONE_TIMER_EVENT_DEFINITION,
     &PASS_EVENT_DEFINITION,
-    &PASS_LAST_COMPLETED_EVENT_DEFINITION,
     &BALL_CARRY_EVENT_DEFINITION,
     &FIFTY_FIFTY_EVENT_DEFINITION,
     &RUSH_EVENT_DEFINITION,
@@ -802,7 +780,6 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &POWERSLIDE_EVENT_DEFINITION,
     &TOUCH_CLASSIFICATION_EVENT_DEFINITION,
     &TOUCH_BALL_MOVEMENT_EVENT_DEFINITION,
-    &TOUCH_LAST_TOUCH_EVENT_DEFINITION,
     &BOOST_PICKUP_COMPARISON_EVENT_DEFINITION,
     &BOOST_LEDGER_EVENT_DEFINITION,
     &BOOST_STATE_EVENT_DEFINITION,
@@ -938,15 +915,12 @@ const ONE_TIMER_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "OneTimerCalculator",
 )];
 
-const PASS_EMITTED_EVENTS: &[EmittedEvent] = &[
-    produced_event(&PASS_EVENT_DEFINITION, "pass", "PassNode", "PassCalculator"),
-    produced_event(
-        &PASS_LAST_COMPLETED_EVENT_DEFINITION,
-        "pass",
-        "PassNode",
-        "PassCalculator",
-    ),
-];
+const PASS_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &PASS_EVENT_DEFINITION,
+    "pass",
+    "PassNode",
+    "PassCalculator",
+)];
 
 const BALL_CARRY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &BALL_CARRY_EVENT_DEFINITION,
@@ -1027,12 +1001,6 @@ const TOUCH_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
     produced_event(
         &TOUCH_BALL_MOVEMENT_EVENT_DEFINITION,
-        "touch",
-        "TouchNode",
-        "TouchCalculator",
-    ),
-    produced_event(
-        &TOUCH_LAST_TOUCH_EVENT_DEFINITION,
         "touch",
         "TouchNode",
         "TouchCalculator",

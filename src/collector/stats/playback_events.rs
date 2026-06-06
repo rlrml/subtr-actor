@@ -357,11 +357,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_fifty_fifty_event,
             )?,
             pass: self.module_player_events("pass", "events", parse_pass_event)?,
-            pass_last_completed: self.module_player_events(
-                "pass",
-                "last_completed_events",
-                parse_pass_last_completed_event,
-            )?,
             ball_carry: self.module_player_events(
                 "ball_carry",
                 "events",
@@ -396,11 +391,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "touch",
                 "ball_movement_events",
                 parse_touch_ball_movement_event,
-            )?,
-            touch_last_touch: self.module_player_events(
-                "touch",
-                "last_touch_events",
-                parse_touch_last_touch_event,
             )?,
             boost_pickups: self.module_player_events(
                 "boost",
@@ -537,10 +527,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "touch_ball_movement".to_owned(),
             Value::Array(self.module_array("touch", "ball_movement_events")),
-        );
-        events.insert(
-            "touch_last_touch".to_owned(),
-            Value::Array(self.module_array("touch", "last_touch_events")),
         );
         events.insert(
             "boost_pickups".to_owned(),

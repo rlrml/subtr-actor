@@ -21,7 +21,6 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<DoubleTapEvent>();
     assert_stats_event::<OneTimerEvent>();
     assert_stats_event::<PassEvent>();
-    assert_stats_event::<PassLastCompletedEvent>();
     assert_stats_event::<BallCarryEvent>();
     assert_stats_event::<FiftyFiftyEvent>();
     assert_stats_event::<RushEvent>();
@@ -33,7 +32,6 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<PowerslideEvent>();
     assert_stats_event::<TouchClassificationEvent>();
     assert_stats_event::<TouchBallMovementEvent>();
-    assert_stats_event::<TouchLastTouchEvent>();
     assert_stats_event::<BoostPickupComparisonEvent>();
     assert_stats_event::<BoostLedgerEvent>();
     assert_stats_event::<BoostStateEvent>();

@@ -691,13 +691,12 @@ fn test_touch_attribution_usually_matches_goal_scorer() {
         .filter(|event| event.player.is_some())
     {
         total_with_scorer += 1;
-        let last_touch = timeline.events.touch_last_touch.iter().rev().find(|touch| {
+        let last_touch = timeline.events.touch.iter().rev().find(|touch| {
             touch.frame <= goal_event.frame
                 && touch.is_team_0 == goal_event.scoring_team_is_team_0
-                && touch.player.is_some()
         });
         if last_touch
-            .and_then(|touch| touch.player.as_ref())
+            .map(|touch| &touch.player)
             .zip(goal_event.player.as_ref())
             .map(|(touch_player, scorer)| touch_player == scorer)
             .unwrap_or(false)

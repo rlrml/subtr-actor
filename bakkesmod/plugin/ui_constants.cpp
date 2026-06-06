@@ -175,7 +175,6 @@ constexpr std::array<const char *, 44> GRAPH_EVENT_FIELDS{
     "musty_flick",
     "one_timer",
     "pass",
-    "pass_last_completed",
     "rush",
     "flip_impulse",
     "speed_flip",
@@ -190,7 +189,6 @@ constexpr std::array<const char *, 44> GRAPH_EVENT_FIELDS{
     "boost_state",
     "bump",
     "touch",
-    "touch_last_touch",
     "touch_ball_movement",
 };
 constexpr std::array<const char *, 3> REQUIRED_GRAPH_EVENT_FIELDS{

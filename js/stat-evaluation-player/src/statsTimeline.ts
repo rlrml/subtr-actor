@@ -24,7 +24,6 @@ import type { MovementEvent } from "./generated/MovementEvent.ts";
 import type { MustyFlickEvent } from "./generated/MustyFlickEvent.ts";
 import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
 import type { PassEvent } from "./generated/PassEvent.ts";
-import type { PassLastCompletedEvent } from "./generated/PassLastCompletedEvent.ts";
 import type { PlayerStatsSnapshot as GeneratedPlayerStatsSnapshot } from "./generated/PlayerStatsSnapshot.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { PositioningEvent } from "./generated/PositioningEvent.ts";
@@ -45,7 +44,6 @@ import type { StatsTimelineConfig } from "./generated/StatsTimelineConfig.ts";
 import type { TeamStatsSnapshot as GeneratedTeamStatsSnapshot } from "./generated/TeamStatsSnapshot.ts";
 import type { TimelineEvent } from "./generated/TimelineEvent.ts";
 import type { TouchBallMovementEvent } from "./generated/TouchBallMovementEvent.ts";
-import type { TouchLastTouchEvent } from "./generated/TouchLastTouchEvent.ts";
 import type { TouchClassificationEvent } from "./generated/TouchClassificationEvent.ts";
 import type { HalfFlipEvent } from "./generated/HalfFlipEvent.ts";
 import type { HalfVolleyEvent } from "./generated/HalfVolleyEvent.ts";
@@ -89,7 +87,6 @@ export type {
   MustyFlickEvent,
   OneTimerEvent,
   PassEvent,
-  PassLastCompletedEvent,
   PossessionEvent,
   PositioningEvent,
   PressureEvent,
@@ -103,7 +100,6 @@ export type {
   StatsTimelineConfig,
   TimelineEvent,
   TouchBallMovementEvent,
-  TouchLastTouchEvent,
   TouchClassificationEvent,
   HalfFlipEvent,
   HalfVolleyEvent,

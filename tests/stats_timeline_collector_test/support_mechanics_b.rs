@@ -33,16 +33,7 @@ fn assert_pass_events_reconstruct_serialized_partial_sums(
             .cmp(&right.sample_frame)
             .then_with(|| left.sample_time.total_cmp(&right.sample_time))
     });
-    let mut last_completed_events = timeline.events.pass_last_completed.clone();
-    last_completed_events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
-            .then_with(|| left.time.total_cmp(&right.time))
-    });
-    let has_last_completed_events = !last_completed_events.is_empty();
-
     let mut event_index = 0;
-    let mut last_completed_event_index = 0;
     let mut players: HashMap<PlayerId, DerivedPassPlayerStats> = HashMap::new();
     let mut team_zero = PassTeamStats::default();
     let mut team_one = PassTeamStats::default();
@@ -90,35 +81,12 @@ fn assert_pass_events_reconstruct_serialized_partial_sums(
                 processed_event = true;
             }
 
-            if !has_last_completed_events && processed_event {
+            if processed_event {
                 for stats in players.values_mut() {
                     stats.stats.is_last_completed_pass = false;
                 }
             }
 
-            if !has_last_completed_events {
-                if let Some(player_id) = last_completed_pass_player.as_ref() {
-                    if let Some(stats) = players.get_mut(player_id) {
-                        stats.stats.is_last_completed_pass = true;
-                    }
-                }
-            }
-        }
-
-        let mut processed_last_completed_event = false;
-        while last_completed_event_index < last_completed_events.len()
-            && last_completed_events[last_completed_event_index].frame <= frame.frame_number
-        {
-            last_completed_pass_player = last_completed_events[last_completed_event_index]
-                .player
-                .clone();
-            last_completed_event_index += 1;
-            processed_last_completed_event = true;
-        }
-        if processed_last_completed_event {
-            for stats in players.values_mut() {
-                stats.stats.is_last_completed_pass = false;
-            }
             if let Some(player_id) = last_completed_pass_player.as_ref() {
                 if let Some(stats) = players.get_mut(player_id) {
                     stats.stats.is_last_completed_pass = true;
@@ -153,11 +121,6 @@ fn assert_pass_events_reconstruct_serialized_partial_sums(
         event_index,
         events.len(),
         "{replay_path} unprocessed pass events"
-    );
-    assert_eq!(
-        last_completed_event_index,
-        last_completed_events.len(),
-        "{replay_path} unprocessed pass-last-completed events"
     );
 }
 

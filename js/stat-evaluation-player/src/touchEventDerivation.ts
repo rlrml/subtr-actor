@@ -1,6 +1,5 @@
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { TouchBallMovementEvent } from "./generated/TouchBallMovementEvent.ts";
-import type { TouchLastTouchEvent } from "./generated/TouchLastTouchEvent.ts";
 import type { TouchStats } from "./generated/TouchStats.ts";
 import type { TouchClassificationEvent } from "./generated/TouchClassificationEvent.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
@@ -257,11 +256,9 @@ export function createTouchEventDerivedStatsAccumulator(timeline: MaterializedSt
   applyFrame(frame: StatsFrame): void;
 } {
   const touchEvents = sortBySample(timeline.events.touch ?? []);
-  const lastTouchEvents = sortBySample(timeline.events.touch_last_touch ?? []);
   const movementEvents = sortByFrame(timeline.events.touch_ball_movement ?? []);
 
   let touchEventIndex = 0;
-  let lastTouchEventIndex = 0;
   let movementEventIndex = 0;
   let currentLastTouchPlayerKey: string | null = null;
   const players = new Map<string, TouchAccumulator>();
@@ -295,17 +292,8 @@ export function createTouchEventDerivedStatsAccumulator(timeline: MaterializedSt
           const accumulator = players.get(playerKey) ?? createTouchAccumulator();
           players.set(playerKey, accumulator);
           applyTouchClassificationEvent(accumulator, event, frame);
+          currentLastTouchPlayerKey = playerKey;
           touchEventIndex += 1;
-        }
-
-        while (
-          lastTouchEventIndex < lastTouchEvents.length &&
-          (lastTouchEvents[lastTouchEventIndex]!.sample_frame ??
-            lastTouchEvents[lastTouchEventIndex]!.frame) <= frame.frame_number
-        ) {
-          const event = lastTouchEvents[lastTouchEventIndex] as TouchLastTouchEvent;
-          currentLastTouchPlayerKey = event.player == null ? null : remoteIdKey(event.player);
-          lastTouchEventIndex += 1;
         }
 
         if (currentLastTouchPlayerKey != null) {

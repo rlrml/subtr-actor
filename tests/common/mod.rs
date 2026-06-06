@@ -370,13 +370,6 @@ fn compare_timeline_events(
     })
     .or_else(|| {
         compare_serialized_slice(
-            &format!("{label}.touch_last_touch"),
-            &left.touch_last_touch,
-            &right.touch_last_touch,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
             &format!("{label}.boost_pickups"),
             &left.boost_pickups,
             &right.boost_pickups,
