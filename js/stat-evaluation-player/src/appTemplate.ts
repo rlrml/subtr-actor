@@ -29,6 +29,7 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               <button type="button" data-window-toggle="mechanics">Events</button>
               <button type="button" data-window-toggle="event-playlist">Event playlist</button>
               <button type="button" data-window-toggle="mechanics-review">Events review</button>
+              <button type="button" data-window-toggle="shot-visualization">Shot chart</button>
               <button type="button" data-window-toggle="replay-loading">Replay loading</button>
               <button type="button" data-window-toggle="boost-pickups">Boost pickup filters</button>
               <button type="button" data-window-toggle="touch-controls">Touch controls</button>
@@ -522,6 +523,23 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               </button>
             </header>
             <div id="touch-controls-window-body"></div>
+          </section>
+
+          <section
+            class="floating-window floating-window-shot-visualization"
+            data-window-id="shot-visualization"
+            hidden
+            style="--window-x: calc(100vw - 39rem); --window-y: 20rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <h2>Shot chart</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="shot-visualization">
+                Hide
+              </button>
+            </header>
+            <div id="shot-visualization-window-body"></div>
           </section>
         </div>
 

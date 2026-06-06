@@ -83,6 +83,7 @@ import { logStatsPlayerConfigLoadDebug } from "./playerConfigRuntime.ts";
 import { createPlaybackActionController } from "./playbackActions.ts";
 import { createPlayerConfigBindings, type PlayerConfigBindings } from "./playerConfigBindings.ts";
 import { createWindowCommandController } from "./windowCommands.ts";
+import { ShotVisualizationController } from "./shotVisualization.ts";
 
 const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
 const GOAL_WATCH_LEAD_SECONDS = 4;
@@ -231,6 +232,7 @@ let mechanicsReviewController: MechanicsReviewWindowController | null = null;
 let floatingWindowController: FloatingWindowController | null = null;
 let scoreboardWindowController: ScoreboardWindowController | null = null;
 let playbackReadoutsController: PlaybackReadoutsController | null = null;
+let shotVisualizationController: ShotVisualizationController | null = null;
 let configBindings: PlayerConfigBindings | null = null;
 let loadedReplayName: string | null = null;
 let initialUrlConfig: StatsPlayerConfig | null = null;
@@ -417,6 +419,10 @@ function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0)
   scoreboardWindowController?.render(frameIndex);
 }
 
+function renderShotVisualization(state = replayPlayer?.getState() ?? null): void {
+  shotVisualizationController?.render(state);
+}
+
 function setTransportEnabled(enabled: boolean): void {
   playbackReadoutsController?.setTransportEnabled(enabled, replayPlayer?.getState());
 }
@@ -440,6 +446,7 @@ function renderSnapshot(state: ReplayPlayerState): void {
 
   renderStatsWindows(state.frameIndex, { preserveOpenPickers: true });
   renderScoreboard(state.frameIndex);
+  renderShotVisualization(state);
   syncEventPlaylistTimeline(state);
 }
 
@@ -598,6 +605,11 @@ export function mountStatEvaluationPlayer(
     getSources: getEventPlaylistSourcesForWindow,
     cueTimelineEvent: playbackActions.cueTimelineEvent,
     formatTime,
+  });
+  shotVisualizationController = new ShotVisualizationController({
+    body: mustElement<HTMLDivElement>(root, "#shot-visualization-window-body"),
+    getReplayPlayer: () => replayPlayer,
+    cueTimelineEvent: playbackActions.cueTimelineEvent,
   });
   replayLoadingSummary = mustElement<HTMLElement>(root, "#replay-loading-summary");
   replayLoadingActive = mustElement<HTMLElement>(root, "#replay-loading-active");
@@ -875,6 +887,8 @@ export function mountStatEvaluationPlayer(
     moduleControlsController = null;
     scoreboardWindowController = null;
     playbackReadoutsController = null;
+    shotVisualizationController?.destroy();
+    shotVisualizationController = null;
     initialUrlConfig = null;
     configBindings?.reset();
     configBindings = null;

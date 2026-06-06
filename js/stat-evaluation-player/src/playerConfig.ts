@@ -23,7 +23,8 @@ export type SingletonWindowId =
   | "mechanics-review"
   | "replay-loading"
   | "boost-pickups"
-  | "touch-controls";
+  | "touch-controls"
+  | "shot-visualization";
 export type ConfigWindowKind = SingletonWindowId | "stats";
 
 export interface ConfigViewportSize {

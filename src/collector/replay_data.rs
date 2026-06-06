@@ -609,6 +609,44 @@ fn replay_tick_marks(
         .collect()
 }
 
+pub(crate) fn player_stat_events_with_shot_saves(
+    player_stat_events: &[PlayerStatEvent],
+) -> Vec<PlayerStatEvent> {
+    let mut annotated_events = player_stat_events.to_vec();
+    let mut pending_shot_indices = Vec::new();
+
+    for index in 0..annotated_events.len() {
+        match annotated_events[index].kind {
+            PlayerStatEventKind::Shot => {
+                if annotated_events[index].shot.is_some() {
+                    pending_shot_indices.push(index);
+                }
+            }
+            PlayerStatEventKind::Save => {
+                let save = ShotSaveMetadata {
+                    time: annotated_events[index].time,
+                    frame: annotated_events[index].frame,
+                    player: annotated_events[index].player.clone(),
+                    player_position: annotated_events[index].player_position,
+                    is_team_0: annotated_events[index].is_team_0,
+                };
+                let Some(pending_position) = pending_shot_indices.iter().rposition(|shot_index| {
+                    annotated_events[*shot_index].is_team_0 != annotated_events[index].is_team_0
+                }) else {
+                    continue;
+                };
+                let shot_index = pending_shot_indices.remove(pending_position);
+                if let Some(shot) = annotated_events[shot_index].shot.as_mut() {
+                    shot.resulting_save = Some(save);
+                }
+            }
+            PlayerStatEventKind::Assist => {}
+        }
+    }
+
+    annotated_events
+}
+
 impl FrameData {
     /// Creates a new empty [`FrameData`] instance.
     ///
@@ -756,7 +794,7 @@ impl ReplayDataCollector {
             boost_pads: processor.resolved_boost_pads(),
             touch_events: processor.touch_events().to_vec(),
             dodge_refreshed_events: processor.dodge_refreshed_events().to_vec(),
-            player_stat_events: processor.player_stat_events().to_vec(),
+            player_stat_events: player_stat_events_with_shot_saves(processor.player_stat_events()),
             goal_events: processor.goal_events().to_vec(),
             replay_tick_marks: replay_tick_marks(processor.replay, &frame_data.metadata_frames),
             frame_data,
