@@ -169,7 +169,22 @@ const SHOT_TARGET_GOAL_CENTER_Y: f32 = 5120.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
+pub struct ShotSaveMetadata {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<boxcars::Vector3f>,
+    pub is_team_0: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ShotEventMetadata {
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
+    pub shot_touch_position: boxcars::Vector3f,
     #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub ball_position: boxcars::Vector3f,
     #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
@@ -187,6 +202,8 @@ pub struct ShotEventMetadata {
     pub distance_to_goal_line: f32,
     pub ball_goal_alignment: Option<f32>,
     pub ball_speed_toward_goal: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resulting_save: Option<ShotSaveMetadata>,
 }
 
 impl ShotEventMetadata {
@@ -219,6 +236,7 @@ impl ShotEventMetadata {
         });
 
         Self {
+            shot_touch_position: ball_body.location,
             ball_position: ball_body.location,
             ball_velocity: ball_body.linear_velocity,
             ball_speed: ball_velocity.map(|velocity| velocity.length()),
@@ -232,6 +250,7 @@ impl ShotEventMetadata {
             distance_to_goal_line,
             ball_goal_alignment,
             ball_speed_toward_goal: ball_velocity.map(|velocity| goal_direction.dot(velocity)),
+            resulting_save: None,
         }
     }
 }

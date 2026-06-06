@@ -51,6 +51,7 @@ fn shot_event_metadata_calculates_speed_distance_and_goal_alignment() {
 
     let metadata = ShotEventMetadata::from_rigid_bodies(true, &ball, Some(&player));
 
+    assert_eq!(metadata.shot_touch_position, ball.location);
     assert_eq!(metadata.ball_position, ball.location);
     assert_eq!(metadata.ball_velocity, ball.linear_velocity);
     assert_eq!(metadata.ball_speed, Some(2000.0));
