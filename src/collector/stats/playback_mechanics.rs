@@ -76,6 +76,44 @@ pub(in crate::collector::stats::playback) fn mechanic_event_unsigned_property(
     }
 }
 
+pub(in crate::collector::stats::playback) fn mechanic_event_float_property(
+    key: &str,
+    value: f32,
+) -> StatsEventProperty {
+    StatsEventProperty {
+        key: key.to_owned(),
+        value: StatsEventPropertyValue::Float(value),
+    }
+}
+
+pub(in crate::collector::stats::playback) fn flick_mechanic_event_properties(
+    object: &serde_json::Map<String, Value>,
+) -> Vec<StatsEventProperty> {
+    vec![
+        mechanic_event_text_property(
+            "flick_kind",
+            object
+                .get("kind")
+                .and_then(Value::as_str)
+                .unwrap_or("other"),
+        ),
+        mechanic_event_text_property(
+            "setup_rotation_direction",
+            object
+                .get("setup_rotation_direction")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown"),
+        ),
+        mechanic_event_float_property(
+            "setup_rotation_degrees",
+            object
+                .get("setup_rotation_degrees")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0) as f32,
+        ),
+    ]
+}
+
 pub(in crate::collector::stats::playback) fn ball_carry_mechanic_event_properties(
     object: &serde_json::Map<String, Value>,
 ) -> Vec<StatsEventProperty> {

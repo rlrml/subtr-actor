@@ -396,7 +396,7 @@ pub(in crate::collector::stats::playback) fn parse_flick_mechanic_event(
     index: usize,
 ) -> SubtrActorResult<StatsTimelineTagEvent> {
     let object = json_object(value, "flick mechanic event")?;
-    Ok(span_mechanic_event(
+    let mut mechanic_event = span_mechanic_event(
         "flick",
         index,
         json_required_usize(object, "setup_start_frame")?,
@@ -405,7 +405,9 @@ pub(in crate::collector::stats::playback) fn parse_flick_mechanic_event(
         json_required_f32(object, "time")?,
         json_required_remote_id(object, "player")?,
         json_required_bool(object, "is_team_0")?,
-    ))
+    );
+    mechanic_event.properties = flick_mechanic_event_properties(object);
+    Ok(mechanic_event)
 }
 
 pub(in crate::collector::stats::playback) fn parse_flick_event(
@@ -447,6 +449,13 @@ pub(in crate::collector::stats::playback) fn parse_flick_event(
         backflip_pitch_rate: json_optional_f32(object.get("backflip_pitch_rate"))?.unwrap_or(0.0),
         rotation_under_ball_degrees: json_optional_f32(object.get("rotation_under_ball_degrees"))?
             .unwrap_or(0.0),
+        setup_rotation_degrees: json_optional_f32(object.get("setup_rotation_degrees"))?
+            .unwrap_or(0.0),
+        setup_rotation_direction: object
+            .get("setup_rotation_direction")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_owned(),
         confidence: json_required_f32(object, "confidence")?,
     })
 }

@@ -78,6 +78,8 @@ test("flick event derivation can populate compacted player stats", () => {
           local_ball_impulse: [1200, 0, 520],
           backflip_pitch_rate: 5,
           rotation_under_ball_degrees: 20,
+          setup_rotation_degrees: -20,
+          setup_rotation_direction: "left",
           confidence: 0.7,
         },
       ],
@@ -148,4 +150,8 @@ test("flick event derivation can populate compacted player stats", () => {
   assertClose(timeline.frames[2]?.players[1]?.flick.cumulative_setup_duration, 0.5);
   assert.equal(timeline.frames[2]?.players[1]?.flick.cumulative_ball_speed_change, 350);
   assert.equal(labeledCount(timeline.frames[2]?.players[1]?.flick ?? {}, "kind", "reverse"), 1);
+  assert.equal(
+    labeledCount(timeline.frames[2]?.players[1]?.flick ?? {}, "setup_rotation_direction", "left"),
+    1,
+  );
 });

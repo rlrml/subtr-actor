@@ -58,6 +58,16 @@ function mechanicShortLabel(kind: string): string {
   );
 }
 
+function flickMarkerKindLabel(event: { kind?: string; setup_rotation_direction?: string }): string {
+  if (event.kind !== "reverse") {
+    return "flick";
+  }
+  if (event.setup_rotation_direction === "left" || event.setup_rotation_direction === "right") {
+    return `${event.setup_rotation_direction} reverse flick`;
+  }
+  return "reverse flick";
+}
+
 export function getMechanicKinds(statsTimeline: StatsTimeline | null): string[] {
   return [
     ...new Set(
@@ -231,12 +241,13 @@ export function buildFlickTimelineEvents(
   return (statsTimeline.events?.flick ?? []).map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = getReplayPlayerName(replay, playerId);
+    const kindLabel = flickMarkerKindLabel(event);
     return {
       id: `flick:${event.frame}:${playerId}:${index + 1}`,
       time: getReplayFrameTime(replay, event.frame, event.time),
       frame: event.frame,
       kind: "flick",
-      label: `${playerName} flick`,
+      label: `${playerName} ${kindLabel}`,
       shortLabel: "F",
       playerId,
       playerName,
