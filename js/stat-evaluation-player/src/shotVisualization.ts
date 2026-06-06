@@ -1,9 +1,5 @@
 import * as THREE from "three";
-import type {
-  ReplayPlayer,
-  ReplayPlayerState,
-  ReplayTimelineEvent,
-} from "@rlrml/player";
+import type { ReplayPlayer, ReplayPlayerState, ReplayTimelineEvent } from "@rlrml/player";
 
 const FIELD_HALF_WIDTH = 4096;
 const FIELD_HALF_LENGTH = 5120;
@@ -73,7 +69,9 @@ export class ShotVisualizationController {
     this.camera = null;
   }
 
-  render(state: ReplayPlayerState | null = this.options.getReplayPlayer()?.getState() ?? null): void {
+  render(
+    state: ReplayPlayerState | null = this.options.getReplayPlayer()?.getState() ?? null,
+  ): void {
     const shots = this.shotEvents();
     const currentTime = state?.currentTime ?? null;
     if (!shots.some((shot) => shot.id === this.selectedShotId)) {
@@ -106,7 +104,9 @@ export class ShotVisualizationController {
       .map((shot) => shot.shot.ball_speed)
       .filter((speed): speed is number => Number.isFinite(speed));
     const averageSpeed =
-      speeds.length === 0 ? null : speeds.reduce((total, speed) => total + speed, 0) / speeds.length;
+      speeds.length === 0
+        ? null
+        : speeds.reduce((total, speed) => total + speed, 0) / speeds.length;
     return `${shots.length} shots | ${saved} saved | avg ${formatSpeed(averageSpeed)}`;
   }
 
@@ -208,13 +208,20 @@ export class ShotVisualizationController {
     scene.add(directional);
 
     const field = new THREE.Mesh(
-      new THREE.PlaneGeometry(FIELD_HALF_WIDTH * 2 * FIELD_SCALE, FIELD_HALF_LENGTH * 2 * FIELD_SCALE),
+      new THREE.PlaneGeometry(
+        FIELD_HALF_WIDTH * 2 * FIELD_SCALE,
+        FIELD_HALF_LENGTH * 2 * FIELD_SCALE,
+      ),
       new THREE.MeshBasicMaterial({ color: 0x173326, side: THREE.DoubleSide }),
     );
     field.rotation.x = -Math.PI / 2;
     scene.add(field);
 
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xd9e7e2, transparent: true, opacity: 0.55 });
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: 0xd9e7e2,
+      transparent: true,
+      opacity: 0.55,
+    });
     scene.add(new THREE.LineSegments(new THREE.EdgesGeometry(field.geometry), lineMaterial));
     scene.add(goalFrame(true));
     scene.add(goalFrame(false));
@@ -227,14 +234,20 @@ export class ShotVisualizationController {
       : target.clone();
     const path = new THREE.CatmullRomCurve3([
       start,
-      start.clone().lerp(end, 0.45).setY(Math.max(start.y, end.y) + 2.8),
+      start
+        .clone()
+        .lerp(end, 0.45)
+        .setY(Math.max(start.y, end.y) + 2.8),
       end,
     ]);
     const pathGeometry = new THREE.BufferGeometry().setFromPoints(path.getPoints(36));
     scene.add(
       new THREE.Line(
         pathGeometry,
-        new THREE.LineBasicMaterial({ color: shot.shot.resulting_save ? 0xf2c14e : 0x62d2a2, linewidth: 2 }),
+        new THREE.LineBasicMaterial({
+          color: shot.shot.resulting_save ? 0xf2c14e : 0x62d2a2,
+          linewidth: 2,
+        }),
       ),
     );
 
@@ -395,11 +408,19 @@ function goalFrame(orange: boolean): THREE.Group {
 }
 
 function toThree(position: Vec3Like): THREE.Vector3 {
-  return new THREE.Vector3(position.x * FIELD_SCALE, position.z * FIELD_SCALE, position.y * FIELD_SCALE);
+  return new THREE.Vector3(
+    position.x * FIELD_SCALE,
+    position.z * FIELD_SCALE,
+    position.y * FIELD_SCALE,
+  );
 }
 
 function toThreeDelta(position: Vec3Like): THREE.Vector3 {
-  return new THREE.Vector3(position.x * FIELD_SCALE, position.z * FIELD_SCALE, position.y * FIELD_SCALE);
+  return new THREE.Vector3(
+    position.x * FIELD_SCALE,
+    position.z * FIELD_SCALE,
+    position.y * FIELD_SCALE,
+  );
 }
 
 function detail(label: string, value: string): HTMLElement {
