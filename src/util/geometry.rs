@@ -677,6 +677,211 @@ pub fn car_hitbox_ball_contact_gap(
         .map(|center_distance| (center_distance - BALL_COLLISION_RADIUS).max(0.0))
 }
 
+#[derive(Debug, Clone, Copy)]
+struct OrientedCarHitbox {
+    center: glam::Vec3,
+    axes: [glam::Vec3; 3],
+    half_extents: glam::Vec3,
+}
+
+impl OrientedCarHitbox {
+    fn corners(self) -> [glam::Vec3; 8] {
+        let x = self.axes[0] * self.half_extents.x;
+        let y = self.axes[1] * self.half_extents.y;
+        let z = self.axes[2] * self.half_extents.z;
+
+        [
+            self.center - x - y - z,
+            self.center - x - y + z,
+            self.center - x + y - z,
+            self.center - x + y + z,
+            self.center + x - y - z,
+            self.center + x - y + z,
+            self.center + x + y - z,
+            self.center + x + y + z,
+        ]
+    }
+
+    fn edge_segments(self) -> [(glam::Vec3, glam::Vec3); 12] {
+        let corners = self.corners();
+        [
+            (corners[0], corners[1]),
+            (corners[0], corners[2]),
+            (corners[0], corners[4]),
+            (corners[3], corners[1]),
+            (corners[3], corners[2]),
+            (corners[3], corners[7]),
+            (corners[5], corners[1]),
+            (corners[5], corners[4]),
+            (corners[5], corners[7]),
+            (corners[6], corners[2]),
+            (corners[6], corners[4]),
+            (corners[6], corners[7]),
+        ]
+    }
+}
+
+fn oriented_car_hitbox(
+    player_body: &boxcars::RigidBody,
+    hitbox: CarHitbox,
+) -> Option<OrientedCarHitbox> {
+    let car_position = vec_to_glam(&player_body.location);
+    let car_rotation = quat_to_glam(&player_body.rotation);
+    let hitbox_center = glam::Vec3::new(hitbox.offset, 0.0, hitbox.elevation);
+    let hitbox_rotation = glam::Quat::from_rotation_y(hitbox.angle.to_radians());
+    let rotation = car_rotation * hitbox_rotation;
+    let center = car_position + car_rotation * hitbox_center;
+    let axes = [
+        rotation * glam::Vec3::X,
+        rotation * glam::Vec3::Y,
+        rotation * glam::Vec3::Z,
+    ];
+    let half_extents =
+        glam::Vec3::new(hitbox.length / 2.0, hitbox.width / 2.0, hitbox.height / 2.0);
+
+    if center.is_finite() && axes.iter().all(|axis| axis.is_finite()) && half_extents.is_finite() {
+        Some(OrientedCarHitbox {
+            center,
+            axes,
+            half_extents,
+        })
+    } else {
+        None
+    }
+}
+
+fn point_oriented_box_distance(point: glam::Vec3, hitbox: OrientedCarHitbox) -> f32 {
+    let delta = point - hitbox.center;
+    let mut closest = hitbox.center;
+    for (axis, half_extent) in hitbox.axes.into_iter().zip([
+        hitbox.half_extents.x,
+        hitbox.half_extents.y,
+        hitbox.half_extents.z,
+    ]) {
+        let distance_on_axis = delta.dot(axis).clamp(-half_extent, half_extent);
+        closest += axis * distance_on_axis;
+    }
+    (point - closest).length()
+}
+
+fn segment_segment_distance(
+    left_start: glam::Vec3,
+    left_end: glam::Vec3,
+    right_start: glam::Vec3,
+    right_end: glam::Vec3,
+) -> f32 {
+    let left_delta = left_end - left_start;
+    let right_delta = right_end - right_start;
+    let offset = left_start - right_start;
+    let left_length_sq = left_delta.length_squared();
+    let right_length_sq = right_delta.length_squared();
+    let left_right_dot = left_delta.dot(right_delta);
+    let left_offset_dot = left_delta.dot(offset);
+    let right_offset_dot = right_delta.dot(offset);
+    let denominator = left_length_sq * right_length_sq - left_right_dot * left_right_dot;
+
+    let mut left_t;
+    let mut right_t;
+    if denominator.abs() > f32::EPSILON {
+        left_t = ((left_right_dot * right_offset_dot - right_length_sq * left_offset_dot)
+            / denominator)
+            .clamp(0.0, 1.0);
+    } else {
+        left_t = 0.0;
+    }
+
+    right_t = (left_right_dot * left_t + right_offset_dot) / right_length_sq;
+    if right_t < 0.0 {
+        right_t = 0.0;
+        left_t = (-left_offset_dot / left_length_sq).clamp(0.0, 1.0);
+    } else if right_t > 1.0 {
+        right_t = 1.0;
+        left_t = ((left_right_dot - left_offset_dot) / left_length_sq).clamp(0.0, 1.0);
+    }
+
+    let left_closest = left_start + left_delta * left_t;
+    let right_closest = right_start + right_delta * right_t;
+    (left_closest - right_closest).length()
+}
+
+fn projected_interval(points: &[glam::Vec3; 8], axis: glam::Vec3) -> (f32, f32) {
+    points
+        .iter()
+        .map(|point| point.dot(axis))
+        .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), value| {
+            (min.min(value), max.max(value))
+        })
+}
+
+fn separated_on_axis(
+    left_corners: &[glam::Vec3; 8],
+    right_corners: &[glam::Vec3; 8],
+    axis: glam::Vec3,
+) -> bool {
+    if axis.length_squared() <= f32::EPSILON {
+        return false;
+    }
+    let axis = axis.normalize();
+    let (left_min, left_max) = projected_interval(left_corners, axis);
+    let (right_min, right_max) = projected_interval(right_corners, axis);
+    left_max < right_min || right_max < left_min
+}
+
+fn oriented_boxes_intersect(left: OrientedCarHitbox, right: OrientedCarHitbox) -> bool {
+    let left_corners = left.corners();
+    let right_corners = right.corners();
+    let face_axes = left.axes.into_iter().chain(right.axes);
+    let edge_axes = left
+        .axes
+        .into_iter()
+        .flat_map(|left_axis| right.axes.map(|right_axis| left_axis.cross(right_axis)));
+
+    face_axes
+        .chain(edge_axes)
+        .all(|axis| !separated_on_axis(&left_corners, &right_corners, axis))
+}
+
+fn oriented_box_distance(left: OrientedCarHitbox, right: OrientedCarHitbox) -> f32 {
+    if oriented_boxes_intersect(left, right) {
+        return 0.0;
+    }
+
+    let left_corners = left.corners();
+    let right_corners = right.corners();
+    let mut distance = f32::INFINITY;
+
+    for corner in left_corners {
+        distance = distance.min(point_oriented_box_distance(corner, right));
+    }
+    for corner in right_corners {
+        distance = distance.min(point_oriented_box_distance(corner, left));
+    }
+    for (left_start, left_end) in left.edge_segments() {
+        for (right_start, right_end) in right.edge_segments() {
+            distance = distance.min(segment_segment_distance(
+                left_start,
+                left_end,
+                right_start,
+                right_end,
+            ));
+        }
+    }
+
+    distance
+}
+
+pub fn car_hitbox_pair_contact_gap(
+    left_body: &boxcars::RigidBody,
+    left_hitbox: CarHitbox,
+    right_body: &boxcars::RigidBody,
+    right_hitbox: CarHitbox,
+) -> Option<f32> {
+    let left = oriented_car_hitbox(left_body, left_hitbox)?;
+    let right = oriented_car_hitbox(right_body, right_hitbox)?;
+    let distance = oriented_box_distance(left, right);
+    distance.is_finite().then_some(distance)
+}
+
 pub fn car_hitbox_min_world_z(player_body: &boxcars::RigidBody, hitbox: CarHitbox) -> Option<f32> {
     let car_position = vec_to_glam(&player_body.location);
     let car_rotation = quat_to_glam(&player_body.rotation);

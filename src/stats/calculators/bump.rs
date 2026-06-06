@@ -1,8 +1,8 @@
 use super::*;
 
 const BUMP_MAX_SAMPLE_DT: f32 = 0.18;
-const BUMP_MAX_CONTACT_DISTANCE: f32 = 230.0;
-const BUMP_MAX_VERTICAL_GAP: f32 = 190.0;
+const BUMP_MAX_CONTACT_GAP: f32 = 35.0;
+const BUMP_CONTACT_GAP_SAMPLES: usize = 8;
 const BUMP_MIN_CLOSING_SPEED: f32 = 420.0;
 const BUMP_MIN_VICTIM_IMPULSE: f32 = 180.0;
 const BUMP_MIN_INITIATOR_SLOWDOWN: f32 = 100.0;
@@ -186,20 +186,15 @@ impl BumpCalculator {
         let left_position = vec_to_glam(&left_body.location);
         let right_position = vec_to_glam(&right_body.location);
 
-        let contact_distance = swept_horizontal_distance(
-            left_previous_position,
-            left_position,
-            right_previous_position,
-            right_position,
-        );
-        if contact_distance > BUMP_MAX_CONTACT_DISTANCE {
-            return None;
-        }
-
-        let vertical_gap = (left_position.z - right_position.z)
-            .abs()
-            .min((left_previous_position.z - right_previous_position.z).abs());
-        if vertical_gap > BUMP_MAX_VERTICAL_GAP {
+        let contact_distance = swept_car_hitbox_contact_gap(
+            previous_left_body,
+            left_body,
+            left.hitbox,
+            previous_right_body,
+            right_body,
+            right.hitbox,
+        )?;
+        if contact_distance > BUMP_MAX_CONTACT_GAP {
             return None;
         }
 
@@ -254,8 +249,7 @@ impl BumpCalculator {
             return None;
         }
 
-        let distance_factor =
-            (1.0 - (contact_distance / BUMP_MAX_CONTACT_DISTANCE)).clamp(0.0, 1.0);
+        let distance_factor = (1.0 - (contact_distance / BUMP_MAX_CONTACT_GAP)).clamp(0.0, 1.0);
         let score_factor = ((candidate.score - BUMP_MIN_DIRECTIONAL_SCORE) / 900.0).clamp(0.0, 1.0);
         let margin_factor =
             ((candidate.score - reverse_score - BUMP_MIN_SCORE_MARGIN) / 500.0).clamp(0.0, 1.0);
@@ -389,25 +383,44 @@ fn vec3_to_array(v: glam::Vec3) -> [f32; 3] {
     [v.x, v.y, v.z]
 }
 
-fn horizontal(v: glam::Vec3) -> glam::Vec2 {
-    glam::Vec2::new(v.x, v.y)
+fn swept_car_hitbox_contact_gap(
+    left_previous: &boxcars::RigidBody,
+    left_current: &boxcars::RigidBody,
+    left_hitbox: CarHitbox,
+    right_previous: &boxcars::RigidBody,
+    right_current: &boxcars::RigidBody,
+    right_hitbox: CarHitbox,
+) -> Option<f32> {
+    let mut closest_gap =
+        car_hitbox_pair_contact_gap(left_current, left_hitbox, right_current, right_hitbox)?;
+
+    for sample_index in 0..=BUMP_CONTACT_GAP_SAMPLES {
+        let sample_fraction = sample_index as f32 / BUMP_CONTACT_GAP_SAMPLES as f32;
+        let left_sample = interpolate_rigid_body(left_previous, left_current, sample_fraction);
+        let right_sample = interpolate_rigid_body(right_previous, right_current, sample_fraction);
+        let sample_gap =
+            car_hitbox_pair_contact_gap(&left_sample, left_hitbox, &right_sample, right_hitbox)?;
+        closest_gap = closest_gap.min(sample_gap);
+    }
+
+    Some(closest_gap)
 }
 
-fn swept_horizontal_distance(
-    left_previous: glam::Vec3,
-    left_current: glam::Vec3,
-    right_previous: glam::Vec3,
-    right_current: glam::Vec3,
-) -> f32 {
-    let relative_start = horizontal(left_previous - right_previous);
-    let relative_delta =
-        horizontal((left_current - left_previous) - (right_current - right_previous));
-    let closest_t = if relative_delta.length_squared() > f32::EPSILON {
-        (-relative_start.dot(relative_delta) / relative_delta.length_squared()).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    (relative_start + relative_delta * closest_t).length()
+fn interpolate_rigid_body(
+    previous: &boxcars::RigidBody,
+    current: &boxcars::RigidBody,
+    fraction: f32,
+) -> boxcars::RigidBody {
+    let fraction = fraction.clamp(0.0, 1.0);
+    let previous_position = vec_to_glam(&previous.location);
+    let current_position = vec_to_glam(&current.location);
+    let previous_rotation = quat_to_glam(&previous.rotation);
+    let current_rotation = quat_to_glam(&current.rotation);
+
+    let mut interpolated = *current;
+    interpolated.location = glam_to_vec(&previous_position.lerp(current_position, fraction));
+    interpolated.rotation = glam_to_quat(&previous_rotation.slerp(current_rotation, fraction));
+    interpolated
 }
 
 fn contact_normal(

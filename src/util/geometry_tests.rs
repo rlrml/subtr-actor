@@ -336,6 +336,52 @@ fn car_hitbox_ball_contact_gap_subtracts_ball_radius() {
 }
 
 #[test]
+fn car_hitbox_pair_contact_gap_returns_zero_for_touching_cars() {
+    let hitbox = default_car_hitbox();
+    let left = sample_rotated_rigid_body(0.0, 0.0, 17.0, glam::Quat::IDENTITY);
+    let right = sample_rotated_rigid_body(118.0, 0.0, 17.0, glam::Quat::IDENTITY);
+
+    let gap = car_hitbox_pair_contact_gap(&left, hitbox, &right, hitbox).unwrap();
+
+    assert!(gap <= 0.001);
+}
+
+#[test]
+fn car_hitbox_pair_contact_gap_measures_separation_between_hitboxes() {
+    let hitbox = default_car_hitbox();
+    let left = sample_rotated_rigid_body(0.0, 0.0, 17.0, glam::Quat::IDENTITY);
+    let right = sample_rotated_rigid_body(128.0, 0.0, 17.0, glam::Quat::IDENTITY);
+
+    let gap = car_hitbox_pair_contact_gap(&left, hitbox, &right, hitbox).unwrap();
+
+    assert!(
+        gap > 9.0 && gap < 10.0,
+        "expected a small positive oriented-hitbox gap, got {gap:?}"
+    );
+}
+
+#[test]
+fn car_hitbox_pair_contact_gap_uses_car_orientation() {
+    let hitbox = default_car_hitbox();
+    let left = sample_rotated_rigid_body(0.0, 0.0, 17.0, glam::Quat::IDENTITY);
+    let forward_right = sample_rotated_rigid_body(155.0, 0.0, 17.0, glam::Quat::IDENTITY);
+    let sideways_right = sample_rotated_rigid_body(
+        155.0,
+        0.0,
+        17.0,
+        glam::Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
+    );
+
+    let forward_gap = car_hitbox_pair_contact_gap(&left, hitbox, &forward_right, hitbox).unwrap();
+    let sideways_gap = car_hitbox_pair_contact_gap(&left, hitbox, &sideways_right, hitbox).unwrap();
+
+    assert!(
+        forward_gap < sideways_gap,
+        "expected the forward-facing car's long axis to be closer: {forward_gap:?} !< {sideways_gap:?}"
+    );
+}
+
+#[test]
 fn car_hitbox_distance_applies_hitbox_offset_elevation_and_slope() {
     let hitbox = default_car_hitbox();
     let car = sample_rotated_rigid_body(0.0, 0.0, 0.0, glam::Quat::IDENTITY);
