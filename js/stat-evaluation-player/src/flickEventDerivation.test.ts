@@ -151,11 +151,7 @@ test("flick event derivation can populate compacted player stats", () => {
   assert.equal(timeline.frames[2]?.players[1]?.flick.cumulative_ball_speed_change, 350);
   assert.equal(labeledCount(timeline.frames[2]?.players[1]?.flick ?? {}, "kind", "reverse"), 1);
   assert.equal(
-    labeledCount(
-      timeline.frames[2]?.players[1]?.flick ?? {},
-      "setup_rotation_direction",
-      "left",
-    ),
+    labeledCount(timeline.frames[2]?.players[1]?.flick ?? {}, "setup_rotation_direction", "left"),
     1,
   );
 });
