@@ -77,6 +77,7 @@ import {
   isStatsPlayerConfigDebugEnabled,
   type StatsPlayerConfig,
   type StatsWindowKind,
+  type SingletonWindowId,
   type WindowPlacementConfig,
 } from "./playerConfig.ts";
 import { logStatsPlayerConfigLoadDebug } from "./playerConfigRuntime.ts";
@@ -386,10 +387,18 @@ function renderEventPlaylistWindow(): void {
   eventPlaylistController?.render();
 }
 
+function isSingletonWindowVisible(id: string): boolean {
+  const windowEl = appRoot?.querySelector<HTMLElement>(`[data-window-id="${id}"]`);
+  return Boolean(windowEl && !windowEl.hidden);
+}
+
 function syncEventPlaylistTimeline(
   state: ReplayPlayerState,
   options: SyncEventPlaylistTimelineOptions = {},
 ): void {
+  if (!options.forceScroll && !isSingletonWindowVisible("event-playlist")) {
+    return;
+  }
   eventPlaylistController?.syncTimeline(state, options);
 }
 
@@ -420,7 +429,28 @@ function renderScoreboard(frameIndex = replayPlayer?.getState().frameIndex ?? 0)
 }
 
 function renderShotVisualization(state = replayPlayer?.getState() ?? null): void {
+  if (!isSingletonWindowVisible("shot-visualization")) {
+    return;
+  }
   shotVisualizationController?.render(state);
+}
+
+function toggleSingletonWindow(id: SingletonWindowId): void {
+  windowCommands.toggleWindow(id);
+  if (!isSingletonWindowVisible(id)) {
+    return;
+  }
+
+  if (id === "event-playlist") {
+    renderEventPlaylistWindow();
+    const state = replayPlayer?.getState();
+    if (state) {
+      syncEventPlaylistTimeline(state, { forceScroll: true });
+    }
+  }
+  if (id === "shot-visualization") {
+    renderShotVisualization(replayPlayer?.getState() ?? null);
+  }
 }
 
 function setTransportEnabled(enabled: boolean): void {
@@ -937,7 +967,7 @@ export function mountStatEvaluationPlayer(
     setLauncherOpen: windowCommands.setLauncherOpen,
     openReplayFilePicker: windowCommands.openReplayFilePicker,
     getElementWindowId: windowCommands.getElementWindowId,
-    toggleWindow: windowCommands.toggleWindow,
+    toggleWindow: toggleSingletonWindow,
     hideWindow: windowCommands.hideWindow,
     createStatsWindow,
     async loadReplayFile(file) {

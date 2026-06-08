@@ -36,6 +36,12 @@ export class ShotVisualizationController {
   private camera: THREE.PerspectiveCamera | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private selectedShotId: string | null = null;
+  private cachedReplay: ReplayPlayer["replay"] | null = null;
+  private cachedShots: ShotEvent[] = [];
+  private lastShotsSignature = "";
+  private lastListSelectionKey: string | null = null;
+  private lastSelectedShotKey: string | null = null;
+  private readonly shotButtons = new Map<string, HTMLButtonElement>();
 
   constructor(private readonly options: ShotVisualizationControllerOptions) {
     this.options.body.innerHTML = `
@@ -74,24 +80,46 @@ export class ShotVisualizationController {
   ): void {
     const shots = this.shotEvents();
     const currentTime = state?.currentTime ?? null;
-    if (!shots.some((shot) => shot.id === this.selectedShotId)) {
-      this.selectedShotId = shots[0]?.id ?? null;
+    if (!this.findSelectedShot(shots)) {
+      this.selectedShotId = shots[0] ? this.shotKey(shots[0], 0) : null;
     }
+    const selectedShot = this.findSelectedShot(shots);
+    const selectedShotKey = selectedShot?.key ?? null;
+    const shotsSignature = this.shotsSignature(shots);
+    const shotsChanged = shotsSignature !== this.lastShotsSignature;
 
     this.emptyState.hidden = shots.length > 0;
-    this.summary.textContent = this.summaryText(shots);
-    this.renderShotList(shots, currentTime);
+    if (shotsChanged) {
+      this.summary.textContent = this.summaryText(shots);
+    }
+    if (shotsChanged || selectedShotKey !== this.lastListSelectionKey) {
+      this.renderShotList(shots, currentTime, selectedShotKey);
+      this.lastListSelectionKey = selectedShotKey;
+    } else {
+      this.updateShotListActiveState(shots, currentTime);
+    }
     this.renderChart(shots, currentTime);
-    this.renderSelectedShot(shots.find((shot) => shot.id === this.selectedShotId) ?? null);
+    if (shotsChanged || selectedShotKey !== this.lastSelectedShotKey) {
+      this.renderSelectedShot(selectedShot?.shot ?? null);
+      this.lastSelectedShotKey = selectedShotKey;
+    }
+    this.lastShotsSignature = shotsSignature;
   }
 
   private shotEvents(): ShotEvent[] {
     const replay = this.options.getReplayPlayer()?.replay;
     if (!replay) {
+      this.cachedReplay = null;
+      this.cachedShots = [];
       return [];
     }
+    if (replay === this.cachedReplay) {
+      return this.cachedShots;
+    }
 
-    return replay.timelineEvents.filter(isShotEvent);
+    this.cachedReplay = replay;
+    this.cachedShots = replay.timelineEvents.filter(isShotEvent);
+    return this.cachedShots;
   }
 
   private summaryText(shots: readonly ShotEvent[]): string {
@@ -110,18 +138,22 @@ export class ShotVisualizationController {
     return `${shots.length} shots | ${saved} saved | avg ${formatSpeed(averageSpeed)}`;
   }
 
-  private renderShotList(shots: readonly ShotEvent[], currentTime: number | null): void {
+  private renderShotList(
+    shots: readonly ShotEvent[],
+    currentTime: number | null,
+    selectedShotKey: string | null,
+  ): void {
+    this.shotButtons.clear();
     this.shotList.replaceChildren(
       ...shots.map((shot, index) => {
+        const key = this.shotKey(shot, index);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "shot-list-item";
-        button.dataset.selected = String(shot.id === this.selectedShotId);
-        button.dataset.active = String(
-          currentTime !== null && Math.abs(currentTime - shot.time) < 1.5,
-        );
+        button.dataset.selected = String(key === selectedShotKey);
+        button.dataset.active = String(isShotActive(shot, currentTime));
         button.addEventListener("click", () => {
-          this.selectedShotId = shot.id ?? `${shot.frame ?? index}:${shot.playerId ?? "shot"}`;
+          this.selectedShotId = key;
           this.options.cueTimelineEvent(shot);
           this.render();
         });
@@ -135,9 +167,19 @@ export class ShotVisualizationController {
           shot.shot.resulting_save ? "saved" : "unsaved"
         }`;
         button.append(title, meta);
+        this.shotButtons.set(key, button);
         return button;
       }),
     );
+  }
+
+  private updateShotListActiveState(shots: readonly ShotEvent[], currentTime: number | null): void {
+    shots.forEach((shot, index) => {
+      const button = this.shotButtons.get(this.shotKey(shot, index));
+      if (button) {
+        button.dataset.active = String(isShotActive(shot, currentTime));
+      }
+    });
   }
 
   private renderChart(shots: readonly ShotEvent[], currentTime: number | null): void {
@@ -161,12 +203,12 @@ export class ShotVisualizationController {
     context.clearRect(0, 0, cssWidth, cssHeight);
     drawField(context, cssWidth, cssHeight);
 
-    for (const shot of shots) {
+    shots.forEach((shot, index) => {
       const position = shot.shot.shot_touch_position ?? shot.shot.ball_position;
       const point = fieldToChart(position, cssWidth, cssHeight);
       const saved = Boolean(shot.shot.resulting_save);
-      const active = currentTime !== null && Math.abs(currentTime - shot.time) < 1.5;
-      const selected = shot.id === this.selectedShotId;
+      const active = isShotActive(shot, currentTime);
+      const selected = this.shotKey(shot, index) === this.selectedShotId;
       const radius = selected ? 6 : active ? 5 : 4;
 
       context.beginPath();
@@ -176,7 +218,7 @@ export class ShotVisualizationController {
       context.lineWidth = selected ? 2.5 : 1.25;
       context.strokeStyle = selected ? "#f8fafc" : active ? "#e11d48" : "rgba(4, 12, 20, 0.85)";
       context.stroke();
-    }
+    });
   }
 
   private renderSelectedShot(shot: ShotEvent | null): void {
@@ -340,7 +382,7 @@ export class ShotVisualizationController {
       }
     }
     if (nearest && nearestDistance <= 18) {
-      this.selectedShotId = nearest.id ?? null;
+      this.selectedShotId = this.shotKey(nearest, shots.indexOf(nearest));
       this.options.cueTimelineEvent(nearest);
       this.render();
     }
@@ -353,10 +395,40 @@ export class ShotVisualizationController {
     }
     return element as T;
   }
+
+  private findSelectedShot(
+    shots: readonly ShotEvent[],
+  ): { shot: ShotEvent; index: number; key: string } | null {
+    if (!this.selectedShotId) {
+      return null;
+    }
+    for (let index = 0; index < shots.length; index += 1) {
+      const shot = shots[index]!;
+      const key = this.shotKey(shot, index);
+      if (key === this.selectedShotId) {
+        return { shot, index, key };
+      }
+    }
+    return null;
+  }
+
+  private shotKey(shot: ShotEvent, index: number): string {
+    return shot.id ?? `${shot.frame ?? "time"}:${shot.time}:${shot.playerId ?? "shot"}:${index}`;
+  }
+
+  private shotsSignature(shots: readonly ShotEvent[]): string {
+    return shots
+      .map((shot, index) => `${this.shotKey(shot, index)}:${shot.time}:${shot.shot.ball_speed}`)
+      .join("|");
+  }
 }
 
 function isShotEvent(event: ReplayTimelineEvent): event is ShotEvent {
   return event.kind === "shot" && Boolean(event.shot);
+}
+
+function isShotActive(shot: ShotEvent, currentTime: number | null): boolean {
+  return currentTime !== null && Math.abs(currentTime - shot.time) < 1.5;
 }
 
 function drawField(context: CanvasRenderingContext2D, width: number, height: number): void {
