@@ -266,6 +266,36 @@ _None documented._
 
 _None documented._
 
+### Controlled Play (`controlled_play`)
+
+- Category: `possession`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `controlled_play` via `ControlledPlayNode` / `ControlledPlayCalculator`
+
+**Summary**
+
+A same-player possession episode with multiple touches and sustained close-ball time.
+
+**Approach**
+
+- Start a player-owned candidate from an attributed touch during live play.
+- Require at least two distinct touches by the same player with at least one second between the first and last touch.
+- Require sustained proximity to the ball and finish the candidate when another player touches, live play ends, or the touch chain times out.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Core Player Goal Context (`core_player_goal_context`)
 
 - Category: `goal_context`

@@ -143,6 +143,7 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "rotation_first_man_stint",
     "backboard",
     "ball_carry",
+    "controlled_play",
     "ceiling_shot",
     "wall_aerial",
     "wall_aerial_shot",
