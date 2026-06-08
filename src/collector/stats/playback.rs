@@ -251,6 +251,16 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .and_then(|config| config.get("level_ball_depth_margin"))
                 .and_then(json_f32)
                 .unwrap_or(PositioningCalculatorConfig::default().level_ball_depth_margin),
+            closest_to_ball_switch_margin: positioning_config
+                .and_then(|config| config.get("closest_to_ball_switch_margin"))
+                .and_then(json_f32)
+                .unwrap_or(PositioningCalculatorConfig::default().closest_to_ball_switch_margin),
+            closest_to_ball_switch_min_seconds: positioning_config
+                .and_then(|config| config.get("closest_to_ball_switch_min_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(
+                    PositioningCalculatorConfig::default().closest_to_ball_switch_min_seconds,
+                ),
             pressure_neutral_zone_half_width_y: pressure_config
                 .and_then(|config| config.get("pressure_neutral_zone_half_width_y"))
                 .and_then(json_f32)
@@ -456,6 +466,29 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                     .and_then(Value::as_f64)
                     .unwrap_or(
                         PositioningCalculatorConfig::default().level_ball_depth_margin as f64,
+                    ),
+            )?,
+        );
+        config.insert(
+            "closest_to_ball_switch_margin".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("closest_to_ball_switch_margin"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(
+                        PositioningCalculatorConfig::default().closest_to_ball_switch_margin as f64,
+                    ),
+            )?,
+        );
+        config.insert(
+            "closest_to_ball_switch_min_seconds".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("closest_to_ball_switch_min_seconds"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(
+                        PositioningCalculatorConfig::default().closest_to_ball_switch_min_seconds
+                            as f64,
                     ),
             )?,
         );

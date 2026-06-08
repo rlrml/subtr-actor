@@ -48,7 +48,7 @@ test("event timeline sources include empty canonical stats streams", () => {
   const timelineSources = getTestTimelineSources(ctx);
   const sourceIds = new Set(timelineSources.map((source) => source.id));
 
-  assert.ok(sourceIds.has("stats-stream:positioning"));
+  assert.ok(sourceIds.has("stats-stream:positioning_activity"));
   assert.ok(sourceIds.has("stats-stream:backboard"));
   assert.ok(sourceIds.has("stats-stream:rotation_role_span"));
   assert.ok(sourceIds.has("stats-stream:flip_impulse"));
@@ -76,16 +76,17 @@ test("event playlist filters include empty canonical stats streams", () => {
   const playlistSources = getEventPlaylistSources(ctx, getTestTimelineSources(ctx));
   const playlistSourceIds = new Set(playlistSources.map((source) => source.id));
 
-  assert.ok(playlistSourceIds.has("stats-stream:positioning"));
+  assert.ok(playlistSourceIds.has("stats-stream:positioning_activity"));
   assert.ok(playlistSourceIds.has("stats-stream:backboard"));
   assert.ok(playlistSourceIds.has("mechanic:speed_flip"));
   assert.equal(
-    playlistSources.find((source) => source.id === "stats-stream:positioning")?.events.length,
+    playlistSources.find((source) => source.id === "stats-stream:positioning_activity")?.events
+      .length,
     0,
   );
 });
 
-test("event playlist sources include generic stats event streams such as positioning", () => {
+test("event playlist sources include generic stats event streams such as positioning activity", () => {
   const replay = {
     frames: Array.from({ length: 13 }, (_, frame) => ({ time: frame === 12 ? 1.25 : frame })),
     players: [{ id: "Steam:blue-id", name: "Blue" }],
@@ -93,7 +94,7 @@ test("event playlist sources include generic stats event streams such as positio
   } as ReplayModel;
   const statsTimeline = createStatsTimeline({
     events: {
-      positioning: [
+      positioning_activity: [
         {
           time: 1.2,
           frame: 11,
@@ -104,23 +105,7 @@ test("event playlist sources include generic stats event streams such as positio
           is_team_0: true,
           active: true,
           tracked: true,
-          distance_to_teammates: 1000,
-          distance_to_ball: 2000,
-          possession_state: "has_possession",
           demolished: false,
-          no_teammates: false,
-          teammate_role: "most_back",
-          defensive_zone_fraction: 0.5,
-          neutral_zone_fraction: 0.5,
-          offensive_zone_fraction: 0,
-          defensive_half_fraction: 0.8,
-          offensive_half_fraction: 0.2,
-          closest_to_ball: true,
-          farthest_from_ball: false,
-          behind_ball_fraction: 0.6,
-          level_with_ball_fraction: 0.4,
-          in_front_of_ball_fraction: 0,
-          caught_ahead_of_play_on_conceded_goal: false,
         },
       ],
     },
@@ -144,20 +129,22 @@ test("event playlist sources include generic stats event streams such as positio
     },
   });
 
-  const positioningSource = timelineSources.find(
-    (source) => source.id === "stats-stream:positioning",
+  const positioningActivitySource = timelineSources.find(
+    (source) => source.id === "stats-stream:positioning_activity",
   );
-  assert.ok(positioningSource);
-  assert.equal(positioningSource.group, "Event streams");
-  assert.equal(positioningSource.label, "Positioning");
-  assert.equal(positioningSource.count, 1);
-  assert.equal(positioningSource.active, false);
+  assert.ok(positioningActivitySource);
+  assert.equal(positioningActivitySource.group, "Event streams");
+  assert.equal(positioningActivitySource.label, "Positioning Activity");
+  assert.equal(positioningActivitySource.count, 1);
+  assert.equal(positioningActivitySource.active, false);
 
-  positioningSource.setActive(true);
-  assert.deepEqual(toggled, [{ id: "stats-stream:positioning", enabled: true }]);
+  positioningActivitySource.setActive(true);
+  assert.deepEqual(toggled, [{ id: "stats-stream:positioning_activity", enabled: true }]);
 
   const playlistSources = getEventPlaylistSources(ctx, timelineSources);
-  const playlistSource = playlistSources.find((source) => source.id === "stats-stream:positioning");
+  const playlistSource = playlistSources.find(
+    (source) => source.id === "stats-stream:positioning_activity",
+  );
   assert.ok(playlistSource);
 
   const items = buildEventPlaylistItems({
@@ -180,12 +167,12 @@ test("event playlist sources include generic stats event streams such as positio
     })),
     [
       {
-        sourceId: "stats-stream:positioning",
-        sourceLabel: "Positioning",
+        sourceId: "stats-stream:positioning_activity",
+        sourceLabel: "Positioning Activity",
         time: 1.25,
         frame: 12,
-        label: "Blue positioning",
-        shortLabel: "P",
+        label: "Blue positioning activity",
+        shortLabel: "PA",
         playerId: "Steam:blue-id",
         playerName: "Blue",
         isTeamZero: true,

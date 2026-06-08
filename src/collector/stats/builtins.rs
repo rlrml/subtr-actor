@@ -824,10 +824,18 @@ pub(crate) fn builtin_module_json(
         "positioning" => {
             let calculator = graph_state::<PositioningCalculator>(graph, module_name)?;
             let projection = projected_stats(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(projection.positioning.player_stats()),
-                events: calculator.events(),
-            })
+            serialize_to_json_value(&serde_json::json!({
+                "team_zero": projection.positioning.team_zero_stats(),
+                "team_one": projection.positioning.team_one_stats(),
+                "player_stats": player_stats_entries(projection.positioning.player_stats()),
+                "activity_events": calculator.activity_events(),
+                "distance_events": calculator.distance_events(),
+                "field_zone_events": calculator.field_zone_events(),
+                "ball_depth_events": calculator.ball_depth_events(),
+                "teammate_role_events": calculator.teammate_role_events(),
+                "ball_proximity_events": calculator.ball_proximity_events(),
+                "goal_context_events": calculator.goal_context_events(),
+            }))
         }
         "powerslide" => {
             let calculator = graph_state::<PowerslideCalculator>(graph, module_name)?;
@@ -1426,7 +1434,9 @@ pub(crate) fn builtin_snapshot_frame_json(
         }
         "positioning" => {
             let projection = projected_stats(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsExport {
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.positioning.team_zero_stats(),
+                team_one: projection.positioning.team_one_stats(),
                 player_stats: player_stats_entries(projection.positioning.player_stats()),
             })?
         }
@@ -1465,6 +1475,8 @@ pub(crate) fn builtin_snapshot_config_json(
             Some(serialize_to_json_value(&serde_json::json!({
                 "most_back_forward_threshold_y": calculator.config().most_back_forward_threshold_y,
                 "level_ball_depth_margin": calculator.config().level_ball_depth_margin,
+                "closest_to_ball_switch_margin": calculator.config().closest_to_ball_switch_margin,
+                "closest_to_ball_switch_min_seconds": calculator.config().closest_to_ball_switch_min_seconds,
             }))?)
         }
         "pressure" => {

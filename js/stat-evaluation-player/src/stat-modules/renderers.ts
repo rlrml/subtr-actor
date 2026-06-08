@@ -194,7 +194,8 @@ export function renderRelativePositioningStats(
     <div class="stat-row"><span class="label">Most forward</span><span class="value">${formatPositioningTimeShare(positioning, "percent_most_forward", "time_most_forward")}</span></div>
     <div class="stat-row"><span class="label">Mid role</span><span class="value">${formatPositioningTimeShare(positioning, "percent_mid_role", "time_mid_role")}</span></div>
     <div class="stat-row"><span class="label">Other role</span><span class="value">${formatPositioningTimeShare(positioning, "percent_other_role", "time_other_role")}</span></div>
-    <div class="stat-row"><span class="label">Closest to ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_closest_to_ball", "time_closest_to_ball")}</span></div>
+    <div class="stat-row"><span class="label">Closest on team</span><span class="value">${formatPositioningTimeShare(positioning, "percent_closest_to_ball_team", "time_closest_to_ball_team")}</span></div>
+    <div class="stat-row"><span class="label">Closest overall</span><span class="value">${formatPositioningTimeShare(positioning, "percent_closest_to_ball_absolute", "time_closest_to_ball_absolute")}</span></div>
     <div class="stat-row"><span class="label">Farthest from ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_farthest_from_ball", "time_farthest_from_ball")}</span></div>
     <div class="stat-row"><span class="label">Behind ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_behind_ball", "time_behind_ball")}</span></div>
     <div class="stat-row"><span class="label">Level with ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_level_with_ball", "time_level_with_ball")}</span></div>

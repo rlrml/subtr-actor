@@ -147,7 +147,7 @@ constexpr std::array<const char *, 6> REQUIRED_EVENT_HISTORY_FIELDS{
     "player_stat_events",
     "goal_events",
 };
-constexpr std::array<const char *, 44> GRAPH_EVENT_FIELDS{
+constexpr std::array<const char *, 50> GRAPH_EVENT_FIELDS{
     "timeline",
     "mechanics",
     "goal_context",
@@ -157,7 +157,13 @@ constexpr std::array<const char *, 44> GRAPH_EVENT_FIELDS{
     "pressure",
     "territorial_pressure",
     "movement",
-    "positioning",
+    "positioning_activity",
+    "positioning_distance",
+    "positioning_field_zone",
+    "positioning_ball_depth",
+    "positioning_teammate_role",
+    "positioning_ball_proximity",
+    "positioning_goal_context",
     "rotation_player",
     "rotation_team",
     "rotation_role_span",
