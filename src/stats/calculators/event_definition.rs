@@ -8,17 +8,16 @@ use linkme::distributed_slice;
 use super::{
     BackboardBounceEvent, BallCarryEvent, BoostLedgerEvent, BoostPickupComparisonEvent,
     BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent, ConfirmedFlipResetEvent,
-    ControlledPlayEvent, CorePlayerGoalContextEvent, CorePlayerScoreboardEvent,
-    DodgeRefreshedEvent, DodgeResetEvent, DoubleTapEvent, FiftyFiftyEvent, FlickEvent,
-    FlipImpulseEvent, FlipResetEvent, FlipResetFollowupDodgeEvent, GoalContextEvent, HalfFlipEvent,
-    HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent, PassEvent,
-    PositioningActivityEvent, PositioningBallDepthEvent, PositioningBallProximityEvent,
-    PositioningDistanceEvent, PositioningFieldZoneEvent, PositioningGoalContextEvent,
-    PositioningTeammateRoleEvent, PossessionEvent, PostWallDodgeEvent, PowerslideEvent,
-    PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent,
-    RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
-    TimelineEvent, TouchBallMovementEvent, TouchClassificationEvent, WallAerialEvent,
-    WallAerialShotEvent, WavedashEvent, WhiffEvent,
+    ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeRefreshedEvent, DodgeResetEvent,
+    DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipImpulseEvent, FlipResetEvent,
+    FlipResetFollowupDodgeEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
+    OneTimerEvent, PassEvent, PositioningActivityEvent, PositioningBallDepthEvent,
+    PositioningBallProximityEvent, PositioningDistanceEvent, PositioningFieldZoneEvent,
+    PositioningGoalContextEvent, PositioningTeammateRoleEvent, PossessionEvent, PostWallDodgeEvent,
+    PowerslideEvent, PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent,
+    RotationPlayerEvent, RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent,
+    TerritorialPressureEvent, TimelineEvent, TouchBallMovementEvent, TouchClassificationEvent,
+    WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::StatsTimelineTagEvent;
 
@@ -44,12 +43,12 @@ pub struct EventDefinition {
 pub enum EventCategory {
     Core,
     Mechanic,
-    GoalContext,
     Possession,
     Positioning,
     Boost,
     Contact,
     Movement,
+    Annotation,
 }
 
 /// Multi-dimensional confidence metadata for an event detector.
@@ -275,20 +274,6 @@ define_stats_event!(
     "core_player_scoreboard",
     "Core Player Scoreboard",
     EventCategory::Core
-);
-define_stats_event!(
-    CorePlayerGoalContextEvent,
-    CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION,
-    "core_player_goal_context",
-    "Core Player Goal Context",
-    EventCategory::GoalContext
-);
-define_stats_event!(
-    GoalContextEvent,
-    GOAL_CONTEXT_EVENT_DEFINITION,
-    "goal_context",
-    "Goal Context",
-    EventCategory::GoalContext
 );
 define_stats_event!(
     BackboardBounceEvent,
@@ -812,8 +797,6 @@ define_stats_event!(
 pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &TIMELINE_EVENT_DEFINITION,
     &CORE_PLAYER_SCOREBOARD_EVENT_DEFINITION,
-    &CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION,
-    &GOAL_CONTEXT_EVENT_DEFINITION,
     &BACKBOARD_BOUNCE_EVENT_DEFINITION,
     &CEILING_SHOT_EVENT_DEFINITION,
     &WALL_AERIAL_EVENT_DEFINITION,
@@ -871,18 +854,6 @@ const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
     produced_event(
         &CORE_PLAYER_SCOREBOARD_EVENT_DEFINITION,
-        "match_stats",
-        "MatchStatsNode",
-        "MatchStatsCalculator",
-    ),
-    produced_event(
-        &CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION,
-        "match_stats",
-        "MatchStatsNode",
-        "MatchStatsCalculator",
-    ),
-    produced_event(
-        &GOAL_CONTEXT_EVENT_DEFINITION,
         "match_stats",
         "MatchStatsNode",
         "MatchStatsCalculator",

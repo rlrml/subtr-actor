@@ -6,8 +6,6 @@ fn assert_stats_event<T: StatsEvent>() {}
 fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<TimelineEvent>();
     assert_stats_event::<CorePlayerScoreboardEvent>();
-    assert_stats_event::<CorePlayerGoalContextEvent>();
-    assert_stats_event::<GoalContextEvent>();
     assert_stats_event::<BackboardBounceEvent>();
     assert_stats_event::<CeilingShotEvent>();
     assert_stats_event::<WallAerialEvent>();
