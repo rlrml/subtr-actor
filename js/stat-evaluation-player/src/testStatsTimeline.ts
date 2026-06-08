@@ -181,6 +181,7 @@ export function createLegacyStatsTimeline(
     one_timer_events?: StatsEvents["one_timer"];
     pass_events?: StatsEvents["pass"];
     ball_carry_events?: StatsEvents["ball_carry"];
+    controlled_play_events?: StatsEvents["controlled_play"];
     mechanic_events?: StatsEvents["mechanics"];
     rush_events?: StatsEvents["rush"];
     speed_flip_events?: StatsEvents["speed_flip"];
@@ -221,6 +222,7 @@ export function createLegacyStatsTimeline(
       one_timer: overrides.one_timer_events ?? overrides.events?.one_timer ?? [],
       pass: overrides.pass_events ?? overrides.events?.pass ?? [],
       ball_carry: overrides.ball_carry_events ?? overrides.events?.ball_carry ?? [],
+      controlled_play: overrides.controlled_play_events ?? overrides.events?.controlled_play ?? [],
       rush: overrides.rush_events ?? overrides.events?.rush ?? [],
       flip_impulse: overrides.events?.flip_impulse ?? [],
       speed_flip: overrides.speed_flip_events ?? overrides.events?.speed_flip ?? [],
