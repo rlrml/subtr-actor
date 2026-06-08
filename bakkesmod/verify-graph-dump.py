@@ -74,7 +74,6 @@ DEFAULT_GRAPH_EVENT_FIELDS = (
     "boost_state",
     "bump",
     "touch",
-    "touch_ball_movement",
 )
 DEFAULT_REQUIRED_GRAPH_EVENT_FIELDS = ("timeline", "goal_context", "boost_pickups")
 DEFAULT_EVENT_HISTORY_FIELDS = (

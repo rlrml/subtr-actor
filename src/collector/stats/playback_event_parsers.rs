@@ -455,27 +455,28 @@ pub(in crate::collector::stats::playback) fn parse_touch_stats_event(
         surface: json_required_str(object, "surface")?.to_owned(),
         dodge_state: json_required_str(object, "dodge_state")?.to_owned(),
         ball_speed_change: json_required_f32(object, "ball_speed_change")?,
+        ball_movement: object
+            .get("ball_movement")
+            .filter(|value| !value.is_null())
+            .map(parse_touch_ball_movement)
+            .transpose()?,
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_touch_ball_movement_event(
-    value: &Value,
-) -> SubtrActorResult<TouchBallMovementEvent> {
+fn parse_touch_ball_movement(value: &Value) -> SubtrActorResult<TouchBallMovement> {
     let object = json_object(value, "touch ball movement event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(TouchBallMovementEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
+    let start_time = json_required_f32(object, "start_time")?;
+    let start_frame = json_required_usize(object, "start_frame")?;
+    Ok(TouchBallMovement {
+        start_time,
+        start_frame,
+        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(start_time),
+        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(start_frame),
         duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
         travel_distance: json_required_f32(object, "travel_distance")?,
         advance_distance: json_required_f32(object, "advance_distance")?,
         retreat_distance: json_required_f32(object, "retreat_distance")?,
+        finalized: json_optional_bool(object.get("finalized")).unwrap_or(true),
     })
 }
 

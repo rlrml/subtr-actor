@@ -425,11 +425,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_powerslide_event,
             )?,
             touch: self.module_player_events("touch", "events", parse_touch_stats_event)?,
-            touch_ball_movement: self.module_player_events(
-                "touch",
-                "ball_movement_events",
-                parse_touch_ball_movement_event,
-            )?,
             boost_pickups: self.module_player_events(
                 "boost",
                 "events",
@@ -589,10 +584,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "touch".to_owned(),
             Value::Array(self.module_array("touch", "events")),
-        );
-        events.insert(
-            "touch_ball_movement".to_owned(),
-            Value::Array(self.module_array("touch", "ball_movement_events")),
         );
         events.insert(
             "boost_pickups".to_owned(),

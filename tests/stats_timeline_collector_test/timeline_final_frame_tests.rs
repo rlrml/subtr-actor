@@ -117,7 +117,6 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             whiff: Vec::new(),
             powerslide: Vec::new(),
             touch: Vec::new(),
-            touch_ball_movement: Vec::new(),
             boost_pickups: Vec::new(),
             boost_ledger: Vec::new(),
             boost_state: Vec::new(),

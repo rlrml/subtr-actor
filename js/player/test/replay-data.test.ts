@@ -418,6 +418,20 @@ test("hitbox inference recognizes newer body name aliases", () => {
   assert.equal(inferReplayHitboxKindFromBodyName("Psyclops"), "octane");
 });
 
+test("normalization uses explicit player hitbox fields before stats text", () => {
+  const raw = buildReplayData(2, 2);
+  raw.meta.team_zero[0]!.car_hitbox_family = "plank";
+  raw.meta.team_zero[0]!.stats = {
+    Body: { Str: "Dominus" },
+  };
+  raw.meta.team_one[0]!.car_body_id = 30;
+
+  const replay = normalizeReplayData(raw);
+
+  assert.equal(replay.players[0]!.hitbox.kind, "plank");
+  assert.equal(replay.players[1]!.hitbox.kind, "merc");
+});
+
 test("async normalization can yield without a progress callback", async () => {
   let yieldCount = 0;
   const raw = buildReplayData(12);

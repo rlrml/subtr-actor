@@ -1010,6 +1010,31 @@ export function mountStatEvaluationPlayer(
   recordingWindowController?.installEventListeners(listeners.signal);
   cameraControlsController?.installEventListeners(listeners.signal);
 
+  // Allow an embedding parent window (e.g. the Rocket Sense stats UI) to drive
+  // the active review clip without reloading the replay, so hovering a goal can
+  // scrub the player to that goal's clip. Messages are only honored from the
+  // same origin to avoid cross-site control of the player.
+  window.addEventListener(
+    "message",
+    (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      const data = event.data as { source?: unknown; type?: unknown; index?: unknown } | null;
+      if (!data || typeof data !== "object" || data.source !== "rocket-sense") {
+        return;
+      }
+      if (
+        data.type === "activateReviewItem" &&
+        typeof data.index === "number" &&
+        Number.isInteger(data.index)
+      ) {
+        void mechanicsReviewController?.activateItem(data.index);
+      }
+    },
+    { signal: listeners.signal },
+  );
+
   renderModuleSummary();
   renderModuleSettings();
   renderScoreboard();

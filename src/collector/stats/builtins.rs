@@ -713,7 +713,6 @@ pub(crate) fn builtin_module_json(
             serialize_to_json_value(&serde_json::json!({
                 "player_stats": player_stats_entries(projection.touch.player_stats()),
                 "events": calculator.events(),
-                "ball_movement_events": calculator.ball_movement_events(),
             }))
         }
         "whiff" => {

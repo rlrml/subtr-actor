@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::any::{type_name, Any, TypeId};
 use std::collections::{HashMap, HashSet};
 

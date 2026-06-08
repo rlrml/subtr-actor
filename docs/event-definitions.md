@@ -150,7 +150,7 @@ _None documented._
 
 ### Bump (`bump`)
 
-- Category: `contact`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -326,7 +326,7 @@ _None documented._
 
 ### Dodge Refreshed (`dodge_refreshed`)
 
-- Category: `mechanic`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -355,7 +355,7 @@ _None documented._
 
 ### Dodge Reset (`dodge_reset`)
 
-- Category: `mechanic`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -415,7 +415,7 @@ _None documented._
 
 ### 50/50 (`fifty_fifty`)
 
-- Category: `contact`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -596,7 +596,7 @@ _None documented._
 
 ### Movement (`movement`)
 
-- Category: `movement`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -684,7 +684,7 @@ _None documented._
 
 ### Pass (`pass`)
 
-- Category: `mechanic`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -1169,35 +1169,7 @@ _None documented._
 
 ### Touch (`touch`)
 
-- Category: `contact`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `touch` via `TouchNode` / `TouchCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Touch Ball Movement (`touch_ball_movement`)
-
-- Category: `contact`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -1315,7 +1287,7 @@ _None documented._
 
 ### Whiff (`whiff`)
 
-- Category: `mechanic`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`

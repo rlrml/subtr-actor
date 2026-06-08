@@ -190,14 +190,12 @@ impl TouchStatsAccumulator {
         stats.last_ball_speed_change = Some(event.ball_speed_change);
         stats.max_ball_speed_change = stats.max_ball_speed_change.max(event.ball_speed_change);
         stats.cumulative_ball_speed_change += event.ball_speed_change;
+        if let Some(movement) = event.ball_movement.as_ref() {
+            stats.total_ball_travel_distance += movement.travel_distance;
+            stats.total_ball_advance_distance += movement.advance_distance;
+            stats.total_ball_retreat_distance += movement.retreat_distance;
+        }
         self.current_last_touch_player = Some(event.player.clone());
-    }
-
-    pub fn apply_ball_movement_event(&mut self, event: &TouchBallMovementEvent) {
-        let stats = self.player_stats.entry(event.player.clone()).or_default();
-        stats.total_ball_travel_distance += event.travel_distance;
-        stats.total_ball_advance_distance += event.advance_distance;
-        stats.total_ball_retreat_distance += event.retreat_distance;
     }
 
     pub fn set_current_last_touch_player(&mut self, player: Option<PlayerId>) {

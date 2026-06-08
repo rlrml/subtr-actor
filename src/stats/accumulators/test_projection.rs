@@ -573,9 +573,6 @@ impl TouchTestProjection for TouchCalculator {
             let frame = stats_test_frame(event.sample_time, event.sample_frame);
             stats.apply_touch_event(event, &frame);
         }
-        for event in self.projected_ball_movement_events() {
-            stats.apply_ball_movement_event(&event);
-        }
         leak_test_stats(stats.player_stats().clone())
     }
 }

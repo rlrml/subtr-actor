@@ -392,7 +392,6 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "territorial_pressure",
         "timeline",
         "touch",
-        "touch_ball_movement",
         "wall_aerial",
         "wall_aerial_shot",
         "wavedash",

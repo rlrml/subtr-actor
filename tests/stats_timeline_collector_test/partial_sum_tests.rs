@@ -434,8 +434,12 @@ fn test_touch_events_reconstruct_final_serialized_sums() {
         "expected touch fixture to contain touch events"
     );
     assert!(
-        !timeline.events.touch_ball_movement.is_empty(),
-        "expected touch fixture to contain ball movement credit events"
+        timeline
+            .events
+            .touch
+            .iter()
+            .any(|event| event.ball_movement.is_some()),
+        "expected touch fixture to contain ball movement credits"
     );
     assert_touch_events_reconstruct_final_serialized_sums(replay_path, &timeline);
 }

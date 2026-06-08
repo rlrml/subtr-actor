@@ -248,7 +248,6 @@ impl StatsTimelineEventsNode {
             whiff: whiff.events().to_vec(),
             powerslide: powerslide.events().to_vec(),
             touch: touch.events().to_vec(),
-            touch_ball_movement: touch.ball_movement_events().to_vec(),
             boost_pickups: boost.pickup_comparison_events().to_vec(),
             boost_ledger: boost.ledger_events().to_vec(),
             boost_state: boost.state_events().to_vec(),

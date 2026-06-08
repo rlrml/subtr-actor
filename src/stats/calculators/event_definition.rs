@@ -16,8 +16,8 @@ use super::{
     PositioningPossessionEvent, PositioningTeammateRoleEvent, PossessionEvent, PostWallDodgeEvent,
     PowerslideEvent, PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent,
     RotationPlayerEvent, RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent,
-    TerritorialPressureEvent, TimelineEvent, TouchBallMovementEvent, TouchClassificationEvent,
-    WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
+    TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
+    WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::StatsTimelineTagEvent;
 
@@ -46,9 +46,9 @@ pub enum EventCategory {
     Possession,
     Positioning,
     Boost,
-    Contact,
     Movement,
     Annotation,
+    Other,
 }
 
 /// Multi-dimensional confidence metadata for an event detector.
@@ -372,7 +372,7 @@ define_stats_event!(
     DODGE_RESET_EVENT_DEFINITION,
     "dodge_reset",
     "Dodge Reset",
-    EventCategory::Mechanic,
+    EventCategory::Other,
     summary = "A frame-level dodge refresh observed from replay state, optionally marked as occurring on the ball.",
     approach = [
         "Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.",
@@ -385,7 +385,7 @@ define_stats_event!(
     DODGE_REFRESHED_EVENT_DEFINITION,
     "dodge_refreshed",
     "Dodge Refreshed",
-    EventCategory::Mechanic,
+    EventCategory::Other,
     summary = "A raw replay dodge-refresh signal for a player.",
     approach = [
         "Forward the replay's dodge-refreshed event stream with player, team, time, frame, and counter value.",
@@ -436,7 +436,7 @@ define_stats_event!(
     PASS_EVENT_DEFINITION,
     "pass",
     "Pass",
-    EventCategory::Mechanic,
+    EventCategory::Other,
     summary = "A same-team touch sequence where one player sends the ball to a different teammate.",
     approach = [
         "Track the last attributed touch in live play and compare it to each new touch.",
@@ -475,7 +475,7 @@ define_stats_event!(
     FIFTY_FIFTY_EVENT_DEFINITION,
     "fifty_fifty",
     "50/50",
-    EventCategory::Contact,
+    EventCategory::Other,
     summary = "A contested ball interaction involving touches or pressure from both teams in a short window.",
     approach = [
         "Start an active 50/50 when a frame contains touches from both teams, including kickoff-specific tracking.",
@@ -566,7 +566,7 @@ define_stats_event!(
     WHIFF_EVENT_DEFINITION,
     "whiff",
     "Whiff",
-    EventCategory::Mechanic,
+    EventCategory::Other,
     summary = "A committed attempt near the ball that does not result in that player touching it.",
     approach = [
         "Start candidates when a player gets within hitbox distance of the ball while moving or dodging toward it with sufficient alignment and closing speed.",
@@ -592,14 +592,7 @@ define_stats_event!(
     TOUCH_CLASSIFICATION_EVENT_DEFINITION,
     "touch",
     "Touch",
-    EventCategory::Contact
-);
-define_stats_event!(
-    TouchBallMovementEvent,
-    TOUCH_BALL_MOVEMENT_EVENT_DEFINITION,
-    "touch_ball_movement",
-    "Touch Ball Movement",
-    EventCategory::Contact
+    EventCategory::Other
 );
 define_stats_event!(
     BoostPickupComparisonEvent,
@@ -627,7 +620,7 @@ define_stats_event!(
     BUMP_EVENT_DEFINITION,
     "bump",
     "Bump",
-    EventCategory::Contact
+    EventCategory::Other
 );
 define_stats_event!(
     PossessionEvent,
@@ -655,7 +648,7 @@ define_stats_event!(
     MOVEMENT_EVENT_DEFINITION,
     "movement",
     "Movement",
-    EventCategory::Movement
+    EventCategory::Other
 );
 define_stats_event!(
     PositioningActivityEvent,
@@ -821,7 +814,6 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &WHIFF_EVENT_DEFINITION,
     &POWERSLIDE_EVENT_DEFINITION,
     &TOUCH_CLASSIFICATION_EVENT_DEFINITION,
-    &TOUCH_BALL_MOVEMENT_EVENT_DEFINITION,
     &BOOST_PICKUP_COMPARISON_EVENT_DEFINITION,
     &BOOST_LEDGER_EVENT_DEFINITION,
     &BOOST_STATE_EVENT_DEFINITION,
@@ -1035,20 +1027,12 @@ const POWERSLIDE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "PowerslideCalculator",
 )];
 
-const TOUCH_EMITTED_EVENTS: &[EmittedEvent] = &[
-    produced_event(
-        &TOUCH_CLASSIFICATION_EVENT_DEFINITION,
-        "touch",
-        "TouchNode",
-        "TouchCalculator",
-    ),
-    produced_event(
-        &TOUCH_BALL_MOVEMENT_EVENT_DEFINITION,
-        "touch",
-        "TouchNode",
-        "TouchCalculator",
-    ),
-];
+const TOUCH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &TOUCH_CLASSIFICATION_EVENT_DEFINITION,
+    "touch",
+    "TouchNode",
+    "TouchCalculator",
+)];
 
 const BOOST_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(

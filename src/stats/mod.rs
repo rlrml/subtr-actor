@@ -1,3 +1,5 @@
+#![allow(ambiguous_glob_reexports)]
+
 pub mod accumulators;
 pub mod analysis_graph;
 pub(crate) mod calculators;

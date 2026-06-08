@@ -52,7 +52,6 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "whiff",
   "powerslide",
   "touch",
-  "touch_ball_movement",
   "boost_pickups",
   "boost_ledger",
   "boost_state",

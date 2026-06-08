@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::collections::HashSet;
 
 use serde::Serialize;
@@ -250,60 +248,16 @@ where
 }
 
 pub fn all_analysis_nodes() -> Vec<Box<dyn AnalysisNodeDyn>> {
-    vec![
-        nodes::backboard::boxed_default(),
-        nodes::ball_carry::boxed_default(),
-        nodes::boost::boxed_default(),
-        nodes::bump::boxed_default(),
-        nodes::ceiling_shot::boxed_default(),
-        nodes::center::boxed_default(),
-        nodes::continuous_ball_control::boxed_default(),
-        nodes::demo::boxed_default(),
-        nodes::dodge_reset::boxed_default(),
-        nodes::double_tap::boxed_default(),
-        nodes::fifty_fifty::boxed_default(),
-        nodes::match_stats::boxed_default(),
-        nodes::movement::boxed_default(),
-        nodes::flick::boxed_default(),
-        nodes::goal_tags::boxed_aerial_goal(),
-        nodes::goal_tags::boxed_high_aerial_goal(),
-        nodes::goal_tags::boxed_long_distance_goal(),
-        nodes::goal_tags::boxed_own_half_goal(),
-        nodes::goal_tags::boxed_empty_net_goal(),
-        nodes::goal_tags::boxed_counter_attack_goal(),
-        nodes::goal_tags::boxed_flick_goal(),
-        nodes::goal_tags::boxed_double_tap_goal(),
-        nodes::goal_tags::boxed_one_timer_goal(),
-        nodes::goal_tags::boxed_passing_goal(),
-        nodes::goal_tags::boxed_air_dribble_goal(),
-        nodes::goal_tags::boxed_flip_reset_goal(),
-        nodes::goal_tags::boxed_bump_goal(),
-        nodes::goal_tags::boxed_demo_goal(),
-        nodes::goal_tags::boxed_half_volley_goal(),
-        nodes::musty_flick::boxed_default(),
-        nodes::one_timer::boxed_default(),
-        nodes::pass::boxed_default(),
-        nodes::positioning::boxed_default(),
-        nodes::possession::boxed_default(),
-        nodes::powerslide::boxed_default(),
-        nodes::pressure::boxed_default(),
-        nodes::territorial_pressure::boxed_default(),
-        nodes::rotation::boxed_default(),
-        nodes::rush::boxed_default(),
-        nodes::settings::boxed_default(),
-        nodes::stats_projection::boxed_default(),
-        nodes::speed_flip::boxed_default(),
-        nodes::flip_impulse::boxed_default(),
-        nodes::half_flip::boxed_default(),
-        nodes::half_volley::boxed_default(),
-        nodes::wavedash::boxed_default(),
-        nodes::touch::boxed_default(),
-        nodes::wall_aerial::boxed_default(),
-        nodes::wall_aerial_shot::boxed_default(),
-        nodes::whiff::boxed_default(),
-        nodes::stats_timeline_frame::boxed_default(),
-        nodes::stats_timeline_events::boxed_default(),
-    ]
+    let mut seen = HashSet::new();
+    builtin_analysis_node_names()
+        .iter()
+        .filter_map(|name| canonical_builtin_analysis_node_name(name))
+        .filter(|name| seen.insert(*name))
+        .map(|name| {
+            boxed_analysis_node_by_name(name)
+                .unwrap_or_else(|| panic!("builtin analysis node should be registered: {name}"))
+        })
+        .collect()
 }
 
 pub fn graph_with_all_analysis_nodes() -> AnalysisGraph {
