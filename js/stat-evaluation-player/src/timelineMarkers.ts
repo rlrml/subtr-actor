@@ -4,28 +4,15 @@ import { buildCeilingShotMarkers } from "./ceilingShotOverlay.ts";
 import { buildTouchMarkers, playerIdToString } from "./touchOverlay.ts";
 import type { GoalTag } from "./generated/GoalTag.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
+import {
+  BLUE_TIMELINE_COLOR,
+  ORANGE_TIMELINE_COLOR,
+  formatMechanicKind,
+  isVisibleMechanicKind,
+  mechanicShortLabel,
+} from "./timelinePresentation.ts";
 
-const BLUE_TIMELINE_COLOR = "#3b82f6";
-const ORANGE_TIMELINE_COLOR = "#f59e0b";
 const NEUTRAL_TIMELINE_COLOR = "#d1d9e0";
-const MECHANIC_SHORT_LABELS: Record<string, string> = {
-  air_dribble: "AD",
-  ball_carry: "BC",
-  ceiling_shot: "CS",
-  double_tap: "DT",
-  flick: "F",
-  flip_reset: "FR",
-  half_flip: "HF",
-  half_volley: "HV",
-  musty_flick: "M",
-  one_timer: "OT",
-  pass: "P",
-  speed_flip: "SF",
-  wall_aerial: "WA",
-  wall_aerial_shot: "WS",
-  wavedash: "WD",
-};
-const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
 const PERFORMER_ATTRIBUTED_GOAL_TAG_KINDS = new Set([
   "flick_goal",
   "double_tap_goal",
@@ -37,6 +24,8 @@ const PERFORMER_ATTRIBUTED_GOAL_TAG_KINDS = new Set([
   "demo_goal",
   "half_volley_goal",
 ]);
+
+export { formatMechanicKind, isVisibleMechanicKind };
 
 export type GoalTagPerformerRole = "scorer" | "teammate" | "unknown";
 
@@ -76,27 +65,6 @@ function getReplayFrameTime(
   return replay.frames[frame ?? -1]?.time ?? fallbackTime;
 }
 
-export function formatMechanicKind(kind: string): string {
-  return kind
-    .split(/[_-]+/)
-    .filter((part) => part.length > 0)
-    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
-    .join(" ");
-}
-
-function mechanicShortLabel(kind: string): string {
-  return (
-    MECHANIC_SHORT_LABELS[kind] ??
-    (kind
-      .split(/[_-]+/)
-      .filter((part) => part.length > 0)
-      .map((part) => part.slice(0, 1).toUpperCase())
-      .join("")
-      .slice(0, 3) ||
-      "M")
-  );
-}
-
 function flickMarkerKindLabel(event: { kind?: string; setup_rotation_direction?: string }): string {
   if (event.kind !== "reverse") {
     return "flick";
@@ -115,10 +83,6 @@ export function getMechanicKinds(statsTimeline: StatsTimeline | null): string[] 
         .map((event) => event.kind),
     ),
   ].sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
-}
-
-export function isVisibleMechanicKind(kind: string): boolean {
-  return !HIDDEN_MECHANIC_KINDS.has(kind);
 }
 
 export function mechanicKindToModuleId(kind: string): string {

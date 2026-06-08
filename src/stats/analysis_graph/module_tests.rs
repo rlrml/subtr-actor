@@ -27,6 +27,24 @@ fn parse_replay(path: &str) -> boxcars::Replay {
         .unwrap_or_else(|_| panic!("Failed to parse replay: {}", replay_path.display()))
 }
 
+fn canonical_builtin_analysis_node_name_set() -> HashSet<&'static str> {
+    builtin_analysis_node_names()
+        .iter()
+        .filter_map(|name| canonical_builtin_analysis_node_name(name))
+        .collect()
+}
+
+#[test]
+fn all_analysis_nodes_matches_builtin_registry() {
+    let node_names = all_analysis_nodes()
+        .into_iter()
+        .map(|node| node.name())
+        .collect::<HashSet<_>>();
+
+    assert_eq!(node_names, canonical_builtin_analysis_node_name_set());
+    assert!(node_names.contains("kickoff"));
+}
+
 #[test]
 fn resolves_all_analysis_nodes_with_default_signal_nodes() {
     let requested_node_names = all_analysis_nodes()
