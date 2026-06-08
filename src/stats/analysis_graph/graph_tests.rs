@@ -360,6 +360,7 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "ceiling_shot",
         "center",
         "confirmed_flip_reset",
+        "controlled_play",
         "core_player_goal_context",
         "core_player_scoreboard",
         "dodge_refreshed",

@@ -2,7 +2,7 @@ pub(crate) use super::graph::*;
 use crate::stats::calculators::{
     AerialGoalCalculator, AirDribbleGoalCalculator, BackboardBounceState, BackboardCalculator,
     BallCarryCalculator, BallFrameState, BoostCalculator, BumpCalculator, BumpGoalCalculator,
-    CeilingShotCalculator, CenterCalculator, ContinuousBallControlState,
+    CeilingShotCalculator, CenterCalculator, ContinuousBallControlState, ControlledPlayCalculator,
     CounterAttackGoalCalculator, DemoCalculator, DemoGoalCalculator, DodgeResetCalculator,
     DoubleTapCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator, FiftyFiftyCalculator,
     FiftyFiftyState, FlickCalculator, FlickGoalCalculator, FlipImpulseCalculator,
@@ -26,6 +26,7 @@ pub(crate) mod bump;
 pub(crate) mod ceiling_shot;
 pub(crate) mod center;
 pub(crate) mod continuous_ball_control;
+pub(crate) mod controlled_play;
 pub(crate) mod demo;
 pub(crate) mod dodge_reset;
 pub(crate) mod double_tap;
@@ -86,6 +87,8 @@ pub use ceiling_shot::CeilingShotNode;
 pub use center::CenterNode;
 #[allow(unused_imports)]
 pub use continuous_ball_control::ContinuousBallControlNode;
+#[allow(unused_imports)]
+pub use controlled_play::ControlledPlayNode;
 #[allow(unused_imports)]
 pub use demo::DemoNode;
 #[allow(unused_imports)]
@@ -243,6 +246,10 @@ pub(crate) fn fifty_fifty_state_dependency() -> AnalysisDependency {
 
 pub(crate) fn match_stats_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<MatchStatsCalculator>(match_stats::boxed_default)
+}
+
+pub(crate) fn controlled_play_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<ControlledPlayCalculator>(controlled_play::boxed_default)
 }
 
 pub(crate) fn kickoff_dependency() -> AnalysisDependency {

@@ -23,6 +23,10 @@ import {
   createCoreEventDerivedStatsAccumulator,
 } from "./coreEventDerivation.ts";
 import {
+  applyControlledPlayEventDerivedStats,
+  createControlledPlayEventDerivedStatsAccumulator,
+} from "./controlledPlayEventDerivation.ts";
+import {
   applyEventCountDerivedStats,
   createEventCountDerivedStatsAccumulator,
 } from "./eventCountDerivation.ts";
@@ -295,6 +299,13 @@ export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventD
     teamModules: ["ball_carry", "air_dribble"],
     apply: applyBallCarryEventDerivedStats,
     createFrameAccumulator: createBallCarryEventDerivedStatsAccumulator,
+  },
+  {
+    id: "controlled-play",
+    playerModules: ["controlled_play"],
+    teamModules: ["controlled_play"],
+    apply: applyControlledPlayEventDerivedStats,
+    createFrameAccumulator: createControlledPlayEventDerivedStatsAccumulator,
   },
   {
     id: "wall-aerial",

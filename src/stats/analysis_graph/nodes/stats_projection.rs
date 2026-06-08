@@ -38,6 +38,7 @@ pub struct StatsProjectionState {
     pub powerslide: PowerslideStatsAccumulator,
     pub demo: DemoStatsAccumulator,
     pub center: CenterStatsAccumulator,
+    pub controlled_play: ControlledPlayStatsAccumulator,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -142,6 +143,7 @@ struct StatsProjectionCursors {
     powerslide: usize,
     demo_timeline: usize,
     center: usize,
+    controlled_play: usize,
 }
 
 impl StatsProjectionNode {
@@ -494,6 +496,11 @@ impl StatsProjectionNode {
         for event in Self::events_since(&mut self.cursors.center, center.events()) {
             self.state.center.apply_event(frame, event);
         }
+        let controlled_play = ctx.get::<ControlledPlayCalculator>()?;
+        for event in Self::events_since(&mut self.cursors.controlled_play, controlled_play.events())
+        {
+            self.state.controlled_play.apply_event(event);
+        }
 
         self.finish_sample();
         self.previous_live_play = Some(live_play);
@@ -546,6 +553,7 @@ impl AnalysisNode for StatsProjectionNode {
             powerslide_dependency(),
             demo_dependency(),
             center_dependency(),
+            controlled_play_dependency(),
         ]
     }
 

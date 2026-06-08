@@ -395,6 +395,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_ball_carry_event,
             )?,
+            controlled_play: self.module_player_events(
+                "controlled_play",
+                "events",
+                parse_controlled_play_event,
+            )?,
             rush: self.module_typed_array("rush", "events")?,
             flip_impulse: self.module_player_events(
                 "flip_impulse",

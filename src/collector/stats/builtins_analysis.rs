@@ -499,11 +499,19 @@ pub(crate) fn builtin_snapshot_frame_json(
             })?
         }
         "ball_carry" => {
-            let calculator = graph_state::<BallCarryCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsExport {
-                team_zero: calculator.team_zero_stats(),
-                team_one: calculator.team_one_stats(),
-                player_stats: player_stats_entries(calculator.player_stats()),
+                team_zero: projection.ball_carry.team_zero_stats(),
+                team_one: projection.ball_carry.team_one_stats(),
+                player_stats: player_stats_entries(projection.ball_carry.player_stats()),
+            })?
+        }
+        "controlled_play" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.controlled_play.team_zero_stats(),
+                team_one: projection.controlled_play.team_one_stats(),
+                player_stats: player_stats_entries(projection.controlled_play.player_stats()),
             })?
         }
         "air_dribble" => {
@@ -743,6 +751,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "musty_flick"
         | "dodge_reset"
         | "ball_carry"
+        | "controlled_play"
         | "air_dribble"
         | "counter_attack_goal"
         | "boost"

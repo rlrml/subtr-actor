@@ -1,43 +1,56 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly wasm_pack_version="0.13.1"
-readonly installer_url="https://rustwasm.github.io/wasm-pack/installer/init.sh"
-readonly installer_path="${RUNNER_TEMP:-/tmp}/wasm-pack-init.sh"
+version="${WASM_PACK_VERSION:-0.13.1}"
+install_dir="${CARGO_HOME:-$HOME/.cargo}/bin"
+export PATH="$install_dir:$PATH"
 
-for attempt in 1 2 3; do
-  echo "Installing wasm-pack from binary release (attempt ${attempt}/3)"
+if command -v wasm-pack >/dev/null 2>&1 && wasm-pack --version | grep -q "wasm-pack $version"; then
+  wasm-pack --version
+  exit 0
+fi
 
-  if curl -fsSL "${installer_url}" -o "${installer_path}" && sh "${installer_path}"; then
-    wasm-pack --version
-    exit 0
-  fi
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64)
+    target="x86_64-unknown-linux-musl"
+    ;;
+  Darwin-x86_64)
+    target="x86_64-apple-darwin"
+    ;;
+  Darwin-arm64)
+    target="aarch64-apple-darwin"
+    ;;
+  *)
+    echo "unsupported wasm-pack install target: $(uname -s)-$(uname -m)" >&2
+    exit 1
+    ;;
+esac
 
-  if [[ "${attempt}" == "3" ]]; then
-    break
-  fi
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
 
-  sleep_seconds=$((attempt * 10))
-  echo "wasm-pack binary install failed; retrying in ${sleep_seconds}s"
-  sleep "${sleep_seconds}"
-done
+archive="$tmpdir/wasm-pack.tar.gz"
+url="https://github.com/rustwasm/wasm-pack/releases/download/v${version}/wasm-pack-v${version}-${target}.tar.gz"
 
-for attempt in 1 2; do
-  echo "Installing wasm-pack from crates.io (attempt ${attempt}/2)"
+if ! curl \
+  --fail \
+  --location \
+  --show-error \
+  --silent \
+  --retry 5 \
+  --retry-all-errors \
+  --retry-delay 5 \
+  --connect-timeout 30 \
+  --output "$archive" \
+  "$url"; then
+  echo "failed to download wasm-pack release archive; falling back to cargo install" >&2
+  cargo install wasm-pack --version "$version" --locked
+  wasm-pack --version
+  exit 0
+fi
 
-  if cargo install wasm-pack --version "${wasm_pack_version}" --locked; then
-    wasm-pack --version
-    exit 0
-  fi
+tar -xzf "$archive" -C "$tmpdir"
+mkdir -p "$install_dir"
+install "$tmpdir/wasm-pack-v${version}-${target}/wasm-pack" "$install_dir/wasm-pack"
 
-  if [[ "${attempt}" == "2" ]]; then
-    break
-  fi
-
-  sleep_seconds=$((attempt * 10))
-  echo "wasm-pack cargo install failed; retrying in ${sleep_seconds}s"
-  sleep "${sleep_seconds}"
-done
-
-echo "Failed to install wasm-pack" >&2
-exit 1
+wasm-pack --version

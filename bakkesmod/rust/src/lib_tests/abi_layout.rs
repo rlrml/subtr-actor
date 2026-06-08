@@ -371,6 +371,7 @@ fn goal_tag(kind: GoalTagKind) -> GoalTag {
         kind,
         GoalTagMetadata {
             confidence: 0.72,
+            performer: None,
             modifiers: Vec::new(),
             related_events: Vec::new(),
             evidence: Vec::new(),

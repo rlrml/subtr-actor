@@ -7,6 +7,7 @@ mod boost;
 mod bump;
 mod ceiling_shot;
 mod center;
+mod controlled_play;
 mod core;
 mod demo;
 mod dodge_reset;

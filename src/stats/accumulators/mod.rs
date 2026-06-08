@@ -25,6 +25,8 @@ pub mod ceiling_shot_stats;
 pub use ceiling_shot_stats::*;
 pub mod center_stats;
 pub use center_stats::*;
+pub mod controlled_play_stats;
+pub use controlled_play_stats::*;
 pub mod demo_stats;
 pub use demo_stats::*;
 pub mod dodge_reset_stats;
