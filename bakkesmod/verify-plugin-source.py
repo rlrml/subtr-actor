@@ -1396,8 +1396,14 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.metadata.confidence * 100)}%`;",
+        "chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.metadata.confidence * 100)}%${",
         "stats evaluation player goal-label tag confidence chips",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        "formatGoalTagPerformer(tag)",
+        "stats evaluation player goal-label tag performer chips",
         errors,
     )
     require_contains(

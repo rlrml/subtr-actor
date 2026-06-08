@@ -161,6 +161,12 @@ export function createStatsTimeline(
         team_zero: [],
         team_one: [],
         all_headers: [],
+        game_type: {
+          game_type: "Unknown",
+          header_match_type: null,
+          playlist_id: null,
+          match_type_class: null,
+        },
       },
       events: createStatsEvents(),
       frames: [],
