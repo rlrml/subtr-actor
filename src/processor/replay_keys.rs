@@ -47,7 +47,9 @@ pub(crate) static TEAM_INFO_SCORE_KEY: &str = "Engine.TeamInfo:Score";
 pub(crate) static REPLICATED_STATE_NAME_KEY: &str = "TAGame.GameEvent_TA:ReplicatedStateName";
 pub(crate) static REPLICATED_GAME_STATE_TIME_REMAINING_KEY: &str =
     "TAGame.GameEvent_TA:ReplicatedGameStateTimeRemaining";
+pub(crate) static MATCH_TYPE_CLASS_KEY: &str = "TAGame.GameEvent_TA:MatchTypeClass";
 pub(crate) static BALL_HAS_BEEN_HIT_KEY: &str = "TAGame.GameEvent_Soccar_TA:bBallHasBeenHit";
+pub(crate) static REPLICATED_GAME_PLAYLIST_KEY: &str = "ProjectX.GRI_X:ReplicatedGamePlaylist";
 pub(crate) static TEAM_KEY: &str = "Engine.PlayerReplicationInfo:Team";
 pub(crate) static UNIQUE_ID_KEY: &str = "Engine.PlayerReplicationInfo:UniqueId";
 pub(crate) static VEHICLE_KEY: &str = "TAGame.CarComponent_TA:Vehicle";

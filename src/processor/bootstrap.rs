@@ -180,6 +180,7 @@ impl<'a> ReplayProcessor<'a> {
         Ok(ReplayMeta {
             team_zero: team_zero?,
             team_one: team_one?,
+            game_type: self.get_replay_game_type_details(),
             all_headers: self.replay.properties.clone(),
         })
     }

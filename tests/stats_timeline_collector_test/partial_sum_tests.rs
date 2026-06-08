@@ -730,6 +730,7 @@ fn test_ceiling_shot_events_reconstruct_serialized_partial_sums() {
         replay_meta: ReplayMeta {
             team_zero: Vec::new(),
             team_one: Vec::new(),
+            game_type: Default::default(),
             all_headers: Vec::new(),
         },
         events: ReplayStatsTimelineEvents {
