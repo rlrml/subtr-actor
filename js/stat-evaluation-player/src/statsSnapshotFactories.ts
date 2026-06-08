@@ -152,6 +152,13 @@ export function createTeamStatsSnapshot(
         average_horizontal_gap_sum: 0,
         average_vertical_gap_sum: 0,
       },
+      controlled_play: {
+        count: 0,
+        total_time: 0,
+        longest_time: 0,
+        touch_count: 0,
+        total_advance_distance: 0,
+      },
       air_dribble: {
         count: 0,
         ground_to_air_count: 0,
@@ -489,6 +496,13 @@ export function createPlayerStatsSnapshot(
         carry_speed_sum: 0,
         average_horizontal_gap_sum: 0,
         average_vertical_gap_sum: 0,
+      },
+      controlled_play: {
+        count: 0,
+        total_time: 0,
+        longest_time: 0,
+        touch_count: 0,
+        total_advance_distance: 0,
       },
       air_dribble: {
         count: 0,

@@ -92,6 +92,11 @@ impl StatsTimelineFrameNode {
             } else {
                 projection.ball_carry.team_one_stats().clone()
             },
+            controlled_play: if is_team_zero {
+                projection.controlled_play.team_zero_stats().clone()
+            } else {
+                projection.controlled_play.team_one_stats().clone()
+            },
             air_dribble: if is_team_zero {
                 projection.ball_carry.team_zero_air_dribble_stats().clone()
             } else {
@@ -246,6 +251,12 @@ impl StatsTimelineFrameNode {
                 .unwrap_or_default(),
             ball_carry: projection
                 .ball_carry
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
+            controlled_play: projection
+                .controlled_play
                 .player_stats()
                 .get(player_id)
                 .cloned()

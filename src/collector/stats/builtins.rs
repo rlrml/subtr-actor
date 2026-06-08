@@ -418,6 +418,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "musty_flick",
         "dodge_reset",
         "ball_carry",
+        "controlled_play",
         "air_dribble",
         "boost",
         "bump",
@@ -770,6 +771,16 @@ pub(crate) fn builtin_module_json(
                 team_one: projection.ball_carry.team_one_stats(),
                 player_stats: player_stats_entries(projection.ball_carry.player_stats()),
                 events: calculator.carry_events(),
+            })
+        }
+        "controlled_play" => {
+            let calculator = graph_state::<ControlledPlayCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
+                team_zero: projection.controlled_play.team_zero_stats(),
+                team_one: projection.controlled_play.team_one_stats(),
+                player_stats: player_stats_entries(projection.controlled_play.player_stats()),
+                events: calculator.events(),
             })
         }
         "air_dribble" => {
@@ -1381,6 +1392,14 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(projection.ball_carry.player_stats()),
             })?
         }
+        "controlled_play" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.controlled_play.team_zero_stats(),
+                team_one: projection.controlled_play.team_one_stats(),
+                player_stats: player_stats_entries(projection.controlled_play.player_stats()),
+            })?
+        }
         "air_dribble" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsExport {
@@ -1615,6 +1634,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "musty_flick"
         | "dodge_reset"
         | "ball_carry"
+        | "controlled_play"
         | "air_dribble"
         | "counter_attack_goal"
         | "boost"

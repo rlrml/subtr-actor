@@ -8,11 +8,11 @@ use linkme::distributed_slice;
 use super::{
     BackboardBounceEvent, BallCarryEvent, BoostLedgerEvent, BoostPickupComparisonEvent,
     BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent, ConfirmedFlipResetEvent,
-    CorePlayerGoalContextEvent, CorePlayerScoreboardEvent, DodgeRefreshedEvent, DodgeResetEvent,
-    DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipImpulseEvent, FlipResetEvent,
-    FlipResetFollowupDodgeEvent, GoalContextEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
-    MustyFlickEvent, OneTimerEvent, PassEvent, PositioningEvent, PossessionEvent,
-    PostWallDodgeEvent, PowerslideEvent, PressureEvent, RotationDepthSpanEvent,
+    ControlledPlayEvent, CorePlayerGoalContextEvent, CorePlayerScoreboardEvent,
+    DodgeRefreshedEvent, DodgeResetEvent, DoubleTapEvent, FiftyFiftyEvent, FlickEvent,
+    FlipImpulseEvent, FlipResetEvent, FlipResetFollowupDodgeEvent, GoalContextEvent, HalfFlipEvent,
+    HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent, PassEvent, PositioningEvent,
+    PossessionEvent, PostWallDodgeEvent, PowerslideEvent, PressureEvent, RotationDepthSpanEvent,
     RotationFirstManStintEvent, RotationPlayerEvent, RotationRoleSpanEvent, RotationTeamEvent,
     RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent, TouchBallMovementEvent,
     TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
@@ -467,6 +467,19 @@ define_stats_event!(
         "Use continuous ball-control tracking to build player-owned sequences while live play is active.",
         "Sample grounded carries from close horizontal/vertical ball gaps over the car, excluding wall contact.",
         "Sample air dribbles with the air-dribble policy, then emit completed sequences that meet the duration and validity rules for their carry kind.",
+    ]
+);
+define_stats_event!(
+    ControlledPlayEvent,
+    CONTROLLED_PLAY_EVENT_DEFINITION,
+    "controlled_play",
+    "Controlled Play",
+    EventCategory::Possession,
+    summary = "A same-player possession episode with multiple touches and sustained close-ball time.",
+    approach = [
+        "Start a player-owned candidate from an attributed touch during live play.",
+        "Require at least two distinct touches by the same player with at least one second between the first and last touch.",
+        "Require sustained proximity to the ball and finish the candidate when another player touches, live play ends, or the touch chain times out.",
     ]
 );
 define_stats_event!(
@@ -930,6 +943,13 @@ const BALL_CARRY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "BallCarryCalculator",
 )];
 
+const CONTROLLED_PLAY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &CONTROLLED_PLAY_EVENT_DEFINITION,
+    "controlled_play",
+    "ControlledPlayNode",
+    "ControlledPlayCalculator",
+)];
+
 const FIFTY_FIFTY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &FIFTY_FIFTY_EVENT_DEFINITION,
     "fifty_fifty",
@@ -1146,6 +1166,11 @@ register_event_producer!(
     BALL_CARRY_EVENT_PRODUCER,
     "ball_carry",
     BALL_CARRY_EMITTED_EVENTS
+);
+register_event_producer!(
+    CONTROLLED_PLAY_EVENT_PRODUCER,
+    "controlled_play",
+    CONTROLLED_PLAY_EMITTED_EVENTS
 );
 register_event_producer!(
     FIFTY_FIFTY_EVENT_PRODUCER,

@@ -35,6 +35,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "one_timer",
   "pass",
   "ball_carry",
+  "controlled_play",
   "rush",
   "flip_impulse",
   "speed_flip",

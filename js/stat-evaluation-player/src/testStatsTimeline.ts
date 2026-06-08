@@ -44,6 +44,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       one_timer: [],
       pass: [],
       ball_carry: [],
+      controlled_play: [],
       rush: [],
       flip_impulse: [],
       speed_flip: [],

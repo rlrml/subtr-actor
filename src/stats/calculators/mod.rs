@@ -42,6 +42,8 @@ pub mod ceiling_shot;
 pub use ceiling_shot::*;
 pub mod center;
 pub use center::*;
+pub mod controlled_play;
+pub use controlled_play::*;
 pub mod demo;
 pub use demo::*;
 mod flip_reset;

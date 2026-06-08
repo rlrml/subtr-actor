@@ -33,7 +33,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     graph.resolve().expect("graph should resolve");
 
     let names: HashSet<_> = graph.node_names().collect();
-    assert_eq!(names.len(), 63);
+    assert_eq!(names.len(), 64);
     assert!(names.contains("player_vertical_state"));
     assert!(names.contains("touch_state"));
     assert!(names.contains("possession_state"));
@@ -53,6 +53,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     assert!(names.contains("wall_aerial_shot"));
     assert!(names.contains("one_timer"));
     assert!(names.contains("center"));
+    assert!(names.contains("controlled_play"));
     assert!(names.contains("pass"));
     assert!(names.contains("rotation"));
     assert!(names.contains("territorial_pressure"));
