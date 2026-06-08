@@ -63,7 +63,7 @@ pub struct PositioningActivityEvent {
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct PositioningDistanceEvent {
+pub struct PositioningPossessionEvent {
     pub time: f32,
     pub frame: usize,
     pub end_time: f32,
@@ -74,10 +74,6 @@ pub struct PositioningDistanceEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub distance_to_teammates: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub distance_to_ball: Option<f32>,
     pub possession_state: PositioningPossessionState,
 }
 
@@ -228,12 +224,9 @@ impl PositioningEvent {
         })
     }
 
-    pub fn distance_event(&self) -> Option<PositioningDistanceEvent> {
-        (self.tracked
-            && (self.distance_to_teammates.is_some()
-                || self.distance_to_ball.is_some()
-                || self.possession_state != PositioningPossessionState::Neutral))
-            .then(|| PositioningDistanceEvent {
+    pub fn possession_event(&self) -> Option<PositioningPossessionEvent> {
+        (self.tracked && self.possession_state != PositioningPossessionState::Neutral).then(|| {
+            PositioningPossessionEvent {
                 time: self.time,
                 frame: self.frame,
                 end_time: self.end_time,
@@ -242,10 +235,9 @@ impl PositioningEvent {
                 player: self.player.clone(),
                 player_position: self.player_position,
                 is_team_0: self.is_team_0,
-                distance_to_teammates: self.distance_to_teammates,
-                distance_to_ball: self.distance_to_ball,
                 possession_state: self.possession_state,
-            })
+            }
+        })
     }
 
     pub fn field_zone_event(&self) -> Option<PositioningFieldZoneEvent> {
@@ -332,6 +324,110 @@ impl PositioningEvent {
     }
 }
 
+/// A projected positioning facet event that represents a span of game time for a
+/// single player and can therefore be coalesced with adjacent same-state spans.
+///
+/// The internal [`PositioningEvent`] stream is still computed once per frame (it is
+/// transient calculator state and never serialized), but the per-facet projections
+/// that are emitted to the timeline collapse consecutive frames with an identical
+/// categorical state into a single span. Because every per-frame contribution to the
+/// exported stats is `duration * fraction` (or `duration` for booleans), summing the
+/// merged span's `duration` reproduces the per-frame totals exactly: a run of frames
+/// that sits purely in one state has `fraction == 1.0` each frame, and the only frames
+/// that stay standalone are sub-frame boundary crossings whose fractions differ.
+trait CoalescibleSpan {
+    fn span_player(&self) -> &PlayerId;
+    /// Whether `self` and `next` share the same categorical state and can be merged.
+    fn same_state(&self, next: &Self) -> bool;
+    /// Extend `self` to absorb the immediately-following `next` span for this player.
+    fn merge_span(&mut self, next: &Self);
+}
+
+macro_rules! impl_coalescible_span {
+    ($t:ty, |$a:ident, $b:ident| $eq:expr) => {
+        impl CoalescibleSpan for $t {
+            fn span_player(&self) -> &PlayerId {
+                &self.player
+            }
+            fn same_state(&self, next: &Self) -> bool {
+                let $a = self;
+                let $b = next;
+                $eq
+            }
+            fn merge_span(&mut self, next: &Self) {
+                self.end_time = next.end_time;
+                self.end_frame = next.end_frame;
+                self.duration += next.duration;
+                self.player_position = next.player_position;
+            }
+        }
+    };
+}
+
+/// Compare fraction fields by bit pattern so that pure-state runs (exactly `1.0`/`0.0`)
+/// merge while sub-frame crossing frames stay distinct, without tripping float-cmp lints.
+fn same_fraction(left: f32, right: f32) -> bool {
+    left.to_bits() == right.to_bits()
+}
+
+impl_coalescible_span!(
+    PositioningActivityEvent,
+    |a, b| a.active == b.active && a.tracked == b.tracked && a.demolished == b.demolished
+);
+impl_coalescible_span!(PositioningPossessionEvent, |a, b| a.possession_state
+    == b.possession_state);
+impl_coalescible_span!(PositioningFieldZoneEvent, |a, b| same_fraction(
+    a.defensive_zone_fraction,
+    b.defensive_zone_fraction
+) && same_fraction(a.neutral_zone_fraction, b.neutral_zone_fraction)
+    && same_fraction(a.offensive_zone_fraction, b.offensive_zone_fraction)
+    && same_fraction(a.defensive_half_fraction, b.defensive_half_fraction)
+    && same_fraction(a.offensive_half_fraction, b.offensive_half_fraction));
+impl_coalescible_span!(PositioningBallDepthEvent, |a, b| same_fraction(
+    a.behind_ball_fraction,
+    b.behind_ball_fraction
+) && same_fraction(a.level_with_ball_fraction, b.level_with_ball_fraction)
+    && same_fraction(a.in_front_of_ball_fraction, b.in_front_of_ball_fraction));
+impl_coalescible_span!(PositioningTeammateRoleEvent, |a, b| a.teammate_role
+    == b.teammate_role);
+impl_coalescible_span!(
+    PositioningBallProximityEvent,
+    |a, b| a.closest_to_ball_team == b.closest_to_ball_team
+        && a.closest_to_ball_absolute == b.closest_to_ball_absolute
+        && a.farthest_from_ball == b.farthest_from_ball
+);
+
+/// Project each internal per-frame [`PositioningEvent`] through `project` and coalesce
+/// consecutive same-state spans per player into a single span. A frame that projects to
+/// `None` (the facet is inactive for that player) closes the player's open span so a
+/// later resumption starts a fresh span rather than bridging the gap.
+fn coalesce_facet<E: CoalescibleSpan>(
+    events: &[PositioningEvent],
+    project: impl Fn(&PositioningEvent) -> Option<E>,
+) -> Vec<E> {
+    let mut open: HashMap<PlayerId, usize> = HashMap::new();
+    let mut out: Vec<E> = Vec::new();
+    for event in events {
+        match project(event) {
+            Some(span) => {
+                let player = span.span_player().clone();
+                if let Some(&index) = open.get(&player) {
+                    if out[index].same_state(&span) {
+                        out[index].merge_span(&span);
+                        continue;
+                    }
+                }
+                open.insert(player, out.len());
+                out.push(span);
+            }
+            None => {
+                open.remove(&event.player);
+            }
+        }
+    }
+    out
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -353,6 +449,45 @@ pub enum PositioningTeammateRoleState {
     Other,
     #[default]
     Unknown,
+}
+
+/// Cumulative per-player distance totals.
+///
+/// Distance to the ball/teammates is a continuous magnitude, not a discrete occurrence, so
+/// it cannot be reconstructed from an event stream; the calculator accumulates these running
+/// totals as it processes frames and the timeline ships them directly. The possession-split
+/// distance sums are bucketed by the per-frame possession state, but the possession *times*
+/// themselves are categorical and are emitted as `PositioningPossessionEvent` spans instead.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PositioningSignalSnapshot {
+    pub sum_distance_to_teammates: f32,
+    pub sum_distance_to_ball: f32,
+    pub sum_distance_to_ball_has_possession: f32,
+    pub sum_distance_to_ball_no_possession: f32,
+}
+
+impl PositioningSignalSnapshot {
+    fn accumulate(&mut self, event: &PositioningEvent) {
+        if !event.tracked {
+            return;
+        }
+        if let Some(distance) = event.distance_to_teammates {
+            self.sum_distance_to_teammates += distance * event.duration;
+        }
+        if let Some(distance) = event.distance_to_ball {
+            self.sum_distance_to_ball += distance * event.duration;
+            match event.possession_state {
+                PositioningPossessionState::HasPossession => {
+                    self.sum_distance_to_ball_has_possession += distance * event.duration;
+                }
+                PositioningPossessionState::NoPossession => {
+                    self.sum_distance_to_ball_no_possession += distance * event.duration;
+                }
+                PositioningPossessionState::Neutral => {}
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -468,6 +603,7 @@ pub struct PositioningCalculator {
     team_zero_closest_to_ball: ClosestToBallDebouncer,
     team_one_closest_to_ball: ClosestToBallDebouncer,
     events: EventStream<PositioningEvent>,
+    signal: HashMap<PlayerId, PositioningSignalSnapshot>,
 }
 
 impl PositioningCalculator {
@@ -499,45 +635,27 @@ impl PositioningCalculator {
     }
 
     pub fn activity_events(&self) -> Vec<PositioningActivityEvent> {
-        self.events()
-            .iter()
-            .filter_map(PositioningEvent::activity_event)
-            .collect()
+        coalesce_facet(self.events(), PositioningEvent::activity_event)
     }
 
-    pub fn distance_events(&self) -> Vec<PositioningDistanceEvent> {
-        self.events()
-            .iter()
-            .filter_map(PositioningEvent::distance_event)
-            .collect()
+    pub fn possession_events(&self) -> Vec<PositioningPossessionEvent> {
+        coalesce_facet(self.events(), PositioningEvent::possession_event)
     }
 
     pub fn field_zone_events(&self) -> Vec<PositioningFieldZoneEvent> {
-        self.events()
-            .iter()
-            .filter_map(PositioningEvent::field_zone_event)
-            .collect()
+        coalesce_facet(self.events(), PositioningEvent::field_zone_event)
     }
 
     pub fn ball_depth_events(&self) -> Vec<PositioningBallDepthEvent> {
-        self.events()
-            .iter()
-            .filter_map(PositioningEvent::ball_depth_event)
-            .collect()
+        coalesce_facet(self.events(), PositioningEvent::ball_depth_event)
     }
 
     pub fn teammate_role_events(&self) -> Vec<PositioningTeammateRoleEvent> {
-        self.events()
-            .iter()
-            .filter_map(PositioningEvent::teammate_role_event)
-            .collect()
+        coalesce_facet(self.events(), PositioningEvent::teammate_role_event)
     }
 
     pub fn ball_proximity_events(&self) -> Vec<PositioningBallProximityEvent> {
-        self.events()
-            .iter()
-            .filter_map(PositioningEvent::ball_proximity_event)
-            .collect()
+        coalesce_facet(self.events(), PositioningEvent::ball_proximity_event)
     }
 
     pub fn goal_context_events(&self) -> Vec<PositioningGoalContextEvent> {
@@ -1009,7 +1127,19 @@ impl PositioningCalculator {
         frame_events.sort_by(|left, right| {
             format!("{:?}", left.player).cmp(&format!("{:?}", right.player))
         });
+        for event in &frame_events {
+            self.signal
+                .entry(event.player.clone())
+                .or_default()
+                .accumulate(event);
+        }
         self.events.extend(frame_events);
+    }
+
+    /// Cumulative distance/possession signal for `player` through the frames processed so
+    /// far. Continuous distance is shipped as this per-frame snapshot rather than as events.
+    pub fn player_signal(&self, player: &PlayerId) -> PositioningSignalSnapshot {
+        self.signal.get(player).copied().unwrap_or_default()
     }
 }
 

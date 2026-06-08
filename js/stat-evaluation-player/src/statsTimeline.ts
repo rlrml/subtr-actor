@@ -27,9 +27,9 @@ import type { PassEvent } from "./generated/PassEvent.ts";
 import type { PlayerStatsSnapshot as GeneratedPlayerStatsSnapshot } from "./generated/PlayerStatsSnapshot.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { PositioningActivityEvent } from "./generated/PositioningActivityEvent.ts";
+import type { PositioningPossessionEvent } from "./generated/PositioningPossessionEvent.ts";
 import type { PositioningBallDepthEvent } from "./generated/PositioningBallDepthEvent.ts";
 import type { PositioningBallProximityEvent } from "./generated/PositioningBallProximityEvent.ts";
-import type { PositioningDistanceEvent } from "./generated/PositioningDistanceEvent.ts";
 import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
 import type { PositioningGoalContextEvent } from "./generated/PositioningGoalContextEvent.ts";
 import type { PositioningTeammateRoleEvent } from "./generated/PositioningTeammateRoleEvent.ts";
@@ -95,9 +95,9 @@ export type {
   PassEvent,
   PossessionEvent,
   PositioningActivityEvent,
+  PositioningPossessionEvent,
   PositioningBallDepthEvent,
   PositioningBallProximityEvent,
-  PositioningDistanceEvent,
   PositioningFieldZoneEvent,
   PositioningGoalContextEvent,
   PositioningTeammateRoleEvent,

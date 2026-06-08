@@ -39,7 +39,6 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<TerritorialPressureEvent>();
     assert_stats_event::<MovementEvent>();
     assert_stats_event::<PositioningActivityEvent>();
-    assert_stats_event::<PositioningDistanceEvent>();
     assert_stats_event::<PositioningFieldZoneEvent>();
     assert_stats_event::<PositioningBallDepthEvent>();
     assert_stats_event::<PositioningTeammateRoleEvent>();

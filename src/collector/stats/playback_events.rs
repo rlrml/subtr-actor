@@ -292,10 +292,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "activity_events",
                 parse_positioning_activity_event,
             )?,
-            positioning_distance: self.module_player_events(
+            positioning_possession: self.module_player_events(
                 "positioning",
-                "distance_events",
-                parse_positioning_distance_event,
+                "possession_events",
+                parse_positioning_possession_event,
             )?,
             positioning_field_zone: self.module_player_events(
                 "positioning",
@@ -483,8 +483,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             Value::Array(self.module_array("positioning", "activity_events")),
         );
         events.insert(
-            "positioning_distance".to_owned(),
-            Value::Array(self.module_array("positioning", "distance_events")),
+            "positioning_possession".to_owned(),
+            Value::Array(self.module_array("positioning", "possession_events")),
         );
         events.insert(
             "positioning_field_zone".to_owned(),

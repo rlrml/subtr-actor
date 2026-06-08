@@ -246,6 +246,7 @@ fn stats_timeline_json_parts(
             .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
     }
     set_json_bytes(&result, "events", &timeline.events)?;
+    set_json_bytes(&result, "positioningSummary", &timeline.positioning_summary)?;
     if let Some((callback, _, start, end)) = progress {
         emit_stats_timeline_progress(callback, start + ((end - start) * 0.15))
             .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;

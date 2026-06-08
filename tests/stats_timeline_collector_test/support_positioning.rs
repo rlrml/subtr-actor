@@ -414,8 +414,8 @@ fn assert_positioning_events_reconstruct_final_serialized_sums(
     for event in &timeline.events.positioning_activity {
         accumulator.apply_activity_event(event);
     }
-    for event in &timeline.events.positioning_distance {
-        accumulator.apply_distance_event(event);
+    for event in &timeline.events.positioning_possession {
+        accumulator.apply_possession_event(event);
     }
     for event in &timeline.events.positioning_field_zone {
         accumulator.apply_field_zone_event(event);
@@ -438,11 +438,21 @@ fn assert_positioning_events_reconstruct_final_serialized_sums(
         .last()
         .expect("positioning reconstruction requires at least one frame");
     for player in &final_frame.players {
-        let expected = accumulator
+        let mut expected = accumulator
             .player_stats()
             .get(&player.player_id)
             .cloned()
             .unwrap_or_default();
+        // Distance magnitudes are a continuous signal shipped on the frame snapshot, not
+        // reconstructed from events, so carry them through from the authoritative snapshot.
+        // (The signal itself is validated against the export in the scaffold parity test.)
+        // Possession time IS event-reconstructed (positioning_possession), so it is asserted.
+        expected.sum_distance_to_teammates = player.positioning.sum_distance_to_teammates;
+        expected.sum_distance_to_ball = player.positioning.sum_distance_to_ball;
+        expected.sum_distance_to_ball_has_possession =
+            player.positioning.sum_distance_to_ball_has_possession;
+        expected.sum_distance_to_ball_no_possession =
+            player.positioning.sum_distance_to_ball_no_possession;
         assert_positioning_stats_close(
             replay_path,
             &format!("player {} positioning", player.name),

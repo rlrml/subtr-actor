@@ -26,6 +26,7 @@ interface TransferableStatsTimelineParts {
   configBuffer: ArrayBuffer;
   replayMetaBuffer: ArrayBuffer;
   eventsBuffer: ArrayBuffer;
+  positioningSummaryBuffer: ArrayBuffer;
   frameChunkBuffers: ArrayBuffer[];
 }
 
@@ -130,6 +131,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
           configBuffer: replayBundle.statsTimelineParts.config.buffer,
           replayMetaBuffer: replayBundle.statsTimelineParts.replayMeta.buffer,
           eventsBuffer: replayBundle.statsTimelineParts.events.buffer,
+          positioningSummaryBuffer: replayBundle.statsTimelineParts.positioningSummary.buffer,
           frameChunkBuffers,
         },
       },
@@ -138,6 +140,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
         replayBundle.statsTimelineParts.config.buffer,
         replayBundle.statsTimelineParts.replayMeta.buffer,
         replayBundle.statsTimelineParts.events.buffer,
+        replayBundle.statsTimelineParts.positioningSummary.buffer,
         ...frameChunkBuffers,
       ],
     );

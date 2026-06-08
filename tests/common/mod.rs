@@ -203,9 +203,9 @@ fn compare_timeline_events(
     })
     .or_else(|| {
         compare_serialized_slice(
-            &format!("{label}.positioning_distance"),
-            &left.positioning_distance,
-            &right.positioning_distance,
+            &format!("{label}.positioning_possession"),
+            &left.positioning_possession,
+            &right.positioning_possession,
         )
     })
     .or_else(|| {

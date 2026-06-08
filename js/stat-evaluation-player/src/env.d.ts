@@ -38,6 +38,7 @@ declare module "@rlrml/subtr-actor" {
       config: Uint8Array;
       replayMeta: Uint8Array;
       events: Uint8Array;
+      positioningSummary: Uint8Array;
       frameChunks: Uint8Array[];
     };
   };
@@ -57,6 +58,7 @@ declare module "@rlrml/subtr-actor" {
     config: Uint8Array;
     replayMeta: Uint8Array;
     events: Uint8Array;
+    positioningSummary: Uint8Array;
     frameChunks: Uint8Array[];
   };
 }

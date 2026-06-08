@@ -195,7 +195,7 @@ impl StatsTimelineEventsNode {
             territorial_pressure: territorial_pressure.events().to_vec(),
             movement: movement.events().to_vec(),
             positioning_activity: positioning.activity_events(),
-            positioning_distance: positioning.distance_events(),
+            positioning_possession: positioning.possession_events(),
             positioning_field_zone: positioning.field_zone_events(),
             positioning_ball_depth: positioning.ball_depth_events(),
             positioning_teammate_role: positioning.teammate_role_events(),
