@@ -2,7 +2,6 @@ use super::graph::AnalysisGraph;
 use crate::stats::calculators::{FrameInput, ReplayFrameInputBuilder};
 use crate::*;
 
-#[allow(dead_code)]
 pub struct AnalysisNodeCollector {
     graph: AnalysisGraph,
     frame_input_builder: ReplayFrameInputBuilder,
@@ -10,7 +9,6 @@ pub struct AnalysisNodeCollector {
     last_replay_meta_player_count: Option<usize>,
 }
 
-#[allow(dead_code)]
 impl AnalysisNodeCollector {
     pub fn new(mut graph: AnalysisGraph) -> Self {
         graph.register_input_state::<FrameInput>();
