@@ -136,3 +136,59 @@ fn positioning_events_emit_state_change_spans() {
         PositioningTeammateRoleState::MostForward
     );
 }
+
+#[test]
+fn closest_to_ball_requires_stable_challenger_before_switching() {
+    let mut calculator = PositioningCalculator::with_config(PositioningCalculatorConfig {
+        closest_to_ball_switch_margin: 0.0,
+        closest_to_ball_switch_min_seconds: 0.3,
+        ..PositioningCalculatorConfig::default()
+    });
+    let gameplay = active_gameplay();
+    let ball = ball(glam::Vec3::ZERO);
+
+    let closest_player_by_frame = [
+        (glam::vec3(100.0, 0.0, 0.0), glam::vec3(120.0, 0.0, 0.0), 1),
+        (glam::vec3(100.0, 0.0, 0.0), glam::vec3(50.0, 0.0, 0.0), 1),
+        (glam::vec3(100.0, 0.0, 0.0), glam::vec3(50.0, 0.0, 0.0), 1),
+        (glam::vec3(100.0, 0.0, 0.0), glam::vec3(50.0, 0.0, 0.0), 2),
+    ];
+
+    for (frame_number, (player_one_position, player_two_position, expected_closest)) in
+        closest_player_by_frame.iter().enumerate()
+    {
+        let players = PlayerFrameState {
+            players: vec![
+                player(1, true, *player_one_position),
+                player(2, true, *player_two_position),
+            ],
+        };
+        calculator
+            .update(
+                &frame(frame_number, frame_number as f32 * 0.1),
+                &gameplay,
+                &ball,
+                &players,
+                &FrameEventsState::default(),
+                &LivePlayState::active_play(),
+                None,
+            )
+            .expect("positioning update should succeed");
+
+        let closest = calculator
+            .new_events()
+            .iter()
+            .find(|event| event.closest_to_ball_team)
+            .expect("team closest event should be emitted");
+        assert_eq!(closest.player, boxcars::RemoteId::Steam(*expected_closest));
+        let absolute_closest = calculator
+            .new_events()
+            .iter()
+            .find(|event| event.closest_to_ball_absolute)
+            .expect("absolute closest event should be emitted");
+        assert_eq!(
+            absolute_closest.player,
+            boxcars::RemoteId::Steam(*expected_closest)
+        );
+    }
+}

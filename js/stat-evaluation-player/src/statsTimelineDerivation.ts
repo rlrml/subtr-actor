@@ -197,7 +197,7 @@ export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventD
   {
     id: "positioning",
     playerModules: ["positioning"],
-    teamModules: [],
+    teamModules: ["positioning"],
     apply: applyPositioningEventDerivedStats,
     createFrameAccumulator: createPositioningEventDerivedStatsAccumulator,
   },

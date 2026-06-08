@@ -6,7 +6,7 @@ import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
 import type { BoostPickupPadType } from "./generated/BoostPickupPadType.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
-import type { PositioningEvent } from "./generated/PositioningEvent.ts";
+import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
 import type { PressureEvent } from "./generated/PressureEvent.ts";
 
 const RANGE_MERGE_EPSILON_SECONDS = 0.02;
@@ -757,12 +757,14 @@ function playerNameById(frame: StatsTimeline["frames"][number], playerId: string
   );
 }
 
-function positioningZoneValue(event: PositioningEvent, spec: PlayerZoneSpec): number {
-  for (const fieldName of [spec.fieldName, ...(spec.aliases ?? [])]) {
-    const value = (event as unknown as Record<string, unknown>)[fieldName];
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
+function positioningZoneValue(event: PositioningFieldZoneEvent, spec: PlayerZoneSpec): number {
+  switch (spec.fieldName) {
+    case "time_defensive_third":
+      return event.defensive_zone_fraction;
+    case "time_neutral_third":
+      return event.neutral_zone_fraction;
+    case "time_offensive_third":
+      return event.offensive_zone_fraction;
   }
 
   return 0;
@@ -772,7 +774,7 @@ function buildTimeInZoneTimelineRangesFromEvents(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  const events = sortTimelineEvents(timeline.events?.positioning ?? []);
+  const events = sortTimelineEvents(timeline.events?.positioning_field_zone ?? []);
   const ranges: ReplayTimelineRange[] = [];
   const lastRangeByLane = new Map<string, ReplayTimelineRange>();
   let eventIndex = 0;
@@ -781,10 +783,10 @@ function buildTimeInZoneTimelineRangesFromEvents(
   for (const frame of timeline.frames) {
     const eventsByPlayer = new Map<
       string,
-      { event: PositioningEvent; zoneDeltas: Map<string, number> }
+      { event: PositioningFieldZoneEvent; zoneDeltas: Map<string, number> }
     >();
     while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      const event = events[eventIndex] as PositioningEvent;
+      const event = events[eventIndex] as PositioningFieldZoneEvent;
       const playerId = playerIdToString(event.player as Record<string, unknown>);
       const entry = eventsByPlayer.get(playerId) ?? {
         event,
@@ -850,7 +852,7 @@ export function buildTimeInZoneTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  if ((timeline.events?.positioning?.length ?? 0) > 0) {
+  if ((timeline.events?.positioning_field_zone?.length ?? 0) > 0) {
     return buildTimeInZoneTimelineRangesFromEvents(timeline, replay);
   }
 

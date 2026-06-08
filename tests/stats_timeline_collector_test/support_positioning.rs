@@ -411,8 +411,26 @@ fn assert_positioning_events_reconstruct_final_serialized_sums(
     timeline: &ReplayStatsTimeline,
 ) {
     let mut accumulator = PositioningStatsAccumulator::new();
-    for event in &timeline.events.positioning {
-        accumulator.apply_event(event);
+    for event in &timeline.events.positioning_activity {
+        accumulator.apply_activity_event(event);
+    }
+    for event in &timeline.events.positioning_distance {
+        accumulator.apply_distance_event(event);
+    }
+    for event in &timeline.events.positioning_field_zone {
+        accumulator.apply_field_zone_event(event);
+    }
+    for event in &timeline.events.positioning_ball_depth {
+        accumulator.apply_ball_depth_event(event);
+    }
+    for event in &timeline.events.positioning_teammate_role {
+        accumulator.apply_teammate_role_event(event);
+    }
+    for event in &timeline.events.positioning_ball_proximity {
+        accumulator.apply_ball_proximity_event(event);
+    }
+    for event in &timeline.events.positioning_goal_context {
+        accumulator.apply_goal_context_event(event);
     }
 
     let final_frame = timeline

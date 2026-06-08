@@ -26,7 +26,13 @@ import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
 import type { PassEvent } from "./generated/PassEvent.ts";
 import type { PlayerStatsSnapshot as GeneratedPlayerStatsSnapshot } from "./generated/PlayerStatsSnapshot.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
-import type { PositioningEvent } from "./generated/PositioningEvent.ts";
+import type { PositioningActivityEvent } from "./generated/PositioningActivityEvent.ts";
+import type { PositioningBallDepthEvent } from "./generated/PositioningBallDepthEvent.ts";
+import type { PositioningBallProximityEvent } from "./generated/PositioningBallProximityEvent.ts";
+import type { PositioningDistanceEvent } from "./generated/PositioningDistanceEvent.ts";
+import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
+import type { PositioningGoalContextEvent } from "./generated/PositioningGoalContextEvent.ts";
+import type { PositioningTeammateRoleEvent } from "./generated/PositioningTeammateRoleEvent.ts";
 import type { PressureEvent } from "./generated/PressureEvent.ts";
 import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
 import type { ReplayMeta } from "./generated/ReplayMeta.ts";
@@ -88,7 +94,13 @@ export type {
   OneTimerEvent,
   PassEvent,
   PossessionEvent,
-  PositioningEvent,
+  PositioningActivityEvent,
+  PositioningBallDepthEvent,
+  PositioningBallProximityEvent,
+  PositioningDistanceEvent,
+  PositioningFieldZoneEvent,
+  PositioningGoalContextEvent,
+  PositioningTeammateRoleEvent,
   PressureEvent,
   PowerslideEvent,
   ReplayMeta,

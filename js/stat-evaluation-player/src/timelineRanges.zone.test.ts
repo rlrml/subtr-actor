@@ -1,45 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { PositioningEvent } from "./generated/PositioningEvent.ts";
+import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import { buildTimeInZoneTimelineRanges } from "./timelineRanges.ts";
 import { createStatsTimeline } from "./testStatsTimeline.ts";
 
 function positioningEvent(
-  overrides: Partial<PositioningEvent> &
-    Pick<PositioningEvent, "frame" | "time" | "player" | "is_team_0">,
-): PositioningEvent {
+  overrides: Partial<PositioningFieldZoneEvent> &
+    Pick<PositioningFieldZoneEvent, "frame" | "time" | "player" | "is_team_0">,
+): PositioningFieldZoneEvent {
   return {
     frame: overrides.frame,
     time: overrides.time,
+    end_time: overrides.time,
+    end_frame: overrides.frame,
+    duration: 1,
     player: overrides.player,
     is_team_0: overrides.is_team_0,
-    active_game_time: 0,
-    tracked_time: 0,
-    sum_distance_to_teammates: 0,
-    sum_distance_to_ball: 0,
-    sum_distance_to_ball_has_possession: 0,
-    time_has_possession: 0,
-    sum_distance_to_ball_no_possession: 0,
-    time_no_possession: 0,
-    time_demolished: 0,
-    time_no_teammates: 0,
-    time_most_back: 0,
-    time_most_forward: 0,
-    time_mid_role: 0,
-    time_other_role: 0,
-    time_defensive_third: 0,
-    time_neutral_third: 0,
-    time_offensive_third: 0,
-    time_defensive_half: 0,
-    time_offensive_half: 0,
-    time_closest_to_ball: 0,
-    time_farthest_from_ball: 0,
-    time_behind_ball: 0,
-    time_level_with_ball: 0,
-    time_in_front_of_ball: 0,
-    times_caught_ahead_of_play_on_conceded_goals: 0,
+    defensive_zone_fraction: 0,
+    neutral_zone_fraction: 0,
+    offensive_zone_fraction: 0,
+    defensive_half_fraction: 0,
+    offensive_half_fraction: 0,
     ...overrides,
   };
 }
@@ -168,27 +151,27 @@ test("buildTimeInZoneTimelineRanges derives spans from compact positioning event
   const playerId = { Steam: "blue-id" };
   const timeline = createStatsTimeline({
     events: {
-      positioning: [
+      positioning_field_zone: [
         positioningEvent({
           frame: 1,
           time: 1,
           player: playerId,
           is_team_0: true,
-          time_defensive_third: 1,
+          defensive_zone_fraction: 1,
         }),
         positioningEvent({
           frame: 2,
           time: 2,
           player: playerId,
           is_team_0: true,
-          time_neutral_third: 1,
+          neutral_zone_fraction: 1,
         }),
         positioningEvent({
           frame: 3,
           time: 3,
           player: playerId,
           is_team_0: true,
-          time_offensive_third: 1,
+          offensive_zone_fraction: 1,
         }),
       ],
     },

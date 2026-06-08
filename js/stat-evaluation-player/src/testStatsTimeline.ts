@@ -23,7 +23,13 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       pressure: [],
       territorial_pressure: [],
       movement: [],
-      positioning: [],
+      positioning_activity: [],
+      positioning_distance: [],
+      positioning_field_zone: [],
+      positioning_ball_depth: [],
+      positioning_teammate_role: [],
+      positioning_ball_proximity: [],
+      positioning_goal_context: [],
       rotation_player: [],
       rotation_role_span: [],
       rotation_depth_span: [],
@@ -116,6 +122,8 @@ export function createStatsTimeline(
       config: {
         most_back_forward_threshold_y: 0,
         level_ball_depth_margin: 0,
+        closest_to_ball_switch_margin: 0,
+        closest_to_ball_switch_min_seconds: 0,
         pressure_neutral_zone_half_width_y: 0,
         territorial_pressure_neutral_zone_half_width_y: 0,
         territorial_pressure_min_establish_seconds: 0,
@@ -188,7 +196,13 @@ export function createLegacyStatsTimeline(
     wavedash_events?: StatsEvents["wavedash"];
     whiff_events?: StatsEvents["whiff"];
     powerslide_events?: StatsEvents["powerslide"];
-    positioning_events?: StatsEvents["positioning"];
+    positioning_activity_events?: StatsEvents["positioning_activity"];
+    positioning_distance_events?: StatsEvents["positioning_distance"];
+    positioning_field_zone_events?: StatsEvents["positioning_field_zone"];
+    positioning_ball_depth_events?: StatsEvents["positioning_ball_depth"];
+    positioning_teammate_role_events?: StatsEvents["positioning_teammate_role"];
+    positioning_ball_proximity_events?: StatsEvents["positioning_ball_proximity"];
+    positioning_goal_context_events?: StatsEvents["positioning_goal_context"];
     rotation_player_events?: StatsEvents["rotation_player"];
     rotation_role_span_events?: StatsEvents["rotation_role_span"];
     rotation_depth_span_events?: StatsEvents["rotation_depth_span"];
@@ -228,7 +242,26 @@ export function createLegacyStatsTimeline(
       wavedash: overrides.wavedash_events ?? overrides.events?.wavedash ?? [],
       whiff: overrides.whiff_events ?? overrides.events?.whiff ?? [],
       powerslide: overrides.powerslide_events ?? overrides.events?.powerslide ?? [],
-      positioning: overrides.positioning_events ?? overrides.events?.positioning ?? [],
+      positioning_activity:
+        overrides.positioning_activity_events ?? overrides.events?.positioning_activity ?? [],
+      positioning_distance:
+        overrides.positioning_distance_events ?? overrides.events?.positioning_distance ?? [],
+      positioning_field_zone:
+        overrides.positioning_field_zone_events ?? overrides.events?.positioning_field_zone ?? [],
+      positioning_ball_depth:
+        overrides.positioning_ball_depth_events ?? overrides.events?.positioning_ball_depth ?? [],
+      positioning_teammate_role:
+        overrides.positioning_teammate_role_events ??
+        overrides.events?.positioning_teammate_role ??
+        [],
+      positioning_ball_proximity:
+        overrides.positioning_ball_proximity_events ??
+        overrides.events?.positioning_ball_proximity ??
+        [],
+      positioning_goal_context:
+        overrides.positioning_goal_context_events ??
+        overrides.events?.positioning_goal_context ??
+        [],
       rotation_player: overrides.rotation_player_events ?? overrides.events?.rotation_player ?? [],
       rotation_role_span:
         overrides.rotation_role_span_events ?? overrides.events?.rotation_role_span ?? [],
