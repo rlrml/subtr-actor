@@ -2,6 +2,7 @@ import type { ReplayPlayer, ReplayPlayerState } from "@rlrml/player";
 import {
   formatMechanicsReviewClipDetails,
   formatMechanicsReviewEventDetails,
+  getMechanicsReviewCategoryLabel,
   getMechanicsReviewItemLabel,
   getMechanicsReviewMechanicLabel,
   getMechanicsReviewPlayerId,
@@ -235,6 +236,7 @@ export class MechanicsReviewWindowController {
       const meta = document.createElement("strong");
       meta.textContent =
         [
+          getMechanicsReviewCategoryLabel(candidate),
           getMechanicsReviewMechanicLabel(candidate),
           this.getPlayerName(candidate),
           formatMechanicsReviewStatus(candidate.meta?.reviewStatus),
