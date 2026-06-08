@@ -80,7 +80,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             territorial_pressure: Vec::new(),
             movement: Vec::new(),
             positioning_activity: Vec::new(),
-            positioning_distance: Vec::new(),
+            positioning_possession: Vec::new(),
             positioning_field_zone: Vec::new(),
             positioning_ball_depth: Vec::new(),
             positioning_teammate_role: Vec::new(),

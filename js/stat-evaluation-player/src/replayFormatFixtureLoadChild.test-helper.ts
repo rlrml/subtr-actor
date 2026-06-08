@@ -10,6 +10,7 @@ import { normalizeReplayDataAsync } from "@rlrml/player";
 import type { RawReplayFramesData } from "@rlrml/player";
 import {
   createStatsFrameLookup,
+  type CompactStatsTimeline,
   type MaterializedStatsTimeline,
   type StatsTimeline,
 } from "./statsTimeline.ts";
@@ -52,6 +53,10 @@ function parseStatsTimelineParts(
     config: parseJsonBuffer<StatsTimeline["config"]>(decoder, parts.config),
     replay_meta: parseJsonBuffer<StatsTimeline["replay_meta"]>(decoder, parts.replayMeta),
     events: parseJsonBuffer<StatsTimeline["events"]>(decoder, parts.events),
+    positioning_summary: parseJsonBuffer<CompactStatsTimeline["positioning_summary"]>(
+      decoder,
+      parts.positioningSummary,
+    ),
     frames: parts.frameChunks.flatMap((chunk) =>
       parseJsonBuffer<StatsTimeline["frames"]>(decoder, chunk),
     ),

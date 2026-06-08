@@ -66,6 +66,20 @@ pub struct ReplayStatsTimelineScaffold {
     pub replay_meta: ReplayMeta,
     pub events: ReplayStatsTimelineEvents,
     pub frames: Vec<ReplayStatsFrameScaffold>,
+    /// Whole-match distance totals per player. Distance is a continuous magnitude that cannot
+    /// be reconstructed from events, so it is computed over the entire match and shipped once
+    /// here rather than per frame, keeping the scaffold frames a pure event-only product.
+    pub positioning_summary: Vec<ReplayStatsPositioningSummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ReplayStatsPositioningSummary {
+    #[serde(rename = "player_id")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    pub is_team_0: bool,
+    pub distance: PositioningSignalSnapshot,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -108,7 +122,7 @@ pub struct ReplayStatsTimelineEvents {
     pub territorial_pressure: Vec<TerritorialPressureEvent>,
     pub movement: Vec<MovementEvent>,
     pub positioning_activity: Vec<PositioningActivityEvent>,
-    pub positioning_distance: Vec<PositioningDistanceEvent>,
+    pub positioning_possession: Vec<PositioningPossessionEvent>,
     pub positioning_field_zone: Vec<PositioningFieldZoneEvent>,
     pub positioning_ball_depth: Vec<PositioningBallDepthEvent>,
     pub positioning_teammate_role: Vec<PositioningTeammateRoleEvent>,

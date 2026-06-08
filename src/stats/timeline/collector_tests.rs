@@ -68,7 +68,10 @@ fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, us
         ("pressure", events.pressure.len()),
         ("movement", events.movement.len()),
         ("positioning_activity", events.positioning_activity.len()),
-        ("positioning_distance", events.positioning_distance.len()),
+        (
+            "positioning_possession",
+            events.positioning_possession.len(),
+        ),
         (
             "positioning_field_zone",
             events.positioning_field_zone.len(),
@@ -300,6 +303,51 @@ fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(r
             assert_eq!(
                 scaffold_player.is_team_0, full_player.is_team_0,
                 "{replay_path} scaffold player team should match"
+            );
+        }
+    }
+
+    // Distance is a continuous magnitude shipped once as a whole-match summary (not per
+    // frame), so it must match the full timeline's final accumulated distance for each player.
+    let final_full_frame = full_timeline
+        .frames
+        .last()
+        .expect("full timeline should have at least one frame");
+    for summary in &scaffold_timeline.positioning_summary {
+        let Some(full_player) = final_full_frame
+            .players
+            .iter()
+            .find(|player| player.player_id == summary.player_id)
+        else {
+            continue;
+        };
+        let distance = &summary.distance;
+        let positioning = &full_player.positioning;
+        for (label, summary_value, stat_value) in [
+            (
+                "sum_distance_to_ball",
+                distance.sum_distance_to_ball,
+                positioning.sum_distance_to_ball,
+            ),
+            (
+                "sum_distance_to_teammates",
+                distance.sum_distance_to_teammates,
+                positioning.sum_distance_to_teammates,
+            ),
+            (
+                "sum_distance_to_ball_has_possession",
+                distance.sum_distance_to_ball_has_possession,
+                positioning.sum_distance_to_ball_has_possession,
+            ),
+            (
+                "sum_distance_to_ball_no_possession",
+                distance.sum_distance_to_ball_no_possession,
+                positioning.sum_distance_to_ball_no_possession,
+            ),
+        ] {
+            assert_eq!(
+                summary_value, stat_value,
+                "{replay_path} positioning_summary.{label} should match full timeline final frame"
             );
         }
     }

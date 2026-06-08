@@ -213,13 +213,13 @@ pub(in crate::collector::stats::playback) fn parse_positioning_activity_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_positioning_distance_event(
+pub(in crate::collector::stats::playback) fn parse_positioning_possession_event(
     value: &Value,
-) -> SubtrActorResult<PositioningDistanceEvent> {
-    let object = json_object(value, "positioning distance event")?;
+) -> SubtrActorResult<PositioningPossessionEvent> {
+    let object = json_object(value, "positioning possession event")?;
     let time = json_required_f32(object, "time")?;
     let frame = json_required_usize(object, "frame")?;
-    Ok(PositioningDistanceEvent {
+    Ok(PositioningPossessionEvent {
         time,
         frame,
         end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
@@ -228,8 +228,6 @@ pub(in crate::collector::stats::playback) fn parse_positioning_distance_event(
         player: json_required_remote_id(object, "player")?,
         player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        distance_to_teammates: json_optional_f32(object.get("distance_to_teammates"))?,
-        distance_to_ball: json_optional_f32(object.get("distance_to_ball"))?,
         possession_state: decode_json_value(
             json_required_value(object, "possession_state")?.clone(),
         )?,

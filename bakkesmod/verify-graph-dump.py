@@ -36,7 +36,7 @@ DEFAULT_GRAPH_EVENT_FIELDS = (
     "territorial_pressure",
     "movement",
     "positioning_activity",
-    "positioning_distance",
+    "positioning_possession",
     "positioning_field_zone",
     "positioning_ball_depth",
     "positioning_teammate_role",

@@ -24,7 +24,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       territorial_pressure: [],
       movement: [],
       positioning_activity: [],
-      positioning_distance: [],
+      positioning_possession: [],
       positioning_field_zone: [],
       positioning_ball_depth: [],
       positioning_teammate_role: [],
@@ -205,7 +205,7 @@ export function createLegacyStatsTimeline(
     whiff_events?: StatsEvents["whiff"];
     powerslide_events?: StatsEvents["powerslide"];
     positioning_activity_events?: StatsEvents["positioning_activity"];
-    positioning_distance_events?: StatsEvents["positioning_distance"];
+    positioning_possession_events?: StatsEvents["positioning_possession"];
     positioning_field_zone_events?: StatsEvents["positioning_field_zone"];
     positioning_ball_depth_events?: StatsEvents["positioning_ball_depth"];
     positioning_teammate_role_events?: StatsEvents["positioning_teammate_role"];
@@ -254,8 +254,8 @@ export function createLegacyStatsTimeline(
       powerslide: overrides.powerslide_events ?? overrides.events?.powerslide ?? [],
       positioning_activity:
         overrides.positioning_activity_events ?? overrides.events?.positioning_activity ?? [],
-      positioning_distance:
-        overrides.positioning_distance_events ?? overrides.events?.positioning_distance ?? [],
+      positioning_possession:
+        overrides.positioning_possession_events ?? overrides.events?.positioning_possession ?? [],
       positioning_field_zone:
         overrides.positioning_field_zone_events ?? overrides.events?.positioning_field_zone ?? [],
       positioning_ball_depth:

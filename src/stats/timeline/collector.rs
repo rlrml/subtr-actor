@@ -283,11 +283,23 @@ impl StatsTimelineEventCollector {
             .state::<StatsTimelineEventsState>()
             .map(|state| state.events.clone())
             .unwrap_or_default();
+        let positioning = self.graph.state::<PositioningCalculator>();
+        let positioning_summary = replay_meta
+            .player_order()
+            .map(|player| ReplayStatsPositioningSummary {
+                player_id: player.remote_id.clone(),
+                is_team_0: Self::is_team_zero_player(&replay_meta, player),
+                distance: positioning
+                    .map(|calculator| calculator.player_signal(&player.remote_id))
+                    .unwrap_or_default(),
+            })
+            .collect();
         Ok(ReplayStatsTimelineScaffold {
             config: default_stats_timeline_config(),
             replay_meta,
             events,
             frames: self.frames,
+            positioning_summary,
         })
     }
 

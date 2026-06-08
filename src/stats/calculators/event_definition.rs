@@ -12,8 +12,8 @@ use super::{
     DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipImpulseEvent, FlipResetEvent,
     FlipResetFollowupDodgeEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
     OneTimerEvent, PassEvent, PositioningActivityEvent, PositioningBallDepthEvent,
-    PositioningBallProximityEvent, PositioningDistanceEvent, PositioningFieldZoneEvent,
-    PositioningGoalContextEvent, PositioningTeammateRoleEvent, PossessionEvent, PostWallDodgeEvent,
+    PositioningBallProximityEvent, PositioningFieldZoneEvent, PositioningGoalContextEvent,
+    PositioningPossessionEvent, PositioningTeammateRoleEvent, PossessionEvent, PostWallDodgeEvent,
     PowerslideEvent, PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent,
     RotationPlayerEvent, RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent,
     TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
@@ -658,10 +658,10 @@ define_stats_event!(
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningDistanceEvent,
-    POSITIONING_DISTANCE_EVENT_DEFINITION,
-    "positioning_distance",
-    "Positioning Distance",
+    PositioningPossessionEvent,
+    POSITIONING_POSSESSION_EVENT_DEFINITION,
+    "positioning_possession",
+    "Positioning Possession",
     EventCategory::Positioning
 );
 define_stats_event!(
@@ -823,7 +823,7 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     &MOVEMENT_EVENT_DEFINITION,
     &POSITIONING_ACTIVITY_EVENT_DEFINITION,
-    &POSITIONING_DISTANCE_EVENT_DEFINITION,
+    &POSITIONING_POSSESSION_EVENT_DEFINITION,
     &POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
     &POSITIONING_BALL_DEPTH_EVENT_DEFINITION,
     &POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
@@ -1098,7 +1098,7 @@ const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_DISTANCE_EVENT_DEFINITION,
+        &POSITIONING_POSSESSION_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",

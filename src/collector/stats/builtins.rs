@@ -849,7 +849,7 @@ pub(crate) fn builtin_module_json(
                 "team_one": projection.positioning.team_one_stats(),
                 "player_stats": player_stats_entries(projection.positioning.player_stats()),
                 "activity_events": calculator.activity_events(),
-                "distance_events": calculator.distance_events(),
+                "possession_events": calculator.possession_events(),
                 "field_zone_events": calculator.field_zone_events(),
                 "ball_depth_events": calculator.ball_depth_events(),
                 "teammate_role_events": calculator.teammate_role_events(),

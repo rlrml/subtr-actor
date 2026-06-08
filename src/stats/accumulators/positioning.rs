@@ -319,23 +319,19 @@ impl PositioningStatsAccumulator {
         }
     }
 
-    pub fn apply_distance_event(&mut self, event: &PositioningDistanceEvent) {
+    /// Seed the distance portion of a player's stats from the cumulative
+    /// [`PositioningSignalSnapshot`]. Distance is a continuous magnitude rather than an event,
+    /// so these fields are carried directly instead of being reconstructed from events.
+    pub fn apply_signal(&mut self, player: &PlayerId, signal: &PositioningSignalSnapshot) {
+        let stats = self.player_stats.entry(player.clone()).or_default();
+        stats.sum_distance_to_teammates = signal.sum_distance_to_teammates;
+        stats.sum_distance_to_ball = signal.sum_distance_to_ball;
+        stats.sum_distance_to_ball_has_possession = signal.sum_distance_to_ball_has_possession;
+        stats.sum_distance_to_ball_no_possession = signal.sum_distance_to_ball_no_possession;
+    }
+
+    pub fn apply_possession_event(&mut self, event: &PositioningPossessionEvent) {
         let stats = self.player_stats.entry(event.player.clone()).or_default();
-        if let Some(distance) = event.distance_to_teammates {
-            stats.sum_distance_to_teammates += distance * event.duration;
-        }
-        if let Some(distance) = event.distance_to_ball {
-            stats.sum_distance_to_ball += distance * event.duration;
-            match event.possession_state {
-                PositioningPossessionState::HasPossession => {
-                    stats.sum_distance_to_ball_has_possession += distance * event.duration;
-                }
-                PositioningPossessionState::NoPossession => {
-                    stats.sum_distance_to_ball_no_possession += distance * event.duration;
-                }
-                PositioningPossessionState::Neutral => {}
-            }
-        }
         match event.possession_state {
             PositioningPossessionState::HasPossession => {
                 stats.time_has_possession += event.duration;

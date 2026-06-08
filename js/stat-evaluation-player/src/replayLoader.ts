@@ -1,5 +1,10 @@
 import type { ReplayModel } from "@rlrml/player";
-import { createStatsFrameLookup, type StatsFrameLookup, type StatsTimeline } from "./statsTimeline";
+import {
+  createStatsFrameLookup,
+  type CompactStatsTimeline,
+  type StatsFrameLookup,
+  type StatsTimeline,
+} from "./statsTimeline";
 export type { ReplayLoadProgress, ReplayLoadStage } from "./replayLoadProgress.ts";
 export {
   formatReplayLoadProgress,
@@ -42,6 +47,7 @@ interface TransferableStatsTimelineParts {
   configBuffer: ArrayBuffer;
   replayMetaBuffer: ArrayBuffer;
   eventsBuffer: ArrayBuffer;
+  positioningSummaryBuffer: ArrayBuffer;
   frameChunkBuffers: ArrayBuffer[];
 }
 
@@ -68,6 +74,10 @@ async function parseStatsTimelineParts(
   onProgress?.({ stage: "decoding-stats", progress: 0.1 });
   await waitForNextPaint();
   const events = parseJsonBuffer<StatsTimeline["events"]>(decoder, parts.eventsBuffer);
+  const positioningSummary = parseJsonBuffer<CompactStatsTimeline["positioning_summary"]>(
+    decoder,
+    parts.positioningSummaryBuffer,
+  );
   onProgress?.({ stage: "decoding-stats", progress: 0.15 });
   await waitForNextPaint();
 
@@ -94,6 +104,7 @@ async function parseStatsTimelineParts(
     replay_meta: replayMeta,
     events,
     frames,
+    positioning_summary: positioningSummary,
   };
 }
 

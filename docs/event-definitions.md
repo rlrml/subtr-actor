@@ -796,34 +796,6 @@ _None documented._
 
 _None documented._
 
-### Positioning Distance (`positioning_distance`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `positioning` via `PositioningNode` / `PositioningCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
 ### Positioning Field Zone (`positioning_field_zone`)
 
 - Category: `positioning`
@@ -853,6 +825,34 @@ _None documented._
 _None documented._
 
 ### Positioning Goal Context (`positioning_goal_context`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Positioning Possession (`positioning_possession`)
 
 - Category: `positioning`
 - Confidence:
