@@ -2,6 +2,7 @@ import type { ReplayPlayerTrack, ReplayTimelineEvent, ReplayTimelineRange } from
 import {
   STATS_EVENT_STREAM_COUNT_TYPES,
   STATS_MECHANIC_EVENT_COUNT_TYPES,
+  type StatsEventStreamCountType,
 } from "./eventCountDerivation.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import type { StatsEvents } from "./statsTimeline.ts";
@@ -43,6 +44,59 @@ const CURATED_STATS_EVENT_STREAM_IDS = new Set<keyof StatsEvents>([
   "touch",
   "bump",
 ]);
+type StatsEventStreamTimelinePresentation = "marker" | "span" | "mixed";
+
+// Marker is the default because a single event row is usually a seek target.
+// Only list streams that should also occupy time: state/session/stint windows
+// with meaningful bounds are spans, and mixed streams intentionally expose both
+// a seekable marker and a range.
+export const STATS_EVENT_STREAM_TIMELINE_PRESENTATION_OVERRIDES = {
+  possession: "span",
+  pressure: "span",
+  territorial_pressure: "span",
+  movement: "span",
+  positioning_activity: "span",
+  positioning_possession: "span",
+  positioning_field_zone: "span",
+  positioning_ball_depth: "span",
+  positioning_teammate_role: "span",
+  positioning_ball_proximity: "span",
+  rotation_player: "span",
+  rotation_role_span: "span",
+  rotation_depth_span: "span",
+  rotation_first_man_stint: "span",
+  mechanics: "mixed",
+  ceiling_shot: "span",
+  wall_aerial: "span",
+  wall_aerial_shot: "span",
+  center: "span",
+  flick: "span",
+  musty_flick: "span",
+  double_tap: "span",
+  fifty_fifty: "mixed",
+  kickoff: "span",
+  one_timer: "span",
+  pass: "span",
+  ball_carry: "span",
+  controlled_play: "span",
+  rush: "mixed",
+  wavedash: "span",
+  powerslide: "mixed",
+  boost_ledger: "span",
+  boost_state: "span",
+} as const satisfies Partial<
+  Record<StatsEventStreamCountType, StatsEventStreamTimelinePresentation>
+>;
+const statsEventStreamTimelinePresentationOverrides: Partial<
+  Record<StatsEventStreamCountType, StatsEventStreamTimelinePresentation>
+> = STATS_EVENT_STREAM_TIMELINE_PRESENTATION_OVERRIDES;
+
+export const STATS_EVENT_STREAM_TIMELINE_PRESENTATION = Object.fromEntries(
+  STATS_EVENT_STREAM_COUNT_TYPES.map((streamId) => [
+    streamId,
+    statsEventStreamTimelinePresentationOverrides[streamId] ?? "marker",
+  ]),
+) as Record<StatsEventStreamCountType, StatsEventStreamTimelinePresentation>;
 const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#3b82f6",
   "#06b6d4",
@@ -202,6 +256,40 @@ function getGenericEventTiming(
   };
 }
 
+function getGenericEventSpanTiming(
+  event: Record<string, unknown>,
+): { startTime: number; endTime: number; startFrame?: number; endFrame?: number } | null {
+  const timing = event.timing;
+  if (isRecord(timing)) {
+    const startTime = numberField(timing, "start_time") ?? numberField(timing, "time");
+    const endTime = numberField(timing, "end_time") ?? startTime;
+    if (startTime != null && endTime != null) {
+      return {
+        startTime,
+        endTime: Math.max(startTime, endTime),
+        startFrame: numberField(timing, "start_frame") ?? numberField(timing, "frame"),
+        endFrame: numberField(timing, "end_frame") ?? numberField(timing, "frame"),
+      };
+    }
+  }
+
+  const startTime = numberField(event, "start_time") ?? numberField(event, "time");
+  const endTime = numberField(event, "end_time") ?? numberField(event, "resolve_time") ?? startTime;
+  if (startTime == null || endTime == null) {
+    return null;
+  }
+
+  return {
+    startTime,
+    endTime: Math.max(startTime, endTime),
+    startFrame: numberField(event, "start_frame") ?? numberField(event, "frame"),
+    endFrame:
+      numberField(event, "end_frame") ??
+      numberField(event, "resolve_frame") ??
+      numberField(event, "frame"),
+  };
+}
+
 function getGenericEventPlayerId(event: Record<string, unknown>): string | null {
   return (
     remoteIdToString(event.player) ??
@@ -230,6 +318,90 @@ function eventStreamShortLabel(streamId: string): string {
       .join("")
       .slice(0, 3) || "E"
   );
+}
+
+function formatGenericEventValue(value: string): string {
+  return formatMechanicKind(value);
+}
+
+function getGenericSpanStateLabel(
+  streamId: keyof StatsEvents,
+  event: Record<string, unknown>,
+): string | null {
+  const labeledValues: Array<[string, unknown]> = [
+    ["state", event.possession_state],
+    ["third", event.field_third],
+    ["half", event.field_half],
+    ["role", event.current_role_state ?? event.teammate_role],
+    ["depth", event.current_depth_state],
+    ["speed", event.speed_band],
+    ["height", event.height_band],
+    ["transaction", event.transaction],
+  ];
+
+  if (streamId === "movement") {
+    return [event.speed_band, event.height_band]
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .map(formatGenericEventValue)
+      .join(" / ");
+  }
+
+  if (streamId === "positioning_activity") {
+    if (event.demolished === true) return "Demolished";
+    if (event.active === true && event.tracked === true) return "Active";
+    if (event.tracked === true) return "Tracked";
+    return "Inactive";
+  }
+
+  if (streamId === "positioning_ball_depth") {
+    const values = [
+      ["Behind ball", numberField(event, "behind_ball_fraction")],
+      ["Level with ball", numberField(event, "level_with_ball_fraction")],
+      ["In front of ball", numberField(event, "in_front_of_ball_fraction")],
+    ] as const;
+    return values.reduce(
+      (best, [label, value]) => (value != null && value > best.value ? { label, value } : best),
+      { label: "Ball depth", value: 0 },
+    ).label;
+  }
+
+  if (streamId === "positioning_ball_proximity") {
+    const labels = [];
+    if (event.closest_to_ball_absolute === true) labels.push("Closest");
+    if (event.closest_to_ball_team === true) labels.push("Team closest");
+    if (event.farthest_from_ball === true) labels.push("Farthest");
+    return labels.join(" / ") || "Ball proximity";
+  }
+
+  if (streamId === "boost_state") {
+    const amount = numberField(event, "boost_amount");
+    return amount == null ? "Boost state" : `${Math.round(amount)} boost`;
+  }
+
+  if (streamId === "boost_ledger") {
+    const transaction = typeof event.transaction === "string" ? event.transaction : null;
+    const amount = numberField(event, "amount");
+    return [
+      transaction ? formatGenericEventValue(transaction) : "Boost",
+      amount != null ? `${Math.round(amount)}` : null,
+    ]
+      .filter((part): part is string => !!part)
+      .join(" ");
+  }
+
+  if (streamId === "rush") {
+    const attackers = numberField(event, "attackers");
+    const defenders = numberField(event, "defenders");
+    return attackers != null && defenders != null ? `${attackers}v${defenders}` : "Rush";
+  }
+
+  for (const [, value] of labeledValues) {
+    if (typeof value === "string" && value.length > 0) {
+      return formatGenericEventValue(value);
+    }
+  }
+
+  return null;
 }
 
 function buildGenericStatsEventTimelineEvents(
@@ -277,6 +449,66 @@ function buildGenericStatsEventTimelineEvents(
   });
 }
 
+function buildGenericStatsEventTimelineRanges(
+  ctx: StatModuleContext,
+  streamId: keyof StatsEvents,
+  events: readonly unknown[],
+): ReplayTimelineRange[] {
+  const streamLabel = formatMechanicKind(streamId);
+  const playerNames = new Map(ctx.replay.players.map((player) => [player.id, player.name]));
+
+  return events
+    .flatMap((event, index) => {
+      if (!isRecord(event)) {
+        return [];
+      }
+      const timing = getGenericEventSpanTiming(event);
+      if (!timing) {
+        return [];
+      }
+
+      const isTeamZero = getGenericEventTeam(event);
+      const playerId = getGenericEventPlayerId(event);
+      const playerName = playerId ? (playerNames.get(playerId) ?? playerId) : null;
+      const teamLabel = isTeamZero == null ? null : isTeamZero ? "Blue" : "Orange";
+      const stateLabel = getGenericSpanStateLabel(streamId, event);
+      const subjectLabel = playerName ?? teamLabel;
+      const eventId =
+        stringField(event, "id") ??
+        `${streamId}:${timing.startFrame ?? timing.startTime}:${timing.endFrame ?? timing.endTime}:${index}`;
+
+      return [
+        {
+          id: `stats-stream:${eventId}`,
+          startTime: ctx.replay.frames[timing.startFrame ?? -1]?.time ?? timing.startTime,
+          endTime: Math.max(
+            ctx.replay.frames[timing.startFrame ?? -1]?.time ?? timing.startTime,
+            ctx.replay.frames[timing.endFrame ?? -1]?.time ?? timing.endTime,
+          ),
+          lane: playerId ? `stats-stream:${streamId}:${playerId}` : `stats-stream:${streamId}`,
+          laneLabel: playerName ?? streamLabel,
+          label: [subjectLabel, stateLabel ?? streamLabel]
+            .filter((part): part is string => !!part)
+            .join(" "),
+          shortLabel: eventStreamShortLabel(streamId),
+          isTeamZero,
+          color:
+            isTeamZero == null
+              ? EVENT_PLAYLIST_NEUTRAL_COLOR
+              : isTeamZero
+                ? EVENT_PLAYLIST_PLAYER_COLORS[0]
+                : EVENT_PLAYLIST_PLAYER_COLORS[4],
+        },
+      ];
+    })
+    .sort((left, right) => {
+      if (left.startTime !== right.startTime) {
+        return left.startTime - right.startTime;
+      }
+      return (left.id ?? "").localeCompare(right.id ?? "");
+    });
+}
+
 function buildGenericStatsEventSources(
   ctx: StatModuleContext,
   activeTimelineEventSourceIds: ReadonlySet<string>,
@@ -288,7 +520,15 @@ function buildGenericStatsEventSources(
       return [];
     }
 
-    const timelineEvents = buildGenericStatsEventTimelineEvents(ctx, streamId, events);
+    const presentation = STATS_EVENT_STREAM_TIMELINE_PRESENTATION[streamId];
+    const hasTimelineRanges = presentation === "span" || presentation === "mixed";
+    const hasTimelineEvents = presentation === "marker" || presentation === "mixed";
+    const timelineRanges = hasTimelineRanges
+      ? buildGenericStatsEventTimelineRanges(ctx, streamId, events)
+      : [];
+    const timelineEvents = hasTimelineEvents
+      ? buildGenericStatsEventTimelineEvents(ctx, streamId, events)
+      : [];
 
     return [
       {
@@ -298,14 +538,17 @@ function buildGenericStatsEventSources(
         timelineId: `stats-stream:${streamId}`,
         group: "Event streams",
         label: formatMechanicKind(streamId),
-        count: timelineEvents.length,
+        count: timelineEvents.length + timelineRanges.length,
         active: activeTimelineEventSourceIds.has(`stats-stream:${streamId}`),
         buildTimelineEvents() {
           return timelineEvents;
         },
         buildPlaylistEvents() {
-          return timelineEvents;
+          return timelineEvents.length > 0
+            ? timelineEvents
+            : buildGenericStatsEventTimelineEvents(ctx, streamId, events);
         },
+        buildTimelineRanges: hasTimelineRanges ? () => timelineRanges : undefined,
         setActive(enabled) {
           toggleEventSource(`stats-stream:${streamId}`, enabled);
         },

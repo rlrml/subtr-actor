@@ -8,6 +8,7 @@ import { renderRushStats } from "../rushFormatting.ts";
 import { FiftyFiftyOverlay } from "../fiftyFiftyOverlay.ts";
 import { buildFiftyFiftyTimelineEvents, buildRushTimelineEvents } from "../timelineMarkers.ts";
 import {
+  buildFiftyFiftyTimelineRanges,
   buildPossessionTimelineRanges,
   buildPressureTimelineRanges,
   buildRushTimelineRanges,
@@ -230,6 +231,10 @@ export function createFiftyFiftyModule(): StatModule {
 
     getTimelineEvents(ctx) {
       return buildFiftyFiftyTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+
+    getTimelineRanges(ctx) {
+      return buildFiftyFiftyTimelineRanges(ctx.statsTimeline, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {

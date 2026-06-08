@@ -10,8 +10,10 @@ import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
 import type { BoostPickupPadType } from "./generated/BoostPickupPadType.ts";
+import type { FiftyFiftyEvent } from "./generated/FiftyFiftyEvent.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
+import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
 import type { PressureEvent } from "./generated/PressureEvent.ts";
 
 const RANGE_MERGE_EPSILON_SECONDS = 0.02;
@@ -426,6 +428,50 @@ export function buildPressureTimelineRanges(
   return ranges;
 }
 
+export function buildFiftyFiftyTimelineRanges(
+  timeline: StatsTimeline,
+  replay?: ReplayModel,
+): ReplayTimelineRange[] {
+  return (timeline.events?.fifty_fifty ?? [])
+    .map((event: FiftyFiftyEvent, index): ReplayTimelineRange => {
+      const startTime = getReplayFrameTime(replay, event.start_frame, event.start_time);
+      const endTime = Math.max(
+        startTime,
+        getReplayFrameTime(replay, event.resolve_frame, event.resolve_time),
+      );
+      const outcome =
+        event.winning_team_is_team_0 == null
+          ? "Neutral"
+          : event.winning_team_is_team_0
+            ? "Blue win"
+            : "Orange win";
+      const phase = event.is_kickoff ? "kickoff " : "";
+
+      return {
+        id: `fifty-fifty:${event.start_frame}:${event.resolve_frame}:${index}`,
+        startTime,
+        endTime,
+        lane: "fifty-fifty",
+        laneLabel: "50/50",
+        label: `${outcome} ${phase}50/50`,
+        shortLabel: event.is_kickoff ? "KO" : "50",
+        color:
+          event.winning_team_is_team_0 == null
+            ? "rgba(209, 217, 224, 0.7)"
+            : event.winning_team_is_team_0
+              ? "rgba(59, 130, 246, 0.48)"
+              : "rgba(245, 158, 11, 0.48)",
+        isTeamZero: event.winning_team_is_team_0,
+      };
+    })
+    .sort((left, right) => {
+      if (left.startTime !== right.startTime) {
+        return left.startTime - right.startTime;
+      }
+      return (left.id ?? "").localeCompare(right.id ?? "");
+    });
+}
+
 export function buildRushTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
@@ -446,6 +492,76 @@ export function buildRushTimelineRanges(
       color: isTeamZero ? "rgba(59, 130, 246, 0.4)" : "rgba(245, 158, 11, 0.4)",
       isTeamZero,
     };
+  });
+}
+
+export function buildPowerslideTimelineRanges(
+  timeline: StatsTimeline,
+  replay?: ReplayModel,
+): ReplayTimelineRange[] {
+  const events = sortTimelineEvents(timeline.events?.powerslide ?? []);
+  const activeByPlayer = new Map<string, PowerslideEvent>();
+  const ranges: ReplayTimelineRange[] = [];
+  const playerNames = new Map((replay?.players ?? []).map((player) => [player.id, player.name]));
+
+  for (const event of events) {
+    const playerId = remoteIdToString(event.player as Record<string, unknown>);
+    if (event.active) {
+      activeByPlayer.set(playerId, event);
+      continue;
+    }
+
+    const active = activeByPlayer.get(playerId);
+    if (!active) {
+      continue;
+    }
+    activeByPlayer.delete(playerId);
+
+    const startTime = getReplayFrameTime(replay, active.frame, active.time);
+    const endTime = Math.max(startTime, getReplayFrameTime(replay, event.frame, event.time));
+    const playerName = playerNames.get(playerId) ?? playerId;
+    ranges.push({
+      id: `powerslide:${active.frame}:${event.frame}:${playerId}`,
+      startTime,
+      endTime,
+      lane: `powerslide:${playerId}`,
+      laneLabel: playerName,
+      label: `${playerName} powerslide`,
+      shortLabel: "PS",
+      color: teamTimelineColor(active.is_team_0) ?? undefined,
+      isTeamZero: active.is_team_0,
+    });
+  }
+
+  const replayEndTime =
+    replay?.duration ??
+    replay?.frames.at(-1)?.time ??
+    timeline.frames.at(-1)?.time ??
+    Number.POSITIVE_INFINITY;
+  for (const [playerId, active] of activeByPlayer) {
+    const startTime = getReplayFrameTime(replay, active.frame, active.time);
+    if (!Number.isFinite(replayEndTime) || replayEndTime <= startTime) {
+      continue;
+    }
+    const playerName = playerNames.get(playerId) ?? playerId;
+    ranges.push({
+      id: `powerslide:${active.frame}:open:${playerId}`,
+      startTime,
+      endTime: replayEndTime,
+      lane: `powerslide:${playerId}`,
+      laneLabel: playerName,
+      label: `${playerName} powerslide`,
+      shortLabel: "PS",
+      color: teamTimelineColor(active.is_team_0) ?? undefined,
+      isTeamZero: active.is_team_0,
+    });
+  }
+
+  return ranges.sort((left, right) => {
+    if (left.startTime !== right.startTime) {
+      return left.startTime - right.startTime;
+    }
+    return (left.id ?? "").localeCompare(right.id ?? "");
   });
 }
 

@@ -13,7 +13,10 @@ import {
   buildWavedashTimelineEvents,
   buildWhiffTimelineEvents,
 } from "../timelineMarkers.ts";
-import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
+import {
+  buildBoostPickupTimelineRanges,
+  buildPowerslideTimelineRanges,
+} from "../timelineRanges.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import { playerIdToString } from "../touchOverlay.ts";
 import { createPlayerStatsModule } from "./playerStatsModule.ts";
@@ -785,6 +788,9 @@ export function createPowerslideModule(): StatModule {
     render: (powerslide) => renderPowerslideStats(powerslide),
     getTimelineEvents(ctx) {
       return buildPowerslideTimelineEvents(ctx.statsTimeline, ctx.replay);
+    },
+    getTimelineRanges(ctx) {
+      return buildPowerslideTimelineRanges(ctx.statsTimeline, ctx.replay);
     },
   });
 }

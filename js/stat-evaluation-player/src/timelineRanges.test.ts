@@ -5,8 +5,10 @@ import type { ReplayModel } from "@rlrml/player";
 import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildBoostPickupTimelineRanges,
+  buildFiftyFiftyTimelineRanges,
   buildMechanicTimelineRanges,
   buildPossessionTimelineRanges,
+  buildPowerslideTimelineRanges,
   buildPressureTimelineRanges,
   buildRushTimelineRanges,
 } from "./timelineRanges.ts";
@@ -471,6 +473,97 @@ test("buildRushTimelineRanges maps serialized rush spans to replay timeline rang
       label: "Orange rush 3v2",
       color: "rgba(245, 158, 11, 0.4)",
       isTeamZero: false,
+    },
+  ]);
+});
+
+test("buildFiftyFiftyTimelineRanges maps contest resolution windows to ranges", () => {
+  const replay = {
+    frames: Array.from({ length: 6 }, (_, time) => ({ time })),
+  } as ReplayModel;
+  const timeline = createStatsTimeline({
+    events: {
+      fifty_fifty: [
+        {
+          start_time: 1,
+          start_frame: 1,
+          resolve_time: 4,
+          resolve_frame: 4,
+          is_kickoff: true,
+          team_zero_player: null,
+          team_one_player: null,
+          team_zero_touch_time: null,
+          team_zero_touch_frame: null,
+          team_zero_dodge_contact: false,
+          team_one_touch_time: null,
+          team_one_touch_frame: null,
+          team_one_dodge_contact: false,
+          team_zero_position: [0, 0, 0],
+          team_one_position: [0, 0, 0],
+          midpoint: [0, 0, 0],
+          plane_normal: [0, 1, 0],
+          winning_team_is_team_0: true,
+          possession_team_is_team_0: true,
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(buildFiftyFiftyTimelineRanges(timeline, replay), [
+    {
+      id: "fifty-fifty:1:4:0",
+      startTime: 1,
+      endTime: 4,
+      lane: "fifty-fifty",
+      laneLabel: "50/50",
+      label: "Blue win kickoff 50/50",
+      shortLabel: "KO",
+      color: "rgba(59, 130, 246, 0.48)",
+      isTeamZero: true,
+    },
+  ]);
+});
+
+test("buildPowerslideTimelineRanges maps active edges to per-player ranges", () => {
+  const replay = {
+    duration: 10,
+    frames: Array.from({ length: 5 }, (_, time) => ({ time })),
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+  } as ReplayModel;
+  const timeline = createStatsTimeline({
+    events: {
+      powerslide: [
+        {
+          time: 1,
+          frame: 1,
+          player: { Steam: "blue-id" },
+          player_position: null,
+          is_team_0: true,
+          active: true,
+        },
+        {
+          time: 3,
+          frame: 3,
+          player: { Steam: "blue-id" },
+          player_position: null,
+          is_team_0: true,
+          active: false,
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(buildPowerslideTimelineRanges(timeline, replay), [
+    {
+      id: "powerslide:1:3:Steam:blue-id",
+      startTime: 1,
+      endTime: 3,
+      lane: "powerslide:Steam:blue-id",
+      laneLabel: "Blue",
+      label: "Blue powerslide",
+      shortLabel: "PS",
+      color: "#3b82f6",
+      isTeamZero: true,
     },
   ]);
 });
