@@ -291,7 +291,7 @@ void SubtrActorPlugin::renderTouchControlsWindow() {
   }
   ImGui::SameLine();
   if (ImGui::RadioButton("Advancement##touch-mode", &touchControlsMode, 1)) {
-    setCvarString("subtr_actor_overlay_event_types", "touch_ball_movement");
+    setCvarString("subtr_actor_overlay_event_types", "touch");
     scheduleUiConfigAutosave();
   }
 

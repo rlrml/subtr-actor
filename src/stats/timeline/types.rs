@@ -145,7 +145,6 @@ pub struct ReplayStatsTimelineEvents {
     pub whiff: Vec<WhiffEvent>,
     pub powerslide: Vec<PowerslideEvent>,
     pub touch: Vec<TouchClassificationEvent>,
-    pub touch_ball_movement: Vec<TouchBallMovementEvent>,
     pub boost_pickups: Vec<BoostPickupComparisonEvent>,
     pub boost_ledger: Vec<BoostLedgerEvent>,
     pub boost_state: Vec<BoostStateEvent>,

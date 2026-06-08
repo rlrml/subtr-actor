@@ -1,5 +1,5 @@
 import type { StatLabel } from "./generated/StatLabel.ts";
-import type { TouchBallMovementEvent } from "./generated/TouchBallMovementEvent.ts";
+import type { TouchBallMovement } from "./generated/TouchBallMovement.ts";
 import type { TouchStats } from "./generated/TouchStats.ts";
 import type { TouchClassificationEvent } from "./generated/TouchClassificationEvent.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
@@ -14,6 +14,11 @@ interface TouchAccumulator {
   labeledCountsVersion: number;
   labeledCountsSnapshot: TouchStats["labeled_touch_counts"];
   labeledCountsSnapshotVersion: number;
+}
+
+interface TouchMovementCredit {
+  player: TouchClassificationEvent["player"];
+  movement: TouchBallMovement;
 }
 
 function f32(value: number): number {
@@ -112,21 +117,6 @@ function sortBySample<
       if (leftSampleTime !== rightSampleTime) {
         return leftSampleTime - rightSampleTime;
       }
-      if (left.event.frame !== right.event.frame) {
-        return left.event.frame - right.event.frame;
-      }
-      if (left.event.time !== right.event.time) {
-        return left.event.time - right.event.time;
-      }
-      return left.index - right.index;
-    })
-    .map(({ event }) => event);
-}
-
-function sortByFrame<T extends { time: number; frame: number }>(events: readonly T[]): T[] {
-  return events
-    .map((event, index) => ({ event, index }))
-    .sort((left, right) => {
       if (left.event.frame !== right.event.frame) {
         return left.event.frame - right.event.frame;
       }
@@ -256,7 +246,16 @@ export function createTouchEventDerivedStatsAccumulator(timeline: MaterializedSt
   applyFrame(frame: StatsFrame): void;
 } {
   const touchEvents = sortBySample(timeline.events.touch ?? []);
-  const movementEvents = sortByFrame(timeline.events.touch_ball_movement ?? []);
+  const movementEvents = touchEvents
+    .flatMap((event): TouchMovementCredit[] =>
+      event.ball_movement ? [{ player: event.player, movement: event.ball_movement }] : [],
+    )
+    .sort((left, right) => {
+      if (left.movement.end_frame !== right.movement.end_frame) {
+        return left.movement.end_frame - right.movement.end_frame;
+      }
+      return left.movement.end_time - right.movement.end_time;
+    });
 
   let touchEventIndex = 0;
   let movementEventIndex = 0;
@@ -306,24 +305,24 @@ export function createTouchEventDerivedStatsAccumulator(timeline: MaterializedSt
 
       while (
         movementEventIndex < movementEvents.length &&
-        movementEvents[movementEventIndex]!.frame <= frame.frame_number
+        movementEvents[movementEventIndex]!.movement.end_frame <= frame.frame_number
       ) {
-        const event = movementEvents[movementEventIndex] as TouchBallMovementEvent;
+        const event = movementEvents[movementEventIndex] as TouchMovementCredit;
         const playerKey = remoteIdKey(event.player);
         const accumulator = players.get(playerKey) ?? createTouchAccumulator();
         players.set(playerKey, accumulator);
         const stats = accumulator.stats;
         stats.total_ball_travel_distance = addF32(
           stats.total_ball_travel_distance,
-          event.travel_distance,
+          event.movement.travel_distance,
         );
         stats.total_ball_advance_distance = addF32(
           stats.total_ball_advance_distance,
-          event.advance_distance,
+          event.movement.advance_distance,
         );
         stats.total_ball_retreat_distance = addF32(
           stats.total_ball_retreat_distance,
-          event.retreat_distance,
+          event.movement.retreat_distance,
         );
         movementEventIndex += 1;
       }

@@ -405,13 +405,6 @@ fn compare_timeline_events(
     .or_else(|| compare_serialized_slice(&format!("{label}.touch"), &left.touch, &right.touch))
     .or_else(|| {
         compare_serialized_slice(
-            &format!("{label}.touch_ball_movement"),
-            &left.touch_ball_movement,
-            &right.touch_ball_movement,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
             &format!("{label}.boost_pickups"),
             &left.boost_pickups,
             &right.boost_pickups,

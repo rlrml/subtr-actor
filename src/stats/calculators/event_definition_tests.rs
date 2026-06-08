@@ -29,7 +29,6 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<WhiffEvent>();
     assert_stats_event::<PowerslideEvent>();
     assert_stats_event::<TouchClassificationEvent>();
-    assert_stats_event::<TouchBallMovementEvent>();
     assert_stats_event::<BoostPickupComparisonEvent>();
     assert_stats_event::<BoostLedgerEvent>();
     assert_stats_event::<BoostStateEvent>();
@@ -89,7 +88,6 @@ fn mechanic_event_definitions_have_documented_approaches() {
 fn low_level_ball_interaction_events_are_other() {
     for definition in [
         TOUCH_CLASSIFICATION_EVENT_DEFINITION,
-        TOUCH_BALL_MOVEMENT_EVENT_DEFINITION,
         WHIFF_EVENT_DEFINITION,
     ] {
         assert_eq!(

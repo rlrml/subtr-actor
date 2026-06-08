@@ -79,89 +79,48 @@ export function buildTouchMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): TouchMarker[] {
-  const activeMarkerByPlayer = new Map<string, number>();
   const markers: TouchMarker[] = [];
-  const events = [
-    ...(statsTimeline.events?.touch ?? []).map((event, index) => ({
-      kind: "touch" as const,
-      frame: event.frame,
-      time: event.time,
-      index,
-      event,
-    })),
-    ...(statsTimeline.events?.touch_ball_movement ?? []).map((event, index) => ({
-      kind: "movement" as const,
-      frame: event.frame,
-      time: event.time,
-      index,
-      event,
-    })),
-  ].sort((left, right) => {
+  const events = [...(statsTimeline.events?.touch ?? [])].sort((left, right) => {
     if (left.frame !== right.frame) {
       return left.frame - right.frame;
     }
     if (left.time !== right.time) {
       return left.time - right.time;
     }
-    if (left.kind !== right.kind) {
-      return left.kind === "touch" ? -1 : 1;
-    }
-    return left.index - right.index;
+    return 0;
   });
 
-  for (const item of events) {
-    if (item.kind === "touch") {
-      const event = item.event;
-      const playerId = playerIdToString(event.player);
-      const ballPosition = replay.ballFrames[event.frame]?.position;
-      if (!ballPosition) {
-        continue;
-      }
-      const markerIndex = markers.length;
-      markers.push({
-        id: `touch-stat:${event.frame}:${playerId}:${markerIndex + 1}`,
-        time: replay.frames[event.frame]?.time ?? event.time,
-        frame: event.frame,
-        isTeamZero: event.is_team_0,
-        playerId,
-        playerName: replay.players.find((player) => player.id === playerId)?.name ?? playerId,
-        position: {
-          x: ballPosition.x,
-          y: ballPosition.y,
-          z: ballPosition.z,
-        },
-        endPosition: {
-          x: ballPosition.x,
-          y: ballPosition.y,
-          z: ballPosition.z,
-        },
-        totalBallTravelDistance: 0,
-        totalBallAdvanceDistance: 0,
-        totalBallRetreatDistance: 0,
-      });
-      activeMarkerByPlayer.set(playerId, markerIndex);
-      continue;
-    }
-
-    const event = item.event;
+  for (const event of events) {
     const playerId = playerIdToString(event.player);
-    const activeMarkerIndex = activeMarkerByPlayer.get(playerId);
-    const frameBallPosition = replay.ballFrames[event.frame]?.position;
-    if (activeMarkerIndex === undefined || !frameBallPosition) {
+    const ballPosition = replay.ballFrames[event.frame]?.position;
+    if (!ballPosition) {
       continue;
     }
-    const activeMarker = markers[activeMarkerIndex];
-    if (!activeMarker) {
-      continue;
-    }
-    activeMarker.totalBallTravelDistance += positiveDelta(event.travel_distance, 0);
-    activeMarker.totalBallAdvanceDistance += positiveDelta(event.advance_distance, 0);
-    activeMarker.totalBallRetreatDistance += positiveDelta(event.retreat_distance, 0);
-    activeMarker.endPosition = {
-      x: frameBallPosition.x,
-      y: frameBallPosition.y,
-      z: frameBallPosition.z,
-    };
+    const movement = event.ball_movement;
+    const movementEndPosition = movement ? replay.ballFrames[movement.end_frame]?.position : null;
+    const endBallPosition = movementEndPosition ?? ballPosition;
+    const markerIndex = markers.length;
+    markers.push({
+      id: `touch-stat:${event.frame}:${playerId}:${markerIndex + 1}`,
+      time: replay.frames[event.frame]?.time ?? event.time,
+      frame: event.frame,
+      isTeamZero: event.is_team_0,
+      playerId,
+      playerName: replay.players.find((player) => player.id === playerId)?.name ?? playerId,
+      position: {
+        x: ballPosition.x,
+        y: ballPosition.y,
+        z: ballPosition.z,
+      },
+      endPosition: {
+        x: endBallPosition.x,
+        y: endBallPosition.y,
+        z: endBallPosition.z,
+      },
+      totalBallTravelDistance: movement ? positiveDelta(movement.travel_distance, 0) : 0,
+      totalBallAdvanceDistance: movement ? positiveDelta(movement.advance_distance, 0) : 0,
+      totalBallRetreatDistance: movement ? positiveDelta(movement.retreat_distance, 0) : 0,
+    });
   }
 
   return markers;

@@ -127,7 +127,6 @@ struct StatsProjectionCursors {
     rotation_team: usize,
     rush: usize,
     touch: usize,
-    touch_ball_movement: usize,
     whiff: usize,
     wavedash: usize,
     speed_flip: usize,
@@ -375,24 +374,12 @@ impl StatsProjectionNode {
             self.state.rush.apply_event(event);
         }
         let touch = ctx.get::<TouchCalculator>()?;
-        if live_play {
+        if live_play || self.cursors.touch != touch.events().len() {
             self.state.touch = TouchStatsAccumulator::default();
             for event in touch.events() {
                 self.state.touch.apply_touch_event(event, frame);
             }
-            let projected_touch_ball_movement_events = touch.projected_ball_movement_events();
-            for event in projected_touch_ball_movement_events.iter() {
-                self.state.touch.apply_ball_movement_event(event);
-            }
             self.cursors.touch = touch.events().len();
-            self.cursors.touch_ball_movement = projected_touch_ball_movement_events.len();
-        } else {
-            for event in Self::events_since(
-                &mut self.cursors.touch_ball_movement,
-                touch.ball_movement_events(),
-            ) {
-                self.state.touch.apply_ball_movement_event(event);
-            }
         }
         let whiff = ctx.get::<WhiffCalculator>()?;
         if live_play {

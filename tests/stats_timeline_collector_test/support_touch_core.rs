@@ -261,11 +261,19 @@ fn assert_touch_events_reconstruct_final_serialized_sums(
             .then_with(|| left.frame.cmp(&right.frame))
             .then_with(|| left.time.total_cmp(&right.time))
     });
-    let mut movement_events = timeline.events.touch_ball_movement.clone();
-    movement_events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
-            .then_with(|| left.time.total_cmp(&right.time))
+    let mut movement_events: Vec<_> = touch_events
+        .iter()
+        .filter_map(|event| {
+            event
+                .ball_movement
+                .clone()
+                .map(|movement| (event.player.clone(), movement))
+        })
+        .collect();
+    movement_events.sort_by(|(_, left), (_, right)| {
+        left.end_frame
+            .cmp(&right.end_frame)
+            .then_with(|| left.end_time.total_cmp(&right.end_time))
     });
     let mut players: HashMap<PlayerId, TouchStats> = HashMap::new();
     let final_frame = timeline
@@ -281,11 +289,11 @@ fn assert_touch_events_reconstruct_final_serialized_sums(
         );
     }
 
-    for event in &movement_events {
-        let stats = players.entry(event.player.clone()).or_default();
-        stats.total_ball_travel_distance += event.travel_distance;
-        stats.total_ball_advance_distance += event.advance_distance;
-        stats.total_ball_retreat_distance += event.retreat_distance;
+    for (player, movement) in &movement_events {
+        let stats = players.entry(player.clone()).or_default();
+        stats.total_ball_travel_distance += movement.travel_distance;
+        stats.total_ball_advance_distance += movement.advance_distance;
+        stats.total_ball_retreat_distance += movement.retreat_distance;
     }
 
     for player in &final_frame.players {
