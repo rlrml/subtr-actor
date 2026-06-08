@@ -301,6 +301,153 @@ impl TouchEvent {
 
 pub(crate) const TOUCH_RATE_LIMIT_SECONDS: f32 = 0.25;
 
+/// Normalized high-level match type inferred from replay headers and network data.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub enum ReplayGameType {
+    /// Public ranked matchmaking.
+    Ranked,
+    /// Public unranked/casual matchmaking.
+    Casual,
+    /// Private match.
+    Private,
+    /// Local/offline exhibition match.
+    Offline,
+    /// LAN match.
+    Lan,
+    /// Tournament match.
+    Tournament,
+    /// The replay did not expose enough recognized metadata to classify the game type.
+    #[default]
+    Unknown,
+}
+
+/// Raw and normalized game-type metadata for a replay.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ReplayGameTypeDetails {
+    /// Easy-to-use normalized classification.
+    pub game_type: ReplayGameType,
+    /// Header `MatchType`, when present. Post-EAC online replays often only say `Online`.
+    pub header_match_type: Option<String>,
+    /// Network `ProjectX.GRI_X:ReplicatedGamePlaylist`, when present.
+    pub playlist_id: Option<i32>,
+    /// Network `TAGame.GameEvent_TA:MatchTypeClass`, resolved to its actor object name.
+    pub match_type_class: Option<String>,
+}
+
+impl ReplayGameTypeDetails {
+    pub fn from_headers(headers: &[(String, HeaderProp)]) -> Self {
+        let header_match_type = headers
+            .iter()
+            .find(|(key, _)| key == "MatchType")
+            .and_then(|(_, value)| value.as_string())
+            .map(ToOwned::to_owned);
+
+        Self::from_signals(header_match_type, None, None)
+    }
+
+    pub fn from_signals(
+        header_match_type: Option<String>,
+        playlist_id: Option<i32>,
+        match_type_class: Option<String>,
+    ) -> Self {
+        let game_type = infer_replay_game_type(
+            header_match_type.as_deref(),
+            playlist_id,
+            match_type_class.as_deref(),
+        );
+        Self {
+            game_type,
+            header_match_type,
+            playlist_id,
+            match_type_class,
+        }
+    }
+
+    pub fn with_network_signals(
+        &self,
+        playlist_id: Option<i32>,
+        match_type_class: Option<String>,
+    ) -> Self {
+        Self::from_signals(
+            self.header_match_type.clone(),
+            playlist_id.or(self.playlist_id),
+            match_type_class.or_else(|| self.match_type_class.clone()),
+        )
+    }
+}
+
+fn infer_replay_game_type(
+    header_match_type: Option<&str>,
+    playlist_id: Option<i32>,
+    match_type_class: Option<&str>,
+) -> ReplayGameType {
+    if let Some(game_type) = match_type_class.and_then(replay_game_type_from_match_type_class) {
+        return game_type;
+    }
+    if let Some(game_type) = header_match_type.and_then(replay_game_type_from_header_match_type) {
+        return game_type;
+    }
+    if let Some(game_type) = playlist_id.and_then(replay_game_type_from_playlist_id) {
+        return game_type;
+    }
+    ReplayGameType::Unknown
+}
+
+fn replay_game_type_from_match_type_class(class_name: &str) -> Option<ReplayGameType> {
+    let normalized = class_name.to_ascii_lowercase();
+    if normalized.contains("publicranked") {
+        Some(ReplayGameType::Ranked)
+    } else if normalized.contains("private") {
+        Some(ReplayGameType::Private)
+    } else if normalized.contains("offline") {
+        Some(ReplayGameType::Offline)
+    } else if normalized.contains("lan") {
+        Some(ReplayGameType::Lan)
+    } else if normalized.contains("tournament") {
+        Some(ReplayGameType::Tournament)
+    } else if normalized.contains("public") {
+        Some(ReplayGameType::Casual)
+    } else {
+        None
+    }
+}
+
+fn replay_game_type_from_playlist_id(playlist_id: i32) -> Option<ReplayGameType> {
+    match playlist_id {
+        // Private and offline fixtures use these playlist ids, but LAN can also
+        // report 6, so header/class signals intentionally take precedence.
+        6 => Some(ReplayGameType::Private),
+        8 => Some(ReplayGameType::Offline),
+        // Unranked Duel, Doubles, Standard, and Chaos.
+        1..=4 => Some(ReplayGameType::Casual),
+        // Ranked Duel, Doubles, and Standard.
+        10 | 11 | 13 => Some(ReplayGameType::Ranked),
+        // Tournament-style fixtures observed across older and current replays.
+        22 | 34 => Some(ReplayGameType::Tournament),
+        // Older public playlist observed in the fixture corpus.
+        23 => Some(ReplayGameType::Casual),
+        // Ranked extra modes.
+        27..=30 => Some(ReplayGameType::Ranked),
+        _ => None,
+    }
+}
+
+fn replay_game_type_from_header_match_type(match_type: &str) -> Option<ReplayGameType> {
+    match match_type.to_ascii_lowercase().as_str() {
+        "ranked" => Some(ReplayGameType::Ranked),
+        "unranked" | "casual" => Some(ReplayGameType::Casual),
+        "private" => Some(ReplayGameType::Private),
+        "offline" => Some(ReplayGameType::Offline),
+        "lan" => Some(ReplayGameType::Lan),
+        "tournament" => Some(ReplayGameType::Tournament),
+        // Header-only `Online` is intentionally ambiguous.
+        "online" => None,
+        _ => None,
+    }
+}
+
 /// [`ReplayMeta`] struct represents metadata about the replay being processed.
 ///
 /// This includes information about the players in the match and all replay headers.
@@ -311,6 +458,8 @@ pub struct ReplayMeta {
     pub team_zero: Vec<PlayerInfo>,
     /// A vector of [`PlayerInfo`] instances representing the players on team one.
     pub team_one: Vec<PlayerInfo>,
+    /// Normalized and raw game-type signals inferred from headers and network data.
+    pub game_type: ReplayGameTypeDetails,
     /// A vector of tuples containing the names and properties of all the headers in the replay.
     #[ts(as = "Vec<(String, crate::interop::ts_bindings::HeaderPropTs)>")]
     pub all_headers: Vec<(String, HeaderProp)>,

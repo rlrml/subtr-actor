@@ -5,7 +5,9 @@ mod replay_probe_rotation;
 use replay_probe_rotation::LegacyRotationProbe;
 use subtr_actor_tools::replay_plausibility::evaluate_replay_plausibility;
 
-use subtr_actor::{Collector, PlayerFrame, ReplayDataCollector, StatsTimelineCollector};
+use subtr_actor::{
+    Collector, PlayerFrame, ReplayDataCollector, ReplayProcessor, StatsTimelineCollector,
+};
 
 const DEFAULT_REPLAY_PATH: &str =
     "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
@@ -106,6 +108,12 @@ fn print_metadata(path: &str) {
         match_type,
         num_frames
     );
+    let mut processor = ReplayProcessor::new(&replay)
+        .unwrap_or_else(|error| panic!("failed to create processor for {path}: {error:?}"));
+    let meta = processor
+        .process_and_get_replay_meta()
+        .unwrap_or_else(|error| panic!("failed to build replay meta for {path}: {error:?}"));
+    println!("game_type={:#?}", meta.game_type);
 }
 
 fn print_plausibility(path: &str) {

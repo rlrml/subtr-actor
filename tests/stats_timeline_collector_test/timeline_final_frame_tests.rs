@@ -68,6 +68,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
         replay_meta: ReplayMeta {
             team_zero: Vec::new(),
             team_one: Vec::new(),
+            game_type: Default::default(),
             all_headers: Vec::new(),
         },
         events: ReplayStatsTimelineEvents {

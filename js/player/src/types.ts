@@ -33,6 +33,8 @@ export type {
   RawPlayerInfo,
   RawPlayerStatEvent,
   RawPlayerStatEventKind,
+  RawReplayGameType,
+  RawReplayGameTypeDetails,
   RawReplayTickMark,
   RawReplayFramesData,
   RawRigidBody,

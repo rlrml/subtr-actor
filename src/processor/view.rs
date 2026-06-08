@@ -7,6 +7,11 @@ use super::*;
 /// later be driven by non-replay state sources.
 pub trait ProcessorView {
     fn get_replay_meta(&self) -> SubtrActorResult<ReplayMeta>;
+    fn get_replay_game_type_details(&self) -> ReplayGameTypeDetails {
+        self.get_replay_meta()
+            .map(|meta| meta.game_type)
+            .unwrap_or_default()
+    }
     fn player_count(&self) -> usize;
     fn iter_player_ids_in_order(&self) -> Box<dyn Iterator<Item = &PlayerId> + '_>;
     fn current_in_game_team_player_counts(&self) -> [usize; 2];
@@ -89,6 +94,10 @@ pub trait ProcessorView {
 impl ProcessorView for ReplayProcessor<'_> {
     fn get_replay_meta(&self) -> SubtrActorResult<ReplayMeta> {
         ReplayProcessor::get_replay_meta(self)
+    }
+
+    fn get_replay_game_type_details(&self) -> ReplayGameTypeDetails {
+        ReplayProcessor::get_replay_game_type_details(self)
     }
 
     fn player_count(&self) -> usize {

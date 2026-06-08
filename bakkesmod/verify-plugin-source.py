@@ -1405,6 +1405,12 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
+        "formatGoalTagPerformer(tag)",
+        "stats evaluation player goal-label tag performer chips",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
         "left.kind.localeCompare(right.kind) ||\n          right.metadata.confidence - left.metadata.confidence",
         "stats evaluation player sorts goal tags by kind and metadata confidence",
         errors,

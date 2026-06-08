@@ -3,14 +3,17 @@ mod common;
 use serde_json::Value;
 use subtr_actor::{
     builtin_stats_module_names, Collector, FrameRateDecorator, GoalTagKind, NDArrayCollector,
-    PlayerFrame, ReplayDataCollector, StatsCollector, StatsFrameResolution, StatsTimelineCollector,
-    StatsTimelineEventCollector,
+    PlayerFrame, ReplayDataCollector, ReplayGameType, ReplayProcessor, StatsCollector,
+    StatsFrameResolution, StatsTimelineCollector, StatsTimelineEventCollector,
 };
 
 struct PostEacFixture {
     path: &'static str,
     player_count: usize,
     match_type: &'static str,
+    game_type: ReplayGameType,
+    playlist_id: Option<i32>,
+    match_type_class: Option<&'static str>,
 }
 
 const POST_EAC_FIXTURES: &[PostEacFixture] = &[
@@ -18,26 +21,41 @@ const POST_EAC_FIXTURES: &[PostEacFixture] = &[
         path: "assets/post-eac-ranked-duel-2026-04-28-a.replay",
         player_count: 2,
         match_type: "Online",
+        game_type: ReplayGameType::Ranked,
+        playlist_id: Some(10),
+        match_type_class: Some("TAGame.MatchType_PublicRanked_TA"),
     },
     PostEacFixture {
         path: "assets/post-eac-ranked-duel-2026-04-28-b.replay",
         player_count: 2,
         match_type: "Online",
+        game_type: ReplayGameType::Ranked,
+        playlist_id: Some(10),
+        match_type_class: Some("TAGame.MatchType_PublicRanked_TA"),
     },
     PostEacFixture {
         path: "assets/post-eac-ranked-doubles-2026-04-28.replay",
         player_count: 4,
         match_type: "Online",
+        game_type: ReplayGameType::Ranked,
+        playlist_id: Some(11),
+        match_type_class: Some("TAGame.MatchType_PublicRanked_TA"),
     },
     PostEacFixture {
         path: "assets/post-eac-ranked-standard-2026-04-28.replay",
         player_count: 6,
         match_type: "Online",
+        game_type: ReplayGameType::Ranked,
+        playlist_id: Some(13),
+        match_type_class: Some("TAGame.MatchType_PublicRanked_TA"),
     },
     PostEacFixture {
         path: "assets/post-eac-private-2026-04-28.replay",
         player_count: 2,
         match_type: "Private",
+        game_type: ReplayGameType::Private,
+        playlist_id: Some(6),
+        match_type_class: Some("TAGame.MatchType_Private_TA"),
     },
 ];
 
@@ -174,6 +192,54 @@ fn post_eac_replays_parse_and_match_expected_headers() {
                 .as_ref()
                 .is_some_and(|frames| !frames.frames.is_empty()),
             "{} should expose parsed network frames",
+            fixture.path
+        );
+    }
+}
+
+#[test]
+fn post_eac_replays_expose_network_game_type_metadata() {
+    for fixture in POST_EAC_FIXTURES {
+        let replay = common::parse_replay(fixture.path);
+        let mut processor = ReplayProcessor::new(&replay).unwrap_or_else(|error| {
+            panic!("failed to build processor for {}: {error:?}", fixture.path)
+        });
+        let replay_meta = processor
+            .process_and_get_replay_meta()
+            .unwrap_or_else(|error| {
+                panic!(
+                    "failed to build replay meta for {}: {error:?}",
+                    fixture.path
+                )
+            });
+        let game_type = replay_meta.game_type;
+
+        assert_eq!(
+            game_type.game_type, fixture.game_type,
+            "{} game type",
+            fixture.path
+        );
+        assert_eq!(
+            game_type.header_match_type.as_deref(),
+            Some(fixture.match_type),
+            "{} header match type",
+            fixture.path
+        );
+        assert_eq!(
+            game_type.playlist_id, fixture.playlist_id,
+            "{} playlist id",
+            fixture.path
+        );
+        assert_eq!(
+            game_type.match_type_class.as_deref(),
+            fixture.match_type_class,
+            "{} match type class",
+            fixture.path
+        );
+        assert_eq!(
+            processor.get_replay_game_type_details(),
+            game_type,
+            "{} processor game type details",
             fixture.path
         );
     }

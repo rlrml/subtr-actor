@@ -190,7 +190,9 @@ struct CachedObjectIds {
     seconds_remaining: Option<boxcars::ObjectId>,
     replicated_state_name: Option<boxcars::ObjectId>,
     replicated_game_state_time_remaining: Option<boxcars::ObjectId>,
+    match_type_class: Option<boxcars::ObjectId>,
     ball_has_been_hit: Option<boxcars::ObjectId>,
+    replicated_game_playlist: Option<boxcars::ObjectId>,
     ball_hit_team_num: Option<boxcars::ObjectId>,
     dodges_refreshed_counter: Option<boxcars::ObjectId>,
 }
@@ -217,7 +219,9 @@ impl CachedObjectIds {
             seconds_remaining: cached(SECONDS_REMAINING_KEY),
             replicated_state_name: cached(REPLICATED_STATE_NAME_KEY),
             replicated_game_state_time_remaining: cached(REPLICATED_GAME_STATE_TIME_REMAINING_KEY),
+            match_type_class: cached(MATCH_TYPE_CLASS_KEY),
             ball_has_been_hit: cached(BALL_HAS_BEEN_HIT_KEY),
+            replicated_game_playlist: cached(REPLICATED_GAME_PLAYLIST_KEY),
             ball_hit_team_num: cached(BALL_HIT_TEAM_NUM_KEY),
             dodges_refreshed_counter: cached(DODGES_REFRESHED_COUNTER_KEY),
         }
@@ -277,6 +281,8 @@ pub struct ReplayProcessor<'a> {
     pub name_to_object_id: HashMap<String, boxcars::ObjectId>,
     /// Cached actor id for the replay ball when known.
     pub ball_actor_id: Option<boxcars::ActorId>,
+    /// Best known game-type metadata for this replay.
+    pub game_type_details: ReplayGameTypeDetails,
     /// Stable ordering of team 0 players.
     pub team_zero: Vec<PlayerId>,
     /// Stable ordering of team 1 players.
@@ -384,6 +390,7 @@ impl<'a> ReplayProcessor<'a> {
             name_to_object_id.insert(name.clone(), object_id);
         }
         let cached_object_ids = CachedObjectIds::from_name_map(&name_to_object_id);
+        let game_type_details = ReplayGameTypeDetails::from_headers(&replay.properties);
         let mut processor = Self {
             actor_state: ActorStateModeler::new(),
             replay,
@@ -398,6 +405,7 @@ impl<'a> ReplayProcessor<'a> {
                 .collect(),
             object_id_to_name,
             name_to_object_id,
+            game_type_details,
             team_zero: Vec::new(),
             team_one: Vec::new(),
             ball_actor_id: None,
@@ -608,6 +616,7 @@ impl<'a> ReplayProcessor<'a> {
         {
             // Update the internal state of the processor based on the current frame
             self.actor_state.process_frame(frame, index)?;
+            self.update_game_type_details();
             self.update_mappings(frame)?;
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame, index)?;
@@ -664,6 +673,7 @@ impl<'a> ReplayProcessor<'a> {
             .enumerate()
         {
             self.actor_state.process_frame(frame, index)?;
+            self.update_game_type_details();
             self.update_mappings(frame)?;
             self.update_ball_id(frame)?;
             self.update_boost_amounts(frame, index)?;

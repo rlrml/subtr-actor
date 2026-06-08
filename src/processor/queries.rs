@@ -321,6 +321,64 @@ impl<'a> ReplayProcessor<'a> {
             })
     }
 
+    fn get_actor_object_name(&self, actor_id: &boxcars::ActorId) -> Option<String> {
+        self.actor_state
+            .actor_states
+            .get(actor_id)
+            .and_then(|state| self.object_id_to_name.get(&state.object_id))
+            .cloned()
+            .or_else(|| {
+                usize::try_from(actor_id.0)
+                    .ok()
+                    .and_then(|object_index| self.replay.objects.get(object_index))
+                    .cloned()
+            })
+    }
+
+    fn get_first_attribute_by_object_id(
+        &self,
+        object_id: Option<boxcars::ObjectId>,
+    ) -> Option<&boxcars::Attribute> {
+        let object_id = object_id?;
+        self.actor_state.actor_states.values().find_map(|state| {
+            state
+                .attributes
+                .get(&object_id)
+                .map(|(attribute, _)| attribute)
+        })
+    }
+
+    /// Returns the replicated Rocket League playlist id, when present in network data.
+    pub fn get_replicated_game_playlist(&self) -> Option<i32> {
+        match self.get_first_attribute_by_object_id(self.cached_object_ids.replicated_game_playlist)
+        {
+            Some(boxcars::Attribute::Int(playlist_id)) => Some(*playlist_id),
+            _ => None,
+        }
+    }
+
+    /// Returns the resolved match-type class object name, when present in network data.
+    pub fn get_match_type_class(&self) -> Option<String> {
+        match self.get_first_attribute_by_object_id(self.cached_object_ids.match_type_class) {
+            Some(boxcars::Attribute::ActiveActor(active_actor)) => {
+                self.get_actor_object_name(&active_actor.actor)
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns the best known normalized game-type metadata.
+    pub fn get_replay_game_type_details(&self) -> ReplayGameTypeDetails {
+        self.game_type_details.clone()
+    }
+
+    pub(crate) fn update_game_type_details(&mut self) {
+        self.game_type_details = self.game_type_details.with_network_signals(
+            self.get_replicated_game_playlist(),
+            self.get_match_type_class(),
+        );
+    }
+
     pub(crate) fn get_actor_attribute<'b>(
         &'b self,
         actor_id: &boxcars::ActorId,

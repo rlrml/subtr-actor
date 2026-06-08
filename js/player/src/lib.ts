@@ -114,6 +114,8 @@ export type {
   ReplayPreloadContext,
   ReplayPreloadPolicy,
   PlayerSample,
+  RawReplayGameType,
+  RawReplayGameTypeDetails,
   RawReplayFramesData,
   ReplayLoadResult,
   ReplayLoadOptions,
