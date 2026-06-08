@@ -16,7 +16,7 @@ import type {
   StatsTimeline,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
-import { formatMechanicKind } from "./timelineMarkers.ts";
+import { formatGoalTagPerformer, formatMechanicKind } from "./timelineMarkers.ts";
 import { playerIdToString } from "./touchOverlay.ts";
 
 interface SelectedStatEntry {
@@ -679,7 +679,10 @@ export class StatsWindowsController {
         for (const tag of tags) {
           const chip = document.createElement("span");
           chip.className = "goal-label-tag";
-          chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.metadata.confidence * 100)}%`;
+          const performer = formatGoalTagPerformer(tag);
+          chip.textContent = `${formatMechanicKind(tag.kind)} ${Math.round(tag.metadata.confidence * 100)}%${
+            performer ? ` - ${performer}` : ""
+          }`;
           labels.append(chip);
         }
       }

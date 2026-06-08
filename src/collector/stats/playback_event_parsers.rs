@@ -986,6 +986,11 @@ pub(in crate::collector::stats::playback) fn parse_goal_tag_event(
     let kind = decode_json_value(json_required_value(object, "kind")?.clone())?;
     let metadata = GoalTagMetadata {
         confidence: json_required_f32(object, "confidence")?,
+        performer: object
+            .get("performer")
+            .cloned()
+            .map(decode_json_value)
+            .transpose()?,
         modifiers: json_optional_array(object.get("modifiers"))?
             .iter()
             .map(|modifier| decode_json_value(modifier.clone()))
@@ -1016,6 +1021,11 @@ pub(in crate::collector::stats::playback) fn parse_goal_tag(
     )?;
     let metadata = GoalTagMetadata {
         confidence: json_required_f32(metadata_object, "confidence")?,
+        performer: metadata_object
+            .get("performer")
+            .cloned()
+            .map(decode_json_value)
+            .transpose()?,
         modifiers: json_optional_array(metadata_object.get("modifiers"))?
             .iter()
             .map(|modifier| decode_json_value(modifier.clone()))
@@ -1071,6 +1081,130 @@ pub(in crate::collector::stats::playback) fn parse_fifty_fifty_event(
         plane_normal: json_required_vec3(object, "plane_normal")?,
         winning_team_is_team_0: json_optional_bool(object.get("winning_team_is_team_0")),
         possession_team_is_team_0: json_optional_bool(object.get("possession_team_is_team_0")),
+    })
+}
+
+fn parse_kickoff_taker_event(value: &Value) -> SubtrActorResult<KickoffTakerEvent> {
+    let object = json_object(value, "kickoff taker event")?;
+    Ok(KickoffTakerEvent {
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        start_position: json_required_vec3(object, "start_position")?,
+        spawn_position: decode_json_value(json_required_value(object, "spawn_position")?.clone())?,
+        start_boost: json_optional_f32(object.get("start_boost"))?,
+        boost_after: json_optional_f32(object.get("boost_after"))?,
+        first_touch_time: json_optional_f32(object.get("first_touch_time"))?,
+        first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
+        outcome: decode_json_value(json_required_value(object, "outcome")?.clone())?,
+        approach: object
+            .get("approach")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
+    })
+}
+
+fn parse_kickoff_support_event(value: &Value) -> SubtrActorResult<KickoffSupportEvent> {
+    let object = json_object(value, "kickoff support event")?;
+    Ok(KickoffSupportEvent {
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        start_position: json_required_vec3(object, "start_position")?,
+        spawn_position: decode_json_value(json_required_value(object, "spawn_position")?.clone())?,
+        start_boost: json_optional_f32(object.get("start_boost"))?,
+        boost_after: json_optional_f32(object.get("boost_after"))?,
+        first_touch_time: json_optional_f32(object.get("first_touch_time"))?,
+        first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
+        support_behavior: object
+            .get("support_behavior")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
+    })
+}
+
+fn parse_optional_kickoff_taker_event(
+    value: Option<&Value>,
+) -> SubtrActorResult<Option<KickoffTakerEvent>> {
+    match value {
+        Some(Value::Null) | None => Ok(None),
+        Some(value) => parse_kickoff_taker_event(value).map(Some),
+    }
+}
+
+fn parse_kickoff_support_event_array(
+    object: &serde_json::Map<String, Value>,
+    field: &str,
+) -> SubtrActorResult<Vec<KickoffSupportEvent>> {
+    object
+        .get(field)
+        .and_then(Value::as_array)
+        .map(|events| {
+            events
+                .iter()
+                .map(parse_kickoff_support_event)
+                .collect::<SubtrActorResult<Vec<_>>>()
+        })
+        .transpose()
+        .map(Option::unwrap_or_default)
+}
+
+pub(in crate::collector::stats::playback) fn parse_kickoff_event(
+    value: &Value,
+) -> SubtrActorResult<KickoffEvent> {
+    let object = json_object(value, "kickoff event")?;
+    Ok(KickoffEvent {
+        start_time: json_required_f32(object, "start_time")?,
+        start_frame: json_required_usize(object, "start_frame")?,
+        end_time: json_required_f32(object, "end_time")?,
+        end_frame: json_required_usize(object, "end_frame")?,
+        first_touch_time: json_optional_f32(object.get("first_touch_time"))?,
+        first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
+        first_touch_team_is_team_0: json_optional_bool(object.get("first_touch_team_is_team_0")),
+        first_touch_player: json_optional_remote_id(object.get("first_touch_player"))?,
+        team_zero_taker_touch_time: json_optional_f32(object.get("team_zero_taker_touch_time"))?,
+        team_zero_taker_touch_frame: json_optional_usize(
+            object.get("team_zero_taker_touch_frame"),
+        )?,
+        team_one_taker_touch_time: json_optional_f32(object.get("team_one_taker_touch_time"))?,
+        team_one_taker_touch_frame: json_optional_usize(object.get("team_one_taker_touch_frame"))?,
+        taker_touch_delay_seconds: json_optional_f32(object.get("taker_touch_delay_seconds"))?,
+        exit_velocity: json_optional_vec3(object.get("exit_velocity"))?,
+        exit_speed: json_optional_f32(object.get("exit_speed"))?,
+        exit_y_velocity: json_optional_f32(object.get("exit_y_velocity"))?,
+        first_follow_up_touch_time: json_optional_f32(object.get("first_follow_up_touch_time"))?,
+        first_follow_up_touch_frame: json_optional_usize(
+            object.get("first_follow_up_touch_frame"),
+        )?,
+        first_follow_up_touch_team_is_team_0: json_optional_bool(
+            object.get("first_follow_up_touch_team_is_team_0"),
+        ),
+        first_follow_up_touch_player: json_optional_remote_id(
+            object.get("first_follow_up_touch_player"),
+        )?,
+        outcome: decode_json_value(json_required_value(object, "outcome")?.clone())?,
+        winning_team_is_team_0: json_optional_bool(object.get("winning_team_is_team_0")),
+        win_strength: json_optional_f32(object.get("win_strength"))?,
+        win_strength_band: object
+            .get("win_strength_band")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
+        kickoff_possession_outcome: object
+            .get("kickoff_possession_outcome")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
+        kickoff_possession_team_is_team_0: json_optional_bool(
+            object.get("kickoff_possession_team_is_team_0"),
+        ),
+        kickoff_goal: json_required_bool(object, "kickoff_goal")?,
+        scoring_team_is_team_0: json_optional_bool(object.get("scoring_team_is_team_0")),
+        time_to_goal: json_optional_f32(object.get("time_to_goal"))?,
+        team_zero_taker: parse_optional_kickoff_taker_event(object.get("team_zero_taker"))?,
+        team_one_taker: parse_optional_kickoff_taker_event(object.get("team_one_taker"))?,
+        team_zero_non_takers: parse_kickoff_support_event_array(object, "team_zero_non_takers")?,
+        team_one_non_takers: parse_kickoff_support_event_array(object, "team_one_non_takers")?,
     })
 }
 

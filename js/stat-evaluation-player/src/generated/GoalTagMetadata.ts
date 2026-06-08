@@ -2,5 +2,6 @@
 import type { GoalTagEventRef } from "./GoalTagEventRef.ts";
 import type { GoalTagEvidence } from "./GoalTagEvidence.ts";
 import type { GoalTagModifier } from "./GoalTagModifier.ts";
+import type { GoalTagPerformer } from "./GoalTagPerformer.ts";
 
-export type GoalTagMetadata = { confidence: number, modifiers?: Array<GoalTagModifier>, related_events?: Array<GoalTagEventRef>, evidence?: Array<GoalTagEvidence>, };
+export type GoalTagMetadata = { confidence: number, performer?: GoalTagPerformer | null, modifiers?: Array<GoalTagModifier>, related_events?: Array<GoalTagEventRef>, evidence?: Array<GoalTagEvidence>, };

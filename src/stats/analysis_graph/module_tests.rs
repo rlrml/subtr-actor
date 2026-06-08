@@ -55,6 +55,7 @@ fn resolves_all_reducer_nodes_with_default_signal_nodes() {
     assert!(names.contains("center"));
     assert!(names.contains("controlled_play"));
     assert!(names.contains("pass"));
+    assert!(names.contains("kickoff"));
     assert!(names.contains("rotation"));
     assert!(names.contains("territorial_pressure"));
     assert!(names.contains("flick"));

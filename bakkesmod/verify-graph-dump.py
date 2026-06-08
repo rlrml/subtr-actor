@@ -55,6 +55,7 @@ DEFAULT_GRAPH_EVENT_FIELDS = (
     "center",
     "double_tap",
     "fifty_fifty",
+    "kickoff",
     "flick",
     "musty_flick",
     "one_timer",
