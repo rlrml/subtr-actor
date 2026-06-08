@@ -179,9 +179,11 @@ Common player features:
 - `PlayerAnyJump`
 - `PlayerJump`
 - `PlayerDodgeRefreshed`
-- `AnalysisPlayerTouches`
+- `PlayerEvent:touch`
 
 `PlayerBoost` is exposed in raw replay units (`0-255`), not `0-100` percent.
+Analysis-backed player event indicators use `PlayerEvent:<event_name>` and emit
+`1` for a sampled frame when that player has a new event, otherwise `0`.
 
 ## Development
 

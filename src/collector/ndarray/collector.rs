@@ -434,10 +434,7 @@ where
         "PlayerDemolishedBy" => Some(NDArrayPlayerFeatureAdder::plain(
             PlayerDemolishedBy::<F>::arc_new(),
         )),
-        "AnalysisPlayerTouches" | "PlayerTouches" | "PlayerTouchCount" => Some(
-            NDArrayPlayerFeatureAdder::analysis(AnalysisPlayerTouches::<F>::arc_new()),
-        ),
-        _ => None,
+        _ => analysis_player_event_feature_adder_from_name(name),
     }
 }
 

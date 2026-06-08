@@ -140,7 +140,7 @@ fn analysis_feature_adders_share_one_graph_evaluation_per_ndarray_row() {
 #[test]
 fn string_feature_names_can_create_analysis_backed_touch_adders() {
     let replay = parse_replay(NDARRAY_ANALYSIS_FIXTURE);
-    let mut collector = NDArrayCollector::<f32>::from_strings(&[], &["AnalysisPlayerTouches"])
+    let mut collector = NDArrayCollector::<f32>::from_strings(&[], &["PlayerEvent:touch"])
         .expect("analysis-backed feature names should resolve");
     FrameRateDecorator::new_from_fps(30.0, &mut collector)
         .process_replay(&replay)
@@ -171,5 +171,49 @@ fn string_feature_names_can_create_analysis_backed_touch_adders() {
     assert!(
         touch_event_count > 0,
         "fixture should produce at least one string-created player touch event"
+    );
+}
+
+#[test]
+fn player_event_names_create_registered_analysis_indicators() {
+    let event_names = [
+        "PlayerEvent:touch",
+        "PlayerEvent:center",
+        "PlayerEvent:double_tap",
+        "PlayerEvent:one_timer",
+        "PlayerEvent:wall_aerial",
+        "PlayerEvent:wall_aerial_shot",
+        "PlayerEvent:ceiling_shot",
+        "PlayerEvent:flick",
+        "PlayerEvent:musty_flick",
+        "PlayerEvent:dodge_reset",
+        "PlayerEvent:flip_reset_dodge",
+        "PlayerEvent:half_flip",
+        "PlayerEvent:half_volley",
+        "PlayerEvent:wavedash",
+        "PlayerEvent:whiff",
+        "PlayerEvent:speed_flip",
+        "PlayerEvent:flip_impulse",
+        "PlayerEvent:powerslide",
+        "PlayerEvent:ball_carry",
+        "PlayerEvent:boost_pickup",
+        "PlayerEvent:boost_ledger",
+        "PlayerEvent:boost_state",
+        "PlayerEvent:bump",
+        "PlayerEvent:pass",
+        "PlayerEvent:rotation",
+        "PlayerEvent:movement",
+        "PlayerEvent:positioning",
+    ];
+    let collector = NDArrayCollector::<f32>::from_strings(&[], &event_names)
+        .expect("registered event feature names should resolve");
+    let headers = collector.get_column_headers();
+
+    assert_eq!(headers.global_headers, Vec::<String>::new());
+    assert_eq!(headers.player_headers.len(), event_names.len());
+    assert_eq!(headers.player_headers[0], "analysis touch event");
+    assert_eq!(
+        headers.player_headers.last(),
+        Some(&"analysis positioning event".to_owned())
     );
 }
