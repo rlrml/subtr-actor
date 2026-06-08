@@ -127,13 +127,9 @@ function applyTeamEvent(stats: KickoffTeamStats, teamIsTeam0: boolean, event: Ki
   stats.count += 1;
   if (event.outcome === "neutral") {
     stats.neutral_outcomes += 1;
-  } else if (
-    event.outcome === (teamIsTeam0 ? "team_zero_win" : "team_one_win")
-  ) {
+  } else if (event.outcome === (teamIsTeam0 ? "team_zero_win" : "team_one_win")) {
     stats.wins += 1;
-  } else if (
-    event.outcome === (teamIsTeam0 ? "team_one_win" : "team_zero_win")
-  ) {
+  } else if (event.outcome === (teamIsTeam0 ? "team_one_win" : "team_zero_win")) {
     stats.losses += 1;
   }
 
