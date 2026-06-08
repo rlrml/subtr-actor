@@ -2,7 +2,12 @@ import "./report.css";
 import { toBoostDisplayUnits } from "./boostFormatting.ts";
 import { formatReplayLoadProgress, loadReplayBundleInWorker } from "./replayLoader.ts";
 import { createStatRegistry, type StatDefinition } from "./statRegistry.ts";
-import { formatMechanicKind } from "./timelineMarkers.ts";
+import {
+  formatGoalTagPerformer,
+  formatMechanicKind,
+  isScorerGoalTag,
+  isTeammatePerformedGoalTag,
+} from "./timelineMarkers.ts";
 import { createStatsFrameLookup } from "./statsTimeline.ts";
 import type { PlayerStatsSnapshot, StatsFrame } from "./statsTimeline.ts";
 import {
@@ -165,10 +170,8 @@ function renderGoalTagChips(tags: GoalTag[]): HTMLElement {
 
   for (const tag of tags) {
     const metadata = tag.metadata;
-    const modifiers =
-      metadata.modifiers && metadata.modifiers.length > 0
-        ? ` - ${metadata.modifiers.map(formatMechanicKind).join(", ")}`
-        : "";
+    const performer = formatGoalTagPerformer(tag);
+    const modifiers = performer ? ` - ${performer}` : "";
     list.append(
       el("span", {
         className: "stats-report-goal-tag",
@@ -316,16 +319,20 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
     (left, right) => left.time - right.time,
   );
   const goalTags = goalContexts.flatMap((goal) => goal.tags ?? []);
+  const scorerGoalTags = goalTags.filter(isScorerGoalTag);
+  const assistGoalTags = goalTags.filter(isTeammatePerformedGoalTag);
   const goalIndexes = goalContexts.map((_, index) => index);
   const taggedGoalCount = goalContexts.filter((goal) => (goal.tags ?? []).length > 0).length;
-  const tagRows = getGoalTagCounts(goalTags);
-  const topTag = tagRows[0];
+  const scorerTagRows = getGoalTagCounts(scorerGoalTags);
+  const assistTagRows = getGoalTagCounts(assistGoalTags);
+  const topTag = scorerTagRows[0];
 
   page.append(
     renderMetricGrid([
       createSummaryCard("Goals found", goalIndexes.length.toLocaleString()),
       createSummaryCard("Tagged goals", taggedGoalCount.toLocaleString()),
-      createSummaryCard("Goal tags", goalTags.length.toLocaleString()),
+      createSummaryCard("Scorer goal tags", scorerGoalTags.length.toLocaleString()),
+      createSummaryCard("Assist goal tags", assistGoalTags.length.toLocaleString()),
       createSummaryCard("Top tag", topTag ? `${topTag.label} (${topTag.value})` : "--"),
     ]),
   );
@@ -343,10 +350,16 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
   const charts = el("section", { className: "stats-report-charts" });
   charts.append(
     renderChartCard(
-      "Goal tags by type",
-      tagRows.length > 0
-        ? renderBarChartRows(tagRows, (value) => value.toLocaleString())
-        : el("p", { className: "stats-report-note", text: "No goal tags emitted." }),
+      "Scorer goal tags by type",
+      scorerTagRows.length > 0
+        ? renderBarChartRows(scorerTagRows, (value) => value.toLocaleString())
+        : el("p", { className: "stats-report-note", text: "No scorer goal tags emitted." }),
+    ),
+    renderChartCard(
+      "Assist goal tags by type",
+      assistTagRows.length > 0
+        ? renderBarChartRows(assistTagRows, (value) => value.toLocaleString())
+        : el("p", { className: "stats-report-note", text: "No assist goal tags emitted." }),
     ),
     renderChartCard(
       "Goal timing",

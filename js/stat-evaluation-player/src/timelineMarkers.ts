@@ -2,6 +2,7 @@ import type { ReplayModel, ReplayTimelineEvent, ReplayTimelineEventKind } from "
 import { buildFiftyFiftyMarkers } from "./fiftyFiftyOverlay.ts";
 import { buildCeilingShotMarkers } from "./ceilingShotOverlay.ts";
 import { buildTouchMarkers, playerIdToString } from "./touchOverlay.ts";
+import type { GoalTag } from "./generated/GoalTag.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
 
 const BLUE_TIMELINE_COLOR = "#3b82f6";
@@ -25,6 +26,44 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
   wavedash: "WD",
 };
 const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
+const PERFORMER_ATTRIBUTED_GOAL_TAG_KINDS = new Set([
+  "flick_goal",
+  "double_tap_goal",
+  "one_timer_goal",
+  "passing_goal",
+  "air_dribble_goal",
+  "flip_reset_goal",
+  "bump_goal",
+  "demo_goal",
+  "half_volley_goal",
+]);
+
+export type GoalTagPerformerRole = "scorer" | "teammate" | "unknown";
+
+export function goalTagPerformerRole(tag: GoalTag): GoalTagPerformerRole {
+  if (tag.metadata.performer === "scorer" || tag.metadata.modifiers?.includes("by_scorer")) {
+    return "scorer";
+  }
+  if (tag.metadata.performer === "teammate") {
+    return "teammate";
+  }
+  return PERFORMER_ATTRIBUTED_GOAL_TAG_KINDS.has(tag.kind) ? "unknown" : "scorer";
+}
+
+export function isScorerGoalTag(tag: GoalTag): boolean {
+  return goalTagPerformerRole(tag) === "scorer";
+}
+
+export function isTeammatePerformedGoalTag(tag: GoalTag): boolean {
+  return goalTagPerformerRole(tag) === "teammate";
+}
+
+export function formatGoalTagPerformer(tag: GoalTag): string | null {
+  const role = goalTagPerformerRole(tag);
+  if (role === "unknown") return "performer unknown";
+  return PERFORMER_ATTRIBUTED_GOAL_TAG_KINDS.has(tag.kind) ? `by ${role}` : null;
+}
+
 function getReplayPlayerName(replay: ReplayModel, playerId: string): string {
   return replay.players.find((player) => player.id === playerId)?.name ?? playerId;
 }
@@ -540,14 +579,19 @@ export function buildGoalTagTimelineEvents(
       const scorerName = scorerId ? getReplayPlayerName(replay, scorerId) : null;
       const eventTime = getReplayFrameTime(replay, goal.frame, goal.time);
       const tagLabel = formatGoalTagKind(tag.kind);
+      const performerRole = goalTagPerformerRole(tag);
       const confidencePercent = Math.round(tag.metadata.confidence * 100);
+      const goalLabel =
+        performerRole === "teammate"
+          ? `${tagLabel.toLowerCase()} assist goal`
+          : `${tagLabel.toLowerCase()} goal`;
 
       return {
         id: `goal-tag:${goalIndex}:${tag.kind}:${tagIndex}`,
         time: eventTime,
         frame: goal.frame,
         kind: "goal-tag",
-        label: `${scorerName ?? "Goal"} ${tagLabel.toLowerCase()} goal ${confidencePercent}%`,
+        label: `${scorerName ?? "Goal"} ${goalLabel} ${confidencePercent}%`,
         shortLabel: "GT",
         playerId: scorerId,
         playerName: scorerName,
