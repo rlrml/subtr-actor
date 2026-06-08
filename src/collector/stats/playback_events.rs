@@ -287,10 +287,40 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_territorial_pressure_event,
             )?,
             movement: self.module_player_events("movement", "events", parse_movement_event)?,
-            positioning: self.module_player_events(
+            positioning_activity: self.module_player_events(
                 "positioning",
-                "events",
-                parse_positioning_event,
+                "activity_events",
+                parse_positioning_activity_event,
+            )?,
+            positioning_distance: self.module_player_events(
+                "positioning",
+                "distance_events",
+                parse_positioning_distance_event,
+            )?,
+            positioning_field_zone: self.module_player_events(
+                "positioning",
+                "field_zone_events",
+                parse_positioning_field_zone_event,
+            )?,
+            positioning_ball_depth: self.module_player_events(
+                "positioning",
+                "ball_depth_events",
+                parse_positioning_ball_depth_event,
+            )?,
+            positioning_teammate_role: self.module_player_events(
+                "positioning",
+                "teammate_role_events",
+                parse_positioning_teammate_role_event,
+            )?,
+            positioning_ball_proximity: self.module_player_events(
+                "positioning",
+                "ball_proximity_events",
+                parse_positioning_ball_proximity_event,
+            )?,
+            positioning_goal_context: self.module_player_events(
+                "positioning",
+                "goal_context_events",
+                parse_positioning_goal_context_event,
             )?,
             rotation_player: self.module_player_events(
                 "rotation",
@@ -444,8 +474,32 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             Value::Array(self.module_array("movement", "events")),
         );
         events.insert(
-            "positioning".to_owned(),
-            Value::Array(self.module_array("positioning", "events")),
+            "positioning_activity".to_owned(),
+            Value::Array(self.module_array("positioning", "activity_events")),
+        );
+        events.insert(
+            "positioning_distance".to_owned(),
+            Value::Array(self.module_array("positioning", "distance_events")),
+        );
+        events.insert(
+            "positioning_field_zone".to_owned(),
+            Value::Array(self.module_array("positioning", "field_zone_events")),
+        );
+        events.insert(
+            "positioning_ball_depth".to_owned(),
+            Value::Array(self.module_array("positioning", "ball_depth_events")),
+        );
+        events.insert(
+            "positioning_teammate_role".to_owned(),
+            Value::Array(self.module_array("positioning", "teammate_role_events")),
+        );
+        events.insert(
+            "positioning_ball_proximity".to_owned(),
+            Value::Array(self.module_array("positioning", "ball_proximity_events")),
+        );
+        events.insert(
+            "positioning_goal_context".to_owned(),
+            Value::Array(self.module_array("positioning", "goal_context_events")),
         );
         events.insert(
             "rotation_player".to_owned(),

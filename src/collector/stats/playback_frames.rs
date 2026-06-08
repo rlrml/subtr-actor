@@ -144,6 +144,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             bump: self.frame_team_stat_or_default_typed(frame, "bump", team_key)?,
             half_volley: self.frame_team_stat_or_default_typed(frame, "half_volley", team_key)?,
             movement: self.frame_team_stat_or_default_typed(frame, "movement", team_key)?,
+            positioning: self.frame_team_stat_or_default_typed(frame, "positioning", team_key)?,
             powerslide: self.frame_team_stat_or_default_typed(frame, "powerslide", team_key)?,
             demo: self.frame_team_stat_or_default_typed(frame, "demo", team_key)?,
         })
@@ -392,6 +393,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         team.insert(
             "movement".to_owned(),
             self.frame_team_stat_or_default::<MovementStats>(frame, "movement", team_key),
+        );
+        team.insert(
+            "positioning".to_owned(),
+            self.frame_team_stat_or_default::<PositioningTeamStats>(frame, "positioning", team_key),
         );
         team.insert(
             "powerslide".to_owned(),

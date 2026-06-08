@@ -20,7 +20,6 @@ mod collector;
 mod nodes;
 
 use crate::stats::calculators::FrameInput;
-
 #[allow(unused_imports)]
 pub use collector::AnalysisNodeCollector;
 #[allow(unused_imports)]
@@ -43,6 +42,7 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "double_tap",
     "fifty_fifty",
     "fifty_fifty_state",
+    "kickoff",
     "possession",
     "possession_state",
     "pressure",
@@ -149,6 +149,7 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "double_tap" => Some(nodes::double_tap::boxed_default()),
         "fifty_fifty" => Some(nodes::fifty_fifty::boxed_default()),
         "fifty_fifty_state" => Some(nodes::fifty_fifty_state::boxed_default()),
+        "kickoff" => Some(nodes::kickoff::boxed_default()),
         "possession" => Some(nodes::possession::boxed_default()),
         "possession_state" => Some(nodes::possession_state::boxed_default()),
         "pressure" => Some(nodes::pressure::boxed_default()),

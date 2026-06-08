@@ -5,6 +5,10 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             most_back_forward_threshold_y: PositioningCalculatorConfig::default()
                 .most_back_forward_threshold_y,
             level_ball_depth_margin: PositioningCalculatorConfig::default().level_ball_depth_margin,
+            closest_to_ball_switch_margin: PositioningCalculatorConfig::default()
+                .closest_to_ball_switch_margin,
+            closest_to_ball_switch_min_seconds: PositioningCalculatorConfig::default()
+                .closest_to_ball_switch_min_seconds,
             pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
                 .neutral_zone_half_width_y,
             territorial_pressure_neutral_zone_half_width_y:
@@ -74,7 +78,13 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             pressure: Vec::new(),
             territorial_pressure: Vec::new(),
             movement: Vec::new(),
-            positioning: Vec::new(),
+            positioning_activity: Vec::new(),
+            positioning_distance: Vec::new(),
+            positioning_field_zone: Vec::new(),
+            positioning_ball_depth: Vec::new(),
+            positioning_teammate_role: Vec::new(),
+            positioning_ball_proximity: Vec::new(),
+            positioning_goal_context: Vec::new(),
             rotation_player: Vec::new(),
             rotation_role_span: Vec::new(),
             rotation_depth_span: Vec::new(),

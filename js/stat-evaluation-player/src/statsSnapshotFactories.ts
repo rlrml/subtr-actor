@@ -230,6 +230,12 @@ export function createTeamStatsSnapshot(
         time_high_air: 0,
         labeled_tracked_time: { entries: [] },
       },
+      positioning: {
+        tracked_time: 0,
+        time_closest_to_ball: 0,
+        time_closest_to_ball_team: 0,
+        time_closest_to_ball_absolute: 0,
+      },
       powerslide: {
         total_duration: 0,
         press_count: 0,
@@ -561,6 +567,8 @@ export function createPlayerStatsSnapshot(
         time_defensive_half: 0,
         time_offensive_half: 0,
         time_closest_to_ball: 0,
+        time_closest_to_ball_team: 0,
+        time_closest_to_ball_absolute: 0,
         time_farthest_from_ball: 0,
         time_behind_ball: 0,
         time_level_with_ball: 0,

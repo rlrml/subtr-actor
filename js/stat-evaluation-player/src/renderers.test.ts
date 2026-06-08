@@ -23,7 +23,8 @@ test("relative positioning renderer shows times and derives percentages from acc
     time_most_forward: 2,
     time_mid_role: 1,
     time_other_role: 0,
-    time_closest_to_ball: 3,
+    time_closest_to_ball_team: 3,
+    time_closest_to_ball_absolute: 1,
     time_farthest_from_ball: 1,
     time_behind_ball: 1,
     time_level_with_ball: 1,
@@ -36,7 +37,8 @@ test("relative positioning renderer shows times and derives percentages from acc
   assert.match(html, /Most forward.*2\.0s \(50%\)/s);
   assert.match(html, /Mid role.*1\.0s \(25%\)/s);
   assert.match(html, /Other role.*0\.0s \(0%\)/s);
-  assert.match(html, /Closest to ball.*3\.0s \(75%\)/s);
+  assert.match(html, /Closest on team.*3\.0s \(75%\)/s);
+  assert.match(html, /Closest overall.*1\.0s \(25%\)/s);
   assert.match(html, /Farthest from ball.*1\.0s \(25%\)/s);
   assert.match(html, /Behind ball.*1\.0s \(25%\)/s);
   assert.match(html, /Level with ball.*1\.0s \(25%\)/s);
