@@ -596,7 +596,7 @@ _None documented._
 
 ### Movement (`movement`)
 
-- Category: `movement`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`

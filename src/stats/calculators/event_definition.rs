@@ -648,7 +648,7 @@ define_stats_event!(
     MOVEMENT_EVENT_DEFINITION,
     "movement",
     "Movement",
-    EventCategory::Movement
+    EventCategory::Other
 );
 define_stats_event!(
     PositioningActivityEvent,
