@@ -1,6 +1,11 @@
 import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "@rlrml/player";
 import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
-import { formatMechanicKind, isVisibleMechanicKind } from "./timelineMarkers.ts";
+import {
+  formatMechanicKind,
+  isVisibleMechanicKind,
+  mechanicShortLabel,
+  teamTimelineColor,
+} from "./timelinePresentation.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
@@ -13,8 +18,6 @@ const RANGE_MERGE_EPSILON_SECONDS = 0.02;
 const DELTA_EPSILON = 0.0001;
 const DEFAULT_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y = 200;
 const BOOST_PICKUP_TICK_SECONDS = 0.08;
-const BLUE_TIMELINE_COLOR = "#3b82f6";
-const ORANGE_TIMELINE_COLOR = "#f59e0b";
 const BOOST_PICKUP_COLORS: Record<ReplayBoostPadSize, string> = {
   big: "rgba(245, 158, 11, 0.92)",
   small: "rgba(52, 211, 153, 0.86)",
@@ -24,20 +27,6 @@ const BOOST_PICKUP_COMPARISON_COLORS: Record<BoostPickupComparison, string> = {
   ghost: "rgba(239, 68, 68, 0.9)",
   missed: "rgba(59, 130, 246, 0.9)",
 };
-const MECHANIC_SHORT_LABELS: Record<string, string> = {
-  air_dribble: "AD",
-  ball_carry: "BC",
-  ceiling_shot: "CS",
-  double_tap: "DT",
-  flick: "F",
-  half_flip: "HF",
-  half_volley: "HV",
-  musty_flick: "M",
-  one_timer: "OT",
-  pass: "P",
-  wavedash: "WD",
-};
-
 type PressureHalfControlState = "team_zero_side" | "team_one_side" | "neutral";
 
 export interface BoostPickupTimelineRangeOptions {
@@ -64,30 +53,6 @@ function getReplayFrameTime(
   fallbackTime: number,
 ): number {
   return replay?.frames?.[frame ?? -1]?.time ?? fallbackTime;
-}
-
-function teamTimelineColor(isTeamZero: boolean | null | undefined): string | null {
-  if (isTeamZero === true) {
-    return BLUE_TIMELINE_COLOR;
-  }
-  if (isTeamZero === false) {
-    return ORANGE_TIMELINE_COLOR;
-  }
-
-  return null;
-}
-
-function mechanicShortLabel(kind: string): string {
-  return (
-    MECHANIC_SHORT_LABELS[kind] ??
-    (kind
-      .split(/[_-]+/)
-      .filter((part) => part.length > 0)
-      .map((part) => part.slice(0, 1).toUpperCase())
-      .join("")
-      .slice(0, 3) ||
-      "M")
-  );
 }
 
 export function buildMechanicTimelineRanges(
