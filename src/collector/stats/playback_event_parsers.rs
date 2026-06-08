@@ -858,6 +858,11 @@ pub(in crate::collector::stats::playback) fn parse_goal_tag_event(
     let kind = decode_json_value(json_required_value(object, "kind")?.clone())?;
     let metadata = GoalTagMetadata {
         confidence: json_required_f32(object, "confidence")?,
+        performer: object
+            .get("performer")
+            .cloned()
+            .map(decode_json_value)
+            .transpose()?,
         modifiers: json_optional_array(object.get("modifiers"))?
             .iter()
             .map(|modifier| decode_json_value(modifier.clone()))
@@ -888,6 +893,11 @@ pub(in crate::collector::stats::playback) fn parse_goal_tag(
     )?;
     let metadata = GoalTagMetadata {
         confidence: json_required_f32(metadata_object, "confidence")?,
+        performer: metadata_object
+            .get("performer")
+            .cloned()
+            .map(decode_json_value)
+            .transpose()?,
         modifiers: json_optional_array(metadata_object.get("modifiers"))?
             .iter()
             .map(|modifier| decode_json_value(modifier.clone()))

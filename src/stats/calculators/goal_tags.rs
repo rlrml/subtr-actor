@@ -86,6 +86,14 @@ pub enum GoalTagModifier {
     ByScorer,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum GoalTagPerformer {
+    Scorer,
+    Teammate,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalTagEvidence {
@@ -109,6 +117,8 @@ pub struct GoalTagEventRef {
 #[ts(export)]
 pub struct GoalTagMetadata {
     pub confidence: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub performer: Option<GoalTagPerformer>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modifiers: Vec<GoalTagModifier>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1032,10 +1042,11 @@ impl PassingGoalCalculator {
                 continue;
             };
 
-            tags.push(goal_tag_with_modifiers(
+            tags.push(mechanic_goal_tag(
                 ctx,
                 GoalTagKind::PassingGoal,
                 1.0,
+                mechanic_goal_performer(goal, &event.receiver),
                 mechanic_goal_modifiers(goal, &event.receiver),
                 mechanic_goal_evidence(goal, pass_evidence(event)),
                 vec![GoalTagEventRef {
@@ -1159,10 +1170,11 @@ impl BumpGoalCalculator {
                 continue;
             };
 
-            tags.push(goal_tag_with_modifiers(
+            tags.push(mechanic_goal_tag(
                 ctx,
                 GoalTagKind::BumpGoal,
                 event.confidence,
+                mechanic_goal_performer(goal, &event.initiator),
                 mechanic_goal_modifiers(goal, &event.initiator),
                 mechanic_goal_evidence(goal, bump_evidence(event)),
                 vec![GoalTagEventRef {
@@ -1218,10 +1230,11 @@ impl DemoGoalCalculator {
                 continue;
             };
 
-            tags.push(goal_tag_with_modifiers(
+            tags.push(mechanic_goal_tag(
                 ctx,
                 GoalTagKind::DemoGoal,
                 1.0,
+                mechanic_goal_performer(goal, attacker),
                 mechanic_goal_modifiers(goal, attacker),
                 mechanic_goal_evidence(goal, demo_evidence(event)),
                 vec![GoalTagEventRef {
@@ -1260,10 +1273,11 @@ impl HalfVolleyGoalCalculator {
                 continue;
             };
 
-            tags.push(goal_tag_with_modifiers(
+            tags.push(mechanic_goal_tag(
                 ctx,
                 GoalTagKind::HalfVolleyGoal,
                 1.0,
+                mechanic_goal_performer(goal, &candidate.player),
                 mechanic_goal_modifiers(goal, &candidate.player),
                 mechanic_goal_evidence(goal, half_volley_evidence(candidate)),
                 vec![GoalTagEventRef {

@@ -89,10 +89,11 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
             continue;
         };
 
-        tags.push(goal_tag_with_modifiers(
+        tags.push(mechanic_goal_tag(
             ctx,
             kind,
             event.event_confidence(),
+            mechanic_goal_performer(goal, event.event_player()),
             mechanic_goal_modifiers(goal, event.event_player()),
             mechanic_goal_evidence(goal, point_mechanic_evidence(event)),
             vec![event.event_ref(event_index)],
@@ -148,10 +149,11 @@ pub(super) fn tag_goals_by_air_dribble_event(
             continue;
         };
 
-        tags.push(goal_tag_with_modifiers(
+        tags.push(mechanic_goal_tag(
             ctx,
             GoalTagKind::AirDribbleGoal,
             1.0,
+            mechanic_goal_performer(goal, &event.player_id),
             mechanic_goal_modifiers(goal, &event.player_id),
             mechanic_goal_evidence(goal, air_dribble_evidence(event)),
             vec![GoalTagEventRef {
@@ -349,6 +351,21 @@ pub(super) fn mechanic_goal_modifiers(
     }
 }
 
+pub(super) fn mechanic_goal_performer(
+    goal: &GoalContextEvent,
+    mechanic_player: &PlayerId,
+) -> GoalTagPerformer {
+    if goal
+        .scorer
+        .as_ref()
+        .is_some_and(|scorer| scorer == mechanic_player)
+    {
+        GoalTagPerformer::Scorer
+    } else {
+        GoalTagPerformer::Teammate
+    }
+}
+
 pub(super) fn mechanic_goal_evidence(
     goal: &GoalContextEvent,
     mechanic_evidence: GoalTagEvidence,
@@ -369,6 +386,28 @@ pub(super) fn goal_tag(
     goal_tag_with_modifiers(ctx, kind, confidence, Vec::new(), evidence, Vec::new())
 }
 
+pub(super) fn mechanic_goal_tag(
+    ctx: GoalTaggingContext,
+    kind: GoalTagKind,
+    confidence: f32,
+    performer: GoalTagPerformer,
+    modifiers: Vec<GoalTagModifier>,
+    evidence: Vec<GoalTagEvidence>,
+    related_events: Vec<GoalTagEventRef>,
+) -> GoalTagAssignment {
+    goal_tag_with_metadata(
+        ctx,
+        kind,
+        GoalTagMetadata {
+            confidence,
+            performer: Some(performer),
+            modifiers,
+            related_events,
+            evidence,
+        },
+    )
+}
+
 pub(super) fn goal_tag_with_modifiers(
     ctx: GoalTaggingContext,
     kind: GoalTagKind,
@@ -377,12 +416,24 @@ pub(super) fn goal_tag_with_modifiers(
     evidence: Vec<GoalTagEvidence>,
     related_events: Vec<GoalTagEventRef>,
 ) -> GoalTagAssignment {
-    let metadata = GoalTagMetadata {
-        confidence,
-        modifiers,
-        related_events,
-        evidence,
-    };
+    goal_tag_with_metadata(
+        ctx,
+        kind,
+        GoalTagMetadata {
+            confidence,
+            performer: None,
+            modifiers,
+            related_events,
+            evidence,
+        },
+    )
+}
+
+pub(super) fn goal_tag_with_metadata(
+    ctx: GoalTaggingContext,
+    kind: GoalTagKind,
+    metadata: GoalTagMetadata,
+) -> GoalTagAssignment {
     GoalTagAssignment {
         goal_index: ctx.goal_index,
         tag: GoalTag::from_parts(kind, metadata),
