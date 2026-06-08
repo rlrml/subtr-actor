@@ -370,32 +370,43 @@ fn same_fraction(left: f32, right: f32) -> bool {
     left.to_bits() == right.to_bits()
 }
 
-impl_coalescible_span!(
-    PositioningActivityEvent,
-    |a, b| a.active == b.active && a.tracked == b.tracked && a.demolished == b.demolished
-);
+impl_coalescible_span!(PositioningActivityEvent, |a, b| a.active == b.active
+    && a.tracked == b.tracked
+    && a.demolished == b.demolished);
 impl_coalescible_span!(PositioningPossessionEvent, |a, b| a.possession_state
     == b.possession_state);
 impl_coalescible_span!(PositioningFieldZoneEvent, |a, b| same_fraction(
     a.defensive_zone_fraction,
     b.defensive_zone_fraction
-) && same_fraction(a.neutral_zone_fraction, b.neutral_zone_fraction)
-    && same_fraction(a.offensive_zone_fraction, b.offensive_zone_fraction)
-    && same_fraction(a.defensive_half_fraction, b.defensive_half_fraction)
-    && same_fraction(a.offensive_half_fraction, b.offensive_half_fraction));
+) && same_fraction(
+    a.neutral_zone_fraction,
+    b.neutral_zone_fraction
+) && same_fraction(
+    a.offensive_zone_fraction,
+    b.offensive_zone_fraction
+) && same_fraction(
+    a.defensive_half_fraction,
+    b.defensive_half_fraction
+) && same_fraction(
+    a.offensive_half_fraction,
+    b.offensive_half_fraction
+));
 impl_coalescible_span!(PositioningBallDepthEvent, |a, b| same_fraction(
     a.behind_ball_fraction,
     b.behind_ball_fraction
-) && same_fraction(a.level_with_ball_fraction, b.level_with_ball_fraction)
-    && same_fraction(a.in_front_of_ball_fraction, b.in_front_of_ball_fraction));
+) && same_fraction(
+    a.level_with_ball_fraction,
+    b.level_with_ball_fraction
+) && same_fraction(
+    a.in_front_of_ball_fraction,
+    b.in_front_of_ball_fraction
+));
 impl_coalescible_span!(PositioningTeammateRoleEvent, |a, b| a.teammate_role
     == b.teammate_role);
-impl_coalescible_span!(
-    PositioningBallProximityEvent,
-    |a, b| a.closest_to_ball_team == b.closest_to_ball_team
-        && a.closest_to_ball_absolute == b.closest_to_ball_absolute
-        && a.farthest_from_ball == b.farthest_from_ball
-);
+impl_coalescible_span!(PositioningBallProximityEvent, |a, b| a.closest_to_ball_team
+    == b.closest_to_ball_team
+    && a.closest_to_ball_absolute == b.closest_to_ball_absolute
+    && a.farthest_from_ball == b.farthest_from_ball);
 
 /// Project each internal per-frame [`PositioningEvent`] through `project` and coalesce
 /// consecutive same-state spans per player into a single span. A frame that projects to
