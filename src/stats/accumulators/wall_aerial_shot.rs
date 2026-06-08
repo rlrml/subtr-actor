@@ -1,5 +1,5 @@
-use super::wall_aerial::WALL_AERIAL_HIGH_CONFIDENCE;
 use super::*;
+use crate::stats::calculators::wall_aerial::WALL_AERIAL_HIGH_CONFIDENCE;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
