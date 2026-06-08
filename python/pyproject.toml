@@ -11,7 +11,12 @@ requires-python = ">=3.7"
 Repository = "https://github.com/rlrml/subtr-actor"
 
 [dependency-groups]
-dev = ["wheel", "pytest", "numpy"]
+dev = [
+    "wheel",
+    "pytest",
+    "numpy",
+    "ruff>=0.15.14",
+]
 
 [tool.maturin]
 python-source = "."

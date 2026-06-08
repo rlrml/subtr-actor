@@ -26,7 +26,7 @@ def _load_native_module():
             try:
                 spec.loader.exec_module(module)
                 return module
-            except Exception as error:  # pragma: no cover - exercised in packaging failures
+            except Exception as error:  # pragma: no cover
                 sys.modules.pop(spec.name, None)
                 load_errors.append(f"{candidate.name}: {error}")
         load_error_text = "; ".join(load_errors) if load_errors else str(initial_error)

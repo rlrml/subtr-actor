@@ -35,8 +35,12 @@ headers = subtr_actor.get_column_headers(
 
 replay_meta = subtr_actor.get_replay_meta(replay_path)
 frames_data = subtr_actor.get_replay_frames_data(replay_path)
+stats_events = subtr_actor.get_stats_events(replay_path)
+summed_stats = subtr_actor.get_summed_stats(
+    replay_path,
+    module_names=["core", "boost", "movement"],
+)
 stats_module_names = subtr_actor.get_stats_module_names()
-stats = subtr_actor.get_stats(replay_path, module_names=["core", "boost", "movement"])
 stats_snapshot_data = subtr_actor.get_stats_snapshot_data(
     replay_path,
     module_names=["core", "boost"],
@@ -55,8 +59,9 @@ legacy_stats_timeline = subtr_actor.get_legacy_stats_timeline(
 print(ndarray.shape)
 print(headers["player_headers"][:5])
 print(replay_meta["map_name"])
+print(stats_events["boost_ledger"][-1])
+print(summed_stats["modules"]["boost"]["team_zero"]["amount_collected"])
 print(stats_module_names)
-print(stats["modules"]["core"]["team_zero"]["score"])
 print(stats_snapshot_data["frames"][-1]["modules"]["boost"]["team_zero"]["amount_collected"])
 print(stats_timeline["events"]["boost_ledger"][-1])
 print(legacy_stats_timeline["frames"][-1]["team_zero"]["boost"]["amount_collected"])
@@ -97,20 +102,31 @@ Get header information for the configured ndarray layout.
 
 Get structured frame-by-frame game state data with no FPS resampling.
 
-### `get_stats_module_names() -> list[str]`
+### `get_stats_events(filepath, frame_step_seconds=None) -> dict`
 
-List the builtin stats modules that can be selected in `get_stats`,
-`get_stats_snapshot_data`, and `get_legacy_stats_timeline`.
+Get the compact modern stats event streams for a replay.
 
-### `get_stats(filepath, module_names=None) -> dict`
+Parameters:
 
-Get aggregate replay stats for the selected builtin modules.
+- `filepath`: path to the replay file
+- `frame_step_seconds`: optional positive sampling interval in seconds for the
+  accompanying timeline collector. Events are still emitted as compact stat
+  change streams.
+
+### `get_summed_stats(filepath, module_names=None) -> dict`
+
+Get aggregate summed stats for the selected builtin modules.
 
 Parameters:
 
 - `filepath`: path to the replay file
 - `module_names`: optional list of builtin stats module names. By default all
   builtin modules are included.
+
+### `get_stats_module_names() -> list[str]`
+
+List the builtin stats modules that can be selected in `get_summed_stats`,
+`get_stats_snapshot_data`, and `get_legacy_stats_timeline`.
 
 ### `get_stats_snapshot_data(filepath, module_names=None, frame_step_seconds=None) -> dict`
 
