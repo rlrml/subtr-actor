@@ -49,7 +49,21 @@ jobs:
         run: |
           set -euo pipefail
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-          nix build .#js-stats-player-pages --print-build-logs --fallback
+
+          for attempt in 1 2 3; do
+            echo "nix build attempt ${attempt}/3"
+            if nix build .#js-stats-player-pages --print-build-logs --fallback; then
+              exit 0
+            fi
+
+            status=$?
+            if [ "$attempt" -eq 3 ]; then
+              exit "$status"
+            fi
+
+            # Flake input archive fetches occasionally return transient 504s on GitHub.
+            sleep $((attempt * 60))
+          done
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
