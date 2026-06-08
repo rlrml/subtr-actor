@@ -518,7 +518,7 @@ fn test_positioning_events_reconstruct_final_serialized_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.positioning.is_empty(),
+        !timeline.events.positioning_activity.is_empty(),
         "expected positioning fixture to contain positioning events"
     );
     assert_positioning_events_reconstruct_final_serialized_sums(replay_path, &timeline);

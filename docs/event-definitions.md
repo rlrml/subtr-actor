@@ -768,7 +768,175 @@ _None documented._
 
 _None documented._
 
-### Positioning (`positioning`)
+### Positioning Activity (`positioning_activity`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Positioning Ball Depth (`positioning_ball_depth`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Positioning Ball Proximity (`positioning_ball_proximity`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Positioning Distance (`positioning_distance`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Positioning Field Zone (`positioning_field_zone`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Positioning Goal Context (`positioning_goal_context`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Positioning Teammate Role (`positioning_teammate_role`)
 
 - Category: `positioning`
 - Confidence:

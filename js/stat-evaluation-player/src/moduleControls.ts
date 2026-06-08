@@ -1,4 +1,5 @@
 import type { BoostPickupFilterController } from "./boostPickupFilters.ts";
+import type { EventTimelineSource } from "./eventTimelineSources.ts";
 import {
   RELATIVE_POSITIONING_MODULE_ID,
   type StatModule,
@@ -31,6 +32,7 @@ export interface ModuleControlsOptions {
   readonly modules: readonly StatModule[];
   readonly boostPickupFilters: BoostPickupFilterController;
   getContext(): StatModuleContext | null;
+  getTimelineSources(): readonly EventTimelineSource[];
   getActiveModules(): readonly StatModule[];
   getActiveCapabilityIds(kind: ModuleCapabilityKind): ReadonlySet<string>;
   getBoostPickupAnimationEnabled(): boolean;
@@ -38,6 +40,10 @@ export interface ModuleControlsOptions {
   toggleCapability(id: string, kind: ModuleCapabilityKind, enabled: boolean): void;
   toggleBoostPickupAnimation(): void;
   toggleBoostPadOverlay(): void;
+  syncTimelineEvents(): void;
+  syncTimelineRanges(): void;
+  renderTimelineEventCount(): void;
+  requestConfigSync(): void;
 }
 
 export class ModuleControlsController {
@@ -47,8 +53,11 @@ export class ModuleControlsController {
     const { summary } = this.options.elements;
     summary.replaceChildren();
 
-    const timelineToggles: HTMLButtonElement[] = [];
+    const timelineSources = this.options.getTimelineSources();
+    const markerToggles = timelineSources.map((source) => this.renderTimelineSourceToggle(source));
+    const rangeToggles: HTMLButtonElement[] = [];
     const inGameVisualizationToggles: HTMLButtonElement[] = [];
+    const ctx = this.options.getContext();
 
     for (const mod of this.options.modules) {
       const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
@@ -56,14 +65,19 @@ export class ModuleControlsController {
         continue;
       }
 
-      if (mod.getTimelineEvents) {
-        timelineToggles.push(
+      if (timelineSources.length === 0 && mod.getTimelineEvents) {
+        markerToggles.push(
           this.renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "events"), "events"),
         );
       }
       if (mod.getTimelineRanges) {
-        timelineToggles.push(
-          this.renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "ranges"), "ranges"),
+        rangeToggles.push(
+          this.renderCapabilityToggle(
+            mod.id,
+            getCapabilityLabel(mod, "ranges"),
+            "ranges",
+            ctx ? mod.getTimelineRanges(ctx).length : undefined,
+          ),
         );
       }
       if (hasRenderEffect) {
@@ -77,7 +91,8 @@ export class ModuleControlsController {
     inGameVisualizationToggles.push(this.renderBoostPadOverlayToggle());
 
     summary.append(
-      renderModuleSummaryGroup("Timeline visualizations", timelineToggles),
+      renderModuleSummaryGroup("Timeline markers", markerToggles),
+      renderModuleSummaryGroup("Timeline ranges", rangeToggles),
       renderModuleSummaryGroup("In-game visualizations", inGameVisualizationToggles),
     );
   }
@@ -148,6 +163,7 @@ export class ModuleControlsController {
     moduleId: string,
     label: string,
     kind: ModuleCapabilityKind,
+    count?: number,
   ): HTMLButtonElement {
     const activeIds = this.options.getActiveCapabilityIds(kind);
     const active = activeIds.has(moduleId);
@@ -168,7 +184,32 @@ export class ModuleControlsController {
     name.textContent = label;
 
     const state = document.createElement("strong");
-    state.textContent = active ? "On" : "Off";
+    state.textContent = formatToggleState(active, count);
+
+    item.append(name, state);
+    return item;
+  }
+
+  private renderTimelineSourceToggle(source: EventTimelineSource): HTMLButtonElement {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "module-summary-item";
+    item.dataset.active = source.active ? "true" : "false";
+    item.setAttribute("aria-pressed", source.active ? "true" : "false");
+    item.addEventListener("click", () => {
+      source.setActive(!source.active);
+      this.options.syncTimelineEvents();
+      this.options.syncTimelineRanges();
+      this.options.renderTimelineEventCount();
+      this.options.requestConfigSync();
+      this.renderSummary();
+    });
+
+    const name = document.createElement("span");
+    name.textContent = getTimelineSourceLabel(source);
+
+    const state = document.createElement("strong");
+    state.textContent = formatToggleState(source.active, source.count);
 
     item.append(name, state);
     return item;
@@ -206,6 +247,18 @@ function renderModuleSummaryGroup(title: string, items: HTMLButtonElement[]): HT
 
   group.append(heading, list);
   return group;
+}
+
+function formatToggleState(active: boolean, count?: number): string {
+  const state = active ? "On" : "Off";
+  return count == null ? state : `${state} ${count}`;
+}
+
+function getTimelineSourceLabel(source: EventTimelineSource): string {
+  if (source.group === "Replay") {
+    return source.label;
+  }
+  return `${source.label} events`;
 }
 
 function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string {

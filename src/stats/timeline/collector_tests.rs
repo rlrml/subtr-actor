@@ -67,7 +67,28 @@ fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, us
         ("possession", events.possession.len()),
         ("pressure", events.pressure.len()),
         ("movement", events.movement.len()),
-        ("positioning", events.positioning.len()),
+        ("positioning_activity", events.positioning_activity.len()),
+        ("positioning_distance", events.positioning_distance.len()),
+        (
+            "positioning_field_zone",
+            events.positioning_field_zone.len(),
+        ),
+        (
+            "positioning_ball_depth",
+            events.positioning_ball_depth.len(),
+        ),
+        (
+            "positioning_teammate_role",
+            events.positioning_teammate_role.len(),
+        ),
+        (
+            "positioning_ball_proximity",
+            events.positioning_ball_proximity.len(),
+        ),
+        (
+            "positioning_goal_context",
+            events.positioning_goal_context.len(),
+        ),
         ("rotation_player", events.rotation_player.len()),
         ("rotation_role_span", events.rotation_role_span.len()),
         ("rotation_depth_span", events.rotation_depth_span.len()),

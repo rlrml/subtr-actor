@@ -11,11 +11,14 @@ use super::{
     ControlledPlayEvent, CorePlayerGoalContextEvent, CorePlayerScoreboardEvent,
     DodgeRefreshedEvent, DodgeResetEvent, DoubleTapEvent, FiftyFiftyEvent, FlickEvent,
     FlipImpulseEvent, FlipResetEvent, FlipResetFollowupDodgeEvent, GoalContextEvent, HalfFlipEvent,
-    HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent, PassEvent, PositioningEvent,
-    PossessionEvent, PostWallDodgeEvent, PowerslideEvent, PressureEvent, RotationDepthSpanEvent,
-    RotationFirstManStintEvent, RotationPlayerEvent, RotationRoleSpanEvent, RotationTeamEvent,
-    RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent, TouchBallMovementEvent,
-    TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
+    HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent, PassEvent,
+    PositioningActivityEvent, PositioningBallDepthEvent, PositioningBallProximityEvent,
+    PositioningDistanceEvent, PositioningFieldZoneEvent, PositioningGoalContextEvent,
+    PositioningTeammateRoleEvent, PossessionEvent, PostWallDodgeEvent, PowerslideEvent,
+    PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent,
+    RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
+    TimelineEvent, TouchBallMovementEvent, TouchClassificationEvent, WallAerialEvent,
+    WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::StatsTimelineTagEvent;
 
@@ -670,10 +673,52 @@ define_stats_event!(
     EventCategory::Movement
 );
 define_stats_event!(
-    PositioningEvent,
-    POSITIONING_EVENT_DEFINITION,
-    "positioning",
-    "Positioning",
+    PositioningActivityEvent,
+    POSITIONING_ACTIVITY_EVENT_DEFINITION,
+    "positioning_activity",
+    "Positioning Activity",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    PositioningDistanceEvent,
+    POSITIONING_DISTANCE_EVENT_DEFINITION,
+    "positioning_distance",
+    "Positioning Distance",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    PositioningFieldZoneEvent,
+    POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
+    "positioning_field_zone",
+    "Positioning Field Zone",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    PositioningBallDepthEvent,
+    POSITIONING_BALL_DEPTH_EVENT_DEFINITION,
+    "positioning_ball_depth",
+    "Positioning Ball Depth",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    PositioningTeammateRoleEvent,
+    POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
+    "positioning_teammate_role",
+    "Positioning Teammate Role",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    PositioningBallProximityEvent,
+    POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
+    "positioning_ball_proximity",
+    "Positioning Ball Proximity",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    PositioningGoalContextEvent,
+    POSITIONING_GOAL_CONTEXT_EVENT_DEFINITION,
+    "positioning_goal_context",
+    "Positioning Goal Context",
     EventCategory::Positioning
 );
 define_stats_event!(
@@ -802,7 +847,13 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &PRESSURE_EVENT_DEFINITION,
     &TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     &MOVEMENT_EVENT_DEFINITION,
-    &POSITIONING_EVENT_DEFINITION,
+    &POSITIONING_ACTIVITY_EVENT_DEFINITION,
+    &POSITIONING_DISTANCE_EVENT_DEFINITION,
+    &POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
+    &POSITIONING_BALL_DEPTH_EVENT_DEFINITION,
+    &POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
+    &POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
+    &POSITIONING_GOAL_CONTEXT_EVENT_DEFINITION,
     &ROTATION_PLAYER_EVENT_DEFINITION,
     &ROTATION_TEAM_EVENT_DEFINITION,
     &FLIP_RESET_EVENT_DEFINITION,
@@ -1084,12 +1135,50 @@ const MOVEMENT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "MovementCalculator",
 )];
 
-const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
-    &POSITIONING_EVENT_DEFINITION,
-    "positioning",
-    "PositioningNode",
-    "PositioningCalculator",
-)];
+const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
+    produced_event(
+        &POSITIONING_ACTIVITY_EVENT_DEFINITION,
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+    produced_event(
+        &POSITIONING_DISTANCE_EVENT_DEFINITION,
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+    produced_event(
+        &POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+    produced_event(
+        &POSITIONING_BALL_DEPTH_EVENT_DEFINITION,
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+    produced_event(
+        &POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+    produced_event(
+        &POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+    produced_event(
+        &POSITIONING_GOAL_CONTEXT_EVENT_DEFINITION,
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+];
 
 const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(

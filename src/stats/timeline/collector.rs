@@ -29,6 +29,10 @@ pub fn default_stats_timeline_config() -> StatsTimelineConfig {
         most_back_forward_threshold_y: PositioningCalculatorConfig::default()
             .most_back_forward_threshold_y,
         level_ball_depth_margin: PositioningCalculatorConfig::default().level_ball_depth_margin,
+        closest_to_ball_switch_margin: PositioningCalculatorConfig::default()
+            .closest_to_ball_switch_margin,
+        closest_to_ball_switch_min_seconds: PositioningCalculatorConfig::default()
+            .closest_to_ball_switch_min_seconds,
         pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
             .neutral_zone_half_width_y,
         territorial_pressure_neutral_zone_half_width_y: territorial_pressure_defaults

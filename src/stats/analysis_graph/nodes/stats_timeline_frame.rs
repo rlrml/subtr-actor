@@ -122,6 +122,11 @@ impl StatsTimelineFrameNode {
             } else {
                 projection.movement.team_one_stats().clone()
             },
+            positioning: if is_team_zero {
+                projection.positioning.team_zero_stats().clone()
+            } else {
+                projection.positioning.team_one_stats().clone()
+            },
             powerslide: if is_team_zero {
                 projection.powerslide.team_zero_stats().clone()
             } else {

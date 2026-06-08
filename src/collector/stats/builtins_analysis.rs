@@ -545,7 +545,11 @@ pub(crate) fn builtin_snapshot_frame_json(
         }
         "positioning" => {
             let calculator = graph_state::<PositioningCalculator>(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsExport {
+            let mut accumulator = PositioningStatsAccumulator::default();
+            accumulator.apply_events(calculator.projected_events().iter());
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: accumulator.team_zero_stats(),
+                team_one: accumulator.team_one_stats(),
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
@@ -584,6 +588,8 @@ pub(crate) fn builtin_snapshot_config_json(
             Some(serialize_to_json_value(&serde_json::json!({
                 "most_back_forward_threshold_y": calculator.config().most_back_forward_threshold_y,
                 "level_ball_depth_margin": calculator.config().level_ball_depth_margin,
+                "closest_to_ball_switch_margin": calculator.config().closest_to_ball_switch_margin,
+                "closest_to_ball_switch_min_seconds": calculator.config().closest_to_ball_switch_min_seconds,
             }))?)
         }
         "pressure" => {

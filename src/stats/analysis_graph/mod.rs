@@ -20,7 +20,6 @@ mod collector;
 mod nodes;
 
 use crate::stats::calculators::FrameInput;
-
 #[allow(unused_imports)]
 pub use collector::AnalysisNodeCollector;
 #[allow(unused_imports)]

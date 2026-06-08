@@ -4,16 +4,16 @@ const GOAL_CAUGHT_AHEAD_MAX_BALL_Y: f32 = -1200.0;
 const GOAL_CAUGHT_AHEAD_MIN_PLAYER_Y: f32 = -250.0;
 const GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y: f32 = 2200.0;
 const DEFAULT_LEVEL_BALL_DEPTH_MARGIN: f32 = 150.0;
+const DEFAULT_CLOSEST_TO_BALL_SWITCH_MARGIN: f32 = 100.0;
+const DEFAULT_CLOSEST_TO_BALL_SWITCH_MIN_SECONDS: f32 = 0.2;
 
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PositioningEvent {
     pub time: f32,
     pub frame: usize,
     pub end_time: f32,
     pub end_frame: usize,
     pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
@@ -34,10 +34,135 @@ pub struct PositioningEvent {
     pub defensive_half_fraction: f32,
     pub offensive_half_fraction: f32,
     pub closest_to_ball: bool,
+    pub closest_to_ball_team: bool,
+    pub closest_to_ball_absolute: bool,
     pub farthest_from_ball: bool,
     pub behind_ball_fraction: f32,
     pub level_with_ball_fraction: f32,
     pub in_front_of_ball_fraction: f32,
+    pub caught_ahead_of_play_on_conceded_goal: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PositioningActivityEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    pub active: bool,
+    pub tracked: bool,
+    pub demolished: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PositioningDistanceEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub distance_to_teammates: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub distance_to_ball: Option<f32>,
+    pub possession_state: PositioningPossessionState,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PositioningFieldZoneEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    pub defensive_zone_fraction: f32,
+    pub neutral_zone_fraction: f32,
+    pub offensive_zone_fraction: f32,
+    pub defensive_half_fraction: f32,
+    pub offensive_half_fraction: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PositioningBallDepthEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    pub behind_ball_fraction: f32,
+    pub level_with_ball_fraction: f32,
+    pub in_front_of_ball_fraction: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PositioningTeammateRoleEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    pub teammate_role: PositioningTeammateRoleState,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PositioningBallProximityEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    pub closest_to_ball_team: bool,
+    pub closest_to_ball_absolute: bool,
+    pub farthest_from_ball: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PositioningGoalContextEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
     pub caught_ahead_of_play_on_conceded_goal: bool,
 }
 
@@ -71,6 +196,8 @@ impl PositioningEvent {
             defensive_half_fraction: 0.0,
             offensive_half_fraction: 0.0,
             closest_to_ball: false,
+            closest_to_ball_team: false,
+            closest_to_ball_absolute: false,
             farthest_from_ball: false,
             behind_ball_fraction: 0.0,
             level_with_ball_fraction: 0.0,
@@ -81,6 +208,127 @@ impl PositioningEvent {
 
     fn has_delta(&self) -> bool {
         self.duration != 0.0 || self.caught_ahead_of_play_on_conceded_goal
+    }
+
+    pub fn activity_event(&self) -> Option<PositioningActivityEvent> {
+        (self.duration != 0.0 && (self.active || self.tracked || self.demolished)).then(|| {
+            PositioningActivityEvent {
+                time: self.time,
+                frame: self.frame,
+                end_time: self.end_time,
+                end_frame: self.end_frame,
+                duration: self.duration,
+                player: self.player.clone(),
+                player_position: self.player_position,
+                is_team_0: self.is_team_0,
+                active: self.active,
+                tracked: self.tracked,
+                demolished: self.demolished,
+            }
+        })
+    }
+
+    pub fn distance_event(&self) -> Option<PositioningDistanceEvent> {
+        (self.tracked
+            && (self.distance_to_teammates.is_some()
+                || self.distance_to_ball.is_some()
+                || self.possession_state != PositioningPossessionState::Neutral))
+            .then(|| PositioningDistanceEvent {
+                time: self.time,
+                frame: self.frame,
+                end_time: self.end_time,
+                end_frame: self.end_frame,
+                duration: self.duration,
+                player: self.player.clone(),
+                player_position: self.player_position,
+                is_team_0: self.is_team_0,
+                distance_to_teammates: self.distance_to_teammates,
+                distance_to_ball: self.distance_to_ball,
+                possession_state: self.possession_state,
+            })
+    }
+
+    pub fn field_zone_event(&self) -> Option<PositioningFieldZoneEvent> {
+        self.tracked.then(|| PositioningFieldZoneEvent {
+            time: self.time,
+            frame: self.frame,
+            end_time: self.end_time,
+            end_frame: self.end_frame,
+            duration: self.duration,
+            player: self.player.clone(),
+            player_position: self.player_position,
+            is_team_0: self.is_team_0,
+            defensive_zone_fraction: self.defensive_zone_fraction,
+            neutral_zone_fraction: self.neutral_zone_fraction,
+            offensive_zone_fraction: self.offensive_zone_fraction,
+            defensive_half_fraction: self.defensive_half_fraction,
+            offensive_half_fraction: self.offensive_half_fraction,
+        })
+    }
+
+    pub fn ball_depth_event(&self) -> Option<PositioningBallDepthEvent> {
+        self.tracked.then(|| PositioningBallDepthEvent {
+            time: self.time,
+            frame: self.frame,
+            end_time: self.end_time,
+            end_frame: self.end_frame,
+            duration: self.duration,
+            player: self.player.clone(),
+            player_position: self.player_position,
+            is_team_0: self.is_team_0,
+            behind_ball_fraction: self.behind_ball_fraction,
+            level_with_ball_fraction: self.level_with_ball_fraction,
+            in_front_of_ball_fraction: self.in_front_of_ball_fraction,
+        })
+    }
+
+    pub fn teammate_role_event(&self) -> Option<PositioningTeammateRoleEvent> {
+        (self.tracked && self.teammate_role != PositioningTeammateRoleState::Unknown).then(|| {
+            PositioningTeammateRoleEvent {
+                time: self.time,
+                frame: self.frame,
+                end_time: self.end_time,
+                end_frame: self.end_frame,
+                duration: self.duration,
+                player: self.player.clone(),
+                player_position: self.player_position,
+                is_team_0: self.is_team_0,
+                teammate_role: self.teammate_role,
+            }
+        })
+    }
+
+    pub fn ball_proximity_event(&self) -> Option<PositioningBallProximityEvent> {
+        (self.tracked
+            && (self.closest_to_ball
+                || self.closest_to_ball_team
+                || self.closest_to_ball_absolute
+                || self.farthest_from_ball))
+            .then(|| PositioningBallProximityEvent {
+                time: self.time,
+                frame: self.frame,
+                end_time: self.end_time,
+                end_frame: self.end_frame,
+                duration: self.duration,
+                player: self.player.clone(),
+                player_position: self.player_position,
+                is_team_0: self.is_team_0,
+                closest_to_ball_team: self.closest_to_ball || self.closest_to_ball_team,
+                closest_to_ball_absolute: self.closest_to_ball_absolute,
+                farthest_from_ball: self.farthest_from_ball,
+            })
+    }
+
+    pub fn goal_context_event(&self) -> Option<PositioningGoalContextEvent> {
+        self.caught_ahead_of_play_on_conceded_goal
+            .then(|| PositioningGoalContextEvent {
+                time: self.time,
+                frame: self.frame,
+                player: self.player.clone(),
+                player_position: self.player_position,
+                is_team_0: self.is_team_0,
+                caught_ahead_of_play_on_conceded_goal: true,
+            })
     }
 }
 
@@ -111,6 +359,8 @@ pub enum PositioningTeammateRoleState {
 pub struct PositioningCalculatorConfig {
     pub most_back_forward_threshold_y: f32,
     pub level_ball_depth_margin: f32,
+    pub closest_to_ball_switch_margin: f32,
+    pub closest_to_ball_switch_min_seconds: f32,
 }
 
 impl Default for PositioningCalculatorConfig {
@@ -118,7 +368,94 @@ impl Default for PositioningCalculatorConfig {
         Self {
             most_back_forward_threshold_y: DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y,
             level_ball_depth_margin: DEFAULT_LEVEL_BALL_DEPTH_MARGIN,
+            closest_to_ball_switch_margin: DEFAULT_CLOSEST_TO_BALL_SWITCH_MARGIN,
+            closest_to_ball_switch_min_seconds: DEFAULT_CLOSEST_TO_BALL_SWITCH_MIN_SECONDS,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ClosestToBallCandidate {
+    player_id: PlayerId,
+    player_position: Option<[f32; 3]>,
+    is_team_0: bool,
+    distance: f32,
+}
+
+impl ClosestToBallCandidate {
+    fn from_player(player: &PlayerSample, position: glam::Vec3, ball_position: glam::Vec3) -> Self {
+        Self {
+            player_id: player.player_id.clone(),
+            player_position: Some(position.to_array()),
+            is_team_0: player.is_team_0,
+            distance: position.distance(ball_position),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct ClosestToBallDebouncer {
+    current_player: Option<PlayerId>,
+    pending_player: Option<PlayerId>,
+    pending_seconds: f32,
+}
+
+impl ClosestToBallDebouncer {
+    fn select(
+        &mut self,
+        candidates: &[ClosestToBallCandidate],
+        dt: f32,
+        switch_margin: f32,
+        switch_min_seconds: f32,
+    ) -> Option<ClosestToBallCandidate> {
+        let raw_closest = candidates
+            .iter()
+            .min_by(|left, right| left.distance.partial_cmp(&right.distance).unwrap())?;
+        let Some(current_player) = self.current_player.as_ref() else {
+            self.current_player = Some(raw_closest.player_id.clone());
+            self.pending_player = None;
+            self.pending_seconds = 0.0;
+            return Some(raw_closest.clone());
+        };
+        let Some(current) = candidates
+            .iter()
+            .find(|candidate| candidate.player_id == *current_player)
+        else {
+            self.current_player = Some(raw_closest.player_id.clone());
+            self.pending_player = None;
+            self.pending_seconds = 0.0;
+            return Some(raw_closest.clone());
+        };
+        if raw_closest.player_id == current.player_id {
+            self.pending_player = None;
+            self.pending_seconds = 0.0;
+            return Some(current.clone());
+        }
+        if raw_closest.distance + switch_margin >= current.distance {
+            self.pending_player = None;
+            self.pending_seconds = 0.0;
+            return Some(current.clone());
+        }
+        if self.pending_player.as_ref() == Some(&raw_closest.player_id) {
+            self.pending_seconds += dt;
+        } else {
+            self.pending_player = Some(raw_closest.player_id.clone());
+            self.pending_seconds = dt;
+        }
+        if self.pending_seconds >= switch_min_seconds.max(0.0) {
+            self.current_player = Some(raw_closest.player_id.clone());
+            self.pending_player = None;
+            self.pending_seconds = 0.0;
+            Some(raw_closest.clone())
+        } else {
+            Some(current.clone())
+        }
+    }
+
+    fn clear(&mut self) {
+        self.current_player = None;
+        self.pending_player = None;
+        self.pending_seconds = 0.0;
     }
 }
 
@@ -127,6 +464,9 @@ pub struct PositioningCalculator {
     config: PositioningCalculatorConfig,
     previous_ball_position: Option<glam::Vec3>,
     previous_player_positions: HashMap<PlayerId, glam::Vec3>,
+    absolute_closest_to_ball: ClosestToBallDebouncer,
+    team_zero_closest_to_ball: ClosestToBallDebouncer,
+    team_one_closest_to_ball: ClosestToBallDebouncer,
     events: EventStream<PositioningEvent>,
 }
 
@@ -156,6 +496,55 @@ impl PositioningCalculator {
 
     pub fn projected_events(&self) -> Vec<PositioningEvent> {
         self.events.all().to_vec()
+    }
+
+    pub fn activity_events(&self) -> Vec<PositioningActivityEvent> {
+        self.events()
+            .iter()
+            .filter_map(PositioningEvent::activity_event)
+            .collect()
+    }
+
+    pub fn distance_events(&self) -> Vec<PositioningDistanceEvent> {
+        self.events()
+            .iter()
+            .filter_map(PositioningEvent::distance_event)
+            .collect()
+    }
+
+    pub fn field_zone_events(&self) -> Vec<PositioningFieldZoneEvent> {
+        self.events()
+            .iter()
+            .filter_map(PositioningEvent::field_zone_event)
+            .collect()
+    }
+
+    pub fn ball_depth_events(&self) -> Vec<PositioningBallDepthEvent> {
+        self.events()
+            .iter()
+            .filter_map(PositioningEvent::ball_depth_event)
+            .collect()
+    }
+
+    pub fn teammate_role_events(&self) -> Vec<PositioningTeammateRoleEvent> {
+        self.events()
+            .iter()
+            .filter_map(PositioningEvent::teammate_role_event)
+            .collect()
+    }
+
+    pub fn ball_proximity_events(&self) -> Vec<PositioningBallProximityEvent> {
+        self.events()
+            .iter()
+            .filter_map(PositioningEvent::ball_proximity_event)
+            .collect()
+    }
+
+    pub fn goal_context_events(&self) -> Vec<PositioningGoalContextEvent> {
+        self.events()
+            .iter()
+            .filter_map(PositioningEvent::goal_context_event)
+            .collect()
     }
 
     pub fn flush_pending_events(&mut self) {}
@@ -354,6 +743,34 @@ impl PositioningCalculator {
         }
 
         if live_play {
+            let positioned_players: Vec<_> = players
+                .players
+                .iter()
+                .filter(|player| !demoed_players.contains(&player.player_id))
+                .filter_map(|player| {
+                    player.position().map(|position| {
+                        ClosestToBallCandidate::from_player(player, position, ball_position)
+                    })
+                })
+                .collect();
+            if let Some(closest_player) = self.absolute_closest_to_ball.select(
+                &positioned_players,
+                frame.dt,
+                self.config.closest_to_ball_switch_margin,
+                self.config.closest_to_ball_switch_min_seconds,
+            ) {
+                Self::event_delta(
+                    &mut event_deltas,
+                    frame,
+                    &closest_player.player_id,
+                    closest_player.player_position,
+                    closest_player.is_team_0,
+                )
+                .closest_to_ball_absolute = true;
+            } else {
+                self.absolute_closest_to_ball.clear();
+            }
+
             for is_team_0 in [true, false] {
                 let team_present_player_count = players
                     .players
@@ -376,6 +793,11 @@ impl PositioningCalculator {
                     .collect();
 
                 if team_players.is_empty() {
+                    if is_team_0 {
+                        self.team_zero_closest_to_ball.clear();
+                    } else {
+                        self.team_one_closest_to_ball.clear();
+                    }
                     continue;
                 }
 
@@ -487,21 +909,37 @@ impl PositioningCalculator {
                     }
                 }
 
-                if let Some((closest_player, _)) = team_players.iter().min_by(|(_, a), (_, b)| {
-                    a.distance(ball_position)
-                        .partial_cmp(&b.distance(ball_position))
-                        .unwrap()
-                }) {
-                    Self::event_delta(
+                let team_candidates: Vec<_> = team_players
+                    .iter()
+                    .map(|(player, position)| {
+                        ClosestToBallCandidate::from_player(player, *position, ball_position)
+                    })
+                    .collect();
+                let closest_player = if is_team_0 {
+                    self.team_zero_closest_to_ball.select(
+                        &team_candidates,
+                        frame.dt,
+                        self.config.closest_to_ball_switch_margin,
+                        self.config.closest_to_ball_switch_min_seconds,
+                    )
+                } else {
+                    self.team_one_closest_to_ball.select(
+                        &team_candidates,
+                        frame.dt,
+                        self.config.closest_to_ball_switch_margin,
+                        self.config.closest_to_ball_switch_min_seconds,
+                    )
+                };
+                if let Some(closest_player) = closest_player {
+                    let delta = Self::event_delta(
                         &mut event_deltas,
                         frame,
                         &closest_player.player_id,
-                        closest_player
-                            .position()
-                            .map(|position| position.to_array()),
+                        closest_player.player_position,
                         closest_player.is_team_0,
-                    )
-                    .closest_to_ball = true;
+                    );
+                    delta.closest_to_ball = true;
+                    delta.closest_to_ball_team = true;
                 }
 
                 if let Some((farthest_player, _)) = team_players.iter().max_by(|(_, a), (_, b)| {
@@ -521,6 +959,10 @@ impl PositioningCalculator {
                     .farthest_from_ball = true;
                 }
             }
+        } else {
+            self.absolute_closest_to_ball.clear();
+            self.team_zero_closest_to_ball.clear();
+            self.team_one_closest_to_ball.clear();
         }
 
         let frame_events: Vec<_> = event_deltas

@@ -196,9 +196,51 @@ fn compare_timeline_events(
     })
     .or_else(|| {
         compare_serialized_slice(
-            &format!("{label}.positioning"),
-            &left.positioning,
-            &right.positioning,
+            &format!("{label}.positioning_activity"),
+            &left.positioning_activity,
+            &right.positioning_activity,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.positioning_distance"),
+            &left.positioning_distance,
+            &right.positioning_distance,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.positioning_field_zone"),
+            &left.positioning_field_zone,
+            &right.positioning_field_zone,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.positioning_ball_depth"),
+            &left.positioning_ball_depth,
+            &right.positioning_ball_depth,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.positioning_teammate_role"),
+            &left.positioning_teammate_role,
+            &right.positioning_teammate_role,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.positioning_ball_proximity"),
+            &left.positioning_ball_proximity,
+            &right.positioning_ball_proximity,
+        )
+    })
+    .or_else(|| {
+        compare_serialized_slice(
+            &format!("{label}.positioning_goal_context"),
+            &left.positioning_goal_context,
+            &right.positioning_goal_context,
         )
     })
     .or_else(|| {
