@@ -401,6 +401,17 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(calculator.player_stats()),
             })?
         }
+        "kickoff" => {
+            let calculator = graph_state::<KickoffCalculator>(graph, module_name)?;
+            let mut stats = KickoffStatsAccumulator::default();
+            for event in calculator.events() {
+                stats.apply_event(event);
+            }
+            serialize_to_json_value(&StatsWithPlayerStatsExport {
+                stats: stats.stats(),
+                player_stats: player_stats_entries(stats.player_stats()),
+            })?
+        }
         "possession" => {
             let calculator = graph_state::<PossessionCalculator>(graph, module_name)?;
             serialize_to_json_value(&StatsExport {
@@ -715,6 +726,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "one_timer"
         | "pass"
         | "fifty_fifty"
+        | "kickoff"
         | "possession"
         | "touch"
         | "whiff"

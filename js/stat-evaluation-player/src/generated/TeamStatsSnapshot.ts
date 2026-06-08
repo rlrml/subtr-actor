@@ -9,6 +9,7 @@ import type { DemoTeamStats } from "./DemoTeamStats.ts";
 import type { DoubleTapTeamStats } from "./DoubleTapTeamStats.ts";
 import type { FiftyFiftyTeamStats } from "./FiftyFiftyTeamStats.ts";
 import type { HalfVolleyTeamStats } from "./HalfVolleyTeamStats.ts";
+import type { KickoffTeamStats } from "./KickoffTeamStats.ts";
 import type { MovementStats } from "./MovementStats.ts";
 import type { OneTimerTeamStats } from "./OneTimerTeamStats.ts";
 import type { PassTeamStats } from "./PassTeamStats.ts";
@@ -31,4 +32,4 @@ import type { TerritorialPressureTeamStats } from "./TerritorialPressureTeamStat
  * timelines. It is not the authoritative registry of team analysis outputs;
  * use the module-keyed stats/graph surfaces when callers need discoverability.
  */
-export type TeamStatsSnapshot = { fifty_fifty: FiftyFiftyTeamStats, possession: PossessionTeamStats, pressure: PressureTeamStats, territorial_pressure: TerritorialPressureTeamStats, rotation: RotationTeamStats, rush: RushTeamStats, core: CoreTeamStats, backboard: BackboardTeamStats, double_tap: DoubleTapTeamStats, one_timer: OneTimerTeamStats, pass: PassTeamStats, ball_carry: BallCarryStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpTeamStats, half_volley: HalfVolleyTeamStats, movement: MovementStats, powerslide: PowerslideStats, demo: DemoTeamStats, };
+export type TeamStatsSnapshot = { fifty_fifty: FiftyFiftyTeamStats, possession: PossessionTeamStats, pressure: PressureTeamStats, territorial_pressure: TerritorialPressureTeamStats, rotation: RotationTeamStats, rush: RushTeamStats, core: CoreTeamStats, backboard: BackboardTeamStats, double_tap: DoubleTapTeamStats, one_timer: OneTimerTeamStats, pass: PassTeamStats, kickoff: KickoffTeamStats, ball_carry: BallCarryStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpTeamStats, half_volley: HalfVolleyTeamStats, movement: MovementStats, powerslide: PowerslideStats, demo: DemoTeamStats, };

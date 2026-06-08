@@ -403,6 +403,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "demo_goal",
         "half_volley_goal",
         "fifty_fifty",
+        "kickoff",
         "possession",
         "pressure",
         "territorial_pressure",
@@ -644,6 +645,15 @@ pub(crate) fn builtin_module_json(
             serialize_to_json_value(&StatsWithPlayerEventsExport {
                 stats: projection.fifty_fifty.stats(),
                 player_stats: player_stats_entries(projection.fifty_fifty.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "kickoff" => {
+            let calculator = graph_state::<KickoffCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsWithPlayerEventsExport {
+                stats: projection.kickoff.stats(),
+                player_stats: player_stats_entries(projection.kickoff.player_stats()),
                 events: calculator.events(),
             })
         }
@@ -1285,6 +1295,13 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(projection.fifty_fifty.player_stats()),
             })?
         }
+        "kickoff" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsWithPlayerStatsExport {
+                stats: projection.kickoff.stats(),
+                player_stats: player_stats_entries(projection.kickoff.player_stats()),
+            })?
+        }
         "possession" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsExport {
@@ -1604,6 +1621,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "one_timer"
         | "pass"
         | "fifty_fifty"
+        | "kickoff"
         | "possession"
         | "flip_impulse"
         | "touch"

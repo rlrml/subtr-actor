@@ -92,6 +92,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             dodge_reset: Vec::new(),
             double_tap: Vec::new(),
             fifty_fifty: Vec::new(),
+            kickoff: Vec::new(),
             one_timer: Vec::new(),
             pass: Vec::new(),
             ball_carry: Vec::new(),

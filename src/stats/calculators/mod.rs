@@ -64,6 +64,8 @@ pub mod half_flip;
 pub use half_flip::*;
 pub mod half_volley;
 pub use half_volley::*;
+pub mod kickoff;
+pub use kickoff::*;
 pub mod match_stats;
 pub use match_stats::*;
 pub mod movement;

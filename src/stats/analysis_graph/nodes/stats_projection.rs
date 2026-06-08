@@ -15,6 +15,7 @@ pub struct StatsProjectionState {
     pub one_timer: OneTimerStatsAccumulator,
     pub pass: PassStatsAccumulator,
     pub fifty_fifty: FiftyFiftyStatsAccumulator,
+    pub kickoff: KickoffStatsAccumulator,
     pub possession: PossessionStatsAccumulator,
     pub pressure: PressureStatsAccumulator,
     pub territorial_pressure: TerritorialPressureStatsAccumulator,
@@ -118,6 +119,7 @@ struct StatsProjectionCursors {
     one_timer: usize,
     pass: usize,
     fifty_fifty: usize,
+    kickoff: usize,
     possession: usize,
     pressure: usize,
     rotation_player: usize,
@@ -323,6 +325,10 @@ impl StatsProjectionNode {
         for event in Self::events_since(&mut self.cursors.fifty_fifty, fifty_fifty.events()) {
             self.state.fifty_fifty.apply_event(event);
         }
+        let kickoff = ctx.get::<KickoffCalculator>()?;
+        for event in Self::events_since(&mut self.cursors.kickoff, kickoff.events()) {
+            self.state.kickoff.apply_event(event);
+        }
         let possession = ctx.get::<PossessionCalculator>()?;
         let projected_possession_events = possession.projected_events();
         self.state.possession = PossessionStatsAccumulator::default();
@@ -517,6 +523,7 @@ impl AnalysisNode for StatsProjectionNode {
             one_timer_dependency(),
             pass_dependency(),
             fifty_fifty_dependency(),
+            kickoff_dependency(),
             possession_dependency(),
             pressure_dependency(),
             territorial_pressure_dependency(),

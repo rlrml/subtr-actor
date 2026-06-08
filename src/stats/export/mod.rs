@@ -15,6 +15,7 @@ mod fifty_fifty;
 mod flick;
 mod half_flip;
 mod half_volley;
+mod kickoff;
 mod movement;
 mod musty_flick;
 mod one_timer;
@@ -194,7 +195,7 @@ impl LabeledCounts {
                 let mut normalized_labels = labels.clone();
                 normalized_labels.sort();
                 entries.push(LabeledCountEntry {
-                    count: counts.count_exact(&normalized_labels),
+                    count: counts.count_matching(&normalized_labels),
                     labels: normalized_labels,
                 });
                 return;

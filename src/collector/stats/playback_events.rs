@@ -358,6 +358,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "events",
                 parse_fifty_fifty_event,
             )?,
+            kickoff: self.module_player_events("kickoff", "events", parse_kickoff_event)?,
             pass: self.module_player_events("pass", "events", parse_pass_event)?,
             ball_carry: self.module_player_events(
                 "ball_carry",
@@ -493,6 +494,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "fifty_fifty".to_owned(),
             Value::Array(self.module_array("fifty_fifty", "events")),
+        );
+        events.insert(
+            "kickoff".to_owned(),
+            Value::Array(self.module_array("kickoff", "events")),
         );
         events.insert(
             "rush".to_owned(),

@@ -39,6 +39,8 @@ pub mod half_flip_stats;
 pub use half_flip_stats::*;
 pub mod half_volley_stats;
 pub use half_volley_stats::*;
+pub mod kickoff_stats;
+pub use kickoff_stats::*;
 pub mod match_stats_stats;
 pub use match_stats_stats::*;
 pub mod movement_stats;

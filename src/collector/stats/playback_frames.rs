@@ -41,6 +41,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_stats_or_default::<FiftyFiftyStats>(frame, "fifty_fifty"),
         );
         timeline.insert(
+            "kickoff".to_owned(),
+            self.frame_stats_or_default::<KickoffStats>(frame, "kickoff"),
+        );
+        timeline.insert(
             "possession".to_owned(),
             self.frame_stats_or_default::<PossessionStats>(frame, "possession"),
         );
@@ -109,6 +113,9 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         Ok(TeamStatsSnapshot {
             fifty_fifty: self
                 .frame_stats_or_default_typed::<FiftyFiftyStats>(frame, "fifty_fifty")?
+                .for_team(is_team_zero),
+            kickoff: self
+                .frame_stats_or_default_typed::<KickoffStats>(frame, "kickoff")?
                 .for_team(is_team_zero),
             possession: self
                 .frame_stats_or_default_typed::<PossessionStats>(frame, "possession")?
@@ -187,6 +194,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             fifty_fifty: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "fifty_fifty",
+                &player_key,
+            )?,
+            kickoff: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "kickoff",
                 &player_key,
             )?,
             speed_flip: self.frame_player_stat_or_default_typed_by_key(
@@ -287,6 +299,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             serialize_to_json_value(
                 &self
                     .frame_stats_or_default_typed::<FiftyFiftyStats>(frame, "fifty_fifty")?
+                    .for_team(is_team_zero),
+            )?,
+        );
+        team.insert(
+            "kickoff".to_owned(),
+            serialize_to_json_value(
+                &self
+                    .frame_stats_or_default_typed::<KickoffStats>(frame, "kickoff")?
                     .for_team(is_team_zero),
             )?,
         );
@@ -475,6 +495,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<FiftyFiftyPlayerStats>(
                 frame,
                 "fifty_fifty",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "kickoff".to_owned(),
+            self.frame_player_stat_or_default_by_key::<KickoffPlayerStats>(
+                frame,
+                "kickoff",
                 &player_key,
             )?,
         );
