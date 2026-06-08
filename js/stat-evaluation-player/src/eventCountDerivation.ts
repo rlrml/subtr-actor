@@ -54,13 +54,19 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "touch",
   "boost_pickups",
   "boost_ledger",
-  "boost_state",
+  "boost_bucket",
   "bump",
 ] as const satisfies readonly (keyof StatsEvents)[];
 
+const INTERNAL_STATS_EVENT_STREAM_TYPES = ["boost_state"] as const satisfies readonly (keyof StatsEvents)[];
+
 type AssertNever<T extends never> = T;
 type _StatsEventStreamCountTypesCoverAll = AssertNever<
-  Exclude<keyof StatsEvents, (typeof STATS_EVENT_STREAM_COUNT_TYPES)[number]>
+  Exclude<
+    keyof StatsEvents,
+    | (typeof STATS_EVENT_STREAM_COUNT_TYPES)[number]
+    | (typeof INTERNAL_STATS_EVENT_STREAM_TYPES)[number]
+  >
 >;
 
 export const STATS_MECHANIC_EVENT_COUNT_TYPES = [

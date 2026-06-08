@@ -435,6 +435,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "ledger_events",
                 parse_boost_ledger_event,
             )?,
+            boost_bucket: self.module_player_events(
+                "boost",
+                "bucket_events",
+                parse_boost_bucket_event,
+            )?,
             boost_state: self.module_player_events(
                 "boost",
                 "state_events",
@@ -592,6 +597,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         events.insert(
             "boost_ledger".to_owned(),
             Value::Array(self.module_array("boost", "ledger_events")),
+        );
+        events.insert(
+            "boost_bucket".to_owned(),
+            Value::Array(self.module_array("boost", "bucket_events")),
         );
         events.insert(
             "boost_state".to_owned(),

@@ -198,6 +198,7 @@ fn player_event_names_create_registered_analysis_indicators() {
         "PlayerEvent:ball_carry",
         "PlayerEvent:boost_pickup",
         "PlayerEvent:boost_ledger",
+        "PlayerEvent:boost_bucket",
         "PlayerEvent:boost_state",
         "PlayerEvent:bump",
         "PlayerEvent:pass",

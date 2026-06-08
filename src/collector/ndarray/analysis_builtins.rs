@@ -227,6 +227,15 @@ build_analysis_player_event_indicator!(
 );
 
 build_analysis_player_event_indicator!(
+    AnalysisPlayerBoostBucketEvents,
+    boost_dependency,
+    BoostCalculator,
+    new_bucket_events,
+    |event: &BoostBucketEvent, player_id: &PlayerId| &event.player_id == player_id,
+    "analysis boost bucket event",
+);
+
+build_analysis_player_event_indicator!(
     AnalysisPlayerBoostStateEvents,
     boost_dependency,
     BoostCalculator,
@@ -356,6 +365,9 @@ where
         )),
         "boost_ledger" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerBoostLedgerEvents::<F>::arc_new(),
+        )),
+        "boost_bucket" => Some(NDArrayPlayerFeatureAdder::analysis(
+            AnalysisPlayerBoostBucketEvents::<F>::arc_new(),
         )),
         "boost_state" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerBoostStateEvents::<F>::arc_new(),

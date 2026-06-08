@@ -1446,3 +1446,22 @@ pub(in crate::collector::stats::playback) fn parse_boost_state_event(
         boost_before: json_optional_f32(object.get("boost_before"))?,
     })
 }
+
+pub(in crate::collector::stats::playback) fn parse_boost_bucket_event(
+    value: &Value,
+) -> SubtrActorResult<BoostBucketEvent> {
+    let object = json_object(value, "boost bucket event")?;
+    let frame = json_required_usize(object, "frame")?;
+    let time = json_required_f32(object, "time")?;
+    Ok(BoostBucketEvent {
+        frame,
+        time,
+        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
+        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
+        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
+        player_id: json_required_remote_id(object, "player_id")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        bucket: decode_json_value(json_required_value(object, "bucket")?.clone())?,
+    })
+}

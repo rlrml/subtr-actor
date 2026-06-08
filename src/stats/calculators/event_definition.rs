@@ -6,11 +6,12 @@ use serde::Serialize;
 use linkme::distributed_slice;
 
 use super::{
-    BackboardBounceEvent, BallCarryEvent, BoostLedgerEvent, BoostPickupComparisonEvent,
-    BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent, ConfirmedFlipResetEvent,
-    ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeRefreshedEvent, DodgeResetEvent,
-    DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipImpulseEvent, FlipResetEvent,
-    FlipResetFollowupDodgeEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
+    BackboardBounceEvent, BallCarryEvent, BoostBucketEvent, BoostLedgerEvent,
+    BoostPickupComparisonEvent, BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent,
+    ConfirmedFlipResetEvent, ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeRefreshedEvent,
+    DodgeResetEvent, DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipImpulseEvent,
+    FlipResetEvent, FlipResetFollowupDodgeEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
+    MustyFlickEvent,
     OneTimerEvent, PassEvent, PositioningActivityEvent, PositioningBallDepthEvent,
     PositioningBallProximityEvent, PositioningFieldZoneEvent, PositioningGoalContextEvent,
     PositioningPossessionEvent, PositioningTeammateRoleEvent, PossessionEvent, PostWallDodgeEvent,
@@ -609,6 +610,19 @@ define_stats_event!(
     EventCategory::Boost
 );
 define_stats_event!(
+    BoostBucketEvent,
+    BOOST_BUCKET_EVENT_DEFINITION,
+    "boost_bucket",
+    "Boost Bucket",
+    EventCategory::Boost,
+    summary = "A completed span for a player's display boost bucket.",
+    approach = [
+        "Bucket each live player boost sample into the fixed display ranges.",
+        "Hold the current bucket open while it remains unchanged.",
+        "Emit the completed bucket span only after a later sample shows the player entered a different bucket.",
+    ]
+);
+define_stats_event!(
     BoostStateEvent,
     BOOST_STATE_EVENT_DEFINITION,
     "boost_state",
@@ -816,6 +830,7 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &TOUCH_CLASSIFICATION_EVENT_DEFINITION,
     &BOOST_PICKUP_COMPARISON_EVENT_DEFINITION,
     &BOOST_LEDGER_EVENT_DEFINITION,
+    &BOOST_BUCKET_EVENT_DEFINITION,
     &BOOST_STATE_EVENT_DEFINITION,
     &BUMP_EVENT_DEFINITION,
     &POSSESSION_EVENT_DEFINITION,
@@ -1043,6 +1058,12 @@ const BOOST_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
     produced_event(
         &BOOST_LEDGER_EVENT_DEFINITION,
+        "boost",
+        "BoostNode",
+        "BoostCalculator",
+    ),
+    produced_event(
+        &BOOST_BUCKET_EVENT_DEFINITION,
         "boost",
         "BoostNode",
         "BoostCalculator",

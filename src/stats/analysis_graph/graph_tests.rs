@@ -353,6 +353,7 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
     let expected_ids = BTreeSet::from([
         "backboard_bounce",
         "ball_carry",
+        "boost_bucket",
         "boost_ledger",
         "boost_pickups",
         "boost_state",
