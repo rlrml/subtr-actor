@@ -60,6 +60,8 @@ pub struct PossessionEvent {
     pub active: bool,
     pub duration: f32,
     pub possession_state: String,
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
+    pub player_id: Option<PlayerId>,
     pub field_third: Option<String>,
 }
 
@@ -245,10 +247,11 @@ pub struct PossessionCalculator {
     pending_event: Option<PendingPossessionEvent>,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct PossessionEventState {
     active: bool,
     possession_state: PossessionStateLabel,
+    player_id: Option<PlayerId>,
     field_third: Option<FieldThirdLabel>,
 }
 
@@ -292,14 +295,16 @@ impl PossessionCalculator {
         active: bool,
         duration: f32,
         possession_state: PossessionStateLabel,
+        player_id: Option<PlayerId>,
         field_third: Option<FieldThirdLabel>,
     ) {
         let event_state = PossessionEventState {
             active,
             possession_state,
+            player_id: player_id.clone(),
             field_third,
         };
-        if self.last_emitted_event_state == Some(event_state) && duration == 0.0 {
+        if self.last_emitted_event_state.as_ref() == Some(&event_state) && duration == 0.0 {
             return;
         }
         let event = PossessionEvent {
@@ -310,9 +315,10 @@ impl PossessionCalculator {
             active,
             duration,
             possession_state: possession_state.as_label_value().to_owned(),
+            player_id,
             field_third: field_third.map(|label| label.as_label_value().to_owned()),
         };
-        self.record_event(event_state, frame, event);
+        self.record_event(event_state.clone(), frame, event);
         self.last_emitted_event_state = Some(event_state);
     }
 
@@ -349,22 +355,35 @@ impl PossessionCalculator {
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         if !live_play_state.is_live_play {
-            self.emit_event_if_changed(frame, false, 0.0, PossessionStateLabel::Neutral, None);
+            self.emit_event_if_changed(
+                frame,
+                false,
+                0.0,
+                PossessionStateLabel::Neutral,
+                None,
+                None,
+            );
             return Ok(());
         }
 
         let field_third = ball.sample().map(FieldThirdLabel::from_ball);
-        let state =
+        let (state, player_id) =
             if let Some(possession_team_is_team_0) = possession_state.active_team_before_sample {
                 if possession_team_is_team_0 {
-                    PossessionStateLabel::TeamZero
+                    (
+                        PossessionStateLabel::TeamZero,
+                        possession_state.active_player_before_sample.clone(),
+                    )
                 } else {
-                    PossessionStateLabel::TeamOne
+                    (
+                        PossessionStateLabel::TeamOne,
+                        possession_state.active_player_before_sample.clone(),
+                    )
                 }
             } else {
-                PossessionStateLabel::Neutral
+                (PossessionStateLabel::Neutral, None)
             };
-        self.emit_event_if_changed(frame, true, frame.dt, state, field_third);
+        self.emit_event_if_changed(frame, true, frame.dt, state, player_id, field_third);
         Ok(())
     }
 }

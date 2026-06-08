@@ -642,6 +642,9 @@
 .mechanics-review-item strong {
   color: var(--muted);
   font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mechanics-review-item[data-active="true"] {

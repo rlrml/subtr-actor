@@ -30,6 +30,7 @@ export interface MechanicsReviewReplay {
 export interface MechanicsReviewItemMeta {
   confidence?: number | null;
   eventId?: string;
+  eventCategory?: string;
   eventType?: string;
   eventTypeLabel?: string;
   mechanic?: string;
@@ -493,6 +494,13 @@ export function getMechanicsReviewMechanicLabel(item: MechanicsReviewItem): stri
   }
   const eventType = item.meta?.eventType ?? item.meta?.mechanic;
   return typeof eventType === "string" ? formatMechanicKind(eventType) : "--";
+}
+
+export function getMechanicsReviewCategoryLabel(item: MechanicsReviewItem): string {
+  const category = item.meta?.eventCategory;
+  return typeof category === "string" && category.trim()
+    ? formatMechanicKind(category.trim())
+    : "--";
 }
 
 export function getMechanicsReviewMechanicKind(item: MechanicsReviewItem): string | null {
