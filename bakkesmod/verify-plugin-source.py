@@ -2297,8 +2297,14 @@ def main() -> int:
         )
     require_contains(
         web_player_main_source,
-        'renderModuleSummaryGroup("Timeline visualizations", timelineToggles)',
-        "stats evaluation player launcher module summary timeline group",
+        'renderModuleSummaryGroup("Timeline markers", markerToggles)',
+        "stats evaluation player launcher module summary timeline marker group",
+        errors,
+    )
+    require_contains(
+        web_player_main_source,
+        'renderModuleSummaryGroup("Timeline ranges", rangeToggles)',
+        "stats evaluation player launcher module summary timeline range group",
         errors,
     )
     require_contains(
@@ -2738,7 +2744,11 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        'empty.textContent = "No event types selected.";',
+        'if (selectedSourceIds.size === 0) {\n'
+        '        empty.textContent = "No event types selected.";\n'
+        "      } else {\n"
+        '        empty.textContent = "No events in selected event types.";\n'
+        "      }",
         "stats evaluation player event playlist no-selection empty state",
         errors,
     )

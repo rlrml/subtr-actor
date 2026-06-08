@@ -269,6 +269,39 @@ impl AnalysisGraph {
         self.resolved = false;
     }
 
+    pub fn ensure_dependency(&mut self, dependency: AnalysisDependency) -> SubtrActorResult<()> {
+        let providers = self.provider_index_by_type()?;
+        if providers.contains_key(&dependency.state_type_id())
+            || self
+                .declared_root_states
+                .contains_key(&dependency.state_type_id())
+            || self
+                .declared_input_states
+                .contains_key(&dependency.state_type_id())
+        {
+            return Ok(());
+        }
+        if dependency.is_external() {
+            return Err(analysis_node_graph_error(format!(
+                "Required state {} has no provider",
+                dependency.state_type_name(),
+            )));
+        }
+
+        self.push_boxed_node((dependency.default_factory())());
+        Ok(())
+    }
+
+    pub fn ensure_dependencies<I>(&mut self, dependencies: I) -> SubtrActorResult<()>
+    where
+        I: IntoIterator<Item = AnalysisDependency>,
+    {
+        for dependency in dependencies {
+            self.ensure_dependency(dependency)?;
+        }
+        Ok(())
+    }
+
     pub fn resolve(&mut self) -> SubtrActorResult<()> {
         if self.resolved {
             return Ok(());

@@ -1,11 +1,12 @@
 use super::builtins::*;
 use super::traits::*;
 use crate::collector::{Collector, TimeAdvance};
+use crate::stats::analysis_graph::{AnalysisDependency, AnalysisGraph};
+use crate::stats::calculators::{FrameInput, ReplayFrameInputBuilder};
 use crate::*;
 use ::ndarray;
 use boxcars;
 use serde::Serialize;
-use std::sync::Arc;
 
 /// Column headers for the frame matrix emitted by [`NDArrayCollector`].
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -65,22 +66,96 @@ impl ReplayMetaWithHeaders {
 
 /// Collects replay frames into a dense 2D feature matrix.
 pub struct NDArrayCollector<F> {
-    feature_adders: FeatureAdders<F>,
-    player_feature_adders: PlayerFeatureAdders<F>,
+    feature_adders: NDArrayFeatureAdders<F>,
+    player_feature_adders: NDArrayPlayerFeatureAdders<F>,
+    analysis_runtime: Option<NDArrayAnalysisRuntime>,
     data: Vec<F>,
     replay_meta: Option<ReplayMeta>,
     frames_added: usize,
 }
 
+struct NDArrayAnalysisRuntime {
+    graph: AnalysisGraph,
+    dependencies: Vec<AnalysisDependency>,
+    frame_input_builder: ReplayFrameInputBuilder,
+    last_sample_time: Option<f32>,
+    last_replay_meta_player_count: Option<usize>,
+}
+
+impl NDArrayAnalysisRuntime {
+    fn new(dependencies: Vec<AnalysisDependency>) -> Self {
+        let mut graph = AnalysisGraph::new();
+        graph.register_input_state::<FrameInput>();
+        Self {
+            graph,
+            dependencies,
+            frame_input_builder: ReplayFrameInputBuilder::default(),
+            last_sample_time: None,
+            last_replay_meta_player_count: None,
+        }
+    }
+
+    fn process_frame(
+        &mut self,
+        processor: &dyn ProcessorView,
+        frame_number: usize,
+        current_time: f32,
+    ) -> SubtrActorResult<()> {
+        let player_count = processor.player_count();
+        if self.last_replay_meta_player_count != Some(player_count) {
+            self.graph
+                .ensure_dependencies(self.dependencies.iter().copied())?;
+            self.graph.on_replay_meta(&processor.get_replay_meta()?)?;
+            self.last_replay_meta_player_count = Some(player_count);
+        }
+
+        let dt = self
+            .last_sample_time
+            .map(|last_time| (current_time - last_time).max(0.0))
+            .unwrap_or(0.0);
+        let frame_input =
+            self.frame_input_builder
+                .aggregate(processor, frame_number, current_time, dt);
+        self.graph.evaluate_with_state(&frame_input)?;
+        self.last_sample_time = Some(current_time);
+        Ok(())
+    }
+
+    fn context(&self) -> AnalysisFeatureContext<'_> {
+        AnalysisFeatureContext::new(&self.graph)
+    }
+
+    fn finish_replay(&mut self) -> SubtrActorResult<()> {
+        self.graph.finish()
+    }
+}
+
 impl<F> NDArrayCollector<F> {
-    /// Creates a collector from explicit global and per-player feature adders.
+    /// Creates a collector from ordered global and per-player feature-adder specs.
     pub fn new(
-        feature_adders: FeatureAdders<F>,
-        player_feature_adders: PlayerFeatureAdders<F>,
+        feature_adders: NDArrayFeatureAdders<F>,
+        player_feature_adders: NDArrayPlayerFeatureAdders<F>,
     ) -> Self {
+        let analysis_dependencies = feature_adders
+            .iter()
+            .flat_map(NDArrayFeatureAdder::analysis_dependencies)
+            .chain(
+                player_feature_adders
+                    .iter()
+                    .flat_map(NDArrayPlayerFeatureAdder::analysis_dependencies),
+            )
+            .collect();
+        let uses_analysis = feature_adders
+            .iter()
+            .any(NDArrayFeatureAdder::is_analysis_backed)
+            || player_feature_adders
+                .iter()
+                .any(NDArrayPlayerFeatureAdder::is_analysis_backed);
         Self {
             feature_adders,
             player_feature_adders,
+            analysis_runtime: uses_analysis
+                .then(|| NDArrayAnalysisRuntime::new(analysis_dependencies)),
             data: Vec::new(),
             replay_meta: None,
             frames_added: 0,
@@ -193,26 +268,64 @@ impl<F> Collector for NDArrayCollector<F> {
     ) -> SubtrActorResult<TimeAdvance> {
         self.maybe_set_replay_meta(processor)?;
 
-        for feature_adder in &self.feature_adders {
-            feature_adder.add_features(
-                processor,
-                frame,
-                frame_number,
-                current_time,
-                &mut self.data,
-            )?;
+        if let Some(analysis_runtime) = self.analysis_runtime.as_mut() {
+            analysis_runtime.process_frame(processor, frame_number, current_time)?;
         }
+        let analysis_context = self
+            .analysis_runtime
+            .as_ref()
+            .map(NDArrayAnalysisRuntime::context);
 
-        for player_id in processor.iter_player_ids_in_order() {
-            for player_feature_adder in &self.player_feature_adders {
-                player_feature_adder.add_features(
-                    player_id,
+        for feature_adder in &self.feature_adders {
+            match feature_adder {
+                NDArrayFeatureAdder::Plain(adder) => adder.add_features(
                     processor,
                     frame,
                     frame_number,
                     current_time,
                     &mut self.data,
-                )?;
+                )?,
+                NDArrayFeatureAdder::Analysis(adder) => adder.add_features(
+                    analysis_context
+                        .as_ref()
+                        .expect("analysis runtime exists for analysis feature adders"),
+                    processor,
+                    frame,
+                    frame_number,
+                    current_time,
+                    &mut self.data,
+                )?,
+            }
+        }
+
+        for player_id in processor.iter_player_ids_in_order() {
+            for player_feature_adder in &self.player_feature_adders {
+                match player_feature_adder {
+                    NDArrayPlayerFeatureAdder::Plain(adder) => adder.add_features(
+                        player_id,
+                        processor,
+                        frame,
+                        frame_number,
+                        current_time,
+                        &mut self.data,
+                    )?,
+                    NDArrayPlayerFeatureAdder::Analysis(adder) => {
+                        let context = analysis_context
+                            .as_ref()
+                            .expect("analysis runtime exists for analysis feature adders");
+                        adder.add_features(
+                            AnalysisPlayerFeatureInput {
+                                context,
+                                player_id,
+                                processor,
+                                frame,
+                                frame_count: frame_number,
+                                current_time,
+                            },
+                            &mut self.data,
+                        )?
+                    }
+                }
             }
         }
 
@@ -220,73 +333,108 @@ impl<F> Collector for NDArrayCollector<F> {
 
         Ok(TimeAdvance::NextFrame)
     }
+
+    fn finish_replay(&mut self, _processor: &dyn ProcessorView) -> SubtrActorResult<()> {
+        if let Some(analysis_runtime) = self.analysis_runtime.as_mut() {
+            analysis_runtime.finish_replay()?;
+        }
+        Ok(())
+    }
 }
 
-fn global_feature_adder_from_name<F>(
-    name: &str,
-) -> Option<Arc<dyn FeatureAdder<F> + Send + Sync + 'static>>
+fn global_feature_adder_from_name<F>(name: &str) -> Option<NDArrayFeatureAdder<F>>
 where
     F: TryFrom<f32> + Send + Sync + 'static,
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     match name {
-        "BallRigidBody" => Some(BallRigidBody::<F>::arc_new()),
-        "BallRigidBodyNoVelocities" => Some(BallRigidBodyNoVelocities::<F>::arc_new()),
-        "BallRigidBodyQuaternions" => Some(BallRigidBodyQuaternions::<F>::arc_new()),
-        "BallRigidBodyQuaternionVelocities" => {
-            Some(BallRigidBodyQuaternionVelocities::<F>::arc_new())
-        }
-        "BallRigidBodyBasis" => Some(BallRigidBodyBasis::<F>::arc_new()),
-        "VelocityAddedBallRigidBodyNoVelocities" => {
-            Some(VelocityAddedBallRigidBodyNoVelocities::<F>::arc_new())
-        }
-        "InterpolatedBallRigidBodyNoVelocities" => {
-            Some(InterpolatedBallRigidBodyNoVelocities::<F>::arc_new(0.0))
-        }
-        "SecondsRemaining" => Some(SecondsRemaining::<F>::arc_new()),
-        "CurrentTime" => Some(CurrentTime::<F>::arc_new()),
-        "FrameTime" => Some(FrameTime::<F>::arc_new()),
-        "ReplicatedStateName" => Some(ReplicatedStateName::<F>::arc_new()),
-        "ReplicatedGameStateTimeRemaining" => {
-            Some(ReplicatedGameStateTimeRemaining::<F>::arc_new())
-        }
-        "BallHasBeenHit" => Some(BallHasBeenHit::<F>::arc_new()),
+        "BallRigidBody" => Some(NDArrayFeatureAdder::plain(BallRigidBody::<F>::arc_new())),
+        "BallRigidBodyNoVelocities" => Some(NDArrayFeatureAdder::plain(
+            BallRigidBodyNoVelocities::<F>::arc_new(),
+        )),
+        "BallRigidBodyQuaternions" => Some(NDArrayFeatureAdder::plain(
+            BallRigidBodyQuaternions::<F>::arc_new(),
+        )),
+        "BallRigidBodyQuaternionVelocities" => Some(NDArrayFeatureAdder::plain(
+            BallRigidBodyQuaternionVelocities::<F>::arc_new(),
+        )),
+        "BallRigidBodyBasis" => Some(NDArrayFeatureAdder::plain(
+            BallRigidBodyBasis::<F>::arc_new(),
+        )),
+        "VelocityAddedBallRigidBodyNoVelocities" => Some(NDArrayFeatureAdder::plain(
+            VelocityAddedBallRigidBodyNoVelocities::<F>::arc_new(),
+        )),
+        "InterpolatedBallRigidBodyNoVelocities" => Some(NDArrayFeatureAdder::plain(
+            InterpolatedBallRigidBodyNoVelocities::<F>::arc_new(0.0),
+        )),
+        "SecondsRemaining" => Some(NDArrayFeatureAdder::plain(SecondsRemaining::<F>::arc_new())),
+        "CurrentTime" => Some(NDArrayFeatureAdder::plain(CurrentTime::<F>::arc_new())),
+        "FrameTime" => Some(NDArrayFeatureAdder::plain(FrameTime::<F>::arc_new())),
+        "ReplicatedStateName" => Some(NDArrayFeatureAdder::plain(
+            ReplicatedStateName::<F>::arc_new(),
+        )),
+        "ReplicatedGameStateTimeRemaining" => Some(NDArrayFeatureAdder::plain(
+            ReplicatedGameStateTimeRemaining::<F>::arc_new(),
+        )),
+        "BallHasBeenHit" => Some(NDArrayFeatureAdder::plain(BallHasBeenHit::<F>::arc_new())),
         _ => None,
     }
 }
 
-fn player_feature_adder_from_name<F>(
-    name: &str,
-) -> Option<Arc<dyn PlayerFeatureAdder<F> + Send + Sync + 'static>>
+fn player_feature_adder_from_name<F>(name: &str) -> Option<NDArrayPlayerFeatureAdder<F>>
 where
     F: TryFrom<f32> + Send + Sync + 'static,
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
     match name {
-        "PlayerRigidBody" => Some(PlayerRigidBody::<F>::arc_new()),
-        "PlayerRigidBodyNoVelocities" => Some(PlayerRigidBodyNoVelocities::<F>::arc_new()),
-        "PlayerRigidBodyQuaternions" => Some(PlayerRigidBodyQuaternions::<F>::arc_new()),
-        "PlayerRigidBodyQuaternionVelocities" => {
-            Some(PlayerRigidBodyQuaternionVelocities::<F>::arc_new())
-        }
-        "PlayerRigidBodyBasis" => Some(PlayerRigidBodyBasis::<F>::arc_new()),
-        "PlayerRelativeBallPosition" => Some(PlayerRelativeBallPosition::<F>::arc_new()),
-        "PlayerRelativeBallVelocity" => Some(PlayerRelativeBallVelocity::<F>::arc_new()),
-        "PlayerLocalRelativeBallPosition" => Some(PlayerLocalRelativeBallPosition::<F>::arc_new()),
-        "PlayerLocalRelativeBallVelocity" => Some(PlayerLocalRelativeBallVelocity::<F>::arc_new()),
-        "VelocityAddedPlayerRigidBodyNoVelocities" => {
-            Some(VelocityAddedPlayerRigidBodyNoVelocities::<F>::arc_new())
-        }
-        "InterpolatedPlayerRigidBodyNoVelocities" => {
-            Some(InterpolatedPlayerRigidBodyNoVelocities::<F>::arc_new(0.003))
-        }
-        "PlayerBallDistance" | "PlayerDistanceToBall" => Some(PlayerBallDistance::<F>::arc_new()),
-        "PlayerBoost" => Some(PlayerBoost::<F>::arc_new()),
-        "PlayerJump" => Some(PlayerJump::<F>::arc_new()),
-        "PlayerAnyJump" => Some(PlayerAnyJump::<F>::arc_new()),
-        "PlayerDodgeRefreshed" => Some(PlayerDodgeRefreshed::<F>::arc_new()),
-        "PlayerDemolishedBy" => Some(PlayerDemolishedBy::<F>::arc_new()),
-        _ => None,
+        "PlayerRigidBody" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerRigidBody::<F>::arc_new(),
+        )),
+        "PlayerRigidBodyNoVelocities" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerRigidBodyNoVelocities::<F>::arc_new(),
+        )),
+        "PlayerRigidBodyQuaternions" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerRigidBodyQuaternions::<F>::arc_new(),
+        )),
+        "PlayerRigidBodyQuaternionVelocities" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerRigidBodyQuaternionVelocities::<F>::arc_new(),
+        )),
+        "PlayerRigidBodyBasis" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerRigidBodyBasis::<F>::arc_new(),
+        )),
+        "PlayerRelativeBallPosition" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerRelativeBallPosition::<F>::arc_new(),
+        )),
+        "PlayerRelativeBallVelocity" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerRelativeBallVelocity::<F>::arc_new(),
+        )),
+        "PlayerLocalRelativeBallPosition" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerLocalRelativeBallPosition::<F>::arc_new(),
+        )),
+        "PlayerLocalRelativeBallVelocity" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerLocalRelativeBallVelocity::<F>::arc_new(),
+        )),
+        "VelocityAddedPlayerRigidBodyNoVelocities" => Some(NDArrayPlayerFeatureAdder::plain(
+            VelocityAddedPlayerRigidBodyNoVelocities::<F>::arc_new(),
+        )),
+        "InterpolatedPlayerRigidBodyNoVelocities" => Some(NDArrayPlayerFeatureAdder::plain(
+            InterpolatedPlayerRigidBodyNoVelocities::<F>::arc_new(0.003),
+        )),
+        "PlayerBallDistance" | "PlayerDistanceToBall" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerBallDistance::<F>::arc_new(),
+        )),
+        "PlayerBoost" => Some(NDArrayPlayerFeatureAdder::plain(PlayerBoost::<F>::arc_new())),
+        "PlayerJump" => Some(NDArrayPlayerFeatureAdder::plain(PlayerJump::<F>::arc_new())),
+        "PlayerAnyJump" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerAnyJump::<F>::arc_new(),
+        )),
+        "PlayerDodgeRefreshed" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerDodgeRefreshed::<F>::arc_new(),
+        )),
+        "PlayerDemolishedBy" => Some(NDArrayPlayerFeatureAdder::plain(
+            PlayerDemolishedBy::<F>::arc_new(),
+        )),
+        _ => analysis_player_event_feature_adder_from_name(name),
     }
 }
 
@@ -297,7 +445,7 @@ where
 {
     /// Builds a collector from the registered string names of feature adders.
     pub fn from_strings_typed(fa_names: &[&str], pfa_names: &[&str]) -> SubtrActorResult<Self> {
-        let feature_adders: Vec<Arc<dyn FeatureAdder<F> + Send + Sync>> = fa_names
+        let feature_adders: NDArrayFeatureAdders<F> = fa_names
             .iter()
             .map(|name| {
                 global_feature_adder_from_name(name).ok_or_else(|| {
@@ -307,7 +455,7 @@ where
                 })
             })
             .collect::<SubtrActorResult<Vec<_>>>()?;
-        let player_feature_adders: Vec<Arc<dyn PlayerFeatureAdder<F> + Send + Sync>> = pfa_names
+        let player_feature_adders: NDArrayPlayerFeatureAdders<F> = pfa_names
             .iter()
             .map(|name| {
                 player_feature_adder_from_name(name).ok_or_else(|| {
@@ -334,12 +482,16 @@ where
 {
     fn default() -> Self {
         NDArrayCollector::new(
-            vec![BallRigidBody::arc_new()],
+            vec![NDArrayFeatureAdder::plain(BallRigidBody::arc_new())],
             vec![
-                PlayerRigidBody::arc_new(),
-                PlayerBoost::arc_new(),
-                PlayerAnyJump::arc_new(),
+                NDArrayPlayerFeatureAdder::plain(PlayerRigidBody::arc_new()),
+                NDArrayPlayerFeatureAdder::plain(PlayerBoost::arc_new()),
+                NDArrayPlayerFeatureAdder::plain(PlayerAnyJump::arc_new()),
             ],
         )
     }
 }
+
+#[cfg(test)]
+#[path = "collector_tests.rs"]
+mod tests;
