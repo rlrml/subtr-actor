@@ -180,16 +180,6 @@ pub use whiff::WhiffNode;
 
 pub(crate) type NodeDependencies = Vec<AnalysisDependency>;
 
-pub(crate) fn full_frame_dependencies() -> NodeDependencies {
-    vec![
-        frame_info_dependency(),
-        gameplay_state_dependency(),
-        ball_frame_state_dependency(),
-        player_frame_state_dependency(),
-        frame_events_state_dependency(),
-    ]
-}
-
 pub(crate) fn frame_info_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<FrameInfo>(frame_info::boxed_default)
 }
