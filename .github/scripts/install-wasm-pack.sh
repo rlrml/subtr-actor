@@ -32,7 +32,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 archive="$tmpdir/wasm-pack.tar.gz"
 url="https://github.com/rustwasm/wasm-pack/releases/download/v${version}/wasm-pack-v${version}-${target}.tar.gz"
 
-curl \
+if ! curl \
   --fail \
   --location \
   --show-error \
@@ -42,7 +42,12 @@ curl \
   --retry-delay 5 \
   --connect-timeout 30 \
   --output "$archive" \
-  "$url"
+  "$url"; then
+  echo "failed to download wasm-pack release archive; falling back to cargo install" >&2
+  cargo install wasm-pack --version "$version" --locked
+  wasm-pack --version
+  exit 0
+fi
 
 tar -xzf "$archive" -C "$tmpdir"
 mkdir -p "$install_dir"
