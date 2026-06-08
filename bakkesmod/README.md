@@ -26,6 +26,10 @@ This is an early BakkesMod integration spike. It is intentionally split into:
   The `subtr_actor_dump_analysis_node <node_name> [finish]` console command
   writes one callable analysis node by name, using the callable node-name
   registry exposed by the Rust ABI.
+  The `subtr_actor_dump_products [all]` console command writes product metadata
+  from BakkesMod's item database to `data/subtr-actor/body-products.json`.
+  By default it only writes car bodies; pass `all` to write every product slot
+  to `data/subtr-actor/products-all.json`.
   The `subtr_actor_verify_graph [finish]` console command calls the fixed graph
   outputs plus every callable analysis node name from the loaded plugin
   runtime and logs byte sizes, giving a quick in-game check that the graph

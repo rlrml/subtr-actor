@@ -36,6 +36,7 @@ BAKKESMOD_PLUGIN(
 #include "live_tick.cpp"
 #include "live_sampling.cpp"
 #include "graph_dump_commands.cpp"
+#include "product_dump_commands.cpp"
 #include "graph_verify.cpp"
 #include "event_messages.cpp"
 #include "overlay_layout.cpp"
