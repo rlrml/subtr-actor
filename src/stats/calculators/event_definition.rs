@@ -49,6 +49,7 @@ pub enum EventCategory {
     Contact,
     Movement,
     Annotation,
+    Other,
 }
 
 /// Multi-dimensional confidence metadata for an event detector.
@@ -655,7 +656,7 @@ define_stats_event!(
     MOVEMENT_EVENT_DEFINITION,
     "movement",
     "Movement",
-    EventCategory::Movement
+    EventCategory::Other
 );
 define_stats_event!(
     PositioningActivityEvent,
