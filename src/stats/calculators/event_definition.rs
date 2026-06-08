@@ -48,6 +48,7 @@ pub enum EventCategory {
     Boost,
     Contact,
     Movement,
+    Other,
     Annotation,
 }
 
@@ -566,7 +567,7 @@ define_stats_event!(
     WHIFF_EVENT_DEFINITION,
     "whiff",
     "Whiff",
-    EventCategory::Mechanic,
+    EventCategory::Other,
     summary = "A committed attempt near the ball that does not result in that player touching it.",
     approach = [
         "Start candidates when a player gets within hitbox distance of the ball while moving or dodging toward it with sufficient alignment and closing speed.",
@@ -592,14 +593,14 @@ define_stats_event!(
     TOUCH_CLASSIFICATION_EVENT_DEFINITION,
     "touch",
     "Touch",
-    EventCategory::Contact
+    EventCategory::Other
 );
 define_stats_event!(
     TouchBallMovementEvent,
     TOUCH_BALL_MOVEMENT_EVENT_DEFINITION,
     "touch_ball_movement",
     "Touch Ball Movement",
-    EventCategory::Contact
+    EventCategory::Other
 );
 define_stats_event!(
     BoostPickupComparisonEvent,

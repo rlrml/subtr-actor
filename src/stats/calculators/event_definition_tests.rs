@@ -86,6 +86,22 @@ fn mechanic_event_definitions_have_documented_approaches() {
 }
 
 #[test]
+fn low_level_ball_interaction_events_are_other() {
+    for definition in [
+        TOUCH_CLASSIFICATION_EVENT_DEFINITION,
+        TOUCH_BALL_MOVEMENT_EVENT_DEFINITION,
+        WHIFF_EVENT_DEFINITION,
+    ] {
+        assert_eq!(
+            definition.category,
+            EventCategory::Other,
+            "{}",
+            definition.id
+        );
+    }
+}
+
+#[test]
 fn event_definition_ids_are_unique() {
     let mut ids = std::collections::BTreeSet::new();
     for definition in ALL_EVENT_DEFINITIONS {
