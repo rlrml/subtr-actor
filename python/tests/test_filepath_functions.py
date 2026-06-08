@@ -28,12 +28,28 @@ def test_get_stats_module_names():
     assert "movement" in module_names
 
 
-def test_get_stats_with_module_selection():
-    stats = subtr_actor.get_stats(REPLAY_PATH, module_names=["core", "boost"])
+def test_get_stats_events():
+    events = subtr_actor.get_stats_events(REPLAY_PATH)
 
-    assert set(stats["modules"]) == {"core", "boost"}
-    assert "player_stats" in stats["modules"]["core"]
-    assert "player_stats" in stats["modules"]["boost"]
+    assert "timeline" in events
+    assert "boost_ledger" in events
+    assert "core_player" in events
+
+
+def test_get_summed_stats_with_module_selection():
+    summed_stats = subtr_actor.get_summed_stats(
+        REPLAY_PATH,
+        module_names=["core", "boost"],
+    )
+
+    assert set(summed_stats["modules"]) == {"core", "boost"}
+    assert "score" in summed_stats["modules"]["core"]["team_zero"]
+    assert "amount_collected" in summed_stats["modules"]["boost"]["team_zero"]
+
+
+def test_get_summed_stats_rejects_unknown_module_name():
+    with pytest.raises(ValueError, match="Unknown builtin stats module"):
+        subtr_actor.get_summed_stats(REPLAY_PATH, module_names=["not_a_real_module"])
 
 
 def test_get_stats_snapshot_data_with_sampling():
@@ -87,8 +103,3 @@ def test_get_stats_timeline_rejects_module_filtering():
 def test_get_stats_timeline_rejects_invalid_sampling_step():
     with pytest.raises(ValueError, match="frame_step_seconds"):
         subtr_actor.get_stats_timeline(REPLAY_PATH, frame_step_seconds=0.0)
-
-
-def test_get_stats_rejects_unknown_module_name():
-    with pytest.raises(ValueError, match="Unknown builtin stats module"):
-        subtr_actor.get_stats(REPLAY_PATH, module_names=["not_a_real_module"])

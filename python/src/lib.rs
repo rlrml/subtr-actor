@@ -35,7 +35,8 @@ fn subtr_actor_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_column_headers, m)?)?;
     m.add_function(wrap_pyfunction!(get_replay_frames_data, m)?)?;
     m.add_function(wrap_pyfunction!(get_stats_module_names, m)?)?;
-    m.add_function(wrap_pyfunction!(get_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(get_stats_events, m)?)?;
+    m.add_function(wrap_pyfunction!(get_summed_stats, m)?)?;
     m.add_function(wrap_pyfunction!(get_stats_snapshot_data, m)?)?;
     m.add_function(wrap_pyfunction!(get_stats_timeline, m)?)?;
     m.add_function(wrap_pyfunction!(get_legacy_stats_timeline, m)?)?;
@@ -395,8 +396,25 @@ fn get_stats_module_names<'p>(py: Python<'p>) -> PyResult<Py<PyAny>> {
 
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
+#[pyo3(signature = (filepath, frame_step_seconds=None))]
+fn get_stats_events<'p>(
+    py: Python<'p>,
+    filepath: PathBuf,
+    frame_step_seconds: Option<f32>,
+) -> PyResult<Py<PyAny>> {
+    let replay = replay_from_filepath(&filepath)?;
+    let timeline = build_stats_timeline_event_collector(frame_step_seconds)?
+        .get_replay_stats_timeline_scaffold(&replay)
+        .map_err(handle_subtr_actor_exception)?;
+    let events = serde_json::to_value(timeline.events).map_err(to_py_error)?;
+
+    Ok(convert_to_py(py, &events))
+}
+
+#[allow(clippy::useless_conversion)]
+#[pyfunction]
 #[pyo3(signature = (filepath, module_names=None))]
-fn get_stats<'p>(
+fn get_summed_stats<'p>(
     py: Python<'p>,
     filepath: PathBuf,
     module_names: Option<Vec<String>>,
