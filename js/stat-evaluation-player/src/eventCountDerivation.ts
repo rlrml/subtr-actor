@@ -38,6 +38,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "dodge_reset",
   "double_tap",
   "fifty_fifty",
+  "kickoff",
   "one_timer",
   "pass",
   "ball_carry",

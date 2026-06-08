@@ -69,6 +69,7 @@ impl StatsTimelineEventsNode {
             one_timer_dependency(),
             pass_dependency(),
             fifty_fifty_dependency(),
+            kickoff_dependency(),
             possession_dependency(),
             pressure_dependency(),
             territorial_pressure_dependency(),
@@ -130,6 +131,7 @@ impl StatsTimelineEventsNode {
         let one_timer = ctx.get::<OneTimerCalculator>()?;
         let pass = ctx.get::<PassCalculator>()?;
         let fifty_fifty = ctx.get::<FiftyFiftyCalculator>()?;
+        let kickoff = ctx.get::<KickoffCalculator>()?;
         let flick = ctx.get::<FlickCalculator>()?;
         let musty_flick = ctx.get::<MustyFlickCalculator>()?;
         let aerial_goal = ctx.get::<AerialGoalCalculator>()?;
@@ -233,6 +235,7 @@ impl StatsTimelineEventsNode {
             pass: pass.events().to_vec(),
             ball_carry: ball_carry.carry_events().to_vec(),
             fifty_fifty: fifty_fifty.events().to_vec(),
+            kickoff: kickoff.events().to_vec(),
             rush: rush.events().to_vec(),
             flip_impulse: flip_impulse.events().to_vec(),
             speed_flip: speed_flip.events().to_vec(),

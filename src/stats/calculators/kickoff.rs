@@ -1,0 +1,1270 @@
+use super::*;
+
+const KICKOFF_CENTER_MAX_ABS_X: f32 = 350.0;
+const KICKOFF_CENTER_MIN_ABS_Y: f32 = 4300.0;
+const KICKOFF_OFF_CENTER_MAX_ABS_X: f32 = 900.0;
+const KICKOFF_OFF_CENTER_MIN_ABS_Y: f32 = 3300.0;
+const KICKOFF_DIAGONAL_MIN_ABS_X: f32 = 1500.0;
+const KICKOFF_DIAGONAL_MAX_ABS_Y: f32 = 3300.0;
+const KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS: f32 = 1.25;
+const KICKOFF_GOAL_MAX_SECONDS: f32 = 10.0;
+const KICKOFF_WIN_MIN_BALL_Y: f32 = 180.0;
+const KICKOFF_WIN_MIN_BALL_SPEED_Y: f32 = 220.0;
+const KICKOFF_CLEAR_WIN_STRENGTH: f32 = 1.5;
+const KICKOFF_STRONG_WIN_STRENGTH: f32 = 2.5;
+const KICKOFF_TAKER_DISTANCE_TIE_EPSILON: f32 = 150.0;
+const KICKOFF_POSSESSION_IMMEDIATE_CONTEST_SECONDS: f32 = 0.35;
+const KICKOFF_TOUCH_CLUSTER_MAX_GAP_SECONDS: f32 = 0.35;
+const KICKOFF_APPROACH_MIN_BOOST_USED: f32 = 3.0;
+const KICKOFF_APPROACH_MIN_FAKE_MOVE_DISTANCE: f32 = 350.0;
+const KICKOFF_APPROACH_FRONT_FLIP_FORWARD_COMPONENT: f32 = 0.45;
+const KICKOFF_APPROACH_DIAGONAL_FLIP_SIDE_COMPONENT: f32 = 0.35;
+const KICKOFF_SUPPORT_CHEAT_MIN_CENTER_PROGRESS: f32 = 400.0;
+const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_LATERAL_MOVE: f32 = 600.0;
+const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_BOOST_GAIN: f32 = 10.0;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffSpawnPosition {
+    Center,
+    OffCenterLeft,
+    OffCenterRight,
+    DiagonalLeft,
+    DiagonalRight,
+    #[default]
+    Unknown,
+}
+
+impl KickoffSpawnPosition {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::Center => "center",
+            Self::OffCenterLeft => "off_center_left",
+            Self::OffCenterRight => "off_center_right",
+            Self::DiagonalLeft => "diagonal_left",
+            Self::DiagonalRight => "diagonal_right",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffTakerOutcome {
+    Touched,
+    Fake,
+    Missed,
+    #[default]
+    Unknown,
+}
+
+impl KickoffTakerOutcome {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::Touched => "touched",
+            Self::Fake => "fake",
+            Self::Missed => "missed",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffOutcome {
+    TeamZeroWin,
+    TeamOneWin,
+    Neutral,
+    #[default]
+    Unknown,
+}
+
+impl KickoffOutcome {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::TeamZeroWin => "team_zero_win",
+            Self::TeamOneWin => "team_one_win",
+            Self::Neutral => "neutral",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffWinStrengthBand {
+    Narrow,
+    Clear,
+    Strong,
+    #[default]
+    Unknown,
+}
+
+impl KickoffWinStrengthBand {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::Narrow => "narrow",
+            Self::Clear => "clear",
+            Self::Strong => "strong",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffPossessionOutcome {
+    TeamZeroPossession,
+    TeamOnePossession,
+    TeamZeroAdvantage,
+    TeamOneAdvantage,
+    #[default]
+    Contested,
+}
+
+impl KickoffPossessionOutcome {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::TeamZeroPossession => "team_zero_possession",
+            Self::TeamOnePossession => "team_one_possession",
+            Self::TeamZeroAdvantage => "team_zero_advantage",
+            Self::TeamOneAdvantage => "team_one_advantage",
+            Self::Contested => "contested",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffApproach {
+    SpeedFlip,
+    BoostIntoBall,
+    FakeGoForBoost,
+    FrontFlip,
+    DiagonalFlip,
+    #[default]
+    Other,
+}
+
+impl KickoffApproach {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::SpeedFlip => "speed_flip",
+            Self::BoostIntoBall => "boost_into_ball",
+            Self::FakeGoForBoost => "fake_go_for_boost",
+            Self::FrontFlip => "front_flip",
+            Self::DiagonalFlip => "diagonal_flip",
+            Self::Other => "other",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffSupportBehavior {
+    GoForBoost,
+    Cheat,
+    Other,
+    #[default]
+    Unknown,
+}
+
+impl KickoffSupportBehavior {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::GoForBoost => "go_for_boost",
+            Self::Cheat => "cheat",
+            Self::Other => "other",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct KickoffTakerEvent {
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub start_position: [f32; 3],
+    pub spawn_position: KickoffSpawnPosition,
+    pub start_boost: Option<f32>,
+    pub boost_after: Option<f32>,
+    pub first_touch_time: Option<f32>,
+    pub first_touch_frame: Option<usize>,
+    pub outcome: KickoffTakerOutcome,
+    pub approach: KickoffApproach,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct KickoffSupportEvent {
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub start_position: [f32; 3],
+    pub spawn_position: KickoffSpawnPosition,
+    pub start_boost: Option<f32>,
+    pub boost_after: Option<f32>,
+    pub first_touch_time: Option<f32>,
+    pub first_touch_frame: Option<usize>,
+    pub support_behavior: KickoffSupportBehavior,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct KickoffEvent {
+    pub start_time: f32,
+    pub start_frame: usize,
+    pub end_time: f32,
+    pub end_frame: usize,
+    pub first_touch_time: Option<f32>,
+    pub first_touch_frame: Option<usize>,
+    pub first_touch_team_is_team_0: Option<bool>,
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
+    pub first_touch_player: Option<PlayerId>,
+    pub team_zero_taker_touch_time: Option<f32>,
+    pub team_zero_taker_touch_frame: Option<usize>,
+    pub team_one_taker_touch_time: Option<f32>,
+    pub team_one_taker_touch_frame: Option<usize>,
+    pub taker_touch_delay_seconds: Option<f32>,
+    pub exit_velocity: Option<[f32; 3]>,
+    pub exit_speed: Option<f32>,
+    pub exit_y_velocity: Option<f32>,
+    pub first_follow_up_touch_time: Option<f32>,
+    pub first_follow_up_touch_frame: Option<usize>,
+    pub first_follow_up_touch_team_is_team_0: Option<bool>,
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
+    pub first_follow_up_touch_player: Option<PlayerId>,
+    pub outcome: KickoffOutcome,
+    pub winning_team_is_team_0: Option<bool>,
+    pub win_strength: Option<f32>,
+    pub win_strength_band: KickoffWinStrengthBand,
+    pub kickoff_possession_outcome: KickoffPossessionOutcome,
+    pub kickoff_possession_team_is_team_0: Option<bool>,
+    pub kickoff_goal: bool,
+    pub scoring_team_is_team_0: Option<bool>,
+    pub time_to_goal: Option<f32>,
+    pub team_zero_taker: Option<KickoffTakerEvent>,
+    pub team_one_taker: Option<KickoffTakerEvent>,
+    pub team_zero_non_takers: Vec<KickoffSupportEvent>,
+    pub team_one_non_takers: Vec<KickoffSupportEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct KickoffPlayerSnapshot {
+    player: PlayerId,
+    is_team_0: bool,
+    start_position: [f32; 3],
+    spawn_position: KickoffSpawnPosition,
+    start_boost: Option<f32>,
+    first_touch_time: Option<f32>,
+    first_touch_frame: Option<usize>,
+    approach_trace: KickoffApproachTrace,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct KickoffApproachTrace {
+    boost_active_sample_count: u32,
+    first_dodge_time: Option<f32>,
+    first_dodge_frame: Option<usize>,
+    first_dodge_forward_component: Option<f32>,
+    first_dodge_side_component: Option<f32>,
+    max_speed: f32,
+    min_boost: Option<f32>,
+    last_position: Option<[f32; 3]>,
+    previous_velocity: Option<glam::Vec3>,
+    previous_dodge_active: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct KickoffTouchSnapshot {
+    time: f32,
+    frame: usize,
+    team_is_team_0: bool,
+    player: Option<PlayerId>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct ActiveKickoff {
+    start_time: f32,
+    start_frame: usize,
+    players: Vec<KickoffPlayerSnapshot>,
+    first_touch_time: Option<f32>,
+    first_touch_frame: Option<usize>,
+    first_touch_team_is_team_0: Option<bool>,
+    touches: Vec<KickoffTouchSnapshot>,
+    speed_flip_players: HashSet<PlayerId>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct KickoffCalculator {
+    active: Option<ActiveKickoff>,
+    events: EventStream<KickoffEvent>,
+}
+
+pub(crate) struct KickoffUpdateContext<'a> {
+    pub frame: &'a FrameInfo,
+    pub gameplay: &'a GameplayState,
+    pub ball: &'a BallFrameState,
+    pub players: &'a PlayerFrameState,
+    pub touch_state: &'a TouchState,
+    pub events: &'a FrameEventsState,
+    pub speed_flip_events: &'a [SpeedFlipEvent],
+}
+
+pub(crate) const KICKOFF_SPAWN_LABELS: [StatLabel; 6] = [
+    StatLabel::new("kickoff_spawn", "center"),
+    StatLabel::new("kickoff_spawn", "off_center_left"),
+    StatLabel::new("kickoff_spawn", "off_center_right"),
+    StatLabel::new("kickoff_spawn", "diagonal_left"),
+    StatLabel::new("kickoff_spawn", "diagonal_right"),
+    StatLabel::new("kickoff_spawn", "unknown"),
+];
+pub(crate) const KICKOFF_TAKER_OUTCOME_LABELS: [StatLabel; 4] = [
+    StatLabel::new("taker_outcome", "touched"),
+    StatLabel::new("taker_outcome", "fake"),
+    StatLabel::new("taker_outcome", "missed"),
+    StatLabel::new("taker_outcome", "unknown"),
+];
+pub(crate) const KICKOFF_APPROACH_LABELS: [StatLabel; 6] = [
+    StatLabel::new("kickoff_approach", "speed_flip"),
+    StatLabel::new("kickoff_approach", "boost_into_ball"),
+    StatLabel::new("kickoff_approach", "fake_go_for_boost"),
+    StatLabel::new("kickoff_approach", "front_flip"),
+    StatLabel::new("kickoff_approach", "diagonal_flip"),
+    StatLabel::new("kickoff_approach", "other"),
+];
+pub(crate) const KICKOFF_SUPPORT_BEHAVIOR_LABELS: [StatLabel; 4] = [
+    StatLabel::new("support_behavior", "go_for_boost"),
+    StatLabel::new("support_behavior", "cheat"),
+    StatLabel::new("support_behavior", "other"),
+    StatLabel::new("support_behavior", "unknown"),
+];
+pub(crate) const KICKOFF_OUTCOME_LABELS: [StatLabel; 4] = [
+    StatLabel::new("outcome", "team_zero_win"),
+    StatLabel::new("outcome", "team_one_win"),
+    StatLabel::new("outcome", "neutral"),
+    StatLabel::new("outcome", "unknown"),
+];
+pub(crate) const KICKOFF_WIN_STRENGTH_LABELS: [StatLabel; 4] = [
+    StatLabel::new("win_strength", "narrow"),
+    StatLabel::new("win_strength", "clear"),
+    StatLabel::new("win_strength", "strong"),
+    StatLabel::new("win_strength", "unknown"),
+];
+pub(crate) const KICKOFF_POSSESSION_OUTCOME_LABELS: [StatLabel; 5] = [
+    StatLabel::new("kickoff_possession_outcome", "team_zero_possession"),
+    StatLabel::new("kickoff_possession_outcome", "team_one_possession"),
+    StatLabel::new("kickoff_possession_outcome", "team_zero_advantage"),
+    StatLabel::new("kickoff_possession_outcome", "team_one_advantage"),
+    StatLabel::new("kickoff_possession_outcome", "contested"),
+];
+pub(crate) const KICKOFF_GOAL_LABELS: [StatLabel; 2] = [
+    StatLabel::new("kickoff_goal", "false"),
+    StatLabel::new("kickoff_goal", "true"),
+];
+
+pub(crate) fn kickoff_spawn_label(spawn: KickoffSpawnPosition) -> StatLabel {
+    StatLabel::new("kickoff_spawn", spawn.as_label_value())
+}
+
+pub(crate) fn kickoff_taker_outcome_label(outcome: KickoffTakerOutcome) -> StatLabel {
+    StatLabel::new("taker_outcome", outcome.as_label_value())
+}
+
+pub(crate) fn kickoff_outcome_label(outcome: KickoffOutcome) -> StatLabel {
+    StatLabel::new("outcome", outcome.as_label_value())
+}
+
+pub(crate) fn kickoff_win_strength_label(band: KickoffWinStrengthBand) -> StatLabel {
+    StatLabel::new("win_strength", band.as_label_value())
+}
+
+pub(crate) fn kickoff_possession_outcome_label(outcome: KickoffPossessionOutcome) -> StatLabel {
+    StatLabel::new("kickoff_possession_outcome", outcome.as_label_value())
+}
+
+pub(crate) fn kickoff_goal_label(kickoff_goal: bool) -> StatLabel {
+    StatLabel::new("kickoff_goal", if kickoff_goal { "true" } else { "false" })
+}
+
+pub(crate) fn kickoff_approach_label(approach: KickoffApproach) -> StatLabel {
+    StatLabel::new("kickoff_approach", approach.as_label_value())
+}
+
+pub(crate) fn kickoff_support_behavior_label(behavior: KickoffSupportBehavior) -> StatLabel {
+    StatLabel::new("support_behavior", behavior.as_label_value())
+}
+
+impl KickoffTakerEvent {
+    pub(crate) fn labels(&self) -> Vec<StatLabel> {
+        vec![
+            kickoff_spawn_label(self.spawn_position),
+            kickoff_taker_outcome_label(self.outcome),
+            kickoff_approach_label(self.approach),
+        ]
+    }
+}
+
+impl KickoffSupportEvent {
+    pub(crate) fn labels(&self) -> Vec<StatLabel> {
+        vec![
+            kickoff_spawn_label(self.spawn_position),
+            kickoff_support_behavior_label(self.support_behavior),
+        ]
+    }
+}
+
+pub(crate) enum KickoffPlayerEventRef<'a> {
+    Taker(&'a KickoffTakerEvent),
+    Support(&'a KickoffSupportEvent),
+}
+
+impl KickoffPlayerEventRef<'_> {
+    pub(crate) fn player(&self) -> &PlayerId {
+        match self {
+            Self::Taker(event) => &event.player,
+            Self::Support(event) => &event.player,
+        }
+    }
+
+    pub(crate) fn is_team_0(&self) -> bool {
+        match self {
+            Self::Taker(event) => event.is_team_0,
+            Self::Support(event) => event.is_team_0,
+        }
+    }
+
+    pub(crate) fn boost_after(&self) -> Option<f32> {
+        match self {
+            Self::Taker(event) => event.boost_after,
+            Self::Support(event) => event.boost_after,
+        }
+    }
+
+    pub(crate) fn labels(&self) -> Vec<StatLabel> {
+        match self {
+            Self::Taker(event) => event.labels(),
+            Self::Support(event) => event.labels(),
+        }
+    }
+
+    pub(crate) fn as_taker(&self) -> Option<&KickoffTakerEvent> {
+        match self {
+            Self::Taker(event) => Some(event),
+            Self::Support(_) => None,
+        }
+    }
+
+    pub(crate) fn as_support(&self) -> Option<&KickoffSupportEvent> {
+        match self {
+            Self::Taker(_) => None,
+            Self::Support(event) => Some(event),
+        }
+    }
+}
+
+impl KickoffEvent {
+    pub(crate) fn labels(&self) -> [StatLabel; 4] {
+        [
+            kickoff_outcome_label(self.outcome),
+            kickoff_win_strength_label(self.win_strength_band),
+            kickoff_possession_outcome_label(self.kickoff_possession_outcome),
+            kickoff_goal_label(self.kickoff_goal),
+        ]
+    }
+
+    pub(crate) fn player_events(&self) -> impl Iterator<Item = KickoffPlayerEventRef<'_>> {
+        self.team_zero_taker
+            .iter()
+            .map(KickoffPlayerEventRef::Taker)
+            .chain(self.team_one_taker.iter().map(KickoffPlayerEventRef::Taker))
+            .chain(
+                self.team_zero_non_takers
+                    .iter()
+                    .map(KickoffPlayerEventRef::Support),
+            )
+            .chain(
+                self.team_one_non_takers
+                    .iter()
+                    .map(KickoffPlayerEventRef::Support),
+            )
+    }
+}
+
+impl KickoffCalculator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn events(&self) -> &[KickoffEvent] {
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[KickoffEvent] {
+        self.events.new_events()
+    }
+
+    pub(crate) fn kickoff_spawn_position(
+        position: glam::Vec3,
+        is_team_0: bool,
+    ) -> KickoffSpawnPosition {
+        let abs_x = position.x.abs();
+        let abs_y = position.y.abs();
+        let relative_x = if is_team_0 { position.x } else { -position.x };
+
+        if abs_x <= KICKOFF_CENTER_MAX_ABS_X && abs_y >= KICKOFF_CENTER_MIN_ABS_Y {
+            return KickoffSpawnPosition::Center;
+        }
+        if abs_x <= KICKOFF_OFF_CENTER_MAX_ABS_X && abs_y >= KICKOFF_OFF_CENTER_MIN_ABS_Y {
+            return if relative_x < 0.0 {
+                KickoffSpawnPosition::OffCenterLeft
+            } else {
+                KickoffSpawnPosition::OffCenterRight
+            };
+        }
+        if abs_x >= KICKOFF_DIAGONAL_MIN_ABS_X && abs_y <= KICKOFF_DIAGONAL_MAX_ABS_Y {
+            return if relative_x < 0.0 {
+                KickoffSpawnPosition::DiagonalLeft
+            } else {
+                KickoffSpawnPosition::DiagonalRight
+            };
+        }
+        KickoffSpawnPosition::Unknown
+    }
+
+    fn kickoff_player_snapshot(player: &PlayerSample) -> Option<KickoffPlayerSnapshot> {
+        let position = player.position()?;
+        Some(KickoffPlayerSnapshot {
+            player: player.player_id.clone(),
+            is_team_0: player.is_team_0,
+            start_position: position.to_array(),
+            spawn_position: Self::kickoff_spawn_position(position, player.is_team_0),
+            start_boost: player.boost_amount.or(player.last_boost_amount),
+            first_touch_time: None,
+            first_touch_frame: None,
+            approach_trace: KickoffApproachTrace::default(),
+        })
+    }
+
+    fn start_kickoff(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
+        self.active = Some(ActiveKickoff {
+            start_time: frame.time,
+            start_frame: frame.frame_number,
+            players: players
+                .players
+                .iter()
+                .filter_map(Self::kickoff_player_snapshot)
+                .collect(),
+            first_touch_time: None,
+            first_touch_frame: None,
+            first_touch_team_is_team_0: None,
+            touches: Vec::new(),
+            speed_flip_players: HashSet::new(),
+        });
+    }
+
+    fn boost_amount(player: &PlayerSample) -> Option<f32> {
+        player.boost_amount.or(player.last_boost_amount)
+    }
+
+    fn observe_player_approach(
+        trace: &mut KickoffApproachTrace,
+        frame: &FrameInfo,
+        player: &PlayerSample,
+    ) {
+        if player.boost_active {
+            trace.boost_active_sample_count += 1;
+        }
+        if let Some(boost_amount) = Self::boost_amount(player) {
+            trace.min_boost = Some(
+                trace
+                    .min_boost
+                    .map(|current| current.min(boost_amount))
+                    .unwrap_or(boost_amount),
+            );
+        }
+        if let Some(position) = player.position() {
+            trace.last_position = Some(position.to_array());
+        }
+        if let Some(speed) = player.speed() {
+            trace.max_speed = trace.max_speed.max(speed);
+        }
+
+        if player.dodge_active && !trace.previous_dodge_active {
+            trace.first_dodge_time.get_or_insert(frame.time);
+            trace.first_dodge_frame.get_or_insert(frame.frame_number);
+            if let (Some(previous_velocity), Some(velocity), Some(rigid_body)) = (
+                trace.previous_velocity,
+                player.velocity(),
+                player.rigid_body.as_ref(),
+            ) {
+                let velocity_delta = velocity - previous_velocity;
+                if velocity_delta.length_squared() > f32::EPSILON {
+                    let dodge_direction = velocity_delta.normalize();
+                    let rotation = quat_to_glam(&rigid_body.rotation);
+                    let forward = rotation * glam::Vec3::X;
+                    let right = rotation * glam::Vec3::Y;
+                    trace.first_dodge_forward_component = Some(dodge_direction.dot(forward));
+                    trace.first_dodge_side_component = Some(dodge_direction.dot(right).abs());
+                }
+            }
+        }
+
+        trace.previous_velocity = player.velocity();
+        trace.previous_dodge_active = player.dodge_active;
+    }
+
+    fn apply_player_samples(
+        active: &mut ActiveKickoff,
+        frame: &FrameInfo,
+        players: &PlayerFrameState,
+    ) {
+        for snapshot in &mut active.players {
+            let Some(player) = players.player(&snapshot.player) else {
+                continue;
+            };
+            Self::observe_player_approach(&mut snapshot.approach_trace, frame, player);
+        }
+    }
+
+    fn apply_touches(active: &mut ActiveKickoff, touch_state: &TouchState) {
+        for touch in chronological_touch_events(&touch_state.touch_events) {
+            active.touches.push(KickoffTouchSnapshot {
+                time: touch.time,
+                frame: touch.frame,
+                team_is_team_0: touch.team_is_team_0,
+                player: touch.player.clone(),
+            });
+            if active.first_touch_time.is_none() {
+                active.first_touch_time = Some(touch.time);
+                active.first_touch_frame = Some(touch.frame);
+                active.first_touch_team_is_team_0 = Some(touch.team_is_team_0);
+            }
+            let Some(player_id) = touch.player.as_ref() else {
+                continue;
+            };
+            let Some(player) = active
+                .players
+                .iter_mut()
+                .find(|player| &player.player == player_id)
+            else {
+                continue;
+            };
+            if player.first_touch_time.is_none() {
+                player.first_touch_time = Some(touch.time);
+                player.first_touch_frame = Some(touch.frame);
+            }
+        }
+    }
+
+    fn apply_speed_flip_events(
+        active: &mut ActiveKickoff,
+        frame: &FrameInfo,
+        speed_flip_events: &[SpeedFlipEvent],
+    ) {
+        for event in speed_flip_events {
+            if event.time < active.start_time || event.resolved_time > frame.time {
+                continue;
+            }
+            if active
+                .players
+                .iter()
+                .any(|player| player.player == event.player)
+            {
+                active.speed_flip_players.insert(event.player.clone());
+            }
+        }
+    }
+
+    fn kickoff_start_distance(player: &KickoffPlayerSnapshot) -> f32 {
+        glam::Vec2::new(player.start_position[0], player.start_position[1]).length()
+    }
+
+    fn relative_left_value(player: &KickoffPlayerSnapshot) -> f32 {
+        if player.is_team_0 {
+            player.start_position[0]
+        } else {
+            -player.start_position[0]
+        }
+    }
+
+    fn expected_taker_by_team(players: &[KickoffPlayerSnapshot], is_team_0: bool) -> Option<usize> {
+        let closest_distance = players
+            .iter()
+            .filter(|player| player.is_team_0 == is_team_0)
+            .map(Self::kickoff_start_distance)
+            .min_by(|left, right| left.total_cmp(right))?;
+
+        let tied_candidates = players.iter().enumerate().filter(|(_, player)| {
+            player.is_team_0 == is_team_0
+                && (Self::kickoff_start_distance(player) - closest_distance).abs()
+                    <= KICKOFF_TAKER_DISTANCE_TIE_EPSILON
+        });
+
+        tied_candidates
+            .clone()
+            .filter(|(_, player)| player.first_touch_time.is_some())
+            .min_by(|(_, left), (_, right)| {
+                left.first_touch_time
+                    .unwrap_or(f32::INFINITY)
+                    .total_cmp(&right.first_touch_time.unwrap_or(f32::INFINITY))
+                    .then_with(|| {
+                        left.first_touch_frame
+                            .unwrap_or(usize::MAX)
+                            .cmp(&right.first_touch_frame.unwrap_or(usize::MAX))
+                    })
+            })
+            .or_else(|| {
+                tied_candidates.min_by(|(_, left), (_, right)| {
+                    Self::relative_left_value(left).total_cmp(&Self::relative_left_value(right))
+                })
+            })
+            .map(|(index, _)| index)
+    }
+
+    fn taker_outcome(
+        player: &KickoffPlayerSnapshot,
+        expected_taker_index: Option<usize>,
+        player_index: usize,
+        team_touched: bool,
+    ) -> KickoffTakerOutcome {
+        if player.first_touch_time.is_some() {
+            KickoffTakerOutcome::Touched
+        } else if expected_taker_index == Some(player_index) && team_touched {
+            KickoffTakerOutcome::Fake
+        } else if expected_taker_index == Some(player_index) {
+            KickoffTakerOutcome::Missed
+        } else {
+            KickoffTakerOutcome::Unknown
+        }
+    }
+
+    fn is_taker(player_index: usize, expected_taker_index: Option<usize>) -> bool {
+        expected_taker_index == Some(player_index)
+    }
+
+    fn boost_after(players: &PlayerFrameState, player_id: &PlayerId) -> Option<f32> {
+        players.player(player_id).and_then(Self::boost_amount)
+    }
+
+    fn boost_used(player: &KickoffPlayerSnapshot, boost_after: Option<f32>) -> f32 {
+        let Some(start_boost) = player.start_boost else {
+            return 0.0;
+        };
+        let lowest_boost = player
+            .approach_trace
+            .min_boost
+            .or(boost_after)
+            .unwrap_or(start_boost);
+        (start_boost - lowest_boost).max(0.0)
+    }
+
+    fn moved_distance(player: &KickoffPlayerSnapshot) -> f32 {
+        let Some(last_position) = player.approach_trace.last_position else {
+            return 0.0;
+        };
+        glam::Vec3::from_array(last_position)
+            .distance(glam::Vec3::from_array(player.start_position))
+    }
+
+    fn classify_approach(
+        player: &KickoffPlayerSnapshot,
+        outcome: KickoffTakerOutcome,
+        boost_after: Option<f32>,
+        has_speed_flip: bool,
+    ) -> KickoffApproach {
+        if has_speed_flip {
+            return KickoffApproach::SpeedFlip;
+        }
+
+        let boost_used = Self::boost_used(player, boost_after);
+        let used_boost = player.approach_trace.boost_active_sample_count > 0
+            || boost_used >= KICKOFF_APPROACH_MIN_BOOST_USED;
+        if player.first_touch_time.is_none() {
+            let boost_gain = match (player.start_boost, boost_after) {
+                (Some(start_boost), Some(boost_after)) => boost_after - start_boost,
+                _ => 0.0,
+            };
+            if matches!(
+                outcome,
+                KickoffTakerOutcome::Fake | KickoffTakerOutcome::Missed
+            ) && (used_boost
+                || boost_gain > KICKOFF_APPROACH_MIN_BOOST_USED
+                || Self::moved_distance(player) >= KICKOFF_APPROACH_MIN_FAKE_MOVE_DISTANCE)
+            {
+                return KickoffApproach::FakeGoForBoost;
+            }
+            return KickoffApproach::Other;
+        }
+
+        let forward_component = player
+            .approach_trace
+            .first_dodge_forward_component
+            .unwrap_or(0.0);
+        let side_component = player
+            .approach_trace
+            .first_dodge_side_component
+            .unwrap_or(0.0);
+        if player.approach_trace.first_dodge_time.is_some() {
+            if side_component >= KICKOFF_APPROACH_DIAGONAL_FLIP_SIDE_COMPONENT {
+                return KickoffApproach::DiagonalFlip;
+            }
+            if forward_component >= KICKOFF_APPROACH_FRONT_FLIP_FORWARD_COMPONENT {
+                return KickoffApproach::FrontFlip;
+            }
+        }
+
+        if used_boost {
+            return KickoffApproach::BoostIntoBall;
+        }
+
+        KickoffApproach::Other
+    }
+
+    fn center_progress(player: &KickoffPlayerSnapshot) -> f32 {
+        let Some(last_position) = player.approach_trace.last_position else {
+            return 0.0;
+        };
+        let start_distance =
+            glam::Vec2::new(player.start_position[0], player.start_position[1]).length();
+        let end_distance = glam::Vec2::new(last_position[0], last_position[1]).length();
+        (start_distance - end_distance).max(0.0)
+    }
+
+    fn lateral_movement(player: &KickoffPlayerSnapshot) -> f32 {
+        let Some(last_position) = player.approach_trace.last_position else {
+            return 0.0;
+        };
+        (last_position[0].abs() - player.start_position[0].abs()).max(0.0)
+    }
+
+    fn boost_gain(player: &KickoffPlayerSnapshot, boost_after: Option<f32>) -> f32 {
+        match (player.start_boost, boost_after) {
+            (Some(start_boost), Some(boost_after)) => (boost_after - start_boost).max(0.0),
+            _ => 0.0,
+        }
+    }
+
+    fn classify_support_behavior(
+        player: &KickoffPlayerSnapshot,
+        is_taker: bool,
+        boost_after: Option<f32>,
+    ) -> Option<KickoffSupportBehavior> {
+        if is_taker {
+            return None;
+        }
+        if player.first_touch_time.is_some()
+            || Self::center_progress(player) >= KICKOFF_SUPPORT_CHEAT_MIN_CENTER_PROGRESS
+        {
+            return Some(KickoffSupportBehavior::Cheat);
+        }
+        if Self::boost_gain(player, boost_after) >= KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_BOOST_GAIN
+            || Self::lateral_movement(player) >= KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_LATERAL_MOVE
+        {
+            return Some(KickoffSupportBehavior::GoForBoost);
+        }
+        Some(KickoffSupportBehavior::Other)
+    }
+
+    fn win_strength_band(strength: f32) -> KickoffWinStrengthBand {
+        if strength >= KICKOFF_STRONG_WIN_STRENGTH {
+            KickoffWinStrengthBand::Strong
+        } else if strength >= KICKOFF_CLEAR_WIN_STRENGTH {
+            KickoffWinStrengthBand::Clear
+        } else {
+            KickoffWinStrengthBand::Narrow
+        }
+    }
+
+    fn win_from_ball(ball: &BallFrameState) -> (KickoffOutcome, Option<bool>, Option<f32>) {
+        let Some(ball) = ball.sample() else {
+            return (KickoffOutcome::Unknown, None, None);
+        };
+        let position_y = ball.position().y;
+        if position_y.abs() >= KICKOFF_WIN_MIN_BALL_Y {
+            let toward_team_zero_win = position_y > 0.0;
+            let strength = position_y.abs() / KICKOFF_WIN_MIN_BALL_Y;
+            return (
+                if toward_team_zero_win {
+                    KickoffOutcome::TeamZeroWin
+                } else {
+                    KickoffOutcome::TeamOneWin
+                },
+                Some(toward_team_zero_win),
+                Some(strength),
+            );
+        }
+        let velocity_y = ball.velocity().y;
+        if velocity_y.abs() >= KICKOFF_WIN_MIN_BALL_SPEED_Y {
+            let toward_team_zero_win = velocity_y > 0.0;
+            let strength = velocity_y.abs() / KICKOFF_WIN_MIN_BALL_SPEED_Y;
+            return (
+                if toward_team_zero_win {
+                    KickoffOutcome::TeamZeroWin
+                } else {
+                    KickoffOutcome::TeamOneWin
+                },
+                Some(toward_team_zero_win),
+                Some(strength),
+            );
+        }
+        (KickoffOutcome::Neutral, None, None)
+    }
+
+    fn exit_velocity(ball: &BallFrameState) -> Option<[f32; 3]> {
+        ball.sample().map(|ball| ball.velocity().to_array())
+    }
+
+    fn exit_speed(exit_velocity: Option<[f32; 3]>) -> Option<f32> {
+        exit_velocity
+            .map(|velocity| glam::Vec3::new(velocity[0], velocity[1], velocity[2]).length())
+    }
+
+    fn first_follow_up_touch<'a>(
+        touches: &'a [KickoffTouchSnapshot],
+        first_touch_time: Option<f32>,
+        first_touch_frame: Option<usize>,
+        team_zero_taker_player: Option<&PlayerId>,
+        team_one_taker_player: Option<&PlayerId>,
+    ) -> Option<&'a KickoffTouchSnapshot> {
+        let (Some(first_touch_time), Some(first_touch_frame)) =
+            (first_touch_time, first_touch_frame)
+        else {
+            return None;
+        };
+        let mut previous_touch_time = first_touch_time;
+        for touch in touches
+            .iter()
+            .filter(|touch| Self::touch_after(touch, first_touch_time, first_touch_frame))
+        {
+            if Self::is_non_taker_touch(touch, team_zero_taker_player, team_one_taker_player) {
+                return Some(touch);
+            }
+            if touch.time - previous_touch_time > KICKOFF_TOUCH_CLUSTER_MAX_GAP_SECONDS {
+                return Some(touch);
+            }
+            previous_touch_time = touch.time;
+        }
+        None
+    }
+
+    fn is_non_taker_touch(
+        touch: &KickoffTouchSnapshot,
+        team_zero_taker_player: Option<&PlayerId>,
+        team_one_taker_player: Option<&PlayerId>,
+    ) -> bool {
+        let Some(player) = touch.player.as_ref() else {
+            return false;
+        };
+        let expected_taker = if touch.team_is_team_0 {
+            team_zero_taker_player
+        } else {
+            team_one_taker_player
+        };
+        expected_taker.is_some_and(|taker| taker != player)
+    }
+
+    fn touch_after(touch: &KickoffTouchSnapshot, time: f32, frame: usize) -> bool {
+        touch.time > time || (touch.time == time && touch.frame > frame)
+    }
+
+    fn kickoff_possession_outcome(
+        touches: &[KickoffTouchSnapshot],
+        first_follow_up_touch: Option<&KickoffTouchSnapshot>,
+    ) -> (KickoffPossessionOutcome, Option<bool>) {
+        let Some(first_follow_up_touch) = first_follow_up_touch else {
+            return (KickoffPossessionOutcome::Contested, None);
+        };
+        let possession = match touches.iter().find(|touch| {
+            Self::touch_after(
+                touch,
+                first_follow_up_touch.time,
+                first_follow_up_touch.frame,
+            )
+        }) {
+            Some(next_touch)
+                if next_touch.team_is_team_0 != first_follow_up_touch.team_is_team_0
+                    && next_touch.time - first_follow_up_touch.time
+                        <= KICKOFF_POSSESSION_IMMEDIATE_CONTEST_SECONDS =>
+            {
+                KickoffPossessionOutcome::Contested
+            }
+            Some(next_touch)
+                if next_touch.team_is_team_0 != first_follow_up_touch.team_is_team_0
+                    && first_follow_up_touch.team_is_team_0 =>
+            {
+                KickoffPossessionOutcome::TeamZeroAdvantage
+            }
+            Some(next_touch)
+                if next_touch.team_is_team_0 != first_follow_up_touch.team_is_team_0 =>
+            {
+                KickoffPossessionOutcome::TeamOneAdvantage
+            }
+            _ if first_follow_up_touch.team_is_team_0 => {
+                KickoffPossessionOutcome::TeamZeroPossession
+            }
+            _ => KickoffPossessionOutcome::TeamOnePossession,
+        };
+        let possession_team = match possession {
+            KickoffPossessionOutcome::TeamZeroPossession
+            | KickoffPossessionOutcome::TeamZeroAdvantage => Some(true),
+            KickoffPossessionOutcome::TeamOnePossession
+            | KickoffPossessionOutcome::TeamOneAdvantage => Some(false),
+            _ => None,
+        };
+        (possession, possession_team)
+    }
+
+    fn should_finish(
+        active: &ActiveKickoff,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+        events: &FrameEventsState,
+    ) -> bool {
+        if !events.goal_events.is_empty() {
+            return true;
+        }
+        let Some(first_touch_time) = active.first_touch_time else {
+            return gameplay.game_state == Some(GAME_STATE_GOAL_SCORED_REPLAY);
+        };
+        frame.time - first_touch_time >= KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS
+            || gameplay.game_state == Some(GAME_STATE_GOAL_SCORED_REPLAY)
+    }
+
+    fn finish_event(
+        active: ActiveKickoff,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        speed_flip_events: &[SpeedFlipEvent],
+    ) -> KickoffEvent {
+        let mut active = active;
+        Self::apply_speed_flip_events(&mut active, frame, speed_flip_events);
+        let (outcome, winning_team_is_team_0, win_strength) = Self::win_from_ball(ball);
+        let scoring_goal = events.goal_events.iter().min_by(|left, right| {
+            left.time
+                .total_cmp(&right.time)
+                .then_with(|| left.frame.cmp(&right.frame))
+        });
+        let time_to_goal = scoring_goal.and_then(|goal| {
+            active
+                .first_touch_time
+                .map(|first_touch| goal.time - first_touch)
+        });
+        let kickoff_goal =
+            time_to_goal.is_some_and(|time| (0.0..KICKOFF_GOAL_MAX_SECONDS).contains(&time));
+        let win_strength_band = win_strength
+            .map(Self::win_strength_band)
+            .unwrap_or_default();
+        let team_zero_taker = Self::expected_taker_by_team(&active.players, true);
+        let team_one_taker = Self::expected_taker_by_team(&active.players, false);
+        let first_touch = active.touches.first();
+        let first_touch_player = first_touch.and_then(|touch| touch.player.clone());
+        let team_zero_taker_touch_time =
+            team_zero_taker.and_then(|index| active.players[index].first_touch_time);
+        let team_zero_taker_touch_frame =
+            team_zero_taker.and_then(|index| active.players[index].first_touch_frame);
+        let team_one_taker_touch_time =
+            team_one_taker.and_then(|index| active.players[index].first_touch_time);
+        let team_one_taker_touch_frame =
+            team_one_taker.and_then(|index| active.players[index].first_touch_frame);
+        let taker_touch_delay_seconds =
+            match (team_zero_taker_touch_time, team_one_taker_touch_time) {
+                (Some(team_zero_time), Some(team_one_time)) => {
+                    Some((team_one_time - team_zero_time).abs())
+                }
+                _ => None,
+            };
+        let exit_velocity = Self::exit_velocity(ball);
+        let exit_speed = Self::exit_speed(exit_velocity);
+        let exit_y_velocity = exit_velocity.map(|velocity| velocity[1]);
+        let team_zero_taker_player = team_zero_taker.map(|index| &active.players[index].player);
+        let team_one_taker_player = team_one_taker.map(|index| &active.players[index].player);
+        let first_follow_up_touch = Self::first_follow_up_touch(
+            &active.touches,
+            active.first_touch_time,
+            active.first_touch_frame,
+            team_zero_taker_player,
+            team_one_taker_player,
+        );
+        let first_follow_up_touch_team_is_team_0 =
+            first_follow_up_touch.map(|touch| touch.team_is_team_0);
+        let (kickoff_possession_outcome, kickoff_possession_team_is_team_0) =
+            Self::kickoff_possession_outcome(&active.touches, first_follow_up_touch);
+        let team_zero_touched = active
+            .players
+            .iter()
+            .any(|player| player.is_team_0 && player.first_touch_time.is_some());
+        let team_one_touched = active
+            .players
+            .iter()
+            .any(|player| !player.is_team_0 && player.first_touch_time.is_some());
+        let mut team_zero_taker_event = None;
+        let mut team_one_taker_event = None;
+        let mut team_zero_non_takers = Vec::new();
+        let mut team_one_non_takers = Vec::new();
+        for (index, player) in active.players.iter().enumerate() {
+            let expected_taker = if player.is_team_0 {
+                team_zero_taker
+            } else {
+                team_one_taker
+            };
+            let boost_after = Self::boost_after(players, &player.player);
+            let is_taker = Self::is_taker(index, expected_taker);
+            if is_taker {
+                let outcome = Self::taker_outcome(
+                    player,
+                    expected_taker,
+                    index,
+                    if player.is_team_0 {
+                        team_zero_touched
+                    } else {
+                        team_one_touched
+                    },
+                );
+                let player_event = KickoffTakerEvent {
+                    player: player.player.clone(),
+                    is_team_0: player.is_team_0,
+                    start_position: player.start_position,
+                    spawn_position: player.spawn_position,
+                    start_boost: player.start_boost,
+                    boost_after,
+                    first_touch_time: player.first_touch_time,
+                    first_touch_frame: player.first_touch_frame,
+                    outcome,
+                    approach: Self::classify_approach(
+                        player,
+                        outcome,
+                        boost_after,
+                        active.speed_flip_players.contains(&player.player),
+                    ),
+                };
+                if player_event.is_team_0 {
+                    team_zero_taker_event = Some(player_event);
+                } else {
+                    team_one_taker_event = Some(player_event);
+                }
+            } else {
+                let player_event = KickoffSupportEvent {
+                    player: player.player.clone(),
+                    is_team_0: player.is_team_0,
+                    start_position: player.start_position,
+                    spawn_position: player.spawn_position,
+                    start_boost: player.start_boost,
+                    boost_after,
+                    first_touch_time: player.first_touch_time,
+                    first_touch_frame: player.first_touch_frame,
+                    support_behavior: Self::classify_support_behavior(player, false, boost_after)
+                        .unwrap_or_default(),
+                };
+                if player_event.is_team_0 {
+                    team_zero_non_takers.push(player_event);
+                } else {
+                    team_one_non_takers.push(player_event);
+                }
+            }
+        }
+
+        KickoffEvent {
+            start_time: active.start_time,
+            start_frame: active.start_frame,
+            end_time: frame.time,
+            end_frame: frame.frame_number,
+            first_touch_time: active.first_touch_time,
+            first_touch_frame: active.first_touch_frame,
+            first_touch_team_is_team_0: active.first_touch_team_is_team_0,
+            first_touch_player,
+            team_zero_taker_touch_time,
+            team_zero_taker_touch_frame,
+            team_one_taker_touch_time,
+            team_one_taker_touch_frame,
+            taker_touch_delay_seconds,
+            exit_velocity,
+            exit_speed,
+            exit_y_velocity,
+            first_follow_up_touch_time: first_follow_up_touch.map(|touch| touch.time),
+            first_follow_up_touch_frame: first_follow_up_touch.map(|touch| touch.frame),
+            first_follow_up_touch_team_is_team_0,
+            first_follow_up_touch_player: first_follow_up_touch
+                .and_then(|touch| touch.player.clone()),
+            outcome,
+            winning_team_is_team_0,
+            win_strength,
+            win_strength_band,
+            kickoff_possession_outcome,
+            kickoff_possession_team_is_team_0,
+            kickoff_goal,
+            scoring_team_is_team_0: scoring_goal.map(|goal| goal.scoring_team_is_team_0),
+            time_to_goal,
+            team_zero_taker: team_zero_taker_event,
+            team_one_taker: team_one_taker_event,
+            team_zero_non_takers,
+            team_one_non_takers,
+        }
+    }
+
+    pub fn update(
+        &mut self,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        touch_state: &TouchState,
+        events: &FrameEventsState,
+    ) -> SubtrActorResult<()> {
+        self.update_with_speed_flips(KickoffUpdateContext {
+            frame,
+            gameplay,
+            ball,
+            players,
+            touch_state,
+            events,
+            speed_flip_events: &[],
+        })
+    }
+
+    pub(crate) fn update_with_speed_flips(
+        &mut self,
+        ctx: KickoffUpdateContext<'_>,
+    ) -> SubtrActorResult<()> {
+        self.events.begin_update();
+        if ctx.gameplay.kickoff_phase_active() && self.active.is_none() {
+            self.start_kickoff(ctx.frame, ctx.players);
+        }
+
+        let Some(active) = self.active.as_mut() else {
+            return Ok(());
+        };
+        Self::apply_player_samples(active, ctx.frame, ctx.players);
+        Self::apply_touches(active, ctx.touch_state);
+        Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);
+
+        if Self::should_finish(active, ctx.frame, ctx.gameplay, ctx.events) {
+            let active = self.active.take().expect("active kickoff should exist");
+            let event = Self::finish_event(
+                active,
+                ctx.frame,
+                ctx.ball,
+                ctx.players,
+                ctx.events,
+                ctx.speed_flip_events,
+            );
+            self.events.push(event);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[path = "kickoff_tests.rs"]
+mod tests;

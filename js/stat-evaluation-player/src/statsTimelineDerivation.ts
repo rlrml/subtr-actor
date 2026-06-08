@@ -43,6 +43,10 @@ import {
   createFiftyFiftyEventDerivedStatsAccumulator,
 } from "./fiftyFiftyEventDerivation.ts";
 import {
+  applyKickoffEventDerivedStats,
+  createKickoffEventDerivedStatsAccumulator,
+} from "./kickoffEventDerivation.ts";
+import {
   applyFlickEventDerivedStats,
   createFlickEventDerivedStatsAccumulator,
 } from "./flickEventDerivation.ts";
@@ -249,6 +253,13 @@ export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventD
     teamModules: ["fifty_fifty"],
     apply: applyFiftyFiftyEventDerivedStats,
     createFrameAccumulator: createFiftyFiftyEventDerivedStatsAccumulator,
+  },
+  {
+    id: "kickoff",
+    playerModules: ["kickoff"],
+    teamModules: ["kickoff"],
+    apply: applyKickoffEventDerivedStats,
+    createFrameAccumulator: createKickoffEventDerivedStatsAccumulator,
   },
   {
     id: "bump",

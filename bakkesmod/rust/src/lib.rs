@@ -155,6 +155,7 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "center",
     "double_tap",
     "fifty_fifty",
+    "kickoff",
     "flick",
     "musty_flick",
     "one_timer",

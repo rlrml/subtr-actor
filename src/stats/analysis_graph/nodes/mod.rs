@@ -7,14 +7,14 @@ use crate::stats::calculators::{
     DoubleTapCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator, FiftyFiftyCalculator,
     FiftyFiftyState, FlickCalculator, FlickGoalCalculator, FlipImpulseCalculator,
     FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState, HalfFlipCalculator,
-    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator, LivePlayState,
-    LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator, MustyFlickCalculator,
-    OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator,
-    PassingGoalCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
-    PossessionCalculator, PossessionState, PowerslideCalculator, PressureCalculator,
-    RotationCalculator, RushCalculator, SpeedFlipCalculator, TerritorialPressureCalculator,
-    TouchCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
-    WavedashCalculator, WhiffCalculator,
+    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator, KickoffCalculator,
+    LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator,
+    MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
+    PassCalculator, PassingGoalCalculator, PlayerFrameState, PlayerVerticalState,
+    PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
+    PressureCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
+    TerritorialPressureCalculator, TouchCalculator, TouchState, WallAerialCalculator,
+    WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -39,6 +39,7 @@ pub(crate) mod gameplay_state;
 pub(crate) mod goal_tags;
 pub(crate) mod half_flip;
 pub(crate) mod half_volley;
+pub(crate) mod kickoff;
 pub(crate) mod live_play;
 pub(crate) mod match_stats;
 pub(crate) mod movement;
@@ -115,6 +116,8 @@ pub use goal_tags::{
 pub use half_flip::HalfFlipNode;
 #[allow(unused_imports)]
 pub use half_volley::HalfVolleyNode;
+#[allow(unused_imports)]
+pub use kickoff::KickoffNode;
 #[allow(unused_imports)]
 pub use live_play::LivePlayNode;
 #[allow(unused_imports)]
@@ -240,6 +243,10 @@ pub(crate) fn fifty_fifty_state_dependency() -> AnalysisDependency {
 
 pub(crate) fn match_stats_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<MatchStatsCalculator>(match_stats::boxed_default)
+}
+
+pub(crate) fn kickoff_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<KickoffCalculator>(kickoff::boxed_default)
 }
 
 pub(crate) fn aerial_goal_dependency() -> AnalysisDependency {

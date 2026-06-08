@@ -50,6 +50,7 @@ impl StatsTimelineFrameNode {
         let projection = ctx.get::<StatsProjectionState>()?;
         Ok(TeamStatsSnapshot {
             fifty_fifty: projection.fifty_fifty.stats().for_team(is_team_zero),
+            kickoff: projection.kickoff.stats().for_team(is_team_zero),
             possession: projection.possession.stats().for_team(is_team_zero),
             pressure: projection.pressure.stats().for_team(is_team_zero),
             territorial_pressure: projection
@@ -197,6 +198,12 @@ impl StatsTimelineFrameNode {
                 .unwrap_or_default(),
             fifty_fifty: projection
                 .fifty_fifty
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
+            kickoff: projection
+                .kickoff
                 .player_stats()
                 .get(player_id)
                 .cloned()
