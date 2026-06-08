@@ -1169,7 +1169,7 @@ _None documented._
 
 ### Touch (`touch`)
 
-- Category: `contact`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -1197,7 +1197,7 @@ _None documented._
 
 ### Touch Ball Movement (`touch_ball_movement`)
 
-- Category: `contact`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -1315,7 +1315,7 @@ _None documented._
 
 ### Whiff (`whiff`)
 
-- Category: `mechanic`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
