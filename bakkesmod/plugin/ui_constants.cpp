@@ -197,7 +197,6 @@ constexpr std::array<const char *, 50> GRAPH_EVENT_FIELDS{
     "boost_state",
     "bump",
     "touch",
-    "touch_ball_movement",
 };
 constexpr std::array<const char *, 3> REQUIRED_GRAPH_EVENT_FIELDS{
     "timeline",
@@ -258,7 +257,7 @@ struct UiStatIdAlias {
 
 std::string normalizeUiStatId(std::string_view statId);
 
-constexpr std::array<EventFilterOption, 34> EVENT_FILTER_OPTIONS{{
+constexpr std::array<EventFilterOption, 33> EVENT_FILTER_OPTIONS{{
     {"all", "All events", "All"},
     {"goal", "Goals", "Replay"},
     {"core", "Shots, saves, assists", "Replay"},
@@ -267,7 +266,6 @@ constexpr std::array<EventFilterOption, 34> EVENT_FILTER_OPTIONS{{
     {"team", "Team events", "Sources"},
     {"goal_context", "Goal context", "Sources"},
     {"touch", "Touch", "Stats"},
-    {"touch_ball_movement", "Touch movement", "Stats"},
     {"dodge_reset", "Dodge refresh", "Stats"},
     {"boost_pickup", "Boost pickup", "Stats"},
     {"boost_ledger", "Boost ledger", "Stats"},

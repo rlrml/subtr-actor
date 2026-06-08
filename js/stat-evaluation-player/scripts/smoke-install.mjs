@@ -222,7 +222,6 @@ async function main() {
         "    whiff: [],",
         "    powerslide: [],",
         "    touch: [],",
-        "    touch_ball_movement: [],",
         "    boost_pickups: [],",
         "    boost_ledger: [],",
         "    boost_state: [],",

@@ -360,7 +360,8 @@ fn touch_on_wall_gets_wall_surface_classification() {
 fn credits_ball_travel_and_goal_advancement_to_possession_player() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = TouchCalculator::new();
-    let touch_state = TouchState {
+    let initial_touch_state = touch_state(1, &player_id);
+    let followup_touch_state = TouchState {
         last_touch_player: Some(player_id.clone()),
         last_touch_team_is_team_0: Some(true),
         ..TouchState::default()
@@ -372,7 +373,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
-            &touch_state,
+            &initial_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
             &LivePlayState::active_play(),
@@ -384,7 +385,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &ball(0.0, 100.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
-            &touch_state,
+            &followup_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
             &LivePlayState::active_play(),
@@ -396,7 +397,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &ball(40.0, 70.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
-            &touch_state,
+            &followup_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
             &LivePlayState::active_play(),
@@ -413,7 +414,8 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
 fn skips_ball_movement_without_a_possession_player() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = TouchCalculator::new();
-    let touch_state = TouchState {
+    let initial_touch_state = touch_state(1, &player_id);
+    let followup_touch_state = TouchState {
         last_touch_player: Some(player_id.clone()),
         last_touch_team_is_team_0: Some(true),
         ..TouchState::default()
@@ -425,7 +427,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
-            &touch_state,
+            &initial_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
             &LivePlayState::active_play(),
@@ -437,7 +439,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &ball(0.0, 100.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
-            &touch_state,
+            &followup_touch_state,
             &PossessionState::default(),
             &FiftyFiftyState::default(),
             &LivePlayState::active_play(),
@@ -449,7 +451,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &ball(0.0, 160.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
-            &touch_state,
+            &followup_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
             &LivePlayState::active_play(),
@@ -466,7 +468,32 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
     let blue_player = boxcars::RemoteId::Steam(1);
     let orange_player = boxcars::RemoteId::Steam(2);
     let mut calculator = TouchCalculator::new();
-    let touch_state = TouchState {
+    let initial_touch_state = TouchState {
+        touch_events: vec![
+            TouchEvent {
+                time: 0.1,
+                frame: 1,
+                team_is_team_0: true,
+                player: Some(blue_player.clone()),
+                player_position: None,
+                closest_approach_distance: None,
+                dodge_contact: false,
+            },
+            TouchEvent {
+                time: 0.1,
+                frame: 1,
+                team_is_team_0: false,
+                player: Some(orange_player.clone()),
+                player_position: None,
+                closest_approach_distance: None,
+                dodge_contact: false,
+            },
+        ],
+        last_touch_player: Some(orange_player.clone()),
+        last_touch_team_is_team_0: Some(false),
+        ..TouchState::default()
+    };
+    let followup_touch_state = TouchState {
         last_touch_player: Some(orange_player.clone()),
         last_touch_team_is_team_0: Some(false),
         ..TouchState::default()
@@ -519,7 +546,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
-            &touch_state,
+            &initial_touch_state,
             &PossessionState::default(),
             &FiftyFiftyState {
                 active_event: Some(active_fifty.clone()),
@@ -534,7 +561,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
             &ball(0.0, 100.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
-            &touch_state,
+            &followup_touch_state,
             &PossessionState::default(),
             &FiftyFiftyState {
                 active_event: Some(active_fifty),
@@ -549,7 +576,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
             &ball(0.0, 170.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
-            &touch_state,
+            &followup_touch_state,
             &PossessionState::default(),
             &FiftyFiftyState {
                 resolved_events: vec![resolved_fifty],
@@ -563,7 +590,10 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
     assert_eq!(blue_stats.total_ball_travel_distance, 170.0);
     assert_eq!(blue_stats.total_ball_advance_distance, 170.0);
     assert_eq!(blue_stats.total_ball_retreat_distance, 0.0);
-    assert!(calculator.player_stats().get(&orange_player).is_none());
+    let orange_stats = calculator.player_stats().get(&orange_player).unwrap();
+    assert_eq!(orange_stats.total_ball_travel_distance, 0.0);
+    assert_eq!(orange_stats.total_ball_advance_distance, 0.0);
+    assert_eq!(orange_stats.total_ball_retreat_distance, 0.0);
 }
 
 #[test]

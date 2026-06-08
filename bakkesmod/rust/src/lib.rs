@@ -175,7 +175,6 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "boost_state",
     "bump",
     "touch",
-    "touch_ball_movement",
 ];
 const REQUIRED_GRAPH_EVENT_FIELD_NAMES: &[&str] = &["timeline", "goal_context", "boost_pickups"];
 

@@ -49,7 +49,7 @@ import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsTimelineConfig } from "./generated/StatsTimelineConfig.ts";
 import type { TeamStatsSnapshot as GeneratedTeamStatsSnapshot } from "./generated/TeamStatsSnapshot.ts";
 import type { TimelineEvent } from "./generated/TimelineEvent.ts";
-import type { TouchBallMovementEvent } from "./generated/TouchBallMovementEvent.ts";
+import type { TouchBallMovement } from "./generated/TouchBallMovement.ts";
 import type { TouchClassificationEvent } from "./generated/TouchClassificationEvent.ts";
 import type { HalfFlipEvent } from "./generated/HalfFlipEvent.ts";
 import type { HalfVolleyEvent } from "./generated/HalfVolleyEvent.ts";
@@ -111,7 +111,7 @@ export type {
   StatLabel,
   StatsTimelineConfig,
   TimelineEvent,
-  TouchBallMovementEvent,
+  TouchBallMovement,
   TouchClassificationEvent,
   HalfFlipEvent,
   HalfVolleyEvent,

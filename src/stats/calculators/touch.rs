@@ -86,35 +86,37 @@ pub struct TouchClassificationEvent {
     pub surface: String,
     pub dodge_state: String,
     pub ball_speed_change: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ball_movement: Option<TouchBallMovement>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct TouchBallMovementEvent {
-    pub time: f32,
-    pub frame: usize,
+pub struct TouchBallMovement {
+    pub start_time: f32,
+    pub start_frame: usize,
     pub end_time: f32,
     pub end_frame: usize,
     pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
     pub travel_distance: f32,
     pub advance_distance: f32,
     pub retreat_distance: f32,
+    pub finalized: bool,
 }
 
-impl TouchBallMovementEvent {
+impl TouchBallMovement {
     fn absorb_delta(&mut self, event: Self) {
-        self.end_time = event.time;
-        self.end_frame = event.frame;
+        self.end_time = event.end_time;
+        self.end_frame = event.end_frame;
         self.duration += event.duration;
-        self.player_position = event.player_position;
         self.travel_distance += event.travel_distance;
         self.advance_distance += event.advance_distance;
         self.retreat_distance += event.retreat_distance;
+    }
+
+    fn finalized(mut self) -> Self {
+        self.finalized = true;
+        self
     }
 }
 
@@ -126,17 +128,16 @@ struct PendingFiftyFiftyMovement {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct PendingTouchBallMovementEvent {
-    player: PlayerId,
-    is_team_0: bool,
-    event: TouchBallMovementEvent,
+struct PendingTouchBallMovementCredit {
+    touch_index: usize,
+    movement: TouchBallMovement,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchCalculator {
     events: EventStream<TouchClassificationEvent>,
-    ball_movement_events: EventStream<TouchBallMovementEvent>,
-    pending_ball_movement_event: Option<PendingTouchBallMovementEvent>,
+    pending_ball_movement_credit: Option<PendingTouchBallMovementCredit>,
+    active_touch_index_by_player: HashMap<PlayerId, usize>,
     previous_ball_velocity: Option<glam::Vec3>,
     previous_ball_position: Option<glam::Vec3>,
     pending_fifty_fifty_movement: Option<PendingFiftyFiftyMovement>,
@@ -155,27 +156,13 @@ impl TouchCalculator {
         self.events.new_events()
     }
 
-    pub fn ball_movement_events(&self) -> &[TouchBallMovementEvent] {
-        self.ball_movement_events.all()
-    }
-
-    pub fn new_ball_movement_events(&self) -> &[TouchBallMovementEvent] {
-        self.ball_movement_events.new_events()
-    }
-
-    pub fn projected_ball_movement_events(&self) -> Vec<TouchBallMovementEvent> {
-        let mut events = self.ball_movement_events.all().to_vec();
-        if let Some(pending) = &self.pending_ball_movement_event {
-            events.push(pending.event.clone());
-        }
-        events
-    }
-
-    pub fn flush_pending_ball_movement_event(&mut self) {
-        let Some(pending) = self.pending_ball_movement_event.take() else {
+    pub fn flush_pending_ball_movement_credit(&mut self) {
+        let Some(pending) = self.pending_ball_movement_credit.take() else {
             return;
         };
-        self.ball_movement_events.push(pending.event);
+        if let Some(event) = self.events.get_mut(pending.touch_index) {
+            event.ball_movement = Some(pending.movement.finalized());
+        }
     }
 
     fn ball_speed_change(
@@ -327,8 +314,12 @@ impl TouchCalculator {
                 surface: classification.surface.as_label_value().to_owned(),
                 dodge_state: classification.dodge_state.as_label_value().to_owned(),
                 ball_speed_change,
+                ball_movement: None,
             };
+            let touch_index = self.events.len();
             self.events.push(event);
+            self.active_touch_index_by_player
+                .insert(player_id.clone(), touch_index);
         }
     }
 
@@ -351,46 +342,57 @@ impl TouchCalculator {
         } else {
             (0.0, -advance_distance)
         };
-        let event = TouchBallMovementEvent {
-            time,
-            frame,
+        let movement = TouchBallMovement {
+            start_time: time,
+            start_frame: frame,
             end_time: time,
             end_frame: frame,
             duration,
-            player: player_id.clone(),
-            player_position,
-            is_team_0: team_is_team_0,
             travel_distance,
             advance_distance,
             retreat_distance,
+            finalized: false,
         };
-        self.record_ball_movement_event(event);
+        self.record_ball_movement_credit(player_id, player_position, movement);
     }
 
-    fn record_ball_movement_event(&mut self, event: TouchBallMovementEvent) {
-        let Some(pending) = self.pending_ball_movement_event.as_mut() else {
-            self.pending_ball_movement_event = Some(PendingTouchBallMovementEvent {
-                player: event.player.clone(),
-                is_team_0: event.is_team_0,
-                event,
+    fn record_ball_movement_credit(
+        &mut self,
+        player_id: &PlayerId,
+        player_position: Option<[f32; 3]>,
+        movement: TouchBallMovement,
+    ) {
+        let Some(&touch_index) = self.active_touch_index_by_player.get(player_id) else {
+            return;
+        };
+        let Some(pending) = self.pending_ball_movement_credit.as_mut() else {
+            if let Some(event) = self.events.get_mut(touch_index) {
+                event.player_position = player_position.or(event.player_position);
+                event.ball_movement = Some(movement.clone());
+            }
+            self.pending_ball_movement_credit = Some(PendingTouchBallMovementCredit {
+                touch_index,
+                movement,
             });
             return;
         };
 
-        if pending.player == event.player && pending.is_team_0 == event.is_team_0 {
-            pending.event.absorb_delta(event);
+        if pending.touch_index == touch_index {
+            pending.movement.absorb_delta(movement);
+            if let Some(event) = self.events.get_mut(touch_index) {
+                event.player_position = player_position.or(event.player_position);
+                event.ball_movement = Some(pending.movement.clone());
+            }
         } else {
-            let previous =
-                self.pending_ball_movement_event
-                    .replace(PendingTouchBallMovementEvent {
-                        player: event.player.clone(),
-                        is_team_0: event.is_team_0,
-                        event,
-                    });
-            let Some(previous) = previous else {
-                return;
-            };
-            self.ball_movement_events.push(previous.event);
+            self.flush_pending_ball_movement_credit();
+            if let Some(event) = self.events.get_mut(touch_index) {
+                event.player_position = player_position.or(event.player_position);
+                event.ball_movement = Some(movement.clone());
+            }
+            self.pending_ball_movement_credit = Some(PendingTouchBallMovementCredit {
+                touch_index,
+                movement,
+            });
         }
     }
 
@@ -446,25 +448,28 @@ impl TouchCalculator {
         } else {
             (0.0, -advance_distance)
         };
-        let event = TouchBallMovementEvent {
-            time: event.resolve_time,
-            frame: event.resolve_frame,
+        let movement = TouchBallMovement {
+            start_time: event.resolve_time,
+            start_frame: event.resolve_frame,
             end_time: event.resolve_time,
             end_frame: event.resolve_frame,
             duration: 0.0,
-            player: player_id.clone(),
-            player_position: if team_is_team_0 {
+            travel_distance: pending.travel_distance,
+            advance_distance,
+            retreat_distance,
+            finalized: false,
+        };
+        self.flush_pending_ball_movement_credit();
+        self.record_ball_movement_credit(
+            player_id,
+            if team_is_team_0 {
                 Some(event.team_zero_position)
             } else {
                 Some(event.team_one_position)
             },
-            is_team_0: team_is_team_0,
-            travel_distance: pending.travel_distance,
-            advance_distance,
-            retreat_distance,
-        };
-        self.flush_pending_ball_movement_event();
-        self.ball_movement_events.push(event);
+            movement,
+        );
+        self.flush_pending_ball_movement_credit();
     }
 
     fn credit_ball_movement(
@@ -478,14 +483,14 @@ impl TouchCalculator {
     ) {
         let current_ball_position = ball.position();
         if !live_play_state.is_live_play {
-            self.flush_pending_ball_movement_event();
+            self.flush_pending_ball_movement_credit();
             self.previous_ball_position = current_ball_position;
             self.pending_fifty_fifty_movement = None;
             return;
         }
 
         let Some(current_ball_position) = current_ball_position else {
-            self.flush_pending_ball_movement_event();
+            self.flush_pending_ball_movement_credit();
             self.previous_ball_position = None;
             self.pending_fifty_fifty_movement = None;
             return;
@@ -503,7 +508,7 @@ impl TouchCalculator {
         }
 
         if let Some(active_event) = fifty_fifty_state.active_event.as_ref() {
-            self.flush_pending_ball_movement_event();
+            self.flush_pending_ball_movement_credit();
             self.buffer_fifty_fifty_movement(active_event.start_frame, delta, travel_distance);
             return;
         }
@@ -520,7 +525,7 @@ impl TouchCalculator {
             possession_state.active_player_before_sample.as_ref(),
             possession_state.active_team_before_sample,
         ) else {
-            self.flush_pending_ball_movement_event();
+            self.flush_pending_ball_movement_credit();
             return;
         };
 
@@ -549,9 +554,8 @@ impl TouchCalculator {
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.ball_movement_events.begin_update();
         if !live_play_state.is_live_play {
-            self.flush_pending_ball_movement_event();
+            self.flush_pending_ball_movement_credit();
             self.previous_ball_velocity = ball.velocity();
             self.previous_ball_position = ball.position();
             self.pending_fifty_fifty_movement = None;

@@ -55,7 +55,7 @@ impl AnalysisNode for TouchNode {
     }
 
     fn finish(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
-        self.calculator.flush_pending_ball_movement_event();
+        self.calculator.flush_pending_ball_movement_credit();
         Ok(())
     }
 
