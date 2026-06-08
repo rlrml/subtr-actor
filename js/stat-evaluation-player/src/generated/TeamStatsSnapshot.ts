@@ -4,6 +4,7 @@ import type { BackboardTeamStats } from "./BackboardTeamStats.ts";
 import type { BallCarryStats } from "./BallCarryStats.ts";
 import type { BoostStats } from "./BoostStats.ts";
 import type { BumpTeamStats } from "./BumpTeamStats.ts";
+import type { ControlledPlayStats } from "./ControlledPlayStats.ts";
 import type { CoreTeamStats } from "./CoreTeamStats.ts";
 import type { DemoTeamStats } from "./DemoTeamStats.ts";
 import type { DoubleTapTeamStats } from "./DoubleTapTeamStats.ts";
@@ -33,4 +34,4 @@ import type { TerritorialPressureTeamStats } from "./TerritorialPressureTeamStat
  * timelines. It is not the authoritative registry of team analysis outputs;
  * use the module-keyed stats/graph surfaces when callers need discoverability.
  */
-export type TeamStatsSnapshot = { fifty_fifty: FiftyFiftyTeamStats, possession: PossessionTeamStats, pressure: PressureTeamStats, territorial_pressure: TerritorialPressureTeamStats, rotation: RotationTeamStats, rush: RushTeamStats, core: CoreTeamStats, backboard: BackboardTeamStats, double_tap: DoubleTapTeamStats, one_timer: OneTimerTeamStats, pass: PassTeamStats, kickoff: KickoffTeamStats, ball_carry: BallCarryStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpTeamStats, half_volley: HalfVolleyTeamStats, movement: MovementStats, positioning: PositioningTeamStats, powerslide: PowerslideStats, demo: DemoTeamStats, };
+export type TeamStatsSnapshot = { fifty_fifty: FiftyFiftyTeamStats, possession: PossessionTeamStats, pressure: PressureTeamStats, territorial_pressure: TerritorialPressureTeamStats, rotation: RotationTeamStats, rush: RushTeamStats, core: CoreTeamStats, backboard: BackboardTeamStats, double_tap: DoubleTapTeamStats, one_timer: OneTimerTeamStats, pass: PassTeamStats, kickoff: KickoffTeamStats, ball_carry: BallCarryStats, controlled_play: ControlledPlayStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpTeamStats, half_volley: HalfVolleyTeamStats, movement: MovementStats, positioning: PositioningTeamStats, powerslide: PowerslideStats, demo: DemoTeamStats, };

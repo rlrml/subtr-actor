@@ -38,7 +38,7 @@ it belongs in an accumulator.
 
 Use these observation shapes:
 
-- Discrete events: touches, whiffs, rushes, flicks, goal tags, demos.
+- Discrete events: touches, whiffs, rushes, flicks, goals with goal tags, demos.
 - Intervals or episodes: powerslides, ball carries, air dribbles, possession
   spans, pressure spans.
 - Quantity ledger entries: boost collected, used, stolen, overfilled, or

@@ -266,9 +266,9 @@ _None documented._
 
 _None documented._
 
-### Core Player Goal Context (`core_player_goal_context`)
+### Controlled Play (`controlled_play`)
 
-- Category: `goal_context`
+- Category: `possession`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -276,15 +276,17 @@ _None documented._
   - False negative evidence: `not_evaluated`
   - Testing: `untested`
 - Producers:
-  - `match_stats` via `MatchStatsNode` / `MatchStatsCalculator`
+  - `controlled_play` via `ControlledPlayNode` / `ControlledPlayCalculator`
 
 **Summary**
 
-Definition pending.
+A same-player possession episode with multiple touches and sustained close-ball time.
 
 **Approach**
 
-_None documented._
+- Start a player-owned candidate from an attributed touch during live play.
+- Require at least two distinct touches by the same player with at least one second between the first and last touch.
+- Require sustained proximity to the ball and finish the candidate when another player touches, live play ends, or the touch chain times out.
 
 **Limitations**
 
@@ -493,34 +495,6 @@ A dodge-start event with a rough estimated direction of the velocity impulse pro
 - Start on the replay's dodge-active rising edge for each player.
 - Sample the player's velocity change over the early dodge window and subtract an approximate forward boost contribution when boost is active.
 - Classify the resulting direction in car-local space while retaining the raw and compensated world-space vectors for visualization and downstream mechanic detectors.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Goal Context (`goal_context`)
-
-- Category: `goal_context`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `match_stats` via `MatchStatsNode` / `MatchStatsCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
 
 **Limitations**
 

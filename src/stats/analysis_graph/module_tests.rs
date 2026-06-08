@@ -28,54 +28,34 @@ fn parse_replay(path: &str) -> boxcars::Replay {
 }
 
 #[test]
-fn resolves_all_reducer_nodes_with_default_signal_nodes() {
+fn resolves_all_analysis_nodes_with_default_signal_nodes() {
+    let requested_node_names = all_analysis_nodes()
+        .into_iter()
+        .map(|node| node.name())
+        .collect::<HashSet<_>>();
+
     let mut graph = graph_with_all_analysis_nodes();
     graph.resolve().expect("graph should resolve");
 
     let names: HashSet<_> = graph.node_names().collect();
-    assert_eq!(names.len(), 64);
-    assert!(names.contains("player_vertical_state"));
-    assert!(names.contains("touch_state"));
-    assert!(names.contains("possession_state"));
-    assert!(names.contains("continuous_ball_control"));
-    assert!(names.contains("backboard_bounce_state"));
-    assert!(names.contains("fifty_fifty_state"));
-    assert!(names.contains("match_stats"));
-    assert!(names.contains("live_play"));
-    assert!(names.contains("touch"));
-    assert!(names.contains("bump"));
-    assert!(names.contains("whiff"));
-    assert!(names.contains("wavedash"));
-    assert!(names.contains("flip_impulse"));
-    assert!(names.contains("half_flip"));
-    assert!(names.contains("half_volley"));
-    assert!(names.contains("wall_aerial"));
-    assert!(names.contains("wall_aerial_shot"));
-    assert!(names.contains("one_timer"));
-    assert!(names.contains("center"));
-    assert!(names.contains("pass"));
-    assert!(names.contains("kickoff"));
-    assert!(names.contains("rotation"));
-    assert!(names.contains("territorial_pressure"));
-    assert!(names.contains("flick"));
-    assert!(names.contains("aerial_goal"));
-    assert!(names.contains("high_aerial_goal"));
-    assert!(names.contains("long_distance_goal"));
-    assert!(names.contains("own_half_goal"));
-    assert!(names.contains("empty_net_goal"));
-    assert!(names.contains("counter_attack_goal"));
-    assert!(names.contains("flick_goal"));
-    assert!(names.contains("double_tap_goal"));
-    assert!(names.contains("one_timer_goal"));
-    assert!(names.contains("passing_goal"));
-    assert!(names.contains("air_dribble_goal"));
-    assert!(names.contains("flip_reset_goal"));
-    assert!(names.contains("bump_goal"));
-    assert!(names.contains("demo_goal"));
-    assert!(names.contains("half_volley_goal"));
-    assert!(names.contains("stats_timeline_frame"));
-    assert!(names.contains("stats_timeline_events"));
-    assert!(names.contains("stats_projection"));
+    for name in requested_node_names {
+        assert!(names.contains(name), "resolved graph should include {name}");
+    }
+    for name in [
+        "player_vertical_state",
+        "touch_state",
+        "possession_state",
+        "backboard_bounce_state",
+        "fifty_fifty_state",
+        "live_play",
+        "kickoff",
+        "controlled_play",
+    ] {
+        assert!(
+            names.contains(name),
+            "resolved graph should include default dependency node {name}"
+        );
+    }
 }
 
 #[test]

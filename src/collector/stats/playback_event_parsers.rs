@@ -874,6 +874,28 @@ pub(in crate::collector::stats::playback) fn parse_ball_carry_event(
     })
 }
 
+pub(in crate::collector::stats::playback) fn parse_controlled_play_event(
+    value: &Value,
+) -> SubtrActorResult<ControlledPlayEvent> {
+    let object = json_object(value, "controlled play event")?;
+    Ok(ControlledPlayEvent {
+        player_id: json_required_remote_id(object, "player_id")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        start_frame: json_required_usize(object, "start_frame")?,
+        end_frame: json_required_usize(object, "end_frame")?,
+        start_time: json_required_f32(object, "start_time")?,
+        end_time: json_required_f32(object, "end_time")?,
+        duration: json_required_f32(object, "duration")?,
+        first_touch_frame: json_required_usize(object, "first_touch_frame")?,
+        last_touch_frame: json_required_usize(object, "last_touch_frame")?,
+        first_touch_time: json_required_f32(object, "first_touch_time")?,
+        last_touch_time: json_required_f32(object, "last_touch_time")?,
+        touch_count: json_required_usize(object, "touch_count")? as u32,
+        close_duration: json_required_f32(object, "close_duration")?,
+        total_advance_distance: json_required_f32(object, "total_advance_distance")?,
+    })
+}
+
 pub(in crate::collector::stats::playback) fn parse_ball_carry_kind(
     kind: &str,
 ) -> SubtrActorResult<BallCarryKind> {

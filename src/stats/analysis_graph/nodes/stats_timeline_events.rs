@@ -68,6 +68,7 @@ impl StatsTimelineEventsNode {
             double_tap_dependency(),
             one_timer_dependency(),
             pass_dependency(),
+            controlled_play_dependency(),
             fifty_fifty_dependency(),
             kickoff_dependency(),
             possession_dependency(),
@@ -130,6 +131,7 @@ impl StatsTimelineEventsNode {
         let double_tap = ctx.get::<DoubleTapCalculator>()?;
         let one_timer = ctx.get::<OneTimerCalculator>()?;
         let pass = ctx.get::<PassCalculator>()?;
+        let controlled_play = ctx.get::<ControlledPlayCalculator>()?;
         let fifty_fifty = ctx.get::<FiftyFiftyCalculator>()?;
         let kickoff = ctx.get::<KickoffCalculator>()?;
         let flick = ctx.get::<FlickCalculator>()?;
@@ -234,6 +236,7 @@ impl StatsTimelineEventsNode {
             one_timer: one_timer.events().to_vec(),
             pass: pass.events().to_vec(),
             ball_carry: ball_carry.carry_events().to_vec(),
+            controlled_play: controlled_play.events().to_vec(),
             fifty_fifty: fifty_fifty.events().to_vec(),
             kickoff: kickoff.events().to_vec(),
             rush: rush.events().to_vec(),

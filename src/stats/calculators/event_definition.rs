@@ -8,10 +8,10 @@ use linkme::distributed_slice;
 use super::{
     BackboardBounceEvent, BallCarryEvent, BoostLedgerEvent, BoostPickupComparisonEvent,
     BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent, ConfirmedFlipResetEvent,
-    CorePlayerGoalContextEvent, CorePlayerScoreboardEvent, DodgeRefreshedEvent, DodgeResetEvent,
+    ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeRefreshedEvent, DodgeResetEvent,
     DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipImpulseEvent, FlipResetEvent,
-    FlipResetFollowupDodgeEvent, GoalContextEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
-    MustyFlickEvent, OneTimerEvent, PassEvent, PositioningActivityEvent, PositioningBallDepthEvent,
+    FlipResetFollowupDodgeEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
+    OneTimerEvent, PassEvent, PositioningActivityEvent, PositioningBallDepthEvent,
     PositioningBallProximityEvent, PositioningDistanceEvent, PositioningFieldZoneEvent,
     PositioningGoalContextEvent, PositioningTeammateRoleEvent, PossessionEvent, PostWallDodgeEvent,
     PowerslideEvent, PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent,
@@ -43,12 +43,12 @@ pub struct EventDefinition {
 pub enum EventCategory {
     Core,
     Mechanic,
-    GoalContext,
     Possession,
     Positioning,
     Boost,
     Contact,
     Movement,
+    Annotation,
 }
 
 /// Multi-dimensional confidence metadata for an event detector.
@@ -276,20 +276,6 @@ define_stats_event!(
     EventCategory::Core
 );
 define_stats_event!(
-    CorePlayerGoalContextEvent,
-    CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION,
-    "core_player_goal_context",
-    "Core Player Goal Context",
-    EventCategory::GoalContext
-);
-define_stats_event!(
-    GoalContextEvent,
-    GOAL_CONTEXT_EVENT_DEFINITION,
-    "goal_context",
-    "Goal Context",
-    EventCategory::GoalContext
-);
-define_stats_event!(
     BackboardBounceEvent,
     BACKBOARD_BOUNCE_EVENT_DEFINITION,
     "backboard_bounce",
@@ -469,6 +455,19 @@ define_stats_event!(
         "Use continuous ball-control tracking to build player-owned sequences while live play is active.",
         "Sample grounded carries from close horizontal/vertical ball gaps over the car, excluding wall contact.",
         "Sample air dribbles with the air-dribble policy, then emit completed sequences that meet the duration and validity rules for their carry kind.",
+    ]
+);
+define_stats_event!(
+    ControlledPlayEvent,
+    CONTROLLED_PLAY_EVENT_DEFINITION,
+    "controlled_play",
+    "Controlled Play",
+    EventCategory::Possession,
+    summary = "A same-player possession episode with multiple touches and sustained close-ball time.",
+    approach = [
+        "Start a player-owned candidate from an attributed touch during live play.",
+        "Require at least two distinct touches by the same player with at least one second between the first and last touch.",
+        "Require sustained proximity to the ball and finish the candidate when another player touches, live play ends, or the touch chain times out.",
     ]
 );
 define_stats_event!(
@@ -798,8 +797,6 @@ define_stats_event!(
 pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &TIMELINE_EVENT_DEFINITION,
     &CORE_PLAYER_SCOREBOARD_EVENT_DEFINITION,
-    &CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION,
-    &GOAL_CONTEXT_EVENT_DEFINITION,
     &BACKBOARD_BOUNCE_EVENT_DEFINITION,
     &CEILING_SHOT_EVENT_DEFINITION,
     &WALL_AERIAL_EVENT_DEFINITION,
@@ -857,18 +854,6 @@ const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
     produced_event(
         &CORE_PLAYER_SCOREBOARD_EVENT_DEFINITION,
-        "match_stats",
-        "MatchStatsNode",
-        "MatchStatsCalculator",
-    ),
-    produced_event(
-        &CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION,
-        "match_stats",
-        "MatchStatsNode",
-        "MatchStatsCalculator",
-    ),
-    produced_event(
-        &GOAL_CONTEXT_EVENT_DEFINITION,
         "match_stats",
         "MatchStatsNode",
         "MatchStatsCalculator",
@@ -978,6 +963,13 @@ const BALL_CARRY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "ball_carry",
     "BallCarryNode",
     "BallCarryCalculator",
+)];
+
+const CONTROLLED_PLAY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &CONTROLLED_PLAY_EVENT_DEFINITION,
+    "controlled_play",
+    "ControlledPlayNode",
+    "ControlledPlayCalculator",
 )];
 
 const FIFTY_FIFTY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
@@ -1234,6 +1226,11 @@ register_event_producer!(
     BALL_CARRY_EVENT_PRODUCER,
     "ball_carry",
     BALL_CARRY_EMITTED_EVENTS
+);
+register_event_producer!(
+    CONTROLLED_PLAY_EVENT_PRODUCER,
+    "controlled_play",
+    CONTROLLED_PLAY_EMITTED_EVENTS
 );
 register_event_producer!(
     FIFTY_FIFTY_EVENT_PRODUCER,
