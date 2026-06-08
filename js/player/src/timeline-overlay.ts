@@ -81,10 +81,13 @@ interface TimelineEventLanePlayhead {
 interface TimelineMarkerRecord {
   element: HTMLButtonElement;
   timelineTime: number;
+  active: boolean;
+  passed: boolean;
 }
 
 const DEFAULT_REPLAY_EVENT_KINDS = new Set<ReplayTimelineEventKind>(["goal", "save", "bookmark"]);
 const ACTIVE_MARKER_WINDOW_SECONDS = 0.2;
+const MAX_MARKERS_PER_TIMELINE_LANE = 60;
 const DEFAULT_EVENT_SEEK_LEAD_SECONDS = 2;
 const GOAL_EVENT_SEEK_LEAD_SECONDS = 4;
 const HIDDEN_EVENT_SEEK_EPSILON_SECONDS = 0.01;
@@ -188,6 +191,16 @@ function eventBadgeText(bucket: TimelineEventBucket): string {
   return event.kind.slice(0, 1).toUpperCase();
 }
 
+function sortBucketEvents(events: ReplayTimelineEvent[]): ReplayTimelineEvent[] {
+  return [...events].sort((left, right) => {
+    const priorityDiff = eventPriority(right) - eventPriority(left);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+    return left.time - right.time;
+  });
+}
+
 function bucketTitle(bucket: TimelineEventBucket): string {
   return bucket.events
     .map((event) => `${formatPlaybackTime(event.time)} ${event.label ?? event.kind}`)
@@ -214,13 +227,52 @@ function groupEvents(events: ReplayTimelineEvent[]): TimelineEventBucket[] {
   return [...groups.values()]
     .map((bucket) => ({
       ...bucket,
-      events: [...bucket.events].sort((left, right) => {
-        const priorityDiff = eventPriority(right) - eventPriority(left);
-        if (priorityDiff !== 0) {
-          return priorityDiff;
-        }
-        return left.time - right.time;
-      }),
+      events: sortBucketEvents(bucket.events),
+    }))
+    .sort((left, right) => left.time - right.time);
+}
+
+function compactDenseTimelineBuckets(buckets: TimelineEventBucket[]): TimelineEventBucket[] {
+  if (buckets.length <= MAX_MARKERS_PER_TIMELINE_LANE) {
+    return buckets;
+  }
+
+  const firstTime = buckets[0]?.time ?? 0;
+  const lastTime = buckets[buckets.length - 1]?.time ?? firstTime;
+  const span = lastTime - firstTime;
+  if (span <= 0) {
+    return [
+      {
+        key: "compact:0",
+        time: firstTime,
+        events: sortBucketEvents(buckets.flatMap((bucket) => bucket.events)),
+      },
+    ];
+  }
+
+  const bucketWidth = span / MAX_MARKERS_PER_TIMELINE_LANE;
+  const compactBuckets = new Map<number, TimelineEventBucket>();
+  for (const bucket of buckets) {
+    const compactIndex = Math.min(
+      MAX_MARKERS_PER_TIMELINE_LANE - 1,
+      Math.max(0, Math.floor((bucket.time - firstTime) / bucketWidth)),
+    );
+    const existing = compactBuckets.get(compactIndex);
+    if (existing) {
+      existing.events.push(...bucket.events);
+      continue;
+    }
+    compactBuckets.set(compactIndex, {
+      key: `compact:${compactIndex}`,
+      time: bucket.time,
+      events: [...bucket.events],
+    });
+  }
+
+  return [...compactBuckets.values()]
+    .map((bucket) => ({
+      ...bucket,
+      events: sortBucketEvents(bucket.events),
     }))
     .sort((left, right) => left.time - right.time);
 }
@@ -421,9 +473,12 @@ export function createTimelineOverlayPlugin(
   let rangeLanes: TimelineRangeLane[] = [];
   let projectionCacheKey: string | null = null;
   const markerElements = new Map<string, TimelineMarkerRecord>();
+  const timelineMarkers: TimelineMarkerRecord[] = [];
   const rangeElements: TimelineRangeRecord[] = [];
   const rangeLanePlayheads: TimelineRangeLanePlayhead[] = [];
   const eventLanePlayheads: TimelineEventLanePlayhead[] = [];
+  let passedMarkerEndIndex = 0;
+  let activeMarkers = new Set<TimelineMarkerRecord>();
 
   function refreshMarkers(): void {
     if (!playerContext) {
@@ -487,13 +542,7 @@ export function createTimelineOverlayPlugin(
     remainingTimeText.textContent = `-${formatPlaybackTime(duration - currentTime)}`;
     shell.dataset.scrubbing = scrubbing ? "true" : "false";
 
-    for (const markerRecord of markerElements.values()) {
-      const timeSinceEvent = currentTime - markerRecord.timelineTime;
-      const active = timeSinceEvent >= 0 && timeSinceEvent <= ACTIVE_MARKER_WINDOW_SECONDS;
-      markerRecord.element.dataset.active = active ? "true" : "false";
-      markerRecord.element.dataset.passed =
-        markerRecord.timelineTime <= currentTime ? "true" : "false";
-    }
+    syncMarkerStates(currentTime);
 
     for (const record of rangeElements) {
       const leftTime = Math.max(0, record.startTimelineTime);
@@ -517,6 +566,83 @@ export function createTimelineOverlayPlugin(
     for (const playhead of rangeLanePlayheads) {
       playhead.element.style.left = playheadLeft;
     }
+  }
+
+  function upperBoundMarkerTime(time: number): number {
+    let low = 0;
+    let high = timelineMarkers.length;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (timelineMarkers[mid]!.timelineTime <= time) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low;
+  }
+
+  function lowerBoundMarkerTime(time: number): number {
+    let low = 0;
+    let high = timelineMarkers.length;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (timelineMarkers[mid]!.timelineTime < time) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low;
+  }
+
+  function setMarkerActive(record: TimelineMarkerRecord, active: boolean): void {
+    if (record.active === active) {
+      return;
+    }
+    record.active = active;
+    record.element.dataset.active = active ? "true" : "false";
+  }
+
+  function setMarkerPassed(record: TimelineMarkerRecord, passed: boolean): void {
+    if (record.passed === passed) {
+      return;
+    }
+    record.passed = passed;
+    record.element.dataset.passed = passed ? "true" : "false";
+  }
+
+  function syncMarkerStates(currentTime: number): void {
+    if (timelineMarkers.length === 0) {
+      return;
+    }
+
+    const nextPassedEndIndex = upperBoundMarkerTime(currentTime);
+    if (nextPassedEndIndex > passedMarkerEndIndex) {
+      for (let index = passedMarkerEndIndex; index < nextPassedEndIndex; index += 1) {
+        setMarkerPassed(timelineMarkers[index]!, true);
+      }
+    } else if (nextPassedEndIndex < passedMarkerEndIndex) {
+      for (let index = nextPassedEndIndex; index < passedMarkerEndIndex; index += 1) {
+        setMarkerPassed(timelineMarkers[index]!, false);
+      }
+    }
+    passedMarkerEndIndex = nextPassedEndIndex;
+
+    const activeStartIndex = lowerBoundMarkerTime(currentTime - ACTIVE_MARKER_WINDOW_SECONDS);
+    const activeEndIndex = nextPassedEndIndex;
+    const nextActiveMarkers = new Set<TimelineMarkerRecord>();
+    for (let index = activeStartIndex; index < activeEndIndex; index += 1) {
+      const record = timelineMarkers[index]!;
+      nextActiveMarkers.add(record);
+      setMarkerActive(record, true);
+    }
+    for (const record of activeMarkers) {
+      if (!nextActiveMarkers.has(record)) {
+        setMarkerActive(record, false);
+      }
+    }
+    activeMarkers = nextActiveMarkers;
   }
 
   function createMarker(
@@ -543,10 +669,14 @@ export function createTimelineOverlayPlugin(
     marker.dataset.active = "false";
     marker.dataset.passed = "false";
 
-    markerElements.set(bucket.key, {
+    const markerRecord: TimelineMarkerRecord = {
       element: marker,
       timelineTime: projection.timelineTime,
-    });
+      active: false,
+      passed: false,
+    };
+    markerElements.set(bucket.key, markerRecord);
+    timelineMarkers.push(markerRecord);
 
     return marker;
   }
@@ -559,6 +689,9 @@ export function createTimelineOverlayPlugin(
     markers.replaceChildren();
     eventLanesRoot.replaceChildren();
     markerElements.clear();
+    timelineMarkers.splice(0, timelineMarkers.length);
+    passedMarkerEndIndex = 0;
+    activeMarkers = new Set<TimelineMarkerRecord>();
     eventLanePlayheads.splice(0, eventLanePlayheads.length);
 
     const replayEvents = resolveReplayEvents(options, context);
@@ -575,7 +708,7 @@ export function createTimelineOverlayPlugin(
 
     const replayLane = eventLanes[0];
     if (replayLane?.key === "replay") {
-      for (const bucket of replayLane.buckets) {
+      for (const bucket of compactDenseTimelineBuckets(replayLane.buckets)) {
         const marker = createMarker(
           { ...bucket, key: `${replayLane.key}:${bucket.key}` },
           context,
@@ -607,7 +740,7 @@ export function createTimelineOverlayPlugin(
       const laneMarkers = document.createElement("div");
       laneMarkers.className = "sap-tl-markers";
 
-      for (const bucket of lane.buckets) {
+      for (const bucket of compactDenseTimelineBuckets(lane.buckets)) {
         const marker = createMarker(
           { ...bucket, key: `${lane.key}:${bucket.key}` },
           context,
@@ -625,6 +758,8 @@ export function createTimelineOverlayPlugin(
       laneEl.append(track);
       eventLanesRoot.append(laneEl);
     }
+
+    timelineMarkers.sort((left, right) => left.timelineTime - right.timelineTime);
   }
 
   function buildRanges(context: ReplayPlayerPluginContext): void {
@@ -929,9 +1064,12 @@ export function createTimelineOverlayPlugin(
       rangeLanes = [];
       projectionCacheKey = null;
       markerElements.clear();
+      timelineMarkers.splice(0, timelineMarkers.length);
       rangeElements.splice(0, rangeElements.length);
       rangeLanePlayheads.splice(0, rangeLanePlayheads.length);
       eventLanePlayheads.splice(0, eventLanePlayheads.length);
+      passedMarkerEndIndex = 0;
+      activeMarkers = new Set<TimelineMarkerRecord>();
       if (changedContainerPosition) {
         context.container.style.position = originalContainerPosition;
         changedContainerPosition = false;
