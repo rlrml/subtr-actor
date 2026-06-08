@@ -21,16 +21,23 @@ export class EventPlaylistWindowController {
   private activeSourceIds: Set<string> | null = null;
   private autoFollow = true;
   private lastActiveKey: string | null = null;
+  private activeItem: HTMLElement | null = null;
+  private renderedItems: { key: string; time: number; element: HTMLElement }[] = [];
 
   constructor(private readonly options: EventPlaylistWindowControllerOptions) {}
 
   reset(): void {
     this.activeSourceIds = null;
     this.lastActiveKey = null;
+    this.activeItem = null;
+    this.renderedItems = [];
   }
 
   render(): void {
     this.options.body.replaceChildren();
+    this.lastActiveKey = null;
+    this.activeItem = null;
+    this.renderedItems = [];
     const sources = this.options.getSources();
     if (sources.length === 0) {
       const empty = document.createElement("p");
@@ -168,6 +175,13 @@ export class EventPlaylistWindowController {
         button.dataset.eventKey = item.key;
         button.dataset.eventTime = `${item.event.time}`;
         button.style.setProperty("--event-color", item.color);
+        if (Number.isFinite(item.event.time)) {
+          this.renderedItems.push({
+            key: item.key,
+            time: item.event.time,
+            element: button,
+          });
+        }
         button.addEventListener("click", () => {
           this.options.cueTimelineEvent(item.event);
         });
@@ -204,23 +218,26 @@ export class EventPlaylistWindowController {
       return;
     }
 
-    const activeItem = this.getActiveItem(list, state.currentTime);
+    const activeItem = this.getActiveItem(state.currentTime);
     const activeKey = activeItem?.dataset.eventKey ?? null;
     if (activeKey === this.lastActiveKey && !options.forceScroll) {
       return;
     }
 
-    list
-      .querySelectorAll<HTMLElement>(".event-playlist-item[data-active='true']")
-      .forEach((item) => {
-        item.dataset.active = "false";
-      });
+    if (this.activeItem?.isConnected) {
+      this.activeItem.dataset.active = "false";
+    } else if (this.activeItem) {
+      this.activeItem = null;
+    }
 
     if (activeItem) {
       activeItem.dataset.active = "true";
+      this.activeItem = activeItem;
       if (this.autoFollow || options.forceScroll) {
         activeItem.scrollIntoView({ block: "nearest" });
       }
+    } else {
+      this.activeItem = null;
     }
 
     this.lastActiveKey = activeKey;
@@ -241,26 +258,31 @@ export class EventPlaylistWindowController {
     }
   }
 
-  private getActiveItem(list: HTMLElement, currentTime: number): HTMLElement | null {
-    const items = [...list.querySelectorAll<HTMLElement>(".event-playlist-item")];
+  private getActiveItem(currentTime: number): HTMLElement | null {
+    const items = this.renderedItems;
     if (items.length === 0) {
       return null;
     }
 
-    let bestItem = items[0] ?? null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (const item of items) {
-      const time = Number(item.dataset.eventTime);
-      if (!Number.isFinite(time)) {
-        continue;
-      }
-      const distance = Math.abs(time - currentTime);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestItem = item;
+    let low = 0;
+    let high = items.length - 1;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (items[mid]!.time < currentTime) {
+        low = mid + 1;
+      } else {
+        high = mid;
       }
     }
-    return bestItem;
+
+    const right = items[low]!;
+    const left = items[low - 1] ?? null;
+    if (!left) {
+      return right.element;
+    }
+    return Math.abs(left.time - currentTime) <= Math.abs(right.time - currentTime)
+      ? left.element
+      : right.element;
   }
 }
 

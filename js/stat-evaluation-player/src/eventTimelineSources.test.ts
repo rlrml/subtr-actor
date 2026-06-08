@@ -9,6 +9,7 @@ import {
 import type { StatModuleContext } from "./statModules.ts";
 import {
   buildEventPlaylistItems,
+  getEventPlaylistSelectedSourceIds,
   getEventPlaylistSources,
   getEventTimelineSources,
 } from "./eventTimelineSources.ts";
@@ -146,10 +147,16 @@ test("event playlist sources include generic stats event streams such as positio
     (source) => source.id === "stats-stream:positioning_activity",
   );
   assert.ok(playlistSource);
+  assert.equal(
+    getEventPlaylistSelectedSourceIds(playlistSources, null).has(
+      "stats-stream:positioning_activity",
+    ),
+    false,
+  );
 
   const items = buildEventPlaylistItems({
     sources: playlistSources,
-    activeSourceIds: null,
+    activeSourceIds: new Set(["stats-stream:positioning_activity"]),
     replayPlayers: replay.players,
   });
 

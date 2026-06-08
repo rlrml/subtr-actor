@@ -15,6 +15,7 @@ import {
 import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
 
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
+const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_PREFIXES = ["stats-stream:"] as const;
 const CURATED_STATS_EVENT_STREAM_IDS = new Set<keyof StatsEvents>([
   "timeline",
   "mechanics",
@@ -476,7 +477,15 @@ export function getEventPlaylistSelectedSourceIds(
 ): Set<string> {
   const sourceIds = sources.map((source) => source.id);
   if (activeSourceIds === null) {
-    return new Set(sourceIds.filter((id) => !DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS.has(id)));
+    return new Set(
+      sourceIds.filter(
+        (id) =>
+          !DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS.has(id) &&
+          !DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_PREFIXES.some((prefix) =>
+            id.startsWith(prefix),
+          ),
+      ),
+    );
   }
   return new Set(sourceIds.filter((id) => activeSourceIds.has(id)));
 }
