@@ -100,6 +100,7 @@ impl StatsTimelineEventsNode {
             own_half_goal_dependency(),
             empty_net_goal_dependency(),
             counter_attack_goal_dependency(),
+            sustained_pressure_goal_dependency(),
             flick_goal_dependency(),
             double_tap_goal_dependency(),
             one_timer_goal_dependency(),
@@ -142,6 +143,7 @@ impl StatsTimelineEventsNode {
         let own_half_goal = ctx.get::<OwnHalfGoalCalculator>()?;
         let empty_net_goal = ctx.get::<EmptyNetGoalCalculator>()?;
         let counter_attack_goal = ctx.get::<CounterAttackGoalCalculator>()?;
+        let sustained_pressure_goal = ctx.get::<SustainedPressureGoalCalculator>()?;
         let flick_goal = ctx.get::<FlickGoalCalculator>()?;
         let double_tap_goal = ctx.get::<DoubleTapGoalCalculator>()?;
         let one_timer_goal = ctx.get::<OneTimerGoalCalculator>()?;
@@ -173,6 +175,7 @@ impl StatsTimelineEventsNode {
             own_half_goal.events(),
             empty_net_goal.events(),
             counter_attack_goal.events(),
+            sustained_pressure_goal.events(),
             flick_goal.events(),
             double_tap_goal.events(),
             one_timer_goal.events(),
@@ -240,7 +243,7 @@ impl StatsTimelineEventsNode {
             fifty_fifty: fifty_fifty.events().to_vec(),
             kickoff: kickoff.events().to_vec(),
             rush: rush.events().to_vec(),
-            flip_impulse: flip_impulse.events().to_vec(),
+            dodge: flip_impulse.events().to_vec(),
             speed_flip: speed_flip.events().to_vec(),
             half_flip: half_flip.events().to_vec(),
             half_volley: half_volley.events().to_vec(),
@@ -250,6 +253,7 @@ impl StatsTimelineEventsNode {
             touch: touch.events().to_vec(),
             boost_pickups: boost.pickup_comparison_events().to_vec(),
             boost_ledger: boost.ledger_events().to_vec(),
+            boost_bucket: boost.bucket_events().to_vec(),
             boost_state: boost.state_events().to_vec(),
             bump: bump.events().to_vec(),
         };

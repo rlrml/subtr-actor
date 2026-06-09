@@ -162,7 +162,7 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "one_timer",
     "pass",
     "rush",
-    "flip_impulse",
+    "dodge",
     "speed_flip",
     "half_flip",
     "half_volley",
@@ -173,6 +173,7 @@ const LIVE_GRAPH_EVENT_FIELD_NAMES: &[&str] = &[
     "boost_pickups",
     "boost_ledger",
     "boost_state",
+    "boost_bucket",
     "bump",
     "touch",
 ];

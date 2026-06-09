@@ -192,6 +192,65 @@ impl BoostStateEvent {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum BoostBucket {
+    Zero,
+    #[serde(rename = "0_25")]
+    Boost0To25,
+    #[serde(rename = "25_50")]
+    Boost25To50,
+    #[serde(rename = "50_75")]
+    Boost50To75,
+    #[serde(rename = "75_100")]
+    Boost75To100,
+    Hundred,
+}
+
+impl BoostBucket {
+    fn from_amount(boost_amount: f32) -> Self {
+        if boost_amount <= 1.0 {
+            Self::Zero
+        } else if boost_amount >= BOOST_MAX_AMOUNT - 1.0 {
+            Self::Hundred
+        } else if boost_amount < boost_percent_to_amount(25.0) {
+            Self::Boost0To25
+        } else if boost_amount < boost_percent_to_amount(50.0) {
+            Self::Boost25To50
+        } else if boost_amount < boost_percent_to_amount(75.0) {
+            Self::Boost50To75
+        } else {
+            Self::Boost75To100
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct BoostBucketEvent {
+    pub frame: usize,
+    pub time: f32,
+    pub end_frame: usize,
+    pub end_time: f32,
+    pub duration: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    pub bucket: BoostBucket,
+}
+
+impl BoostBucketEvent {
+    fn absorb_sample(&mut self, event: Self) {
+        self.end_frame = event.frame;
+        self.end_time = event.end_time;
+        self.duration += event.duration;
+        self.player_position = event.player_position;
+    }
+}
+
 fn boost_transaction_label(kind: &'static str) -> StatLabel {
     StatLabel::new("transaction", kind)
 }
@@ -250,8 +309,10 @@ pub struct BoostCalculator {
     pickup_comparison_events: EventStream<BoostPickupComparisonEvent>,
     ledger_events: EventStream<BoostLedgerEvent>,
     state_events: EventStream<BoostStateEvent>,
+    bucket_events: EventStream<BoostBucketEvent>,
     pending_ledger_events: HashMap<PendingBoostLedgerKey, PendingBoostLedgerEvent>,
     pending_state_events: HashMap<PlayerId, PendingBoostStateEvent>,
+    pending_bucket_events: HashMap<PlayerId, BoostBucketEvent>,
     player_usage_state: HashMap<PlayerId, BoostUsageState>,
     kickoff_phase_active_last_frame: bool,
     kickoff_respawn_awarded: HashSet<PlayerId>,
@@ -443,6 +504,14 @@ impl BoostCalculator {
         self.state_events.new_events()
     }
 
+    pub fn bucket_events(&self) -> &[BoostBucketEvent] {
+        self.bucket_events.all()
+    }
+
+    pub fn new_bucket_events(&self) -> &[BoostBucketEvent] {
+        self.bucket_events.new_events()
+    }
+
     pub fn projected_state_events(&self) -> Vec<BoostStateEvent> {
         let mut events = self.state_events.all().to_vec();
         let mut pending: Vec<_> = self
@@ -450,6 +519,18 @@ impl BoostCalculator {
             .values()
             .map(|pending| pending.event.clone())
             .collect();
+        pending.sort_by(|left, right| {
+            left.frame.cmp(&right.frame).then_with(|| {
+                format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
+            })
+        });
+        events.extend(pending);
+        events
+    }
+
+    pub fn projected_bucket_events(&self) -> Vec<BoostBucketEvent> {
+        let mut events = self.bucket_events.all().to_vec();
+        let mut pending: Vec<_> = self.pending_bucket_events.values().cloned().collect();
         pending.sort_by(|left, right| {
             left.frame.cmp(&right.frame).then_with(|| {
                 format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
@@ -472,6 +553,20 @@ impl BoostCalculator {
         });
         self.state_events
             .extend(pending.into_iter().map(|pending| pending.event));
+    }
+
+    pub fn flush_pending_bucket_events(&mut self) {
+        let mut pending: Vec<_> = self
+            .pending_bucket_events
+            .drain()
+            .map(|(_, event)| event)
+            .collect();
+        pending.sort_by(|left, right| {
+            left.frame.cmp(&right.frame).then_with(|| {
+                format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
+            })
+        });
+        self.bucket_events.extend(pending);
     }
 
     fn player_usage_state(&self, player_id: &PlayerId) -> BoostUsageState {
@@ -524,6 +619,23 @@ impl BoostCalculator {
                 return;
             };
             self.state_events.push(previous.event);
+        }
+    }
+
+    fn record_bucket_sample(&mut self, event: BoostBucketEvent) {
+        let player_id = event.player_id.clone();
+        let Some(pending) = self.pending_bucket_events.get_mut(&player_id) else {
+            self.pending_bucket_events.insert(player_id, event);
+            return;
+        };
+
+        if pending.is_team_0 == event.is_team_0 && pending.bucket == event.bucket {
+            pending.absorb_sample(event);
+        } else {
+            let previous = self.pending_bucket_events.insert(player_id, event);
+            if let Some(previous) = previous {
+                self.bucket_events.push(previous);
+            }
         }
     }
 
@@ -1386,6 +1498,7 @@ impl BoostCalculator {
         self.pending_inferred_pickups.clear();
         self.flush_pending_ledger_events();
         self.flush_pending_state_events();
+        self.flush_pending_bucket_events();
         Ok(())
     }
 
@@ -1433,6 +1546,7 @@ impl BoostCalculator {
         self.pickup_comparison_events.begin_update();
         self.ledger_events.begin_update();
         self.state_events.begin_update();
+        self.bucket_events.begin_update();
         let live_play = live_play_state.counts_toward_player_motion();
         let boost_levels_live = Self::boost_levels_live(live_play);
         let track_boost_levels = Self::tracks_boost_levels(boost_levels_live);
@@ -1440,6 +1554,7 @@ impl BoostCalculator {
         if !track_boost_levels {
             self.flush_pending_ledger_events();
             self.flush_pending_state_events();
+            self.flush_pending_bucket_events();
         }
         let boost_levels_resumed_this_sample =
             boost_levels_live && !self.previous_boost_levels_live.unwrap_or(false);
@@ -1556,6 +1671,17 @@ impl BoostCalculator {
                     is_team_0: player.is_team_0,
                     boost_amount,
                     boost_before,
+                });
+                self.record_bucket_sample(BoostBucketEvent {
+                    frame: frame.frame_number,
+                    time: frame.time,
+                    end_frame: frame.frame_number,
+                    end_time: frame.time + frame.dt,
+                    duration: frame.dt,
+                    player_id: player.player_id.clone(),
+                    player_position: player.position().map(|position| position.to_array()),
+                    is_team_0: player.is_team_0,
+                    bucket: BoostBucket::from_amount(boost_amount),
                 });
             }
 

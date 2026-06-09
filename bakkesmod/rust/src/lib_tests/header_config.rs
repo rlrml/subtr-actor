@@ -374,6 +374,10 @@ fn checked_in_header_matches_event_abi_enums() {
                 SaMechanicKind::CounterAttackGoal as i32,
             ),
             (
+                "SaMechanicKindSustainedPressureGoal".to_owned(),
+                SaMechanicKind::SustainedPressureGoal as i32,
+            ),
+            (
                 "SaMechanicKindFlickGoal".to_owned(),
                 SaMechanicKind::FlickGoal as i32,
             ),

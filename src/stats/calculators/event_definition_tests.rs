@@ -31,6 +31,7 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<TouchClassificationEvent>();
     assert_stats_event::<BoostPickupComparisonEvent>();
     assert_stats_event::<BoostLedgerEvent>();
+    assert_stats_event::<BoostBucketEvent>();
     assert_stats_event::<BoostStateEvent>();
     assert_stats_event::<BumpEvent>();
     assert_stats_event::<PossessionEvent>();

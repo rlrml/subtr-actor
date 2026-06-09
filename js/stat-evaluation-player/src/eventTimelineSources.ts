@@ -34,7 +34,7 @@ const CURATED_STATS_EVENT_STREAM_IDS = new Set<keyof StatsEvents>([
   "pass",
   "ball_carry",
   "rush",
-  "flip_impulse",
+  "dodge",
   "speed_flip",
   "half_flip",
   "half_volley",
@@ -83,7 +83,6 @@ export const STATS_EVENT_STREAM_TIMELINE_PRESENTATION_OVERRIDES = {
   wavedash: "span",
   powerslide: "mixed",
   boost_ledger: "span",
-  boost_state: "span",
 } as const satisfies Partial<
   Record<StatsEventStreamCountType, StatsEventStreamTimelinePresentation>
 >;

@@ -224,6 +224,7 @@ async function main() {
         "    touch: [],",
         "    boost_pickups: [],",
         "    boost_ledger: [],",
+        "    boost_bucket: [],",
         "    boost_state: [],",
         "    bump: [],",
         "  },",

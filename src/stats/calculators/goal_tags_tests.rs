@@ -83,12 +83,14 @@ fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
     let own_half = OwnHalfGoalCalculator::new();
     let empty_net = EmptyNetGoalCalculator::new();
     let counter_attack = CounterAttackGoalCalculator::new();
+    let sustained_pressure = SustainedPressureGoalCalculator::new();
     let aerial_events = aerial.tag_goals(goals);
     let high_aerial_events = high_aerial.tag_goals(goals);
     let long_distance_events = long_distance.tag_goals(goals);
     let own_half_events = own_half.tag_goals(goals);
     let empty_net_events = empty_net.tag_goals(goals);
     let counter_attack_events = counter_attack.tag_goals(goals);
+    let sustained_pressure_events = sustained_pressure.tag_goals(goals);
 
     combined_goal_tag_assignments(&[
         &aerial_events,
@@ -97,6 +99,7 @@ fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
         &own_half_events,
         &empty_net_events,
         &counter_attack_events,
+        &sustained_pressure_events,
     ])
 }
 
@@ -419,6 +422,31 @@ fn counter_attack_goal_rejects_other_buildup() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 120.0), Vec::new());
 
     let events = CounterAttackGoalCalculator::new().tag_goals(&[goal]);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn sustained_pressure_goal_tags_goal_with_sustained_pressure_buildup() {
+    let mut goal = goal_with_touch(true, position(0.0, 1800.0, 120.0), Vec::new());
+    goal.goal_buildup = GoalBuildupKind::SustainedPressure;
+
+    let events = SustainedPressureGoalCalculator::new().tag_goals(&[goal]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::SustainedPressureGoal]);
+    assert!(events[0]
+        .tag
+        .metadata()
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::GoalBuildup));
+}
+
+#[test]
+fn sustained_pressure_goal_rejects_other_buildup() {
+    let goal = goal_with_touch(true, position(0.0, 1800.0, 120.0), Vec::new());
+
+    let events = SustainedPressureGoalCalculator::new().tag_goals(&[goal]);
 
     assert!(events.is_empty());
 }

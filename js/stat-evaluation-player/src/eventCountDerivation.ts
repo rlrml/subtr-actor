@@ -44,7 +44,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "ball_carry",
   "controlled_play",
   "rush",
-  "flip_impulse",
+  "dodge",
   "speed_flip",
   "half_flip",
   "half_volley",
@@ -54,13 +54,18 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "touch",
   "boost_pickups",
   "boost_ledger",
-  "boost_state",
+  "boost_bucket",
   "bump",
 ] as const satisfies readonly (keyof StatsEvents)[];
 
+type InternalStatsEventStreamType = Extract<keyof StatsEvents, "boost_state">;
+
 type AssertNever<T extends never> = T;
 type _StatsEventStreamCountTypesCoverAll = AssertNever<
-  Exclude<keyof StatsEvents, (typeof STATS_EVENT_STREAM_COUNT_TYPES)[number]>
+  Exclude<
+    keyof StatsEvents,
+    (typeof STATS_EVENT_STREAM_COUNT_TYPES)[number] | InternalStatsEventStreamType
+  >
 >;
 
 export const STATS_MECHANIC_EVENT_COUNT_TYPES = [

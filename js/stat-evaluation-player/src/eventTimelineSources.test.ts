@@ -54,7 +54,7 @@ test("event timeline sources include empty canonical stats streams", () => {
   assert.ok(sourceIds.has("stats-stream:positioning_activity"));
   assert.ok(sourceIds.has("stats-stream:backboard"));
   assert.ok(sourceIds.has("stats-stream:rotation_role_span"));
-  assert.ok(sourceIds.has("stats-stream:flip_impulse"));
+  assert.ok(sourceIds.has("stats-stream:dodge"));
   assert.ok(sourceIds.has("mechanic:speed_flip"));
   assert.ok(sourceIds.has("stats-stream:territorial_pressure"));
 

@@ -152,8 +152,9 @@ void SubtrActorPlugin::renderGoalsOverviewStats(UiStatsWindow &window) {
     return event.type == "aerial_goal" || event.type == "high_aerial_goal" ||
            event.type == "long_distance_goal" || event.type == "own_half_goal" ||
            event.type == "empty_net_goal" || event.type == "counter_attack_goal" ||
-           event.type == "flick_goal" || event.type == "double_tap_goal" ||
-           event.type == "one_timer_goal" || event.type == "passing_goal" ||
+           event.type == "sustained_pressure_goal" || event.type == "flick_goal" ||
+           event.type == "double_tap_goal" || event.type == "one_timer_goal" ||
+           event.type == "passing_goal" ||
            event.type == "air_dribble_goal" || event.type == "flip_reset_goal" ||
            event.type == "half_volley_goal";
   };

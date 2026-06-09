@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import type { ReplayModel, ReplayScene } from "@rlrml/player";
-import type { FlipImpulseEvent, StatsTimeline } from "./statsTimeline.ts";
+import type { DodgeEvent, StatsTimeline } from "./statsTimeline.ts";
 
-const STYLE_ID = "subtr-actor-flip-impulse-overlay-styles";
+const STYLE_ID = "subtr-actor-dodge-impulse-overlay-styles";
 const BLUE_COLOR = 0x59c3ff;
 const ORANGE_COLOR = 0xffc15c;
 const ARROW_LENGTH_MIN = 260;
@@ -10,7 +10,7 @@ const ARROW_LENGTH_MAX = 760;
 const LABEL_HEIGHT = 260;
 const DEFAULT_DECAY_SECONDS = 2.5;
 
-export interface FlipImpulseMarker {
+export interface DodgeImpulseMarker {
   id: string;
   time: number;
   frame: number;
@@ -24,8 +24,8 @@ export interface FlipImpulseMarker {
   directionLabel: string;
 }
 
-interface FlipImpulseMarkerView {
-  marker: FlipImpulseMarker;
+interface DodgeImpulseMarkerView {
+  marker: DodgeImpulseMarker;
   arrow: THREE.ArrowHelper;
   label: HTMLDivElement;
 }
@@ -60,18 +60,22 @@ function titleCaseLabel(value: string): string {
     .join(" ");
 }
 
-export function buildFlipImpulseMarkers(
+export function buildDodgeImpulseMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
-): FlipImpulseMarker[] {
-  return (statsTimeline.events.flip_impulse ?? []).map((event: FlipImpulseEvent, index) => {
+): DodgeImpulseMarker[] {
+  return (statsTimeline.events.dodge ?? []).flatMap((event: DodgeEvent, index) => {
+    const dodgeImpulse = event.dodge_impulse;
+    if (!dodgeImpulse) {
+      return [];
+    }
     const playerName = findPlayerName(replay, event.player);
     const playerId = playerIdToString(event.player);
     const time = replay.frames[event.frame]?.time ?? event.time;
     const direction = new THREE.Vector3(
-      event.estimated_direction[0],
-      event.estimated_direction[1],
-      event.estimated_direction[2],
+      dodgeImpulse.estimated_direction[0],
+      dodgeImpulse.estimated_direction[1],
+      dodgeImpulse.estimated_direction[2],
     );
     if (direction.lengthSq() <= Number.EPSILON) {
       direction.set(1, 0, 0);
@@ -79,30 +83,30 @@ export function buildFlipImpulseMarkers(
     direction.normalize();
 
     return {
-      id: `flip-impulse:${event.frame}:${playerId}:${index}`,
+      id: `dodge-impulse:${event.frame}:${playerId}:${index}`,
       time,
       frame: event.frame,
       isTeamZero: event.is_team_0,
       playerId,
       playerName,
       position: new THREE.Vector3(
-        event.start_position[0],
-        event.start_position[1],
-        event.start_position[2] + 44,
+        dodgeImpulse.start_position[0],
+        dodgeImpulse.start_position[1],
+        dodgeImpulse.start_position[2] + 44,
       ),
       direction,
-      magnitude: event.estimated_impulse_magnitude,
-      confidence: event.confidence,
-      directionLabel: event.direction_label,
+      magnitude: dodgeImpulse.estimated_impulse_magnitude,
+      confidence: dodgeImpulse.confidence,
+      directionLabel: dodgeImpulse.direction_label,
     };
   });
 }
 
-export function getVisibleFlipImpulseMarkers(
-  markers: FlipImpulseMarker[],
+export function getVisibleDodgeImpulseMarkers(
+  markers: DodgeImpulseMarker[],
   currentTime: number,
   decaySeconds: number,
-): FlipImpulseMarker[] {
+): DodgeImpulseMarker[] {
   const effectiveDecay = Math.max(0.1, decaySeconds);
   return markers.filter((marker) => {
     const age = currentTime - marker.time;
@@ -118,7 +122,7 @@ function ensureStyles(): void {
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = `
-    .sap-flip-impulse-overlay-root {
+    .sap-dodge-impulse-overlay-root {
       position: absolute;
       inset: 0;
       z-index: 2;
@@ -127,7 +131,7 @@ function ensureStyles(): void {
       font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
     }
 
-    .sap-flip-impulse-overlay-label {
+    .sap-dodge-impulse-overlay-label {
       position: absolute;
       min-width: max-content;
       padding: 0.24rem 0.58rem;
@@ -144,12 +148,12 @@ function ensureStyles(): void {
       will-change: transform, opacity;
     }
 
-    .sap-flip-impulse-overlay-label-blue {
+    .sap-dodge-impulse-overlay-label-blue {
       border-color: rgba(89, 195, 255, 0.5);
       background: rgba(17, 47, 73, 0.84);
     }
 
-    .sap-flip-impulse-overlay-label-orange {
+    .sap-dodge-impulse-overlay-label-orange {
       border-color: rgba(255, 193, 92, 0.5);
       background: rgba(76, 41, 7, 0.84);
     }
@@ -181,7 +185,7 @@ function projectToContainer(
   return true;
 }
 
-export class FlipImpulseOverlay {
+export class DodgeImpulseOverlay {
   private readonly scene: ReplayScene;
   private readonly container: HTMLElement;
   private readonly group = new THREE.Group();
@@ -189,8 +193,8 @@ export class FlipImpulseOverlay {
   private readonly projectedPosition = new THREE.Vector3();
   private readonly worldPosition = new THREE.Vector3();
   private readonly labelOffset = new THREE.Vector3(0, 0, LABEL_HEIGHT);
-  private readonly markers: FlipImpulseMarker[];
-  private readonly views = new Map<string, FlipImpulseMarkerView>();
+  private readonly markers: DodgeImpulseMarker[];
+  private readonly views = new Map<string, DodgeImpulseMarkerView>();
   private changedContainerPosition = false;
   private originalContainerPosition = "";
   private decaySeconds = DEFAULT_DECAY_SECONDS;
@@ -204,7 +208,7 @@ export class FlipImpulseOverlay {
     ensureStyles();
     this.scene = scene;
     this.container = container;
-    this.markers = buildFlipImpulseMarkers(statsTimeline, replay);
+    this.markers = buildDodgeImpulseMarkers(statsTimeline, replay);
 
     if (getComputedStyle(container).position === "static") {
       this.changedContainerPosition = true;
@@ -212,16 +216,16 @@ export class FlipImpulseOverlay {
       container.style.position = "relative";
     }
 
-    this.group.name = "flip-impulse-overlay";
+    this.group.name = "dodge-impulse-overlay";
     this.scene.replayRoot.add(this.group);
 
     this.labelRoot = document.createElement("div");
-    this.labelRoot.className = "sap-flip-impulse-overlay-root";
+    this.labelRoot.className = "sap-dodge-impulse-overlay-root";
     this.container.append(this.labelRoot);
   }
 
   update(currentTime: number): void {
-    const visibleMarkers = getVisibleFlipImpulseMarkers(
+    const visibleMarkers = getVisibleDodgeImpulseMarkers(
       this.markers,
       currentTime,
       this.decaySeconds,
@@ -284,7 +288,7 @@ export class FlipImpulseOverlay {
     }
   }
 
-  private ensureView(marker: FlipImpulseMarker): FlipImpulseMarkerView {
+  private ensureView(marker: DodgeImpulseMarker): DodgeImpulseMarkerView {
     const existing = this.views.get(marker.id);
     if (existing) {
       return existing;
@@ -310,10 +314,10 @@ export class FlipImpulseOverlay {
     this.group.add(arrow);
 
     const label = document.createElement("div");
-    label.className = `sap-flip-impulse-overlay-label ${
+    label.className = `sap-dodge-impulse-overlay-label ${
       marker.isTeamZero
-        ? "sap-flip-impulse-overlay-label-blue"
-        : "sap-flip-impulse-overlay-label-orange"
+        ? "sap-dodge-impulse-overlay-label-blue"
+        : "sap-dodge-impulse-overlay-label-orange"
     }`;
     label.textContent = `${marker.playerName} ${titleCaseLabel(marker.directionLabel)} ${Math.round(
       marker.confidence * 100,

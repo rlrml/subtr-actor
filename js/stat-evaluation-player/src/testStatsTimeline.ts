@@ -53,7 +53,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       ball_carry: [],
       controlled_play: [],
       rush: [],
-      flip_impulse: [],
+      dodge: [],
       speed_flip: [],
       half_flip: [],
       half_volley: [],
@@ -63,6 +63,7 @@ export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEv
       touch: [],
       boost_pickups: [],
       boost_ledger: [],
+      boost_bucket: [],
       boost_state: [],
       bump: [],
     },
@@ -218,6 +219,7 @@ export function createLegacyStatsTimeline(
     rotation_team_events?: StatsEvents["rotation_team"];
     boost_pickups?: StatsEvents["boost_pickups"];
     boost_ledger?: StatsEvents["boost_ledger"];
+    boost_bucket?: StatsEvents["boost_bucket"];
     boost_state?: StatsEvents["boost_state"];
     bump_events?: StatsEvents["bump"];
   } = {},
@@ -245,7 +247,7 @@ export function createLegacyStatsTimeline(
       ball_carry: overrides.ball_carry_events ?? overrides.events?.ball_carry ?? [],
       controlled_play: overrides.controlled_play_events ?? overrides.events?.controlled_play ?? [],
       rush: overrides.rush_events ?? overrides.events?.rush ?? [],
-      flip_impulse: overrides.events?.flip_impulse ?? [],
+      dodge: overrides.events?.dodge ?? [],
       speed_flip: overrides.speed_flip_events ?? overrides.events?.speed_flip ?? [],
       half_flip: overrides.half_flip_events ?? overrides.events?.half_flip ?? [],
       half_volley: overrides.half_volley_events ?? overrides.events?.half_volley ?? [],
@@ -284,6 +286,7 @@ export function createLegacyStatsTimeline(
       rotation_team: overrides.rotation_team_events ?? overrides.events?.rotation_team ?? [],
       boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],
       boost_ledger: overrides.boost_ledger ?? overrides.events?.boost_ledger ?? [],
+      boost_bucket: overrides.boost_bucket ?? overrides.events?.boost_bucket ?? [],
       boost_state: overrides.boost_state ?? overrides.events?.boost_state ?? [],
       bump: overrides.bump_events ?? overrides.events?.bump ?? [],
     },

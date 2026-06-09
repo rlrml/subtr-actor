@@ -234,6 +234,56 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
 }
 
 #[test]
+fn boost_bucket_events_emit_completed_span_when_bucket_changes() {
+    let mut calculator = BoostCalculator::new();
+    let player_id = PlayerId::Steam(1);
+    let position = glam::Vec3::new(0.0, 0.0, 17.0);
+    let active_gameplay = GameplayState {
+        ball_has_been_hit: Some(true),
+        ..GameplayState::default()
+    };
+
+    for (frame_number, time, boost_amount) in [(1, 1.0, 20.0), (2, 1.1, 30.0), (3, 1.2, 70.0)] {
+        calculator
+            .update_parts(
+                &FrameInfo {
+                    frame_number,
+                    time,
+                    dt: 0.1,
+                    seconds_remaining: None,
+                },
+                &active_gameplay,
+                &PlayerFrameState {
+                    players: vec![test_player(
+                        player_id.clone(),
+                        boost_amount,
+                        boost_amount,
+                        position,
+                    )],
+                },
+                &FrameEventsState::default(),
+                &PlayerVerticalState::default(),
+                &LivePlayState::active_play(),
+            )
+            .expect("boost update should succeed");
+    }
+
+    assert_eq!(calculator.bucket_events().len(), 1);
+    let event = &calculator.bucket_events()[0];
+    assert_eq!(event.player_id, player_id);
+    assert_eq!(event.bucket, BoostBucket::Boost0To25);
+    assert_eq!(event.frame, 1);
+    assert_eq!(event.end_frame, 2);
+    assert!((event.end_time - 1.2).abs() < 0.001);
+    assert!((event.duration - 0.2).abs() < 0.001);
+
+    let projected = calculator.projected_bucket_events();
+    assert_eq!(projected.len(), 2);
+    assert_eq!(projected[1].bucket, BoostBucket::Boost25To50);
+    assert_eq!(projected[1].frame, 3);
+}
+
+#[test]
 fn reported_small_pickup_while_boosting_infers_same_sample_use() {
     let mut calculator = BoostCalculator::new();
     let player_id = PlayerId::Steam(1);
