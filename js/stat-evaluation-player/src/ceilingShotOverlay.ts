@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { ReplayModel, ReplayScene } from "@rlrml/player";
 import type { StatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const STYLE_ID = "subtr-actor-ceiling-shot-overlay-styles";
 const BLUE_COLOR = 0x59c3ff;
@@ -68,7 +69,7 @@ export function buildCeilingShotMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): CeilingShotMarker[] {
-  return statsTimeline.events.ceiling_shot.map((event) => {
+  return statsEventPayloads(statsTimeline, "ceiling_shot").map((event) => {
     const playerName = findPlayerName(replay, event.player);
     const playerId = playerIdToString(event.player);
     const time = replay.frames[event.frame]?.time ?? event.time;

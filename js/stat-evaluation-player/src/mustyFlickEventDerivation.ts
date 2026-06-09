@@ -3,6 +3,7 @@ import type { MustyFlickEvent } from "./generated/MustyFlickEvent.ts";
 import type { MustyFlickStats } from "./generated/MustyFlickStats.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const MUSTY_HIGH_CONFIDENCE = 0.8;
 
@@ -184,7 +185,7 @@ export function applyMustyFlickEventDerivedStats(
 export function createMustyFlickEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortMustyFlickEvents(timeline.events.musty_flick ?? []);
+  const events = sortMustyFlickEvents(statsEventPayloads(timeline, "musty_flick"));
 
   let eventIndex = 0;
   let lastMustyPlayer: string | null = null;

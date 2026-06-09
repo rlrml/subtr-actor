@@ -1,6 +1,7 @@
 import type { TerritorialPressureEvent } from "./generated/TerritorialPressureEvent.ts";
 import type { TerritorialPressureTeamStats } from "./generated/TerritorialPressureTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function f32(value: number): number {
   return Math.fround(value);
@@ -85,7 +86,9 @@ export function applyTerritorialPressureEventDerivedStats(
 export function createTerritorialPressureEventDerivedStatsAccumulator(
   timeline: MaterializedStatsTimeline,
 ): { applyFrame(frame: StatsFrame): void } {
-  const events = sortTerritorialPressureEvents(timeline.events.territorial_pressure ?? []);
+  const events = sortTerritorialPressureEvents(
+    statsEventPayloads(timeline, "territorial_pressure"),
+  );
   let eventIndex = 0;
   const teamZero = defaultTerritorialPressureTeamStats();
   const teamOne = defaultTerritorialPressureTeamStats();

@@ -4,6 +4,7 @@ import type { FiftyFiftyTeamStats } from "./generated/FiftyFiftyTeamStats.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 type FiftyFiftyPlayerStatsWithLabels = FiftyFiftyPlayerStats & {
   labeled_event_counts?: LabeledCounts;
@@ -249,7 +250,7 @@ export function applyFiftyFiftyEventDerivedStats(
 export function createFiftyFiftyEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortFiftyFiftyEvents(timeline.events.fifty_fifty ?? []);
+  const events = sortFiftyFiftyEvents(statsEventPayloads(timeline, "fifty_fifty"));
 
   let eventIndex = 0;
   const teamZero = defaultFiftyFiftyTeamStats();

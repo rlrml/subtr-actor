@@ -6,6 +6,7 @@ import type {
   StatsFrame,
   MaterializedStatsTimeline,
 } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const FLOAT_TOLERANCE = 0.001;
 const BOOST_MAX_AMOUNT = 255;
@@ -549,7 +550,7 @@ function compareLedgerDerivedBoostStats(
 }
 
 function sortedBoostLedgerEvents(timeline: MaterializedStatsTimeline): BoostLedgerEvent[] {
-  return [...(timeline.events.boost_ledger ?? [])].sort((left, right) => {
+  return [...statsEventPayloads(timeline, "boost_ledger")].sort((left, right) => {
     if (left.frame !== right.frame) {
       return left.frame - right.frame;
     }
@@ -563,7 +564,7 @@ function sortedBoostLedgerEvents(timeline: MaterializedStatsTimeline): BoostLedg
 }
 
 function sortedBoostStateEvents(timeline: MaterializedStatsTimeline): BoostStateEvent[] {
-  return [...(timeline.events.boost_state ?? [])].sort((left, right) => {
+  return [...statsEventPayloads(timeline, "boost_state")].sort((left, right) => {
     if (left.frame !== right.frame) {
       return left.frame - right.frame;
     }

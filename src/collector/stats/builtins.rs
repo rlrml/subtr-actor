@@ -396,6 +396,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "sustained_pressure_goal",
         "kickoff_goal",
         "flick_goal",
+        "ceiling_shot_goal",
         "double_tap_goal",
         "one_timer_goal",
         "passing_goal",
@@ -602,6 +603,12 @@ pub(crate) fn builtin_module_json(
         }
         "flick_goal" => {
             let calculator = graph_state::<FlickGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "ceiling_shot_goal" => {
+            let calculator = graph_state::<CeilingShotGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
@@ -1317,6 +1324,7 @@ pub(crate) fn builtin_snapshot_frame_json(
         | "sustained_pressure_goal"
         | "kickoff_goal"
         | "flick_goal"
+        | "ceiling_shot_goal"
         | "double_tap_goal"
         | "one_timer_goal"
         | "passing_goal"
@@ -1602,6 +1610,12 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<FlickGoalCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "flick_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "ceiling_shot_goal" => {
+            let calculator = graph_state::<CeilingShotGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "ceiling_shot_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
             }))?)
         }
         "double_tap_goal" => {

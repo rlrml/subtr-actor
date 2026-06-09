@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import type { ReplayModel, ReplayScene } from "@rlrml/player";
 import type { DodgeEvent, StatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
-const STYLE_ID = "subtr-actor-dodge-impulse-overlay-styles";
+const STYLE_ID = "subtr-actor-flip-impulse-overlay-styles";
 const BLUE_COLOR = 0x59c3ff;
 const ORANGE_COLOR = 0xffc15c;
 const ARROW_LENGTH_MIN = 260;
@@ -64,7 +65,7 @@ export function buildDodgeImpulseMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): DodgeImpulseMarker[] {
-  return (statsTimeline.events.dodge ?? []).flatMap((event: DodgeEvent, index) => {
+  return statsEventPayloads(statsTimeline, "dodge").flatMap((event: DodgeEvent, index) => {
     const dodgeImpulse = event.dodge_impulse;
     if (!dodgeImpulse) {
       return [];
@@ -122,7 +123,7 @@ function ensureStyles(): void {
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = `
-    .sap-dodge-impulse-overlay-root {
+    .sap-flip-impulse-overlay-root {
       position: absolute;
       inset: 0;
       z-index: 2;
@@ -131,7 +132,7 @@ function ensureStyles(): void {
       font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
     }
 
-    .sap-dodge-impulse-overlay-label {
+    .sap-flip-impulse-overlay-label {
       position: absolute;
       min-width: max-content;
       padding: 0.24rem 0.58rem;
@@ -148,12 +149,12 @@ function ensureStyles(): void {
       will-change: transform, opacity;
     }
 
-    .sap-dodge-impulse-overlay-label-blue {
+    .sap-flip-impulse-overlay-label-blue {
       border-color: rgba(89, 195, 255, 0.5);
       background: rgba(17, 47, 73, 0.84);
     }
 
-    .sap-dodge-impulse-overlay-label-orange {
+    .sap-flip-impulse-overlay-label-orange {
       border-color: rgba(255, 193, 92, 0.5);
       background: rgba(76, 41, 7, 0.84);
     }
@@ -216,11 +217,11 @@ export class DodgeImpulseOverlay {
       container.style.position = "relative";
     }
 
-    this.group.name = "dodge-impulse-overlay";
+    this.group.name = "flip-impulse-overlay";
     this.scene.replayRoot.add(this.group);
 
     this.labelRoot = document.createElement("div");
-    this.labelRoot.className = "sap-dodge-impulse-overlay-root";
+    this.labelRoot.className = "sap-flip-impulse-overlay-root";
     this.container.append(this.labelRoot);
   }
 
@@ -314,10 +315,10 @@ export class DodgeImpulseOverlay {
     this.group.add(arrow);
 
     const label = document.createElement("div");
-    label.className = `sap-dodge-impulse-overlay-label ${
+    label.className = `sap-flip-impulse-overlay-label ${
       marker.isTeamZero
-        ? "sap-dodge-impulse-overlay-label-blue"
-        : "sap-dodge-impulse-overlay-label-orange"
+        ? "sap-flip-impulse-overlay-label-blue"
+        : "sap-flip-impulse-overlay-label-orange"
     }`;
     label.textContent = `${marker.playerName} ${titleCaseLabel(marker.directionLabel)} ${Math.round(
       marker.confidence * 100,

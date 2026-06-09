@@ -100,9 +100,8 @@ impl StatsTimelineEventsNode {
             own_half_goal_dependency(),
             empty_net_goal_dependency(),
             counter_attack_goal_dependency(),
-            sustained_pressure_goal_dependency(),
-            kickoff_goal_dependency(),
             flick_goal_dependency(),
+            ceiling_shot_goal_dependency(),
             double_tap_goal_dependency(),
             one_timer_goal_dependency(),
             passing_goal_dependency(),
@@ -144,9 +143,8 @@ impl StatsTimelineEventsNode {
         let own_half_goal = ctx.get::<OwnHalfGoalCalculator>()?;
         let empty_net_goal = ctx.get::<EmptyNetGoalCalculator>()?;
         let counter_attack_goal = ctx.get::<CounterAttackGoalCalculator>()?;
-        let sustained_pressure_goal = ctx.get::<SustainedPressureGoalCalculator>()?;
-        let kickoff_goal = ctx.get::<KickoffGoalCalculator>()?;
         let flick_goal = ctx.get::<FlickGoalCalculator>()?;
+        let ceiling_shot_goal = ctx.get::<CeilingShotGoalCalculator>()?;
         let double_tap_goal = ctx.get::<DoubleTapGoalCalculator>()?;
         let one_timer_goal = ctx.get::<OneTimerGoalCalculator>()?;
         let passing_goal = ctx.get::<PassingGoalCalculator>()?;
@@ -177,9 +175,8 @@ impl StatsTimelineEventsNode {
             own_half_goal.events(),
             empty_net_goal.events(),
             counter_attack_goal.events(),
-            sustained_pressure_goal.events(),
-            kickoff_goal.events(),
             flick_goal.events(),
+            ceiling_shot_goal.events(),
             double_tap_goal.events(),
             one_timer_goal.events(),
             passing_goal.events(),
@@ -193,26 +190,17 @@ impl StatsTimelineEventsNode {
             goal_context_events_with_tags(match_stats.goal_context_events(), &goal_tag_assignments);
 
         self.state.events = ReplayStatsTimelineEvents {
-            timeline,
-            core_player: match_stats.core_player_events().to_vec(),
-            core_player_goal_context: match_stats.core_player_goal_context_events().to_vec(),
-            possession: possession.events().to_vec(),
-            pressure: pressure.events().to_vec(),
-            territorial_pressure: territorial_pressure.events().to_vec(),
-            movement: movement.events().to_vec(),
-            positioning_activity: positioning.activity_events(),
-            positioning_possession: positioning.possession_events(),
-            positioning_field_zone: positioning.field_zone_events(),
-            positioning_ball_depth: positioning.ball_depth_events(),
-            positioning_teammate_role: positioning.teammate_role_events(),
-            positioning_ball_proximity: positioning.ball_proximity_events(),
-            positioning_goal_context: positioning.goal_context_events(),
-            rotation_player: rotation.player_events().to_vec(),
-            rotation_role_span: rotation.role_span_events(),
-            rotation_depth_span: rotation.depth_span_events(),
-            rotation_first_man_stint: rotation.first_man_stint_events(),
-            rotation_team: rotation.team_events().to_vec(),
-            mechanics: build_mechanic_events(
+            events: build_replay_events(
+                &timeline,
+                match_stats,
+                possession,
+                pressure,
+                territorial_pressure,
+                movement,
+                positioning,
+                rotation,
+                &goal_context,
+                backboard,
                 ball_carry,
                 ceiling_shot,
                 wall_aerial,
@@ -220,45 +208,25 @@ impl StatsTimelineEventsNode {
                 center,
                 dodge_reset,
                 double_tap,
-                flick,
-                musty_flick,
                 one_timer,
                 pass,
+                controlled_play,
+                fifty_fifty,
+                kickoff,
+                rush,
+                flip_impulse,
                 speed_flip,
                 half_flip,
                 half_volley,
                 wavedash,
+                whiff,
+                powerslide,
+                touch,
+                boost,
+                bump,
+                flick,
+                musty_flick,
             ),
-            goal_context,
-            backboard: backboard.events().to_vec(),
-            ceiling_shot: ceiling_shot.events().to_vec(),
-            wall_aerial: wall_aerial.events().to_vec(),
-            wall_aerial_shot: wall_aerial_shot.events().to_vec(),
-            center: center.events().to_vec(),
-            flick: flick.events().to_vec(),
-            musty_flick: musty_flick.events().to_vec(),
-            dodge_reset: dodge_reset.events().to_vec(),
-            double_tap: double_tap.events().to_vec(),
-            one_timer: one_timer.events().to_vec(),
-            pass: pass.events().to_vec(),
-            ball_carry: ball_carry.carry_events().to_vec(),
-            controlled_play: controlled_play.events().to_vec(),
-            fifty_fifty: fifty_fifty.events().to_vec(),
-            kickoff: kickoff.events().to_vec(),
-            rush: rush.events().to_vec(),
-            dodge: flip_impulse.events().to_vec(),
-            speed_flip: speed_flip.events().to_vec(),
-            half_flip: half_flip.events().to_vec(),
-            half_volley: half_volley.events().to_vec(),
-            wavedash: wavedash.events().to_vec(),
-            whiff: whiff.events().to_vec(),
-            powerslide: powerslide.events().to_vec(),
-            touch: touch.events().to_vec(),
-            boost_pickups: boost.pickup_comparison_events().to_vec(),
-            boost_ledger: boost.ledger_events().to_vec(),
-            boost_bucket: boost.bucket_events().to_vec(),
-            boost_state: boost.state_events().to_vec(),
-            bump: bump.events().to_vec(),
         };
         Ok(())
     }
@@ -294,102 +262,77 @@ impl AnalysisNode for StatsTimelineEventsNode {
     }
 }
 
-fn moment_mechanic_event(
-    kind: &str,
-    index: usize,
-    frame: usize,
-    time: f32,
-    player_id: PlayerId,
-    player_position: Option<[f32; 3]>,
-    is_team_0: bool,
-) -> StatsTimelineTagEvent {
-    StatsTimelineTagEvent {
-        id: format!("{kind}:{frame}:{index}"),
-        kind: kind.to_owned(),
-        player_id,
-        player_position,
-        is_team_0,
-        timing: StatsEventTiming::Moment { frame, time },
-        properties: Vec::new(),
+fn moment(frame: usize, time: f32) -> EventTiming {
+    EventTiming::Moment { frame, time }
+}
+
+fn span(start_frame: usize, end_frame: usize, start_time: f32, end_time: f32) -> EventTiming {
+    EventTiming::Span {
+        start_frame,
+        end_frame,
+        start_time,
+        end_time,
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn span_mechanic_event(
-    kind: &str,
+fn make_event(
+    stream: &str,
     index: usize,
-    start_frame: usize,
-    end_frame: usize,
-    start_time: f32,
-    end_time: f32,
-    player_id: PlayerId,
+    timing: EventTiming,
+    payload: EventPayload,
+    primary_player: Option<PlayerId>,
+    secondary_player: Option<PlayerId>,
+    team_is_team_0: Option<bool>,
     player_position: Option<[f32; 3]>,
-    is_team_0: bool,
-) -> StatsTimelineTagEvent {
-    StatsTimelineTagEvent {
-        id: format!("{kind}:{start_frame}:{end_frame}:{index}"),
-        kind: kind.to_owned(),
-        player_id,
-        player_position,
-        is_team_0,
-        timing: StatsEventTiming::Span {
+    ball_position: Option<[f32; 3]>,
+    confidence: Option<f32>,
+) -> Event {
+    let frame_id = match timing {
+        EventTiming::Moment { frame, .. } => frame.to_string(),
+        EventTiming::Span {
             start_frame,
             end_frame,
-            start_time,
-            end_time,
+            ..
+        } => format!("{start_frame}:{end_frame}"),
+    };
+    Event {
+        meta: EventMeta {
+            id: format!("{stream}:{frame_id}:{index}"),
+            stream: stream.to_owned(),
+            label: stats_timeline_event_label(stream),
+            timing,
+            primary_player,
+            secondary_player,
+            player_position,
+            ball_position,
+            team_is_team_0,
+            confidence,
+            properties: Vec::new(),
         },
-        properties: Vec::new(),
+        payload,
     }
 }
 
-fn mechanic_event_text_property(key: &str, value: &str) -> StatsEventProperty {
-    StatsEventProperty {
-        key: key.to_owned(),
-        value: StatsEventPropertyValue::Text(value.to_owned()),
+fn event_start_time(event: &Event) -> f32 {
+    match event.meta.timing {
+        EventTiming::Moment { time, .. } => time,
+        EventTiming::Span { start_time, .. } => start_time,
     }
 }
 
-fn mechanic_event_unsigned_property(key: &str, value: u32) -> StatsEventProperty {
-    StatsEventProperty {
-        key: key.to_owned(),
-        value: StatsEventPropertyValue::Unsigned(value),
-    }
-}
-
-fn mechanic_event_float_property(key: &str, value: f32) -> StatsEventProperty {
-    StatsEventProperty {
-        key: key.to_owned(),
-        value: StatsEventPropertyValue::Float(value),
-    }
-}
-
-fn flick_mechanic_event_properties(event: &FlickEvent) -> Vec<StatsEventProperty> {
-    vec![
-        mechanic_event_text_property("flick_kind", &event.kind),
-        mechanic_event_text_property("setup_rotation_direction", &event.setup_rotation_direction),
-        mechanic_event_float_property("setup_rotation_degrees", event.setup_rotation_degrees),
-    ]
-}
-
-fn ball_carry_mechanic_event_properties(event: &BallCarryEvent) -> Vec<StatsEventProperty> {
-    let mut properties = Vec::new();
-    if let Some(origin) = event.air_dribble_origin {
-        properties.push(mechanic_event_text_property(
-            "origin",
-            origin.as_label_value(),
-        ));
-    }
-    if event.kind == BallCarryKind::AirDribble {
-        properties.push(mechanic_event_unsigned_property(
-            "touch_count",
-            event.touch_count,
-        ));
-    }
-    properties
-}
-
-#[allow(clippy::too_many_arguments)]
-fn build_mechanic_events(
+#[allow(clippy::too_many_arguments, clippy::cognitive_complexity)]
+fn build_replay_events(
+    timeline: &[TimelineEvent],
+    match_stats: &MatchStatsCalculator,
+    possession: &PossessionCalculator,
+    pressure: &PressureCalculator,
+    territorial_pressure: &TerritorialPressureCalculator,
+    movement: &MovementCalculator,
+    positioning: &PositioningCalculator,
+    rotation: &RotationCalculator,
+    goal_context: &[GoalContextEvent],
+    backboard: &BackboardCalculator,
     ball_carry: &BallCarryCalculator,
     ceiling_shot: &CeilingShotCalculator,
     wall_aerial: &WallAerialCalculator,
@@ -397,253 +340,874 @@ fn build_mechanic_events(
     center: &CenterCalculator,
     dodge_reset: &DodgeResetCalculator,
     double_tap: &DoubleTapCalculator,
-    flick: &FlickCalculator,
-    musty_flick: &MustyFlickCalculator,
     one_timer: &OneTimerCalculator,
     pass: &PassCalculator,
+    controlled_play: &ControlledPlayCalculator,
+    fifty_fifty: &FiftyFiftyCalculator,
+    kickoff: &KickoffCalculator,
+    rush: &RushCalculator,
+    flip_impulse: &FlipImpulseCalculator,
     speed_flip: &SpeedFlipCalculator,
     half_flip: &HalfFlipCalculator,
     half_volley: &HalfVolleyCalculator,
     wavedash: &WavedashCalculator,
-) -> Vec<StatsTimelineTagEvent> {
+    whiff: &WhiffCalculator,
+    powerslide: &PowerslideCalculator,
+    touch: &TouchCalculator,
+    boost: &BoostCalculator,
+    bump: &BumpCalculator,
+    flick: &FlickCalculator,
+    musty_flick: &MustyFlickCalculator,
+) -> Vec<Event> {
     let mut events = Vec::new();
 
-    for (index, event) in ball_carry.carry_events().iter().enumerate() {
-        let kind = match event.kind {
-            BallCarryKind::Carry => MECHANIC_BALL_CARRY,
-            BallCarryKind::AirDribble => MECHANIC_AIR_DRIBBLE,
-        };
-        let mut mechanic_event = span_mechanic_event(
-            kind,
+    for (index, event) in timeline.iter().enumerate() {
+        events.push(make_event(
+            "timeline",
             index,
-            event.start_frame,
-            event.end_frame,
-            event.start_time,
-            event.end_time,
+            moment(event.frame.unwrap_or_default(), event.time),
+            EventPayload::Timeline(event.clone()),
             event.player_id.clone(),
-            Some(event.end_position),
+            None,
             event.is_team_0,
-        );
-        mechanic_event.properties = ball_carry_mechanic_event_properties(event);
-        events.push(mechanic_event);
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in match_stats.core_player_events().iter().enumerate() {
+        events.push(make_event(
+            "core_player",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::CorePlayer(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in match_stats
+        .core_player_goal_context_events()
+        .iter()
+        .enumerate()
+    {
+        events.push(make_event(
+            "core_player_goal_context",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::CorePlayerGoalContext(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in possession.events().iter().enumerate() {
+        events.push(make_event(
+            "possession",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::Possession(event.clone()),
+            event.player_id.clone(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in pressure.events().iter().enumerate() {
+        events.push(make_event(
+            "pressure",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::Pressure(event.clone()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in territorial_pressure.events().iter().enumerate() {
+        events.push(make_event(
+            "territorial_pressure",
+            index,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::TerritorialPressure(event.clone()),
+            None,
+            None,
+            Some(event.team_is_team_0),
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in movement.events().iter().enumerate() {
+        events.push(make_event(
+            "movement",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::Movement(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in positioning.activity_events().iter().enumerate() {
+        events.push(make_event(
+            "positioning_activity",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::PositioningActivity(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in positioning.possession_events().iter().enumerate() {
+        events.push(make_event(
+            "positioning_possession",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::PositioningPossession(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in positioning.field_zone_events().iter().enumerate() {
+        events.push(make_event(
+            "positioning_field_zone",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::PositioningFieldZone(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in positioning.ball_depth_events().iter().enumerate() {
+        events.push(make_event(
+            "positioning_ball_depth",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::PositioningBallDepth(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in positioning.teammate_role_events().iter().enumerate() {
+        events.push(make_event(
+            "positioning_teammate_role",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::PositioningTeammateRole(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in positioning.ball_proximity_events().iter().enumerate() {
+        events.push(make_event(
+            "positioning_ball_proximity",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::PositioningBallProximity(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in positioning.goal_context_events().iter().enumerate() {
+        events.push(make_event(
+            "positioning_goal_context",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::PositioningGoalContext(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in rotation.player_events().iter().enumerate() {
+        events.push(make_event(
+            "rotation_player",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::RotationPlayer(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in rotation.role_span_events().iter().enumerate() {
+        events.push(make_event(
+            "rotation_role_span",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::RotationRoleSpan(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in rotation.depth_span_events().iter().enumerate() {
+        events.push(make_event(
+            "rotation_depth_span",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::RotationDepthSpan(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in rotation.first_man_stint_events().iter().enumerate() {
+        events.push(make_event(
+            "rotation_first_man_stint",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::RotationFirstManStint(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in rotation.team_events().iter().enumerate() {
+        events.push(make_event(
+            "rotation_team",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::RotationTeam(event.clone()),
+            Some(event.next_first_man.clone()),
+            Some(event.previous_first_man.clone()),
+            Some(event.is_team_0),
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in goal_context.iter().enumerate() {
+        events.push(make_event(
+            "goal_context",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::GoalContext(event.clone()),
+            event.scorer.clone(),
+            None,
+            Some(event.scoring_team_is_team_0),
+            None,
+            event
+                .ball_position
+                .map(|position| [position.x, position.y, position.z]),
+            None,
+        ));
+    }
+
+    for (index, event) in backboard.events().iter().enumerate() {
+        events.push(make_event(
+            "backboard",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::Backboard(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in ball_carry.carry_events().iter().enumerate() {
+        events.push(make_event(
+            match event.kind {
+                BallCarryKind::Carry => MECHANIC_BALL_CARRY,
+                BallCarryKind::AirDribble => MECHANIC_AIR_DRIBBLE,
+            },
+            index,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::BallCarry(event.clone()),
+            Some(event.player_id.clone()),
+            None,
+            Some(event.is_team_0),
+            Some(event.end_position),
+            Some(event.end_position),
+            None,
+        ));
     }
 
     for (index, event) in ceiling_shot.events().iter().enumerate() {
-        events.push(span_mechanic_event(
+        events.push(make_event(
             MECHANIC_CEILING_SHOT,
             index,
-            event.ceiling_contact_frame,
-            event.frame,
-            event.ceiling_contact_time,
-            event.time,
-            event.player.clone(),
+            span(
+                event.ceiling_contact_frame,
+                event.frame,
+                event.ceiling_contact_time,
+                event.time,
+            ),
+            EventPayload::CeilingShot(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
             event.player_position,
-            event.is_team_0,
+            Some(event.touch_position),
+            Some(event.confidence),
         ));
     }
 
     for (index, event) in wall_aerial.events().iter().enumerate() {
-        let mut mechanic_event = span_mechanic_event(
+        events.push(make_event(
             MECHANIC_WALL_AERIAL,
             index,
-            event.wall_contact_frame,
-            event.frame,
-            event.wall_contact_time,
-            event.time,
-            event.player.clone(),
+            span(
+                event.wall_contact_frame,
+                event.frame,
+                event.wall_contact_time,
+                event.time,
+            ),
+            EventPayload::WallAerial(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
             Some(event.player_position),
-            event.is_team_0,
-        );
-        mechanic_event.properties = vec![mechanic_event_text_property(
-            "wall",
-            event.wall.as_label_value(),
-        )];
-        events.push(mechanic_event);
-    }
-
-    for (index, event) in wall_aerial_shot.events().iter().enumerate() {
-        let mut mechanic_event = span_mechanic_event(
-            MECHANIC_WALL_AERIAL_SHOT,
-            index,
-            event.takeoff_frame,
-            event.frame,
-            event.takeoff_time,
-            event.time,
-            event.player.clone(),
-            Some(event.player_position),
-            event.is_team_0,
-        );
-        mechanic_event.properties = vec![mechanic_event_text_property(
-            "wall",
-            event.wall.as_label_value(),
-        )];
-        events.push(mechanic_event);
-    }
-
-    for (index, event) in center.events().iter().enumerate() {
-        events.push(span_mechanic_event(
-            MECHANIC_CENTER,
-            index,
-            event.start_frame,
-            event.frame,
-            event.start_time,
-            event.time,
-            event.player.clone(),
-            event.player_position,
-            event.is_team_0,
+            Some(event.ball_position),
+            Some(event.confidence),
         ));
     }
 
-    for (index, event) in dodge_reset.confirmed_flip_reset_events().iter().enumerate() {
-        events.push(moment_mechanic_event(
-            MECHANIC_FLIP_RESET,
+    for (index, event) in wall_aerial_shot.events().iter().enumerate() {
+        events.push(make_event(
+            MECHANIC_WALL_AERIAL_SHOT,
             index,
-            event.frame,
-            event.time,
-            event.player.clone(),
+            span(
+                event.takeoff_frame,
+                event.frame,
+                event.takeoff_time,
+                event.time,
+            ),
+            EventPayload::WallAerialShot(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            Some(event.player_position),
+            Some(event.ball_position),
+            Some(event.confidence),
+        ));
+    }
+
+    for (index, event) in center.events().iter().enumerate() {
+        events.push(make_event(
+            MECHANIC_CENTER,
+            index,
+            span(event.start_frame, event.frame, event.start_time, event.time),
+            EventPayload::Center(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
             event.player_position,
-            event.is_team_0,
+            Some(event.end_ball_position),
+            None,
+        ));
+    }
+
+    for (index, event) in dodge_reset.events().iter().enumerate() {
+        events.push(make_event(
+            "dodge_reset",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::DodgeReset(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
         ));
     }
 
     for (index, event) in double_tap.events().iter().enumerate() {
-        events.push(span_mechanic_event(
+        events.push(make_event(
             MECHANIC_DOUBLE_TAP,
             index,
-            event.backboard_frame,
-            event.frame,
-            event.backboard_time,
-            event.time,
-            event.player.clone(),
+            span(
+                event.backboard_frame,
+                event.frame,
+                event.backboard_time,
+                event.time,
+            ),
+            EventPayload::DoubleTap(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
             event.player_position,
-            event.is_team_0,
-        ));
-    }
-
-    for (index, event) in flick.events().iter().enumerate() {
-        let mut mechanic_event = span_mechanic_event(
-            MECHANIC_FLICK,
-            index,
-            event.setup_start_frame,
-            event.frame,
-            event.setup_start_time,
-            event.time,
-            event.player.clone(),
-            event.player_position,
-            event.is_team_0,
-        );
-        mechanic_event.properties = flick_mechanic_event_properties(event);
-        events.push(mechanic_event);
-    }
-
-    for (index, event) in musty_flick.events().iter().enumerate() {
-        events.push(span_mechanic_event(
-            MECHANIC_MUSTY_FLICK,
-            index,
-            event.dodge_frame,
-            event.frame,
-            event.dodge_time,
-            event.time,
-            event.player.clone(),
-            event.player_position,
-            event.is_team_0,
+            None,
+            None,
         ));
     }
 
     for (index, event) in one_timer.events().iter().enumerate() {
-        events.push(span_mechanic_event(
+        events.push(make_event(
             MECHANIC_ONE_TIMER,
             index,
-            event.pass_start_frame,
-            event.frame,
-            event.pass_start_time,
-            event.time,
-            event.player.clone(),
+            span(
+                event.pass_start_frame,
+                event.frame,
+                event.pass_start_time,
+                event.time,
+            ),
+            EventPayload::OneTimer(event.clone()),
+            Some(event.player.clone()),
+            Some(event.passer.clone()),
+            Some(event.is_team_0),
             event.player_position,
-            event.is_team_0,
+            None,
+            None,
         ));
     }
 
     for (index, event) in pass.events().iter().enumerate() {
-        events.push(span_mechanic_event(
+        events.push(make_event(
             MECHANIC_PASS,
             index,
-            event.start_frame,
-            event.frame,
-            event.start_time,
-            event.time,
-            event.passer.clone(),
+            span(event.start_frame, event.frame, event.start_time, event.time),
+            EventPayload::Pass(event.clone()),
+            Some(event.passer.clone()),
+            Some(event.receiver.clone()),
+            Some(event.is_team_0),
             event.passer_position,
-            event.is_team_0,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in controlled_play.events().iter().enumerate() {
+        events.push(make_event(
+            "controlled_play",
+            index,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::ControlledPlay(event.clone()),
+            Some(event.player_id.clone()),
+            None,
+            Some(event.is_team_0),
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in fifty_fifty.events().iter().enumerate() {
+        events.push(make_event(
+            "fifty_fifty",
+            index,
+            span(
+                event.start_frame,
+                event.resolve_frame,
+                event.start_time,
+                event.resolve_time,
+            ),
+            EventPayload::FiftyFifty(event.clone()),
+            event
+                .team_zero_player
+                .clone()
+                .or_else(|| event.team_one_player.clone()),
+            None,
+            event.winning_team_is_team_0,
+            None,
+            Some(event.midpoint),
+            None,
+        ));
+    }
+
+    for (index, event) in kickoff.events().iter().enumerate() {
+        events.push(make_event(
+            "kickoff",
+            index,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::Kickoff(event.clone()),
+            event.first_touch_player.clone(),
+            None,
+            event.first_touch_team_is_team_0,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in rush.events().iter().enumerate() {
+        events.push(make_event(
+            "rush",
+            index,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::Rush(event.clone()),
+            None,
+            None,
+            Some(event.is_team_0),
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in flip_impulse.events().iter().enumerate() {
+        events.push(make_event(
+            "dodge",
+            index,
+            span(
+                event.frame,
+                event.resolved_frame,
+                event.time,
+                event.resolved_time,
+            ),
+            EventPayload::Dodge(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event
+                .dodge_impulse
+                .as_ref()
+                .map(|dodge_impulse| dodge_impulse.end_position),
+            None,
+            event
+                .dodge_impulse
+                .as_ref()
+                .map(|dodge_impulse| dodge_impulse.confidence),
         ));
     }
 
     for (index, event) in speed_flip.events().iter().enumerate() {
-        events.push(moment_mechanic_event(
+        events.push(make_event(
             MECHANIC_SPEED_FLIP,
             index,
-            event.frame,
-            event.time,
-            event.player.clone(),
+            span(
+                event.frame,
+                event.resolved_frame,
+                event.time,
+                event.resolved_time,
+            ),
+            EventPayload::SpeedFlip(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
             Some(event.end_position),
-            event.is_team_0,
+            None,
+            Some(event.confidence),
         ));
     }
 
     for (index, event) in half_flip.events().iter().enumerate() {
-        events.push(moment_mechanic_event(
+        events.push(make_event(
             MECHANIC_HALF_FLIP,
             index,
-            event.frame,
-            event.time,
-            event.player.clone(),
+            moment(event.frame, event.time),
+            EventPayload::HalfFlip(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
             Some(event.end_position),
-            event.is_team_0,
+            None,
+            Some(event.confidence),
         ));
     }
 
     for (index, event) in half_volley.events().iter().enumerate() {
-        events.push(moment_mechanic_event(
+        events.push(make_event(
             MECHANIC_HALF_VOLLEY,
             index,
-            event.frame,
-            event.time,
-            event.player.clone(),
+            moment(event.frame, event.time),
+            EventPayload::HalfVolley(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
             event.player_position,
-            event.is_team_0,
+            None,
+            None,
         ));
     }
 
     for (index, event) in wavedash.events().iter().enumerate() {
-        events.push(span_mechanic_event(
+        events.push(make_event(
             MECHANIC_WAVEDASH,
             index,
-            event.dodge_frame,
-            event.frame,
-            event.dodge_time,
-            event.time,
-            event.player.clone(),
+            span(event.dodge_frame, event.frame, event.dodge_time, event.time),
+            EventPayload::Wavedash(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
             Some(event.landing_position),
-            event.is_team_0,
+            None,
+            Some(event.confidence),
+        ));
+    }
+
+    for (index, event) in whiff.events().iter().enumerate() {
+        events.push(make_event(
+            "whiff",
+            index,
+            span(
+                event.frame,
+                event.resolved_frame,
+                event.time,
+                event.resolved_time,
+            ),
+            EventPayload::Whiff(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in powerslide.events().iter().enumerate() {
+        events.push(make_event(
+            "powerslide",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::Powerslide(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in touch.events().iter().enumerate() {
+        let timing =
+            event
+                .ball_movement
+                .as_ref()
+                .map_or(moment(event.frame, event.time), |movement| {
+                    span(
+                        movement.start_frame,
+                        movement.end_frame,
+                        movement.start_time,
+                        movement.end_time,
+                    )
+                });
+        events.push(make_event(
+            "touch",
+            index,
+            timing,
+            EventPayload::Touch(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in boost.pickup_comparison_events().iter().enumerate() {
+        events.push(make_event(
+            "boost_pickups",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::BoostPickup(event.clone()),
+            Some(event.player_id.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in boost.ledger_events().iter().enumerate() {
+        events.push(make_event(
+            "boost_ledger",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::BoostLedger(event.clone()),
+            Some(event.player_id.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in boost.bucket_events().iter().enumerate() {
+        events.push(make_event(
+            "boost_bucket",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::BoostBucket(event.clone()),
+            Some(event.player_id.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in boost.state_events().iter().enumerate() {
+        events.push(make_event(
+            "boost_state",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::BoostState(event.clone()),
+            Some(event.player_id.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in bump.events().iter().enumerate() {
+        events.push(make_event(
+            "bump",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::Bump(event.clone()),
+            Some(event.initiator.clone()),
+            Some(event.victim.clone()),
+            Some(event.initiator_is_team_0),
+            Some(event.initiator_position),
+            None,
+            Some(event.confidence),
+        ));
+    }
+
+    for (index, event) in flick.events().iter().enumerate() {
+        events.push(make_event(
+            MECHANIC_FLICK,
+            index,
+            span(
+                event.setup_start_frame,
+                event.frame,
+                event.setup_start_time,
+                event.time,
+            ),
+            EventPayload::Flick(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            Some(event.confidence),
+        ));
+    }
+
+    for (index, event) in musty_flick.events().iter().enumerate() {
+        events.push(make_event(
+            MECHANIC_MUSTY_FLICK,
+            index,
+            span(event.dodge_frame, event.frame, event.dodge_time, event.time),
+            EventPayload::MustyFlick(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            Some(event.confidence),
         ));
     }
 
     events.sort_by(|left, right| {
-        let left_time = mechanic_event_start_time(left);
-        let right_time = mechanic_event_start_time(right);
-        left_time
-            .total_cmp(&right_time)
-            .then_with(|| left.kind.cmp(&right.kind))
-            .then_with(|| left.id.cmp(&right.id))
+        event_start_time(left)
+            .total_cmp(&event_start_time(right))
+            .then_with(|| left.meta.stream.cmp(&right.meta.stream))
+            .then_with(|| left.meta.id.cmp(&right.meta.id))
     });
     events
-}
-
-fn mechanic_event_start_time(event: &StatsTimelineTagEvent) -> f32 {
-    match event.timing {
-        StatsEventTiming::Moment { time, .. } => time,
-        StatsEventTiming::Span { start_time, .. } => start_time,
-    }
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

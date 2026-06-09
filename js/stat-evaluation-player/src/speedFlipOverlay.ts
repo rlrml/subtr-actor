@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { ReplayModel, ReplayScene } from "@rlrml/player";
 import type { StatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const STYLE_ID = "subtr-actor-speed-flip-overlay-styles";
 const BLUE_COLOR = 0x59c3ff;
@@ -60,7 +61,7 @@ export function buildSpeedFlipMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): SpeedFlipMarker[] {
-  return statsTimeline.events.speed_flip.map((event) => {
+  return statsEventPayloads(statsTimeline, "speed_flip").map((event) => {
     const playerName = findPlayerName(replay, event.player);
     const playerId = playerIdToString(event.player);
     const time = replay.frames[event.frame]?.time ?? event.time;

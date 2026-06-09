@@ -30,6 +30,7 @@ pub struct StatsTimelineConfig {
     pub empty_net_min_defender_distance: f32,
     pub empty_net_max_touch_attacking_y: f32,
     pub flick_goal_max_event_to_goal_seconds: f32,
+    pub ceiling_shot_goal_max_event_to_goal_seconds: f32,
     pub double_tap_goal_max_event_to_goal_seconds: f32,
     pub one_timer_goal_max_event_to_goal_seconds: f32,
     pub air_dribble_goal_max_end_to_goal_seconds: f32,
@@ -114,62 +115,86 @@ pub struct ReplayStatsPlayerIdentity {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ReplayStatsTimelineEvents {
-    pub timeline: Vec<TimelineEvent>,
-    pub core_player: Vec<CorePlayerScoreboardEvent>,
-    pub core_player_goal_context: Vec<CorePlayerGoalContextEvent>,
-    pub possession: Vec<PossessionEvent>,
-    pub pressure: Vec<PressureEvent>,
-    pub territorial_pressure: Vec<TerritorialPressureEvent>,
-    pub movement: Vec<MovementEvent>,
-    pub positioning_activity: Vec<PositioningActivityEvent>,
-    pub positioning_possession: Vec<PositioningPossessionEvent>,
-    pub positioning_field_zone: Vec<PositioningFieldZoneEvent>,
-    pub positioning_ball_depth: Vec<PositioningBallDepthEvent>,
-    pub positioning_teammate_role: Vec<PositioningTeammateRoleEvent>,
-    pub positioning_ball_proximity: Vec<PositioningBallProximityEvent>,
-    pub positioning_goal_context: Vec<PositioningGoalContextEvent>,
-    pub rotation_player: Vec<RotationPlayerEvent>,
-    pub rotation_role_span: Vec<RotationRoleSpanEvent>,
-    pub rotation_depth_span: Vec<RotationDepthSpanEvent>,
-    pub rotation_first_man_stint: Vec<RotationFirstManStintEvent>,
-    pub rotation_team: Vec<RotationTeamEvent>,
-    pub mechanics: Vec<StatsTimelineTagEvent>,
-    pub goal_context: Vec<GoalContextEvent>,
-    pub backboard: Vec<BackboardBounceEvent>,
-    pub ceiling_shot: Vec<CeilingShotEvent>,
-    pub wall_aerial: Vec<WallAerialEvent>,
-    pub wall_aerial_shot: Vec<WallAerialShotEvent>,
-    pub center: Vec<CenterEvent>,
-    pub flick: Vec<FlickEvent>,
-    pub musty_flick: Vec<MustyFlickEvent>,
-    pub dodge_reset: Vec<DodgeResetEvent>,
-    pub double_tap: Vec<DoubleTapEvent>,
-    pub fifty_fifty: Vec<FiftyFiftyEvent>,
-    pub kickoff: Vec<KickoffEvent>,
-    pub one_timer: Vec<OneTimerEvent>,
-    pub pass: Vec<PassEvent>,
-    pub ball_carry: Vec<BallCarryEvent>,
-    pub controlled_play: Vec<ControlledPlayEvent>,
-    pub rush: Vec<RushEvent>,
-    pub dodge: Vec<DodgeEvent>,
-    pub speed_flip: Vec<SpeedFlipEvent>,
-    pub half_flip: Vec<HalfFlipEvent>,
-    pub half_volley: Vec<HalfVolleyEvent>,
-    pub wavedash: Vec<WavedashEvent>,
-    pub whiff: Vec<WhiffEvent>,
-    pub powerslide: Vec<PowerslideEvent>,
-    pub touch: Vec<TouchClassificationEvent>,
-    pub boost_pickups: Vec<BoostPickupComparisonEvent>,
-    pub boost_ledger: Vec<BoostLedgerEvent>,
-    pub boost_bucket: Vec<BoostBucketEvent>,
-    pub boost_state: Vec<BoostStateEvent>,
-    pub bump: Vec<BumpEvent>,
+    pub events: Vec<Event>,
+}
+
+pub fn stats_timeline_event_label(stream: &str) -> String {
+    let label = match stream {
+        "timeline" => "Timeline",
+        "core_player" => "Core player",
+        "core_player_goal_context" => "Core player goal context",
+        "possession" => "Possession",
+        "pressure" => "Pressure",
+        "territorial_pressure" => "Territorial pressure",
+        "movement" => "Movement",
+        "positioning_activity" => "Positioning activity",
+        "positioning_possession" => "Positioning possession",
+        "positioning_field_zone" => "Positioning field zone",
+        "positioning_ball_depth" => "Positioning ball depth",
+        "positioning_teammate_role" => "Positioning teammate role",
+        "positioning_ball_proximity" => "Positioning ball proximity",
+        "positioning_goal_context" => "Positioning goal context",
+        "rotation_player" => "Rotation player",
+        "rotation_role_span" => "Rotation role span",
+        "rotation_depth_span" => "Rotation depth span",
+        "rotation_first_man_stint" => "Rotation first-man stint",
+        "rotation_team" => "Rotation team",
+        "goal_context" => "Goal context",
+        "backboard" => "Backboard",
+        "air_dribble" => "Air dribble",
+        "ball_carry" => "Ball carry",
+        "controlled_play" => "Controlled play",
+        "ceiling_shot" => "Ceiling shot",
+        "wall_aerial" => "Wall aerial",
+        "wall_aerial_shot" => "Wall aerial shot",
+        "center" => "Center",
+        "dodge_reset" => "Flip reset",
+        "flip_reset" => "Flip reset",
+        "double_tap" => "Double tap",
+        "one_timer" => "One-timer",
+        "pass" => "Pass",
+        "fifty_fifty" => "50/50",
+        "kickoff" => "Kickoff",
+        "rush" => "Rush",
+        "dodge" => "Dodge",
+        "speed_flip" => "Speed flip",
+        "half_flip" => "Half flip",
+        "half_volley" => "Half-volley",
+        "wavedash" => "Wavedash",
+        "whiff" => "Whiff",
+        "powerslide" => "Powerslide",
+        "touch" => "Touch",
+        "boost_pickups" => "Boost pickup",
+        "boost_ledger" => "Boost ledger",
+        "boost_bucket" => "Boost bucket",
+        "boost_state" => "Boost state",
+        "bump" => "Bump",
+        "flick" => "Flick",
+        "musty_flick" => "Musty flick",
+        _ => return title_case_event_stream(stream),
+    };
+    label.to_owned()
+}
+
+fn title_case_event_stream(stream: &str) -> String {
+    stream
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[ts(export)]
-pub enum StatsEventTiming {
+pub enum EventTiming {
     Moment {
         frame: usize,
         time: f32,
@@ -182,10 +207,34 @@ pub enum StatsEventTiming {
     },
 }
 
+impl EventTiming {
+    pub fn start(&self) -> (usize, f32) {
+        match self {
+            Self::Moment { frame, time } => (*frame, *time),
+            Self::Span {
+                start_frame,
+                start_time,
+                ..
+            } => (*start_frame, *start_time),
+        }
+    }
+
+    pub fn end(&self) -> (usize, f32) {
+        match self {
+            Self::Moment { frame, time } => (*frame, *time),
+            Self::Span {
+                end_frame,
+                end_time,
+                ..
+            } => (*end_frame, *end_time),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[ts(export)]
-pub enum StatsEventPropertyValue {
+pub enum EventPropertyValue {
     Text(String),
     Unsigned(u32),
     Float(f32),
@@ -194,24 +243,96 @@ pub enum StatsEventPropertyValue {
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct StatsEventProperty {
+pub struct EventProperty {
     pub key: String,
-    pub value: StatsEventPropertyValue,
+    pub value: EventPropertyValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct StatsTimelineTagEvent {
+pub struct EventMeta {
     pub id: String,
-    pub kind: String,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player_id: PlayerId,
+    pub stream: String,
+    pub label: String,
+    pub timing: EventTiming,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
+    pub primary_player: Option<PlayerId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
+    pub secondary_player: Option<PlayerId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-    pub timing: StatsEventTiming,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ball_position: Option<[f32; 3]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team_is_team_0: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<f32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub properties: Vec<StatsEventProperty>,
+    pub properties: Vec<EventProperty>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[serde(tag = "kind", content = "payload", rename_all = "snake_case")]
+#[ts(export)]
+pub enum EventPayload {
+    Timeline(TimelineEvent),
+    CorePlayer(CorePlayerScoreboardEvent),
+    CorePlayerGoalContext(CorePlayerGoalContextEvent),
+    Possession(PossessionEvent),
+    Pressure(PressureEvent),
+    TerritorialPressure(TerritorialPressureEvent),
+    Movement(MovementEvent),
+    PositioningActivity(PositioningActivityEvent),
+    PositioningPossession(PositioningPossessionEvent),
+    PositioningFieldZone(PositioningFieldZoneEvent),
+    PositioningBallDepth(PositioningBallDepthEvent),
+    PositioningTeammateRole(PositioningTeammateRoleEvent),
+    PositioningBallProximity(PositioningBallProximityEvent),
+    PositioningGoalContext(PositioningGoalContextEvent),
+    RotationPlayer(RotationPlayerEvent),
+    RotationRoleSpan(RotationRoleSpanEvent),
+    RotationDepthSpan(RotationDepthSpanEvent),
+    RotationFirstManStint(RotationFirstManStintEvent),
+    RotationTeam(RotationTeamEvent),
+    GoalContext(GoalContextEvent),
+    Backboard(BackboardBounceEvent),
+    CeilingShot(CeilingShotEvent),
+    WallAerial(WallAerialEvent),
+    WallAerialShot(WallAerialShotEvent),
+    Center(CenterEvent),
+    Flick(FlickEvent),
+    MustyFlick(MustyFlickEvent),
+    DodgeReset(DodgeResetEvent),
+    DoubleTap(DoubleTapEvent),
+    FiftyFifty(FiftyFiftyEvent),
+    Kickoff(KickoffEvent),
+    OneTimer(OneTimerEvent),
+    Pass(PassEvent),
+    BallCarry(BallCarryEvent),
+    ControlledPlay(ControlledPlayEvent),
+    Rush(RushEvent),
+    Dodge(DodgeEvent),
+    SpeedFlip(SpeedFlipEvent),
+    HalfFlip(HalfFlipEvent),
+    HalfVolley(HalfVolleyEvent),
+    Wavedash(WavedashEvent),
+    Whiff(WhiffEvent),
+    Powerslide(PowerslideEvent),
+    Touch(TouchClassificationEvent),
+    BoostPickup(BoostPickupComparisonEvent),
+    BoostLedger(BoostLedgerEvent),
+    BoostBucket(BoostBucketEvent),
+    BoostState(BoostStateEvent),
+    Bump(BumpEvent),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct Event {
+    pub meta: EventMeta,
+    pub payload: EventPayload,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]

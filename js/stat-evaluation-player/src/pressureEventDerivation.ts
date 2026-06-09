@@ -3,6 +3,7 @@ import type { PressureEvent } from "./generated/PressureEvent.ts";
 import type { PressureTeamStats } from "./generated/PressureTeamStats.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 interface RawPressureStats {
   tracked_time: number;
@@ -164,7 +165,7 @@ export function applyPressureEventDerivedStats(
 export function createPressureEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortPressureEvents(timeline.events.pressure ?? []);
+  const events = sortPressureEvents(statsEventPayloads(timeline, "pressure"));
 
   let eventIndex = 0;
   const raw = defaultRawPressureStats();

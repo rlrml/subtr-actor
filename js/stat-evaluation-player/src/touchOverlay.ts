@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { ReplayModel, ReplayScene } from "@rlrml/player";
 import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const STYLE_ID = "subtr-actor-touch-overlay-styles";
 const BLUE_TOUCH_COLOR = 0x59c3ff;
@@ -80,7 +81,7 @@ export function buildTouchMarkers(
   replay: ReplayModel,
 ): TouchMarker[] {
   const markers: TouchMarker[] = [];
-  const events = [...(statsTimeline.events?.touch ?? [])].sort((left, right) => {
+  const events = [...statsEventPayloads(statsTimeline, "touch")].sort((left, right) => {
     if (left.frame !== right.frame) {
       return left.frame - right.frame;
     }

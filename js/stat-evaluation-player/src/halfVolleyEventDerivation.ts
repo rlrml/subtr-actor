@@ -2,6 +2,7 @@ import type { HalfVolleyEvent } from "./generated/HalfVolleyEvent.ts";
 import type { HalfVolleyPlayerStats } from "./generated/HalfVolleyPlayerStats.ts";
 import type { HalfVolleyTeamStats } from "./generated/HalfVolleyTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function f32(value: number): number {
   return Math.fround(value);
@@ -119,7 +120,7 @@ export function applyHalfVolleyEventDerivedStats(
 export function createHalfVolleyEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortHalfVolleyEvents(timeline.events.half_volley ?? []);
+  const events = sortHalfVolleyEvents(statsEventPayloads(timeline, "half_volley"));
 
   let eventIndex = 0;
   let lastHalfVolleyPlayer: string | null = null;

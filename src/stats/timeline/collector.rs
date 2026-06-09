@@ -66,6 +66,8 @@ pub fn default_stats_timeline_config() -> StatsTimelineConfig {
             .max_touch_attacking_y,
         flick_goal_max_event_to_goal_seconds: FlickGoalCalculatorConfig::default()
             .max_event_to_goal_seconds,
+        ceiling_shot_goal_max_event_to_goal_seconds: CeilingShotGoalCalculatorConfig::default()
+            .max_event_to_goal_seconds,
         double_tap_goal_max_event_to_goal_seconds: DoubleTapGoalCalculatorConfig::default()
             .max_event_to_goal_seconds,
         one_timer_goal_max_event_to_goal_seconds: OneTimerGoalCalculatorConfig::default()
@@ -143,17 +145,11 @@ impl StatsTimelineCollector {
             .replay_meta
             .clone()
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?;
-        let mut events = self
+        let events = self
             .graph
             .state::<StatsTimelineEventsState>()
             .map(|state| state.events.clone())
             .unwrap_or_default();
-        if let Some(boost) = self.graph.state::<BoostCalculator>() {
-            events.boost_pickups = boost.pickup_comparison_events().to_vec();
-            events.boost_ledger = boost.ledger_events().to_vec();
-            events.boost_bucket = boost.bucket_events().to_vec();
-            events.boost_state = boost.state_events().to_vec();
-        }
         Ok(ReplayStatsTimeline {
             config: self.timeline_config(),
             replay_meta,

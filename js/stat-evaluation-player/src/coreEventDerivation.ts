@@ -3,6 +3,7 @@ import type { CorePlayerGoalContextEvent } from "./generated/CorePlayerGoalConte
 import type { CorePlayerScoreboardEvent } from "./generated/CorePlayerScoreboardEvent.ts";
 import type { CoreTeamStats } from "./generated/CoreTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -218,8 +219,10 @@ export function applyCoreEventDerivedStats(
 export function createCoreEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const playerEvents = sortCoreEvents(timeline.events.core_player ?? []);
-  const goalContextEvents = sortCoreEvents(timeline.events.core_player_goal_context ?? []);
+  const playerEvents = sortCoreEvents(statsEventPayloads(timeline, "core_player"));
+  const goalContextEvents = sortCoreEvents(
+    statsEventPayloads(timeline, "core_player_goal_context"),
+  );
 
   let playerEventIndex = 0;
   let goalContextEventIndex = 0;

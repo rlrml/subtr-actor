@@ -14,11 +14,8 @@ mod playback_events;
 mod playback_frames;
 #[path = "playback_json.rs"]
 mod playback_json;
-#[path = "playback_mechanics.rs"]
-mod playback_mechanics;
 use playback_event_parsers::*;
 use playback_json::*;
-use playback_mechanics::*;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CapturedStatsFrame<Modules> {
@@ -221,6 +218,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let own_half_goal_config = self.config.get("own_half_goal").and_then(Value::as_object);
         let empty_net_goal_config = self.config.get("empty_net_goal").and_then(Value::as_object);
         let flick_goal_config = self.config.get("flick_goal").and_then(Value::as_object);
+        let ceiling_shot_goal_config = self
+            .config
+            .get("ceiling_shot_goal")
+            .and_then(Value::as_object);
         let double_tap_goal_config = self
             .config
             .get("double_tap_goal")
@@ -349,6 +350,12 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "flick_goal_max_event_to_touch_seconds",
             )
             .unwrap_or(FlickGoalCalculatorConfig::default().max_event_to_goal_seconds),
+            ceiling_shot_goal_max_event_to_goal_seconds: json_config_f32(
+                ceiling_shot_goal_config,
+                "ceiling_shot_goal_max_event_to_goal_seconds",
+                "ceiling_shot_goal_max_event_to_touch_seconds",
+            )
+            .unwrap_or(CeilingShotGoalCalculatorConfig::default().max_event_to_goal_seconds),
             double_tap_goal_max_event_to_goal_seconds: json_config_f32(
                 double_tap_goal_config,
                 "double_tap_goal_max_event_to_goal_seconds",

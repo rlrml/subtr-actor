@@ -2,6 +2,7 @@ import type { PassEvent } from "./generated/PassEvent.ts";
 import type { PassPlayerStats } from "./generated/PassPlayerStats.ts";
 import type { PassTeamStats } from "./generated/PassTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -104,7 +105,7 @@ export function applyPassEventDerivedStats(
 export function createPassEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortPassEvents(timeline.events.pass ?? []);
+  const events = sortPassEvents(statsEventPayloads(timeline, "pass"));
 
   let eventIndex = 0;
   let lastCompletedPassPlayer: string | null = null;

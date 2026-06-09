@@ -1,6 +1,7 @@
 import type { WhiffEvent } from "./generated/WhiffEvent.ts";
 import type { WhiffStats } from "./generated/WhiffStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 type WhiffAccumulator = Omit<WhiffStats, "labeled_whiff_counts">;
 
@@ -112,7 +113,7 @@ export function applyWhiffEventDerivedStats(
 export function createWhiffEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortWhiffEvents(timeline.events.whiff ?? []);
+  const events = sortWhiffEvents(statsEventPayloads(timeline, "whiff"));
 
   let eventIndex = 0;
   let lastWhiffPlayer: string | null = null;

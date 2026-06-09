@@ -5,6 +5,7 @@ import type { BallCarryStats } from "./generated/BallCarryStats.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 type BallCarryStatsWithLabels = BallCarryStats & {
   labeled_event_counts?: LabeledCounts;
@@ -204,7 +205,7 @@ export function applyBallCarryEventDerivedStats(
 export function createBallCarryEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortBallCarryEvents(timeline.events.ball_carry ?? []);
+  const events = sortBallCarryEvents(statsEventPayloads(timeline, "ball_carry"));
 
   let eventIndex = 0;
   const ballCarryPlayers = new Map<string, BallCarryStatsWithLabels>();

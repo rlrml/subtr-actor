@@ -1,6 +1,7 @@
 import type { RushEvent } from "./generated/RushEvent.ts";
 import type { RushTeamStats } from "./generated/RushTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function defaultRushTeamStats(): RushTeamStats {
   return {
@@ -68,7 +69,7 @@ export function applyRushEventDerivedStats(
 export function createRushEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortRushEvents(timeline.events.rush ?? []);
+  const events = sortRushEvents(statsEventPayloads(timeline, "rush"));
 
   let eventIndex = 0;
   const teamZero = defaultRushTeamStats();

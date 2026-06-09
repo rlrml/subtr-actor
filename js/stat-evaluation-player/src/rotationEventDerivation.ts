@@ -3,6 +3,7 @@ import type { RotationPlayerStats } from "./generated/RotationPlayerStats.ts";
 import type { RotationTeamEvent } from "./generated/RotationTeamEvent.ts";
 import type { RotationTeamStats } from "./generated/RotationTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 interface RotationPlayerState {
   active: boolean;
@@ -209,8 +210,8 @@ export function applyRotationEventDerivedStats(
 export function createRotationEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const playerEvents = sortRotationEvents(timeline.events.rotation_player ?? []);
-  const teamEvents = sortRotationEvents(timeline.events.rotation_team ?? []);
+  const playerEvents = sortRotationEvents(statsEventPayloads(timeline, "rotation_player"));
+  const teamEvents = sortRotationEvents(statsEventPayloads(timeline, "rotation_team"));
   const firstManStintEndGraceSeconds = timeline.config.rotation_first_man_debounce_seconds;
 
   let playerEventIndex = 0;

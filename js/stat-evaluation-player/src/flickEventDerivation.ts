@@ -3,6 +3,7 @@ import type { FlickStats } from "./generated/FlickStats.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const FLICK_HIGH_CONFIDENCE = 0.8;
 
@@ -203,7 +204,7 @@ export function applyFlickEventDerivedStats(
 export function createFlickEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortFlickEvents(timeline.events.flick ?? []);
+  const events = sortFlickEvents(statsEventPayloads(timeline, "flick"));
 
   let eventIndex = 0;
   let lastFlickPlayer: string | null = null;
