@@ -13,6 +13,7 @@ export {
 export type { BallchasingReplayDownloadOptions } from "./ballchasing";
 export { createBallchasingOverlayPlugin } from "./ballchasing-overlay";
 export type { BallchasingOverlayPluginOptions } from "./ballchasing-overlay";
+export { BOOST_RAW_MAX, boostAmountToPercent, boostPercentToAmount } from "./boost-units";
 export { createBoostPadOverlayPlugin } from "./boost-pad-overlay";
 export type { BoostPadOverlayPluginOptions } from "./boost-pad-overlay";
 export { createBoostPickupAnimationPlugin } from "./boost-pickup-animation";

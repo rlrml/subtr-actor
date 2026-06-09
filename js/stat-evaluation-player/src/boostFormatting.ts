@@ -1,12 +1,14 @@
-const BOOST_RAW_MAX = 255;
+import { boostAmountToPercent } from "@rlrml/player";
 
-export function toBoostDisplayUnits(amount: number): number {
-  return (amount * 100) / BOOST_RAW_MAX;
-}
+// The raw `0..=255` -> `0..=100` conversion lives in `@rlrml/player`
+// (`boostAmountToPercent`) so every subtr-actor JS consumer rescales boost the
+// same way. This module keeps the stat-player display conventions (the `"?"`
+// missing-value sentinel and the respawn-inclusive bound) on top of it.
+export { boostAmountToPercent as toBoostDisplayUnits } from "@rlrml/player";
 
 export function formatBoostDisplayAmount(amount: number | null | undefined): string {
   if (amount == null) return "?";
-  return toBoostDisplayUnits(amount).toFixed(0);
+  return boostAmountToPercent(amount).toFixed(0);
 }
 
 export function formatCollectedWithRespawnBound(
