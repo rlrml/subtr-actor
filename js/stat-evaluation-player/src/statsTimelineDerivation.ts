@@ -91,9 +91,9 @@ import {
   createPowerslideEventDerivedStatsAccumulator,
 } from "./powerslideEventDerivation.ts";
 import {
-  applyPressureEventDerivedStats,
-  createPressureEventDerivedStatsAccumulator,
-} from "./pressureEventDerivation.ts";
+  applyBallHalfEventDerivedStats,
+  createBallHalfEventDerivedStatsAccumulator,
+} from "./ballHalfEventDerivation.ts";
 import {
   applyTerritorialPressureEventDerivedStats,
   createTerritorialPressureEventDerivedStatsAccumulator,
@@ -182,11 +182,11 @@ export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventD
     createFrameAccumulator: createPossessionEventDerivedStatsAccumulator,
   },
   {
-    id: "pressure",
+    id: "ball_half",
     playerModules: [],
-    teamModules: ["pressure"],
-    apply: applyPressureEventDerivedStats,
-    createFrameAccumulator: createPressureEventDerivedStatsAccumulator,
+    teamModules: ["ball_half"],
+    apply: applyBallHalfEventDerivedStats,
+    createFrameAccumulator: createBallHalfEventDerivedStatsAccumulator,
   },
   {
     id: "territorial-pressure",

@@ -49,8 +49,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_stats_or_default::<PossessionStats>(frame, "possession"),
         );
         timeline.insert(
-            "pressure".to_owned(),
-            self.frame_stats_or_default::<PressureStats>(frame, "pressure"),
+            "ball_half".to_owned(),
+            self.frame_stats_or_default::<BallHalfStats>(frame, "ball_half"),
         );
         timeline.insert(
             "territorial_pressure".to_owned(),
@@ -120,8 +120,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             possession: self
                 .frame_stats_or_default_typed::<PossessionStats>(frame, "possession")?
                 .for_team(is_team_zero),
-            pressure: self
-                .frame_stats_or_default_typed::<PressureStats>(frame, "pressure")?
+            ball_half: self
+                .frame_stats_or_default_typed::<BallHalfStats>(frame, "ball_half")?
                 .for_team(is_team_zero),
             territorial_pressure: self
                 .frame_stats_or_default_typed::<TerritorialPressureStats>(
@@ -330,10 +330,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             )?,
         );
         team.insert(
-            "pressure".to_owned(),
+            "ball_half".to_owned(),
             serialize_to_json_value(
                 &self
-                    .frame_stats_or_default_typed::<PressureStats>(frame, "pressure")?
+                    .frame_stats_or_default_typed::<BallHalfStats>(frame, "ball_half")?
                     .for_team(is_team_zero),
             )?,
         );

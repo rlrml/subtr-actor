@@ -64,6 +64,34 @@ _None documented._
 
 _None documented._
 
+### Ball Half (`ball_half`)
+
+- Category: `possession`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `ball_half` via `BallHalfNode` / `BallHalfCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Boost Bucket (`boost_bucket`)
 
 - Category: `boost`
@@ -937,9 +965,9 @@ _None documented._
 
 _None documented._
 
-### Pressure (`pressure`)
+### Rotation Depth Span (`rotation_depth_span`)
 
-- Category: `possession`
+- Category: `positioning`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -947,7 +975,35 @@ _None documented._
   - False negative evidence: `not_evaluated`
   - Testing: `untested`
 - Producers:
-  - `pressure` via `PressureNode` / `PressureCalculator`
+  - `rotation` via `RotationNode` / `RotationCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### First Man Stint (`rotation_first_man_stint`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `rotation` via `RotationNode` / `RotationCalculator`
 
 **Summary**
 
@@ -966,6 +1022,34 @@ _None documented._
 _None documented._
 
 ### Player Rotation (`rotation_player`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `rotation` via `RotationNode` / `RotationCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Rotation Role Span (`rotation_role_span`)
 
 - Category: `positioning`
 - Confidence:

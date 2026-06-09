@@ -48,8 +48,12 @@ fn ball(y: f32) -> BallFrameState {
 }
 
 fn ball_with_velocity(y: f32, velocity: glam::Vec3) -> BallFrameState {
+    ball_at(glam::Vec3::new(0.0, y, 92.0), velocity)
+}
+
+fn ball_at(position: glam::Vec3, velocity: glam::Vec3) -> BallFrameState {
     BallFrameState::Present(BallSample {
-        rigid_body: rigid_body(glam::Vec3::new(0.0, y, 92.0), velocity),
+        rigid_body: rigid_body(position, velocity),
     })
 }
 
@@ -682,6 +686,152 @@ fn kickoff_tracks_first_touch_taker_delay_exit_velocity_and_follow_up() {
 }
 
 #[test]
+fn kickoff_ball_direction_is_taker_relative() {
+    let right_side_ball = ball_at(
+        glam::Vec3::new(240.0, 0.0, 92.0),
+        glam::Vec3::new(-500.0, 0.0, 0.0),
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&right_side_ball, true),
+        KickoffBallDirection::Right
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&right_side_ball, false),
+        KickoffBallDirection::Left
+    );
+
+    let centered_ball_moving_left = ball_at(
+        glam::Vec3::new(0.0, 0.0, 92.0),
+        glam::Vec3::new(-500.0, 0.0, 0.0),
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&centered_ball_moving_left, true),
+        KickoffBallDirection::Left
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&centered_ball_moving_left, false),
+        KickoffBallDirection::Right
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&ball(0.0), true),
+        KickoffBallDirection::Center
+    );
+}
+
+#[test]
+fn kickoff_taker_tracks_time_to_ball_and_approach_boost_totals() {
+    let blue_taker = PlayerId::Steam(24);
+    let orange_taker = PlayerId::Steam(25);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                game_state: Some(GAME_STATE_KICKOFF_COUNTDOWN),
+                ball_has_been_hit: Some(false),
+                kickoff_countdown_time: Some(3),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(30, 3.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                kickoff_countdown_time: Some(0),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-1200.0, -1700.0, 17.0),
+                        30.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(1200.0, 1700.0, 17.0),
+                        32.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(35, 3.5),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(blue_taker.clone(), true, glam::Vec3::ZERO, 45.0),
+                    player(orange_taker.clone(), false, glam::Vec3::ZERO, 28.0),
+                ],
+            },
+            &TouchState {
+                touch_events: vec![touch(blue_taker.clone(), true, 35, 3.5)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(50, 5.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(360.0),
+            &PlayerFrameState {
+                players: vec![player(blue_taker.clone(), true, glam::Vec3::ZERO, 10.0)],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    let event = calculator.events().last().unwrap();
+    let blue_taker_event = event.team_zero_taker.as_ref().unwrap();
+    assert_eq!(blue_taker_event.player, blue_taker);
+    assert_eq!(blue_taker_event.time_to_ball, Some(0.5));
+    assert_eq!(blue_taker_event.boost_collected, 15.0);
+    assert_eq!(blue_taker_event.boost_used, 3.0);
+}
+
+#[test]
 fn kickoff_taker_touch_delay_is_non_negative_when_team_one_touches_first() {
     let blue_taker = PlayerId::Steam(26);
     let orange_taker = PlayerId::Steam(27);
@@ -1276,6 +1426,7 @@ fn kickoff_classifies_known_taker_approaches() {
         start_position: [-2048.0, -2560.0, 17.0],
         spawn_position: KickoffSpawnPosition::DiagonalLeft,
         start_boost: Some(33.0),
+        first_touch_boost: Some(20.0),
         first_touch_time: Some(1.0),
         first_touch_frame: Some(10),
         approach_trace: KickoffApproachTrace {
@@ -1510,6 +1661,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
                 start_position: [-2048.0, -2560.0, 17.0],
                 spawn_position: KickoffSpawnPosition::DiagonalLeft,
                 start_boost: Some(33.0),
+                first_touch_boost: None,
                 first_touch_time: None,
                 first_touch_frame: None,
                 approach_trace: KickoffApproachTrace::default(),
@@ -1520,6 +1672,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
                 start_position: [2048.0, -2560.0, 17.0],
                 spawn_position: KickoffSpawnPosition::DiagonalRight,
                 start_boost: Some(33.0),
+                first_touch_boost: None,
                 first_touch_time: None,
                 first_touch_frame: None,
                 approach_trace: KickoffApproachTrace::default(),
@@ -1528,6 +1681,62 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
         true,
     );
     assert_eq!(left_goes_index, Some(0));
+}
+
+#[test]
+fn kickoff_taker_prefers_ball_committer_when_no_touch() {
+    // Regression for a real 2v2 kickoff (a contested 50/50). The orange
+    // challenger drove in and contacted the ball, but the replay only emitted
+    // the opposing team's BallHitTeamNum marker, so subtr-actor recorded no
+    // touch for either orange player. Both orange players spawn on mirrored
+    // diagonals at equal distance from the ball, so the distance tie and the
+    // first-touch tiebreak can't disambiguate. The legacy fallback then picked
+    // the geometrically leftmost player (index 0) -- a back/cheat player that
+    // stayed ~3400uu from the ball -- instead of the challenger who drove from
+    // spawn into the ball and burned all boost (index 1). Selection must follow
+    // the commitment signal (advance toward the ball, then boost burned), not
+    // the static left-side tiebreak.
+    let kept_boost_player = PlayerId::Epic("kept-boost".to_owned());
+    let ball_committer = PlayerId::Epic("ball-committer".to_owned());
+
+    let players = [
+        KickoffPlayerSnapshot {
+            player: kept_boost_player,
+            is_team_0: false,
+            start_position: [2048.0, 2560.0, 17.0],
+            spawn_position: KickoffSpawnPosition::DiagonalLeft,
+            start_boost: Some(85.0),
+            first_touch_boost: None,
+            first_touch_time: None,
+            first_touch_frame: None,
+            approach_trace: KickoffApproachTrace {
+                min_boost: Some(85.0),
+                last_position: Some([1900.0, 2400.0, 17.0]),
+                ..KickoffApproachTrace::default()
+            },
+        },
+        KickoffPlayerSnapshot {
+            player: ball_committer,
+            is_team_0: false,
+            start_position: [-2048.0, 2560.0, 17.0],
+            spawn_position: KickoffSpawnPosition::DiagonalRight,
+            start_boost: Some(85.0),
+            first_touch_boost: None,
+            first_touch_time: None,
+            first_touch_frame: None,
+            approach_trace: KickoffApproachTrace {
+                min_boost: Some(0.0),
+                last_position: Some([-300.0, 700.0, 17.0]),
+                ..KickoffApproachTrace::default()
+            },
+        },
+    ];
+
+    // Legacy `relative_left_value` tiebreak would have returned Some(0).
+    assert_eq!(
+        KickoffCalculator::expected_taker_by_team(&players, false),
+        Some(1)
+    );
 }
 
 #[test]
@@ -1576,6 +1785,10 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
             spawn_position: KickoffSpawnPosition::Center,
             start_boost: Some(33.0),
             boost_after: Some(11.0),
+            time_to_ball: None,
+            boost_collected: 0.0,
+            boost_used: 22.0,
+            ball_direction: KickoffBallDirection::Center,
             first_touch_time: None,
             first_touch_frame: None,
             outcome: KickoffTakerOutcome::Fake,

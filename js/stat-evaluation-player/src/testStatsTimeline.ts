@@ -50,7 +50,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
     kind: "core_player_goal_context",
   },
   { field: "possession", stream: "possession", kind: "possession" },
-  { field: "pressure", stream: "pressure", kind: "pressure" },
+  { field: "ball_half", stream: "ball_half", kind: "ball_half" },
   {
     field: "territorial_pressure",
     stream: "territorial_pressure",
@@ -331,7 +331,7 @@ export function createStatsTimeline(
         level_ball_depth_margin: 0,
         closest_to_ball_switch_margin: 0,
         closest_to_ball_switch_min_seconds: 0,
-        pressure_neutral_zone_half_width_y: 0,
+        ball_half_neutral_zone_half_width_y: 0,
         territorial_pressure_neutral_zone_half_width_y: 0,
         territorial_pressure_min_establish_seconds: 0,
         territorial_pressure_min_establish_third_seconds: 0,

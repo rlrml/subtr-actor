@@ -264,6 +264,28 @@ impl KickoffSupportBehavior {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffBallDirection {
+    Left,
+    Right,
+    Center,
+    #[default]
+    Unknown,
+}
+
+impl KickoffBallDirection {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::Left => "left",
+            Self::Right => "right",
+            Self::Center => "center",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffTakerEvent {
@@ -274,6 +296,10 @@ pub struct KickoffTakerEvent {
     pub spawn_position: KickoffSpawnPosition,
     pub start_boost: Option<f32>,
     pub boost_after: Option<f32>,
+    pub time_to_ball: Option<f32>,
+    pub boost_collected: f32,
+    pub boost_used: f32,
+    pub ball_direction: KickoffBallDirection,
     pub first_touch_time: Option<f32>,
     pub first_touch_frame: Option<usize>,
     pub outcome: KickoffTakerOutcome,

@@ -475,8 +475,8 @@ fn test_pressure_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        timeline_has_stream(&timeline, "pressure"),
-        "expected pressure fixture to contain pressure events"
+        timeline_has_stream(&timeline, "ball_half"),
+        "expected ball_half fixture to contain ball_half events"
     );
     assert_pressure_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
 }

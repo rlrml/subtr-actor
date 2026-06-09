@@ -114,13 +114,13 @@ pub(in crate::collector::stats::playback) fn parse_possession_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_pressure_event(
+pub(in crate::collector::stats::playback) fn parse_ball_half_event(
     value: &Value,
-) -> SubtrActorResult<PressureEvent> {
-    let object = json_object(value, "pressure event")?;
+) -> SubtrActorResult<BallHalfEvent> {
+    let object = json_object(value, "ball_half event")?;
     let time = json_required_f32(object, "time")?;
     let frame = json_required_usize(object, "frame")?;
-    Ok(PressureEvent {
+    Ok(BallHalfEvent {
         time,
         frame,
         end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
@@ -561,6 +561,9 @@ pub(in crate::collector::stats::playback) fn parse_goal_context_event(
         ball_position: json_optional_goal_context_position(object.get("ball_position"))?,
         ball_speed_at_goal: json_optional_f32(object.get("ball_speed_at_goal"))?,
         ball_air_time_before_goal: json_optional_f32(object.get("ball_air_time_before_goal"))?,
+        pressure_duration_before_goal: json_optional_f32(
+            object.get("pressure_duration_before_goal"),
+        )?,
         goal_buildup: object
             .get("goal_buildup")
             .map(|value| decode_json_value(value.clone()))
@@ -1042,6 +1045,14 @@ fn parse_kickoff_taker_event(value: &Value) -> SubtrActorResult<KickoffTakerEven
         spawn_position: decode_json_value(json_required_value(object, "spawn_position")?.clone())?,
         start_boost: json_optional_f32(object.get("start_boost"))?,
         boost_after: json_optional_f32(object.get("boost_after"))?,
+        time_to_ball: json_optional_f32(object.get("time_to_ball"))?,
+        boost_collected: json_optional_f32(object.get("boost_collected"))?.unwrap_or(0.0),
+        boost_used: json_optional_f32(object.get("boost_used"))?.unwrap_or(0.0),
+        ball_direction: object
+            .get("ball_direction")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
         first_touch_time: json_optional_f32(object.get("first_touch_time"))?,
         first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
         outcome: decode_json_value(json_required_value(object, "outcome")?.clone())?,

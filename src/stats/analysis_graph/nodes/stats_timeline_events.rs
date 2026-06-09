@@ -72,7 +72,7 @@ impl StatsTimelineEventsNode {
             fifty_fifty_dependency(),
             kickoff_dependency(),
             possession_dependency(),
-            pressure_dependency(),
+            ball_half_dependency(),
             territorial_pressure_dependency(),
             rotation_dependency(),
             rush_dependency(),
@@ -116,7 +116,7 @@ impl StatsTimelineEventsNode {
     fn capture_events(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         let match_stats = ctx.get::<MatchStatsCalculator>()?;
         let possession = ctx.get::<PossessionCalculator>()?;
-        let pressure = ctx.get::<PressureCalculator>()?;
+        let ball_half = ctx.get::<BallHalfCalculator>()?;
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
         let movement = ctx.get::<MovementCalculator>()?;
         let positioning = ctx.get::<PositioningCalculator>()?;
@@ -194,7 +194,7 @@ impl StatsTimelineEventsNode {
                 &timeline,
                 match_stats,
                 possession,
-                pressure,
+                ball_half,
                 territorial_pressure,
                 movement,
                 positioning,
@@ -326,7 +326,7 @@ fn build_replay_events(
     timeline: &[TimelineEvent],
     match_stats: &MatchStatsCalculator,
     possession: &PossessionCalculator,
-    pressure: &PressureCalculator,
+    ball_half: &BallHalfCalculator,
     territorial_pressure: &TerritorialPressureCalculator,
     movement: &MovementCalculator,
     positioning: &PositioningCalculator,
@@ -425,12 +425,12 @@ fn build_replay_events(
         ));
     }
 
-    for (index, event) in pressure.events().iter().enumerate() {
+    for (index, event) in ball_half.events().iter().enumerate() {
         events.push(make_event(
-            "pressure",
+            "ball_half",
             index,
             span(event.frame, event.end_frame, event.time, event.end_time),
-            EventPayload::Pressure(event.clone()),
+            EventPayload::BallHalf(event.clone()),
             None,
             None,
             None,

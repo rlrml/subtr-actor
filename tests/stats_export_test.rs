@@ -2,9 +2,9 @@ use subtr_actor::stats::export::{
     ExportedStat, LabeledFloatSums, StatFieldProvider, StatUnit, StatValue, LEGACY_STAT_VARIANT,
 };
 use subtr_actor::{
-    BackboardPlayerStats, BoostStats, CorePlayerStats, DodgeResetStats, DoubleTapPlayerStats,
-    GoalAfterKickoffStats, GoalBuildupStats, PlayerScoringContextStats, PositioningStats,
-    PossessionStats, PressureStats, TouchStats,
+    BackboardPlayerStats, BallHalfStats, BoostStats, CorePlayerStats, DodgeResetStats,
+    DoubleTapPlayerStats, GoalAfterKickoffStats, GoalBuildupStats, PlayerScoringContextStats,
+    PositioningStats, PossessionStats, TouchStats,
 };
 
 fn find_field<'a>(fields: &'a [ExportedStat], domain: &str, name: &str) -> &'a ExportedStat {
@@ -183,7 +183,7 @@ fn test_double_tap_stats_export_count() {
 
 #[test]
 fn test_pressure_stats_export_includes_side_totals_and_percentages() {
-    let stats = PressureStats {
+    let stats = BallHalfStats {
         tracked_time: 10.0,
         team_zero_side_time: 4.0,
         team_one_side_time: 5.0,
@@ -194,27 +194,27 @@ fn test_pressure_stats_export_includes_side_totals_and_percentages() {
     let fields = stats.stat_fields();
 
     assert_eq!(
-        find_field(&fields, "pressure", "team_zero_side_time").value,
+        find_field(&fields, "ball_half", "team_zero_side_time").value,
         StatValue::Float(4.0)
     );
     assert_eq!(
-        find_field(&fields, "pressure", "team_one_side_time").value,
+        find_field(&fields, "ball_half", "team_one_side_time").value,
         StatValue::Float(5.0)
     );
     assert_eq!(
-        find_field(&fields, "pressure", "neutral_time").value,
+        find_field(&fields, "ball_half", "neutral_time").value,
         StatValue::Float(1.0)
     );
     assert_eq!(
-        find_field(&fields, "pressure", "team_zero_side_pct").value,
+        find_field(&fields, "ball_half", "team_zero_side_pct").value,
         StatValue::Float(40.0)
     );
     assert_eq!(
-        find_field(&fields, "pressure", "team_one_side_pct").value,
+        find_field(&fields, "ball_half", "team_one_side_pct").value,
         StatValue::Float(50.0)
     );
     assert_eq!(
-        find_field(&fields, "pressure", "neutral_pct").value,
+        find_field(&fields, "ball_half", "neutral_pct").value,
         StatValue::Float(10.0)
     );
 }

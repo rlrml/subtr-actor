@@ -10,6 +10,8 @@ const KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS: f32 = 1.25;
 const KICKOFF_GOAL_MAX_SECONDS: f32 = 10.0;
 const KICKOFF_WIN_MIN_BALL_Y: f32 = 180.0;
 const KICKOFF_WIN_MIN_BALL_SPEED_Y: f32 = 220.0;
+const KICKOFF_BALL_DIRECTION_MIN_ABS_X: f32 = 180.0;
+const KICKOFF_BALL_DIRECTION_MIN_ABS_SPEED_X: f32 = 220.0;
 const KICKOFF_CLEAR_WIN_STRENGTH: f32 = 1.5;
 const KICKOFF_STRONG_WIN_STRENGTH: f32 = 2.5;
 const KICKOFF_TAKER_DISTANCE_TIE_EPSILON: f32 = 150.0;
@@ -30,6 +32,7 @@ struct KickoffPlayerSnapshot {
     start_position: [f32; 3],
     spawn_position: KickoffSpawnPosition,
     start_boost: Option<f32>,
+    first_touch_boost: Option<f32>,
     first_touch_time: Option<f32>,
     first_touch_frame: Option<usize>,
     approach_trace: KickoffApproachTrace,
@@ -44,6 +47,9 @@ struct KickoffApproachTrace {
     first_dodge_side_component: Option<f32>,
     max_speed: f32,
     min_boost: Option<f32>,
+    previous_boost: Option<f32>,
+    sampled_boost_collected: f32,
+    sampled_boost_used: f32,
     last_position: Option<[f32; 3]>,
     previous_velocity: Option<glam::Vec3>,
     previous_dodge_active: bool,
@@ -129,6 +135,12 @@ pub(crate) const KICKOFF_SUPPORT_BEHAVIOR_LABELS: [StatLabel; 4] = [
     StatLabel::new("support_behavior", "other"),
     StatLabel::new("support_behavior", "unknown"),
 ];
+pub(crate) const KICKOFF_BALL_DIRECTION_LABELS: [StatLabel; 4] = [
+    StatLabel::new("ball_direction", "left"),
+    StatLabel::new("ball_direction", "right"),
+    StatLabel::new("ball_direction", "center"),
+    StatLabel::new("ball_direction", "unknown"),
+];
 pub(crate) const KICKOFF_OUTCOME_LABELS: [StatLabel; 4] = [
     StatLabel::new("outcome", "team_zero_win"),
     StatLabel::new("outcome", "team_one_win"),
@@ -193,12 +205,17 @@ pub(crate) fn kickoff_support_behavior_label(behavior: KickoffSupportBehavior) -
     StatLabel::new("support_behavior", behavior.as_label_value())
 }
 
+pub(crate) fn kickoff_ball_direction_label(direction: KickoffBallDirection) -> StatLabel {
+    StatLabel::new("ball_direction", direction.as_label_value())
+}
+
 impl KickoffTakerEvent {
     pub(crate) fn labels(&self) -> Vec<StatLabel> {
         vec![
             kickoff_spawn_label(self.spawn_position),
             kickoff_taker_outcome_label(self.outcome),
             kickoff_approach_label(self.approach),
+            kickoff_ball_direction_label(self.ball_direction),
         ]
     }
 }
@@ -340,6 +357,7 @@ impl KickoffCalculator {
             start_position: position.to_array(),
             spawn_position: Self::kickoff_spawn_position(position, player.is_team_0),
             start_boost: player.boost_amount.or(player.last_boost_amount),
+            first_touch_boost: None,
             first_touch_time: None,
             first_touch_frame: None,
             approach_trace: KickoffApproachTrace::default(),
@@ -401,6 +419,15 @@ impl KickoffCalculator {
             trace.boost_active_sample_count += 1;
         }
         if let Some(boost_amount) = Self::boost_amount(player) {
+            if let Some(previous_boost) = trace.previous_boost {
+                let delta = boost_amount - previous_boost;
+                if delta > 0.0 {
+                    trace.sampled_boost_collected += delta;
+                } else {
+                    trace.sampled_boost_used += -delta;
+                }
+            }
+            trace.previous_boost = Some(boost_amount);
             trace.min_boost = Some(
                 trace
                     .min_boost
@@ -445,6 +472,9 @@ impl KickoffCalculator {
         players: &PlayerFrameState,
     ) {
         for snapshot in &mut active.players {
+            if snapshot.first_touch_time.is_some() {
+                continue;
+            }
             let Some(player) = players.player(&snapshot.player) else {
                 continue;
             };
@@ -476,6 +506,8 @@ impl KickoffCalculator {
                 continue;
             };
             if player.first_touch_time.is_none() {
+                player.first_touch_boost =
+                    player.approach_trace.previous_boost.or(player.start_boost);
                 player.first_touch_time = Some(touch.time);
                 player.first_touch_frame = Some(touch.frame);
             }
@@ -540,11 +572,35 @@ impl KickoffCalculator {
                     })
             })
             .or_else(|| {
+                // No tied candidate touched the ball (the team was beaten to the
+                // kickoff). Distance and first-touch can't disambiguate, so prefer
+                // the player who actually committed to the ball: greatest advance
+                // toward center, then most boost burned. The static left-side
+                // tiebreak is only a last resort for genuinely identical approaches.
                 tied_candidates.min_by(|(_, left), (_, right)| {
-                    Self::relative_left_value(left).total_cmp(&Self::relative_left_value(right))
+                    Self::center_progress(right)
+                        .total_cmp(&Self::center_progress(left))
+                        .then_with(|| {
+                            Self::boost_committed(right).total_cmp(&Self::boost_committed(left))
+                        })
+                        .then_with(|| {
+                            Self::relative_left_value(left)
+                                .total_cmp(&Self::relative_left_value(right))
+                        })
                 })
             })
             .map(|(index, _)| index)
+    }
+
+    /// Boost spent during the kickoff approach (`start_boost - min_boost`). A
+    /// player charging the ball burns boost; a teammate peeling off for a pad
+    /// does not, so this separates the true taker from support when neither
+    /// player touched the ball.
+    fn boost_committed(player: &KickoffPlayerSnapshot) -> f32 {
+        match (player.start_boost, player.approach_trace.min_boost) {
+            (Some(start_boost), Some(min_boost)) => (start_boost - min_boost).max(0.0),
+            _ => 0.0,
+        }
     }
 
     fn taker_outcome(
@@ -582,6 +638,25 @@ impl KickoffCalculator {
             .or(boost_after)
             .unwrap_or(start_boost);
         (start_boost - lowest_boost).max(0.0)
+    }
+
+    fn taker_time_to_ball(player: &KickoffPlayerSnapshot, movement_start_time: f32) -> Option<f32> {
+        player
+            .first_touch_time
+            .map(|touch_time| (touch_time - movement_start_time).max(0.0))
+    }
+
+    fn taker_boost_collected(player: &KickoffPlayerSnapshot) -> f32 {
+        player.approach_trace.sampled_boost_collected
+    }
+
+    fn taker_boost_used(player: &KickoffPlayerSnapshot) -> f32 {
+        match (player.start_boost, player.first_touch_boost) {
+            (Some(start_boost), Some(first_touch_boost)) => {
+                (start_boost + Self::taker_boost_collected(player) - first_touch_boost).max(0.0)
+            }
+            _ => player.approach_trace.sampled_boost_used,
+        }
     }
 
     fn moved_distance(player: &KickoffPlayerSnapshot) -> f32 {
@@ -741,6 +816,35 @@ impl KickoffCalculator {
             );
         }
         (KickoffOutcome::Neutral, None, None)
+    }
+
+    fn ball_direction(ball: &BallFrameState, is_team_0: bool) -> KickoffBallDirection {
+        let Some(ball) = ball.sample() else {
+            return KickoffBallDirection::Unknown;
+        };
+        let position_x = ball.position().x;
+        if position_x.abs() >= KICKOFF_BALL_DIRECTION_MIN_ABS_X {
+            return Self::ball_direction_from_global_x(position_x, is_team_0);
+        }
+        let velocity_x = ball.velocity().x;
+        if velocity_x.abs() >= KICKOFF_BALL_DIRECTION_MIN_ABS_SPEED_X {
+            return Self::ball_direction_from_global_x(velocity_x, is_team_0);
+        }
+        KickoffBallDirection::Center
+    }
+
+    fn ball_direction_from_global_x(value: f32, is_team_0: bool) -> KickoffBallDirection {
+        if value > 0.0 {
+            if is_team_0 {
+                KickoffBallDirection::Right
+            } else {
+                KickoffBallDirection::Left
+            }
+        } else if is_team_0 {
+            KickoffBallDirection::Left
+        } else {
+            KickoffBallDirection::Right
+        }
     }
 
     fn exit_velocity(ball: &BallFrameState) -> Option<[f32; 3]> {
@@ -957,6 +1061,7 @@ impl KickoffCalculator {
         let mut team_one_taker_event = None;
         let mut team_zero_non_takers = Vec::new();
         let mut team_one_non_takers = Vec::new();
+        let movement_start_time = active.movement_start_time.unwrap_or(active.start_time);
         for (index, player) in active.players.iter().enumerate() {
             let expected_taker = if player.is_team_0 {
                 team_zero_taker
@@ -983,6 +1088,10 @@ impl KickoffCalculator {
                     spawn_position: player.spawn_position,
                     start_boost: player.start_boost,
                     boost_after,
+                    time_to_ball: Self::taker_time_to_ball(player, movement_start_time),
+                    boost_collected: Self::taker_boost_collected(player),
+                    boost_used: Self::taker_boost_used(player),
+                    ball_direction: Self::ball_direction(ball, player.is_team_0),
                     first_touch_time: player.first_touch_time,
                     first_touch_frame: player.first_touch_frame,
                     outcome,
@@ -1026,7 +1135,7 @@ impl KickoffCalculator {
             end_frame: frame.frame_number,
             live_action_start_time: active.live_action_start_time,
             live_action_start_frame: active.live_action_start_frame,
-            movement_start_time: active.movement_start_time.unwrap_or(active.start_time),
+            movement_start_time,
             movement_start_frame: active.movement_start_frame.unwrap_or(active.start_frame),
             kickoff_type,
             kickoff_direction,

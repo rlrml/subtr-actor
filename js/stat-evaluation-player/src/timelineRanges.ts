@@ -15,7 +15,7 @@ import type { FiftyFiftyEvent } from "./generated/FiftyFiftyEvent.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
 import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
-import type { PressureEvent } from "./generated/PressureEvent.ts";
+import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
 
 const RANGE_MERGE_EPSILON_SECONDS = 0.02;
 const DELTA_EPSILON = 0.0001;
@@ -30,7 +30,7 @@ const BOOST_PICKUP_DETECTION_COLORS: Record<BoostPickupDetection, string> = {
   inferred_only: "rgba(239, 68, 68, 0.9)",
   reported_only: "rgba(59, 130, 246, 0.9)",
 };
-type PressureHalfControlState = "team_zero_side" | "team_one_side" | "neutral";
+type BallHalfControlState = "team_zero_side" | "team_one_side" | "neutral";
 
 export interface BoostPickupTimelineRangeOptions {
   sizes?: Iterable<ReplayBoostPadSize>;
@@ -41,8 +41,8 @@ export interface BoostPickupTimelineRangeOptions {
   playerIds?: Iterable<string>;
 }
 
-function getPressureNeutralZoneHalfWidthY(timeline: StatsTimeline): number {
-  const configured = timeline.config?.pressure_neutral_zone_half_width_y;
+function getBallHalfNeutralZoneHalfWidthY(timeline: StatsTimeline): number {
+  const configured = timeline.config?.ball_half_neutral_zone_half_width_y;
   if (typeof configured === "number" && Number.isFinite(configured)) {
     return Math.max(0, configured);
   }
@@ -112,14 +112,14 @@ export function buildMechanicTimelineRanges(
     });
 }
 
-function resolvePressureHalfControlState(
+function resolveBallHalfControlState(
   frameNumber: number,
   replay: ReplayModel | undefined,
   neutralZoneHalfWidthY: number,
   deltaTeamZero: number,
   deltaTeamOne: number,
   deltaNeutral: number,
-): PressureHalfControlState | null {
+): BallHalfControlState | null {
   const ballY = replay?.ballFrames[frameNumber]?.position?.y;
   if (
     typeof ballY === "number" &&
@@ -142,8 +142,8 @@ function resolvePressureHalfControlState(
   return null;
 }
 
-function createPressureRange(
-  halfControlState: PressureHalfControlState,
+function createBallHalfRange(
+  halfControlState: BallHalfControlState,
   startTime: number,
   endTime: number,
 ): ReplayTimelineRange {
@@ -341,20 +341,20 @@ export function buildPossessionTimelineRanges(
   return ranges;
 }
 
-function buildPressureTimelineRangesFromEvents(
+function buildBallHalfTimelineRangesFromEvents(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  const events = sortTimelineEvents(statsEventPayloads(timeline, "pressure"));
+  const events = sortTimelineEvents(statsEventPayloads(timeline, "ball_half"));
   const ranges: ReplayTimelineRange[] = [];
   let eventIndex = 0;
   let active = false;
-  let fieldHalf: PressureHalfControlState = "neutral";
+  let fieldHalf: BallHalfControlState = "neutral";
 
   let previousFrame: StatsTimeline["frames"][number] | null = null;
   for (const frame of timeline.frames) {
     while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      const event = events[eventIndex] as PressureEvent;
+      const event = events[eventIndex] as BallHalfEvent;
       active = event.active;
       fieldHalf =
         event.field_half === "team_zero_side" || event.field_half === "team_one_side"
@@ -369,19 +369,19 @@ function buildPressureTimelineRangesFromEvents(
     }
 
     const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
-    mergeRange(ranges, active ? createPressureRange(fieldHalf, startTime, endTime) : null);
+    mergeRange(ranges, active ? createBallHalfRange(fieldHalf, startTime, endTime) : null);
     previousFrame = frame;
   }
 
   return ranges;
 }
 
-export function buildPressureTimelineRanges(
+export function buildBallHalfTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  if (statsEventPayloads(timeline, "pressure").length > 0) {
-    return buildPressureTimelineRangesFromEvents(timeline, replay);
+  if (statsEventPayloads(timeline, "ball_half").length > 0) {
+    return buildBallHalfTimelineRangesFromEvents(timeline, replay);
   }
 
   const ranges: ReplayTimelineRange[] = [];
@@ -389,7 +389,7 @@ export function buildPressureTimelineRanges(
   let previousTeamZero = 0;
   let previousTeamOne = 0;
   let previousNeutral = 0;
-  const neutralZoneHalfWidthY = getPressureNeutralZoneHalfWidthY(timeline);
+  const neutralZoneHalfWidthY = getBallHalfNeutralZoneHalfWidthY(timeline);
 
   let previousFrame: StatsTimeline["frames"][number] | null = null;
   for (const frame of timeline.frames) {
@@ -399,9 +399,9 @@ export function buildPressureTimelineRanges(
     }
 
     const statsFrame = frame as StatsFrame;
-    const currentTeamZero = statsFrame.team_zero?.pressure?.defensive_half_time ?? 0;
-    const currentTeamOne = statsFrame.team_one?.pressure?.defensive_half_time ?? 0;
-    const currentNeutral = statsFrame.team_zero?.pressure?.neutral_time ?? 0;
+    const currentTeamZero = statsFrame.team_zero?.ball_half?.defensive_half_time ?? 0;
+    const currentTeamOne = statsFrame.team_one?.ball_half?.defensive_half_time ?? 0;
+    const currentNeutral = statsFrame.team_zero?.ball_half?.neutral_time ?? 0;
     const deltaTeamZero = currentTeamZero - previousTeamZero;
     const deltaTeamOne = currentTeamOne - previousTeamOne;
     const deltaNeutral = currentNeutral - previousNeutral;
@@ -411,7 +411,7 @@ export function buildPressureTimelineRanges(
     previousNeutral = currentNeutral;
 
     const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
-    const halfControlState = resolvePressureHalfControlState(
+    const halfControlState = resolveBallHalfControlState(
       frame.frame_number,
       replay,
       neutralZoneHalfWidthY,
@@ -420,7 +420,7 @@ export function buildPressureTimelineRanges(
       deltaNeutral,
     );
     const nextRange = halfControlState
-      ? createPressureRange(halfControlState, startTime, endTime)
+      ? createBallHalfRange(halfControlState, startTime, endTime)
       : null;
 
     mergeRange(ranges, nextRange);
