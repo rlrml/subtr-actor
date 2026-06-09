@@ -97,7 +97,7 @@ export const OVERVIEW_CHARTS: ChartSpec[] = [
   { statId: "player:touch.touch_count", kind: "bar", title: "Touches by player" },
   { statId: "team:core.shots", kind: "pie", title: "Shot share" },
   { statId: "team:possession.possession_time", kind: "pie", title: "Possession share" },
-  { statId: "team:pressure.offensive_pressure_time", kind: "bar", title: "Offensive pressure" },
+  { statId: "team:ball_half.offensive_pressure_time", kind: "bar", title: "Offensive pressure" },
 ];
 
 export const INVOLVEMENT_CHARTS: ChartSpec[] = [
@@ -506,17 +506,17 @@ export function renderTerritoryShareChart(
       [
         {
           label: "Blue half",
-          value: finalFrame.team_zero.pressure.defensive_half_time,
+          value: finalFrame.team_zero.ball_half.defensive_half_time,
           color: TEAM_COLORS[0]!,
         },
         {
           label: "Neutral",
-          value: finalFrame.team_zero.pressure.neutral_time,
+          value: finalFrame.team_zero.ball_half.neutral_time,
           color: "#65d6ad",
         },
         {
           label: "Orange half",
-          value: finalFrame.team_zero.pressure.offensive_half_time,
+          value: finalFrame.team_zero.ball_half.offensive_half_time,
           color: TEAM_COLORS[1]!,
         },
       ],

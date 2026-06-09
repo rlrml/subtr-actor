@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn pressure_export_includes_labeled_time_stats() {
-    let mut stats = PressureStats {
+    let mut stats = BallHalfStats {
         tracked_time: 4.0,
         ..Default::default()
     };
@@ -14,7 +14,7 @@ fn pressure_export_includes_labeled_time_stats() {
         .stat_fields()
         .into_iter()
         .filter(|stat| {
-            stat.descriptor.domain == "pressure"
+            stat.descriptor.domain == "ball_half"
                 && stat.descriptor.name == "time"
                 && stat.descriptor.variant == LABELED_STAT_VARIANT
         })

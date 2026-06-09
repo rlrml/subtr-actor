@@ -611,7 +611,7 @@ function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
   );
 
   const possessionTotal = finalFrame.team_zero.possession.tracked_time;
-  const pressureTotal = finalFrame.team_zero.pressure.tracked_time;
+  const ballHalfTotal = finalFrame.team_zero.ball_half.tracked_time;
   page.append(
     renderMetricGrid([
       createSummaryCard(
@@ -624,12 +624,12 @@ function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
       ),
       createSummaryCard(
         "Blue pressure",
-        formatShare(finalFrame.team_zero.pressure.offensive_half_time, pressureTotal),
+        formatShare(finalFrame.team_zero.ball_half.offensive_half_time, ballHalfTotal),
         "Time in Orange half",
       ),
       createSummaryCard(
         "Orange pressure",
-        formatShare(finalFrame.team_zero.pressure.defensive_half_time, pressureTotal),
+        formatShare(finalFrame.team_zero.ball_half.defensive_half_time, ballHalfTotal),
         "Time in Blue half",
       ),
     ]),

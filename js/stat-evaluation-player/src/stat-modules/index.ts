@@ -1,7 +1,7 @@
 import {
   createFiftyFiftyModule,
   createPossessionModule,
-  createPressureModule,
+  createBallHalfModule,
   createRushModule,
 } from "./teamModules.ts";
 import {
@@ -64,7 +64,7 @@ export function createStatModules(
     createPassModule(),
     createPossessionModule(runtime),
     createFiftyFiftyModule(),
-    createPressureModule(),
+    createBallHalfModule(),
     createRushModule(),
     createRelativePositioningModule(),
     createAbsolutePositioningModule(),

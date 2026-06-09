@@ -1,6 +1,6 @@
 import type { TeamStatsSnapshot } from "./statsTimeline.ts";
 
-interface PressureRenderOptions {
+interface BallHalfRenderOptions {
   labelPerspective:
     | {
         kind: "shared";
@@ -64,7 +64,7 @@ function renderStatRow(label: string, value: string): string {
 
 function formatFieldHalfLabel(
   value: string,
-  labelPerspective: PressureRenderOptions["labelPerspective"],
+  labelPerspective: BallHalfRenderOptions["labelPerspective"],
 ): string {
   if (value === "neutral") {
     return "Neutral zone";
@@ -77,22 +77,22 @@ function formatFieldHalfLabel(
   return value === "defensive_half" ? "Own half" : "Opp half";
 }
 
-function renderPressureBreakdownRows(
-  pressure: TeamStatsSnapshot["pressure"],
+function renderBallHalfBreakdownRows(
+  ballHalf: TeamStatsSnapshot["ball_half"],
   trackedTime: number | undefined,
-  labelPerspective: PressureRenderOptions["labelPerspective"],
+  labelPerspective: BallHalfRenderOptions["labelPerspective"],
 ): string {
   const totals = new Map<string, number>();
 
-  if (pressure) {
-    totals.set("defensive_half", pressure.defensive_half_time);
-    totals.set("neutral", pressure.neutral_time ?? 0);
-    totals.set("offensive_half", pressure.offensive_half_time);
+  if (ballHalf) {
+    totals.set("defensive_half", ballHalf.defensive_half_time);
+    totals.set("neutral", ballHalf.neutral_time ?? 0);
+    totals.set("offensive_half", ballHalf.offensive_half_time);
   }
 
-  if (pressure?.labeled_time?.entries?.length) {
+  if (ballHalf?.labeled_time?.entries?.length) {
     totals.clear();
-    for (const entry of pressure.labeled_time.entries) {
+    for (const entry of ballHalf.labeled_time.entries) {
       const half = entry.labels.find((label) => label.key === "field_half")?.value;
       if (!half) {
         continue;
@@ -118,13 +118,13 @@ function renderPressureBreakdownRows(
     .join("");
 }
 
-export function renderPressureStats(
-  pressure: TeamStatsSnapshot["pressure"],
-  options: PressureRenderOptions,
+export function renderBallHalfStats(
+  ballHalf: TeamStatsSnapshot["ball_half"],
+  options: BallHalfRenderOptions,
 ): string {
-  const trackedTime = pressure?.tracked_time;
-  const breakdownRows = renderPressureBreakdownRows(
-    pressure,
+  const trackedTime = ballHalf?.tracked_time;
+  const breakdownRows = renderBallHalfBreakdownRows(
+    ballHalf,
     trackedTime,
     options.labelPerspective,
   );

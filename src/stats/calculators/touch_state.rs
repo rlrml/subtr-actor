@@ -25,6 +25,29 @@ const TOUCH_CANDIDATE_WINDOW_FRAMES: usize = 4;
 const CONTESTED_TOUCH_WINDOW_FRAMES: usize = 1;
 const BALL_GRAVITY_Z: f32 = -650.0;
 
+/// Maximum contact gap (uu) at which a replay-reported team touch marker may be
+/// attributed to that team's closest player using current-frame geometry alone.
+///
+/// A `BallHitTeamNum` marker is authoritative that the team touched the ball, but
+/// on a contested 50/50 the losing challenger frequently contacts the ball a frame
+/// before any detectable trajectory deviation, so it never enters the candidate
+/// cache and the marker would otherwise be dropped. When the cache cannot resolve
+/// the marker, the closest same-team car sitting on the ball is the touch. Kept
+/// within the system's relaxed contact boundary so every emitted touch still
+/// reflects a genuine hitbox contact.
+const MARKER_CONTACT_ATTRIBUTION_MAX_GAP: f32 = TOUCH_SCORING.relaxed_contact_gap_threshold;
+
+/// Maximum contact gap (uu) for a car to be credited a *geometric contested touch*:
+/// a car that is physically on the ball but is never accepted as a deviation
+/// candidate because its tight contact lands a frame off the ball's measurable
+/// trajectory deviation (the other car in the 50/50 already redirected the ball).
+const GEOMETRIC_CONTEST_MAX_GAP: f32 = 5.0;
+
+/// How recently (frames / seconds) an opposing-team touch must have been confirmed
+/// for a car now sitting on the ball to be credited a geometric contested touch.
+const GEOMETRIC_CONTEST_WINDOW_FRAMES: usize = 4;
+const GEOMETRIC_CONTEST_WINDOW_SECONDS: f32 = 0.2;
+
 fn accepted_contact_gap(closest_contact_gap: f32, ball_deviation: BallTrajectoryDeviation) -> bool {
     TOUCH_SCORING.accepts_contact_gap(
         closest_contact_gap,
@@ -91,12 +114,20 @@ fn primary_touch_event(touch_events: &[TouchEvent]) -> Option<&TouchEvent> {
         .min_by(|left, right| touch_event_ordering(left, right))
 }
 
+#[derive(Debug, Clone)]
+struct RecentTeamTouch {
+    frame: usize,
+    time: f32,
+    team_is_team_0: bool,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct TouchStateCalculator {
     previous_ball_rigid_body: Option<(boxcars::RigidBody, f32)>,
     current_last_touch: Option<TouchEvent>,
     recent_touch_candidates: HashMap<PlayerId, TouchEvent>,
     last_touch_times: HashMap<TouchCooldownKey, f32>,
+    recent_team_touches: Vec<RecentTeamTouch>,
 }
 
 impl TouchStateCalculator {
@@ -232,8 +263,87 @@ impl TouchStateCalculator {
             .cloned()
     }
 
-    fn enrich_team_touch_event_from_recent_cache(&self, event: &TouchEvent) -> Option<TouchEvent> {
-        let candidate = self.best_candidate_for_team(event.team_is_team_0)?;
+    /// Finds the closest same-team car to the ball at the current frame, used to
+    /// attribute a replay touch marker that the candidate cache cannot resolve.
+    fn current_frame_touch_candidate_for_team(
+        &self,
+        event: &TouchEvent,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+    ) -> Option<TouchEvent> {
+        let ball = ball.sample()?;
+
+        players
+            .players
+            .iter()
+            .filter(|player| player.is_team_0 == event.team_is_team_0)
+            .filter_map(|player| {
+                let rigid_body = player.rigid_body.as_ref()?;
+                let (closest_contact_gap, _current_contact_gap) =
+                    touch_candidate_contact_gap_rank_with_hitbox(
+                        &ball.rigid_body,
+                        rigid_body,
+                        player.hitbox,
+                    )?;
+                Some((closest_contact_gap, player, rigid_body))
+            })
+            .min_by(|left, right| left.0.total_cmp(&right.0))
+            .filter(|(closest_contact_gap, _, _)| {
+                *closest_contact_gap <= MARKER_CONTACT_ATTRIBUTION_MAX_GAP
+            })
+            .map(|(closest_contact_gap, player, rigid_body)| TouchEvent {
+                time: event.time,
+                frame: event.frame,
+                team_is_team_0: event.team_is_team_0,
+                player: Some(player.player_id.clone()),
+                player_position: Some(rigid_body.location),
+                closest_approach_distance: Some(closest_contact_gap),
+                dodge_contact: player.dodge_active,
+            })
+    }
+
+    /// Attributes a team-only replay touch marker to a concrete player.
+    ///
+    /// Prefers whichever of the recent candidate cache or the current frame's
+    /// geometry puts a car closest to the ball. The cache covers the normal case
+    /// where a trajectory deviation already identified the toucher; the
+    /// current-frame fallback recovers contested 50/50 touches where the
+    /// challenger contacted the ball before any deviation was detectable (so it
+    /// never cached) yet is still sitting on the ball at the marker frame.
+    fn enrich_team_touch_event_from_recent_cache(
+        &self,
+        event: &TouchEvent,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+    ) -> Option<TouchEvent> {
+        let gap_of =
+            |candidate: &TouchEvent| candidate.closest_approach_distance.unwrap_or(f32::INFINITY);
+
+        // Current-frame geometry is only trustworthy during continuous live play,
+        // where a previous ball frame establishes a real trajectory. Without that
+        // baseline (e.g. the very first frame after a reset) a car merely parked on
+        // a stationary ball must not be credited from a bare team marker.
+        let current_frame_candidate = if self.previous_ball_rigid_body.is_some() {
+            self.current_frame_touch_candidate_for_team(event, ball, players)
+        } else {
+            None
+        };
+
+        let candidate = match (
+            self.best_candidate_for_team(event.team_is_team_0),
+            current_frame_candidate,
+        ) {
+            (Some(cache_candidate), Some(current_candidate)) => {
+                if gap_of(&current_candidate) < gap_of(&cache_candidate) {
+                    current_candidate
+                } else {
+                    cache_candidate
+                }
+            }
+            (Some(cache_candidate), None) => cache_candidate,
+            (None, Some(current_candidate)) => current_candidate,
+            (None, None) => return None,
+        };
 
         Some(TouchEvent {
             time: event.time,
@@ -316,7 +426,7 @@ impl TouchStateCalculator {
         if event.player.is_some() {
             Some(self.enrich_explicit_touch_event_from_current_frame(event, ball, players))
         } else if allow_team_only_cache_attribution {
-            self.enrich_team_touch_event_from_recent_cache(event)
+            self.enrich_team_touch_event_from_recent_cache(event, ball, players)
         } else {
             None
         }
@@ -346,6 +456,62 @@ impl TouchStateCalculator {
         opposing_candidates.sort_by(touch_event_ordering);
 
         opposing_candidates
+    }
+
+    /// Credits cars that are physically on the ball but were never accepted as a
+    /// deviation candidate, when an opposing-team touch was confirmed in the recent
+    /// window. This recovers the losing side of a contested 50/50: the challenger
+    /// reaches the ball a frame off the measurable trajectory deviation (which the
+    /// winning car already produced), so it never caches and is otherwise dropped.
+    fn geometric_contested_touches(
+        &self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        confirmed_players: &HashSet<PlayerId>,
+    ) -> Vec<TouchEvent> {
+        if self.previous_ball_rigid_body.is_none() {
+            return Vec::new();
+        }
+        let Some(ball) = ball.sample() else {
+            return Vec::new();
+        };
+
+        players
+            .players
+            .iter()
+            .filter(|player| !confirmed_players.contains(&player.player_id))
+            .filter(|player| self.has_recent_opposing_team_touch(frame, player.is_team_0))
+            .filter_map(|player| {
+                let rigid_body = player.rigid_body.as_ref()?;
+                let (closest_contact_gap, _current_contact_gap) =
+                    touch_candidate_contact_gap_rank_with_hitbox(
+                        &ball.rigid_body,
+                        rigid_body,
+                        player.hitbox,
+                    )?;
+                if closest_contact_gap > GEOMETRIC_CONTEST_MAX_GAP {
+                    return None;
+                }
+                Some(TouchEvent {
+                    time: frame.time,
+                    frame: frame.frame_number,
+                    team_is_team_0: player.is_team_0,
+                    player: Some(player.player_id.clone()),
+                    player_position: Some(rigid_body.location),
+                    closest_approach_distance: Some(closest_contact_gap),
+                    dodge_contact: player.dodge_active,
+                })
+            })
+            .collect()
+    }
+
+    fn has_recent_opposing_team_touch(&self, frame: &FrameInfo, team_is_team_0: bool) -> bool {
+        self.recent_team_touches.iter().any(|touch| {
+            touch.team_is_team_0 != team_is_team_0
+                && frame.frame_number.saturating_sub(touch.frame) <= GEOMETRIC_CONTEST_WINDOW_FRAMES
+                && frame.time - touch.time <= GEOMETRIC_CONTEST_WINDOW_SECONDS
+        })
     }
 
     fn confirmed_touch_events(
@@ -424,7 +590,29 @@ impl TouchStateCalculator {
             ));
         }
 
+        for contested in self.geometric_contested_touches(frame, ball, players, &confirmed_players)
+        {
+            if let Some(player_id) = contested.player.clone() {
+                if !confirmed_players.insert(player_id) {
+                    continue;
+                }
+            }
+            touch_events.push(contested);
+        }
+
         touch_events
+    }
+
+    fn record_recent_team_touches(&mut self, frame: usize, touch_events: &[TouchEvent]) {
+        self.recent_team_touches
+            .retain(|touch| frame.saturating_sub(touch.frame) <= GEOMETRIC_CONTEST_WINDOW_FRAMES);
+        for event in touch_events {
+            self.recent_team_touches.push(RecentTeamTouch {
+                frame: event.frame,
+                time: event.time,
+                team_is_team_0: event.team_is_team_0,
+            });
+        }
     }
 
     fn touch_cooldown_key(event: &TouchEvent) -> TouchCooldownKey {
@@ -470,11 +658,14 @@ impl TouchStateCalculator {
             self.prune_recent_touch_candidates(frame.frame_number);
             self.update_recent_touch_candidates(frame, ball, players);
             let touch_events = self.confirmed_touch_events(frame, ball, players, events);
-            self.apply_touch_cooldown(touch_events)
+            let touch_events = self.apply_touch_cooldown(touch_events);
+            self.record_recent_team_touches(frame.frame_number, &touch_events);
+            touch_events
         } else {
             self.current_last_touch = None;
             self.recent_touch_candidates.clear();
             self.last_touch_times.clear();
+            self.recent_team_touches.clear();
             Vec::new()
         };
 

@@ -9,7 +9,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 .closest_to_ball_switch_margin,
             closest_to_ball_switch_min_seconds: PositioningCalculatorConfig::default()
                 .closest_to_ball_switch_min_seconds,
-            pressure_neutral_zone_half_width_y: PressureCalculatorConfig::default()
+            ball_half_neutral_zone_half_width_y: BallHalfCalculatorConfig::default()
                 .neutral_zone_half_width_y,
             territorial_pressure_neutral_zone_half_width_y:
                 TerritorialPressureCalculatorConfig::default().neutral_zone_half_width_y,
@@ -145,7 +145,7 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         [
             "fifty_fifty",
             "possession",
-            "pressure",
+            "ball_half",
             "rush",
             "core",
             "backboard",
@@ -271,12 +271,12 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         projection.possession.stats().for_team(false)
     );
     assert_eq!(
-        final_frame.team_zero.pressure,
-        projection.pressure.stats().for_team(true)
+        final_frame.team_zero.ball_half,
+        projection.ball_half.stats().for_team(true)
     );
     assert_eq!(
-        final_frame.team_one.pressure,
-        projection.pressure.stats().for_team(false)
+        final_frame.team_one.ball_half,
+        projection.ball_half.stats().for_team(false)
     );
     assert_eq!(
         final_frame.team_zero.rush,

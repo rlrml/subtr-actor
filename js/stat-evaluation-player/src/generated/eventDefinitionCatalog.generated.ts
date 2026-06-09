@@ -31,6 +31,13 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "ball_half",
+    "label": "Ball Half",
+    "category": "possession",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
     "key": "boost_bucket",
     "label": "Boost Bucket",
     "category": "boost",
@@ -333,13 +340,6 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "key": "powerslide",
     "label": "Powerslide",
     "category": "movement",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "pressure",
-    "label": "Pressure",
-    "category": "possession",
     "hidden_from_review": false,
     "variants": []
   },

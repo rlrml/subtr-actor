@@ -25,7 +25,7 @@ test("empty event derivations restore default fields for compacted zero-event ti
 
   deleteField(frame.team_zero.core, "goals");
   deleteField(frame.team_zero.possession, "tracked_time");
-  deleteField(frame.team_zero.pressure, "tracked_time");
+  deleteField(frame.team_zero.ball_half, "tracked_time");
   deleteField(frame.team_zero.rotation, "rotation_count");
   deleteField(frame.team_zero.rush, "count");
   deleteField(frame.team_zero.backboard, "count");
@@ -75,7 +75,7 @@ test("empty event derivations restore default fields for compacted zero-event ti
 
   assert.equal(derivedFrame.team_zero.core.goals, 0);
   assert.equal(derivedFrame.team_zero.possession.tracked_time, 0);
-  assert.equal(derivedFrame.team_zero.pressure.tracked_time, 0);
+  assert.equal(derivedFrame.team_zero.ball_half.tracked_time, 0);
   assert.equal(derivedFrame.team_zero.rotation.rotation_count, 0);
   assert.equal(derivedFrame.team_zero.rush.count, 0);
   assert.equal(derivedFrame.team_zero.backboard.count, 0);

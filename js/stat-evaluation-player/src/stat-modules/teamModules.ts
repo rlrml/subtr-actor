@@ -3,14 +3,14 @@ import type { ReplayModel } from "@rlrml/player";
 import { renderPlayerFiftyFiftyStats, renderFiftyFiftySummary } from "../fiftyFiftyFormatting.ts";
 import { renderPossessionStats } from "../possessionFormatting.ts";
 import type { PossessionBreakdownClass } from "../possessionFormatting.ts";
-import { renderPressureStats } from "../pressureFormatting.ts";
+import { renderBallHalfStats } from "../ballHalfFormatting.ts";
 import { renderRushStats } from "../rushFormatting.ts";
 import { FiftyFiftyOverlay } from "../fiftyFiftyOverlay.ts";
 import { buildFiftyFiftyTimelineEvents, buildRushTimelineEvents } from "../timelineMarkers.ts";
 import {
   buildFiftyFiftyTimelineRanges,
   buildPossessionTimelineRanges,
-  buildPressureTimelineRanges,
+  buildBallHalfTimelineRanges,
   buildRushTimelineRanges,
 } from "../timelineRanges.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
@@ -268,12 +268,12 @@ export function createFiftyFiftyModule(): StatModule {
   };
 }
 
-export function createPressureModule(): StatModule {
+export function createBallHalfModule(): StatModule {
   let halfFieldOverlay: HalfFieldOverlay | null = null;
   let replay: ReplayModel | null = null;
 
   return {
-    id: "pressure",
+    id: "ball_half",
     label: "Half Control",
 
     setup(ctx) {
@@ -293,17 +293,17 @@ export function createPressureModule(): StatModule {
     },
 
     getTimelineRanges(ctx) {
-      return buildPressureTimelineRanges(ctx.statsTimeline, ctx.replay);
+      return buildBallHalfTimelineRanges(ctx.statsTimeline, ctx.replay);
     },
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
-      const pressure = statsFrame?.team_zero?.pressure;
-      if (!pressure) return "";
+      const ballHalf = statsFrame?.team_zero?.ball_half;
+      if (!ballHalf) return "";
 
       return renderSharedCard(
         "Field State",
-        renderPressureStats(pressure, {
+        renderBallHalfStats(ballHalf, {
           labelPerspective: {
             kind: "shared",
           },
@@ -314,12 +314,12 @@ export function createPressureModule(): StatModule {
     renderFocusedPlayerStats(playerId, frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
       const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      const pressure = player?.is_team_0
-        ? statsFrame?.team_zero?.pressure
-        : statsFrame?.team_one?.pressure;
-      if (!pressure || !player) return "";
+      const ballHalf = player?.is_team_0
+        ? statsFrame?.team_zero?.ball_half
+        : statsFrame?.team_one?.ball_half;
+      if (!ballHalf || !player) return "";
 
-      return renderPressureStats(pressure, {
+      return renderBallHalfStats(ballHalf, {
         labelPerspective: {
           kind: "team",
         },
