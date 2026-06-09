@@ -202,3 +202,89 @@ fn discarded_items_do_not_appear_in_history() {
     // A discarded candidate never "happened".
     assert!(!ledger.happened_within(1.5, 5.0, false));
 }
+
+#[test]
+fn keyed_arm_replaces_and_looks_up_by_key() {
+    let mut ledger = KeyedInFlightLedger::<u32, TestCandidate>::new();
+    ledger.arm(7, TestCandidate::new("first", 0.0, 0));
+    assert!(ledger.contains(&7));
+    assert_eq!(ledger.get(&7).unwrap().label, "first");
+
+    // Arming the same key replaces the item.
+    ledger.arm(7, TestCandidate::new("second", 1.0, 1));
+    assert_eq!(ledger.len(), 1);
+    assert_eq!(ledger.get(&7).unwrap().label, "second");
+
+    ledger.get_mut(&7).unwrap().samples += 3;
+    assert_eq!(ledger.get(&7).unwrap().samples, 3);
+}
+
+#[test]
+fn keyed_advance_resolves_per_key() {
+    let mut ledger = KeyedInFlightLedger::<u32, TestCandidate>::new();
+    ledger.arm(1, TestCandidate::new("keep", 0.0, 0));
+    ledger.arm(2, TestCandidate::new("finalize", 0.0, 0));
+    ledger.arm(3, TestCandidate::new("discard", 0.0, 0));
+
+    let finalized = ledger.advance(1.0, |_key, candidate| match candidate.label {
+        "finalize" => Disposition::Finalize(FinalizeReason::Completed),
+        "discard" => Disposition::Discard,
+        _ => Disposition::Keep,
+    });
+
+    assert_eq!(finalized.len(), 1);
+    assert_eq!(finalized[0].0, 2);
+    assert_eq!(finalized[0].1.label, "finalize");
+    assert_eq!(finalized[0].2, FinalizeReason::Completed);
+    assert_eq!(ledger.len(), 1);
+    assert!(ledger.contains(&1));
+}
+
+#[test]
+fn keyed_finalize_logs_and_boundary_flushes() {
+    let mut ledger = KeyedInFlightLedger::<u32, TestCandidate>::new();
+    let mut committed = TestCandidate::new("c", 1.0, 10);
+    committed.committed = true;
+    ledger.arm(1, committed);
+
+    // Imperative finalize removes, logs, and returns the item.
+    let item = ledger.finalize(&1, FinalizeReason::Completed);
+    assert!(item.is_some());
+    assert!(ledger.is_empty());
+    assert!(ledger.happened_within(1.0, 1.0, true));
+
+    // Boundary handling mirrors the unkeyed ledger.
+    let mut committed2 = TestCandidate::new("c2", 2.0, 21);
+    committed2.committed = true;
+    ledger.arm(2, TestCandidate::new("speculative", 2.0, 20));
+    ledger.arm(3, committed2);
+    let finalized = ledger.apply_boundary(Boundary::GoalScored);
+    assert_eq!(finalized.len(), 1);
+    assert_eq!(finalized[0].0, 3);
+    assert!(ledger.is_empty(), "speculative discarded, committed finalized");
+}
+
+#[test]
+fn keyed_entry_or_insert_with_inserts_once() {
+    let mut ledger = KeyedInFlightLedger::<u32, TestCandidate>::new();
+    ledger
+        .entry_or_insert_with(5, || TestCandidate::new("created", 0.0, 0))
+        .samples += 1;
+    ledger
+        .entry_or_insert_with(5, || TestCandidate::new("not-created", 9.0, 9))
+        .samples += 1;
+    assert_eq!(ledger.len(), 1);
+    let candidate = ledger.get(&5).unwrap();
+    assert_eq!(candidate.label, "created");
+    assert_eq!(candidate.samples, 2);
+}
+
+#[test]
+fn keyed_clear_discards_without_logging() {
+    let mut ledger = KeyedInFlightLedger::<u32, TestCandidate>::new();
+    ledger.arm(1, TestCandidate::new("a", 1.0, 10));
+    ledger.arm(2, TestCandidate::new("b", 1.0, 11));
+    ledger.clear();
+    assert!(ledger.is_empty());
+    assert!(!ledger.happened_within(1.0, 5.0, false));
+}

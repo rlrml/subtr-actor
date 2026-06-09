@@ -10,14 +10,22 @@
 //! leaving the live phase, or the end of the replay) is finalized or discarded
 //! rather than silently leaking or absorbing data across the boundary.
 //!
-//! [`InFlightLedger`] centralizes that lifecycle:
-//!   * boundary handling is uniform and exhaustive ([`InFlightLedger::apply_boundary`],
-//!     [`InFlightLedger::finish`]), so a calculator cannot forget a boundary;
-//!   * every recognition is logged so other nodes can ask "did this happen
-//!     recently?" *latently* — including events that are recognized but not yet
-//!     finalized ([`InFlightLedger::happened_within`]).
+//! Two containers are offered, sharing the same vocabulary ([`Boundary`],
+//! [`FinalizeReason`], [`Recognition`], [`Disposition`], [`InFlightItem`]) and
+//! the same latent-query semantics:
+//!   * [`InFlightLedger`] holds an unordered set of in-flight items;
+//!   * [`KeyedInFlightLedger`] holds at most one in-flight item per key (e.g.
+//!     per player), for calculators that look candidates up by subject.
+//!
+//! Both centralize boundary handling ([`apply_boundary`](InFlightLedger::apply_boundary),
+//! `finish`) so a calculator cannot forget a boundary, and both log every
+//! recognition so other nodes can ask "did this happen recently?" *latently* —
+//! counting events that are recognized but not yet finalized, with a
+//! `committed_only` gate so speculative candidates don't give false positives.
 
-use std::collections::VecDeque;
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, VecDeque};
+use std::hash::Hash;
 
 /// Default span, in seconds, over which finalized recognitions are retained for
 /// latent queries. Generous enough for "did X happen recently" questions while
@@ -101,10 +109,10 @@ pub enum Disposition {
     Discard,
 }
 
-/// An item that can be held in flight by an [`InFlightLedger`].
+/// An item that can be held in flight by a ledger.
 ///
 /// The per-frame accumulation logic stays in the owning calculator (its inputs
-/// are calculator-specific); the trait only covers what the ledger must do
+/// are calculator-specific); the trait only covers what a ledger must do
 /// uniformly: expose a [`Recognition`] for latent queries, and decide how to
 /// respond when a [`Boundary`] forces resolution.
 pub trait InFlightItem {
@@ -116,17 +124,69 @@ pub trait InFlightItem {
     fn on_boundary(&mut self, boundary: Boundary) -> Disposition;
 }
 
-/// Holds zero or more in-flight items, drives their lifecycle uniformly, and
-/// records recognitions so finalized and in-flight events alike can be queried
-/// latently.
+/// Bounded, time-indexed record of finalized recognitions, shared by both
+/// ledgers to answer latent "did X happen recently?" queries.
 #[derive(Debug, Clone, PartialEq)]
-pub struct InFlightLedger<C> {
-    active: Vec<C>,
-    /// Recognitions of items that have finalized, retained for latent queries
-    /// up to `history_window` seconds before the most recently observed time.
+struct RecognitionLog {
     finalized: VecDeque<Recognition>,
     history_window: f32,
     last_time: f32,
+}
+
+impl RecognitionLog {
+    fn with_history_window(history_window: f32) -> Self {
+        Self {
+            finalized: VecDeque::new(),
+            history_window,
+            last_time: 0.0,
+        }
+    }
+
+    fn observe_time(&mut self, now: f32) {
+        self.last_time = self.last_time.max(now);
+    }
+
+    fn log(&mut self, item: &impl InFlightItem) {
+        let mut recognition = item.recognition();
+        recognition.committed = true;
+        // Keep `last_time` roughly current even for imperative flows that don't
+        // observe a frame time, so the history still prunes (recognition time is
+        // a lower bound on the current time).
+        self.last_time = self.last_time.max(recognition.time);
+        self.finalized.push_back(recognition);
+    }
+
+    fn prune(&mut self) {
+        let cutoff = self.last_time - self.history_window;
+        while self.finalized.front().is_some_and(|rec| rec.time < cutoff) {
+            self.finalized.pop_front();
+        }
+    }
+
+    fn finalized_within(
+        &self,
+        now: f32,
+        window: f32,
+        committed_only: bool,
+    ) -> impl Iterator<Item = Recognition> + '_ {
+        self.finalized
+            .iter()
+            .copied()
+            .filter(move |rec| in_window(rec, now, window, committed_only))
+    }
+}
+
+fn in_window(rec: &Recognition, now: f32, window: f32, committed_only: bool) -> bool {
+    rec.time <= now && now - rec.time <= window && (!committed_only || rec.committed)
+}
+
+/// Holds an unordered set of in-flight items, drives their lifecycle uniformly,
+/// and records recognitions so finalized and in-flight events alike can be
+/// queried latently.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InFlightLedger<C> {
+    active: Vec<C>,
+    log: RecognitionLog,
 }
 
 impl<C> Default for InFlightLedger<C> {
@@ -143,9 +203,7 @@ impl<C> InFlightLedger<C> {
     pub fn with_history_window(history_window: f32) -> Self {
         Self {
             active: Vec::new(),
-            finalized: VecDeque::new(),
-            history_window,
-            last_time: 0.0,
+            log: RecognitionLog::with_history_window(history_window),
         }
     }
 
@@ -189,9 +247,9 @@ impl<C: InFlightItem> InFlightLedger<C> {
         now: f32,
         mut step: impl FnMut(&mut C) -> Disposition,
     ) -> Vec<(C, FinalizeReason)> {
-        self.last_time = now;
+        self.log.observe_time(now);
         let finalized = self.resolve_each(|item| step(item));
-        self.prune_history();
+        self.log.prune();
         finalized
     }
 
@@ -201,7 +259,7 @@ impl<C: InFlightItem> InFlightLedger<C> {
     /// forgotten.
     pub fn apply_boundary(&mut self, boundary: Boundary) -> Vec<(C, FinalizeReason)> {
         let finalized = self.resolve_each(|item| item.on_boundary(boundary));
-        self.prune_history();
+        self.log.prune();
         finalized
     }
 
@@ -218,10 +276,10 @@ impl<C: InFlightItem> InFlightLedger<C> {
     pub fn finalize_all(&mut self, reason: FinalizeReason) -> Vec<(C, FinalizeReason)> {
         let mut finalized = Vec::with_capacity(self.active.len());
         for item in std::mem::take(&mut self.active) {
-            self.log_finalized(&item);
+            self.log.log(&item);
             finalized.push((item, reason));
         }
-        self.prune_history();
+        self.log.prune();
         finalized
     }
 
@@ -239,29 +297,12 @@ impl<C: InFlightItem> InFlightLedger<C> {
                 }
                 Disposition::Finalize(reason) => {
                     let item = self.active.remove(i);
-                    self.log_finalized(&item);
+                    self.log.log(&item);
                     finalized.push((item, reason));
                 }
             }
         }
         finalized
-    }
-
-    fn log_finalized(&mut self, item: &C) {
-        let mut recognition = item.recognition();
-        recognition.committed = true;
-        // Keep `last_time` roughly current even for imperative flows that don't
-        // go through `advance`, so the history still prunes (recognition time is
-        // a lower bound on the current time).
-        self.last_time = self.last_time.max(recognition.time);
-        self.finalized.push_back(recognition);
-    }
-
-    fn prune_history(&mut self) {
-        let cutoff = self.last_time - self.history_window;
-        while self.finalized.front().is_some_and(|rec| rec.time < cutoff) {
-            self.finalized.pop_front();
-        }
     }
 
     /// Whether an event was recognized within `window` seconds before `now`,
@@ -286,13 +327,196 @@ impl<C: InFlightItem> InFlightLedger<C> {
         window: f32,
         committed_only: bool,
     ) -> impl Iterator<Item = Recognition> + '_ {
-        let active = self.active.iter().map(C::recognition).filter(move |rec| {
-            rec.time <= now && now - rec.time <= window && (!committed_only || rec.committed)
-        });
-        let finalized = self.finalized.iter().copied().filter(move |rec| {
-            rec.time <= now && now - rec.time <= window && (!committed_only || rec.committed)
-        });
-        active.chain(finalized)
+        let active = self
+            .active
+            .iter()
+            .map(C::recognition)
+            .filter(move |rec| in_window(rec, now, window, committed_only));
+        active.chain(self.log.finalized_within(now, window, committed_only))
+    }
+}
+
+/// Holds at most one in-flight item per key, drives their lifecycle uniformly,
+/// and records recognitions for latent queries. The keyed analogue of
+/// [`InFlightLedger`], for calculators that track a candidate per subject (e.g.
+/// per player).
+#[derive(Debug, Clone)]
+pub struct KeyedInFlightLedger<K, C> {
+    active: HashMap<K, C>,
+    log: RecognitionLog,
+}
+
+impl<K: Eq + Hash, C: PartialEq> PartialEq for KeyedInFlightLedger<K, C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.active == other.active && self.log == other.log
+    }
+}
+
+impl<K, C> Default for KeyedInFlightLedger<K, C> {
+    fn default() -> Self {
+        Self::with_history_window(DEFAULT_HISTORY_WINDOW_SECONDS)
+    }
+}
+
+impl<K, C> KeyedInFlightLedger<K, C> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_history_window(history_window: f32) -> Self {
+        Self {
+            active: HashMap::new(),
+            log: RecognitionLog::with_history_window(history_window),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.active.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.active.len()
+    }
+}
+
+impl<K: Eq + Hash + Clone, C> KeyedInFlightLedger<K, C> {
+    /// Arm (or replace) the in-flight item for `key`.
+    pub fn arm(&mut self, key: K, item: C) {
+        self.active.insert(key, item);
+    }
+
+    pub fn contains(&self, key: &K) -> bool {
+        self.active.contains_key(key)
+    }
+
+    pub fn get(&self, key: &K) -> Option<&C> {
+        self.active.get(key)
+    }
+
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut C> {
+        self.active.get_mut(key)
+    }
+
+    /// Access the in-flight item for `key`, inserting one produced by `default`
+    /// if absent. Mirrors `HashMap::entry(..).or_insert_with(..)`.
+    pub fn entry_or_insert_with(&mut self, key: K, default: impl FnOnce() -> C) -> &mut C {
+        match self.active.entry(key) {
+            Entry::Occupied(occupied) => occupied.into_mut(),
+            Entry::Vacant(vacant) => vacant.insert(default()),
+        }
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = &K> + '_ {
+        self.active.keys()
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &C> + '_ {
+        self.active.values()
+    }
+
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut C> + '_ {
+        self.active.values_mut()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&K, &C)> + '_ {
+        self.active.iter()
+    }
+
+    /// Remove the item for `key` without recording it as having happened (it is
+    /// abandoned, not finalized).
+    pub fn discard(&mut self, key: &K) -> Option<C> {
+        self.active.remove(key)
+    }
+
+    /// Discard every in-flight item without finalizing any (e.g. abandoning all
+    /// candidates when their precondition no longer holds).
+    pub fn clear(&mut self) {
+        self.active.clear();
+    }
+}
+
+impl<K: Eq + Hash + Clone, C: InFlightItem> KeyedInFlightLedger<K, C> {
+    /// Finalize the item for `key`, logging it for latent queries and returning
+    /// it for the caller to convert into an event.
+    pub fn finalize(&mut self, key: &K, _reason: FinalizeReason) -> Option<C> {
+        let item = self.active.remove(key)?;
+        self.log.log(&item);
+        Some(item)
+    }
+
+    /// Advance every in-flight item with `step`, which receives the key and a
+    /// mutable item and returns a [`Disposition`]. `now` bounds the latent-query
+    /// history. Finalized items are returned with their key and reason.
+    pub fn advance(
+        &mut self,
+        now: f32,
+        mut step: impl FnMut(&K, &mut C) -> Disposition,
+    ) -> Vec<(K, C, FinalizeReason)> {
+        self.log.observe_time(now);
+        let finalized = self.resolve_each(|key, item| step(key, item));
+        self.log.prune();
+        finalized
+    }
+
+    /// Apply `boundary` to every in-flight item via [`InFlightItem::on_boundary`].
+    pub fn apply_boundary(&mut self, boundary: Boundary) -> Vec<(K, C, FinalizeReason)> {
+        let finalized = self.resolve_each(|_key, item| item.on_boundary(boundary));
+        self.log.prune();
+        finalized
+    }
+
+    /// Finalize everything still in flight at end of stream.
+    pub fn finish(&mut self) -> Vec<(K, C, FinalizeReason)> {
+        self.apply_boundary(Boundary::ReplayEnded)
+    }
+
+    fn resolve_each(
+        &mut self,
+        mut decide: impl FnMut(&K, &mut C) -> Disposition,
+    ) -> Vec<(K, C, FinalizeReason)> {
+        let mut finalized = Vec::new();
+        let mut remove_finalize: Vec<(K, FinalizeReason)> = Vec::new();
+        let mut remove_discard: Vec<K> = Vec::new();
+        for (key, item) in self.active.iter_mut() {
+            match decide(key, item) {
+                Disposition::Keep => {}
+                Disposition::Discard => remove_discard.push(key.clone()),
+                Disposition::Finalize(reason) => remove_finalize.push((key.clone(), reason)),
+            }
+        }
+        for key in remove_discard {
+            self.active.remove(&key);
+        }
+        for (key, reason) in remove_finalize {
+            if let Some(item) = self.active.remove(&key) {
+                self.log.log(&item);
+                finalized.push((key, item, reason));
+            }
+        }
+        finalized
+    }
+
+    /// See [`InFlightLedger::happened_within`].
+    pub fn happened_within(&self, now: f32, window: f32, committed_only: bool) -> bool {
+        self.recognitions_within(now, window, committed_only)
+            .next()
+            .is_some()
+    }
+
+    /// All recognitions within `window` seconds before `now`, across in-flight
+    /// and finalized items.
+    pub fn recognitions_within(
+        &self,
+        now: f32,
+        window: f32,
+        committed_only: bool,
+    ) -> impl Iterator<Item = Recognition> + '_ {
+        let active = self
+            .active
+            .values()
+            .map(C::recognition)
+            .filter(move |rec| in_window(rec, now, window, committed_only));
+        active.chain(self.log.finalized_within(now, window, committed_only))
     }
 }
 
