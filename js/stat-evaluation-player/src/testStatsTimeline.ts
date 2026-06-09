@@ -44,11 +44,6 @@ type LegacyEventBucket = {
 const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "timeline", stream: "timeline", kind: "timeline" },
   { field: "core_player", stream: "core_player", kind: "core_player" },
-  {
-    field: "core_player_goal_context",
-    stream: "core_player_goal_context",
-    kind: "core_player_goal_context",
-  },
   { field: "possession", stream: "possession", kind: "possession" },
   { field: "ball_half", stream: "ball_half", kind: "ball_half" },
   {

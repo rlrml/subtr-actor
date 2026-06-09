@@ -123,7 +123,6 @@ struct CoreStatsExport<'a> {
     timeline: &'a [TimelineEvent],
     goal_context: &'a [GoalContextEvent],
     player_events: &'a [CorePlayerScoreboardEvent],
-    player_goal_context_events: &'a [CorePlayerGoalContextEvent],
 }
 
 #[derive(Serialize)]
@@ -467,7 +466,6 @@ pub(crate) fn builtin_module_json(
                 timeline: calculator.timeline(),
                 goal_context: calculator.goal_context_events(),
                 player_events: calculator.core_player_events(),
-                player_goal_context_events: calculator.core_player_goal_context_events(),
             })
         }
         "backboard" => {

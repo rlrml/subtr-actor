@@ -153,29 +153,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
-            .module_player_events(
-                "core",
-                "player_goal_context_events",
-                parse_core_player_goal_context_event,
-            )?
-            .into_iter()
-            .enumerate()
-        {
-            events.push(make_event(
-                "core_player_goal_context",
-                index,
-                moment(event.frame, event.time),
-                EventPayload::CorePlayerGoalContext(event.clone()),
-                Some(event.player.clone()),
-                None,
-                Some(event.is_team_0),
-                event.player_position,
-                None,
-                None,
-            ));
-        }
-
-        for (index, event) in self
             .module_player_events("possession", "events", parse_possession_event)?
             .into_iter()
             .enumerate()

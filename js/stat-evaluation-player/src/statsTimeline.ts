@@ -4,7 +4,6 @@ import type { BoostPickupEvent } from "./generated/BoostPickupEvent.ts";
 import type { RespawnEvent } from "./generated/RespawnEvent.ts";
 import type { BumpEvent } from "./generated/BumpEvent.ts";
 import type { CeilingShotEvent } from "./generated/CeilingShotEvent.ts";
-import type { CorePlayerGoalContextEvent } from "./generated/CorePlayerGoalContextEvent.ts";
 import type { CorePlayerScoreboardEvent } from "./generated/CorePlayerScoreboardEvent.ts";
 import type { DodgeResetEvent } from "./generated/DodgeResetEvent.ts";
 import type { DoubleTapEvent } from "./generated/DoubleTapEvent.ts";
@@ -126,7 +125,6 @@ export type {
   BoostPickupEvent,
   RespawnEvent,
   BumpEvent,
-  CorePlayerGoalContextEvent,
   CorePlayerScoreboardEvent,
   DodgeResetEvent,
 };
