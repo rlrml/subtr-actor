@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::CString;
 use subtr_actor::stats::analysis_graph::STATS_TIMELINE_MECHANIC_KINDS;
 use subtr_actor::{
-    BoostPickupActivity, BoostPickupComparison, BoostPickupFieldHalf, BoostPickupPadType,
-    DemoCalculator, TouchState, WhiffEventKind,
+    BoostPickupActivity, BoostPickupDetection, BoostPickupFieldHalf, BoostPickupPadType,
+    DemoCalculator, EventMeta, HalfFlipEvent, TouchState, WhiffEventKind,
 };
 
 fn checked_in_header_text() -> String {

@@ -393,7 +393,7 @@ fn whiff_event_envelope(event: WhiffEvent) -> Event {
     )
 }
 
-fn boost_pickup_event_envelope(event: BoostPickupComparisonEvent) -> Event {
+fn boost_pickup_event_envelope(event: BoostPickupEvent) -> Event {
     payload_event_envelope(
         "boost_pickups",
         event.frame,
@@ -475,9 +475,8 @@ fn backboard_event(frame: usize, time: f32) -> BackboardBounceEvent {
     }
 }
 
-fn boost_pickup_event(frame: usize, time: f32) -> BoostPickupComparisonEvent {
-    BoostPickupComparisonEvent {
-        comparison: BoostPickupComparison::Both,
+fn boost_pickup_event(frame: usize, time: f32) -> BoostPickupEvent {
+    BoostPickupEvent {
         frame,
         time,
         player_id: RemoteId::SplitScreen(0),
@@ -486,10 +485,10 @@ fn boost_pickup_event(frame: usize, time: f32) -> BoostPickupComparisonEvent {
         pad_type: BoostPickupPadType::Big,
         field_half: BoostPickupFieldHalf::Opponent,
         activity: BoostPickupActivity::Active,
-        reported_frame: Some(frame),
-        reported_time: Some(time),
-        inferred_frame: None,
-        inferred_time: None,
+        detection: BoostPickupDetection::Both,
+        is_steal: true,
+        collected_amount: 80.0,
+        overfill_amount: 0.0,
         boost_before: Some(20.0),
         boost_after: Some(100.0),
     }

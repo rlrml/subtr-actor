@@ -204,7 +204,7 @@ pub(crate) fn push_backboard_events_from_timeline(
 pub(crate) fn push_boost_pickup_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
-    boost_pickups: impl IntoIterator<Item = impl std::borrow::Borrow<BoostPickupComparisonEvent>>,
+    boost_pickups: impl IntoIterator<Item = impl std::borrow::Borrow<BoostPickupEvent>>,
 ) {
     for (index, event) in boost_pickups.into_iter().enumerate() {
         let event = event.borrow();
@@ -213,11 +213,10 @@ pub(crate) fn push_boost_pickup_events_from_timeline(
             emitted_mechanic_ids,
             PendingGraphEvent {
                 id: format!(
-                    "boost_pickup:{}:{}:{:?}:{:?}:{index}",
+                    "boost_pickup:{}:{}:{:?}:{index}",
                     event.frame,
                     player_index(&event.player_id),
-                    event.reported_frame,
-                    event.inferred_frame
+                    event.detection
                 ),
                 kind: SaMechanicKind::BoostPickup,
                 player_id: event.player_id.clone(),
@@ -656,11 +655,10 @@ pub(crate) fn replay_annotations_from_timeline(
                     &index_map,
                     PendingGraphEvent {
                         id: format!(
-                            "replay_boost_pickup:{}:{}:{:?}:{:?}:{index}",
+                            "replay_boost_pickup:{}:{}:{:?}:{index}",
                             event.frame,
                             replay_player_index(&index_map, &event.player_id),
-                            event.reported_frame,
-                            event.inferred_frame
+                            event.detection
                         ),
                         kind: SaMechanicKind::BoostPickup,
                         player_id: event.player_id.clone(),
