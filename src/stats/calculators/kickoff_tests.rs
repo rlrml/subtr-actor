@@ -1389,6 +1389,7 @@ fn kickoff_classifies_known_taker_approaches() {
         start_position: [-2048.0, -2560.0, 17.0],
         spawn_position: KickoffSpawnPosition::DiagonalLeft,
         start_boost: Some(33.0),
+        first_touch_boost: Some(20.0),
         first_touch_time: Some(1.0),
         first_touch_frame: Some(10),
         approach_trace: KickoffApproachTrace {
@@ -1623,6 +1624,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
                 start_position: [-2048.0, -2560.0, 17.0],
                 spawn_position: KickoffSpawnPosition::DiagonalLeft,
                 start_boost: Some(33.0),
+                first_touch_boost: None,
                 first_touch_time: None,
                 first_touch_frame: None,
                 approach_trace: KickoffApproachTrace::default(),
@@ -1633,6 +1635,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
                 start_position: [2048.0, -2560.0, 17.0],
                 spawn_position: KickoffSpawnPosition::DiagonalRight,
                 start_boost: Some(33.0),
+                first_touch_boost: None,
                 first_touch_time: None,
                 first_touch_frame: None,
                 approach_trace: KickoffApproachTrace::default(),
@@ -1666,6 +1669,7 @@ fn kickoff_taker_prefers_ball_committer_when_no_touch() {
             start_position: [2048.0, 2560.0, 17.0],
             spawn_position: KickoffSpawnPosition::DiagonalLeft,
             start_boost: Some(85.0),
+            first_touch_boost: None,
             first_touch_time: None,
             first_touch_frame: None,
             approach_trace: KickoffApproachTrace {
@@ -1680,6 +1684,7 @@ fn kickoff_taker_prefers_ball_committer_when_no_touch() {
             start_position: [-2048.0, 2560.0, 17.0],
             spawn_position: KickoffSpawnPosition::DiagonalRight,
             start_boost: Some(85.0),
+            first_touch_boost: None,
             first_touch_time: None,
             first_touch_frame: None,
             approach_trace: KickoffApproachTrace {
