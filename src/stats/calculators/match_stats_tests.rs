@@ -251,6 +251,39 @@ fn goal_context_links_scorer_touch_with_ball_location_and_speeds() {
 }
 
 #[test]
+fn ball_speed_at_goal_falls_back_to_last_velocity_when_explosion_frame_has_none() {
+    // Real replays record the goal on the ball explosion frame, where the
+    // interpolated ball rigid body carries no velocity (reads as zero). The
+    // speed at goal should fall back to the most recent in-flight velocity
+    // rather than reporting 0.
+    let mut calculator = MatchStatsCalculator::new();
+
+    update(
+        &mut calculator,
+        frame(10, 1.0),
+        ball_with_state(
+            glam::Vec3::new(0.0, 4000.0, 100.0),
+            glam::Vec3::new(0.0, 2500.0, 0.0),
+        ),
+        0,
+        Vec::new(),
+    );
+    update(
+        &mut calculator,
+        frame(20, 1.1),
+        // Explosion frame: ball present but with no usable velocity.
+        ball_with_state(glam::Vec3::new(0.0, 5200.0, 100.0), glam::Vec3::ZERO),
+        1,
+        vec![goal_event(1.1, 20, PlayerId::Steam(1))],
+    );
+
+    assert_eq!(
+        calculator.goal_context_events()[0].ball_speed_at_goal,
+        Some(2500.0)
+    );
+}
+
+#[test]
 fn rewrites_misattributed_goal_context_scorer_from_goal_delta() {
     let scorer = PlayerId::Steam(1);
     let stale_touch_player = PlayerId::Steam(2);
