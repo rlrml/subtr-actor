@@ -83,7 +83,6 @@ export const STATS_EVENT_STREAM_TIMELINE_PRESENTATION_OVERRIDES = {
   wavedash: "span",
   powerslide: "mixed",
   boost_ledger: "span",
-  boost_state: "span",
 } as const satisfies Partial<
   Record<StatsEventStreamCountType, StatsEventStreamTimelinePresentation>
 >;
