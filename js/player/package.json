@@ -16,6 +16,10 @@
       "types": "./dist/lib.d.ts",
       "import": "./dist/index.js"
     },
+    "./boost-units": {
+      "types": "./dist/boost-units.d.ts",
+      "import": "./dist/boost-units.js"
+    },
     "./generated/*": {
       "types": "./dist/generated/*.d.ts"
     },
