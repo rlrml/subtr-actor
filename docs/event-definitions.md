@@ -473,6 +473,36 @@ _None documented._
 
 _None documented._
 
+### Event (`event`)
+
+- Category: `mechanic`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `stats_timeline_events` via `StatsTimelineEventsNode` / `StatsTimelineEventsState`
+
+**Summary**
+
+A shared event envelope with common metadata and a typed event payload.
+
+**Approach**
+
+- Collect completed events from the analysis graph at finish time.
+- Wrap each typed event payload with common timing, participant, team, position, confidence, and stream metadata.
+- Serialize timeline events as a single heterogeneous event list for playback and analysis consumers.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### 50/50 (`fifty_fifty`)
 
 - Category: `other`
@@ -585,36 +615,6 @@ A fast touch shortly after the ball bounces off the floor, paired with a recent 
 - Detect floor bounces from ball height and vertical velocity reversal when no touch occurs on the bounce frame.
 - Track each player's recent ground contact and dodge start.
 - Emit on a same-player touch shortly after the floor bounce and dodge when the post-touch ball speed clears the configured threshold.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Mechanic Timeline Tag (`mechanics`)
-
-- Category: `mechanic`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `stats_timeline_events` via `StatsTimelineEventsNode` / `StatsTimelineEventsState`
-
-**Summary**
-
-A normalized timeline representation of mechanic detections for playback and visualization.
-
-**Approach**
-
-- Collect completed mechanic events from the analysis graph at finish time.
-- Convert point mechanics into moment tags and span mechanics into duration tags with stable IDs.
-- Attach selected mechanic-specific properties, such as air-dribble origin and touch count, for timeline consumers.
 
 **Limitations**
 
@@ -1450,6 +1450,19 @@ A goal linked to a recent flick event.
 - Compare recent flick events against each goal's scorer-last-touch context.
 - Require the flick to fall within the configured event-to-goal window.
 - Prefer by-scorer evidence when the flick player matches the scorer's last touch.
+
+### Ceiling-Shot Goal (`ceiling_shot_goal`)
+
+
+**Summary**
+
+A goal linked to a recent ceiling-shot event.
+
+**Approach**
+
+- Compare recent ceiling-shot events against each goal's scorer-last-touch context.
+- Require the ceiling shot to fall within the configured event-to-goal window.
+- Attach a related ceiling-shot event reference and ceiling-shot evidence to the goal tag metadata.
 
 ### Double-Tap Goal (`double_tap_goal`)
 
