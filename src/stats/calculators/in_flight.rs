@@ -428,6 +428,16 @@ impl<K: Eq + Hash + Clone, C> KeyedInFlightLedger<K, C> {
         self.active.iter()
     }
 
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&K, &mut C)> + '_ {
+        self.active.iter_mut()
+    }
+
+    /// Keep only the items for which `keep` returns true, discarding the rest
+    /// without finalizing them (e.g. pruning stale candidates).
+    pub fn retain(&mut self, mut keep: impl FnMut(&K, &C) -> bool) {
+        self.active.retain(|key, item| keep(key, item));
+    }
+
     /// Remove the item for `key` without recording it as having happened (it is
     /// abandoned, not finalized).
     pub fn discard(&mut self, key: &K) -> Option<C> {

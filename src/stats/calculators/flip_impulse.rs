@@ -61,10 +61,24 @@ struct ActiveFlipImpulseCandidate {
     boost_sample_count: u32,
 }
 
+impl InFlightItem for ActiveFlipImpulseCandidate {
+    fn recognition(&self) -> Recognition {
+        // Speculative until it survives the evaluation window: a candidate can
+        // be pruned (stale) or discarded at a boundary before emitting.
+        Recognition::speculative(self.start_time, self.start_frame)
+    }
+
+    fn on_boundary(&mut self, _boundary: Boundary) -> Disposition {
+        // Candidates in flight at a boundary are dropped (matching the previous
+        // clear-on-stoppage / drop-at-end behavior).
+        Disposition::Discard
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlipImpulseCalculator {
     events: EventStream<DodgeEvent>,
-    active_candidates: HashMap<PlayerId, ActiveFlipImpulseCandidate>,
+    active_candidates: KeyedInFlightLedger<PlayerId, ActiveFlipImpulseCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
 }
 
@@ -147,7 +161,7 @@ impl FlipImpulseCalculator {
         };
 
         let rotation = quat_to_glam(&rigid_body.rotation);
-        self.active_candidates.insert(
+        self.active_candidates.arm(
             player.player_id.clone(),
             ActiveFlipImpulseCandidate {
                 is_team_0: player.is_team_0,
@@ -263,7 +277,7 @@ impl FlipImpulseCalculator {
     fn finalize_candidates(&mut self, frame: &FrameInfo, force_all: bool) {
         let mut finished_candidates = Vec::new();
 
-        for (player_id, candidate) in &self.active_candidates {
+        for (player_id, candidate) in self.active_candidates.iter() {
             let duration = frame.time - candidate.start_time;
             if force_all || duration >= FLIP_IMPULSE_EVALUATION_SECONDS {
                 finished_candidates.push((
@@ -283,7 +297,10 @@ impl FlipImpulseCalculator {
         });
 
         for (_, _, _, player_id) in finished_candidates {
-            let Some(candidate) = self.active_candidates.remove(&player_id) else {
+            let Some(candidate) = self
+                .active_candidates
+                .finalize(&player_id, FinalizeReason::Completed)
+            else {
                 continue;
             };
             let event = Self::candidate_event(&player_id, candidate);
@@ -300,7 +317,7 @@ impl FlipImpulseCalculator {
         self.events.begin_update();
 
         if !live_play_state.counts_toward_player_motion() {
-            self.active_candidates.clear();
+            self.active_candidates.apply_boundary(Boundary::LivePlayEnded);
             return Ok(());
         }
 
@@ -308,7 +325,7 @@ impl FlipImpulseCalculator {
             self.maybe_start_candidate(frame, player);
         }
 
-        for (player_id, candidate) in &mut self.active_candidates {
+        for (player_id, candidate) in self.active_candidates.iter_mut() {
             let Some(player) = Self::player_by_id(players, player_id) else {
                 continue;
             };
