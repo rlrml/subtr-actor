@@ -119,7 +119,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "dodge",
     "label": "Dodge",
-    "category": "movement",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
@@ -280,7 +280,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "powerslide",
     "label": "Powerslide",
-    "category": "movement",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },

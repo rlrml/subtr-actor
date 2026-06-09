@@ -262,7 +262,7 @@ fn kickoff_records_movement_start_after_countdown() {
 
     calculator
         .update(
-            &frame(55, 5.5),
+            &frame(60, 6.0),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -809,7 +809,7 @@ fn kickoff_taker_tracks_time_to_ball_and_approach_boost_totals() {
 
     calculator
         .update(
-            &frame(50, 5.0),
+            &frame(55, 5.5),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
