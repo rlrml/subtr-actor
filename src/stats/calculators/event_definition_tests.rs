@@ -14,8 +14,6 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<FlickEvent>();
     assert_stats_event::<MustyFlickEvent>();
     assert_stats_event::<DodgeResetEvent>();
-    assert_stats_event::<DodgeRefreshedEvent>();
-    assert_stats_event::<ConfirmedFlipResetEvent>();
     assert_stats_event::<DoubleTapEvent>();
     assert_stats_event::<OneTimerEvent>();
     assert_stats_event::<PassEvent>();
@@ -47,8 +45,6 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<RotationPlayerEvent>();
     assert_stats_event::<RotationTeamEvent>();
     assert_stats_event::<FlipResetEvent>();
-    assert_stats_event::<PostWallDodgeEvent>();
-    assert_stats_event::<FlipResetFollowupDodgeEvent>();
     assert_stats_event::<Event>();
 }
 

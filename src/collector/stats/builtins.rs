@@ -790,7 +790,6 @@ pub(crate) fn builtin_module_json(
             serialize_to_json_value(&serde_json::json!({
                 "player_stats": player_stats_entries(projection.dodge_reset.player_stats()),
                 "events": calculator.events(),
-                "on_ball_events": calculator.on_ball_events(),
             }))
         }
         "ball_carry" => {

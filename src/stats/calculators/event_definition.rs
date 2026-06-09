@@ -8,16 +8,15 @@ use linkme::distributed_slice;
 use super::{
     BackboardBounceEvent, BallCarryEvent, BoostBucketEvent, BoostLedgerEvent,
     BoostPickupComparisonEvent, BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent,
-    ConfirmedFlipResetEvent, ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeEvent,
-    DodgeRefreshedEvent, DodgeResetEvent, DoubleTapEvent, FiftyFiftyEvent, FlickEvent,
-    FlipResetEvent, FlipResetFollowupDodgeEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
+    ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeEvent, DodgeResetEvent, DoubleTapEvent,
+    FiftyFiftyEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
     MustyFlickEvent, OneTimerEvent, PassEvent, PositioningActivityEvent, PositioningBallDepthEvent,
     PositioningBallProximityEvent, PositioningFieldZoneEvent, PositioningGoalContextEvent,
-    PositioningPossessionEvent, PositioningTeammateRoleEvent, PossessionEvent, PostWallDodgeEvent,
-    PowerslideEvent, PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent,
-    RotationPlayerEvent, RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent,
-    TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
-    WallAerialShotEvent, WavedashEvent, WhiffEvent,
+    PositioningPossessionEvent, PositioningTeammateRoleEvent, PossessionEvent, PowerslideEvent,
+    PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent,
+    RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
+    TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
+    WhiffEvent,
 };
 use crate::stats::timeline::Event;
 
@@ -373,36 +372,11 @@ define_stats_event!(
     "dodge_reset",
     "Dodge Reset",
     EventCategory::Other,
-    summary = "A frame-level dodge refresh observed from replay state, optionally marked as occurring on the ball.",
+    summary = "A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.",
     approach = [
         "Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.",
-        "Classify the refresh as on-ball when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.",
-        "Keep on-ball resets pending until the player lands or uses the reset in a later confirmed flip-reset sequence.",
-    ]
-);
-define_stats_event!(
-    DodgeRefreshedEvent,
-    DODGE_REFRESHED_EVENT_DEFINITION,
-    "dodge_refreshed",
-    "Dodge Refreshed",
-    EventCategory::Other,
-    summary = "A raw replay dodge-refresh signal for a player.",
-    approach = [
-        "Forward the replay's dodge-refreshed event stream with player, team, time, frame, and counter value.",
-        "Use this lower-level event as evidence for higher-level reset mechanics, including on-ball dodge resets and confirmed flip resets.",
-    ]
-);
-define_stats_event!(
-    ConfirmedFlipResetEvent,
-    CONFIRMED_FLIP_RESET_EVENT_DEFINITION,
-    "confirmed_flip_reset",
-    "Confirmed Flip Reset",
-    EventCategory::Mechanic,
-    summary = "A flip reset that is confirmed by a later dodge-powered touch after an on-ball dodge refresh.",
-    approach = [
-        "Start from a pending on-ball dodge reset detected by the dodge reset calculator.",
-        "Require the player to start a dodge after that reset and then touch the ball while the dodge is active.",
-        "Accept only touches within the configured reset-to-touch window, then clear the pending reset so each reset confirms at most once.",
+        "Classify the refresh as on-ball (a flip reset) when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.",
+        "Keep on-ball resets pending until the player lands; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` to record that the flip reset was converted.",
     ]
 );
 define_stats_event!(
@@ -761,32 +735,6 @@ define_stats_event!(
     ]
 );
 define_stats_event!(
-    PostWallDodgeEvent,
-    POST_WALL_DODGE_EVENT_DEFINITION,
-    "post_wall_dodge",
-    "Post-Wall Dodge",
-    EventCategory::Mechanic,
-    summary = "A dodge that starts shortly after the player contacts a wall.",
-    approach = [
-        "Track recent wall contact times for each player from player position.",
-        "Record dodge rising edges and match them to recent wall contacts for the same player.",
-        "Emit when the dodge begins inside the configured wall-contact-to-dodge window.",
-    ]
-);
-define_stats_event!(
-    FlipResetFollowupDodgeEvent,
-    FLIP_RESET_FOLLOWUP_DODGE_EVENT_DEFINITION,
-    "flip_reset_followup_dodge",
-    "Flip Reset Follow-Up Dodge",
-    EventCategory::Mechanic,
-    summary = "A dodge after a loose flip-reset touch candidate, used as supporting evidence that the candidate produced a usable reset.",
-    approach = [
-        "Track lower-confidence underside touch candidates that are plausible but not strong enough to stand alone.",
-        "Record dodge rising edges for the same player after the candidate touch.",
-        "Emit when the dodge occurs within the follow-up window, carrying through the candidate touch confidence.",
-    ]
-);
-define_stats_event!(
     Event,
     TIMELINE_ENVELOPE_EVENT_DEFINITION,
     "event",
@@ -811,8 +759,6 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &FLICK_EVENT_DEFINITION,
     &MUSTY_FLICK_EVENT_DEFINITION,
     &DODGE_RESET_EVENT_DEFINITION,
-    &DODGE_REFRESHED_EVENT_DEFINITION,
-    &CONFIRMED_FLIP_RESET_EVENT_DEFINITION,
     &DOUBLE_TAP_EVENT_DEFINITION,
     &ONE_TIMER_EVENT_DEFINITION,
     &PASS_EVENT_DEFINITION,
@@ -846,8 +792,6 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &ROTATION_PLAYER_EVENT_DEFINITION,
     &ROTATION_TEAM_EVENT_DEFINITION,
     &FLIP_RESET_EVENT_DEFINITION,
-    &POST_WALL_DODGE_EVENT_DEFINITION,
-    &FLIP_RESET_FOLLOWUP_DODGE_EVENT_DEFINITION,
     &TIMELINE_ENVELOPE_EVENT_DEFINITION,
 ];
 
@@ -922,26 +866,12 @@ const MUSTY_FLICK_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "MustyFlickCalculator",
 )];
 
-const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[
-    produced_event(
-        &DODGE_RESET_EVENT_DEFINITION,
-        "dodge_reset",
-        "DodgeResetNode",
-        "DodgeResetCalculator",
-    ),
-    produced_event(
-        &DODGE_REFRESHED_EVENT_DEFINITION,
-        "dodge_reset",
-        "DodgeResetNode",
-        "DodgeResetCalculator",
-    ),
-    produced_event(
-        &CONFIRMED_FLIP_RESET_EVENT_DEFINITION,
-        "dodge_reset",
-        "DodgeResetNode",
-        "DodgeResetCalculator",
-    ),
-];
+const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &DODGE_RESET_EVENT_DEFINITION,
+    "dodge_reset",
+    "DodgeResetNode",
+    "DodgeResetCalculator",
+)];
 
 const DOUBLE_TAP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &DOUBLE_TAP_EVENT_DEFINITION,

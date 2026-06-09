@@ -171,25 +171,29 @@ pub(super) fn extract_candidates(
                 }));
 
                 if let Some(calculator) = graph.state::<DodgeResetCalculator>() {
-                    candidates.extend(calculator.on_ball_events().iter().map(|event| {
-                        MechanicCandidate {
-                            mechanic: "flip_reset",
-                            mechanic_label: "Flip Reset",
-                            detector: "builtin:dodge_reset:on_ball",
-                            player_id: Some(player_id_string(&event.player)),
-                            is_team_0: Some(event.is_team_0),
-                            event_time: event.time,
-                            event_frame: event.frame,
-                            start_time: event.time,
-                            end_time: event.time,
-                            confidence: None,
-                            reason: format!(
-                                "dodge refresh while close to the ball; counter value {}",
-                                event.counter_value
-                            ),
-                            event: event_json(event),
-                        }
-                    }));
+                    candidates.extend(
+                        calculator
+                            .events()
+                            .iter()
+                            .filter(|event| event.on_ball)
+                            .map(|event| MechanicCandidate {
+                                mechanic: "flip_reset",
+                                mechanic_label: "Flip Reset",
+                                detector: "builtin:dodge_reset:on_ball",
+                                player_id: Some(player_id_string(&event.player)),
+                                is_team_0: Some(event.is_team_0),
+                                event_time: event.time,
+                                event_frame: event.frame,
+                                start_time: event.time,
+                                end_time: event.time,
+                                confidence: None,
+                                reason: format!(
+                                    "dodge refresh while close to the ball; counter value {}",
+                                    event.counter_value
+                                ),
+                                event: event_json(event),
+                            }),
+                    );
                 }
             }
             "ceiling_shot" => {

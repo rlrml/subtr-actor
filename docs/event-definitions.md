@@ -266,36 +266,6 @@ _None documented._
 
 _None documented._
 
-### Confirmed Flip Reset (`confirmed_flip_reset`)
-
-- Category: `mechanic`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `dodge_reset` via `DodgeResetNode` / `DodgeResetCalculator`
-
-**Summary**
-
-A flip reset that is confirmed by a later dodge-powered touch after an on-ball dodge refresh.
-
-**Approach**
-
-- Start from a pending on-ball dodge reset detected by the dodge reset calculator.
-- Require the player to start a dodge after that reset and then touch the ball while the dodge is active.
-- Accept only touches within the configured reset-to-touch window, then clear the pending reset so each reset confirms at most once.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
 ### Controlled Play (`controlled_play`)
 
 - Category: `possession`
@@ -384,35 +354,6 @@ _None documented._
 
 _None documented._
 
-### Dodge Refreshed (`dodge_refreshed`)
-
-- Category: `other`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `dodge_reset` via `DodgeResetNode` / `DodgeResetCalculator`
-
-**Summary**
-
-A raw replay dodge-refresh signal for a player.
-
-**Approach**
-
-- Forward the replay's dodge-refreshed event stream with player, team, time, frame, and counter value.
-- Use this lower-level event as evidence for higher-level reset mechanics, including on-ball dodge resets and confirmed flip resets.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
 ### Dodge Reset (`dodge_reset`)
 
 - Category: `other`
@@ -427,13 +368,13 @@ _None documented._
 
 **Summary**
 
-A frame-level dodge refresh observed from replay state, optionally marked as occurring on the ball.
+A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.
 
 **Approach**
 
 - Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.
-- Classify the refresh as on-ball when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.
-- Keep on-ball resets pending until the player lands or uses the reset in a later confirmed flip-reset sequence.
+- Classify the refresh as on-ball (a flip reset) when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.
+- Keep on-ball resets pending until the player lands; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` to record that the flip reset was converted.
 
 **Limitations**
 

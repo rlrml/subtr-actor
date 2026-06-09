@@ -13,6 +13,7 @@ pub(in crate::collector::stats::playback) fn parse_dodge_reset_event(
         player_position: json_optional_vec3(object.get("player_position"))?,
         counter_value: json_required_i32(object, "counter_value")?,
         on_ball: json_required_bool(object, "on_ball")?,
+        used: json_optional_bool(object.get("used")).unwrap_or(false),
     })
 }
 
