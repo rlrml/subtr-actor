@@ -49,8 +49,9 @@ test("pressure event derivation populates compacted team stats", () => {
   );
   assertClose(blueDefensive?.value, 0.1);
 
-  const orangeDefensive = derived.frames[3]!.team_one.ball_half.labeled_time?.entries.find((entry) =>
-    entry.labels.some((label) => label.key === "field_half" && label.value === "defensive_half"),
+  const orangeDefensive = derived.frames[3]!.team_one.ball_half.labeled_time?.entries.find(
+    (entry) =>
+      entry.labels.some((label) => label.key === "field_half" && label.value === "defensive_half"),
   );
   assertClose(orangeDefensive?.value, 0.3);
 });

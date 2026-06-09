@@ -64,6 +64,34 @@ _None documented._
 
 _None documented._
 
+### Ball Half (`ball_half`)
+
+- Category: `possession`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `ball_half` via `BallHalfNode` / `BallHalfCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Boost Bucket (`boost_bucket`)
 
 - Category: `boost`
@@ -928,34 +956,6 @@ A state-change event for effective grounded powerslide use.
 - Read each player's powerslide-active input/state on every frame.
 - Treat powerslide as effective only while the player is close enough to the ground.
 - Emit when a player's effective powerslide state changes between active and inactive.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Pressure (`pressure`)
-
-- Category: `possession`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `pressure` via `PressureNode` / `PressureCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
 
 **Limitations**
 
