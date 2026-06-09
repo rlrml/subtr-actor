@@ -1,14 +1,14 @@
 import { renderMovementStats } from "../movementFormatting.ts";
 import type { MovementBreakdownClass } from "../movementFormatting.ts";
 import { CeilingShotOverlay } from "../ceilingShotOverlay.ts";
-import { FlipImpulseOverlay } from "../flipImpulseOverlay.ts";
+import { DodgeImpulseOverlay } from "../dodgeImpulseOverlay.ts";
 import { SpeedFlipOverlay } from "../speedFlipOverlay.ts";
 import { createBoostPickupFilterController } from "../boostPickupFilters.ts";
 import type { BoostPickupFilterController } from "../boostPickupFilters.ts";
 import {
   buildBackboardTimelineEvents,
   buildBumpTimelineEvents,
-  buildFlipImpulseTimelineEvents,
+  buildDodgeTimelineEvents,
   buildPowerslideTimelineEvents,
   buildWavedashTimelineEvents,
   buildWhiffTimelineEvents,
@@ -435,15 +435,15 @@ export function createSpeedFlipModule(): StatModule {
   };
 }
 
-export function createFlipImpulseModule(): StatModule {
-  let overlay: FlipImpulseOverlay | null = null;
+export function createDodgeModule(): StatModule {
+  let overlay: DodgeImpulseOverlay | null = null;
 
   return {
-    id: "flip-impulse",
-    label: "Flip Impulse",
+    id: "dodge",
+    label: "Dodge",
 
     setup(ctx) {
-      overlay = new FlipImpulseOverlay(
+      overlay = new DodgeImpulseOverlay(
         ctx.player.sceneState,
         ctx.player.container,
         ctx.replay,
@@ -461,7 +461,7 @@ export function createFlipImpulseModule(): StatModule {
     },
 
     getTimelineEvents(ctx) {
-      return buildFlipImpulseTimelineEvents(ctx.statsTimeline, ctx.replay);
+      return buildDodgeTimelineEvents(ctx.statsTimeline, ctx.replay);
     },
 
     renderStats(_frameIndex, ctx) {
@@ -476,7 +476,7 @@ export function createFlipImpulseModule(): StatModule {
           count: 0,
         });
       }
-      for (const event of ctx.statsTimeline.events.flip_impulse ?? []) {
+      for (const event of ctx.statsTimeline.events.dodge ?? []) {
         const id = playerIdToString(event.player);
         const player = ctx.replay.players.find((candidate) => candidate.id === id) ?? null;
         const entry = eventsByPlayer.get(id) ?? {
@@ -522,7 +522,7 @@ export function createFlipImpulseModule(): StatModule {
     },
 
     renderFocusedPlayerStats(playerId, _frameIndex, ctx) {
-      const count = (ctx.statsTimeline.events.flip_impulse ?? []).filter((event) => {
+      const count = (ctx.statsTimeline.events.dodge ?? []).filter((event) => {
         return playerIdToString(event.player) === playerId;
       }).length;
       return `<div class="stat-grid"><div class="stat-row"><span class="label">Events</span><span class="value">${count}</span></div></div>`;

@@ -401,11 +401,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 parse_controlled_play_event,
             )?,
             rush: self.module_typed_array("rush", "events")?,
-            flip_impulse: self.module_player_events(
-                "flip_impulse",
-                "events",
-                parse_flip_impulse_event,
-            )?,
+            dodge: self.module_player_events("dodge", "events", parse_dodge_event)?,
             speed_flip: self.module_player_events(
                 "speed_flip",
                 "events",
@@ -558,8 +554,8 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             Value::Array(self.module_array("rush", "events")),
         );
         events.insert(
-            "flip_impulse".to_owned(),
-            Value::Array(self.module_array("flip_impulse", "events")),
+            "dodge".to_owned(),
+            Value::Array(self.module_array("dodge", "events")),
         );
         events.insert(
             "speed_flip".to_owned(),

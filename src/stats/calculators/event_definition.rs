@@ -8,8 +8,8 @@ use linkme::distributed_slice;
 use super::{
     BackboardBounceEvent, BallCarryEvent, BoostLedgerEvent, BoostPickupComparisonEvent,
     BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent, ConfirmedFlipResetEvent,
-    ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeRefreshedEvent, DodgeResetEvent,
-    DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipImpulseEvent, FlipResetEvent,
+    ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeEvent, DodgeRefreshedEvent,
+    DodgeResetEvent, DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipResetEvent,
     FlipResetFollowupDodgeEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
     OneTimerEvent, PassEvent, PositioningActivityEvent, PositioningBallDepthEvent,
     PositioningBallProximityEvent, PositioningFieldZoneEvent, PositioningGoalContextEvent,
@@ -497,16 +497,16 @@ define_stats_event!(
     ]
 );
 define_stats_event!(
-    FlipImpulseEvent,
-    FLIP_IMPULSE_EVENT_DEFINITION,
-    "flip_impulse",
-    "Flip Impulse",
+    DodgeEvent,
+    DODGE_EVENT_DEFINITION,
+    "dodge",
+    "Dodge",
     EventCategory::Movement,
-    summary = "A dodge-start event with a rough estimated direction of the velocity impulse produced during the flip.",
+    summary = "A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.",
     approach = [
         "Start on the replay's dodge-active rising edge for each player.",
         "Sample the player's velocity change over the early dodge window and subtract an approximate forward boost contribution when boost is active.",
-        "Classify the resulting direction in car-local space while retaining the raw and compensated world-space vectors for visualization and downstream mechanic detectors.",
+        "Store the impulse estimate as dodge_impulse, including car-local direction classification plus raw and compensated world-space vectors for visualization and downstream mechanic detectors.",
     ]
 );
 define_stats_event!(
@@ -806,7 +806,7 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &BALL_CARRY_EVENT_DEFINITION,
     &FIFTY_FIFTY_EVENT_DEFINITION,
     &RUSH_EVENT_DEFINITION,
-    &FLIP_IMPULSE_EVENT_DEFINITION,
+    &DODGE_EVENT_DEFINITION,
     &SPEED_FLIP_EVENT_DEFINITION,
     &HALF_FLIP_EVENT_DEFINITION,
     &HALF_VOLLEY_EVENT_DEFINITION,
@@ -978,9 +978,9 @@ const RUSH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "RushCalculator",
 )];
 
-const FLIP_IMPULSE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
-    &FLIP_IMPULSE_EVENT_DEFINITION,
-    "flip_impulse",
+const DODGE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &DODGE_EVENT_DEFINITION,
+    "dodge",
     "FlipImpulseNode",
     "FlipImpulseCalculator",
 )];
@@ -1222,11 +1222,7 @@ register_event_producer!(
     FIFTY_FIFTY_EMITTED_EVENTS
 );
 register_event_producer!(RUSH_EVENT_PRODUCER, "rush", RUSH_EMITTED_EVENTS);
-register_event_producer!(
-    FLIP_IMPULSE_EVENT_PRODUCER,
-    "flip_impulse",
-    FLIP_IMPULSE_EMITTED_EVENTS
-);
+register_event_producer!(DODGE_EVENT_PRODUCER, "dodge", DODGE_EMITTED_EVENTS);
 register_event_producer!(
     SPEED_FLIP_EVENT_PRODUCER,
     "speed_flip",

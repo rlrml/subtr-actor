@@ -151,7 +151,7 @@ pub struct ReplayStatsTimelineEvents {
     pub ball_carry: Vec<BallCarryEvent>,
     pub controlled_play: Vec<ControlledPlayEvent>,
     pub rush: Vec<RushEvent>,
-    pub flip_impulse: Vec<FlipImpulseEvent>,
+    pub dodge: Vec<DodgeEvent>,
     pub speed_flip: Vec<SpeedFlipEvent>,
     pub half_flip: Vec<HalfFlipEvent>,
     pub half_volley: Vec<HalfVolleyEvent>,

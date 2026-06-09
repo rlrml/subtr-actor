@@ -240,7 +240,7 @@ impl StatsTimelineEventsNode {
             fifty_fifty: fifty_fifty.events().to_vec(),
             kickoff: kickoff.events().to_vec(),
             rush: rush.events().to_vec(),
-            flip_impulse: flip_impulse.events().to_vec(),
+            dodge: flip_impulse.events().to_vec(),
             speed_flip: speed_flip.events().to_vec(),
             half_flip: half_flip.events().to_vec(),
             half_volley: half_volley.events().to_vec(),

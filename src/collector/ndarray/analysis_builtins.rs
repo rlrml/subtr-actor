@@ -186,8 +186,8 @@ build_analysis_player_event_indicator!(
     flip_impulse_dependency,
     FlipImpulseCalculator,
     new_events,
-    |event: &FlipImpulseEvent, player_id: &PlayerId| &event.player == player_id,
-    "analysis flip impulse event",
+    |event: &DodgeEvent, player_id: &PlayerId| &event.player == player_id,
+    "analysis dodge event",
 );
 
 build_analysis_player_event_indicator!(
@@ -342,7 +342,7 @@ where
         "speed_flip" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerSpeedFlips::<F>::arc_new(),
         )),
-        "flip_impulse" => Some(NDArrayPlayerFeatureAdder::analysis(
+        "dodge" | "flip_impulse" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerFlipImpulses::<F>::arc_new(),
         )),
         "powerslide" => Some(NDArrayPlayerFeatureAdder::analysis(

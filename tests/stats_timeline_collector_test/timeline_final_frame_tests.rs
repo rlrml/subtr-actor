@@ -109,7 +109,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             ball_carry: Vec::new(),
             controlled_play: Vec::new(),
             rush: Vec::new(),
-            flip_impulse: Vec::new(),
+            dodge: Vec::new(),
             speed_flip: Vec::new(),
             half_flip: Vec::new(),
             half_volley: Vec::new(),

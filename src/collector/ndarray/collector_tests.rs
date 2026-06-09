@@ -193,7 +193,7 @@ fn player_event_names_create_registered_analysis_indicators() {
         "PlayerEvent:wavedash",
         "PlayerEvent:whiff",
         "PlayerEvent:speed_flip",
-        "PlayerEvent:flip_impulse",
+        "PlayerEvent:dodge",
         "PlayerEvent:powerslide",
         "PlayerEvent:ball_carry",
         "PlayerEvent:boost_pickup",

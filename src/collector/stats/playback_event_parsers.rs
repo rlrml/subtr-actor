@@ -132,17 +132,10 @@ pub(in crate::collector::stats::playback) fn parse_territorial_pressure_event(
     decode_json_value(value.clone())
 }
 
-pub(in crate::collector::stats::playback) fn parse_flip_impulse_event(
-    value: &Value,
-) -> SubtrActorResult<FlipImpulseEvent> {
-    let object = json_object(value, "flip impulse event")?;
-    Ok(FlipImpulseEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
-        resolved_time: json_required_f32(object, "resolved_time")?,
-        resolved_frame: json_required_usize(object, "resolved_frame")?,
-        player: json_required_remote_id(object, "player")?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
+fn parse_dodge_impulse_from_object(
+    object: &serde_json::Map<String, Value>,
+) -> SubtrActorResult<DodgeImpulse> {
+    Ok(DodgeImpulse {
         start_position: json_required_vec3(object, "start_position")?,
         end_position: json_required_vec3(object, "end_position")?,
         start_speed: json_required_f32(object, "start_speed")?,
@@ -167,6 +160,31 @@ pub(in crate::collector::stats::playback) fn parse_flip_impulse_event(
         sample_count: json_required_u32(object, "sample_count")?,
         boost_compensation_magnitude: json_required_f32(object, "boost_compensation_magnitude")?,
         confidence: json_required_f32(object, "confidence")?,
+    })
+}
+
+fn parse_dodge_impulse(value: &Value) -> SubtrActorResult<DodgeImpulse> {
+    parse_dodge_impulse_from_object(json_object(value, "dodge impulse")?)
+}
+
+pub(in crate::collector::stats::playback) fn parse_dodge_event(
+    value: &Value,
+) -> SubtrActorResult<DodgeEvent> {
+    let object = json_object(value, "dodge event")?;
+    let dodge_impulse = match object.get("dodge_impulse") {
+        Some(Value::Null) | None if !object.contains_key("estimated_impulse_delta") => None,
+        Some(Value::Null) | None => Some(parse_dodge_impulse_from_object(object)?),
+        Some(value) => Some(parse_dodge_impulse(value)?),
+    };
+
+    Ok(DodgeEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        resolved_time: json_required_f32(object, "resolved_time")?,
+        resolved_frame: json_required_usize(object, "resolved_frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        dodge_impulse,
     })
 }
 

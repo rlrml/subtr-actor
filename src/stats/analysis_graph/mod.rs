@@ -54,7 +54,7 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "wall_aerial_shot",
     "whiff",
     "wavedash",
-    "flip_impulse",
+    "dodge",
     "speed_flip",
     "half_flip",
     "half_volley",
@@ -107,6 +107,10 @@ pub const BUILTIN_ANALYSIS_NODE_ALIASES: &[BuiltinAnalysisNodeAlias] = &[
     BuiltinAnalysisNodeAlias {
         alias: "air_dribble",
         node_name: "ball_carry",
+    },
+    BuiltinAnalysisNodeAlias {
+        alias: "flip_impulse",
+        node_name: "dodge",
     },
 ];
 
@@ -163,7 +167,7 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "whiff" => Some(nodes::whiff::boxed_default()),
         "wavedash" => Some(nodes::wavedash::boxed_default()),
         "speed_flip" => Some(nodes::speed_flip::boxed_default()),
-        "flip_impulse" => Some(nodes::flip_impulse::boxed_default()),
+        "dodge" => Some(nodes::flip_impulse::boxed_default()),
         "half_flip" => Some(nodes::half_flip::boxed_default()),
         "half_volley" => Some(nodes::half_volley::boxed_default()),
         "flick" => Some(nodes::flick::boxed_default()),

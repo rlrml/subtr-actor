@@ -44,7 +44,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "ball_carry",
   "controlled_play",
   "rush",
-  "flip_impulse",
+  "dodge",
   "speed_flip",
   "half_flip",
   "half_volley",

@@ -409,7 +409,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "territorial_pressure",
         "rotation",
         "rush",
-        "flip_impulse",
+        "dodge",
         "touch",
         "whiff",
         "wavedash",
@@ -701,7 +701,7 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
-        "flip_impulse" => {
+        "dodge" | "flip_impulse" => {
             let calculator = graph_state::<FlipImpulseCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
@@ -1352,7 +1352,7 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: projection.rush.stats(),
             })?
         }
-        "flip_impulse" => serialize_to_json_value(&serde_json::json!({}))?,
+        "dodge" | "flip_impulse" => serialize_to_json_value(&serde_json::json!({}))?,
         "touch" => {
             let projection = projected_stats(graph, module_name)?;
             let player_stats = projection
@@ -1653,6 +1653,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "fifty_fifty"
         | "kickoff"
         | "possession"
+        | "dodge"
         | "flip_impulse"
         | "touch"
         | "whiff"
