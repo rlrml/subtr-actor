@@ -302,6 +302,8 @@ pub struct KickoffEvent {
     pub start_frame: usize,
     pub end_time: f32,
     pub end_frame: usize,
+    pub live_action_start_time: Option<f32>,
+    pub live_action_start_frame: Option<usize>,
     pub movement_start_time: f32,
     pub movement_start_frame: usize,
     pub kickoff_type: KickoffType,

@@ -1178,6 +1178,8 @@ pub(in crate::collector::stats::playback) fn parse_kickoff_event(
         start_frame,
         end_time: json_required_f32(object, "end_time")?,
         end_frame: json_required_usize(object, "end_frame")?,
+        live_action_start_time: json_optional_f32(object.get("live_action_start_time"))?,
+        live_action_start_frame: json_optional_usize(object.get("live_action_start_frame"))?,
         movement_start_time: json_optional_f32(object.get("movement_start_time"))?
             .unwrap_or(start_time),
         movement_start_frame: json_optional_usize(object.get("movement_start_frame"))?
