@@ -594,23 +594,6 @@ impl KickoffCalculator {
         let boost_used = Self::boost_used(player, boost_after);
         let used_boost = player.approach_trace.boost_active_sample_count > 0
             || boost_used >= KICKOFF_APPROACH_MIN_BOOST_USED;
-        if player.first_touch_time.is_none() {
-            let boost_gain = match (player.start_boost, boost_after) {
-                (Some(start_boost), Some(boost_after)) => boost_after - start_boost,
-                _ => 0.0,
-            };
-            if matches!(
-                outcome,
-                KickoffTakerOutcome::Fake | KickoffTakerOutcome::Missed
-            ) && (used_boost
-                || boost_gain > KICKOFF_APPROACH_MIN_BOOST_USED
-                || Self::moved_distance(player) >= KICKOFF_APPROACH_MIN_FAKE_MOVE_DISTANCE)
-            {
-                return KickoffApproach::FakeGoForBoost;
-            }
-            return KickoffApproach::Other;
-        }
-
         let forward_component = player
             .approach_trace
             .first_dodge_forward_component
@@ -626,6 +609,30 @@ impl KickoffCalculator {
             if forward_component >= KICKOFF_APPROACH_FRONT_FLIP_FORWARD_COMPONENT {
                 return KickoffApproach::FrontFlip;
             }
+        }
+
+        if player.first_touch_time.is_none() {
+            let center_progress = Self::center_progress(player);
+            let low_center_progress = center_progress < KICKOFF_SUPPORT_CHEAT_MIN_CENTER_PROGRESS;
+            let moved_away_with_boost = used_boost
+                && low_center_progress
+                && Self::moved_distance(player) >= KICKOFF_APPROACH_MIN_FAKE_MOVE_DISTANCE;
+            if matches!(
+                outcome,
+                KickoffTakerOutcome::Fake | KickoffTakerOutcome::Missed
+            ) && low_center_progress
+                && (Self::boost_gain(player, boost_after)
+                    >= KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_BOOST_GAIN
+                    || Self::lateral_movement(player)
+                        >= KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_LATERAL_MOVE
+                    || moved_away_with_boost)
+            {
+                return KickoffApproach::FakeGoForBoost;
+            }
+            if used_boost && center_progress > 0.0 {
+                return KickoffApproach::BoostIntoBall;
+            }
+            return KickoffApproach::Other;
         }
 
         if used_boost {

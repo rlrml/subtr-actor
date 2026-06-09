@@ -135,6 +135,37 @@ fn suppresses_same_player_touch_candidates_inside_cooldown() {
 }
 
 #[test]
+fn detects_touch_while_kickoff_waits_for_first_touch() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let players = players(player_id.clone());
+    let mut calculator = TouchStateCalculator::new();
+    let kickoff_waiting = LivePlayState {
+        gameplay_phase: GameplayPhase::KickoffWaitingForTouch,
+        is_live_play: false,
+    };
+
+    calculator.update(
+        &frame(0),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &FrameEventsState::default(),
+        &kickoff_waiting,
+    );
+    let touch_state = calculator.update(
+        &frame(1),
+        &ball(glam::Vec3::new(300.0, 0.0, 0.0)),
+        &players,
+        &FrameEventsState::default(),
+        &kickoff_waiting,
+    );
+
+    assert_eq!(touch_state.touch_events.len(), 1);
+    assert_eq!(touch_state.touch_events[0].player, Some(player_id.clone()));
+    assert_eq!(touch_state.touch_events[0].frame, 1);
+    assert_eq!(touch_state.last_touch_player, Some(player_id));
+}
+
+#[test]
 fn team_only_explicit_touch_events_without_physics_candidate_are_ignored() {
     let player_id = boxcars::RemoteId::Steam(1);
     let players = players(player_id.clone());

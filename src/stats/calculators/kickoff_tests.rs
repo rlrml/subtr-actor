@@ -1205,6 +1205,52 @@ fn kickoff_classifies_known_taker_approaches() {
         KickoffApproach::BoostIntoBall
     );
 
+    let missed_diagonal_flip = KickoffPlayerSnapshot {
+        first_touch_time: None,
+        first_touch_frame: None,
+        approach_trace: KickoffApproachTrace {
+            boost_active_sample_count: 3,
+            first_dodge_time: Some(0.35),
+            first_dodge_frame: Some(4),
+            first_dodge_forward_component: Some(0.55),
+            first_dodge_side_component: Some(0.75),
+            min_boost: Some(20.0),
+            last_position: Some([-800.0, -1000.0, 17.0]),
+            ..KickoffApproachTrace::default()
+        },
+        ..speed_flip.clone()
+    };
+    assert_eq!(
+        KickoffCalculator::classify_approach(
+            &missed_diagonal_flip,
+            KickoffTakerOutcome::Missed,
+            Some(20.0),
+            false,
+        ),
+        KickoffApproach::DiagonalFlip
+    );
+
+    let missed_boost_into_ball = KickoffPlayerSnapshot {
+        first_touch_time: None,
+        first_touch_frame: None,
+        approach_trace: KickoffApproachTrace {
+            boost_active_sample_count: 4,
+            min_boost: Some(20.0),
+            last_position: Some([-800.0, -1000.0, 17.0]),
+            ..KickoffApproachTrace::default()
+        },
+        ..speed_flip.clone()
+    };
+    assert_eq!(
+        KickoffCalculator::classify_approach(
+            &missed_boost_into_ball,
+            KickoffTakerOutcome::Missed,
+            Some(116.0),
+            false,
+        ),
+        KickoffApproach::BoostIntoBall
+    );
+
     let fake_go_for_boost = KickoffPlayerSnapshot {
         first_touch_time: None,
         first_touch_frame: None,
