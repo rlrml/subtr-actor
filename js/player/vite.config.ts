@@ -28,9 +28,12 @@ export default defineConfig({
     outDir: distDir,
     emptyOutDir: true,
     lib: {
-      entry: path.resolve(srcDir, "lib.ts"),
-      name: "SubtrActorPlayer",
-      fileName: "index",
+      // `boost-units` is a dependency-free entry so consumers can rescale boost
+      // for display without pulling in the full player (three.js / wasm).
+      entry: {
+        index: path.resolve(srcDir, "lib.ts"),
+        "boost-units": path.resolve(srcDir, "boost-units.ts"),
+      },
       formats: ["es"],
     },
     rollupOptions: {
