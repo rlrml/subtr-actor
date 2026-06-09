@@ -101,6 +101,7 @@ impl StatsTimelineEventsNode {
             empty_net_goal_dependency(),
             counter_attack_goal_dependency(),
             sustained_pressure_goal_dependency(),
+            kickoff_goal_dependency(),
             flick_goal_dependency(),
             double_tap_goal_dependency(),
             one_timer_goal_dependency(),
@@ -144,6 +145,7 @@ impl StatsTimelineEventsNode {
         let empty_net_goal = ctx.get::<EmptyNetGoalCalculator>()?;
         let counter_attack_goal = ctx.get::<CounterAttackGoalCalculator>()?;
         let sustained_pressure_goal = ctx.get::<SustainedPressureGoalCalculator>()?;
+        let kickoff_goal = ctx.get::<KickoffGoalCalculator>()?;
         let flick_goal = ctx.get::<FlickGoalCalculator>()?;
         let double_tap_goal = ctx.get::<DoubleTapGoalCalculator>()?;
         let one_timer_goal = ctx.get::<OneTimerGoalCalculator>()?;
@@ -176,6 +178,7 @@ impl StatsTimelineEventsNode {
             empty_net_goal.events(),
             counter_attack_goal.events(),
             sustained_pressure_goal.events(),
+            kickoff_goal.events(),
             flick_goal.events(),
             double_tap_goal.events(),
             one_timer_goal.events(),

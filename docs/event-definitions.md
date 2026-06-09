@@ -1555,3 +1555,16 @@ A goal where the scorer's last touch matches a recent half-volley candidate.
 - Require the half-volley touch to be close enough to the goal and sufficiently aligned toward goal.
 - Attach a related half-volley event reference and half-volley evidence to the goal tag metadata.
 
+### Kickoff Goal (`kickoff_goal`)
+
+
+**Summary**
+
+A goal scored shortly after the kickoff's first touch.
+
+**Approach**
+
+- Inspect the scorer's core goal context for time-after-kickoff data.
+- Require the goal to fall within the kickoff-goal timing window.
+- Attach goal-context evidence so the tag appears with the goal label.
+

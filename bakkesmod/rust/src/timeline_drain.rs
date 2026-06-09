@@ -374,6 +374,7 @@ pub(crate) fn goal_tag_kind(kind: GoalTagKind) -> SaMechanicKind {
         GoalTagKind::EmptyNetGoal => SaMechanicKind::EmptyNetGoal,
         GoalTagKind::CounterAttackGoal => SaMechanicKind::CounterAttackGoal,
         GoalTagKind::SustainedPressureGoal => SaMechanicKind::SustainedPressureGoal,
+        GoalTagKind::KickoffGoal => SaMechanicKind::KickoffGoal,
         GoalTagKind::FlickGoal => SaMechanicKind::FlickGoal,
         GoalTagKind::DoubleTapGoal => SaMechanicKind::DoubleTapGoal,
         GoalTagKind::OneTimerGoal => SaMechanicKind::OneTimerGoal,

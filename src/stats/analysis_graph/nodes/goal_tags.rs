@@ -112,6 +112,7 @@ goal_tag_node!(
     SustainedPressureGoalCalculator,
     "sustained_pressure_goal"
 );
+goal_tag_node!(KickoffGoalNode, KickoffGoalCalculator, "kickoff_goal");
 mechanic_goal_tag_node!(
     FlickGoalNode,
     FlickGoalCalculator,
@@ -236,6 +237,10 @@ pub(crate) fn boxed_counter_attack_goal() -> Box<dyn AnalysisNodeDyn> {
 
 pub(crate) fn boxed_sustained_pressure_goal() -> Box<dyn AnalysisNodeDyn> {
     Box::new(SustainedPressureGoalNode::new())
+}
+
+pub(crate) fn boxed_kickoff_goal() -> Box<dyn AnalysisNodeDyn> {
+    Box::new(KickoffGoalNode::new())
 }
 
 pub(crate) fn boxed_flick_goal() -> Box<dyn AnalysisNodeDyn> {
