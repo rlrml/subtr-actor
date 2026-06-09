@@ -6,17 +6,16 @@ use serde::Serialize;
 use linkme::distributed_slice;
 
 use super::{
-    BackboardBounceEvent, BallCarryEvent, BoostBucketEvent, BoostLedgerEvent,
+    BackboardBounceEvent, BallCarryEvent, BallHalfEvent, BoostBucketEvent, BoostLedgerEvent,
     BoostPickupComparisonEvent, BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent,
     ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeEvent, DodgeResetEvent, DoubleTapEvent,
     FiftyFiftyEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
     MustyFlickEvent, OneTimerEvent, PassEvent, PositioningActivityEvent, PositioningBallDepthEvent,
     PositioningBallProximityEvent, PositioningFieldZoneEvent, PositioningGoalContextEvent,
     PositioningPossessionEvent, PositioningTeammateRoleEvent, PossessionEvent, PowerslideEvent,
-    PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent,
-    RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
-    TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
-    WhiffEvent,
+    RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent, RotationRoleSpanEvent,
+    RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent,
+    TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::Event;
 
@@ -617,10 +616,10 @@ define_stats_event!(
     EventCategory::Possession
 );
 define_stats_event!(
-    PressureEvent,
+    BallHalfEvent,
     PRESSURE_EVENT_DEFINITION,
-    "pressure",
-    "Pressure",
+    "ball_half",
+    "Ball Half",
     EventCategory::Possession
 );
 define_stats_event!(
@@ -1019,14 +1018,14 @@ const POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "PossessionCalculator",
 )];
 
-const PRESSURE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+const BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &PRESSURE_EVENT_DEFINITION,
-    "pressure",
-    "PressureNode",
-    "PressureCalculator",
+    "ball_half",
+    "BallHalfNode",
+    "BallHalfCalculator",
 )];
 
-const TERRITORIAL_PRESSURE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+const TERRITORIAL_BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     "territorial_pressure",
     "TerritorialPressureNode",
@@ -1203,11 +1202,15 @@ register_event_producer!(
     "possession",
     POSSESSION_EMITTED_EVENTS
 );
-register_event_producer!(PRESSURE_EVENT_PRODUCER, "pressure", PRESSURE_EMITTED_EVENTS);
 register_event_producer!(
-    TERRITORIAL_PRESSURE_EVENT_PRODUCER,
+    BALL_HALF_EVENT_PRODUCER,
+    "ball_half",
+    BALL_HALF_EMITTED_EVENTS
+);
+register_event_producer!(
+    TERRITORIAL_BALL_HALF_EVENT_PRODUCER,
     "territorial_pressure",
-    TERRITORIAL_PRESSURE_EMITTED_EVENTS
+    TERRITORIAL_BALL_HALF_EMITTED_EVENTS
 );
 register_event_producer!(MOVEMENT_EVENT_PRODUCER, "movement", MOVEMENT_EMITTED_EVENTS);
 register_event_producer!(

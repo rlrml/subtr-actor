@@ -1,16 +1,16 @@
 use super::*;
 
-const DEFAULT_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y: f32 = 200.0;
+const DEFAULT_BALL_HALF_NEUTRAL_ZONE_HALF_WIDTH_Y: f32 = 200.0;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-enum PressureHalfLabel {
+enum BallHalfLabel {
     TeamZeroSide,
     TeamOneSide,
     #[default]
     Neutral,
 }
 
-impl PressureHalfLabel {
+impl BallHalfLabel {
     fn as_label_value(self) -> &'static str {
         match self {
             Self::TeamZeroSide => "team_zero_side",
@@ -22,7 +22,7 @@ impl PressureHalfLabel {
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct PressureEvent {
+pub struct BallHalfEvent {
     pub time: f32,
     pub frame: usize,
     pub end_time: f32,
@@ -32,7 +32,7 @@ pub struct PressureEvent {
     pub field_half: String,
 }
 
-impl PressureEvent {
+impl BallHalfEvent {
     fn absorb_duration(&mut self, frame: &FrameInfo, duration: f32) {
         self.end_time = frame.time;
         self.end_frame = frame.frame_number;
@@ -41,59 +41,59 @@ impl PressureEvent {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PressureCalculatorConfig {
+pub struct BallHalfCalculatorConfig {
     pub neutral_zone_half_width_y: f32,
 }
 
-impl Default for PressureCalculatorConfig {
+impl Default for BallHalfCalculatorConfig {
     fn default() -> Self {
         Self {
-            neutral_zone_half_width_y: DEFAULT_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y,
+            neutral_zone_half_width_y: DEFAULT_BALL_HALF_NEUTRAL_ZONE_HALF_WIDTH_Y,
         }
     }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct PressureCalculator {
-    config: PressureCalculatorConfig,
-    events: EventStream<PressureEvent>,
-    last_emitted_event_state: Option<PressureEventState>,
-    pending_event: Option<PendingPressureEvent>,
+pub struct BallHalfCalculator {
+    config: BallHalfCalculatorConfig,
+    events: EventStream<BallHalfEvent>,
+    last_emitted_event_state: Option<BallHalfEventState>,
+    pending_event: Option<PendingBallHalfEvent>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct PressureEventState {
+struct BallHalfEventState {
     active: bool,
-    field_half: PressureHalfLabel,
+    field_half: BallHalfLabel,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct PendingPressureEvent {
-    state: PressureEventState,
-    event: PressureEvent,
+struct PendingBallHalfEvent {
+    state: BallHalfEventState,
+    event: BallHalfEvent,
 }
 
-impl PressureCalculator {
+impl BallHalfCalculator {
     pub fn new() -> Self {
-        Self::with_config(PressureCalculatorConfig::default())
+        Self::with_config(BallHalfCalculatorConfig::default())
     }
 
-    pub fn with_config(config: PressureCalculatorConfig) -> Self {
+    pub fn with_config(config: BallHalfCalculatorConfig) -> Self {
         Self {
             config,
             ..Self::default()
         }
     }
 
-    pub fn events(&self) -> &[PressureEvent] {
+    pub fn events(&self) -> &[BallHalfEvent] {
         self.events.all()
     }
 
-    pub fn new_events(&self) -> &[PressureEvent] {
+    pub fn new_events(&self) -> &[BallHalfEvent] {
         self.events.new_events()
     }
 
-    pub fn projected_events(&self) -> Vec<PressureEvent> {
+    pub fn projected_events(&self) -> Vec<BallHalfEvent> {
         let mut events = self.events.all().to_vec();
         if let Some(pending) = &self.pending_event {
             events.push(pending.event.clone());
@@ -108,7 +108,7 @@ impl PressureCalculator {
         self.events.push(pending.event);
     }
 
-    pub fn config(&self) -> &PressureCalculatorConfig {
+    pub fn config(&self) -> &BallHalfCalculatorConfig {
         &self.config
     }
 
@@ -117,13 +117,13 @@ impl PressureCalculator {
         frame: &FrameInfo,
         active: bool,
         duration: f32,
-        field_half: PressureHalfLabel,
+        field_half: BallHalfLabel,
     ) {
-        let event_state = PressureEventState { active, field_half };
+        let event_state = BallHalfEventState { active, field_half };
         if self.last_emitted_event_state == Some(event_state) && duration == 0.0 {
             return;
         }
-        let event = PressureEvent {
+        let event = BallHalfEvent {
             time: frame.time,
             frame: frame.frame_number,
             end_time: frame.time,
@@ -136,9 +136,9 @@ impl PressureCalculator {
         self.last_emitted_event_state = Some(event_state);
     }
 
-    fn record_event(&mut self, state: PressureEventState, frame: &FrameInfo, event: PressureEvent) {
+    fn record_event(&mut self, state: BallHalfEventState, frame: &FrameInfo, event: BallHalfEvent) {
         let Some(pending) = self.pending_event.as_mut() else {
-            self.pending_event = Some(PendingPressureEvent { state, event });
+            self.pending_event = Some(PendingBallHalfEvent { state, event });
             return;
         };
 
@@ -147,7 +147,7 @@ impl PressureCalculator {
         } else {
             let previous = self
                 .pending_event
-                .replace(PendingPressureEvent { state, event });
+                .replace(PendingBallHalfEvent { state, event });
             let Some(previous) = previous else {
                 return;
             };
@@ -163,21 +163,21 @@ impl PressureCalculator {
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         if !live_play_state.is_live_play {
-            self.emit_event_if_changed(frame, false, 0.0, PressureHalfLabel::Neutral);
+            self.emit_event_if_changed(frame, false, 0.0, BallHalfLabel::Neutral);
             return Ok(());
         }
         if let Some(ball) = ball.sample() {
             let ball_y = ball.position().y;
             let half = if ball_y.abs() <= self.config.neutral_zone_half_width_y {
-                PressureHalfLabel::Neutral
+                BallHalfLabel::Neutral
             } else if ball_y < 0.0 {
-                PressureHalfLabel::TeamZeroSide
+                BallHalfLabel::TeamZeroSide
             } else {
-                PressureHalfLabel::TeamOneSide
+                BallHalfLabel::TeamOneSide
             };
             self.emit_event_if_changed(frame, true, frame.dt, half);
         } else {
-            self.emit_event_if_changed(frame, false, 0.0, PressureHalfLabel::Neutral);
+            self.emit_event_if_changed(frame, false, 0.0, BallHalfLabel::Neutral);
         }
         Ok(())
     }

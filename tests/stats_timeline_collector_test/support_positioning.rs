@@ -3,7 +3,7 @@ fn pressure_label_for_derivation(value: &str) -> StatLabel {
         "team_zero_side" => StatLabel::new("field_half", "team_zero_side"),
         "team_one_side" => StatLabel::new("field_half", "team_one_side"),
         "neutral" => StatLabel::new("field_half", "neutral"),
-        _ => panic!("unexpected pressure field_half={value}"),
+        _ => panic!("unexpected ball_half field_half={value}"),
     }
 }
 
@@ -22,13 +22,13 @@ impl Default for PressureDerivationState {
     }
 }
 
-fn apply_pressure_event_for_derivation(state: &mut PressureDerivationState, event: &PressureEvent) {
+fn apply_pressure_event_for_derivation(state: &mut PressureDerivationState, event: &BallHalfEvent) {
     state.active = event.active;
     state.field_half = event.field_half.clone();
 }
 
 fn accumulate_pressure_frame_for_derivation(
-    stats: &mut PressureStats,
+    stats: &mut BallHalfStats,
     state: &PressureDerivationState,
     frame: &ReplayStatsFrame,
 ) {
@@ -41,7 +41,7 @@ fn accumulate_pressure_frame_for_derivation(
         "team_zero_side" => stats.team_zero_side_time += frame.dt,
         "team_one_side" => stats.team_one_side_time += frame.dt,
         "neutral" => stats.neutral_time += frame.dt,
-        value => panic!("unexpected pressure field half {value}"),
+        value => panic!("unexpected ball_half field half {value}"),
     }
     stats
         .labeled_time
@@ -52,8 +52,8 @@ fn assert_pressure_team_stats_close(
     replay_path: &str,
     label: &str,
     frame_number: usize,
-    actual: &PressureTeamStats,
-    expected: &PressureTeamStats,
+    actual: &BallHalfTeamStats,
+    expected: &BallHalfTeamStats,
 ) {
     assert!(
         (actual.tracked_time - expected.tracked_time).abs() < 0.001,
@@ -92,7 +92,7 @@ fn assert_pressure_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline_payloads_by_stream(timeline, "pressure", |payload| match payload { EventPayload::Pressure(event) => Some(event), _ => None });
+    let mut events = timeline_payloads_by_stream(timeline, "ball_half", |payload| match payload { EventPayload::BallHalf(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -100,7 +100,7 @@ fn assert_pressure_events_reconstruct_serialized_partial_sums(
     });
 
     let mut event_index = 0;
-    let mut stats = PressureStats::default();
+    let mut stats = BallHalfStats::default();
     let mut state = PressureDerivationState::default();
 
     for frame in &timeline.frames {
@@ -112,16 +112,16 @@ fn assert_pressure_events_reconstruct_serialized_partial_sums(
         accumulate_pressure_frame_for_derivation(&mut stats, &state, frame);
         assert_pressure_team_stats_close(
             replay_path,
-            "team_zero.pressure",
+            "team_zero.ball_half",
             frame.frame_number,
-            &frame.team_zero.pressure,
+            &frame.team_zero.ball_half,
             &stats.for_team(true),
         );
         assert_pressure_team_stats_close(
             replay_path,
-            "team_one.pressure",
+            "team_one.ball_half",
             frame.frame_number,
-            &frame.team_one.pressure,
+            &frame.team_one.ball_half,
             &stats.for_team(false),
         );
     }
@@ -129,7 +129,7 @@ fn assert_pressure_events_reconstruct_serialized_partial_sums(
     assert_eq!(
         event_index,
         events.len(),
-        "{replay_path} unprocessed pressure events"
+        "{replay_path} unprocessed ball_half events"
     );
 }
 

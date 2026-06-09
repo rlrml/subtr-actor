@@ -17,7 +17,7 @@ pub struct StatsProjectionState {
     pub fifty_fifty: FiftyFiftyStatsAccumulator,
     pub kickoff: KickoffStatsAccumulator,
     pub possession: PossessionStatsAccumulator,
-    pub pressure: PressureStatsAccumulator,
+    pub ball_half: BallHalfStatsAccumulator,
     pub territorial_pressure: TerritorialPressureStatsAccumulator,
     pub rotation: RotationStatsAccumulator,
     pub rush: RushStatsAccumulator,
@@ -122,7 +122,7 @@ struct StatsProjectionCursors {
     fifty_fifty: usize,
     kickoff: usize,
     possession: usize,
-    pressure: usize,
+    ball_half: usize,
     rotation_player: usize,
     rotation_team: usize,
     rush: usize,
@@ -337,13 +337,13 @@ impl StatsProjectionNode {
             self.state.possession.apply_event(event);
         }
         self.cursors.possession = possession.events().len();
-        let pressure = ctx.get::<PressureCalculator>()?;
-        let projected_pressure_events = pressure.projected_events();
-        self.state.pressure = PressureStatsAccumulator::default();
-        for event in projected_pressure_events.iter() {
-            self.state.pressure.apply_event(event);
+        let ball_half = ctx.get::<BallHalfCalculator>()?;
+        let projected_ball_half_events = ball_half.projected_events();
+        self.state.ball_half = BallHalfStatsAccumulator::default();
+        for event in projected_ball_half_events.iter() {
+            self.state.ball_half.apply_event(event);
         }
-        self.cursors.pressure = pressure.events().len();
+        self.cursors.ball_half = ball_half.events().len();
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
         if live_play {
             self.territorial_pressure_tracked_time += frame.dt;
@@ -519,7 +519,7 @@ impl AnalysisNode for StatsProjectionNode {
             fifty_fifty_dependency(),
             kickoff_dependency(),
             possession_dependency(),
-            pressure_dependency(),
+            ball_half_dependency(),
             territorial_pressure_dependency(),
             rotation_dependency(),
             rush_dependency(),

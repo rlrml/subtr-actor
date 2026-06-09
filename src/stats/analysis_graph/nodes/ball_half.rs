@@ -2,33 +2,33 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
-pub struct PressureNode {
-    calculator: PressureCalculator,
+pub struct BallHalfNode {
+    calculator: BallHalfCalculator,
 }
 
-impl PressureNode {
+impl BallHalfNode {
     pub fn new() -> Self {
-        Self::with_config(PressureCalculatorConfig::default())
+        Self::with_config(BallHalfCalculatorConfig::default())
     }
 
-    pub fn with_config(config: PressureCalculatorConfig) -> Self {
+    pub fn with_config(config: BallHalfCalculatorConfig) -> Self {
         Self {
-            calculator: PressureCalculator::with_config(config),
+            calculator: BallHalfCalculator::with_config(config),
         }
     }
 }
 
-impl Default for PressureNode {
+impl Default for BallHalfNode {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl AnalysisNode for PressureNode {
-    type State = PressureCalculator;
+impl AnalysisNode for BallHalfNode {
+    type State = BallHalfCalculator;
 
     fn name(&self) -> &'static str {
-        "pressure"
+        "ball_half"
     }
 
     fn dependencies(&self) -> NodeDependencies {
@@ -58,5 +58,5 @@ impl AnalysisNode for PressureNode {
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(PressureNode::new())
+    Box::new(BallHalfNode::new())
 }

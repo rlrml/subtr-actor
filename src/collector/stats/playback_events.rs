@@ -195,15 +195,15 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
-            .module_player_events("pressure", "events", parse_pressure_event)?
+            .module_player_events("ball_half", "events", parse_ball_half_event)?
             .into_iter()
             .enumerate()
         {
             events.push(make_event(
-                "pressure",
+                "ball_half",
                 index,
                 span(event.frame, event.end_frame, event.time, event.end_time),
-                EventPayload::Pressure(event.clone()),
+                EventPayload::BallHalf(event.clone()),
                 None,
                 None,
                 None,

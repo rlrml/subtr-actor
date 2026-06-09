@@ -110,13 +110,13 @@ pub(in crate::collector::stats::playback) fn parse_possession_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_pressure_event(
+pub(in crate::collector::stats::playback) fn parse_ball_half_event(
     value: &Value,
-) -> SubtrActorResult<PressureEvent> {
-    let object = json_object(value, "pressure event")?;
+) -> SubtrActorResult<BallHalfEvent> {
+    let object = json_object(value, "ball_half event")?;
     let time = json_required_f32(object, "time")?;
     let frame = json_required_usize(object, "frame")?;
-    Ok(PressureEvent {
+    Ok(BallHalfEvent {
         time,
         frame,
         end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
