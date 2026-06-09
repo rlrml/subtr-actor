@@ -930,8 +930,21 @@ impl KickoffCalculator {
         );
         let first_follow_up_touch_team_is_team_0 =
             first_follow_up_touch.map(|touch| touch.team_is_team_0);
-        let (kickoff_possession_outcome, kickoff_possession_team_is_team_0) =
+        let (mut kickoff_possession_outcome, mut kickoff_possession_team_is_team_0) =
             Self::kickoff_possession_outcome(&active.touches, first_follow_up_touch);
+        if kickoff_goal
+            && first_follow_up_touch.is_none()
+            && kickoff_possession_outcome == KickoffPossessionOutcome::Contested
+        {
+            if let Some(goal) = scoring_goal {
+                kickoff_possession_outcome = if goal.scoring_team_is_team_0 {
+                    KickoffPossessionOutcome::TeamZeroPossession
+                } else {
+                    KickoffPossessionOutcome::TeamOnePossession
+                };
+                kickoff_possession_team_is_team_0 = Some(goal.scoring_team_is_team_0);
+            }
+        }
         let team_zero_touched = active
             .players
             .iter()
