@@ -54,7 +54,7 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "wall_aerial_shot",
     "whiff",
     "wavedash",
-    "flip_impulse",
+    "dodge",
     "speed_flip",
     "half_flip",
     "half_volley",
@@ -65,6 +65,7 @@ pub const BUILTIN_ANALYSIS_NODE_NAMES: &[&str] = &[
     "own_half_goal",
     "empty_net_goal",
     "counter_attack_goal",
+    "sustained_pressure_goal",
     "flick_goal",
     "double_tap_goal",
     "one_timer_goal",
@@ -108,6 +109,10 @@ pub const BUILTIN_ANALYSIS_NODE_ALIASES: &[BuiltinAnalysisNodeAlias] = &[
         alias: "air_dribble",
         node_name: "ball_carry",
     },
+    BuiltinAnalysisNodeAlias {
+        alias: "flip_impulse",
+        node_name: "dodge",
+    },
 ];
 
 pub fn builtin_analysis_node_names() -> &'static [&'static str] {
@@ -118,7 +123,7 @@ pub fn builtin_analysis_node_aliases() -> &'static [BuiltinAnalysisNodeAlias] {
     BUILTIN_ANALYSIS_NODE_ALIASES
 }
 
-fn canonical_builtin_analysis_node_name(name: &str) -> Option<&'static str> {
+pub(crate) fn canonical_builtin_analysis_node_name(name: &str) -> Option<&'static str> {
     builtin_analysis_node_aliases()
         .iter()
         .find_map(|alias| (alias.alias == name).then_some(alias.node_name))
@@ -163,7 +168,7 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "whiff" => Some(nodes::whiff::boxed_default()),
         "wavedash" => Some(nodes::wavedash::boxed_default()),
         "speed_flip" => Some(nodes::speed_flip::boxed_default()),
-        "flip_impulse" => Some(nodes::flip_impulse::boxed_default()),
+        "dodge" => Some(nodes::flip_impulse::boxed_default()),
         "half_flip" => Some(nodes::half_flip::boxed_default()),
         "half_volley" => Some(nodes::half_volley::boxed_default()),
         "flick" => Some(nodes::flick::boxed_default()),
@@ -173,6 +178,7 @@ pub(crate) fn boxed_analysis_node_by_name(name: &str) -> Option<Box<dyn Analysis
         "own_half_goal" => Some(nodes::goal_tags::boxed_own_half_goal()),
         "empty_net_goal" => Some(nodes::goal_tags::boxed_empty_net_goal()),
         "counter_attack_goal" => Some(nodes::goal_tags::boxed_counter_attack_goal()),
+        "sustained_pressure_goal" => Some(nodes::goal_tags::boxed_sustained_pressure_goal()),
         "flick_goal" => Some(nodes::goal_tags::boxed_flick_goal()),
         "double_tap_goal" => Some(nodes::goal_tags::boxed_double_tap_goal()),
         "one_timer_goal" => Some(nodes::goal_tags::boxed_one_timer_goal()),

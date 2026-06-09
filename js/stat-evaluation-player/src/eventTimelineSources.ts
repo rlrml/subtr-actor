@@ -34,7 +34,7 @@ const CURATED_STATS_EVENT_STREAM_IDS = new Set<keyof StatsEvents>([
   "pass",
   "ball_carry",
   "rush",
-  "flip_impulse",
+  "dodge",
   "speed_flip",
   "half_flip",
   "half_volley",

@@ -689,24 +689,29 @@ export function buildSpeedFlipTimelineEvents(
   });
 }
 
-export function buildFlipImpulseTimelineEvents(
+export function buildDodgeTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.events.flip_impulse ?? []).map((event, index) => {
+  return (statsTimeline.events.dodge ?? []).map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
-    const confidencePercent = Math.round(event.confidence * 100);
-    const directionLabel = event.direction_label.replaceAll("_", " ");
+    const confidencePercent =
+      event.dodge_impulse == null ? null : Math.round(event.dodge_impulse.confidence * 100);
+    const directionLabel = event.dodge_impulse?.direction_label.replaceAll("_", " ");
+    const impulseLabel =
+      directionLabel == null || confidencePercent == null
+        ? ""
+        : ` ${directionLabel} ${confidencePercent}%`;
 
     return {
-      id: `flip-impulse:${event.frame}:${playerId}:${index}`,
+      id: `dodge:${event.frame}:${playerId}:${index}`,
       time: eventTime,
       frame: event.frame,
-      kind: "flip-impulse",
-      label: `${playerName} flip impulse ${directionLabel} ${confidencePercent}%`,
-      shortLabel: "FI",
+      kind: "dodge",
+      label: `${playerName} dodge${impulseLabel}`,
+      shortLabel: "DG",
       playerId,
       playerName,
       isTeamZero: event.is_team_0,
@@ -921,8 +926,8 @@ export function countEnabledTimelineEvents(
     count += buildSpeedFlipTimelineEvents(statsTimeline, replay).length;
   }
 
-  if (active.has("flip-impulse")) {
-    count += buildFlipImpulseTimelineEvents(statsTimeline, replay).length;
+  if (active.has("dodge")) {
+    count += buildDodgeTimelineEvents(statsTimeline, replay).length;
   }
 
   if (active.has("half-flip")) {

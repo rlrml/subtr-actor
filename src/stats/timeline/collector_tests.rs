@@ -125,6 +125,7 @@ fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, us
         ("touch", events.touch.len()),
         ("boost_pickups", events.boost_pickups.len()),
         ("boost_ledger", events.boost_ledger.len()),
+        ("boost_bucket", events.boost_bucket.len()),
         ("boost_state", events.boost_state.len()),
         ("bump", events.bump.len()),
     ]

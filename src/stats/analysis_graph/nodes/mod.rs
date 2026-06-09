@@ -13,8 +13,8 @@ use crate::stats::calculators::{
     PassCalculator, PassingGoalCalculator, PlayerFrameState, PlayerVerticalState,
     PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
     PressureCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
-    TerritorialPressureCalculator, TouchCalculator, TouchState, WallAerialCalculator,
-    WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
+    SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchCalculator, TouchState,
+    WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -114,6 +114,7 @@ pub use goal_tags::{
     AerialGoalNode, AirDribbleGoalNode, BumpGoalNode, CounterAttackGoalNode, DemoGoalNode,
     EmptyNetGoalNode, FlickGoalNode, FlipResetGoalNode, HalfVolleyGoalNode, HighAerialGoalNode,
     LongDistanceGoalNode, OneTimerGoalNode, OwnHalfGoalNode, PassingGoalNode,
+    SustainedPressureGoalNode,
 };
 #[allow(unused_imports)]
 pub use half_flip::HalfFlipNode;
@@ -271,6 +272,12 @@ pub(crate) fn empty_net_goal_dependency() -> AnalysisDependency {
 pub(crate) fn counter_attack_goal_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<CounterAttackGoalCalculator>(
         goal_tags::boxed_counter_attack_goal,
+    )
+}
+
+pub(crate) fn sustained_pressure_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<SustainedPressureGoalCalculator>(
+        goal_tags::boxed_sustained_pressure_goal,
     )
 }
 

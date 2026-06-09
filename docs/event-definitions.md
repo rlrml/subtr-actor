@@ -64,6 +64,36 @@ _None documented._
 
 _None documented._
 
+### Boost Bucket (`boost_bucket`)
+
+- Category: `boost`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `boost` via `BoostNode` / `BoostCalculator`
+
+**Summary**
+
+A completed span for a player's display boost bucket.
+
+**Approach**
+
+- Bucket each live player boost sample into the fixed display ranges.
+- Hold the current bucket open while it remains unchanged.
+- Emit the completed bucket span only after a later sample shows the player entered a different bucket.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Boost Ledger (`boost_ledger`)
 
 - Category: `boost`
@@ -324,6 +354,36 @@ _None documented._
 
 _None documented._
 
+### Dodge (`dodge`)
+
+- Category: `movement`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `dodge` via `FlipImpulseNode` / `FlipImpulseCalculator`
+
+**Summary**
+
+A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.
+
+**Approach**
+
+- Start on the replay's dodge-active rising edge for each player.
+- Sample the player's velocity change over the early dodge window and subtract an approximate forward boost contribution when boost is active.
+- Store the impulse estimate as dodge_impulse, including car-local direction classification plus raw and compensated world-space vectors for visualization and downstream mechanic detectors.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Dodge Refreshed (`dodge_refreshed`)
 
 - Category: `other`
@@ -465,36 +525,6 @@ A dodge-powered touch following a short controlled carry setup.
 - Measure signed horizontal setup rotation so reverse flicks can be labeled as left or right based on the direction the car rotated before the flick.
 - Record dodge starts that happen immediately after, or during, a qualifying setup.
 - Emit on a same-player touch shortly after the dodge when the ball impulse is large and directed away from the player, with confidence from setup duration, timing, impulse, and separation.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Flip Impulse (`flip_impulse`)
-
-- Category: `movement`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `flip_impulse` via `FlipImpulseNode` / `FlipImpulseCalculator`
-
-**Summary**
-
-A dodge-start event with a rough estimated direction of the velocity impulse produced during the flip.
-
-**Approach**
-
-- Start on the replay's dodge-active rising edge for each player.
-- Sample the player's velocity change over the early dodge window and subtract an approximate forward boost contribution when boost is active.
-- Classify the resulting direction in car-local space while retaining the raw and compensated world-space vectors for visualization and downstream mechanic detectors.
 
 **Limitations**
 
@@ -1393,6 +1423,19 @@ A goal whose buildup was classified as a counterattack.
 
 - Use the goal-buildup classification computed in goal context.
 - Tag goals whose buildup kind is counterattack.
+- Attach goal-buildup evidence to the goal tag metadata.
+
+### Sustained Pressure Goal (`sustained_pressure_goal`)
+
+
+**Summary**
+
+A goal whose buildup was classified as sustained offensive pressure.
+
+**Approach**
+
+- Use the goal-buildup classification computed in goal context.
+- Tag goals whose buildup kind is sustained pressure.
 - Attach goal-buildup evidence to the goal tag metadata.
 
 ### Flick Goal (`flick_goal`)

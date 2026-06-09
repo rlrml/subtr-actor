@@ -186,8 +186,8 @@ build_analysis_player_event_indicator!(
     flip_impulse_dependency,
     FlipImpulseCalculator,
     new_events,
-    |event: &FlipImpulseEvent, player_id: &PlayerId| &event.player == player_id,
-    "analysis flip impulse event",
+    |event: &DodgeEvent, player_id: &PlayerId| &event.player == player_id,
+    "analysis dodge event",
 );
 
 build_analysis_player_event_indicator!(
@@ -224,6 +224,15 @@ build_analysis_player_event_indicator!(
     new_ledger_events,
     |event: &BoostLedgerEvent, player_id: &PlayerId| &event.player_id == player_id,
     "analysis boost ledger event",
+);
+
+build_analysis_player_event_indicator!(
+    AnalysisPlayerBoostBucketEvents,
+    boost_dependency,
+    BoostCalculator,
+    new_bucket_events,
+    |event: &BoostBucketEvent, player_id: &PlayerId| &event.player_id == player_id,
+    "analysis boost bucket event",
 );
 
 build_analysis_player_event_indicator!(
@@ -342,7 +351,7 @@ where
         "speed_flip" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerSpeedFlips::<F>::arc_new(),
         )),
-        "flip_impulse" => Some(NDArrayPlayerFeatureAdder::analysis(
+        "dodge" | "flip_impulse" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerFlipImpulses::<F>::arc_new(),
         )),
         "powerslide" => Some(NDArrayPlayerFeatureAdder::analysis(
@@ -356,6 +365,9 @@ where
         )),
         "boost_ledger" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerBoostLedgerEvents::<F>::arc_new(),
+        )),
+        "boost_bucket" => Some(NDArrayPlayerFeatureAdder::analysis(
+            AnalysisPlayerBoostBucketEvents::<F>::arc_new(),
         )),
         "boost_state" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerBoostStateEvents::<F>::arc_new(),

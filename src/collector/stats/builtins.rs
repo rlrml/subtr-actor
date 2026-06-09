@@ -393,6 +393,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "own_half_goal",
         "empty_net_goal",
         "counter_attack_goal",
+        "sustained_pressure_goal",
         "flick_goal",
         "double_tap_goal",
         "one_timer_goal",
@@ -409,7 +410,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "territorial_pressure",
         "rotation",
         "rush",
-        "flip_impulse",
+        "dodge",
         "touch",
         "whiff",
         "wavedash",
@@ -586,6 +587,12 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
+        "sustained_pressure_goal" => {
+            let calculator = graph_state::<SustainedPressureGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
         "flick_goal" => {
             let calculator = graph_state::<FlickGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
@@ -701,7 +708,7 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
-        "flip_impulse" => {
+        "dodge" | "flip_impulse" => {
             let calculator = graph_state::<FlipImpulseCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
@@ -819,6 +826,7 @@ pub(crate) fn builtin_module_json(
                 "events": calculator.pickup_comparison_events(),
                 "ledger_events": calculator.ledger_events(),
                 "state_events": calculator.state_events(),
+                "bucket_events": calculator.bucket_events(),
             }))
         }
         "bump" => {
@@ -1028,6 +1036,8 @@ pub fn builtin_analysis_node_json(
     node_name: &str,
     graph: &AnalysisGraph,
 ) -> SubtrActorResult<Value> {
+    let node_name = crate::stats::analysis_graph::canonical_builtin_analysis_node_name(node_name)
+        .unwrap_or(node_name);
     let value = match node_name {
         "core" | "match_stats" => builtin_module_json("core", graph)?,
         "stats_timeline_events" => serialize_to_json_value(
@@ -1297,6 +1307,7 @@ pub(crate) fn builtin_snapshot_frame_json(
         | "own_half_goal"
         | "empty_net_goal"
         | "counter_attack_goal"
+        | "sustained_pressure_goal"
         | "flick_goal"
         | "double_tap_goal"
         | "one_timer_goal"
@@ -1352,7 +1363,7 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: projection.rush.stats(),
             })?
         }
-        "flip_impulse" => serialize_to_json_value(&serde_json::json!({}))?,
+        "dodge" | "flip_impulse" => serialize_to_json_value(&serde_json::json!({}))?,
         "touch" => {
             let projection = projected_stats(graph, module_name)?;
             let player_stats = projection
@@ -1653,6 +1664,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "fifty_fifty"
         | "kickoff"
         | "possession"
+        | "dodge"
         | "flip_impulse"
         | "touch"
         | "whiff"
@@ -1666,6 +1678,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "controlled_play"
         | "air_dribble"
         | "counter_attack_goal"
+        | "sustained_pressure_goal"
         | "boost"
         | "bump"
         | "movement"

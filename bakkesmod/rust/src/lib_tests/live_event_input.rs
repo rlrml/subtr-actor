@@ -861,6 +861,10 @@ fn maps_goal_tag_kinds_to_abi_kinds() {
         SaMechanicKind::CounterAttackGoal
     );
     assert_eq!(
+        goal_tag_kind(GoalTagKind::SustainedPressureGoal),
+        SaMechanicKind::SustainedPressureGoal
+    );
+    assert_eq!(
         goal_tag_kind(GoalTagKind::FlickGoal),
         SaMechanicKind::FlickGoal
     );

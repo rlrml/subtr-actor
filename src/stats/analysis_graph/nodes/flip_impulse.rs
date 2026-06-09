@@ -24,7 +24,7 @@ impl AnalysisNode for FlipImpulseNode {
     type State = FlipImpulseCalculator;
 
     fn name(&self) -> &'static str {
-        "flip_impulse"
+        "dodge"
     }
 
     fn dependencies(&self) -> NodeDependencies {

@@ -132,17 +132,10 @@ pub(in crate::collector::stats::playback) fn parse_territorial_pressure_event(
     decode_json_value(value.clone())
 }
 
-pub(in crate::collector::stats::playback) fn parse_flip_impulse_event(
-    value: &Value,
-) -> SubtrActorResult<FlipImpulseEvent> {
-    let object = json_object(value, "flip impulse event")?;
-    Ok(FlipImpulseEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
-        resolved_time: json_required_f32(object, "resolved_time")?,
-        resolved_frame: json_required_usize(object, "resolved_frame")?,
-        player: json_required_remote_id(object, "player")?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
+fn parse_dodge_impulse_from_object(
+    object: &serde_json::Map<String, Value>,
+) -> SubtrActorResult<DodgeImpulse> {
+    Ok(DodgeImpulse {
         start_position: json_required_vec3(object, "start_position")?,
         end_position: json_required_vec3(object, "end_position")?,
         start_speed: json_required_f32(object, "start_speed")?,
@@ -167,6 +160,31 @@ pub(in crate::collector::stats::playback) fn parse_flip_impulse_event(
         sample_count: json_required_u32(object, "sample_count")?,
         boost_compensation_magnitude: json_required_f32(object, "boost_compensation_magnitude")?,
         confidence: json_required_f32(object, "confidence")?,
+    })
+}
+
+fn parse_dodge_impulse(value: &Value) -> SubtrActorResult<DodgeImpulse> {
+    parse_dodge_impulse_from_object(json_object(value, "dodge impulse")?)
+}
+
+pub(in crate::collector::stats::playback) fn parse_dodge_event(
+    value: &Value,
+) -> SubtrActorResult<DodgeEvent> {
+    let object = json_object(value, "dodge event")?;
+    let dodge_impulse = match object.get("dodge_impulse") {
+        Some(Value::Null) | None if !object.contains_key("estimated_impulse_delta") => None,
+        Some(Value::Null) | None => Some(parse_dodge_impulse_from_object(object)?),
+        Some(value) => Some(parse_dodge_impulse(value)?),
+    };
+
+    Ok(DodgeEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        resolved_time: json_required_f32(object, "resolved_time")?,
+        resolved_frame: json_required_usize(object, "resolved_frame")?,
+        player: json_required_remote_id(object, "player")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        dodge_impulse,
     })
 }
 
@@ -1444,5 +1462,24 @@ pub(in crate::collector::stats::playback) fn parse_boost_state_event(
         is_team_0: json_required_bool(object, "is_team_0")?,
         boost_amount: json_required_f32(object, "boost_amount")?,
         boost_before: json_optional_f32(object.get("boost_before"))?,
+    })
+}
+
+pub(in crate::collector::stats::playback) fn parse_boost_bucket_event(
+    value: &Value,
+) -> SubtrActorResult<BoostBucketEvent> {
+    let object = json_object(value, "boost bucket event")?;
+    let frame = json_required_usize(object, "frame")?;
+    let time = json_required_f32(object, "time")?;
+    Ok(BoostBucketEvent {
+        frame,
+        time,
+        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
+        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
+        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
+        player_id: json_required_remote_id(object, "player_id")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        bucket: decode_json_value(json_required_value(object, "bucket")?.clone())?,
     })
 }

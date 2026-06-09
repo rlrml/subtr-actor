@@ -79,9 +79,13 @@ fn emits_forward_left_impulse_from_velocity_delta() {
     let event = calculator.events().first().expect("expected event");
     assert_eq!(event.frame, 10);
     assert_eq!(event.resolved_frame, 12);
-    assert_eq!(event.direction_label, "forward_left");
-    assert!(event.local_forward_component > 0.8);
-    assert!(event.local_right_component < -0.4);
+    let dodge_impulse = event
+        .dodge_impulse
+        .as_ref()
+        .expect("expected dodge impulse");
+    assert_eq!(dodge_impulse.direction_label, "forward_left");
+    assert!(dodge_impulse.local_forward_component > 0.8);
+    assert!(dodge_impulse.local_right_component < -0.4);
 }
 
 #[test]
@@ -104,13 +108,16 @@ fn subtracts_forward_boost_compensation() {
         boost_sample_count: 1,
     };
 
-    let event = FlipImpulseCalculator::candidate_event(&boxcars::RemoteId::Steam(1), candidate)
-        .expect("expected event");
+    let event = FlipImpulseCalculator::candidate_event(&boxcars::RemoteId::Steam(1), candidate);
+    let dodge_impulse = event
+        .dodge_impulse
+        .as_ref()
+        .expect("expected dodge impulse");
 
-    assert_eq!(event.raw_velocity_delta, [200.0, 100.0, 0.0]);
-    assert_eq!(event.estimated_impulse_delta, [100.0, 100.0, 0.0]);
-    assert!(event.local_forward_component < 0.72);
-    assert!(event.local_right_component > 0.70);
+    assert_eq!(dodge_impulse.raw_velocity_delta, [200.0, 100.0, 0.0]);
+    assert_eq!(dodge_impulse.estimated_impulse_delta, [100.0, 100.0, 0.0]);
+    assert!(dodge_impulse.local_forward_component < 0.72);
+    assert!(dodge_impulse.local_right_component > 0.70);
 
     let uncompensated_candidate = ActiveFlipImpulseCandidate {
         is_team_0: true,
@@ -132,7 +139,10 @@ fn subtracts_forward_boost_compensation() {
     let uncompensated = FlipImpulseCalculator::candidate_event(
         &boxcars::RemoteId::Steam(1),
         uncompensated_candidate,
-    )
-    .unwrap();
-    assert!(uncompensated.local_forward_component > event.local_forward_component);
+    );
+    let uncompensated_impulse = uncompensated
+        .dodge_impulse
+        .as_ref()
+        .expect("expected uncompensated dodge impulse");
+    assert!(uncompensated_impulse.local_forward_component > dodge_impulse.local_forward_component);
 }

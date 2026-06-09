@@ -7,8 +7,8 @@ use crate::{
     HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
     LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
     OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerVerticalState,
-    PossessionState, RotationCalculator, StatsTimelineCollector, TerritorialPressureCalculator,
-    TouchState, WallAerialCalculator, WallAerialShotCalculator,
+    PossessionState, RotationCalculator, StatsTimelineCollector, SustainedPressureGoalCalculator,
+    TerritorialPressureCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
 };
 use std::any::TypeId;
 use std::collections::HashSet;
@@ -266,6 +266,7 @@ fn assert_all_reducer_states_are_present(graph: &AnalysisGraph) {
     assert!(graph.state::<OwnHalfGoalCalculator>().is_some());
     assert!(graph.state::<EmptyNetGoalCalculator>().is_some());
     assert!(graph.state::<CounterAttackGoalCalculator>().is_some());
+    assert!(graph.state::<SustainedPressureGoalCalculator>().is_some());
     assert!(graph.state::<FlickGoalCalculator>().is_some());
     assert!(graph.state::<DoubleTapGoalCalculator>().is_some());
     assert!(graph.state::<OneTimerGoalCalculator>().is_some());

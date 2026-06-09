@@ -8,14 +8,7 @@ const BOOST_ACCELERATION_UU_PER_SECOND_SQUARED: f32 = 991.6667;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct FlipImpulseEvent {
-    pub time: f32,
-    pub frame: usize,
-    pub resolved_time: f32,
-    pub resolved_frame: usize,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player: PlayerId,
-    pub is_team_0: bool,
+pub struct DodgeImpulse {
     pub start_position: [f32; 3],
     pub end_position: [f32; 3],
     pub start_speed: f32,
@@ -34,6 +27,19 @@ pub struct FlipImpulseEvent {
     pub sample_count: u32,
     pub boost_compensation_magnitude: f32,
     pub confidence: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct DodgeEvent {
+    pub time: f32,
+    pub frame: usize,
+    pub resolved_time: f32,
+    pub resolved_frame: usize,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub dodge_impulse: Option<DodgeImpulse>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,7 +63,7 @@ struct ActiveFlipImpulseCandidate {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlipImpulseCalculator {
-    events: EventStream<FlipImpulseEvent>,
+    events: EventStream<DodgeEvent>,
     active_candidates: HashMap<PlayerId, ActiveFlipImpulseCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
 }
@@ -67,11 +73,11 @@ impl FlipImpulseCalculator {
         Self::default()
     }
 
-    pub fn events(&self) -> &[FlipImpulseEvent] {
+    pub fn events(&self) -> &[DodgeEvent] {
         self.events.all()
     }
 
-    pub fn new_events(&self) -> &[FlipImpulseEvent] {
+    pub fn new_events(&self) -> &[DodgeEvent] {
         self.events.new_events()
     }
 
@@ -192,69 +198,66 @@ impl FlipImpulseCalculator {
         candidate.latest_frame = frame.frame_number;
     }
 
-    fn candidate_event(
-        player_id: &PlayerId,
-        candidate: ActiveFlipImpulseCandidate,
-    ) -> Option<FlipImpulseEvent> {
-        if candidate.sample_count == 0 {
-            return None;
-        }
-
+    fn candidate_event(player_id: &PlayerId, candidate: ActiveFlipImpulseCandidate) -> DodgeEvent {
         let raw_delta = candidate.end_velocity - candidate.start_velocity;
         let estimated_delta = raw_delta - candidate.boost_compensation;
         let estimated_magnitude = estimated_delta.length();
-        if estimated_magnitude < FLIP_IMPULSE_MIN_DELTA {
-            return None;
-        }
+        let dodge_impulse = (candidate.sample_count > 0
+            && estimated_magnitude >= FLIP_IMPULSE_MIN_DELTA)
+            .then(|| {
+                let direction = estimated_delta / estimated_magnitude;
+                let horizontal_delta = estimated_delta.truncate();
+                let horizontal_magnitude = horizontal_delta.length();
+                let horizontal_direction = if horizontal_magnitude > f32::EPSILON {
+                    horizontal_delta / horizontal_magnitude
+                } else {
+                    glam::Vec2::ZERO
+                };
+                let local_forward_component = direction.dot(candidate.local_forward);
+                let local_right_component = direction.dot(candidate.local_right);
+                let local_up_component = direction.dot(candidate.local_up);
+                let boost_compensation_magnitude = candidate.boost_compensation.length();
+                let confidence = Self::score_confidence(
+                    estimated_magnitude,
+                    boost_compensation_magnitude,
+                    candidate.sample_count,
+                );
 
-        let direction = estimated_delta / estimated_magnitude;
-        let horizontal_delta = estimated_delta.truncate();
-        let horizontal_magnitude = horizontal_delta.length();
-        let horizontal_direction = if horizontal_magnitude > f32::EPSILON {
-            horizontal_delta / horizontal_magnitude
-        } else {
-            glam::Vec2::ZERO
-        };
-        let local_forward_component = direction.dot(candidate.local_forward);
-        let local_right_component = direction.dot(candidate.local_right);
-        let local_up_component = direction.dot(candidate.local_up);
-        let boost_compensation_magnitude = candidate.boost_compensation.length();
-        let confidence = Self::score_confidence(
-            estimated_magnitude,
-            boost_compensation_magnitude,
-            candidate.sample_count,
-        );
+                DodgeImpulse {
+                    start_position: candidate.start_position.to_array(),
+                    end_position: candidate.end_position.to_array(),
+                    start_speed: candidate.start_velocity.length(),
+                    end_speed: candidate.end_velocity.length(),
+                    raw_velocity_delta: raw_delta.to_array(),
+                    estimated_impulse_delta: estimated_delta.to_array(),
+                    estimated_direction: direction.to_array(),
+                    estimated_horizontal_direction: horizontal_direction.to_array(),
+                    estimated_impulse_magnitude: estimated_magnitude,
+                    estimated_horizontal_impulse_magnitude: horizontal_magnitude,
+                    local_forward_component,
+                    local_right_component,
+                    local_up_component,
+                    direction_label: Self::direction_label(
+                        local_forward_component,
+                        local_right_component,
+                        local_up_component,
+                    ),
+                    boost_sample_count: candidate.boost_sample_count,
+                    sample_count: candidate.sample_count,
+                    boost_compensation_magnitude,
+                    confidence,
+                }
+            });
 
-        Some(FlipImpulseEvent {
+        DodgeEvent {
             time: candidate.start_time,
             frame: candidate.start_frame,
             resolved_time: candidate.latest_time,
             resolved_frame: candidate.latest_frame,
             player: player_id.clone(),
             is_team_0: candidate.is_team_0,
-            start_position: candidate.start_position.to_array(),
-            end_position: candidate.end_position.to_array(),
-            start_speed: candidate.start_velocity.length(),
-            end_speed: candidate.end_velocity.length(),
-            raw_velocity_delta: raw_delta.to_array(),
-            estimated_impulse_delta: estimated_delta.to_array(),
-            estimated_direction: direction.to_array(),
-            estimated_horizontal_direction: horizontal_direction.to_array(),
-            estimated_impulse_magnitude: estimated_magnitude,
-            estimated_horizontal_impulse_magnitude: horizontal_magnitude,
-            local_forward_component,
-            local_right_component,
-            local_up_component,
-            direction_label: Self::direction_label(
-                local_forward_component,
-                local_right_component,
-                local_up_component,
-            ),
-            boost_sample_count: candidate.boost_sample_count,
-            sample_count: candidate.sample_count,
-            boost_compensation_magnitude,
-            confidence,
-        })
+            dodge_impulse,
+        }
     }
 
     fn finalize_candidates(&mut self, frame: &FrameInfo, force_all: bool) {
@@ -283,9 +286,8 @@ impl FlipImpulseCalculator {
             let Some(candidate) = self.active_candidates.remove(&player_id) else {
                 continue;
             };
-            if let Some(event) = Self::candidate_event(&player_id, candidate) {
-                self.events.push(event);
-            }
+            let event = Self::candidate_event(&player_id, candidate);
+            self.events.push(event);
         }
     }
 

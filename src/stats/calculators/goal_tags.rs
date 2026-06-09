@@ -34,6 +34,7 @@ pub enum GoalTagKind {
     OwnHalfGoal,
     EmptyNetGoal,
     CounterAttackGoal,
+    SustainedPressureGoal,
     FlickGoal,
     DoubleTapGoal,
     OneTimerGoal,
@@ -137,6 +138,7 @@ pub enum GoalTag {
     OwnHalfGoal(GoalTagMetadata),
     EmptyNetGoal(GoalTagMetadata),
     CounterAttackGoal(GoalTagMetadata),
+    SustainedPressureGoal(GoalTagMetadata),
     FlickGoal(GoalTagMetadata),
     DoubleTapGoal(GoalTagMetadata),
     OneTimerGoal(GoalTagMetadata),
@@ -237,6 +239,17 @@ pub const ALL_GOAL_TAG_DEFINITIONS: &[GoalTagDefinition] = &[
         &[
             "Use the goal-buildup classification computed in goal context.",
             "Tag goals whose buildup kind is counterattack.",
+            "Attach goal-buildup evidence to the goal tag metadata.",
+        ],
+    ),
+    goal_tag_definition(
+        GoalTagKind::SustainedPressureGoal,
+        "sustained_pressure_goal",
+        "Sustained Pressure Goal",
+        "A goal whose buildup was classified as sustained offensive pressure.",
+        &[
+            "Use the goal-buildup classification computed in goal context.",
+            "Tag goals whose buildup kind is sustained pressure.",
             "Attach goal-buildup evidence to the goal tag metadata.",
         ],
     ),
@@ -350,6 +363,7 @@ impl GoalTag {
             GoalTagKind::OwnHalfGoal => Self::OwnHalfGoal(metadata),
             GoalTagKind::EmptyNetGoal => Self::EmptyNetGoal(metadata),
             GoalTagKind::CounterAttackGoal => Self::CounterAttackGoal(metadata),
+            GoalTagKind::SustainedPressureGoal => Self::SustainedPressureGoal(metadata),
             GoalTagKind::FlickGoal => Self::FlickGoal(metadata),
             GoalTagKind::DoubleTapGoal => Self::DoubleTapGoal(metadata),
             GoalTagKind::OneTimerGoal => Self::OneTimerGoal(metadata),
@@ -370,6 +384,7 @@ impl GoalTag {
             Self::OwnHalfGoal(_) => GoalTagKind::OwnHalfGoal,
             Self::EmptyNetGoal(_) => GoalTagKind::EmptyNetGoal,
             Self::CounterAttackGoal(_) => GoalTagKind::CounterAttackGoal,
+            Self::SustainedPressureGoal(_) => GoalTagKind::SustainedPressureGoal,
             Self::FlickGoal(_) => GoalTagKind::FlickGoal,
             Self::DoubleTapGoal(_) => GoalTagKind::DoubleTapGoal,
             Self::OneTimerGoal(_) => GoalTagKind::OneTimerGoal,
@@ -390,6 +405,7 @@ impl GoalTag {
             | Self::OwnHalfGoal(metadata)
             | Self::EmptyNetGoal(metadata)
             | Self::CounterAttackGoal(metadata)
+            | Self::SustainedPressureGoal(metadata)
             | Self::FlickGoal(metadata)
             | Self::DoubleTapGoal(metadata)
             | Self::OneTimerGoal(metadata)
@@ -652,6 +668,11 @@ pub struct CounterAttackGoalCalculator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct SustainedPressureGoalCalculator {
+    events: EventStream<GoalTagAssignment>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct FlickGoalCalculator {
     config: FlickGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
@@ -761,6 +782,28 @@ impl Default for CounterAttackGoalCalculator {
 }
 
 impl CounterAttackGoalCalculator {
+    pub fn new() -> Self {
+        Self {
+            events: EventStream::new(),
+        }
+    }
+
+    pub fn events(&self) -> &[GoalTagAssignment] {
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[GoalTagAssignment] {
+        self.events.new_events()
+    }
+}
+
+impl Default for SustainedPressureGoalCalculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SustainedPressureGoalCalculator {
     pub fn new() -> Self {
         Self {
             events: EventStream::new(),
@@ -947,6 +990,30 @@ impl CounterAttackGoalCalculator {
                 goal_tag(
                     GoalTaggingContext { goal_index },
                     GoalTagKind::CounterAttackGoal,
+                    1.0,
+                    vec![goal_buildup_evidence(goal), goal_context_evidence(goal)],
+                )
+            })
+            .collect()
+    }
+}
+
+impl SustainedPressureGoalCalculator {
+    pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
+        self.events
+            .replace_all_assuming_append_only(self.tag_goals(match_stats.goal_context_events()));
+        Ok(())
+    }
+
+    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
+        goals
+            .iter()
+            .enumerate()
+            .filter(|(_, goal)| goal.goal_buildup == GoalBuildupKind::SustainedPressure)
+            .map(|(goal_index, goal)| {
+                goal_tag(
+                    GoalTaggingContext { goal_index },
+                    GoalTagKind::SustainedPressureGoal,
                     1.0,
                     vec![goal_buildup_evidence(goal), goal_context_evidence(goal)],
                 )
