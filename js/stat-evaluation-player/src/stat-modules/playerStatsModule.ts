@@ -1,4 +1,4 @@
-import type { ReplayTimelineEvent } from "@rlrml/player";
+import type { ReplayTimelineEvent, ReplayTimelineRange } from "@rlrml/player";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import type { PlayerStatsSnapshot } from "../statsTimeline.ts";
 import {
@@ -15,6 +15,7 @@ export function createPlayerStatsModule<T>(options: {
   select: (player: PlayerStatsSnapshot) => T | undefined;
   render: (stats: T | undefined, player: PlayerStatsSnapshot) => string;
   getTimelineEvents?: (ctx: StatModuleContext) => ReplayTimelineEvent[];
+  getTimelineRanges?: (ctx: StatModuleContext) => ReplayTimelineRange[];
 }): StatModule {
   return {
     id: options.id,
@@ -27,6 +28,7 @@ export function createPlayerStatsModule<T>(options: {
     onBeforeRender() {},
 
     getTimelineEvents: options.getTimelineEvents,
+    getTimelineRanges: options.getTimelineRanges,
 
     renderStats(frameIndex, ctx) {
       const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);

@@ -12,6 +12,8 @@ import {
   getEventPlaylistSelectedSourceIds,
   getEventPlaylistSources,
   getEventTimelineSources,
+  STATS_EVENT_STREAM_TIMELINE_PRESENTATION,
+  STATS_EVENT_STREAM_TIMELINE_PRESENTATION_OVERRIDES,
 } from "./eventTimelineSources.ts";
 import { createStatsTimeline } from "./testStatsTimeline.ts";
 
@@ -54,6 +56,7 @@ test("event timeline sources include empty canonical stats streams", () => {
   assert.ok(sourceIds.has("stats-stream:rotation_role_span"));
   assert.ok(sourceIds.has("stats-stream:flip_impulse"));
   assert.ok(sourceIds.has("mechanic:speed_flip"));
+  assert.ok(sourceIds.has("stats-stream:territorial_pressure"));
 
   const streamSources = timelineSources.filter((source) => source.id.startsWith("stats-stream:"));
   for (const streamId of STATS_EVENT_STREAM_COUNT_TYPES) {
@@ -72,6 +75,22 @@ test("event timeline sources include empty canonical stats streams", () => {
   );
 });
 
+test("every stats event stream has an explicit timeline presentation policy", () => {
+  assert.deepEqual(
+    Object.keys(STATS_EVENT_STREAM_TIMELINE_PRESENTATION).sort(),
+    [...STATS_EVENT_STREAM_COUNT_TYPES].sort(),
+  );
+  assert.equal(STATS_EVENT_STREAM_TIMELINE_PRESENTATION.touch, "marker");
+  assert.equal(STATS_EVENT_STREAM_TIMELINE_PRESENTATION.territorial_pressure, "span");
+  assert.equal(STATS_EVENT_STREAM_TIMELINE_PRESENTATION.powerslide, "mixed");
+  assert.deepEqual(
+    Object.keys(STATS_EVENT_STREAM_TIMELINE_PRESENTATION_OVERRIDES).sort(),
+    STATS_EVENT_STREAM_COUNT_TYPES.filter(
+      (streamId) => STATS_EVENT_STREAM_TIMELINE_PRESENTATION[streamId] !== "marker",
+    ).sort(),
+  );
+});
+
 test("event playlist filters include empty canonical stats streams", () => {
   const { ctx } = createSourceTestContext();
   const playlistSources = getEventPlaylistSources(ctx, getTestTimelineSources(ctx));
@@ -79,6 +98,7 @@ test("event playlist filters include empty canonical stats streams", () => {
 
   assert.ok(playlistSourceIds.has("stats-stream:positioning_activity"));
   assert.ok(playlistSourceIds.has("stats-stream:backboard"));
+  assert.ok(playlistSourceIds.has("stats-stream:territorial_pressure"));
   assert.ok(playlistSourceIds.has("mechanic:speed_flip"));
   assert.equal(
     playlistSources.find((source) => source.id === "stats-stream:positioning_activity")?.events
@@ -186,4 +206,113 @@ test("event playlist sources include generic stats event streams such as positio
       },
     ],
   );
+});
+
+test("span-based stats event streams build ranges instead of timeline markers", () => {
+  const replay = {
+    frames: Array.from({ length: 7 }, (_, frame) => ({ time: frame })),
+    players: [],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      territorial_pressure: [
+        {
+          start_time: 1,
+          start_frame: 1,
+          end_time: 5,
+          end_frame: 5,
+          team_is_team_0: false,
+          duration: 4,
+          offensive_half_time: 4,
+          offensive_third_time: 2,
+          end_reason: "relieved",
+        },
+      ],
+    },
+  });
+  const ctx = {
+    replay,
+    statsTimeline,
+  } as StatModuleContext;
+
+  const source = getEventTimelineSources({
+    ctx,
+    modules: [],
+    activeTimelineEventSourceIds: new Set(["stats-stream:territorial_pressure"]),
+    activeMechanicTimelineKinds: new Set(),
+    toggleEventSource() {},
+    setMechanicTimelineKind() {},
+  }).find((candidate) => candidate.id === "stats-stream:territorial_pressure");
+
+  assert.ok(source);
+  assert.equal(source.count, 1);
+  assert.deepEqual(source.buildTimelineEvents(), []);
+  assert.deepEqual(source.buildTimelineRanges?.(), [
+    {
+      id: "stats-stream:territorial_pressure:1:5:0",
+      startTime: 1,
+      endTime: 5,
+      lane: "stats-stream:territorial_pressure",
+      laneLabel: "Territorial Pressure",
+      label: "Orange Territorial Pressure",
+      shortLabel: "TP",
+      isTeamZero: false,
+      color: "#f97316",
+    },
+  ]);
+});
+
+test("player-scoped span stats event streams use per-player range lanes", () => {
+  const replay = {
+    frames: Array.from({ length: 4 }, (_, frame) => ({ time: frame })),
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      positioning_possession: [
+        {
+          time: 1,
+          frame: 1,
+          end_time: 3,
+          end_frame: 3,
+          duration: 2,
+          player: { Steam: "blue-id" },
+          player_position: null,
+          is_team_0: true,
+          possession_state: "has_possession",
+        },
+      ],
+    },
+  });
+  const ctx = {
+    replay,
+    statsTimeline,
+  } as StatModuleContext;
+
+  const source = getEventTimelineSources({
+    ctx,
+    modules: [],
+    activeTimelineEventSourceIds: new Set(["stats-stream:positioning_possession"]),
+    activeMechanicTimelineKinds: new Set(),
+    toggleEventSource() {},
+    setMechanicTimelineKind() {},
+  }).find((candidate) => candidate.id === "stats-stream:positioning_possession");
+
+  assert.ok(source);
+  assert.deepEqual(source.buildTimelineEvents(), []);
+  assert.deepEqual(source.buildTimelineRanges?.(), [
+    {
+      id: "stats-stream:positioning_possession:1:3:0",
+      startTime: 1,
+      endTime: 3,
+      lane: "stats-stream:positioning_possession:Steam:blue-id",
+      laneLabel: "Blue",
+      label: "Blue Has Possession",
+      shortLabel: "PP",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
 });

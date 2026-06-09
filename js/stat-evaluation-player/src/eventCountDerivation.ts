@@ -90,6 +90,7 @@ const STATS_EVENT_STREAM_COUNT_TYPE_SET = new Set<string>(STATS_EVENT_STREAM_COU
 const STATS_MECHANIC_EVENT_COUNT_TYPE_SET = new Set<string>(STATS_MECHANIC_EVENT_COUNT_TYPES);
 
 export type StatsEventCountType = (typeof STATS_EVENT_COUNT_TYPES)[number];
+export type StatsEventStreamCountType = (typeof STATS_EVENT_STREAM_COUNT_TYPES)[number];
 export type EventCountStats = Record<StatsEventCountType, number>;
 type TimelineEventRecord = Record<string, unknown>;
 
