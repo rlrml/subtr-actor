@@ -207,7 +207,7 @@ fn exposes_current_timeline_frame_json_after_processing_frame() {
     let team_module_names = [
         "fifty_fifty",
         "possession",
-        "pressure",
+        "ball_half",
         "rotation",
         "rush",
         "core",
@@ -725,4 +725,3 @@ fn explicit_dodge_refreshed_events_feed_live_touch_state() {
     );
     unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
 }
-

@@ -1,11 +1,11 @@
 import type { LabeledFloatSums } from "./generated/LabeledFloatSums.ts";
-import type { PressureEvent } from "./generated/PressureEvent.ts";
-import type { PressureTeamStats } from "./generated/PressureTeamStats.ts";
+import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
+import type { BallHalfTeamStats } from "./generated/BallHalfTeamStats.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 import { statsEventPayloads } from "./statsTimeline.ts";
 
-interface RawPressureStats {
+interface RawBallHalfStats {
   tracked_time: number;
   team_zero_side_time: number;
   team_one_side_time: number;
@@ -13,7 +13,7 @@ interface RawPressureStats {
   labeled_time: LabeledFloatSums;
 }
 
-interface PressureState {
+interface BallHalfState {
   active: boolean;
   fieldHalf: string;
 }
@@ -26,7 +26,7 @@ function addF32(left: number, right: number): number {
   return f32(f32(left) + f32(right));
 }
 
-function defaultRawPressureStats(): RawPressureStats {
+function defaultRawBallHalfStats(): RawBallHalfStats {
   return {
     tracked_time: 0,
     team_zero_side_time: 0,
@@ -36,7 +36,7 @@ function defaultRawPressureStats(): RawPressureStats {
   };
 }
 
-function defaultPressureTeamStats(): PressureTeamStats {
+function defaultBallHalfTeamStats(): BallHalfTeamStats {
   return {
     tracked_time: 0,
     defensive_half_time: 0,
@@ -46,7 +46,7 @@ function defaultPressureTeamStats(): PressureTeamStats {
   };
 }
 
-function sortPressureEvents(events: readonly PressureEvent[]): PressureEvent[] {
+function sortBallHalfEvents(events: readonly BallHalfEvent[]): BallHalfEvent[] {
   return events
     .map((event, index) => ({ event, index }))
     .sort((left, right) => {
@@ -89,7 +89,7 @@ function addLabeledTime(sums: LabeledFloatSums, labels: StatLabel[], value: numb
   }
 }
 
-function relativePressureLabel(label: StatLabel, isTeamZero: boolean): StatLabel {
+function relativeBallHalfLabel(label: StatLabel, isTeamZero: boolean): StatLabel {
   if (label.key === "field_half" && label.value === "team_zero_side") {
     return { key: "field_half", value: isTeamZero ? "defensive_half" : "offensive_half" };
   }
@@ -99,12 +99,12 @@ function relativePressureLabel(label: StatLabel, isTeamZero: boolean): StatLabel
   return { ...label };
 }
 
-function pressureTeamStats(raw: RawPressureStats, isTeamZero: boolean): PressureTeamStats {
+function ballHalfTeamStats(raw: RawBallHalfStats, isTeamZero: boolean): BallHalfTeamStats {
   const labeled_time: LabeledFloatSums = { entries: [] };
   for (const entry of raw.labeled_time.entries) {
     addLabeledTime(
       labeled_time,
-      entry.labels.map((label) => relativePressureLabel(label, isTeamZero)),
+      entry.labels.map((label) => relativeBallHalfLabel(label, isTeamZero)),
       entry.value,
     );
   }
@@ -117,14 +117,14 @@ function pressureTeamStats(raw: RawPressureStats, isTeamZero: boolean): Pressure
   };
 }
 
-function applyPressureEvent(state: PressureState, event: PressureEvent): void {
+function applyBallHalfEvent(state: BallHalfState, event: BallHalfEvent): void {
   state.active = event.active;
   state.fieldHalf = event.field_half;
 }
 
-function accumulatePressureFrame(
-  raw: RawPressureStats,
-  state: PressureState,
+function accumulateBallHalfFrame(
+  raw: RawBallHalfStats,
+  state: BallHalfState,
   frame: StatsFrame,
 ): void {
   if (!state.active) {
@@ -143,17 +143,17 @@ function accumulatePressureFrame(
   addLabeledTime(raw.labeled_time, [{ key: "field_half", value: state.fieldHalf }], dt);
 }
 
-function assignPressureStats(
-  target: PressureTeamStats,
-  source: PressureTeamStats | undefined,
+function assignBallHalfStats(
+  target: BallHalfTeamStats,
+  source: BallHalfTeamStats | undefined,
 ): void {
-  Object.assign(target, source ?? defaultPressureTeamStats());
+  Object.assign(target, source ?? defaultBallHalfTeamStats());
 }
 
-export function applyPressureEventDerivedStats(
+export function applyBallHalfEventDerivedStats(
   timeline: MaterializedStatsTimeline,
 ): MaterializedStatsTimeline {
-  const accumulator = createPressureEventDerivedStatsAccumulator(timeline);
+  const accumulator = createBallHalfEventDerivedStatsAccumulator(timeline);
 
   for (const frame of timeline.frames) {
     accumulator.applyFrame(frame);
@@ -162,14 +162,14 @@ export function applyPressureEventDerivedStats(
   return timeline;
 }
 
-export function createPressureEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
+export function createBallHalfEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortPressureEvents(statsEventPayloads(timeline, "pressure"));
+  const events = sortBallHalfEvents(statsEventPayloads(timeline, "ball_half"));
 
   let eventIndex = 0;
-  const raw = defaultRawPressureStats();
-  const state: PressureState = {
+  const raw = defaultRawBallHalfStats();
+  const state: BallHalfState = {
     active: false,
     fieldHalf: "neutral",
   };
@@ -177,13 +177,13 @@ export function createPressureEventDerivedStatsAccumulator(timeline: Materialize
   return {
     applyFrame(frame: StatsFrame): void {
       while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-        applyPressureEvent(state, events[eventIndex] as PressureEvent);
+        applyBallHalfEvent(state, events[eventIndex] as BallHalfEvent);
         eventIndex += 1;
       }
 
-      accumulatePressureFrame(raw, state, frame);
-      assignPressureStats(frame.team_zero.pressure, pressureTeamStats(raw, true));
-      assignPressureStats(frame.team_one.pressure, pressureTeamStats(raw, false));
+      accumulateBallHalfFrame(raw, state, frame);
+      assignBallHalfStats(frame.team_zero.ball_half, ballHalfTeamStats(raw, true));
+      assignBallHalfStats(frame.team_one.ball_half, ballHalfTeamStats(raw, false));
     },
   };
 }

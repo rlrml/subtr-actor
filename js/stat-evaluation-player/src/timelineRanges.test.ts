@@ -9,7 +9,7 @@ import {
   buildMechanicTimelineRanges,
   buildPossessionTimelineRanges,
   buildPowerslideTimelineRanges,
-  buildPressureTimelineRanges,
+  buildBallHalfTimelineRanges,
   buildRushTimelineRanges,
 } from "./timelineRanges.ts";
 import { createLegacyStatsTimeline, createStatsTimeline } from "./testStatsTimeline.ts";
@@ -311,7 +311,7 @@ test("buildPossessionTimelineRanges derives spans from compact event timelines",
   ]);
 });
 
-test("buildPressureTimelineRanges derives half-control spans from labeled deltas including neutral", () => {
+test("buildBallHalfTimelineRanges derives half-control spans from labeled deltas including neutral", () => {
   const timeline = {
     replay_meta: {},
     timeline_events: [],
@@ -321,7 +321,7 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
         time: 0.5,
         dt: 0.5,
         team_zero: {
-          pressure: {
+          ball_half: {
             tracked_time: 0.5,
             defensive_half_time: 0.5,
             offensive_half_time: 0,
@@ -329,7 +329,7 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
           },
         },
         team_one: {
-          pressure: {
+          ball_half: {
             tracked_time: 0.5,
             defensive_half_time: 0,
             offensive_half_time: 0.5,
@@ -343,7 +343,7 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
         time: 1,
         dt: 0.5,
         team_zero: {
-          pressure: {
+          ball_half: {
             tracked_time: 1,
             defensive_half_time: 0.5,
             offensive_half_time: 0,
@@ -351,7 +351,7 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
           },
         },
         team_one: {
-          pressure: {
+          ball_half: {
             tracked_time: 1,
             defensive_half_time: 0,
             offensive_half_time: 0.5,
@@ -363,7 +363,7 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
     ],
   } as StatsTimeline;
 
-  assert.deepEqual(buildPressureTimelineRanges(timeline), [
+  assert.deepEqual(buildBallHalfTimelineRanges(timeline), [
     {
       id: "half-control:team_zero_side:0.000",
       startTime: 0,
@@ -387,10 +387,10 @@ test("buildPressureTimelineRanges derives half-control spans from labeled deltas
   ]);
 });
 
-test("buildPressureTimelineRanges derives spans from compact event timelines", () => {
+test("buildBallHalfTimelineRanges derives spans from compact event timelines", () => {
   const timeline = createStatsTimeline({
     events: {
-      pressure: [
+      ball_half: [
         { frame: 1, time: 0.5, active: true, field_half: "team_zero_side" },
         { frame: 2, time: 1, active: true, field_half: "neutral" },
       ],
@@ -401,7 +401,7 @@ test("buildPressureTimelineRanges derives spans from compact event timelines", (
     ],
   });
 
-  assert.deepEqual(buildPressureTimelineRanges(timeline), [
+  assert.deepEqual(buildBallHalfTimelineRanges(timeline), [
     {
       id: "half-control:team_zero_side:0.000",
       startTime: 0,
@@ -753,11 +753,11 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
   );
 });
 
-test("buildPressureTimelineRanges uses replay centerline fallback for legacy half-control stats", () => {
+test("buildBallHalfTimelineRanges uses replay centerline fallback for legacy half-control stats", () => {
   const timeline = {
     config: {
       most_back_forward_threshold_y: 400,
-      pressure_neutral_zone_half_width_y: 200,
+      ball_half_neutral_zone_half_width_y: 200,
     },
     replay_meta: {},
     timeline_events: [],
@@ -767,7 +767,7 @@ test("buildPressureTimelineRanges uses replay centerline fallback for legacy hal
         time: 0.5,
         dt: 0.5,
         team_zero: {
-          pressure: {
+          ball_half: {
             tracked_time: 0.5,
             defensive_half_time: 0.5,
             offensive_half_time: 0,
@@ -775,7 +775,7 @@ test("buildPressureTimelineRanges uses replay centerline fallback for legacy hal
           },
         },
         team_one: {
-          pressure: {
+          ball_half: {
             tracked_time: 0.5,
             defensive_half_time: 0,
             offensive_half_time: 0.5,
@@ -789,7 +789,7 @@ test("buildPressureTimelineRanges uses replay centerline fallback for legacy hal
         time: 1,
         dt: 0.5,
         team_zero: {
-          pressure: {
+          ball_half: {
             tracked_time: 1,
             defensive_half_time: 0.5,
             offensive_half_time: 0.5,
@@ -797,7 +797,7 @@ test("buildPressureTimelineRanges uses replay centerline fallback for legacy hal
           },
         },
         team_one: {
-          pressure: {
+          ball_half: {
             tracked_time: 1,
             defensive_half_time: 0.5,
             offensive_half_time: 0.5,
@@ -821,7 +821,7 @@ test("buildPressureTimelineRanges uses replay centerline fallback for legacy hal
     ],
   } as Partial<ReplayModel> as ReplayModel;
 
-  assert.deepEqual(buildPressureTimelineRanges(timeline, replay), [
+  assert.deepEqual(buildBallHalfTimelineRanges(timeline, replay), [
     {
       id: "half-control:team_zero_side:0.000",
       startTime: 0,

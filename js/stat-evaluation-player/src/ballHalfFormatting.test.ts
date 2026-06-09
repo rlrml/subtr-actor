@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { renderPressureStats } from "./pressureFormatting.ts";
+import { renderBallHalfStats } from "./ballHalfFormatting.ts";
 
-test("renderPressureStats shows field-half breakdown rows when selected", () => {
-  const html = renderPressureStats(
+test("renderBallHalfStats shows field-half breakdown rows when selected", () => {
+  const html = renderBallHalfStats(
     {
       tracked_time: 8,
       defensive_half_time: 4,
@@ -40,8 +40,8 @@ test("renderPressureStats shows field-half breakdown rows when selected", () => 
   assert.match(html, /Opp half<\/span><span class="value">3\.0s \(37\.5%\)/);
 });
 
-test("renderPressureStats can render a shared half-control breakdown", () => {
-  const html = renderPressureStats(
+test("renderBallHalfStats can render a shared half-control breakdown", () => {
+  const html = renderBallHalfStats(
     {
       tracked_time: 8,
       defensive_half_time: 4,
@@ -62,8 +62,8 @@ test("renderPressureStats can render a shared half-control breakdown", () => {
   assert.doesNotMatch(html, /Opp half<\/span>/);
 });
 
-test("renderPressureStats uses snapshot pressure totals without labeled exports", () => {
-  const html = renderPressureStats(
+test("renderBallHalfStats uses snapshot pressure totals without labeled exports", () => {
+  const html = renderBallHalfStats(
     {
       tracked_time: 4,
       defensive_half_time: 2,
@@ -82,8 +82,8 @@ test("renderPressureStats uses snapshot pressure totals without labeled exports"
   assert.match(html, /Opp half<\/span><span class="value">2\.0s \(50\.0%\)/);
 });
 
-test("renderPressureStats falls back to tracked time when no breakdown data exists", () => {
-  const html = renderPressureStats(
+test("renderBallHalfStats falls back to tracked time when no breakdown data exists", () => {
+  const html = renderBallHalfStats(
     {
       tracked_time: 4,
       defensive_half_time: 0,

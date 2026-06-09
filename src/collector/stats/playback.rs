@@ -196,7 +196,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
 
     fn timeline_config(&self) -> StatsTimelineConfig {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
-        let pressure_config = self.config.get("pressure").and_then(Value::as_object);
+        let ball_half_config = self.config.get("ball_half").and_then(Value::as_object);
         let territorial_pressure_config = self
             .config
             .get("territorial_pressure")
@@ -262,10 +262,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .unwrap_or(
                     PositioningCalculatorConfig::default().closest_to_ball_switch_min_seconds,
                 ),
-            pressure_neutral_zone_half_width_y: pressure_config
-                .and_then(|config| config.get("pressure_neutral_zone_half_width_y"))
+            ball_half_neutral_zone_half_width_y: ball_half_config
+                .and_then(|config| config.get("ball_half_neutral_zone_half_width_y"))
                 .and_then(json_f32)
-                .unwrap_or(PressureCalculatorConfig::default().neutral_zone_half_width_y),
+                .unwrap_or(BallHalfCalculatorConfig::default().neutral_zone_half_width_y),
             territorial_pressure_neutral_zone_half_width_y: territorial_pressure_config
                 .and_then(|config| config.get("territorial_pressure_neutral_zone_half_width_y"))
                 .and_then(json_f32)
@@ -413,7 +413,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
 
     fn timeline_config_value(&self) -> SubtrActorResult<Value> {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
-        let pressure_config = self.config.get("pressure").and_then(Value::as_object);
+        let ball_half_config = self.config.get("ball_half").and_then(Value::as_object);
         let territorial_pressure_config = self
             .config
             .get("territorial_pressure")
@@ -500,13 +500,13 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             )?,
         );
         config.insert(
-            "pressure_neutral_zone_half_width_y".to_owned(),
+            "ball_half_neutral_zone_half_width_y".to_owned(),
             serialize_to_json_value(
-                &pressure_config
-                    .and_then(|config| config.get("pressure_neutral_zone_half_width_y"))
+                &ball_half_config
+                    .and_then(|config| config.get("ball_half_neutral_zone_half_width_y"))
                     .and_then(Value::as_f64)
                     .unwrap_or(
-                        PressureCalculatorConfig::default().neutral_zone_half_width_y as f64,
+                        BallHalfCalculatorConfig::default().neutral_zone_half_width_y as f64,
                     ),
             )?,
         );

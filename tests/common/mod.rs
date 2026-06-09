@@ -359,9 +359,9 @@ fn compare_team_snapshot(
     })
     .or_else(|| {
         compare_field(
-            &format!("{label}.pressure"),
-            &left.pressure,
-            &right.pressure,
+            &format!("{label}.ball_half"),
+            &left.ball_half,
+            &right.ball_half,
         )
     })
     .or_else(|| compare_field(&format!("{label}.rush"), &left.rush, &right.rush))

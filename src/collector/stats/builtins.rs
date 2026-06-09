@@ -408,7 +408,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "fifty_fifty",
         "kickoff",
         "possession",
-        "pressure",
+        "ball_half",
         "territorial_pressure",
         "rotation",
         "rush",
@@ -687,11 +687,11 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
-        "pressure" => {
-            let calculator = graph_state::<PressureCalculator>(graph, module_name)?;
+        "ball_half" => {
+            let calculator = graph_state::<BallHalfCalculator>(graph, module_name)?;
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsWithEventsExport {
-                stats: projection.pressure.stats(),
+                stats: projection.ball_half.stats(),
                 events: calculator.events(),
             })
         }
@@ -1352,10 +1352,10 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: projection.possession.stats(),
             })?
         }
-        "pressure" => {
+        "ball_half" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsExport {
-                stats: projection.pressure.stats(),
+                stats: projection.ball_half.stats(),
             })?
         }
         "territorial_pressure" => {
@@ -1540,10 +1540,10 @@ pub(crate) fn builtin_snapshot_config_json(
                 "closest_to_ball_switch_min_seconds": calculator.config().closest_to_ball_switch_min_seconds,
             }))?)
         }
-        "pressure" => {
-            let calculator = graph_state::<PressureCalculator>(graph, module_name)?;
+        "ball_half" => {
+            let calculator = graph_state::<BallHalfCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
-                "pressure_neutral_zone_half_width_y": calculator.config().neutral_zone_half_width_y,
+                "ball_half_neutral_zone_half_width_y": calculator.config().neutral_zone_half_width_y,
             }))?)
         }
         "territorial_pressure" => {

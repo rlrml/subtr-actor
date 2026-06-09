@@ -150,7 +150,7 @@ fn default_team_stats_snapshot() -> TeamStatsSnapshot {
     TeamStatsSnapshot {
         fifty_fifty: FiftyFiftyTeamStats::default(),
         possession: PossessionTeamStats::default(),
-        pressure: PressureTeamStats::default(),
+        ball_half: BallHalfTeamStats::default(),
         territorial_pressure: TerritorialPressureTeamStats::default(),
         rotation: RotationTeamStats::default(),
         rush: RushTeamStats::default(),
@@ -220,7 +220,7 @@ fn empty_stats_timeline_config() -> StatsTimelineConfig {
         level_ball_depth_margin: 0.0,
         closest_to_ball_switch_margin: 0.0,
         closest_to_ball_switch_min_seconds: 0.0,
-        pressure_neutral_zone_half_width_y: 0.0,
+        ball_half_neutral_zone_half_width_y: 0.0,
         territorial_pressure_neutral_zone_half_width_y: 0.0,
         territorial_pressure_min_establish_seconds: 0.0,
         territorial_pressure_min_establish_third_seconds: 0.0,

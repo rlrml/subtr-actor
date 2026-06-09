@@ -383,7 +383,7 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "positioning_teammate_role",
         "possession",
         "powerslide",
-        "pressure",
+        "ball_half",
         "rotation_player",
         "rotation_team",
         "rush",
