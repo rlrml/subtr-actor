@@ -10,6 +10,8 @@ const KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS: f32 = 1.25;
 const KICKOFF_GOAL_MAX_SECONDS: f32 = 10.0;
 const KICKOFF_WIN_MIN_BALL_Y: f32 = 180.0;
 const KICKOFF_WIN_MIN_BALL_SPEED_Y: f32 = 220.0;
+const KICKOFF_BALL_DIRECTION_MIN_ABS_X: f32 = 180.0;
+const KICKOFF_BALL_DIRECTION_MIN_ABS_SPEED_X: f32 = 220.0;
 const KICKOFF_CLEAR_WIN_STRENGTH: f32 = 1.5;
 const KICKOFF_STRONG_WIN_STRENGTH: f32 = 2.5;
 const KICKOFF_TAKER_DISTANCE_TIE_EPSILON: f32 = 150.0;
@@ -23,29 +25,6 @@ const KICKOFF_SUPPORT_CHEAT_MIN_CENTER_PROGRESS: f32 = 400.0;
 const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_LATERAL_MOVE: f32 = 600.0;
 const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_BOOST_GAIN: f32 = 10.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct KickoffBoostLedgerKey {
-    frame: usize,
-    time_bits: u32,
-    transaction: BoostLedgerTransactionKind,
-}
-
-impl KickoffBoostLedgerKey {
-    fn from_event(event: &BoostLedgerEvent) -> Self {
-        Self {
-            frame: event.frame,
-            time_bits: event.time.to_bits(),
-            transaction: event.transaction,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum KickoffBoostLedgerTotal {
-    Collected,
-    Used,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 struct KickoffPlayerSnapshot {
     player: PlayerId,
@@ -53,6 +32,7 @@ struct KickoffPlayerSnapshot {
     start_position: [f32; 3],
     spawn_position: KickoffSpawnPosition,
     start_boost: Option<f32>,
+    first_touch_boost: Option<f32>,
     first_touch_time: Option<f32>,
     first_touch_frame: Option<usize>,
     approach_trace: KickoffApproachTrace,
@@ -70,9 +50,6 @@ struct KickoffApproachTrace {
     previous_boost: Option<f32>,
     sampled_boost_collected: f32,
     sampled_boost_used: f32,
-    ledger_boost_collected: f32,
-    ledger_boost_used: f32,
-    ledger_amounts: HashMap<KickoffBoostLedgerKey, f32>,
     last_position: Option<[f32; 3]>,
     previous_velocity: Option<glam::Vec3>,
     previous_dodge_active: bool,
@@ -116,7 +93,6 @@ pub(crate) struct KickoffUpdateContext<'a> {
     pub touch_state: &'a TouchState,
     pub events: &'a FrameEventsState,
     pub speed_flip_events: &'a [SpeedFlipEvent],
-    pub boost_ledger_events: &'a [BoostLedgerEvent],
 }
 
 pub(crate) const KICKOFF_SPAWN_LABELS: [StatLabel; 6] = [
@@ -158,6 +134,12 @@ pub(crate) const KICKOFF_SUPPORT_BEHAVIOR_LABELS: [StatLabel; 4] = [
     StatLabel::new("support_behavior", "cheat"),
     StatLabel::new("support_behavior", "other"),
     StatLabel::new("support_behavior", "unknown"),
+];
+pub(crate) const KICKOFF_BALL_DIRECTION_LABELS: [StatLabel; 4] = [
+    StatLabel::new("ball_direction", "left"),
+    StatLabel::new("ball_direction", "right"),
+    StatLabel::new("ball_direction", "center"),
+    StatLabel::new("ball_direction", "unknown"),
 ];
 pub(crate) const KICKOFF_OUTCOME_LABELS: [StatLabel; 4] = [
     StatLabel::new("outcome", "team_zero_win"),
@@ -223,12 +205,17 @@ pub(crate) fn kickoff_support_behavior_label(behavior: KickoffSupportBehavior) -
     StatLabel::new("support_behavior", behavior.as_label_value())
 }
 
+pub(crate) fn kickoff_ball_direction_label(direction: KickoffBallDirection) -> StatLabel {
+    StatLabel::new("ball_direction", direction.as_label_value())
+}
+
 impl KickoffTakerEvent {
     pub(crate) fn labels(&self) -> Vec<StatLabel> {
         vec![
             kickoff_spawn_label(self.spawn_position),
             kickoff_taker_outcome_label(self.outcome),
             kickoff_approach_label(self.approach),
+            kickoff_ball_direction_label(self.ball_direction),
         ]
     }
 }
@@ -370,6 +357,7 @@ impl KickoffCalculator {
             start_position: position.to_array(),
             spawn_position: Self::kickoff_spawn_position(position, player.is_team_0),
             start_boost: player.boost_amount.or(player.last_boost_amount),
+            first_touch_boost: None,
             first_touch_time: None,
             first_touch_frame: None,
             approach_trace: KickoffApproachTrace::default(),
@@ -494,61 +482,6 @@ impl KickoffCalculator {
         }
     }
 
-    fn apply_boost_ledger_events(active: &mut ActiveKickoff, events: &[BoostLedgerEvent]) {
-        let movement_start_time = active.movement_start_time.unwrap_or(active.start_time);
-        for event in events {
-            if event.end_time < movement_start_time {
-                continue;
-            }
-            let Some(snapshot) = active
-                .players
-                .iter_mut()
-                .find(|player| player.player == event.player_id)
-            else {
-                continue;
-            };
-            if snapshot
-                .first_touch_time
-                .is_some_and(|touch_time| event.end_time > touch_time)
-            {
-                continue;
-            }
-            let Some(total) = Self::relevant_boost_ledger_total(event) else {
-                continue;
-            };
-            let key = KickoffBoostLedgerKey::from_event(event);
-            let previous_total = snapshot
-                .approach_trace
-                .ledger_amounts
-                .insert(key, event.amount)
-                .unwrap_or(0.0);
-            let amount_delta = (event.amount - previous_total).max(0.0);
-            if amount_delta <= 0.0 {
-                continue;
-            }
-            match total {
-                KickoffBoostLedgerTotal::Collected => {
-                    snapshot.approach_trace.ledger_boost_collected += amount_delta;
-                }
-                KickoffBoostLedgerTotal::Used => {
-                    snapshot.approach_trace.ledger_boost_used += amount_delta;
-                }
-            }
-        }
-    }
-
-    fn relevant_boost_ledger_total(event: &BoostLedgerEvent) -> Option<KickoffBoostLedgerTotal> {
-        match event.transaction {
-            BoostLedgerTransactionKind::Collected | BoostLedgerTransactionKind::Stolen => {
-                Some(KickoffBoostLedgerTotal::Collected)
-            }
-            BoostLedgerTransactionKind::Used => Some(KickoffBoostLedgerTotal::Used),
-            BoostLedgerTransactionKind::Overfill
-            | BoostLedgerTransactionKind::Respawn
-            | BoostLedgerTransactionKind::UsedAllocation => None,
-        }
-    }
-
     fn apply_touches(active: &mut ActiveKickoff, touch_state: &TouchState) {
         for touch in chronological_touch_events(&touch_state.touch_events) {
             active.touches.push(KickoffTouchSnapshot {
@@ -573,6 +506,8 @@ impl KickoffCalculator {
                 continue;
             };
             if player.first_touch_time.is_none() {
+                player.first_touch_boost =
+                    player.approach_trace.previous_boost.or(player.start_boost);
                 player.first_touch_time = Some(touch.time);
                 player.first_touch_frame = Some(touch.frame);
             }
@@ -712,20 +647,15 @@ impl KickoffCalculator {
     }
 
     fn taker_boost_collected(player: &KickoffPlayerSnapshot) -> f32 {
-        let trace = &player.approach_trace;
-        if !trace.ledger_amounts.is_empty() {
-            trace.ledger_boost_collected
-        } else {
-            trace.sampled_boost_collected
-        }
+        player.approach_trace.sampled_boost_collected
     }
 
     fn taker_boost_used(player: &KickoffPlayerSnapshot) -> f32 {
-        let trace = &player.approach_trace;
-        if !trace.ledger_amounts.is_empty() {
-            trace.ledger_boost_used
-        } else {
-            trace.sampled_boost_used
+        match (player.start_boost, player.first_touch_boost) {
+            (Some(start_boost), Some(first_touch_boost)) => {
+                (start_boost + Self::taker_boost_collected(player) - first_touch_boost).max(0.0)
+            }
+            _ => player.approach_trace.sampled_boost_used,
         }
     }
 
@@ -886,6 +816,35 @@ impl KickoffCalculator {
             );
         }
         (KickoffOutcome::Neutral, None, None)
+    }
+
+    fn ball_direction(ball: &BallFrameState, is_team_0: bool) -> KickoffBallDirection {
+        let Some(ball) = ball.sample() else {
+            return KickoffBallDirection::Unknown;
+        };
+        let position_x = ball.position().x;
+        if position_x.abs() >= KICKOFF_BALL_DIRECTION_MIN_ABS_X {
+            return Self::ball_direction_from_global_x(position_x, is_team_0);
+        }
+        let velocity_x = ball.velocity().x;
+        if velocity_x.abs() >= KICKOFF_BALL_DIRECTION_MIN_ABS_SPEED_X {
+            return Self::ball_direction_from_global_x(velocity_x, is_team_0);
+        }
+        KickoffBallDirection::Center
+    }
+
+    fn ball_direction_from_global_x(value: f32, is_team_0: bool) -> KickoffBallDirection {
+        if value > 0.0 {
+            if is_team_0 {
+                KickoffBallDirection::Right
+            } else {
+                KickoffBallDirection::Left
+            }
+        } else if is_team_0 {
+            KickoffBallDirection::Left
+        } else {
+            KickoffBallDirection::Right
+        }
     }
 
     fn exit_velocity(ball: &BallFrameState) -> Option<[f32; 3]> {
@@ -1132,6 +1091,7 @@ impl KickoffCalculator {
                     time_to_ball: Self::taker_time_to_ball(player, movement_start_time),
                     boost_collected: Self::taker_boost_collected(player),
                     boost_used: Self::taker_boost_used(player),
+                    ball_direction: Self::ball_direction(ball, player.is_team_0),
                     first_touch_time: player.first_touch_time,
                     first_touch_frame: player.first_touch_frame,
                     outcome,
@@ -1229,7 +1189,6 @@ impl KickoffCalculator {
             touch_state,
             events,
             speed_flip_events: &[],
-            boost_ledger_events: &[],
         })
     }
 
@@ -1251,7 +1210,6 @@ impl KickoffCalculator {
         }
         Self::apply_player_samples(active, ctx.frame, ctx.players);
         Self::apply_touches(active, ctx.touch_state);
-        Self::apply_boost_ledger_events(active, ctx.boost_ledger_events);
         Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);
 
         if Self::should_finish(active, ctx.frame, ctx.gameplay, ctx.events) {

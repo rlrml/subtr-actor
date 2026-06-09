@@ -48,8 +48,12 @@ fn ball(y: f32) -> BallFrameState {
 }
 
 fn ball_with_velocity(y: f32, velocity: glam::Vec3) -> BallFrameState {
+    ball_at(glam::Vec3::new(0.0, y, 92.0), velocity)
+}
+
+fn ball_at(position: glam::Vec3, velocity: glam::Vec3) -> BallFrameState {
     BallFrameState::Present(BallSample {
-        rigid_body: rigid_body(glam::Vec3::new(0.0, y, 92.0), velocity),
+        rigid_body: rigid_body(position, velocity),
     })
 }
 
@@ -679,6 +683,39 @@ fn kickoff_tracks_first_touch_taker_delay_exit_velocity_and_follow_up() {
         KickoffPossessionOutcome::Contested
     );
     assert_eq!(event.kickoff_possession_team_is_team_0, None);
+}
+
+#[test]
+fn kickoff_ball_direction_is_taker_relative() {
+    let right_side_ball = ball_at(
+        glam::Vec3::new(240.0, 0.0, 92.0),
+        glam::Vec3::new(-500.0, 0.0, 0.0),
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&right_side_ball, true),
+        KickoffBallDirection::Right
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&right_side_ball, false),
+        KickoffBallDirection::Left
+    );
+
+    let centered_ball_moving_left = ball_at(
+        glam::Vec3::new(0.0, 0.0, 92.0),
+        glam::Vec3::new(-500.0, 0.0, 0.0),
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&centered_ball_moving_left, true),
+        KickoffBallDirection::Left
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&centered_ball_moving_left, false),
+        KickoffBallDirection::Right
+    );
+    assert_eq!(
+        KickoffCalculator::ball_direction(&ball(0.0), true),
+        KickoffBallDirection::Center
+    );
 }
 
 #[test]
@@ -1339,7 +1376,6 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
-            boost_ledger_events: &[],
         })
         .unwrap();
 
@@ -1358,7 +1394,6 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             },
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
-            boost_ledger_events: &[],
         })
         .unwrap();
 
@@ -1374,7 +1409,6 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
-            boost_ledger_events: &[],
         })
         .unwrap();
 
@@ -1392,6 +1426,7 @@ fn kickoff_classifies_known_taker_approaches() {
         start_position: [-2048.0, -2560.0, 17.0],
         spawn_position: KickoffSpawnPosition::DiagonalLeft,
         start_boost: Some(33.0),
+        first_touch_boost: Some(20.0),
         first_touch_time: Some(1.0),
         first_touch_frame: Some(10),
         approach_trace: KickoffApproachTrace {
@@ -1626,6 +1661,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
                 start_position: [-2048.0, -2560.0, 17.0],
                 spawn_position: KickoffSpawnPosition::DiagonalLeft,
                 start_boost: Some(33.0),
+                first_touch_boost: None,
                 first_touch_time: None,
                 first_touch_frame: None,
                 approach_trace: KickoffApproachTrace::default(),
@@ -1636,6 +1672,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
                 start_position: [2048.0, -2560.0, 17.0],
                 spawn_position: KickoffSpawnPosition::DiagonalRight,
                 start_boost: Some(33.0),
+                first_touch_boost: None,
                 first_touch_time: None,
                 first_touch_frame: None,
                 approach_trace: KickoffApproachTrace::default(),
@@ -1669,6 +1706,7 @@ fn kickoff_taker_prefers_ball_committer_when_no_touch() {
             start_position: [2048.0, 2560.0, 17.0],
             spawn_position: KickoffSpawnPosition::DiagonalLeft,
             start_boost: Some(85.0),
+            first_touch_boost: None,
             first_touch_time: None,
             first_touch_frame: None,
             approach_trace: KickoffApproachTrace {
@@ -1683,6 +1721,7 @@ fn kickoff_taker_prefers_ball_committer_when_no_touch() {
             start_position: [-2048.0, 2560.0, 17.0],
             spawn_position: KickoffSpawnPosition::DiagonalRight,
             start_boost: Some(85.0),
+            first_touch_boost: None,
             first_touch_time: None,
             first_touch_frame: None,
             approach_trace: KickoffApproachTrace {
@@ -1749,6 +1788,7 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
             time_to_ball: None,
             boost_collected: 0.0,
             boost_used: 22.0,
+            ball_direction: KickoffBallDirection::Center,
             first_touch_time: None,
             first_touch_frame: None,
             outcome: KickoffTakerOutcome::Fake,
