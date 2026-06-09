@@ -61,6 +61,8 @@ struct KickoffTouchSnapshot {
 struct ActiveKickoff {
     start_time: f32,
     start_frame: usize,
+    live_action_start_time: Option<f32>,
+    live_action_start_frame: Option<usize>,
     movement_start_time: Option<f32>,
     movement_start_frame: Option<usize>,
     players: Vec<KickoffPlayerSnapshot>,
@@ -348,6 +350,8 @@ impl KickoffCalculator {
         self.active = Some(ActiveKickoff {
             start_time: frame.time,
             start_frame: frame.frame_number,
+            live_action_start_time: None,
+            live_action_start_frame: None,
             movement_start_time: None,
             movement_start_frame: None,
             players: players
@@ -374,6 +378,13 @@ impl KickoffCalculator {
         {
             active.movement_start_time = Some(frame.time);
             active.movement_start_frame = Some(frame.frame_number);
+        }
+    }
+
+    fn observe_live_action_start(active: &mut ActiveKickoff, frame: &FrameInfo) {
+        if active.live_action_start_time.is_none() {
+            active.live_action_start_time = Some(frame.time);
+            active.live_action_start_frame = Some(frame.frame_number);
         }
     }
 
@@ -1000,6 +1011,8 @@ impl KickoffCalculator {
             start_frame: active.start_frame,
             end_time: frame.time,
             end_frame: frame.frame_number,
+            live_action_start_time: active.live_action_start_time,
+            live_action_start_frame: active.live_action_start_frame,
             movement_start_time: active.movement_start_time.unwrap_or(active.start_time),
             movement_start_frame: active.movement_start_frame.unwrap_or(active.start_frame),
             kickoff_type,
@@ -1070,6 +1083,9 @@ impl KickoffCalculator {
             return Ok(());
         };
         Self::observe_movement_start(active, ctx.frame, ctx.gameplay);
+        if ctx.gameplay.kickoff_phase_active() && !ctx.gameplay.kickoff_countdown_active() {
+            Self::observe_live_action_start(active, ctx.frame);
+        }
         Self::apply_player_samples(active, ctx.frame, ctx.players);
         Self::apply_touches(active, ctx.touch_state);
         Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);

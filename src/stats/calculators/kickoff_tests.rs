@@ -268,6 +268,8 @@ fn kickoff_records_movement_start_after_countdown() {
     let event = calculator.events().last().unwrap();
     assert_eq!(event.start_time, 0.0);
     assert_eq!(event.start_frame, 0);
+    assert_eq!(event.live_action_start_time, Some(3.0));
+    assert_eq!(event.live_action_start_frame, Some(30));
     assert_eq!(event.movement_start_time, 3.0);
     assert_eq!(event.movement_start_frame, 30);
 }
@@ -1392,6 +1394,8 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
         start_frame: 0,
         end_time: 1.5,
         end_frame: 15,
+        live_action_start_time: Some(0.0),
+        live_action_start_frame: Some(0),
         movement_start_time: 0.0,
         movement_start_frame: 0,
         kickoff_type: KickoffType::Center,
