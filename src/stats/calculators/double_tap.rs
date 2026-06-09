@@ -22,6 +22,19 @@ struct PendingBackboardBounce {
     frame: usize,
 }
 
+impl InFlightItem for PendingBackboardBounce {
+    fn recognition(&self) -> Recognition {
+        // Speculative: a backboard bounce only becomes a double tap if the same
+        // player makes a goal-bound follow-up touch; otherwise it is discarded.
+        Recognition::speculative(self.time, self.frame)
+    }
+
+    fn on_boundary(&mut self, _boundary: Boundary) -> Disposition {
+        // A pending bounce that survives to a boundary never resolved.
+        Disposition::Discard
+    }
+}
+
 /// Detects double taps from a backboard-bounce sequence.
 ///
 /// Current heuristic:
@@ -42,7 +55,7 @@ struct PendingBackboardBounce {
 #[derive(Debug, Clone, Default)]
 pub struct DoubleTapCalculator {
     events: EventStream<DoubleTapEvent>,
-    pending_backboard_bounces: Vec<PendingBackboardBounce>,
+    pending_backboard_bounces: KeyedInFlightLedger<PlayerId, PendingBackboardBounce>,
 }
 
 impl DoubleTapCalculator {
@@ -64,25 +77,17 @@ impl DoubleTapCalculator {
                 continue;
             }
 
-            if let Some(existing) = self
-                .pending_backboard_bounces
-                .iter_mut()
-                .find(|pending| pending.player_id == event.player)
-            {
-                *existing = PendingBackboardBounce {
+            // Arming with the player key replaces any existing pending bounce
+            // for that player.
+            self.pending_backboard_bounces.arm(
+                event.player.clone(),
+                PendingBackboardBounce {
                     player_id: event.player.clone(),
                     is_team_0: event.is_team_0,
                     time: event.time,
                     frame: event.frame,
-                };
-            } else {
-                self.pending_backboard_bounces.push(PendingBackboardBounce {
-                    player_id: event.player.clone(),
-                    is_team_0: event.is_team_0,
-                    time: event.time,
-                    frame: event.frame,
-                });
-            }
+                },
+            );
         }
     }
 
@@ -93,7 +98,7 @@ impl DoubleTapCalculator {
     }
 
     fn prune_surface_contacts(&mut self, players: &PlayerFrameState) {
-        self.pending_backboard_bounces.retain(|pending| {
+        self.pending_backboard_bounces.retain(|_, pending| {
             !players
                 .player(&pending.player_id)
                 .is_some_and(player_sample_is_touching_surface)
@@ -114,36 +119,36 @@ impl DoubleTapCalculator {
             return;
         };
 
-        let mut completed_events = Vec::new();
-        self.pending_backboard_bounces.retain(|pending| {
-            if touch.time <= pending.time {
-                return true;
-            }
+        let resolved = self
+            .pending_backboard_bounces
+            .advance(frame.time, |_player, pending| {
+                if touch.time <= pending.time {
+                    return Disposition::Keep;
+                }
+                let is_matching_followup = touch.team_is_team_0 == pending.is_team_0
+                    && touch.player.as_ref() == Some(&pending.player_id);
+                if !is_matching_followup {
+                    return Disposition::Discard;
+                }
+                if Self::followup_touch_projects_on_goal_mouth(ball, pending.is_team_0) {
+                    Disposition::Finalize(FinalizeReason::Completed)
+                } else {
+                    Disposition::Discard
+                }
+            });
 
-            let is_matching_followup = touch.team_is_team_0 == pending.is_team_0
-                && touch.player.as_ref() == Some(&pending.player_id);
-            if !is_matching_followup {
-                return false;
-            }
-
-            if Self::followup_touch_projects_on_goal_mouth(ball, pending.is_team_0) {
-                completed_events.push(DoubleTapEvent {
-                    time: touch.time,
-                    frame: touch.frame,
-                    player: pending.player_id.clone(),
-                    player_position: touch
-                        .player_position
-                        .map(|position| vec_to_glam(&position).to_array()),
-                    is_team_0: pending.is_team_0,
-                    backboard_time: pending.time,
-                    backboard_frame: pending.frame,
-                });
-            }
-
-            false
-        });
-
-        for event in completed_events {
+        for (_player, pending, _reason) in resolved {
+            let event = DoubleTapEvent {
+                time: touch.time,
+                frame: touch.frame,
+                player: pending.player_id.clone(),
+                player_position: touch
+                    .player_position
+                    .map(|position| vec_to_glam(&position).to_array()),
+                is_team_0: pending.is_team_0,
+                backboard_time: pending.time,
+                backboard_frame: pending.frame,
+            };
             self.record_double_tap(frame, event);
         }
     }
@@ -196,7 +201,8 @@ impl DoubleTapCalculator {
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         if !live_play_state.is_live_play {
-            self.pending_backboard_bounces.clear();
+            self.pending_backboard_bounces
+                .apply_boundary(Boundary::LivePlayEnded);
         }
 
         self.record_backboard_bounces(backboard_bounce_state);
