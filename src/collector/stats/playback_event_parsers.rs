@@ -595,6 +595,9 @@ pub(in crate::collector::stats::playback) fn parse_goal_context_event(
         ball_position: json_optional_goal_context_position(object.get("ball_position"))?,
         ball_speed_at_goal: json_optional_f32(object.get("ball_speed_at_goal"))?,
         ball_air_time_before_goal: json_optional_f32(object.get("ball_air_time_before_goal"))?,
+        pressure_duration_before_goal: json_optional_f32(
+            object.get("pressure_duration_before_goal"),
+        )?,
         goal_buildup: object
             .get("goal_buildup")
             .map(|value| decode_json_value(value.clone()))
