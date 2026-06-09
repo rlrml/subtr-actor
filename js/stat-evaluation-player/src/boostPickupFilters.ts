@@ -128,9 +128,7 @@ function boostPickupEvents(
   }
   const legacyEvents = (timeline as unknown as { events?: { boost_pickups?: unknown } }).events
     ?.boost_pickups;
-  return Array.isArray(legacyEvents)
-    ? (legacyEvents as BoostPickupEvent[])
-    : pickupEvents;
+  return Array.isArray(legacyEvents) ? (legacyEvents as BoostPickupEvent[]) : pickupEvents;
 }
 
 export function createBoostPickupFilterController(

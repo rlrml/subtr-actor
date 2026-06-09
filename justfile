@@ -19,7 +19,7 @@ build-python:
 
 # Build JavaScript/WASM package
 build-js:
-    npm --prefix js exec wasm-pack -- build --target bundler
+    cd js && npm exec wasm-pack -- build --target bundler
 
 # Run the stats evaluation player dev server
 dev-stats:

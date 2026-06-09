@@ -309,8 +309,9 @@ export function createPositioningEventDerivedStatsAccumulator(
     createEventStreamCursor(statsEventPayloads(timeline, "positioning_field_zone"), (event) =>
       applyFieldZoneEvent(playerStatsFor(players, event), event),
     ),
-    createEventStreamCursor(statsEventPayloads(timeline, "positioning_ball_relative_depth"), (event) =>
-      applyBallRelativeDepthEvent(playerStatsFor(players, event), event),
+    createEventStreamCursor(
+      statsEventPayloads(timeline, "positioning_ball_relative_depth"),
+      (event) => applyBallRelativeDepthEvent(playerStatsFor(players, event), event),
     ),
     createEventStreamCursor(statsEventPayloads(timeline, "positioning_teammate_role"), (event) =>
       applyTeammateRoleEvent(playerStatsFor(players, event), event),

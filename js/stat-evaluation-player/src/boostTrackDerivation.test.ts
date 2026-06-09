@@ -68,13 +68,23 @@ function trackTimeline(): MaterializedStatsTimeline {
         dt: 0.1,
         is_live_play: true,
         team_zero: {
-          boost: { tracked_time: 0.1, time_zero_boost: 0.1, time_boost_0_25: 0.1, amount_respawned: 33 },
+          boost: {
+            tracked_time: 0.1,
+            time_zero_boost: 0.1,
+            time_boost_0_25: 0.1,
+            amount_respawned: 33,
+          },
         },
         players: [
           {
             player_id: playerId,
             is_team_0: true,
-            boost: { tracked_time: 0.1, time_zero_boost: 0.1, time_boost_0_25: 0.1, amount_respawned: 33 },
+            boost: {
+              tracked_time: 0.1,
+              time_zero_boost: 0.1,
+              time_boost_0_25: 0.1,
+              amount_respawned: 33,
+            },
           },
         ],
       }),

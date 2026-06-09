@@ -163,7 +163,12 @@ function addContinuousBoostSample(
     stats.time_hundred_boost,
     mulF32(
       sampleDt,
-      intervalFractionInBoostRange(previous, current, BOOST_FULL_BAND_MIN_RAW, BOOST_MAX_AMOUNT + 1),
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        BOOST_FULL_BAND_MIN_RAW,
+        BOOST_MAX_AMOUNT + 1,
+      ),
     ),
   );
   stats.time_boost_0_25 = addF32(
@@ -174,21 +179,36 @@ function addContinuousBoostSample(
     stats.time_boost_25_50,
     mulF32(
       sampleDt,
-      intervalFractionInBoostRange(previous, current, boostPercentToAmount(25), boostPercentToAmount(50)),
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        boostPercentToAmount(25),
+        boostPercentToAmount(50),
+      ),
     ),
   );
   stats.time_boost_50_75 = addF32(
     stats.time_boost_50_75,
     mulF32(
       sampleDt,
-      intervalFractionInBoostRange(previous, current, boostPercentToAmount(50), boostPercentToAmount(75)),
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        boostPercentToAmount(50),
+        boostPercentToAmount(75),
+      ),
     ),
   );
   stats.time_boost_75_100 = addF32(
     stats.time_boost_75_100,
     mulF32(
       sampleDt,
-      intervalFractionInBoostRange(previous, current, boostPercentToAmount(75), BOOST_MAX_AMOUNT + 1),
+      intervalFractionInBoostRange(
+        previous,
+        current,
+        boostPercentToAmount(75),
+        BOOST_MAX_AMOUNT + 1,
+      ),
     ),
   );
 }
@@ -317,7 +337,10 @@ interface BoostFrameAccumulator {
 }
 
 function createAccumulatorState(timeline: MaterializedStatsTimeline): {
-  applyFrame(frame: StatsFrame, onPlayer?: (key: string, isTeamZero: boolean, stats: DerivedBoostStats) => void): void;
+  applyFrame(
+    frame: StatsFrame,
+    onPlayer?: (key: string, isTeamZero: boolean, stats: DerivedBoostStats) => void,
+  ): void;
 } {
   const pickupEvents = sortedPickupEvents(timeline);
   const respawnEvents = sortedRespawnEvents(timeline);
@@ -354,15 +377,27 @@ function createAccumulatorState(timeline: MaterializedStatsTimeline): {
 
   return {
     applyFrame(frame, onPlayer): void {
-      while (pickupIndex < pickupEvents.length && pickupEvents[pickupIndex]!.frame <= frame.frame_number) {
+      while (
+        pickupIndex < pickupEvents.length &&
+        pickupEvents[pickupIndex]!.frame <= frame.frame_number
+      ) {
         const event = pickupEvents[pickupIndex]!;
-        applyPickupEvent(playerFor(event.player_id as Record<string, unknown>, event.is_team_0), event);
+        applyPickupEvent(
+          playerFor(event.player_id as Record<string, unknown>, event.is_team_0),
+          event,
+        );
         applyPickupEvent(event.is_team_0 ? teamZero : teamOne, event);
         pickupIndex += 1;
       }
-      while (respawnIndex < respawnEvents.length && respawnEvents[respawnIndex]!.frame <= frame.frame_number) {
+      while (
+        respawnIndex < respawnEvents.length &&
+        respawnEvents[respawnIndex]!.frame <= frame.frame_number
+      ) {
         const event = respawnEvents[respawnIndex]!;
-        applyRespawnEvent(playerFor(event.player_id as Record<string, unknown>, event.is_team_0), event);
+        applyRespawnEvent(
+          playerFor(event.player_id as Record<string, unknown>, event.is_team_0),
+          event,
+        );
         applyRespawnEvent(event.is_team_0 ? teamZero : teamOne, event);
         respawnIndex += 1;
       }
@@ -376,7 +411,9 @@ function createAccumulatorState(timeline: MaterializedStatsTimeline): {
             continue;
           }
           const boostAmount = cursor.sample(frame.frame_number);
-          const accumulator = players.get(key) ?? playerFor(player.player_id as Record<string, unknown>, player.is_team_0);
+          const accumulator =
+            players.get(key) ??
+            playerFor(player.player_id as Record<string, unknown>, player.is_team_0);
           const previous = accumulator.previousBoostAmount ?? boostAmount;
           addContinuousBoostSample(accumulator.stats, previous, boostAmount, frame.dt);
           addContinuousBoostSample(

@@ -503,7 +503,12 @@ export function createLegacyStatsTimeline(
       payloadEvent("positioning_field_zone", "positioning_field_zone", event, index),
     ),
     ...(overrides.positioning_ball_relative_depth_events ?? []).map((event, index) =>
-      payloadEvent("positioning_ball_relative_depth", "positioning_ball_relative_depth", event, index),
+      payloadEvent(
+        "positioning_ball_relative_depth",
+        "positioning_ball_relative_depth",
+        event,
+        index,
+      ),
     ),
     ...(overrides.positioning_teammate_role_events ?? []).map((event, index) =>
       payloadEvent("positioning_teammate_role", "positioning_teammate_role", event, index),
