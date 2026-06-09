@@ -38,51 +38,6 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "boost_bucket",
-    "label": "Boost Bucket",
-    "category": "boost",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "boost_ledger",
-    "label": "Boost Ledger",
-    "category": "boost",
-    "hidden_from_review": true,
-    "variants": [
-      {
-        "key": "boost_ledger_collected",
-        "label": "Boost Ledger Collected",
-        "category": "boost"
-      },
-      {
-        "key": "boost_ledger_overfill",
-        "label": "Boost Ledger Overfill",
-        "category": "boost"
-      },
-      {
-        "key": "boost_ledger_respawn",
-        "label": "Boost Ledger Respawn",
-        "category": "boost"
-      },
-      {
-        "key": "boost_ledger_stolen",
-        "label": "Boost Ledger Stolen",
-        "category": "boost"
-      },
-      {
-        "key": "boost_ledger_used",
-        "label": "Boost Ledger Used",
-        "category": "boost"
-      },
-      {
-        "key": "boost_ledger_used_allocation",
-        "label": "Boost Ledger Used Allocation",
-        "category": "boost"
-      }
-    ]
-  },
-  {
     "key": "boost_pickups",
     "label": "Boost Pickup",
     "category": "boost",
@@ -106,8 +61,8 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     ]
   },
   {
-    "key": "boost_state",
-    "label": "Boost State",
+    "key": "boost_respawn",
+    "label": "Respawn",
     "category": "boost",
     "hidden_from_review": false,
     "variants": []
@@ -288,13 +243,6 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "positioning_ball_depth",
-    "label": "Positioning Ball Depth",
-    "category": "positioning",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
     "key": "positioning_ball_proximity",
     "label": "Positioning Ball Proximity",
     "category": "positioning",
@@ -302,22 +250,15 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "positioning_ball_relative_depth",
+    "label": "Positioning Ball-Relative Depth",
+    "category": "positioning",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
     "key": "positioning_field_zone",
     "label": "Positioning Field Zone",
-    "category": "positioning",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "positioning_goal_context",
-    "label": "Positioning Goal Context",
-    "category": "positioning",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "positioning_possession",
-    "label": "Positioning Possession",
     "category": "positioning",
     "hidden_from_review": false,
     "variants": []

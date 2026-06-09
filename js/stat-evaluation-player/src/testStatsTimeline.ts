@@ -63,19 +63,14 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
     kind: "positioning_activity",
   },
   {
-    field: "positioning_possession",
-    stream: "positioning_possession",
-    kind: "positioning_possession",
-  },
-  {
     field: "positioning_field_zone",
     stream: "positioning_field_zone",
     kind: "positioning_field_zone",
   },
   {
-    field: "positioning_ball_depth",
-    stream: "positioning_ball_depth",
-    kind: "positioning_ball_depth",
+    field: "positioning_ball_relative_depth",
+    stream: "positioning_ball_relative_depth",
+    kind: "positioning_ball_relative_depth",
   },
   {
     field: "positioning_teammate_role",
@@ -86,11 +81,6 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
     field: "positioning_ball_proximity",
     stream: "positioning_ball_proximity",
     kind: "positioning_ball_proximity",
-  },
-  {
-    field: "positioning_goal_context",
-    stream: "positioning_goal_context",
-    kind: "positioning_goal_context",
   },
   { field: "rotation_player", stream: "rotation_player", kind: "rotation_player" },
   { field: "rotation_role_span", stream: "rotation_role_span", kind: "rotation_role_span" },
@@ -127,9 +117,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "powerslide", stream: "powerslide", kind: "powerslide" },
   { field: "touch", stream: "touch", kind: "touch" },
   { field: "boost_pickups", stream: "boost_pickups", kind: "boost_pickup" },
-  { field: "boost_ledger", stream: "boost_ledger", kind: "boost_ledger" },
-  { field: "boost_bucket", stream: "boost_bucket", kind: "boost_bucket" },
-  { field: "boost_state", stream: "boost_state", kind: "boost_state" },
+  { field: "boost_respawn", stream: "boost_respawn", kind: "respawn" },
   { field: "bump", stream: "bump", kind: "bump" },
 ];
 
@@ -423,21 +411,17 @@ export function createLegacyStatsTimeline(
     whiff_events?: PayloadList<"whiff">;
     powerslide_events?: PayloadList<"powerslide">;
     positioning_activity_events?: PayloadList<"positioning_activity">;
-    positioning_possession_events?: PayloadList<"positioning_possession">;
     positioning_field_zone_events?: PayloadList<"positioning_field_zone">;
-    positioning_ball_depth_events?: PayloadList<"positioning_ball_depth">;
+    positioning_ball_relative_depth_events?: PayloadList<"positioning_ball_relative_depth">;
     positioning_teammate_role_events?: PayloadList<"positioning_teammate_role">;
     positioning_ball_proximity_events?: PayloadList<"positioning_ball_proximity">;
-    positioning_goal_context_events?: PayloadList<"positioning_goal_context">;
     rotation_player_events?: PayloadList<"rotation_player">;
     rotation_role_span_events?: PayloadList<"rotation_role_span">;
     rotation_depth_span_events?: PayloadList<"rotation_depth_span">;
     rotation_first_man_stint_events?: PayloadList<"rotation_first_man_stint">;
     rotation_team_events?: PayloadList<"rotation_team">;
     boost_pickups?: PayloadList<"boost_pickup">;
-    boost_ledger?: PayloadList<"boost_ledger">;
-    boost_bucket?: PayloadList<"boost_bucket">;
-    boost_state?: PayloadList<"boost_state">;
+    boost_respawn?: PayloadList<"respawn">;
     bump_events?: PayloadList<"bump">;
   } = {},
 ): MaterializedStatsTimeline {
@@ -515,23 +499,22 @@ export function createLegacyStatsTimeline(
     ...(overrides.positioning_activity_events ?? []).map((event, index) =>
       payloadEvent("positioning_activity", "positioning_activity", event, index),
     ),
-    ...(overrides.positioning_possession_events ?? []).map((event, index) =>
-      payloadEvent("positioning_possession", "positioning_possession", event, index),
-    ),
     ...(overrides.positioning_field_zone_events ?? []).map((event, index) =>
       payloadEvent("positioning_field_zone", "positioning_field_zone", event, index),
     ),
-    ...(overrides.positioning_ball_depth_events ?? []).map((event, index) =>
-      payloadEvent("positioning_ball_depth", "positioning_ball_depth", event, index),
+    ...(overrides.positioning_ball_relative_depth_events ?? []).map((event, index) =>
+      payloadEvent(
+        "positioning_ball_relative_depth",
+        "positioning_ball_relative_depth",
+        event,
+        index,
+      ),
     ),
     ...(overrides.positioning_teammate_role_events ?? []).map((event, index) =>
       payloadEvent("positioning_teammate_role", "positioning_teammate_role", event, index),
     ),
     ...(overrides.positioning_ball_proximity_events ?? []).map((event, index) =>
       payloadEvent("positioning_ball_proximity", "positioning_ball_proximity", event, index),
-    ),
-    ...(overrides.positioning_goal_context_events ?? []).map((event, index) =>
-      payloadEvent("positioning_goal_context", "positioning_goal_context", event, index),
     ),
     ...(overrides.rotation_player_events ?? []).map((event, index) =>
       payloadEvent("rotation_player", "rotation_player", event, index),
@@ -551,14 +534,8 @@ export function createLegacyStatsTimeline(
     ...(overrides.boost_pickups ?? []).map((event, index) =>
       payloadEvent("boost_pickups", "boost_pickup", event, index),
     ),
-    ...(overrides.boost_ledger ?? []).map((event, index) =>
-      payloadEvent("boost_ledger", "boost_ledger", event, index),
-    ),
-    ...(overrides.boost_bucket ?? []).map((event, index) =>
-      payloadEvent("boost_bucket", "boost_bucket", event, index),
-    ),
-    ...(overrides.boost_state ?? []).map((event, index) =>
-      payloadEvent("boost_state", "boost_state", event, index),
+    ...(overrides.boost_respawn ?? []).map((event, index) =>
+      payloadEvent("boost_respawn", "respawn", event, index),
     ),
     ...(overrides.bump_events ?? []).map((event, index) =>
       payloadEvent("bump", "bump", event, index),

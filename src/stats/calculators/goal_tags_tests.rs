@@ -77,6 +77,7 @@ fn core_scoring_goal_context(
         goals_conceded_while_last_defender: false,
         goals_for_while_most_back: false,
         goals_against_while_most_back: false,
+        caught_ahead_of_play_on_conceded_goal: false,
         goal_against_boost_amount: None,
         goal_against_average_boost_in_leadup: None,
         goal_against_min_boost_in_leadup: None,

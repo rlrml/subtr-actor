@@ -1,5 +1,9 @@
 use super::*;
-use std::collections::HashSet;
+use crate::stats::calculators::boost::{
+    boost_activity_label, boost_field_half_label, boost_pad_size_label, boost_supersonic_label,
+    boost_transaction_label,
+};
+use crate::stats::common::vertical_state_label;
 
 const BOOST_ZERO_BAND_RAW: f32 = 1.0;
 const BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
@@ -116,21 +120,24 @@ impl BoostStats {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-struct BoostLedgerProjection {
+struct PlayerBoostProjection {
     stats: BoostStats,
-    counted_pickup_keys: HashSet<(usize, PlayerId, String, String, String)>,
-    current_boost_amount: Option<f32>,
-    current_boost_before: Option<f32>,
-    current_boost_frame: Option<usize>,
     is_team_0: Option<bool>,
 }
 
+/// Accumulates [`BoostStats`] from typed boost transitions.
+///
+/// This replaces the former label-dispatched ledger projection: callers invoke the typed
+/// `apply_*` methods directly (from the boost calculator) instead of constructing string-labeled
+/// ledger events and re-parsing them here. The per-player and per-team arithmetic is identical;
+/// only the representation changed. `labeled_amounts`/`labeled_counts` are still populated so the
+/// exported labeled boost stats stay populated, now built from the clean pickup model.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BoostStatsAccumulator {
-    players: HashMap<PlayerId, BoostLedgerProjection>,
+    players: HashMap<PlayerId, PlayerBoostProjection>,
     player_stats: HashMap<PlayerId, BoostStats>,
-    team_zero: BoostLedgerProjection,
-    team_one: BoostLedgerProjection,
+    team_zero: BoostStats,
+    team_one: BoostStats,
 }
 
 impl BoostStatsAccumulator {
@@ -150,206 +157,167 @@ impl BoostStatsAccumulator {
     }
 
     pub fn team_zero_stats(&self) -> &BoostStats {
-        &self.team_zero.stats
+        &self.team_zero
     }
 
     pub fn team_one_stats(&self) -> &BoostStats {
-        &self.team_one.stats
+        &self.team_one
     }
 
-    pub fn apply_ledger_event(&mut self, event: &BoostLedgerEvent) {
-        let player = self.players.entry(event.player_id.clone()).or_default();
-        player.is_team_0 = Some(event.is_team_0);
-        Self::apply_ledger_event_to_projection(player, event);
+    /// Apply an additive `update` to both the player's stats and their team's stats, refreshing
+    /// the cached per-player snapshot. `update` runs once per stats object.
+    fn project(&mut self, player_id: &PlayerId, is_team_0: bool, update: impl Fn(&mut BoostStats)) {
+        let player = self.players.entry(player_id.clone()).or_default();
+        player.is_team_0 = Some(is_team_0);
+        update(&mut player.stats);
         self.player_stats
-            .insert(event.player_id.clone(), player.stats.clone());
-
-        let team = if event.is_team_0 {
+            .insert(player_id.clone(), player.stats.clone());
+        let team = if is_team_0 {
             &mut self.team_zero
         } else {
             &mut self.team_one
         };
-        Self::apply_ledger_event_to_projection(team, event);
+        update(team);
     }
 
-    pub fn apply_state_event(&mut self, event: &BoostStateEvent) {
-        let player = self.players.entry(event.player_id.clone()).or_default();
-        player.is_team_0 = Some(event.is_team_0);
-        player.current_boost_amount = Some(event.boost_amount);
-        player.current_boost_before = event.boost_before;
-        player.current_boost_frame = Some(event.frame);
-        let previous_boost_amount = event.boost_before.unwrap_or(event.boost_amount);
-        Self::add_continuous_boost_sample(
-            &mut player.stats,
-            previous_boost_amount,
-            event.boost_amount,
-            event.duration,
-        );
-        self.player_stats
-            .insert(event.player_id.clone(), player.stats.clone());
-
-        let team_stats = if event.is_team_0 {
-            &mut self.team_zero.stats
-        } else {
-            &mut self.team_one.stats
-        };
-        Self::add_continuous_boost_sample(
-            team_stats,
-            previous_boost_amount,
-            event.boost_amount,
-            event.duration,
-        );
-    }
-
-    pub fn apply_frame_sample(&mut self, frame: &FrameInfo) {
-        let player_ids = self
-            .players
-            .iter()
-            .filter(|(_, projection)| projection.current_boost_frame == Some(frame.frame_number))
-            .map(|(player_id, _)| player_id.clone())
-            .collect::<Vec<_>>();
-
-        for player_id in player_ids {
-            let Some(player) = self.players.get_mut(&player_id) else {
-                continue;
-            };
-            let Some(boost_amount) = player.current_boost_amount else {
-                continue;
-            };
-            let previous_boost_amount = player.current_boost_before.unwrap_or(boost_amount);
-            Self::add_continuous_boost_sample(
-                &mut player.stats,
-                previous_boost_amount,
-                boost_amount,
-                frame.dt,
-            );
-            self.player_stats
-                .insert(player_id.clone(), player.stats.clone());
-
-            let Some(is_team_0) = player.is_team_0 else {
-                continue;
-            };
-            let team_stats = if is_team_0 {
-                &mut self.team_zero.stats
-            } else {
-                &mut self.team_one.stats
-            };
-            Self::add_continuous_boost_sample(
-                team_stats,
-                previous_boost_amount,
-                boost_amount,
-                frame.dt,
-            );
-        }
-    }
-
-    fn apply_ledger_event_to_projection(
-        projection: &mut BoostLedgerProjection,
-        event: &BoostLedgerEvent,
+    /// Record a single boost pickup, folding the former Collected/Stolen/Overfill ledger
+    /// transactions into one transition. `collected_amount` is the full boost gained; the
+    /// per-pickup totals here sum identically to the old split ledger entries.
+    #[allow(clippy::too_many_arguments)]
+    pub fn apply_pickup(
+        &mut self,
+        player_id: &PlayerId,
+        is_team_0: bool,
+        pad_size: Option<BoostPadSize>,
+        activity: BoostPickupActivity,
+        field_half: BoostPickupFieldHalf,
+        is_steal: bool,
+        collected_amount: f32,
+        overfill_amount: f32,
     ) {
-        let amount = event.amount;
-        if event.transaction != BoostLedgerTransactionKind::Used {
-            projection
-                .stats
-                .add_labeled_amount(event.labels.clone(), amount);
-        }
-        if event.transaction == BoostLedgerTransactionKind::Collected {
-            let count = event.count.max(1);
-            for _ in 0..count {
-                projection
-                    .stats
-                    .increment_labeled_count(event.labels.clone());
-            }
-        }
-
-        let pad_size = Self::label_value(event, "pad_size");
-        let activity = Self::label_value(event, "activity").unwrap_or("active");
-        let field_half = Self::label_value(event, "field_half");
-        match event.transaction {
-            BoostLedgerTransactionKind::Collected => {
-                Self::count_pickup_once(projection, event);
-                if activity == "inactive" {
-                    projection.stats.amount_collected_inactive += amount;
-                    return;
-                }
-                projection.stats.amount_collected += amount;
+        self.project(player_id, is_team_0, |stats| {
+            let labels = |transaction: &'static str| -> Vec<StatLabel> {
+                vec![
+                    boost_transaction_label(transaction),
+                    boost_pad_size_label(pad_size),
+                    boost_activity_label(activity),
+                    boost_field_half_label(field_half),
+                ]
+            };
+            stats.add_labeled_amount(labels("collected"), collected_amount);
+            stats.increment_labeled_count(labels("collected"));
+            if matches!(activity, BoostPickupActivity::Inactive) {
+                stats.amount_collected_inactive += collected_amount;
                 match pad_size {
-                    Some("big") => projection.stats.amount_collected_big += amount,
-                    Some("small") => projection.stats.amount_collected_small += amount,
-                    _ => {}
+                    Some(BoostPadSize::Big) => stats.big_pads_collected_inactive += 1,
+                    Some(BoostPadSize::Small) => stats.small_pads_collected_inactive += 1,
+                    None => {}
                 }
-            }
-            BoostLedgerTransactionKind::Stolen => {
-                projection.stats.amount_stolen += amount;
+            } else {
+                stats.amount_collected += collected_amount;
                 match pad_size {
-                    Some("big") => {
-                        projection.stats.big_pads_stolen += 1;
-                        projection.stats.amount_stolen_big += amount;
+                    Some(BoostPadSize::Big) => {
+                        stats.amount_collected_big += collected_amount;
+                        stats.big_pads_collected += 1;
                     }
-                    Some("small") => {
-                        projection.stats.small_pads_stolen += 1;
-                        projection.stats.amount_stolen_small += amount;
+                    Some(BoostPadSize::Small) => {
+                        stats.amount_collected_small += collected_amount;
+                        stats.small_pads_collected += 1;
                     }
-                    _ => {}
+                    None => {}
                 }
             }
-            BoostLedgerTransactionKind::Overfill => {
-                projection.stats.overfill_total += amount;
-                if field_half == Some("opponent") {
-                    projection.stats.overfill_from_stolen += amount;
-                }
-                Self::count_pickup_once(projection, event);
-            }
-            BoostLedgerTransactionKind::Respawn => {
-                projection.stats.amount_respawned += amount;
-            }
-            BoostLedgerTransactionKind::Used => {
-                projection.stats.amount_used += amount;
-            }
-            BoostLedgerTransactionKind::UsedAllocation => {
-                if Self::label_value(event, "vertical_state") == Some("grounded") {
-                    projection.stats.amount_used_while_grounded += amount;
-                } else if Self::label_value(event, "vertical_state") == Some("aerial") {
-                    projection.stats.amount_used_while_airborne += amount;
-                }
-                if Self::label_value(event, "supersonic") == Some("true") {
-                    projection.stats.amount_used_while_supersonic += amount;
+            if is_steal {
+                stats.add_labeled_amount(labels("stolen"), collected_amount);
+                stats.amount_stolen += collected_amount;
+                match pad_size {
+                    Some(BoostPadSize::Big) => {
+                        stats.big_pads_stolen += 1;
+                        stats.amount_stolen_big += collected_amount;
+                    }
+                    Some(BoostPadSize::Small) => {
+                        stats.small_pads_stolen += 1;
+                        stats.amount_stolen_small += collected_amount;
+                    }
+                    None => {}
                 }
             }
-        }
+            if overfill_amount > 0.0 {
+                stats.add_labeled_amount(labels("overfill"), overfill_amount);
+                stats.overfill_total += overfill_amount;
+                if matches!(field_half, BoostPickupFieldHalf::Opponent) {
+                    stats.overfill_from_stolen += overfill_amount;
+                }
+            }
+        });
     }
 
-    fn count_pickup_once(projection: &mut BoostLedgerProjection, event: &BoostLedgerEvent) {
-        if event.count == 0 {
+    /// Record a respawn boost grant (kickoff or demo respawn).
+    pub fn apply_respawn(&mut self, player_id: &PlayerId, is_team_0: bool, amount: f32) {
+        if amount <= 0.0 {
             return;
         }
-        let Some(pad_size @ ("big" | "small")) = Self::label_value(event, "pad_size") else {
-            return;
-        };
-        let activity = Self::label_value(event, "activity").unwrap_or("unknown");
-        let field_half = Self::label_value(event, "field_half").unwrap_or("unknown");
-        let key = (
-            event.frame,
-            event.player_id.clone(),
-            pad_size.to_owned(),
-            activity.to_owned(),
-            field_half.to_owned(),
-        );
-        if !projection.counted_pickup_keys.insert(key) {
-            return;
-        }
+        self.project(player_id, is_team_0, |stats| {
+            stats.add_labeled_amount(vec![boost_transaction_label("respawn")], amount);
+            stats.amount_respawned += amount;
+        });
+    }
 
-        if activity == "inactive" {
-            if pad_size == "big" {
-                projection.stats.big_pads_collected_inactive += 1;
-            } else {
-                projection.stats.small_pads_collected_inactive += 1;
-            }
-        } else if pad_size == "big" {
-            projection.stats.big_pads_collected += 1;
-        } else {
-            projection.stats.small_pads_collected += 1;
+    /// Record cumulative boost usage for a frame (total drained).
+    pub fn apply_used(&mut self, player_id: &PlayerId, is_team_0: bool, amount: f32) {
+        if amount <= 0.0 {
+            return;
         }
+        self.project(player_id, is_team_0, |stats| {
+            stats.amount_used += amount;
+        });
+    }
+
+    /// Record the vertical-band / supersonic breakdown of boost usage for a frame.
+    pub fn apply_used_allocation(
+        &mut self,
+        player_id: &PlayerId,
+        is_team_0: bool,
+        amount: f32,
+        grounded: bool,
+        supersonic: bool,
+    ) {
+        if amount <= 0.0 {
+            return;
+        }
+        self.project(player_id, is_team_0, |stats| {
+            stats.add_labeled_amount(
+                vec![
+                    boost_transaction_label("used"),
+                    vertical_state_label(!grounded),
+                    boost_supersonic_label(supersonic),
+                ],
+                amount,
+            );
+            if grounded {
+                stats.amount_used_while_grounded += amount;
+            } else {
+                stats.amount_used_while_airborne += amount;
+            }
+            if supersonic {
+                stats.amount_used_while_supersonic += amount;
+            }
+        });
+    }
+
+    /// Record a continuous per-frame boost-amount sample (drives the boost integral and the
+    /// time-in-band totals).
+    pub fn apply_boost_sample(
+        &mut self,
+        player_id: &PlayerId,
+        is_team_0: bool,
+        previous_boost_amount: f32,
+        boost_amount: f32,
+        dt: f32,
+    ) {
+        self.project(player_id, is_team_0, |stats| {
+            Self::add_continuous_boost_sample(stats, previous_boost_amount, boost_amount, dt);
+        });
     }
 
     fn add_continuous_boost_sample(
@@ -420,13 +388,5 @@ impl BoostStatsAccumulator {
         let interval_start = t_at_min.min(t_at_max).max(0.0);
         let interval_end = t_at_min.max(t_at_max).min(1.0);
         (interval_end - interval_start).max(0.0)
-    }
-
-    fn label_value<'a>(event: &'a BoostLedgerEvent, key: &str) -> Option<&'a str> {
-        event
-            .labels
-            .iter()
-            .find(|label| label.key == key)
-            .map(|label| label.value)
     }
 }

@@ -27,10 +27,8 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<WhiffEvent>();
     assert_stats_event::<PowerslideEvent>();
     assert_stats_event::<TouchClassificationEvent>();
-    assert_stats_event::<BoostPickupComparisonEvent>();
-    assert_stats_event::<BoostLedgerEvent>();
-    assert_stats_event::<BoostBucketEvent>();
-    assert_stats_event::<BoostStateEvent>();
+    assert_stats_event::<BoostPickupEvent>();
+    assert_stats_event::<RespawnEvent>();
     assert_stats_event::<BumpEvent>();
     assert_stats_event::<PossessionEvent>();
     assert_stats_event::<BallHalfEvent>();
@@ -38,10 +36,9 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<MovementEvent>();
     assert_stats_event::<PositioningActivityEvent>();
     assert_stats_event::<PositioningFieldZoneEvent>();
-    assert_stats_event::<PositioningBallDepthEvent>();
+    assert_stats_event::<PositioningBallRelativeDepthEvent>();
     assert_stats_event::<PositioningTeammateRoleEvent>();
     assert_stats_event::<PositioningBallProximityEvent>();
-    assert_stats_event::<PositioningGoalContextEvent>();
     assert_stats_event::<RotationPlayerEvent>();
     assert_stats_event::<RotationTeamEvent>();
     assert_stats_event::<FlipResetEvent>();

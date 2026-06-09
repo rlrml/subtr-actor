@@ -1,8 +1,7 @@
 import type { BackboardBounceEvent } from "./generated/BackboardBounceEvent.ts";
 import type { BallCarryEvent } from "./generated/BallCarryEvent.ts";
-import type { BoostLedgerEvent } from "./generated/BoostLedgerEvent.ts";
-import type { BoostLedgerTransactionKind } from "./generated/BoostLedgerTransactionKind.ts";
-import type { BoostPickupComparisonEvent } from "./generated/BoostPickupComparisonEvent.ts";
+import type { BoostPickupEvent } from "./generated/BoostPickupEvent.ts";
+import type { RespawnEvent } from "./generated/RespawnEvent.ts";
 import type { BumpEvent } from "./generated/BumpEvent.ts";
 import type { CeilingShotEvent } from "./generated/CeilingShotEvent.ts";
 import type { CorePlayerGoalContextEvent } from "./generated/CorePlayerGoalContextEvent.ts";
@@ -29,11 +28,9 @@ import type { PassEvent } from "./generated/PassEvent.ts";
 import type { PlayerStatsSnapshot as GeneratedPlayerStatsSnapshot } from "./generated/PlayerStatsSnapshot.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { PositioningActivityEvent } from "./generated/PositioningActivityEvent.ts";
-import type { PositioningPossessionEvent } from "./generated/PositioningPossessionEvent.ts";
-import type { PositioningBallDepthEvent } from "./generated/PositioningBallDepthEvent.ts";
+import type { PositioningBallRelativeDepthEvent } from "./generated/PositioningBallRelativeDepthEvent.ts";
 import type { PositioningBallProximityEvent } from "./generated/PositioningBallProximityEvent.ts";
 import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
-import type { PositioningGoalContextEvent } from "./generated/PositioningGoalContextEvent.ts";
 import type { PositioningTeammateRoleEvent } from "./generated/PositioningTeammateRoleEvent.ts";
 import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
 import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
@@ -104,11 +101,9 @@ export type {
   PassEvent,
   PossessionEvent,
   PositioningActivityEvent,
-  PositioningPossessionEvent,
-  PositioningBallDepthEvent,
+  PositioningBallRelativeDepthEvent,
   PositioningBallProximityEvent,
   PositioningFieldZoneEvent,
-  PositioningGoalContextEvent,
   PositioningTeammateRoleEvent,
   BallHalfEvent,
   PowerslideEvent,
@@ -128,9 +123,8 @@ export type {
   WallAerialEvent,
   WallAerialShotEvent,
   WhiffEvent,
-  BoostLedgerEvent,
-  BoostLedgerTransactionKind,
-  BoostPickupComparisonEvent,
+  BoostPickupEvent,
+  RespawnEvent,
   BumpEvent,
   CorePlayerGoalContextEvent,
   CorePlayerScoreboardEvent,

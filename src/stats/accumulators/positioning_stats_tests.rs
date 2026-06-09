@@ -40,7 +40,6 @@ fn positioning_event(
         behind_ball_fraction: 0.0,
         level_with_ball_fraction: 0.0,
         in_front_of_ball_fraction: 0.0,
-        caught_ahead_of_play_on_conceded_goal: false,
     }
 }
 

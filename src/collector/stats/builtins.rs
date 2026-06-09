@@ -836,10 +836,9 @@ pub(crate) fn builtin_module_json(
                 "team_zero": projection.boost.team_zero_stats(),
                 "team_one": projection.boost.team_one_stats(),
                 "player_stats": player_stats_entries(projection.boost.player_stats()),
-                "events": calculator.pickup_comparison_events(),
-                "ledger_events": calculator.ledger_events(),
-                "state_events": calculator.state_events(),
-                "bucket_events": calculator.bucket_events(),
+                "pickup_events": calculator.pickup_events(),
+                "respawn_events": calculator.respawn_events(),
+                "accumulation_tracks": calculator.accumulation_tracks(),
             }))
         }
         "bump" => {
@@ -870,12 +869,10 @@ pub(crate) fn builtin_module_json(
                 "team_one": projection.positioning.team_one_stats(),
                 "player_stats": player_stats_entries(projection.positioning.player_stats()),
                 "activity_events": calculator.activity_events(),
-                "possession_events": calculator.possession_events(),
                 "field_zone_events": calculator.field_zone_events(),
-                "ball_depth_events": calculator.ball_depth_events(),
+                "ball_relative_depth_events": calculator.ball_relative_depth_events(),
                 "teammate_role_events": calculator.teammate_role_events(),
                 "ball_proximity_events": calculator.ball_proximity_events(),
-                "goal_context_events": calculator.goal_context_events(),
             }))
         }
         "powerslide" => {

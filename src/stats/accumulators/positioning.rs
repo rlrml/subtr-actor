@@ -32,7 +32,6 @@ pub struct PositioningStats {
     pub time_behind_ball: f32,
     pub time_level_with_ball: f32,
     pub time_in_front_of_ball: f32,
-    pub times_caught_ahead_of_play_on_conceded_goals: u32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -295,9 +294,6 @@ impl PositioningStatsAccumulator {
         if event.demolished {
             stats.time_demolished += event.duration;
         }
-        if event.caught_ahead_of_play_on_conceded_goal {
-            stats.times_caught_ahead_of_play_on_conceded_goals += 1;
-        }
     }
 
     pub fn apply_events<'a>(&mut self, events: impl IntoIterator<Item = &'a PositioningEvent>) {
@@ -327,20 +323,9 @@ impl PositioningStatsAccumulator {
         stats.sum_distance_to_teammates = signal.sum_distance_to_teammates;
         stats.sum_distance_to_ball = signal.sum_distance_to_ball;
         stats.sum_distance_to_ball_has_possession = signal.sum_distance_to_ball_has_possession;
+        stats.time_has_possession = signal.time_has_possession;
         stats.sum_distance_to_ball_no_possession = signal.sum_distance_to_ball_no_possession;
-    }
-
-    pub fn apply_possession_event(&mut self, event: &PositioningPossessionEvent) {
-        let stats = self.player_stats.entry(event.player.clone()).or_default();
-        match event.possession_state {
-            PositioningPossessionState::HasPossession => {
-                stats.time_has_possession += event.duration;
-            }
-            PositioningPossessionState::NoPossession => {
-                stats.time_no_possession += event.duration;
-            }
-            PositioningPossessionState::Neutral => {}
-        }
+        stats.time_no_possession = signal.time_no_possession;
     }
 
     pub fn apply_field_zone_event(&mut self, event: &PositioningFieldZoneEvent) {
@@ -352,7 +337,7 @@ impl PositioningStatsAccumulator {
         stats.time_offensive_half += event.duration * event.offensive_half_fraction;
     }
 
-    pub fn apply_ball_depth_event(&mut self, event: &PositioningBallDepthEvent) {
+    pub fn apply_ball_relative_depth_event(&mut self, event: &PositioningBallRelativeDepthEvent) {
         let stats = self.player_stats.entry(event.player.clone()).or_default();
         stats.time_behind_ball += event.duration * event.behind_ball_fraction;
         stats.time_level_with_ball += event.duration * event.level_with_ball_fraction;
@@ -401,13 +386,6 @@ impl PositioningStatsAccumulator {
         }
         if event.farthest_from_ball {
             stats.time_farthest_from_ball += event.duration;
-        }
-    }
-
-    pub fn apply_goal_context_event(&mut self, event: &PositioningGoalContextEvent) {
-        let stats = self.player_stats.entry(event.player.clone()).or_default();
-        if event.caught_ahead_of_play_on_conceded_goal {
-            stats.times_caught_ahead_of_play_on_conceded_goals += 1;
         }
     }
 }

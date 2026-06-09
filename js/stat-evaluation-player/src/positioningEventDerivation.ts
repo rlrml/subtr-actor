@@ -1,9 +1,7 @@
 import type { PositioningActivityEvent } from "./generated/PositioningActivityEvent.ts";
-import type { PositioningBallDepthEvent } from "./generated/PositioningBallDepthEvent.ts";
+import type { PositioningBallRelativeDepthEvent } from "./generated/PositioningBallRelativeDepthEvent.ts";
 import type { PositioningBallProximityEvent } from "./generated/PositioningBallProximityEvent.ts";
-import type { PositioningPossessionEvent } from "./generated/PositioningPossessionEvent.ts";
 import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
-import type { PositioningGoalContextEvent } from "./generated/PositioningGoalContextEvent.ts";
 import type { PositioningStats } from "./generated/PositioningStats.ts";
 import type { PositioningTeamStats } from "./generated/PositioningTeamStats.ts";
 import type { PositioningTeammateRoleEvent } from "./generated/PositioningTeammateRoleEvent.ts";
@@ -12,12 +10,10 @@ import { statsEventPayloads } from "./statsTimeline.ts";
 
 type PositioningTimedEvent =
   | PositioningActivityEvent
-  | PositioningPossessionEvent
   | PositioningFieldZoneEvent
-  | PositioningBallDepthEvent
+  | PositioningBallRelativeDepthEvent
   | PositioningTeammateRoleEvent
-  | PositioningBallProximityEvent
-  | PositioningGoalContextEvent;
+  | PositioningBallProximityEvent;
 
 interface EventStreamCursor {
   applyThroughFrame(frame: StatsFrame): void;
@@ -66,7 +62,6 @@ function defaultPositioningStats(): PositioningStats {
     time_behind_ball: 0,
     time_level_with_ball: 0,
     time_in_front_of_ball: 0,
-    times_caught_ahead_of_play_on_conceded_goals: 0,
   };
 }
 
@@ -118,14 +113,6 @@ function applyActivityEvent(stats: PositioningStats, event: PositioningActivityE
   }
 }
 
-function applyPossessionEvent(stats: PositioningStats, event: PositioningPossessionEvent): void {
-  if (event.possession_state === "has_possession") {
-    stats.time_has_possession = addF32(stats.time_has_possession, event.duration);
-  } else if (event.possession_state === "no_possession") {
-    stats.time_no_possession = addF32(stats.time_no_possession, event.duration);
-  }
-}
-
 function applyFieldZoneEvent(stats: PositioningStats, event: PositioningFieldZoneEvent): void {
   stats.time_defensive_third = addF32(
     stats.time_defensive_third,
@@ -149,7 +136,10 @@ function applyFieldZoneEvent(stats: PositioningStats, event: PositioningFieldZon
   );
 }
 
-function applyBallDepthEvent(stats: PositioningStats, event: PositioningBallDepthEvent): void {
+function applyBallRelativeDepthEvent(
+  stats: PositioningStats,
+  event: PositioningBallRelativeDepthEvent,
+): void {
   stats.time_behind_ball = addF32(
     stats.time_behind_ball,
     event.duration * event.behind_ball_fraction,
@@ -214,12 +204,6 @@ function applyBallProximityEvent(
   }
   if (event.farthest_from_ball) {
     stats.time_farthest_from_ball = addF32(stats.time_farthest_from_ball, event.duration);
-  }
-}
-
-function applyGoalContextEvent(stats: PositioningStats, event: PositioningGoalContextEvent): void {
-  if (event.caught_ahead_of_play_on_conceded_goal) {
-    stats.times_caught_ahead_of_play_on_conceded_goals += 1;
   }
 }
 
@@ -322,14 +306,12 @@ export function createPositioningEventDerivedStatsAccumulator(
     createEventStreamCursor(statsEventPayloads(timeline, "positioning_activity"), (event) =>
       applyActivityEvent(playerStatsFor(players, event), event),
     ),
-    createEventStreamCursor(statsEventPayloads(timeline, "positioning_possession"), (event) =>
-      applyPossessionEvent(playerStatsFor(players, event), event),
-    ),
     createEventStreamCursor(statsEventPayloads(timeline, "positioning_field_zone"), (event) =>
       applyFieldZoneEvent(playerStatsFor(players, event), event),
     ),
-    createEventStreamCursor(statsEventPayloads(timeline, "positioning_ball_depth"), (event) =>
-      applyBallDepthEvent(playerStatsFor(players, event), event),
+    createEventStreamCursor(
+      statsEventPayloads(timeline, "positioning_ball_relative_depth"),
+      (event) => applyBallRelativeDepthEvent(playerStatsFor(players, event), event),
     ),
     createEventStreamCursor(statsEventPayloads(timeline, "positioning_teammate_role"), (event) =>
       applyTeammateRoleEvent(playerStatsFor(players, event), event),
@@ -340,9 +322,6 @@ export function createPositioningEventDerivedStatsAccumulator(
         event.is_team_0 ? teamZero : teamOne,
         event,
       ),
-    ),
-    createEventStreamCursor(statsEventPayloads(timeline, "positioning_goal_context"), (event) =>
-      applyGoalContextEvent(playerStatsFor(players, event), event),
     ),
   ];
 

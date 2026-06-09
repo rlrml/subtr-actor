@@ -1,8 +1,5 @@
 use super::*;
 
-const GOAL_CAUGHT_AHEAD_MAX_BALL_Y: f32 = -1200.0;
-const GOAL_CAUGHT_AHEAD_MIN_PLAYER_Y: f32 = -250.0;
-const GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y: f32 = 2200.0;
 const DEFAULT_LEVEL_BALL_DEPTH_MARGIN: f32 = 150.0;
 const DEFAULT_CLOSEST_TO_BALL_SWITCH_MARGIN: f32 = 100.0;
 const DEFAULT_CLOSEST_TO_BALL_SWITCH_MIN_SECONDS: f32 = 0.2;
@@ -40,7 +37,6 @@ pub struct PositioningEvent {
     pub behind_ball_fraction: f32,
     pub level_with_ball_fraction: f32,
     pub in_front_of_ball_fraction: f32,
-    pub caught_ahead_of_play_on_conceded_goal: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -59,22 +55,6 @@ pub struct PositioningActivityEvent {
     pub active: bool,
     pub tracked: bool,
     pub demolished: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct PositioningPossessionEvent {
-    pub time: f32,
-    pub frame: usize,
-    pub end_time: f32,
-    pub end_frame: usize,
-    pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-    pub possession_state: PositioningPossessionState,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -99,7 +79,7 @@ pub struct PositioningFieldZoneEvent {
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct PositioningBallDepthEvent {
+pub struct PositioningBallRelativeDepthEvent {
     pub time: f32,
     pub frame: usize,
     pub end_time: f32,
@@ -149,19 +129,6 @@ pub struct PositioningBallProximityEvent {
     pub farthest_from_ball: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct PositioningGoalContextEvent {
-    pub time: f32,
-    pub frame: usize,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-    pub caught_ahead_of_play_on_conceded_goal: bool,
-}
-
 impl PositioningEvent {
     fn new(
         frame: &FrameInfo,
@@ -198,12 +165,11 @@ impl PositioningEvent {
             behind_ball_fraction: 0.0,
             level_with_ball_fraction: 0.0,
             in_front_of_ball_fraction: 0.0,
-            caught_ahead_of_play_on_conceded_goal: false,
         }
     }
 
     fn has_delta(&self) -> bool {
-        self.duration != 0.0 || self.caught_ahead_of_play_on_conceded_goal
+        self.duration != 0.0
     }
 
     pub fn activity_event(&self) -> Option<PositioningActivityEvent> {
@@ -220,22 +186,6 @@ impl PositioningEvent {
                 active: self.active,
                 tracked: self.tracked,
                 demolished: self.demolished,
-            }
-        })
-    }
-
-    pub fn possession_event(&self) -> Option<PositioningPossessionEvent> {
-        (self.tracked && self.possession_state != PositioningPossessionState::Neutral).then(|| {
-            PositioningPossessionEvent {
-                time: self.time,
-                frame: self.frame,
-                end_time: self.end_time,
-                end_frame: self.end_frame,
-                duration: self.duration,
-                player: self.player.clone(),
-                player_position: self.player_position,
-                is_team_0: self.is_team_0,
-                possession_state: self.possession_state,
             }
         })
     }
@@ -258,8 +208,8 @@ impl PositioningEvent {
         })
     }
 
-    pub fn ball_depth_event(&self) -> Option<PositioningBallDepthEvent> {
-        self.tracked.then(|| PositioningBallDepthEvent {
+    pub fn ball_relative_depth_event(&self) -> Option<PositioningBallRelativeDepthEvent> {
+        self.tracked.then(|| PositioningBallRelativeDepthEvent {
             time: self.time,
             frame: self.frame,
             end_time: self.end_time,
@@ -308,18 +258,6 @@ impl PositioningEvent {
                 closest_to_ball_team: self.closest_to_ball || self.closest_to_ball_team,
                 closest_to_ball_absolute: self.closest_to_ball_absolute,
                 farthest_from_ball: self.farthest_from_ball,
-            })
-    }
-
-    pub fn goal_context_event(&self) -> Option<PositioningGoalContextEvent> {
-        self.caught_ahead_of_play_on_conceded_goal
-            .then(|| PositioningGoalContextEvent {
-                time: self.time,
-                frame: self.frame,
-                player: self.player.clone(),
-                player_position: self.player_position,
-                is_team_0: self.is_team_0,
-                caught_ahead_of_play_on_conceded_goal: true,
             })
     }
 }
@@ -373,8 +311,6 @@ fn same_fraction(left: f32, right: f32) -> bool {
 impl_coalescible_span!(PositioningActivityEvent, |a, b| a.active == b.active
     && a.tracked == b.tracked
     && a.demolished == b.demolished);
-impl_coalescible_span!(PositioningPossessionEvent, |a, b| a.possession_state
-    == b.possession_state);
 impl_coalescible_span!(PositioningFieldZoneEvent, |a, b| same_fraction(
     a.defensive_zone_fraction,
     b.defensive_zone_fraction
@@ -391,7 +327,7 @@ impl_coalescible_span!(PositioningFieldZoneEvent, |a, b| same_fraction(
     a.offensive_half_fraction,
     b.offensive_half_fraction
 ));
-impl_coalescible_span!(PositioningBallDepthEvent, |a, b| same_fraction(
+impl_coalescible_span!(PositioningBallRelativeDepthEvent, |a, b| same_fraction(
     a.behind_ball_fraction,
     b.behind_ball_fraction
 ) && same_fraction(
@@ -462,20 +398,23 @@ pub enum PositioningTeammateRoleState {
     Unknown,
 }
 
-/// Cumulative per-player distance totals.
+/// Cumulative per-player continuous totals.
 ///
 /// Distance to the ball/teammates is a continuous magnitude, not a discrete occurrence, so
 /// it cannot be reconstructed from an event stream; the calculator accumulates these running
-/// totals as it processes frames and the timeline ships them directly. The possession-split
-/// distance sums are bucketed by the per-frame possession state, but the possession *times*
-/// themselves are categorical and are emitted as `PositioningPossessionEvent` spans instead.
+/// totals as it processes frames and the timeline ships them directly. Possession is an input
+/// to positioning rather than a positioning facet of its own, so the possession-split distance
+/// sums and the possession *times* that denominate them both ride this continuous channel
+/// (keyed off the per-frame `possession_state`) rather than being emitted as positioning events.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PositioningSignalSnapshot {
     pub sum_distance_to_teammates: f32,
     pub sum_distance_to_ball: f32,
     pub sum_distance_to_ball_has_possession: f32,
+    pub time_has_possession: f32,
     pub sum_distance_to_ball_no_possession: f32,
+    pub time_no_possession: f32,
 }
 
 impl PositioningSignalSnapshot {
@@ -486,17 +425,24 @@ impl PositioningSignalSnapshot {
         if let Some(distance) = event.distance_to_teammates {
             self.sum_distance_to_teammates += distance * event.duration;
         }
-        if let Some(distance) = event.distance_to_ball {
+        let distance = event.distance_to_ball;
+        if let Some(distance) = distance {
             self.sum_distance_to_ball += distance * event.duration;
-            match event.possession_state {
-                PositioningPossessionState::HasPossession => {
+        }
+        match event.possession_state {
+            PositioningPossessionState::HasPossession => {
+                self.time_has_possession += event.duration;
+                if let Some(distance) = distance {
                     self.sum_distance_to_ball_has_possession += distance * event.duration;
                 }
-                PositioningPossessionState::NoPossession => {
+            }
+            PositioningPossessionState::NoPossession => {
+                self.time_no_possession += event.duration;
+                if let Some(distance) = distance {
                     self.sum_distance_to_ball_no_possession += distance * event.duration;
                 }
-                PositioningPossessionState::Neutral => {}
             }
+            PositioningPossessionState::Neutral => {}
         }
     }
 }
@@ -649,16 +595,12 @@ impl PositioningCalculator {
         coalesce_facet(self.events(), PositioningEvent::activity_event)
     }
 
-    pub fn possession_events(&self) -> Vec<PositioningPossessionEvent> {
-        coalesce_facet(self.events(), PositioningEvent::possession_event)
-    }
-
     pub fn field_zone_events(&self) -> Vec<PositioningFieldZoneEvent> {
         coalesce_facet(self.events(), PositioningEvent::field_zone_event)
     }
 
-    pub fn ball_depth_events(&self) -> Vec<PositioningBallDepthEvent> {
-        coalesce_facet(self.events(), PositioningEvent::ball_depth_event)
+    pub fn ball_relative_depth_events(&self) -> Vec<PositioningBallRelativeDepthEvent> {
+        coalesce_facet(self.events(), PositioningEvent::ball_relative_depth_event)
     }
 
     pub fn teammate_role_events(&self) -> Vec<PositioningTeammateRoleEvent> {
@@ -667,13 +609,6 @@ impl PositioningCalculator {
 
     pub fn ball_proximity_events(&self) -> Vec<PositioningBallProximityEvent> {
         coalesce_facet(self.events(), PositioningEvent::ball_proximity_event)
-    }
-
-    pub fn goal_context_events(&self) -> Vec<PositioningGoalContextEvent> {
-        self.events()
-            .iter()
-            .filter_map(PositioningEvent::goal_context_event)
-            .collect()
     }
 
     pub fn flush_pending_events(&mut self) {}
@@ -688,49 +623,6 @@ impl PositioningCalculator {
         deltas.entry(player_id.clone()).or_insert_with(|| {
             PositioningEvent::new(frame, player_id.clone(), player_position, is_team_0)
         })
-    }
-
-    fn record_goal_positioning_events(
-        &mut self,
-        frame: &FrameInfo,
-        players: &PlayerFrameState,
-        events: &FrameEventsState,
-        ball_position: glam::Vec3,
-        event_deltas: &mut HashMap<PlayerId, PositioningEvent>,
-    ) {
-        for goal_event in &events.goal_events {
-            let defending_team_is_team_0 = !goal_event.scoring_team_is_team_0;
-            let normalized_ball_y = normalized_y(defending_team_is_team_0, ball_position);
-            if normalized_ball_y > GOAL_CAUGHT_AHEAD_MAX_BALL_Y {
-                continue;
-            }
-
-            for player in players
-                .players
-                .iter()
-                .filter(|player| player.is_team_0 == defending_team_is_team_0)
-            {
-                let Some(position) = player.position() else {
-                    continue;
-                };
-                let normalized_player_y = normalized_y(defending_team_is_team_0, position);
-                if normalized_player_y < GOAL_CAUGHT_AHEAD_MIN_PLAYER_Y {
-                    continue;
-                }
-                if normalized_player_y - normalized_ball_y < GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y {
-                    continue;
-                }
-
-                Self::event_delta(
-                    event_deltas,
-                    frame,
-                    &player.player_id,
-                    Some(position.to_array()),
-                    player.is_team_0,
-                )
-                .caught_ahead_of_play_on_conceded_goal = true;
-            }
-        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -763,15 +655,6 @@ impl PositioningCalculator {
         };
         let ball_position = ball.position();
         let mut event_deltas = HashMap::new();
-        if !events.goal_events.is_empty() {
-            self.record_goal_positioning_events(
-                frame,
-                players,
-                events,
-                ball_position,
-                &mut event_deltas,
-            );
-        }
         let demoed_players: HashSet<_> = events
             .active_demos
             .iter()

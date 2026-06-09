@@ -9,6 +9,11 @@ const SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS: f32 = 7.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS: f32 = 3.5;
 const GOAL_CONTEXT_BOOST_LEADUP_SECONDS: f32 = 5.0;
 const BALL_GROUND_CONTACT_MAX_Z: f32 = BALL_RADIUS_Z + 5.0;
+// A defender is "caught ahead of play" on a conceded goal when the ball is deep in their
+// defensive end while they are stranded well up the field, far in front of the ball.
+const GOAL_CAUGHT_AHEAD_MAX_BALL_Y: f32 = -1200.0;
+const GOAL_CAUGHT_AHEAD_MIN_PLAYER_Y: f32 = -250.0;
+const GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y: f32 = 2200.0;
 // On the frame a goal is recorded, the ball's rigid body is the goal explosion
 // rather than a normal physics update, so its interpolated velocity reads as
 // zero. We carry forward the most recent meaningful ball velocity (anything
@@ -56,6 +61,7 @@ pub struct CorePlayerGoalContextEvent {
     pub goals_conceded_while_last_defender: bool,
     pub goals_for_while_most_back: bool,
     pub goals_against_while_most_back: bool,
+    pub caught_ahead_of_play_on_conceded_goal: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal_against_boost_amount: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -442,6 +448,7 @@ impl MatchStatsCalculator {
         goals_conceded_while_last_defender: bool,
         goals_for_while_most_back: bool,
         goals_against_while_most_back: bool,
+        caught_ahead_of_play_on_conceded_goal: bool,
         goal_against_boost_amount: Option<f32>,
         goal_against_boost_leadup: Option<(f32, f32)>,
         goal_against_position: Option<GoalContextPosition>,
@@ -461,6 +468,7 @@ impl MatchStatsCalculator {
                 goals_conceded_while_last_defender,
                 goals_for_while_most_back,
                 goals_against_while_most_back,
+                caught_ahead_of_play_on_conceded_goal,
                 goal_against_boost_amount,
                 goal_against_average_boost_in_leadup: goal_against_boost_leadup
                     .map(|leadup| leadup.0),
@@ -493,6 +501,7 @@ impl MatchStatsCalculator {
             player_position,
             is_team_0,
             is_team_0,
+            false,
             false,
             false,
             false,
@@ -746,10 +755,33 @@ impl MatchStatsCalculator {
             .collect()
     }
 
+    /// A defender is "caught ahead of play" on a conceded goal when the ball is deep in their
+    /// defensive end while they are stranded well up the field, far in front of the ball.
+    fn caught_ahead_of_play_on_conceded_goal(
+        scoring_team_is_team_0: bool,
+        ball_position: Option<glam::Vec3>,
+        player_position: Option<glam::Vec3>,
+    ) -> bool {
+        let (Some(ball_position), Some(player_position)) = (ball_position, player_position) else {
+            return false;
+        };
+        let defending_team_is_team_0 = !scoring_team_is_team_0;
+        let normalized_ball_y = normalized_y(defending_team_is_team_0, ball_position);
+        if normalized_ball_y > GOAL_CAUGHT_AHEAD_MAX_BALL_Y {
+            return false;
+        }
+        let normalized_player_y = normalized_y(defending_team_is_team_0, player_position);
+        if normalized_player_y < GOAL_CAUGHT_AHEAD_MIN_PLAYER_Y {
+            return false;
+        }
+        normalized_player_y - normalized_ball_y >= GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y
+    }
+
     fn record_goal_context_stats(
         &mut self,
         players: &PlayerFrameState,
         goal_event: &GoalEvent,
+        ball_position: Option<glam::Vec3>,
         scoring_team_most_back_player: Option<&PlayerId>,
         defending_team_most_back_player: Option<&PlayerId>,
     ) {
@@ -763,6 +795,7 @@ impl MatchStatsCalculator {
                 goal_event.scoring_team_is_team_0,
                 false,
                 true,
+                false,
                 false,
                 None,
                 None,
@@ -785,6 +818,7 @@ impl MatchStatsCalculator {
                 false,
                 false,
                 true,
+                false,
                 None,
                 None,
                 None,
@@ -803,6 +837,11 @@ impl MatchStatsCalculator {
             let boost_leadup = self
                 .boost_leadup_for_player(&player.player_id)
                 .map(|stats| (stats.average_boost, stats.min_boost));
+            let caught_ahead = Self::caught_ahead_of_play_on_conceded_goal(
+                goal_event.scoring_team_is_team_0,
+                ball_position,
+                player.position(),
+            );
             self.emit_core_player_goal_context_event(
                 goal_event.time,
                 goal_event.frame,
@@ -813,6 +852,7 @@ impl MatchStatsCalculator {
                 false,
                 false,
                 false,
+                caught_ahead,
                 player.boost_amount.or(player.last_boost_amount),
                 boost_leadup,
                 player.position().map(GoalContextPosition::from),
@@ -830,7 +870,8 @@ impl MatchStatsCalculator {
         players: &PlayerFrameState,
         events: &FrameEventsState,
     ) {
-        let ball_position = ball.position().map(GoalContextPosition::from);
+        let ball_world_position = ball.position();
+        let ball_position = ball_world_position.map(GoalContextPosition::from);
         let ball_speed_at_goal = self.ball_speed_at_goal(ball);
         for goal_event in &events.goal_events {
             let scoring_team_most_back_player =
@@ -850,6 +891,7 @@ impl MatchStatsCalculator {
             self.record_goal_context_stats(
                 players,
                 goal_event,
+                ball_world_position,
                 scoring_team_most_back_player.as_ref(),
                 defending_team_most_back_player.as_ref(),
             );
@@ -1269,6 +1311,7 @@ impl MatchStatsCalculator {
                                 true,
                                 false,
                                 false,
+                                false,
                                 None,
                                 None,
                                 None,
@@ -1293,6 +1336,7 @@ impl MatchStatsCalculator {
                                 true,
                                 false,
                                 true,
+                                false,
                                 false,
                                 false,
                                 None,

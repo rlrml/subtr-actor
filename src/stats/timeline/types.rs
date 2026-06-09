@@ -71,6 +71,53 @@ pub struct ReplayStatsTimelineScaffold {
     /// be reconstructed from events, so it is computed over the entire match and shipped once
     /// here rather than per frame, keeping the scaffold frames a pure event-only product.
     pub positioning_summary: Vec<ReplayStatsPositioningSummary>,
+    /// Compressed per-frame numeric tracks for continuous quantities that are not naturally
+    /// modeled as events (e.g. instantaneous boost amount, cumulative boost used). These ride
+    /// alongside the event-only frames so the player can show a value growing during playback
+    /// without re-deriving it from events. See [`AccumulationTrack`].
+    pub accumulation_tracks: Vec<AccumulationTrack>,
+}
+
+/// A compressed per-player, per-frame numeric series.
+///
+/// This is the continuous-quantity counterpart to events: rather than a discrete state-change,
+/// it carries a value sampled over frames. Storage is run-length compressed via change-points —
+/// a value holds until the next [`AccumulationPoint`]. Consumers binary-search `points` by frame
+/// and use the most recent point's value. Flat/idle stretches cost nothing.
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct AccumulationTrack {
+    #[serde(rename = "player_id")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    pub is_team_0: bool,
+    pub quantity: AccumulationQuantity,
+    pub points: Vec<AccumulationPoint>,
+}
+
+/// A single change-point in an [`AccumulationTrack`]: the value takes effect at `frame` and
+/// holds until the next point.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct AccumulationPoint {
+    pub frame: usize,
+    pub value: f32,
+}
+
+/// The quantity an [`AccumulationTrack`] carries. `BoostAmount` is an instantaneous signal; the
+/// rest are cumulative (monotonic) totals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum AccumulationQuantity {
+    BoostAmount,
+    BoostUsed,
+    BoostUsedGrounded,
+    BoostUsedAirborne,
+    BoostUsedSupersonic,
+    BoostCollected,
+    BoostStolen,
+    BoostOverfill,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -165,9 +212,7 @@ pub fn stats_timeline_event_label(stream: &str) -> String {
         "powerslide" => "Powerslide",
         "touch" => "Touch",
         "boost_pickups" => "Boost pickup",
-        "boost_ledger" => "Boost ledger",
-        "boost_bucket" => "Boost bucket",
-        "boost_state" => "Boost state",
+        "boost_respawn" => "Respawn",
         "bump" => "Bump",
         "flick" => "Flick",
         "musty_flick" => "Musty flick",
@@ -285,12 +330,10 @@ pub enum EventPayload {
     TerritorialPressure(TerritorialPressureEvent),
     Movement(MovementEvent),
     PositioningActivity(PositioningActivityEvent),
-    PositioningPossession(PositioningPossessionEvent),
     PositioningFieldZone(PositioningFieldZoneEvent),
-    PositioningBallDepth(PositioningBallDepthEvent),
+    PositioningBallRelativeDepth(PositioningBallRelativeDepthEvent),
     PositioningTeammateRole(PositioningTeammateRoleEvent),
     PositioningBallProximity(PositioningBallProximityEvent),
-    PositioningGoalContext(PositioningGoalContextEvent),
     RotationPlayer(RotationPlayerEvent),
     RotationRoleSpan(RotationRoleSpanEvent),
     RotationDepthSpan(RotationDepthSpanEvent),
@@ -321,10 +364,8 @@ pub enum EventPayload {
     Whiff(WhiffEvent),
     Powerslide(PowerslideEvent),
     Touch(TouchClassificationEvent),
-    BoostPickup(BoostPickupComparisonEvent),
-    BoostLedger(BoostLedgerEvent),
-    BoostBucket(BoostBucketEvent),
-    BoostState(BoostStateEvent),
+    BoostPickup(BoostPickupEvent),
+    Respawn(RespawnEvent),
     Bump(BumpEvent),
 }
 

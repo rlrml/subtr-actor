@@ -159,6 +159,7 @@ pub struct PlayerScoringContextStats {
     pub goals_conceded_while_last_defender: u32,
     pub goals_for_while_most_back: u32,
     pub goals_against_while_most_back: u32,
+    pub caught_ahead_of_play_on_conceded_goals: u32,
     pub goal_against_boost_sample_count: u32,
     pub cumulative_boost_on_goals_against: f32,
     pub last_boost_on_goal_against: Option<f32>,
@@ -569,6 +570,9 @@ impl CoreStatsAccumulator {
         }
         if event.goals_against_while_most_back {
             scoring_context.goals_against_while_most_back += 1;
+        }
+        if event.caught_ahead_of_play_on_conceded_goal {
+            scoring_context.caught_ahead_of_play_on_conceded_goals += 1;
         }
         scoring_context.record_goal_against_snapshot(
             event.goal_against_boost_amount,

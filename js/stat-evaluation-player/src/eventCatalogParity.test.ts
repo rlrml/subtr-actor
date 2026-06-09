@@ -29,7 +29,6 @@ const CORE_AGGREGATED = new Set(["assist", "death", "goal", "kill", "save", "sho
 // timeline stream.
 const NOT_SURFACED = new Set([
   "event", // the generic timeline envelope, not a concrete event type
-  "boost_state", // internal per-frame boost sub-stream
 ]);
 
 test("every registry event is represented in the viewer (or explicitly excepted)", () => {

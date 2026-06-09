@@ -649,17 +649,17 @@ test("buildBoostPickupTimelineRanges maps pad pickups to a separate size-filtere
 
   assert.deepEqual(
     buildBoostPickupTimelineRanges(legacyTimeline, replay, {
-      comparisons: ["ghost"],
+      detections: [],
     }),
     [],
   );
 });
 
-test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events", () => {
+test("buildBoostPickupTimelineRanges uses tagged boost pickup detection events", () => {
   const timeline = createLegacyStatsTimeline({
     boost_pickups: [
       {
-        comparison: "both",
+        detection: "both",
         frame: 10,
         time: 1,
         player_id: { Steam: "blue-id" },
@@ -667,15 +667,14 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
         pad_type: "big",
         field_half: "own",
         activity: "active",
-        reported_frame: 10,
-        reported_time: 1,
-        inferred_frame: 9,
-        inferred_time: 0.98,
+        is_steal: false,
+        collected_amount: 100,
+        overfill_amount: 0,
         boost_before: 0,
         boost_after: 100,
       },
       {
-        comparison: "ghost",
+        detection: "inferred_only",
         frame: 20,
         time: 2,
         player_id: { Steam: "orange-id" },
@@ -683,10 +682,9 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
         pad_type: "small",
         field_half: "opponent",
         activity: "active",
-        reported_frame: 20,
-        reported_time: 2,
-        inferred_frame: null,
-        inferred_time: null,
+        is_steal: true,
+        collected_amount: 12,
+        overfill_amount: 0,
         boost_before: null,
         boost_after: null,
       },
@@ -717,17 +715,17 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
 
   assert.deepEqual(
     buildBoostPickupTimelineRanges(timeline, replay, {
-      comparisons: ["ghost"],
+      detections: ["inferred_only"],
     }),
     [
       {
-        id: "boost-pickup:ghost:20:Steam:orange-id:0",
+        id: "boost-pickup:inferred_only:20:Steam:orange-id:0",
         startTime: 2.25,
         endTime: 2.33,
         lane: "boost-pickups",
         laneLabel: "Boost Pickups",
-        label: "Orange ghost small boost pickup",
-        shortLabel: "G",
+        label: "Orange inferred small boost pickup",
+        shortLabel: "I",
         color: "#f59e0b",
         isTeamZero: false,
       },
@@ -737,7 +735,7 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
   assert.deepEqual(
     buildBoostPickupTimelineRanges(timeline, replay, {
       padTypes: ["big"],
-      comparisons: ["ghost"],
+      detections: ["inferred_only"],
       playerIds: ["Steam:orange-id"],
     }),
     [],
@@ -746,10 +744,10 @@ test("buildBoostPickupTimelineRanges uses tagged boost pickup comparison events"
   assert.deepEqual(
     buildBoostPickupTimelineRanges(timeline, replay, {
       padTypes: ["small"],
-      comparisons: ["ghost"],
+      detections: ["inferred_only"],
       playerIds: ["Steam:orange-id"],
     }).map((range) => range.id),
-    ["boost-pickup:ghost:20:Steam:orange-id:0"],
+    ["boost-pickup:inferred_only:20:Steam:orange-id:0"],
   );
 });
 

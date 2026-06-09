@@ -427,15 +427,9 @@ impl StatsProjectionNode {
             self.state.ball_carry.apply_event(event);
         }
         let boost = ctx.get::<BoostCalculator>()?;
-        self.state.boost = BoostStatsAccumulator::default();
-        let projected_boost_state_events = boost.projected_state_events();
-        for event in projected_boost_state_events.iter() {
-            self.state.boost.apply_state_event(event);
-        }
-        let projected_boost_ledger_events = boost.projected_ledger_events();
-        for event in projected_boost_ledger_events.iter() {
-            self.state.boost.apply_ledger_event(event);
-        }
+        // The boost calculator now accumulates BoostStats directly as it processes frames, so we
+        // mirror its accumulator instead of replaying projected ledger/state events.
+        self.state.boost = boost.boost_stats().clone();
         if live_play {
             self.check_boost_current_amount_consistency(frame, players);
         }

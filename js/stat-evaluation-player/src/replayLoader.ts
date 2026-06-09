@@ -48,6 +48,7 @@ interface TransferableStatsTimelineParts {
   replayMetaBuffer: ArrayBuffer;
   eventsBuffer: ArrayBuffer;
   positioningSummaryBuffer: ArrayBuffer;
+  accumulationTracksBuffer: ArrayBuffer;
   frameChunkBuffers: ArrayBuffer[];
 }
 
@@ -78,6 +79,10 @@ async function parseStatsTimelineParts(
     decoder,
     parts.positioningSummaryBuffer,
   );
+  const accumulationTracks = parseJsonBuffer<CompactStatsTimeline["accumulation_tracks"]>(
+    decoder,
+    parts.accumulationTracksBuffer,
+  );
   onProgress?.({ stage: "decoding-stats", progress: 0.15 });
   await waitForNextPaint();
 
@@ -105,6 +110,7 @@ async function parseStatsTimelineParts(
     events,
     frames,
     positioning_summary: positioningSummary,
+    accumulation_tracks: accumulationTracks,
   };
 }
 

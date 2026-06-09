@@ -1,4 +1,6 @@
 use super::*;
+use crate::stats::accumulators::boost::{BoostStats, BoostStatsAccumulator};
+use crate::stats::timeline::types::{AccumulationPoint, AccumulationQuantity, AccumulationTrack};
 
 const DEMO_RESPAWN_WINDOW_SECONDS: f32 = 3.2;
 
@@ -77,10 +79,13 @@ pub enum BoostPickupActivity {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
-pub enum BoostPickupComparison {
+pub enum BoostPickupDetection {
+    /// Corroborated by both a reported pad event and an inferred boost-amount jump.
     Both,
-    Ghost,
-    Missed,
+    /// Inferred from a boost-amount jump with no matching reported pad event.
+    InferredOnly,
+    /// Reported by a pad event with no corroborating boost-amount jump.
+    ReportedOnly,
 }
 
 #[derive(Clone, Debug)]
@@ -97,10 +102,11 @@ struct PendingBoostPickupEvent {
     boost_after: Option<f32>,
 }
 
+/// A single boost pickup. Replaces the former pickup-comparison + ledger Collected/Stolen/
+/// Overfill events: pad classification, theft, and amounts are all facets of one pickup.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct BoostPickupComparisonEvent {
-    pub comparison: BoostPickupComparison,
+pub struct BoostPickupEvent {
     pub frame: usize,
     pub time: f32,
     #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
@@ -111,151 +117,49 @@ pub struct BoostPickupComparisonEvent {
     pub pad_type: BoostPickupPadType,
     pub field_half: BoostPickupFieldHalf,
     pub activity: BoostPickupActivity,
-    pub reported_frame: Option<usize>,
-    pub reported_time: Option<f32>,
-    pub inferred_frame: Option<usize>,
-    pub inferred_time: Option<f32>,
+    pub detection: BoostPickupDetection,
+    /// A steal is a pickup collected on the opponent's half (mirrors the former `Stolen` ledger
+    /// transaction condition).
+    pub is_steal: bool,
+    /// Boost actually gained from this pickup.
+    pub collected_amount: f32,
+    /// Boost lost to the cap because the player was already near full when collecting.
+    pub overfill_amount: f32,
     pub boost_before: Option<f32>,
     pub boost_after: Option<f32>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, ts_rs::TS)]
+/// A player respawn (kickoff or post-demo). This is a general lifecycle event, not boost-specific;
+/// the boost grant is just one of its effects.
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct RespawnEvent {
+    pub frame: usize,
+    pub time: f32,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_position: Option<[f32; 3]>,
+    pub is_team_0: bool,
+    pub kind: RespawnKind,
+    /// Boost the player respawned with, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boost_granted: Option<f32>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
-pub enum BoostLedgerTransactionKind {
-    Collected,
-    Stolen,
-    Overfill,
-    Respawn,
-    Used,
-    UsedAllocation,
+pub enum RespawnKind {
+    Kickoff,
+    Demo,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct BoostLedgerEvent {
-    pub frame: usize,
-    pub time: f32,
-    pub end_frame: usize,
-    pub end_time: f32,
-    pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player_id: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-    pub transaction: BoostLedgerTransactionKind,
-    pub amount: f32,
-    pub count: u32,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub labels: Vec<StatLabel>,
-    pub boost_before: Option<f32>,
-    pub boost_after: Option<f32>,
-}
-
-impl BoostLedgerEvent {
-    fn absorb_delta(&mut self, event: Self) {
-        self.end_frame = event.frame;
-        self.end_time = event.time;
-        self.duration += event.duration;
-        self.player_position = event.player_position;
-        self.amount += event.amount;
-        self.count += event.count;
-        self.boost_after = event.boost_after;
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct BoostStateEvent {
-    pub frame: usize,
-    pub time: f32,
-    pub end_frame: usize,
-    pub end_time: f32,
-    pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player_id: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-    pub boost_amount: f32,
-    pub boost_before: Option<f32>,
-}
-
-impl BoostStateEvent {
-    fn absorb_sample(&mut self, event: Self) {
-        self.end_frame = event.frame;
-        self.end_time = event.time;
-        self.duration += event.duration;
-        self.player_position = event.player_position;
-        self.boost_amount = event.boost_amount;
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export)]
-pub enum BoostBucket {
-    Zero,
-    #[serde(rename = "0_25")]
-    Boost0To25,
-    #[serde(rename = "25_50")]
-    Boost25To50,
-    #[serde(rename = "50_75")]
-    Boost50To75,
-    #[serde(rename = "75_100")]
-    Boost75To100,
-    Hundred,
-}
-
-impl BoostBucket {
-    fn from_amount(boost_amount: f32) -> Self {
-        if boost_amount <= 1.0 {
-            Self::Zero
-        } else if boost_amount >= BOOST_MAX_AMOUNT - 1.0 {
-            Self::Hundred
-        } else if boost_amount < boost_percent_to_amount(25.0) {
-            Self::Boost0To25
-        } else if boost_amount < boost_percent_to_amount(50.0) {
-            Self::Boost25To50
-        } else if boost_amount < boost_percent_to_amount(75.0) {
-            Self::Boost50To75
-        } else {
-            Self::Boost75To100
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct BoostBucketEvent {
-    pub frame: usize,
-    pub time: f32,
-    pub end_frame: usize,
-    pub end_time: f32,
-    pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player_id: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-    pub bucket: BoostBucket,
-}
-
-impl BoostBucketEvent {
-    fn absorb_sample(&mut self, event: Self) {
-        self.end_frame = event.frame;
-        self.end_time = event.end_time;
-        self.duration += event.duration;
-        self.player_position = event.player_position;
-    }
-}
-
-fn boost_transaction_label(kind: &'static str) -> StatLabel {
+pub(crate) fn boost_transaction_label(kind: &'static str) -> StatLabel {
     StatLabel::new("transaction", kind)
 }
 
-fn boost_pad_size_label(pad_size: Option<BoostPadSize>) -> StatLabel {
+pub(crate) fn boost_pad_size_label(pad_size: Option<BoostPadSize>) -> StatLabel {
     match pad_size {
         Some(BoostPadSize::Big) => StatLabel::new("pad_size", "big"),
         Some(BoostPadSize::Small) => StatLabel::new("pad_size", "small"),
@@ -263,7 +167,7 @@ fn boost_pad_size_label(pad_size: Option<BoostPadSize>) -> StatLabel {
     }
 }
 
-fn boost_activity_label(activity: BoostPickupActivity) -> StatLabel {
+pub(crate) fn boost_activity_label(activity: BoostPickupActivity) -> StatLabel {
     match activity {
         BoostPickupActivity::Active => StatLabel::new("activity", "active"),
         BoostPickupActivity::Inactive => StatLabel::new("activity", "inactive"),
@@ -271,7 +175,7 @@ fn boost_activity_label(activity: BoostPickupActivity) -> StatLabel {
     }
 }
 
-fn boost_field_half_label(field_half: BoostPickupFieldHalf) -> StatLabel {
+pub(crate) fn boost_field_half_label(field_half: BoostPickupFieldHalf) -> StatLabel {
     match field_half {
         BoostPickupFieldHalf::Own => StatLabel::new("field_half", "own"),
         BoostPickupFieldHalf::Opponent => StatLabel::new("field_half", "opponent"),
@@ -279,7 +183,7 @@ fn boost_field_half_label(field_half: BoostPickupFieldHalf) -> StatLabel {
     }
 }
 
-fn boost_supersonic_label(supersonic: bool) -> StatLabel {
+pub(crate) fn boost_supersonic_label(supersonic: bool) -> StatLabel {
     if supersonic {
         StatLabel::new("supersonic", "true")
     } else {
@@ -306,13 +210,10 @@ pub struct BoostCalculator {
     inactive_pickup_frames: HashSet<(PlayerId, usize, BoostPadSize)>,
     last_pickup_times: HashMap<String, f32>,
     pending_inferred_pickups: VecDeque<PendingBoostPickupEvent>,
-    pickup_comparison_events: EventStream<BoostPickupComparisonEvent>,
-    ledger_events: EventStream<BoostLedgerEvent>,
-    state_events: EventStream<BoostStateEvent>,
-    bucket_events: EventStream<BoostBucketEvent>,
-    pending_ledger_events: HashMap<PendingBoostLedgerKey, PendingBoostLedgerEvent>,
-    pending_state_events: HashMap<PlayerId, PendingBoostStateEvent>,
-    pending_bucket_events: HashMap<PlayerId, BoostBucketEvent>,
+    pickup_events: EventStream<BoostPickupEvent>,
+    respawn_events: EventStream<RespawnEvent>,
+    stats: BoostStatsAccumulator,
+    track_builders: HashMap<(PlayerId, AccumulationQuantity), BoostTrackBuilder>,
     player_usage_state: HashMap<PlayerId, BoostUsageState>,
     kickoff_phase_active_last_frame: bool,
     kickoff_respawn_awarded: HashSet<PlayerId>,
@@ -328,12 +229,12 @@ struct PendingDemoRespawn {
     pre_demo_boost_amount: Option<f32>,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct BoostLedgerContext {
-    frame: usize,
-    time: f32,
-    boost_before: Option<f32>,
-    boost_after: Option<f32>,
+/// Builder for one player's [`AccumulationTrack`]: accumulates change-points, skipping samples
+/// whose value matches the previous point.
+#[derive(Debug, Clone, Default)]
+struct BoostTrackBuilder {
+    is_team_0: bool,
+    points: Vec<AccumulationPoint>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -343,50 +244,6 @@ struct BoostUsageState {
     amount_used: f32,
     amount_used_while_grounded: f32,
     amount_used_while_airborne: f32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct PendingBoostLedgerKey {
-    player_id: PlayerId,
-    is_team_0: bool,
-    transaction: BoostLedgerTransactionKind,
-    labels: Vec<StatLabel>,
-}
-
-#[derive(Debug, Clone)]
-struct PendingBoostLedgerEvent {
-    key: PendingBoostLedgerKey,
-    event: BoostLedgerEvent,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BoostStateDirection {
-    Increasing,
-    Decreasing,
-    Flat,
-    Unknown,
-}
-
-impl BoostStateDirection {
-    fn from_event(event: &BoostStateEvent) -> Self {
-        let Some(boost_before) = event.boost_before else {
-            return Self::Unknown;
-        };
-        if event.boost_amount > boost_before {
-            Self::Increasing
-        } else if event.boost_amount < boost_before {
-            Self::Decreasing
-        } else {
-            Self::Flat
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct PendingBoostStateEvent {
-    is_team_0: bool,
-    direction: BoostStateDirection,
-    event: BoostStateEvent,
 }
 
 impl BoostUsageState {
@@ -461,112 +318,63 @@ impl BoostCalculator {
         }
     }
 
-    pub fn pickup_comparison_events(&self) -> &[BoostPickupComparisonEvent] {
-        self.pickup_comparison_events.all()
+    pub fn pickup_events(&self) -> &[BoostPickupEvent] {
+        self.pickup_events.all()
     }
 
-    pub fn new_pickup_comparison_events(&self) -> &[BoostPickupComparisonEvent] {
-        self.pickup_comparison_events.new_events()
+    pub fn new_pickup_events(&self) -> &[BoostPickupEvent] {
+        self.pickup_events.new_events()
     }
 
-    pub fn ledger_events(&self) -> &[BoostLedgerEvent] {
-        self.ledger_events.all()
+    pub fn respawn_events(&self) -> &[RespawnEvent] {
+        self.respawn_events.all()
     }
 
-    pub fn new_ledger_events(&self) -> &[BoostLedgerEvent] {
-        self.ledger_events.new_events()
+    pub fn new_respawn_events(&self) -> &[RespawnEvent] {
+        self.respawn_events.new_events()
     }
 
-    pub fn projected_ledger_events(&self) -> Vec<BoostLedgerEvent> {
-        let mut events = self.ledger_events.all().to_vec();
-        let mut pending: Vec<_> = self.pending_ledger_events.values().cloned().collect();
-        pending.sort_by(Self::compare_pending_ledger_events);
-        events.extend(pending.into_iter().map(|pending| pending.event));
-        events
+    pub fn player_boost_stats(&self) -> &HashMap<PlayerId, BoostStats> {
+        self.stats.player_stats()
     }
 
-    pub fn flush_pending_ledger_events(&mut self) {
-        let mut pending: Vec<_> = self
-            .pending_ledger_events
-            .drain()
-            .map(|(_, pending)| pending)
-            .collect();
-        pending.sort_by(Self::compare_pending_ledger_events);
-        self.ledger_events
-            .extend(pending.into_iter().map(|pending| pending.event));
+    pub fn player_boost_stats_for(&self, player_id: &PlayerId) -> BoostStats {
+        self.stats.player_stats_for(player_id)
     }
 
-    pub fn state_events(&self) -> &[BoostStateEvent] {
-        self.state_events.all()
+    pub fn team_zero_boost_stats(&self) -> &BoostStats {
+        self.stats.team_zero_stats()
     }
 
-    pub fn new_state_events(&self) -> &[BoostStateEvent] {
-        self.state_events.new_events()
+    pub fn team_one_boost_stats(&self) -> &BoostStats {
+        self.stats.team_one_stats()
     }
 
-    pub fn bucket_events(&self) -> &[BoostBucketEvent] {
-        self.bucket_events.all()
+    /// The boost-stats accumulator, populated directly as frames are processed (no event replay).
+    pub fn boost_stats(&self) -> &BoostStatsAccumulator {
+        &self.stats
     }
 
-    pub fn new_bucket_events(&self) -> &[BoostBucketEvent] {
-        self.bucket_events.new_events()
-    }
-
-    pub fn projected_state_events(&self) -> Vec<BoostStateEvent> {
-        let mut events = self.state_events.all().to_vec();
-        let mut pending: Vec<_> = self
-            .pending_state_events
-            .values()
-            .map(|pending| pending.event.clone())
-            .collect();
-        pending.sort_by(|left, right| {
-            left.frame.cmp(&right.frame).then_with(|| {
-                format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
+    /// Build the compressed per-player accumulation tracks (boost amount + cumulative used /
+    /// collected / stolen / overfill). Sorted by player id then quantity for deterministic output.
+    pub fn accumulation_tracks(&self) -> Vec<AccumulationTrack> {
+        let mut tracks: Vec<AccumulationTrack> = self
+            .track_builders
+            .iter()
+            .filter(|(_, builder)| !builder.points.is_empty())
+            .map(|((player_id, quantity), builder)| AccumulationTrack {
+                player_id: player_id.clone(),
+                is_team_0: builder.is_team_0,
+                quantity: *quantity,
+                points: builder.points.clone(),
             })
-        });
-        events.extend(pending);
-        events
-    }
-
-    pub fn projected_bucket_events(&self) -> Vec<BoostBucketEvent> {
-        let mut events = self.bucket_events.all().to_vec();
-        let mut pending: Vec<_> = self.pending_bucket_events.values().cloned().collect();
-        pending.sort_by(|left, right| {
-            left.frame.cmp(&right.frame).then_with(|| {
-                format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
-            })
-        });
-        events.extend(pending);
-        events
-    }
-
-    pub fn flush_pending_state_events(&mut self) {
-        let mut pending: Vec<_> = self
-            .pending_state_events
-            .drain()
-            .map(|(_, pending)| pending)
             .collect();
-        pending.sort_by(|left, right| {
-            left.event.frame.cmp(&right.event.frame).then_with(|| {
-                format!("{:?}", left.event.player_id).cmp(&format!("{:?}", right.event.player_id))
-            })
+        tracks.sort_by(|left, right| {
+            format!("{:?}", left.player_id)
+                .cmp(&format!("{:?}", right.player_id))
+                .then_with(|| format!("{:?}", left.quantity).cmp(&format!("{:?}", right.quantity)))
         });
-        self.state_events
-            .extend(pending.into_iter().map(|pending| pending.event));
-    }
-
-    pub fn flush_pending_bucket_events(&mut self) {
-        let mut pending: Vec<_> = self
-            .pending_bucket_events
-            .drain()
-            .map(|(_, event)| event)
-            .collect();
-        pending.sort_by(|left, right| {
-            left.frame.cmp(&right.frame).then_with(|| {
-                format!("{:?}", left.player_id).cmp(&format!("{:?}", right.player_id))
-            })
-        });
-        self.bucket_events.extend(pending);
+        tracks
     }
 
     fn player_usage_state(&self, player_id: &PlayerId) -> BoostUsageState {
@@ -576,124 +384,125 @@ impl BoostCalculator {
             .unwrap_or_default()
     }
 
-    fn record_ledger_event(&mut self, event: BoostLedgerEvent) {
-        if event.amount <= 0.0 && event.count == 0 {
+    fn record_track_point(
+        &mut self,
+        player_id: &PlayerId,
+        is_team_0: bool,
+        frame: usize,
+        quantity: AccumulationQuantity,
+        value: f32,
+    ) {
+        let builder = self
+            .track_builders
+            .entry((player_id.clone(), quantity))
+            .or_default();
+        builder.is_team_0 = is_team_0;
+        if builder
+            .points
+            .last()
+            .is_some_and(|point| (point.value - value).abs() <= f32::EPSILON)
+        {
             return;
         }
+        builder.points.push(AccumulationPoint { frame, value });
+    }
 
-        if Self::is_continuous_ledger_event(&event) {
-            self.record_continuous_ledger_event(event);
+    /// Sample this player's instantaneous boost amount and their cumulative boost stats into the
+    /// per-frame accumulation tracks.
+    fn record_boost_tracks(
+        &mut self,
+        player_id: &PlayerId,
+        is_team_0: bool,
+        frame: usize,
+        boost_amount: f32,
+    ) {
+        let stats = self.stats.player_stats_for(player_id);
+        self.record_track_point(
+            player_id,
+            is_team_0,
+            frame,
+            AccumulationQuantity::BoostAmount,
+            boost_amount,
+        );
+        self.record_track_point(
+            player_id,
+            is_team_0,
+            frame,
+            AccumulationQuantity::BoostUsed,
+            stats.amount_used,
+        );
+        self.record_track_point(
+            player_id,
+            is_team_0,
+            frame,
+            AccumulationQuantity::BoostUsedGrounded,
+            stats.amount_used_while_grounded,
+        );
+        self.record_track_point(
+            player_id,
+            is_team_0,
+            frame,
+            AccumulationQuantity::BoostUsedAirborne,
+            stats.amount_used_while_airborne,
+        );
+        self.record_track_point(
+            player_id,
+            is_team_0,
+            frame,
+            AccumulationQuantity::BoostUsedSupersonic,
+            stats.amount_used_while_supersonic,
+        );
+        self.record_track_point(
+            player_id,
+            is_team_0,
+            frame,
+            AccumulationQuantity::BoostCollected,
+            stats.amount_collected,
+        );
+        self.record_track_point(
+            player_id,
+            is_team_0,
+            frame,
+            AccumulationQuantity::BoostStolen,
+            stats.amount_stolen,
+        );
+        self.record_track_point(
+            player_id,
+            is_team_0,
+            frame,
+            AccumulationQuantity::BoostOverfill,
+            stats.overfill_total,
+        );
+    }
+
+    /// Push a reported pickup, resolving its detection against any pending inferred pickup that
+    /// corroborates it (and consuming that inferred pickup so it does not later surface as an
+    /// inferred-only pickup).
+    fn push_reported_pickup(
+        &mut self,
+        reported: PendingBoostPickupEvent,
+        mut pickup: BoostPickupEvent,
+    ) {
+        let matched = if let Some(index) =
+            Self::matching_pending_pickup_index(&self.pending_inferred_pickups, &reported, true)
+        {
+            self.pending_inferred_pickups.remove(index);
+            true
+        } else if let Some(index) = self.pending_inferred_pickups.iter().position(|pending| {
+            pending.player_id == reported.player_id
+                && pending.frame.abs_diff(reported.frame) <= Self::PICKUP_MATCH_FRAME_WINDOW
+        }) {
+            self.pending_inferred_pickups.remove(index);
+            true
         } else {
-            self.flush_pending_ledger_events_for_player(&event.player_id);
-            self.ledger_events.push(event);
-        }
-    }
-
-    fn record_state_event(&mut self, event: BoostStateEvent) {
-        let player_id = event.player_id.clone();
-        let direction = BoostStateDirection::from_event(&event);
-        let Some(pending) = self.pending_state_events.get_mut(&player_id) else {
-            self.pending_state_events.insert(
-                player_id,
-                PendingBoostStateEvent {
-                    is_team_0: event.is_team_0,
-                    direction,
-                    event,
-                },
-            );
-            return;
+            false
         };
-
-        if pending.is_team_0 == event.is_team_0 && pending.direction == direction {
-            pending.event.absorb_sample(event);
+        pickup.detection = if matched {
+            BoostPickupDetection::Both
         } else {
-            let previous = self.pending_state_events.insert(
-                player_id,
-                PendingBoostStateEvent {
-                    is_team_0: event.is_team_0,
-                    direction,
-                    event,
-                },
-            );
-            let Some(previous) = previous else {
-                return;
-            };
-            self.state_events.push(previous.event);
-        }
-    }
-
-    fn record_bucket_sample(&mut self, event: BoostBucketEvent) {
-        let player_id = event.player_id.clone();
-        let Some(pending) = self.pending_bucket_events.get_mut(&player_id) else {
-            self.pending_bucket_events.insert(player_id, event);
-            return;
+            BoostPickupDetection::ReportedOnly
         };
-
-        if pending.is_team_0 == event.is_team_0 && pending.bucket == event.bucket {
-            pending.absorb_sample(event);
-        } else {
-            let previous = self.pending_bucket_events.insert(player_id, event);
-            if let Some(previous) = previous {
-                self.bucket_events.push(previous);
-            }
-        }
-    }
-
-    fn is_continuous_ledger_event(event: &BoostLedgerEvent) -> bool {
-        matches!(
-            event.transaction,
-            BoostLedgerTransactionKind::Used | BoostLedgerTransactionKind::UsedAllocation
-        )
-    }
-
-    fn pending_ledger_key(event: &BoostLedgerEvent) -> PendingBoostLedgerKey {
-        PendingBoostLedgerKey {
-            player_id: event.player_id.clone(),
-            is_team_0: event.is_team_0,
-            transaction: event.transaction,
-            labels: event.labels.clone(),
-        }
-    }
-
-    fn record_continuous_ledger_event(&mut self, event: BoostLedgerEvent) {
-        let key = Self::pending_ledger_key(&event);
-        let Some(pending) = self.pending_ledger_events.get_mut(&key) else {
-            self.pending_ledger_events
-                .insert(key.clone(), PendingBoostLedgerEvent { key, event });
-            return;
-        };
-        pending.event.absorb_delta(event);
-    }
-
-    fn flush_pending_ledger_events_for_player(&mut self, player_id: &PlayerId) {
-        let mut pending: Vec<_> = self
-            .pending_ledger_events
-            .extract_if(|_, pending| pending.key.player_id == *player_id)
-            .map(|(_, pending)| pending)
-            .collect();
-        pending.sort_by(Self::compare_pending_ledger_events);
-        self.ledger_events
-            .extend(pending.into_iter().map(|pending| pending.event));
-    }
-
-    fn compare_pending_ledger_events(
-        left: &PendingBoostLedgerEvent,
-        right: &PendingBoostLedgerEvent,
-    ) -> std::cmp::Ordering {
-        left.event
-            .frame
-            .cmp(&right.event.frame)
-            .then_with(|| {
-                format!("{:?}", left.event.player_id).cmp(&format!("{:?}", right.event.player_id))
-            })
-            .then_with(|| left.event.is_team_0.cmp(&right.event.is_team_0))
-            .then_with(|| {
-                format!("{:?}", left.event.transaction)
-                    .cmp(&format!("{:?}", right.event.transaction))
-            })
-            .then_with(|| {
-                format!("{:?}", left.event.labels).cmp(&format!("{:?}", right.event.labels))
-            })
+        self.pickup_events.push(pickup);
     }
 
     fn estimated_pad_position(&self, pad_id: &str) -> Option<glam::Vec3> {
@@ -922,7 +731,7 @@ impl BoostCalculator {
         pad_id: &str,
         pending_pickup: PendingBoostPickup,
         pad_size: BoostPadSize,
-    ) -> BoostPickupFieldHalf {
+    ) -> BoostPickupEvent {
         let observed_position = self
             .estimated_pad_position(pad_id)
             .unwrap_or(pending_pickup.player_position);
@@ -949,192 +758,132 @@ impl BoostCalculator {
             BoostPickupFieldHalf::Own
         };
 
-        let collected_labels = [
-            boost_transaction_label("collected"),
-            boost_pad_size_label(Some(pad_size)),
-            boost_activity_label(BoostPickupActivity::Active),
-            boost_field_half_label(field_half),
-        ];
+        // The obtained balance is applied incrementally (pre-applied + this delta) so usage
+        // inference stays correctly timed; the pickup stats below carry the full collected amount
+        // once, which sums identically to the former split Collected ledger entries.
         self.player_usage_state
             .entry(pending_pickup.player_id.clone())
             .or_default()
             .apply_obtained_amount(collected_amount_delta);
 
-        let overfill_labels = [
-            boost_transaction_label("overfill"),
-            boost_pad_size_label(Some(pad_size)),
-            boost_activity_label(BoostPickupActivity::Active),
-            boost_field_half_label(field_half),
-        ];
+        self.stats.apply_pickup(
+            &pending_pickup.player_id,
+            pending_pickup.is_team_0,
+            Some(pad_size),
+            BoostPickupActivity::Active,
+            field_half,
+            stolen,
+            collected_amount,
+            overfill,
+        );
 
-        self.record_ledger_event(BoostLedgerEvent {
+        BoostPickupEvent {
             frame: pending_pickup.frame,
             time: pending_pickup.time,
-            end_frame: pending_pickup.frame,
-            end_time: pending_pickup.time,
-            duration: 0.0,
             player_id: pending_pickup.player_id.clone(),
             player_position: Some(pending_pickup.player_position.to_array()),
             is_team_0: pending_pickup.is_team_0,
-            transaction: BoostLedgerTransactionKind::Collected,
-            amount: collected_amount_delta,
-            count: 1,
-            labels: collected_labels.into_iter().collect(),
+            pad_type: pad_size.into(),
+            field_half,
+            activity: BoostPickupActivity::Active,
+            // Overwritten by `push_reported_pickup` for reported pickups; inferred-only callers
+            // set it explicitly.
+            detection: BoostPickupDetection::Both,
+            is_steal: stolen,
+            collected_amount,
+            overfill_amount: overfill,
             boost_before: pending_pickup.boost_before,
             boost_after: pending_pickup.boost_after,
-        });
-        if stolen {
-            let stolen_labels = [
-                boost_transaction_label("stolen"),
-                boost_pad_size_label(Some(pad_size)),
-                boost_activity_label(BoostPickupActivity::Active),
-                boost_field_half_label(field_half),
-            ];
-            self.record_ledger_event(BoostLedgerEvent {
-                frame: pending_pickup.frame,
-                time: pending_pickup.time,
-                end_frame: pending_pickup.frame,
-                end_time: pending_pickup.time,
-                duration: 0.0,
-                player_id: pending_pickup.player_id.clone(),
-                player_position: Some(pending_pickup.player_position.to_array()),
-                is_team_0: pending_pickup.is_team_0,
-                transaction: BoostLedgerTransactionKind::Stolen,
-                amount: collected_amount,
-                count: 1,
-                labels: stolen_labels.into_iter().collect(),
-                boost_before: pending_pickup.boost_before,
-                boost_after: pending_pickup.boost_after,
-            });
         }
-        self.record_ledger_event(BoostLedgerEvent {
-            frame: pending_pickup.frame,
-            time: pending_pickup.time,
-            end_frame: pending_pickup.frame,
-            end_time: pending_pickup.time,
-            duration: 0.0,
-            player_id: pending_pickup.player_id.clone(),
-            player_position: Some(pending_pickup.player_position.to_array()),
-            is_team_0: pending_pickup.is_team_0,
-            transaction: BoostLedgerTransactionKind::Overfill,
-            amount: overfill,
-            count: 0,
-            labels: overfill_labels.into_iter().collect(),
-            boost_before: pending_pickup.boost_before,
-            boost_after: pending_pickup.boost_after,
-        });
-
-        field_half
     }
 
+    /// Pre-apply a partial collected amount to the usage-inference balance only (no stats / event).
+    /// The full pickup is recorded later when [`Self::resolve_pickup`] runs.
     fn apply_pickup_collected_amount(
         &mut self,
-        ledger_context: BoostLedgerContext,
         player_id: &PlayerId,
-        player_position: Option<[f32; 3]>,
-        is_team_0: bool,
         amount: f32,
         pad_size: Option<BoostPadSize>,
     ) {
         if amount <= 0.0 {
             return;
         }
-
-        let collected_labels = [
-            boost_transaction_label("collected"),
-            boost_pad_size_label(pad_size),
-            boost_activity_label(BoostPickupActivity::Active),
-            boost_field_half_label(BoostPickupFieldHalf::Unknown),
-        ];
         if pad_size.is_some() {
             self.player_usage_state
                 .entry(player_id.clone())
                 .or_default()
                 .apply_obtained_amount(amount);
         }
-        self.record_ledger_event(BoostLedgerEvent {
-            frame: ledger_context.frame,
-            time: ledger_context.time,
-            end_frame: ledger_context.frame,
-            end_time: ledger_context.time,
-            duration: 0.0,
-            player_id: player_id.clone(),
-            player_position,
-            is_team_0,
-            transaction: BoostLedgerTransactionKind::Collected,
-            amount,
-            count: 0,
-            labels: collected_labels.into_iter().collect(),
-            boost_before: ledger_context.boost_before,
-            boost_after: ledger_context.boost_after,
-        });
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn apply_inactive_pickup(
         &mut self,
-        ledger_context: BoostLedgerContext,
         player_id: &PlayerId,
         player_position: Option<[f32; 3]>,
         is_team_0: bool,
+        frame: usize,
+        time: f32,
         amount: f32,
         pad_size: BoostPadSize,
-    ) {
-        let collected_labels = [
-            boost_transaction_label("collected"),
-            boost_pad_size_label(Some(pad_size)),
-            boost_activity_label(BoostPickupActivity::Inactive),
-            boost_field_half_label(BoostPickupFieldHalf::Unknown),
-        ];
-        self.record_ledger_event(BoostLedgerEvent {
-            frame: ledger_context.frame,
-            time: ledger_context.time,
-            end_frame: ledger_context.frame,
-            end_time: ledger_context.time,
-            duration: 0.0,
+        boost_before: Option<f32>,
+        boost_after: Option<f32>,
+    ) -> BoostPickupEvent {
+        self.stats.apply_pickup(
+            player_id,
+            is_team_0,
+            Some(pad_size),
+            BoostPickupActivity::Inactive,
+            BoostPickupFieldHalf::Unknown,
+            false,
+            amount,
+            0.0,
+        );
+        BoostPickupEvent {
+            frame,
+            time,
             player_id: player_id.clone(),
             player_position,
             is_team_0,
-            transaction: BoostLedgerTransactionKind::Collected,
-            amount,
-            count: 1,
-            labels: collected_labels.into_iter().collect(),
-            boost_before: ledger_context.boost_before,
-            boost_after: ledger_context.boost_after,
-        });
+            pad_type: pad_size.into(),
+            field_half: BoostPickupFieldHalf::Unknown,
+            activity: BoostPickupActivity::Inactive,
+            detection: BoostPickupDetection::ReportedOnly,
+            is_steal: false,
+            collected_amount: amount,
+            overfill_amount: 0.0,
+            boost_before,
+            boost_after,
+        }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn apply_respawn_amount(
         &mut self,
-        ledger_context: BoostLedgerContext,
         player_id: &PlayerId,
         player_position: Option<[f32; 3]>,
         is_team_0: bool,
+        frame: usize,
+        time: f32,
         amount: f32,
+        kind: RespawnKind,
     ) {
         if amount <= 0.0 {
             return;
         }
-
-        let respawn_labels = [boost_transaction_label("respawn")];
         self.player_usage_state
             .entry(player_id.clone())
             .or_default()
             .apply_obtained_amount(amount);
-        self.record_ledger_event(BoostLedgerEvent {
-            frame: ledger_context.frame,
-            time: ledger_context.time,
-            end_frame: ledger_context.frame,
-            end_time: ledger_context.time,
-            duration: 0.0,
+        self.stats.apply_respawn(player_id, is_team_0, amount);
+        self.respawn_events.push(RespawnEvent {
+            frame,
+            time,
             player_id: player_id.clone(),
             player_position,
             is_team_0,
-            transaction: BoostLedgerTransactionKind::Respawn,
-            amount,
-            count: 0,
-            labels: respawn_labels.into_iter().collect(),
-            boost_before: ledger_context.boost_before,
-            boost_after: ledger_context.boost_after,
+            kind,
+            boost_granted: Some(amount),
         });
     }
 
@@ -1265,58 +1014,6 @@ impl BoostCalculator {
         vec![BoostIncreaseReason::Unknown]
     }
 
-    fn emit_pickup_comparison_event(
-        &mut self,
-        comparison: BoostPickupComparison,
-        inferred: Option<PendingBoostPickupEvent>,
-        reported: Option<PendingBoostPickupEvent>,
-    ) {
-        let reference = inferred.as_ref().or(reported.as_ref()).unwrap();
-        let pad_type = reported
-            .as_ref()
-            .map(|event| event.pad_type)
-            .or_else(|| inferred.as_ref().map(|event| event.pad_type))
-            .unwrap_or(reference.pad_type);
-        let field_half = reported
-            .as_ref()
-            .map(|event| event.field_half)
-            .or_else(|| inferred.as_ref().map(|event| event.field_half))
-            .unwrap_or(reference.field_half);
-        let activity = reported
-            .as_ref()
-            .map(|event| event.activity)
-            .or_else(|| inferred.as_ref().map(|event| event.activity))
-            .unwrap_or(reference.activity);
-        let event_frame = inferred
-            .as_ref()
-            .map(|event| event.frame)
-            .or_else(|| reported.as_ref().map(|event| event.frame))
-            .unwrap_or(reference.frame);
-        let event_time = inferred
-            .as_ref()
-            .map(|event| event.time)
-            .or_else(|| reported.as_ref().map(|event| event.time))
-            .unwrap_or(reference.time);
-        let comparison_event = BoostPickupComparisonEvent {
-            comparison,
-            frame: event_frame,
-            time: event_time,
-            player_id: reference.player_id.clone(),
-            player_position: reference.player_position,
-            is_team_0: reference.is_team_0,
-            pad_type,
-            field_half,
-            activity,
-            reported_frame: reported.as_ref().map(|event| event.frame),
-            reported_time: reported.as_ref().map(|event| event.time),
-            inferred_frame: inferred.as_ref().map(|event| event.frame),
-            inferred_time: inferred.as_ref().map(|event| event.time),
-            boost_before: inferred.as_ref().and_then(|event| event.boost_before),
-            boost_after: inferred.as_ref().and_then(|event| event.boost_after),
-        };
-        self.pickup_comparison_events.push(comparison_event);
-    }
-
     fn matching_pending_pickup_index(
         pending: &VecDeque<PendingBoostPickupEvent>,
         event: &PendingBoostPickupEvent,
@@ -1340,35 +1037,6 @@ impl BoostCalculator {
 
     fn record_inferred_pickup(&mut self, event: PendingBoostPickupEvent) {
         self.pending_inferred_pickups.push_back(event);
-    }
-
-    fn record_reported_pickup(&mut self, event: PendingBoostPickupEvent) {
-        if let Some(index) =
-            Self::matching_pending_pickup_index(&self.pending_inferred_pickups, &event, true)
-        {
-            let inferred = self
-                .pending_inferred_pickups
-                .remove(index)
-                .expect("matched inferred pickup index should exist");
-            self.emit_pickup_comparison_event(
-                BoostPickupComparison::Both,
-                Some(inferred),
-                Some(event),
-            );
-        } else {
-            if let Some(index) = self
-                .pending_inferred_pickups
-                .iter()
-                .position(|pending_event| {
-                    pending_event.player_id == event.player_id
-                        && pending_event.frame.abs_diff(event.frame)
-                            <= Self::PICKUP_MATCH_FRAME_WINDOW
-                })
-            {
-                self.pending_inferred_pickups.remove(index);
-            }
-            self.emit_pickup_comparison_event(BoostPickupComparison::Both, None, Some(event));
-        }
     }
 
     fn resolve_deferred_reported_pickups(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
@@ -1406,20 +1074,18 @@ impl BoostCalculator {
                 }
             }
 
-            let field_half =
+            let pickup =
                 self.resolve_pickup(&deferred.pad_id, deferred.pending_pickup, deferred.pad_size);
-            deferred.reported_event.field_half = field_half;
-            self.record_reported_pickup(deferred.reported_event);
+            self.push_reported_pickup(deferred.reported_event, pickup);
         }
         self.pending_reported_pickups = remaining_pickups;
     }
 
     fn flush_deferred_reported_pickups(&mut self) {
-        while let Some(mut deferred) = self.pending_reported_pickups.pop_front() {
-            let field_half =
+        while let Some(deferred) = self.pending_reported_pickups.pop_front() {
+            let pickup =
                 self.resolve_pickup(&deferred.pad_id, deferred.pending_pickup, deferred.pad_size);
-            deferred.reported_event.field_half = field_half;
-            self.record_reported_pickup(deferred.reported_event);
+            self.push_reported_pickup(deferred.reported_event, pickup);
         }
     }
 
@@ -1445,7 +1111,24 @@ impl BoostCalculator {
         application_frame: &FrameInfo,
     ) {
         let Some(boost_before) = event.boost_before else {
-            self.emit_pickup_comparison_event(BoostPickupComparison::Ghost, Some(event), None);
+            // No boost-before sample to compute amounts from; emit a detection-only inferred
+            // pickup with no stats contribution (matches the former no-resolve Ghost path).
+            self.pickup_events.push(BoostPickupEvent {
+                frame: event.frame,
+                time: event.time,
+                player_id: event.player_id.clone(),
+                player_position: event.player_position,
+                is_team_0: event.is_team_0,
+                pad_type: event.pad_type,
+                field_half: event.field_half,
+                activity: event.activity,
+                detection: BoostPickupDetection::InferredOnly,
+                is_steal: matches!(event.field_half, BoostPickupFieldHalf::Opponent),
+                collected_amount: 0.0,
+                overfill_amount: 0.0,
+                boost_before: event.boost_before,
+                boost_after: event.boost_after,
+            });
             return;
         };
 
@@ -1455,7 +1138,7 @@ impl BoostCalculator {
             .map(glam::Vec3::from_array)
             .unwrap_or(glam::Vec3::ZERO);
         let pad_id = format!("inferred:{:?}:{}", event.player_id, event.frame);
-        let field_half = self.resolve_pickup(
+        let mut pickup = self.resolve_pickup(
             &pad_id,
             PendingBoostPickup {
                 frame: application_frame.frame_number,
@@ -1470,15 +1153,11 @@ impl BoostCalculator {
             },
             pad_size,
         );
-
-        let mut comparison_event = event;
-        comparison_event.pad_type = pad_size.into();
-        comparison_event.field_half = field_half;
-        self.emit_pickup_comparison_event(
-            BoostPickupComparison::Ghost,
-            Some(comparison_event),
-            None,
-        );
+        // The pickup happened when the boost-amount jump was observed, not at the flush frame.
+        pickup.frame = event.frame;
+        pickup.time = event.time;
+        pickup.detection = BoostPickupDetection::InferredOnly;
+        self.pickup_events.push(pickup);
     }
 
     fn flush_stale_pickup_comparisons(&mut self, frame: &FrameInfo) {
@@ -1496,9 +1175,6 @@ impl BoostCalculator {
     pub fn finish_calculation(&mut self) -> SubtrActorResult<()> {
         self.flush_deferred_reported_pickups();
         self.pending_inferred_pickups.clear();
-        self.flush_pending_ledger_events();
-        self.flush_pending_state_events();
-        self.flush_pending_bucket_events();
         Ok(())
     }
 
@@ -1543,19 +1219,12 @@ impl BoostCalculator {
         vertical_state: &PlayerVerticalState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
-        self.pickup_comparison_events.begin_update();
-        self.ledger_events.begin_update();
-        self.state_events.begin_update();
-        self.bucket_events.begin_update();
+        self.pickup_events.begin_update();
+        self.respawn_events.begin_update();
         let live_play = live_play_state.counts_toward_player_motion();
         let boost_levels_live = Self::boost_levels_live(live_play);
         let track_boost_levels = Self::tracks_boost_levels(boost_levels_live);
         let track_boost_pickups = Self::tracks_boost_pickups(gameplay, live_play);
-        if !track_boost_levels {
-            self.flush_pending_ledger_events();
-            self.flush_pending_state_events();
-            self.flush_pending_bucket_events();
-        }
         let boost_levels_resumed_this_sample =
             boost_levels_live && !self.previous_boost_levels_live.unwrap_or(false);
         let kickoff_phase_active = gameplay.kickoff_phase_active();
@@ -1655,34 +1324,18 @@ impl BoostCalculator {
             let generic_respawn_supported = track_boost_levels
                 && boost_increase_reasons.contains(&BoostIncreaseReason::Respawn);
             if track_boost_levels {
-                let boost_before = if boost_levels_resumed_this_sample {
-                    None
+                let previous = if boost_levels_resumed_this_sample {
+                    boost_amount
                 } else {
-                    Some(previous_boost_amount)
+                    previous_boost_amount
                 };
-                self.record_state_event(BoostStateEvent {
-                    frame: frame.frame_number,
-                    time: frame.time,
-                    end_frame: frame.frame_number,
-                    end_time: frame.time,
-                    duration: frame.dt,
-                    player_id: player.player_id.clone(),
-                    player_position: player.position().map(|position| position.to_array()),
-                    is_team_0: player.is_team_0,
+                self.stats.apply_boost_sample(
+                    &player.player_id,
+                    player.is_team_0,
+                    previous,
                     boost_amount,
-                    boost_before,
-                });
-                self.record_bucket_sample(BoostBucketEvent {
-                    frame: frame.frame_number,
-                    time: frame.time,
-                    end_frame: frame.frame_number,
-                    end_time: frame.time + frame.dt,
-                    duration: frame.dt,
-                    player_id: player.player_id.clone(),
-                    player_position: player.position().map(|position| position.to_array()),
-                    is_team_0: player.is_team_0,
-                    bucket: BoostBucket::from_amount(boost_amount),
-                });
+                    frame.dt,
+                );
             }
 
             let mut respawn_amount = 0.0;
@@ -1700,7 +1353,8 @@ impl BoostCalculator {
                 self.kickoff_respawn_awarded
                     .insert(player.player_id.clone());
             }
-            if demo_respawn_supported || generic_respawn_supported {
+            let demo_respawn = demo_respawn_supported || generic_respawn_supported;
+            if demo_respawn {
                 if let Some(pending) = self.pending_demo_respawns.get(&player.player_id) {
                     // A demo removes the victim's pre-demo boost; the respawn
                     // grant below is a separate obtained amount.
@@ -1717,22 +1371,24 @@ impl BoostCalculator {
                 self.pending_demo_respawns.remove(&player.player_id);
             }
             if respawn_amount > 0.0 {
+                let respawn_kind = if demo_respawn {
+                    RespawnKind::Demo
+                } else {
+                    RespawnKind::Kickoff
+                };
                 self.apply_respawn_amount(
-                    BoostLedgerContext {
-                        frame: frame.frame_number,
-                        time: frame.time,
-                        boost_before: Some(previous_boost_amount),
-                        boost_after: Some(boost_amount),
-                    },
                     &player.player_id,
                     player.position().map(|position| position.to_array()),
                     player.is_team_0,
+                    frame.frame_number,
+                    frame.time,
                     respawn_amount,
+                    respawn_kind,
                 );
             }
             respawn_amounts_by_player.insert(player.player_id.clone(), respawn_amount);
 
-            current_boost_amounts.push((player.player_id.clone(), boost_amount));
+            current_boost_amounts.push((player.player_id.clone(), player.is_team_0, boost_amount));
         }
 
         self.resolve_deferred_reported_pickups(frame, players);
@@ -1776,20 +1432,18 @@ impl BoostCalculator {
                         )) {
                             continue;
                         }
-                        self.apply_inactive_pickup(
-                            BoostLedgerContext {
-                                frame: event.frame,
-                                time: event.time,
-                                boost_before: Some(previous_boost_amount),
-                                boost_after: player.boost_amount,
-                            },
+                        let pickup = self.apply_inactive_pickup(
                             player_id,
                             player.position().map(|position| position.to_array()),
                             player.is_team_0,
+                            event.frame,
+                            event.time,
                             collected_amount,
                             pad_size,
+                            Some(previous_boost_amount),
+                            player.boost_amount,
                         );
-                        self.record_reported_pickup(PendingBoostPickupEvent {
+                        let reported_event = PendingBoostPickupEvent {
                             frame: event.frame,
                             time: event.time,
                             player_id: player_id.clone(),
@@ -1803,7 +1457,8 @@ impl BoostCalculator {
                             activity: BoostPickupActivity::Inactive,
                             boost_before: None,
                             boost_after: None,
-                        });
+                        };
+                        self.push_reported_pickup(reported_event, pickup);
                         continue;
                     }
                     let Some(player_id) = &event.player else {
@@ -1878,15 +1533,7 @@ impl BoostCalculator {
                         })
                         .flatten();
                     self.apply_pickup_collected_amount(
-                        BoostLedgerContext {
-                            frame: event.frame,
-                            time: event.time,
-                            boost_before: Some(previous_boost_amount),
-                            boost_after: player.boost_amount,
-                        },
                         player_id,
-                        player.position().map(|position| position.to_array()),
-                        player.is_team_0,
                         pre_applied_collected_amount,
                         pre_applied_pad_size,
                     );
@@ -1923,7 +1570,7 @@ impl BoostCalculator {
                             Some(size)
                         });
                     if let Some(pad_size) = pad_size {
-                        let mut reported_event = PendingBoostPickupEvent {
+                        let reported_event = PendingBoostPickupEvent {
                             frame: event.frame,
                             time: event.time,
                             player_id: player_id.clone(),
@@ -1953,10 +1600,8 @@ impl BoostCalculator {
                             continue;
                         }
 
-                        let field_half =
-                            self.resolve_pickup(&event.pad_id, pending_pickup, pad_size);
-                        reported_event.field_half = field_half;
-                        self.record_reported_pickup(reported_event);
+                        let pickup = self.resolve_pickup(&event.pad_id, pending_pickup, pad_size);
+                        self.push_reported_pickup(reported_event, pickup);
                     }
                 }
                 BoostPadEventKind::Available => {
@@ -1984,12 +1629,6 @@ impl BoostCalculator {
                 let Some(boost_amount) = player.boost_amount else {
                     continue;
                 };
-                let boost_before = self
-                    .previous_boost_amounts
-                    .get(&player.player_id)
-                    .copied()
-                    .or(player.last_boost_amount);
-                let mut used_ledger_event = None;
                 let usage_state = self.player_usage_state(&player.player_id);
                 let previous_amount_used = usage_state.amount_used;
                 let amount_used_raw = usage_state.inferred_amount_used(boost_amount);
@@ -2012,42 +1651,18 @@ impl BoostCalculator {
                     let used_while_supersonic = player.boost_active
                         && speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD
                         && previous_speed.unwrap_or(0.0) >= SUPERSONIC_SPEED_THRESHOLD;
-                    let vertical_label = if vertical_state.is_grounded(&player.player_id) {
-                        vertical_state_label(false)
-                    } else {
-                        vertical_state_label(true)
-                    };
-                    let used_labels = [
-                        boost_transaction_label("used"),
-                        vertical_label,
-                        boost_supersonic_label(used_while_supersonic),
-                    ];
-                    used_ledger_event = Some(BoostLedgerEvent {
-                        frame: frame.frame_number,
-                        time: frame.time,
-                        end_frame: frame.frame_number,
-                        end_time: frame.time,
-                        duration: frame.dt,
-                        player_id: player.player_id.clone(),
-                        player_position: player.position().map(|position| position.to_array()),
-                        is_team_0: player.is_team_0,
-                        transaction: BoostLedgerTransactionKind::UsedAllocation,
-                        amount: amount_used_allocation_delta,
-                        count: 0,
-                        labels: used_labels.into_iter().collect(),
-                        boost_before,
-                        boost_after: Some(boost_amount),
-                    });
+                    let grounded = vertical_state.is_grounded(&player.player_id);
+                    self.stats.apply_used_allocation(
+                        &player.player_id,
+                        player.is_team_0,
+                        amount_used_allocation_delta,
+                        grounded,
+                        used_while_supersonic,
+                    );
                     self.player_usage_state
                         .entry(player.player_id.clone())
                         .or_default()
-                        .apply_used_allocation(
-                            amount_used_allocation_delta,
-                            vertical_state.is_grounded(&player.player_id),
-                        );
-                }
-                if let Some(event) = used_ledger_event {
-                    self.record_ledger_event(event);
+                        .apply_used_allocation(amount_used_allocation_delta, grounded);
                 }
                 if amount_used_delta <= 0.0 {
                     continue;
@@ -2056,25 +1671,14 @@ impl BoostCalculator {
                     .entry(player.player_id.clone())
                     .or_default()
                     .apply_used_amount(amount_used_delta);
-                self.record_ledger_event(BoostLedgerEvent {
-                    frame: frame.frame_number,
-                    time: frame.time,
-                    end_frame: frame.frame_number,
-                    end_time: frame.time,
-                    duration: frame.dt,
-                    player_id: player.player_id.clone(),
-                    player_position: player.position().map(|position| position.to_array()),
-                    is_team_0: player.is_team_0,
-                    transaction: BoostLedgerTransactionKind::Used,
-                    amount: amount_used_delta,
-                    count: 0,
-                    labels: [boost_transaction_label("used")].into_iter().collect(),
-                    boost_before,
-                    boost_after: Some(boost_amount),
-                });
+                self.stats
+                    .apply_used(&player.player_id, player.is_team_0, amount_used_delta);
             }
         }
-        for (player_id, boost_amount) in current_boost_amounts {
+        for (player_id, is_team_0, boost_amount) in current_boost_amounts {
+            if track_boost_levels {
+                self.record_boost_tracks(&player_id, is_team_0, frame.frame_number, boost_amount);
+            }
             self.previous_boost_amounts.insert(player_id, boost_amount);
         }
         for player in &players.players {

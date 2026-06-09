@@ -66,6 +66,10 @@ pub(in crate::collector::stats::playback) fn parse_core_player_goal_context_even
         )?,
         goals_for_while_most_back: json_required_bool(object, "goals_for_while_most_back")?,
         goals_against_while_most_back: json_required_bool(object, "goals_against_while_most_back")?,
+        caught_ahead_of_play_on_conceded_goal: json_optional_bool(
+            object.get("caught_ahead_of_play_on_conceded_goal"),
+        )
+        .unwrap_or(false),
         goal_against_boost_amount: json_optional_f32(object.get("goal_against_boost_amount"))?,
         goal_against_average_boost_in_leadup: json_optional_f32(
             object.get("goal_against_average_boost_in_leadup"),
@@ -232,27 +236,6 @@ pub(in crate::collector::stats::playback) fn parse_positioning_activity_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_positioning_possession_event(
-    value: &Value,
-) -> SubtrActorResult<PositioningPossessionEvent> {
-    let object = json_object(value, "positioning possession event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(PositioningPossessionEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        possession_state: decode_json_value(
-            json_required_value(object, "possession_state")?.clone(),
-        )?,
-    })
-}
-
 pub(in crate::collector::stats::playback) fn parse_positioning_field_zone_event(
     value: &Value,
 ) -> SubtrActorResult<PositioningFieldZoneEvent> {
@@ -276,13 +259,13 @@ pub(in crate::collector::stats::playback) fn parse_positioning_field_zone_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_positioning_ball_depth_event(
+pub(in crate::collector::stats::playback) fn parse_positioning_ball_relative_depth_event(
     value: &Value,
-) -> SubtrActorResult<PositioningBallDepthEvent> {
-    let object = json_object(value, "positioning ball depth event")?;
+) -> SubtrActorResult<PositioningBallRelativeDepthEvent> {
+    let object = json_object(value, "positioning ball-relative depth event")?;
     let time = json_required_f32(object, "time")?;
     let frame = json_required_usize(object, "frame")?;
-    Ok(PositioningBallDepthEvent {
+    Ok(PositioningBallRelativeDepthEvent {
         time,
         frame,
         end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
@@ -337,23 +320,6 @@ pub(in crate::collector::stats::playback) fn parse_positioning_ball_proximity_ev
         closest_to_ball_absolute: json_optional_bool(object.get("closest_to_ball_absolute"))
             .unwrap_or(false),
         farthest_from_ball: json_required_bool(object, "farthest_from_ball")?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_positioning_goal_context_event(
-    value: &Value,
-) -> SubtrActorResult<PositioningGoalContextEvent> {
-    let object = json_object(value, "positioning goal context event")?;
-    Ok(PositioningGoalContextEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        caught_ahead_of_play_on_conceded_goal: json_required_bool(
-            object,
-            "caught_ahead_of_play_on_conceded_goal",
-        )?,
     })
 }
 
@@ -1371,12 +1337,11 @@ pub(in crate::collector::stats::playback) fn parse_bump_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_boost_pickup_comparison_event(
+pub(in crate::collector::stats::playback) fn parse_boost_pickup_event(
     value: &Value,
-) -> SubtrActorResult<BoostPickupComparisonEvent> {
-    let object = json_object(value, "boost pickup comparison event")?;
-    Ok(BoostPickupComparisonEvent {
-        comparison: decode_json_value(json_required_value(object, "comparison")?.clone())?,
+) -> SubtrActorResult<BoostPickupEvent> {
+    let object = json_object(value, "boost pickup event")?;
+    Ok(BoostPickupEvent {
         frame: json_required_usize(object, "frame")?,
         time: json_required_f32(object, "time")?,
         player_id: json_required_remote_id(object, "player_id")?,
@@ -1385,79 +1350,26 @@ pub(in crate::collector::stats::playback) fn parse_boost_pickup_comparison_event
         pad_type: decode_json_value(json_required_value(object, "pad_type")?.clone())?,
         field_half: decode_json_value(json_required_value(object, "field_half")?.clone())?,
         activity: decode_json_value(json_required_value(object, "activity")?.clone())?,
-        reported_frame: json_optional_usize(object.get("reported_frame"))?,
-        reported_time: json_optional_f32(object.get("reported_time"))?,
-        inferred_frame: json_optional_usize(object.get("inferred_frame"))?,
-        inferred_time: json_optional_f32(object.get("inferred_time"))?,
+        detection: decode_json_value(json_required_value(object, "detection")?.clone())?,
+        is_steal: json_required_bool(object, "is_steal")?,
+        collected_amount: json_required_f32(object, "collected_amount")?,
+        overfill_amount: json_required_f32(object, "overfill_amount")?,
         boost_before: json_optional_f32(object.get("boost_before"))?,
         boost_after: json_optional_f32(object.get("boost_after"))?,
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_boost_ledger_event(
+pub(in crate::collector::stats::playback) fn parse_boost_respawn_event(
     value: &Value,
-) -> SubtrActorResult<BoostLedgerEvent> {
-    let object = json_object(value, "boost ledger event")?;
-    let frame = json_required_usize(object, "frame")?;
-    let time = json_required_f32(object, "time")?;
-    Ok(BoostLedgerEvent {
-        frame,
-        time,
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
+) -> SubtrActorResult<RespawnEvent> {
+    let object = json_object(value, "respawn event")?;
+    Ok(RespawnEvent {
+        frame: json_required_usize(object, "frame")?,
+        time: json_required_f32(object, "time")?,
         player_id: json_required_remote_id(object, "player_id")?,
         player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        transaction: decode_json_value(json_required_value(object, "transaction")?.clone())?,
-        amount: json_required_f32(object, "amount")?,
-        count: json_required_usize(object, "count")? as u32,
-        labels: decode_json_value(
-            object
-                .get("labels")
-                .cloned()
-                .unwrap_or_else(|| Value::Array(Vec::new())),
-        )?,
-        boost_before: json_optional_f32(object.get("boost_before"))?,
-        boost_after: json_optional_f32(object.get("boost_after"))?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_boost_state_event(
-    value: &Value,
-) -> SubtrActorResult<BoostStateEvent> {
-    let object = json_object(value, "boost state event")?;
-    let frame = json_required_usize(object, "frame")?;
-    let time = json_required_f32(object, "time")?;
-    Ok(BoostStateEvent {
-        frame,
-        time,
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player_id: json_required_remote_id(object, "player_id")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        boost_amount: json_required_f32(object, "boost_amount")?,
-        boost_before: json_optional_f32(object.get("boost_before"))?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_boost_bucket_event(
-    value: &Value,
-) -> SubtrActorResult<BoostBucketEvent> {
-    let object = json_object(value, "boost bucket event")?;
-    let frame = json_required_usize(object, "frame")?;
-    let time = json_required_f32(object, "time")?;
-    Ok(BoostBucketEvent {
-        frame,
-        time,
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player_id: json_required_remote_id(object, "player_id")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        bucket: decode_json_value(json_required_value(object, "bucket")?.clone())?,
+        kind: decode_json_value(json_required_value(object, "kind")?.clone())?,
+        boost_granted: json_optional_f32(object.get("boost_granted"))?,
     })
 }
