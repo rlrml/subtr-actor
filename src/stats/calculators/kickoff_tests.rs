@@ -1339,7 +1339,6 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
-            boost_ledger_events: &[],
         })
         .unwrap();
 
@@ -1358,7 +1357,6 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             },
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
-            boost_ledger_events: &[],
         })
         .unwrap();
 
@@ -1374,7 +1372,6 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
-            boost_ledger_events: &[],
         })
         .unwrap();
 
