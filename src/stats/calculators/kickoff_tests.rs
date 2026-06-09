@@ -344,7 +344,7 @@ fn kickoff_classifies_fake_and_missed_expected_takers() {
 
     calculator
         .update(
-            &frame(25, 2.5),
+            &frame(35, 3.1),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -490,7 +490,7 @@ fn kickoff_classifies_support_players_as_cheating_or_going_for_boost() {
 
     calculator
         .update(
-            &frame(25, 2.5),
+            &frame(35, 3.1),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -651,7 +651,7 @@ fn kickoff_tracks_first_touch_taker_delay_exit_velocity_and_follow_up() {
 
     calculator
         .update(
-            &frame(25, 2.5),
+            &frame(35, 3.1),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -680,9 +680,9 @@ fn kickoff_tracks_first_touch_taker_delay_exit_velocity_and_follow_up() {
     assert_eq!(event.first_follow_up_touch_player, None);
     assert_eq!(
         event.kickoff_possession_outcome,
-        KickoffPossessionOutcome::Contested
+        KickoffPossessionOutcome::TeamZeroPossession
     );
-    assert_eq!(event.kickoff_possession_team_is_team_0, None);
+    assert_eq!(event.kickoff_possession_team_is_team_0, Some(true));
 }
 
 #[test]
@@ -902,7 +902,7 @@ fn kickoff_taker_touch_delay_is_non_negative_when_team_one_touches_first() {
 
     calculator
         .update(
-            &frame(25, 2.5),
+            &frame(35, 3.1),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -918,6 +918,204 @@ fn kickoff_taker_touch_delay_is_non_negative_when_team_one_touches_first() {
     assert_eq!(event.team_zero_taker_touch_time, Some(1.2));
     assert_eq!(event.team_one_taker_touch_time, Some(1.0));
     assert!((event.taker_touch_delay_seconds.unwrap() - 0.2).abs() < 0.0001);
+}
+
+#[test]
+fn kickoff_waits_past_resolution_to_capture_first_follow_up_touch() {
+    let blue_taker = PlayerId::Steam(44);
+    let blue_support = PlayerId::Steam(45);
+    let orange_taker = PlayerId::Steam(46);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-256.0, -3840.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        blue_support.clone(),
+                        true,
+                        glam::Vec3::new(0.0, -4608.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(256.0, 3840.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(10, 1.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker, true, 10, 1.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(12, 1.15),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(orange_taker, false, 12, 1.15)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(26, 2.3),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball_with_velocity(-360.0, glam::Vec3::new(0.0, -500.0, 0.0)),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    assert!(calculator.events().is_empty());
+
+    calculator
+        .update(
+            &frame(31, 2.6),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball_with_velocity(360.0, glam::Vec3::new(0.0, 900.0, 0.0)),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_support.clone(), true, 31, 2.6)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.outcome, KickoffOutcome::TeamOneWin);
+    assert_eq!(event.exit_velocity, Some([0.0, -500.0, 0.0]));
+    assert_eq!(event.first_follow_up_touch_time, Some(2.6));
+    assert_eq!(event.first_follow_up_touch_frame, Some(31));
+    assert_eq!(event.first_follow_up_touch_team_is_team_0, Some(true));
+    assert_eq!(event.first_follow_up_touch_player, Some(blue_support));
+    assert_eq!(
+        event.kickoff_possession_outcome,
+        KickoffPossessionOutcome::TeamZeroPossession
+    );
+    assert_eq!(event.kickoff_possession_team_is_team_0, Some(true));
+}
+
+#[test]
+fn kickoff_without_follow_up_remains_contested_when_ball_resolution_is_neutral() {
+    let blue_taker = PlayerId::Steam(42);
+    let orange_taker = PlayerId::Steam(43);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker,
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(10, 1.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker, true, 10, 1.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(35, 3.1),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.first_follow_up_touch_time, None);
+    assert_eq!(
+        event.kickoff_possession_outcome,
+        KickoffPossessionOutcome::Contested
+    );
+    assert_eq!(event.kickoff_possession_team_is_team_0, None);
 }
 
 #[test]
@@ -1049,7 +1247,7 @@ fn kickoff_follow_up_clean_possession_uses_unchallenged_touch_sequence() {
 
     calculator
         .update(
-            &frame(25, 2.5),
+            &frame(35, 3.1),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -1318,7 +1516,7 @@ fn kickoff_possession_outcome_tracks_team_advantage_before_late_challenge() {
 
     calculator
         .update(
-            &frame(25, 2.5),
+            &frame(35, 3.1),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -1399,7 +1597,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
 
     calculator
         .update_with_speed_flips(KickoffUpdateContext {
-            frame: &frame(25, 2.5),
+            frame: &frame(35, 3.1),
             gameplay: &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -1631,7 +1829,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
 
     calculator
         .update(
-            &frame(25, 2.5),
+            &frame(35, 3.1),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()

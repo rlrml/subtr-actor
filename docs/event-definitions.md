@@ -296,7 +296,7 @@ _None documented._
 
 ### Dodge (`dodge`)
 
-- Category: `movement`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -823,7 +823,7 @@ _None documented._
 
 ### Powerslide (`powerslide`)
 
-- Category: `movement`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
