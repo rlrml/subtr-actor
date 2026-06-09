@@ -965,7 +965,91 @@ _None documented._
 
 _None documented._
 
+### Rotation Depth Span (`rotation_depth_span`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `rotation` via `RotationNode` / `RotationCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### First Man Stint (`rotation_first_man_stint`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `rotation` via `RotationNode` / `RotationCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Player Rotation (`rotation_player`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `rotation` via `RotationNode` / `RotationCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Rotation Role Span (`rotation_role_span`)
 
 - Category: `positioning`
 - Confidence:
