@@ -908,7 +908,7 @@ fn build_replay_events(
                 event.start_time,
                 event.end_time,
             ),
-            EventPayload::Kickoff(event.clone()),
+            EventPayload::Kickoff(Box::new(event.clone())),
             event.first_touch_player.clone(),
             None,
             event.first_touch_team_is_team_0,

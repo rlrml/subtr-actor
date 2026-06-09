@@ -27,7 +27,7 @@ fn assert_pass_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.pass.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "pass", |payload| match payload { EventPayload::Pass(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.sample_frame
             .cmp(&right.sample_frame)
@@ -141,7 +141,7 @@ fn assert_rush_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.rush.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "rush", |payload| match payload { EventPayload::Rush(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.start_frame
             .cmp(&right.start_frame)
@@ -286,7 +286,7 @@ fn assert_bump_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.bump.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "bump", |payload| match payload { EventPayload::Bump(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -354,17 +354,17 @@ fn assert_demo_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events: Vec<_> = timeline
-        .events
-        .timeline
-        .iter()
+    let mut events: Vec<_> = timeline_payloads_by_stream(timeline, "timeline", |payload| match payload {
+        EventPayload::Timeline(event) => Some(event),
+        _ => None,
+    })
+        .into_iter()
         .filter(|event| {
             matches!(
                 event.kind,
                 TimelineEventKind::Kill | TimelineEventKind::Death
             )
         })
-        .cloned()
         .collect();
     events.sort_by(|left, right| left.time.total_cmp(&right.time));
 
@@ -424,4 +424,3 @@ fn assert_demo_events_reconstruct_serialized_partial_sums(
         "{replay_path} unprocessed demo events"
     );
 }
-

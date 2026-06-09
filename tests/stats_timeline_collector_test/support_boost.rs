@@ -67,6 +67,51 @@ fn frame_total_goals(frame: &ReplayStatsFrame) -> i32 {
     frame.team_zero.core.goals + frame.team_one.core.goals
 }
 
+fn timeline_has_stream(timeline: &ReplayStatsTimeline, stream: &str) -> bool {
+    timeline
+        .events
+        .events
+        .iter()
+        .any(|event| event.meta.stream == stream)
+}
+
+fn timeline_payloads_by_stream<T: Clone>(
+    timeline: &ReplayStatsTimeline,
+    stream: &str,
+    extract: impl Fn(&EventPayload) -> Option<&T>,
+) -> Vec<T> {
+    timeline
+        .events
+        .events
+        .iter()
+        .filter(|event| event.meta.stream == stream)
+        .filter_map(|event| extract(&event.payload))
+        .cloned()
+        .collect()
+}
+
+fn test_event_envelope(stream: &str, index: usize, payload: EventPayload) -> Event {
+    Event {
+        meta: EventMeta {
+            id: format!("{stream}:{index}"),
+            stream: stream.to_owned(),
+            label: stats_timeline_event_label(stream),
+            timing: EventTiming::Moment {
+                frame: 0,
+                time: 0.0,
+            },
+            primary_player: None,
+            secondary_player: None,
+            player_position: None,
+            ball_position: None,
+            team_is_team_0: None,
+            confidence: None,
+            properties: Vec::new(),
+        },
+        payload,
+    }
+}
+
 fn player_snapshot_by_name<'a>(
     frame: &'a ReplayStatsFrame,
     player_name: &str,
@@ -196,6 +241,7 @@ fn empty_stats_timeline_config() -> StatsTimelineConfig {
         empty_net_min_defender_distance: 0.0,
         empty_net_max_touch_attacking_y: 0.0,
         flick_goal_max_event_to_goal_seconds: 0.0,
+        ceiling_shot_goal_max_event_to_goal_seconds: 0.0,
         double_tap_goal_max_event_to_goal_seconds: 0.0,
         one_timer_goal_max_event_to_goal_seconds: 0.0,
         air_dribble_goal_max_end_to_goal_seconds: 0.0,

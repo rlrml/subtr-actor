@@ -45,6 +45,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 .max_touch_attacking_y,
             flick_goal_max_event_to_goal_seconds: FlickGoalCalculatorConfig::default()
                 .max_event_to_goal_seconds,
+            ceiling_shot_goal_max_event_to_goal_seconds: CeilingShotGoalCalculatorConfig::default()
+                .max_event_to_goal_seconds,
             double_tap_goal_max_event_to_goal_seconds: DoubleTapGoalCalculatorConfig::default()
                 .max_event_to_goal_seconds,
             one_timer_goal_max_event_to_goal_seconds: OneTimerGoalCalculatorConfig::default()
@@ -71,58 +73,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             game_type: Default::default(),
             all_headers: Vec::new(),
         },
-        events: ReplayStatsTimelineEvents {
-            timeline: Vec::new(),
-            core_player: Vec::new(),
-            core_player_goal_context: Vec::new(),
-            possession: Vec::new(),
-            pressure: Vec::new(),
-            territorial_pressure: Vec::new(),
-            movement: Vec::new(),
-            positioning_activity: Vec::new(),
-            positioning_possession: Vec::new(),
-            positioning_field_zone: Vec::new(),
-            positioning_ball_depth: Vec::new(),
-            positioning_teammate_role: Vec::new(),
-            positioning_ball_proximity: Vec::new(),
-            positioning_goal_context: Vec::new(),
-            rotation_player: Vec::new(),
-            rotation_role_span: Vec::new(),
-            rotation_depth_span: Vec::new(),
-            rotation_first_man_stint: Vec::new(),
-            rotation_team: Vec::new(),
-            mechanics: Vec::new(),
-            goal_context: Vec::new(),
-            backboard: Vec::new(),
-            ceiling_shot: Vec::new(),
-            wall_aerial: Vec::new(),
-            wall_aerial_shot: Vec::new(),
-            center: Vec::new(),
-            flick: Vec::new(),
-            musty_flick: Vec::new(),
-            dodge_reset: Vec::new(),
-            double_tap: Vec::new(),
-            fifty_fifty: Vec::new(),
-            kickoff: Vec::new(),
-            one_timer: Vec::new(),
-            pass: Vec::new(),
-            ball_carry: Vec::new(),
-            controlled_play: Vec::new(),
-            rush: Vec::new(),
-            dodge: Vec::new(),
-            speed_flip: Vec::new(),
-            half_flip: Vec::new(),
-            half_volley: Vec::new(),
-            wavedash: Vec::new(),
-            whiff: Vec::new(),
-            powerslide: Vec::new(),
-            touch: Vec::new(),
-            boost_pickups: Vec::new(),
-            boost_ledger: Vec::new(),
-            boost_bucket: Vec::new(),
-            boost_state: Vec::new(),
-            bump: Vec::new(),
-        },
+        events: ReplayStatsTimelineEvents::default(),
         frames: vec![
             ReplayStatsFrame {
                 frame_number: 10,
@@ -509,8 +460,20 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
                 .unwrap_or_default()
         );
     }
-    assert_eq!(timeline.events.backboard, backboard.events());
-    assert_eq!(timeline.events.double_tap, double_tap.events());
+    assert_eq!(
+        timeline_payloads_by_stream(&timeline, "backboard", |payload| match payload {
+            EventPayload::Backboard(event) => Some(event),
+            _ => None,
+        }),
+        backboard.events()
+    );
+    assert_eq!(
+        timeline_payloads_by_stream(&timeline, "double_tap", |payload| match payload {
+            EventPayload::DoubleTap(event) => Some(event),
+            _ => None,
+        }),
+        double_tap.events()
+    );
 }
 
 fn assert_boost_stats_events_reconstruct_final_serialized_sums(
@@ -518,11 +481,17 @@ fn assert_boost_stats_events_reconstruct_final_serialized_sums(
     timeline: &ReplayStatsTimeline,
 ) {
     let mut accumulator = BoostStatsAccumulator::default();
-    for event in &timeline.events.boost_ledger {
-        accumulator.apply_ledger_event(event);
+    for event in timeline_payloads_by_stream(timeline, "boost_ledger", |payload| match payload {
+        EventPayload::BoostLedger(event) => Some(event),
+        _ => None,
+    }) {
+        accumulator.apply_ledger_event(&event);
     }
-    for event in &timeline.events.boost_state {
-        accumulator.apply_state_event(event);
+    for event in timeline_payloads_by_stream(timeline, "boost_state", |payload| match payload {
+        EventPayload::BoostState(event) => Some(event),
+        _ => None,
+    }) {
+        accumulator.apply_state_event(&event);
     }
 
     let final_frame = timeline

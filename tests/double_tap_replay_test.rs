@@ -1,6 +1,6 @@
 mod common;
 
-use subtr_actor::{GoalTagKind, StatsTimelineEventCollector};
+use subtr_actor::{EventPayload, EventTiming, GoalTagKind, StatsTimelineEventCollector};
 
 const THIRD_GOAL_DOUBLE_TAP_REPLAY: &str =
     "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
@@ -13,45 +13,53 @@ fn tags_colonelpanic8_third_goal_as_double_tap() {
     let timeline = StatsTimelineEventCollector::new()
         .get_replay_stats_timeline_scaffold(&replay)
         .expect("failed to collect stats timeline for double tap replay");
+    let double_tap_events =
+        common::event_payloads_by_stream(&timeline, "double_tap", |payload| match payload {
+            EventPayload::DoubleTap(event) => Some(event),
+            _ => None,
+        });
+    let goal_context = common::event_payloads(&timeline, |payload| match payload {
+        EventPayload::GoalContext(event) => Some(event),
+        _ => None,
+    });
 
     assert!(
-        timeline.events.double_tap.iter().any(|event| {
+        double_tap_events.iter().any(|event| {
             (event.backboard_time - 174.0366).abs() < 0.05 && (event.time - 174.481).abs() < 0.05
         }),
         "expected raw double tap event before the third goal"
     );
     assert!(
-        timeline.events.mechanics.iter().any(|event| {
-            event.kind == "double_tap"
-                && match event.timing {
-                    subtr_actor::StatsEventTiming::Span {
+        timeline.events.events.iter().any(|event| {
+            event.meta.stream == "double_tap"
+                && match event.meta.timing {
+                    EventTiming::Span {
                         start_time,
                         end_time,
                         ..
                     } => (start_time - 174.0366).abs() < 0.05 && (end_time - 174.481).abs() < 0.05,
-                    subtr_actor::StatsEventTiming::Moment { .. } => false,
+                    EventTiming::Moment { .. } => false,
                 }
         }),
-        "expected generic mechanics stream to include the double tap"
+        "expected event stream to include the double tap"
     );
     assert!(
-        timeline.events.goal_context.get(2).is_some_and(|goal| goal
+        goal_context.get(2).is_some_and(|goal| goal
             .tags
             .iter()
             .any(|tag| tag.kind() == GoalTagKind::DoubleTapGoal)),
-        "expected third goal to be tagged as a double tap; got {:?}",
-        timeline.events.goal_context
+        "expected third goal to be tagged as a double tap; got {goal_context:?}"
     );
 
     let value = serde_json::to_value(&timeline).expect("event timeline should serialize");
-    let mechanics = value["events"]["mechanics"]
+    let events = value["events"]["events"]
         .as_array()
-        .expect("timeline value should expose mechanics as an array");
+        .expect("timeline value should expose events as an array");
     assert!(
-        mechanics
+        events
             .iter()
-            .any(|event| event["kind"].as_str() == Some("double_tap")),
-        "expected value timeline mechanics stream to include the double tap"
+            .any(|event| event["meta"]["stream"].as_str() == Some("double_tap")),
+        "expected value timeline event stream to include the double tap"
     );
 }
 
@@ -62,36 +70,43 @@ fn tags_nuttrback_seventh_goal_as_double_tap() {
     let timeline = StatsTimelineEventCollector::new()
         .get_replay_stats_timeline_scaffold(&replay)
         .expect("failed to collect stats timeline for double tap replay");
+    let double_tap_events =
+        common::event_payloads_by_stream(&timeline, "double_tap", |payload| match payload {
+            EventPayload::DoubleTap(event) => Some(event),
+            _ => None,
+        });
+    let goal_context = common::event_payloads(&timeline, |payload| match payload {
+        EventPayload::GoalContext(event) => Some(event),
+        _ => None,
+    });
 
     assert!(
-        timeline.events.double_tap.iter().any(|event| {
+        double_tap_events.iter().any(|event| {
             (event.backboard_time - 343.42084).abs() < 0.05 && (event.time - 343.69733).abs() < 0.05
         }),
-        "expected raw double tap event before the seventh goal; got {:?}",
-        timeline.events.double_tap
+        "expected raw double tap event before the seventh goal; got {double_tap_events:?}"
     );
     assert!(
-        timeline.events.mechanics.iter().any(|event| {
-            event.kind == "double_tap"
-                && match event.timing {
-                    subtr_actor::StatsEventTiming::Span {
+        timeline.events.events.iter().any(|event| {
+            event.meta.stream == "double_tap"
+                && match event.meta.timing {
+                    EventTiming::Span {
                         start_time,
                         end_time,
                         ..
                     } => {
                         (start_time - 343.42084).abs() < 0.05 && (end_time - 343.69733).abs() < 0.05
                     }
-                    subtr_actor::StatsEventTiming::Moment { .. } => false,
+                    EventTiming::Moment { .. } => false,
                 }
         }),
-        "expected generic mechanics stream to include nuttrback's double tap"
+        "expected event stream to include nuttrback's double tap"
     );
     assert!(
-        timeline.events.goal_context.get(6).is_some_and(|goal| goal
+        goal_context.get(6).is_some_and(|goal| goal
             .tags
             .iter()
             .any(|tag| tag.kind() == GoalTagKind::DoubleTapGoal)),
-        "expected seventh goal to be tagged as a double tap; got {:?}",
-        timeline.events.goal_context
+        "expected seventh goal to be tagged as a double tap; got {goal_context:?}"
     );
 }

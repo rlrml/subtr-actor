@@ -259,16 +259,173 @@ fn player_at(location: SaVec3) -> SaPlayerFrame {
     player_at_index(0, true, location)
 }
 
-fn normalized_mechanic(id: &str, kind: &str, frame: usize, time: f32) -> StatsTimelineTagEvent {
-    StatsTimelineTagEvent {
-        id: id.to_owned(),
-        kind: kind.to_owned(),
-        player_id: RemoteId::SplitScreen(0),
-        player_position: None,
-        is_team_0: true,
-        timing: StatsEventTiming::Moment { frame, time },
-        properties: Vec::new(),
+fn event_envelope(
+    id: &str,
+    stream: &str,
+    frame: usize,
+    time: f32,
+    primary_player: Option<RemoteId>,
+    team_is_team_0: Option<bool>,
+    payload: EventPayload,
+) -> Event {
+    Event {
+        meta: EventMeta {
+            id: id.to_owned(),
+            stream: stream.to_owned(),
+            label: stream.replace('_', " "),
+            timing: EventTiming::Moment { frame, time },
+            primary_player,
+            secondary_player: None,
+            player_position: None,
+            ball_position: None,
+            team_is_team_0,
+            confidence: None,
+            properties: Vec::new(),
+        },
+        payload,
     }
+}
+
+fn normalized_mechanic(id: &str, kind: &str, frame: usize, time: f32) -> Event {
+    event_envelope(
+        id,
+        kind,
+        frame,
+        time,
+        Some(RemoteId::SplitScreen(0)),
+        Some(true),
+        EventPayload::HalfFlip(HalfFlipEvent {
+            time,
+            frame,
+            player: RemoteId::SplitScreen(0),
+            is_team_0: true,
+            start_position: [0.0, 0.0, 0.0],
+            end_position: [0.0, 0.0, 0.0],
+            start_speed: 0.0,
+            end_speed: 0.0,
+            start_backward_alignment: 0.0,
+            best_reorientation_alignment: 0.0,
+            best_forward_reversal: 0.0,
+            max_forward_vertical: 0.0,
+            confidence: 1.0,
+        }),
+    )
+}
+
+fn timeline_event_envelope(event: TimelineEvent) -> Event {
+    let frame = event.frame.unwrap_or(0);
+    let time = event.time;
+    let primary_player = event.player_id.clone();
+    let team_is_team_0 = event.is_team_0;
+    event_envelope(
+        &format!("timeline:{frame}:{time}"),
+        "timeline",
+        frame,
+        time,
+        primary_player,
+        team_is_team_0,
+        EventPayload::Timeline(event),
+    )
+}
+
+fn goal_context_event_envelope(event: GoalContextEvent) -> Event {
+    event_envelope(
+        &format!("goal_context:{}:{}", event.frame, event.time),
+        "goal_context",
+        event.frame,
+        event.time,
+        event.scorer.clone(),
+        Some(event.scoring_team_is_team_0),
+        EventPayload::GoalContext(event),
+    )
+}
+
+fn payload_event_envelope(
+    stream: &str,
+    frame: usize,
+    time: f32,
+    player: RemoteId,
+    is_team_0: bool,
+    payload: EventPayload,
+) -> Event {
+    event_envelope(
+        &format!("{stream}:{frame}:{time}"),
+        stream,
+        frame,
+        time,
+        Some(player),
+        Some(is_team_0),
+        payload,
+    )
+}
+
+fn team_event_envelope(stream: &str, frame: usize, time: f32, payload: EventPayload) -> Event {
+    event_envelope(
+        &format!("{stream}:{frame}:{time}"),
+        stream,
+        frame,
+        time,
+        None,
+        None,
+        payload,
+    )
+}
+
+fn backboard_event_envelope(event: BackboardBounceEvent) -> Event {
+    payload_event_envelope(
+        "backboard",
+        event.frame,
+        event.time,
+        event.player.clone(),
+        event.is_team_0,
+        EventPayload::Backboard(event),
+    )
+}
+
+fn whiff_event_envelope(event: WhiffEvent) -> Event {
+    payload_event_envelope(
+        "whiff",
+        event.frame,
+        event.time,
+        event.player.clone(),
+        event.is_team_0,
+        EventPayload::Whiff(event),
+    )
+}
+
+fn boost_pickup_event_envelope(event: BoostPickupComparisonEvent) -> Event {
+    payload_event_envelope(
+        "boost_pickups",
+        event.frame,
+        event.time,
+        event.player_id.clone(),
+        event.is_team_0,
+        EventPayload::BoostPickup(event),
+    )
+}
+
+fn bump_event_envelope(event: BumpEvent) -> Event {
+    payload_event_envelope(
+        "bump",
+        event.frame,
+        event.time,
+        event.initiator.clone(),
+        event.initiator_is_team_0,
+        EventPayload::Bump(event),
+    )
+}
+
+fn fifty_fifty_event_envelope(event: FiftyFiftyEvent) -> Event {
+    team_event_envelope(
+        "fifty_fifty",
+        event.resolve_frame,
+        event.resolve_time,
+        EventPayload::FiftyFifty(event),
+    )
+}
+
+fn rush_event_envelope(event: RushEvent) -> Event {
+    team_event_envelope("rush", event.end_frame, event.end_time, EventPayload::Rush(event))
 }
 
 fn whiff_event(frame: usize, time: f32, player_index: u32) -> WhiffEvent {
@@ -421,6 +578,22 @@ fn live_events_json_value(engine: *const SaEngine) -> serde_json::Value {
         unsafe { subtr_actor_bakkesmod_write_events_json(engine, bytes.as_mut_ptr(), bytes.len()) };
     assert_eq!(written, json_len);
     serde_json::from_slice(&bytes).expect("events json should be valid")
+}
+
+fn timeline_payload_matches(
+    event: &serde_json::Value,
+    kind: &str,
+    frame: usize,
+    is_team_0: Option<bool>,
+    require_player: bool,
+) -> bool {
+    let payload = &event["payload"];
+    let timeline = &payload["payload"];
+    payload["kind"] == serde_json::json!("timeline")
+        && timeline["kind"] == serde_json::json!(kind)
+        && timeline["frame"] == serde_json::json!(frame)
+        && is_team_0.is_none_or(|team| timeline["is_team_0"] == serde_json::json!(team))
+        && (!require_player || !timeline["player_id"].is_null())
 }
 
 fn live_timeline_json_value(engine: *const SaEngine) -> serde_json::Value {

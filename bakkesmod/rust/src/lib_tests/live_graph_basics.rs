@@ -733,11 +733,7 @@ fn exposes_full_timeline_events_json_after_processing_frame() {
 
     let value: serde_json::Value =
         serde_json::from_slice(&bytes).expect("events json should be valid");
-    assert!(value.get("timeline").is_some());
-    assert!(value.get("mechanics").is_some());
-    assert!(value.get("goal_context").is_some());
-    assert!(value.get("boost_pickups").is_some());
-    assert!(value.get("bump").is_some());
+    assert!(value["events"].is_array());
     assert_eq!(
         unsafe { subtr_actor_bakkesmod_write_events_json(engine, ptr::null_mut(), 10) },
         0
@@ -938,4 +934,3 @@ fn exposes_live_graph_info_json() {
     );
     unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
 }
-

@@ -428,6 +428,10 @@ fn checked_in_header_matches_event_abi_enums() {
                 "SaMechanicKindDemoGoal".to_owned(),
                 SaMechanicKind::DemoGoal as i32,
             ),
+            (
+                "SaMechanicKindCeilingShotGoal".to_owned(),
+                SaMechanicKind::CeilingShotGoal as i32,
+            ),
         ])
     );
     assert_eq!(

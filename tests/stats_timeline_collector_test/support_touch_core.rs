@@ -9,7 +9,7 @@ fn assert_powerslide_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.powerslide.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "powerslide", |payload| match payload { EventPayload::Powerslide(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -253,7 +253,7 @@ fn assert_touch_events_reconstruct_final_serialized_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut touch_events = timeline.events.touch.clone();
+    let mut touch_events = timeline_payloads_by_stream(timeline, "touch", |payload| match payload { EventPayload::Touch(event) => Some(event), _ => None });
     touch_events.sort_by(|left, right| {
         left.sample_frame
             .cmp(&right.sample_frame)
@@ -312,13 +312,13 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut player_events = timeline.events.core_player.clone();
+    let mut player_events = timeline_payloads_by_stream(timeline, "core_player", |payload| match payload { EventPayload::CorePlayer(event) => Some(event), _ => None });
     player_events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
             .then_with(|| left.time.total_cmp(&right.time))
     });
-    let mut goal_context_events = timeline.events.core_player_goal_context.clone();
+    let mut goal_context_events = timeline_payloads_by_stream(timeline, "core_player_goal_context", |payload| match payload { EventPayload::CorePlayerGoalContext(event) => Some(event), _ => None });
     goal_context_events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -511,7 +511,7 @@ fn assert_possession_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.possession.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "possession", |payload| match payload { EventPayload::Possession(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)

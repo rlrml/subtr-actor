@@ -3,8 +3,9 @@ use std::path::Path;
 use serde::Serialize;
 use serde_json::Value;
 use subtr_actor::{
-    CoreTeamStats, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents,
-    StatsEventPropertyValue, StatsEventTiming, StatsTimelineTagEvent, TeamStatsSnapshot,
+    CoreTeamStats, Event, EventPayload, EventPropertyValue, EventTiming, ReplayMeta,
+    ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, ReplayStatsTimelineScaffold,
+    TeamStatsSnapshot,
 };
 
 pub fn parse_replay(path: &str) -> boxcars::Replay {
@@ -19,10 +20,10 @@ pub fn parse_replay(path: &str) -> boxcars::Replay {
 }
 
 #[allow(dead_code)]
-pub fn mechanic_event_time_span(event: &StatsTimelineTagEvent) -> (f32, f32) {
-    match event.timing {
-        StatsEventTiming::Moment { time, .. } => (time, time),
-        StatsEventTiming::Span {
+pub fn mechanic_event_time_span(event: &Event) -> (f32, f32) {
+    match event.meta.timing {
+        EventTiming::Moment { time, .. } => (time, time),
+        EventTiming::Span {
             start_time,
             end_time,
             ..
@@ -33,7 +34,7 @@ pub fn mechanic_event_time_span(event: &StatsTimelineTagEvent) -> (f32, f32) {
 #[allow(dead_code)]
 pub fn mechanic_event_player_name<'a>(
     timeline: &'a ReplayStatsTimeline,
-    event: &StatsTimelineTagEvent,
+    event: &Event,
 ) -> Option<&'a str> {
     mechanic_event_player_name_in_meta(&timeline.replay_meta, event)
 }
@@ -41,26 +42,27 @@ pub fn mechanic_event_player_name<'a>(
 #[allow(dead_code)]
 pub fn mechanic_event_player_name_in_meta<'a>(
     replay_meta: &'a ReplayMeta,
-    event: &StatsTimelineTagEvent,
+    event: &Event,
 ) -> Option<&'a str> {
+    let player_id = event.meta.primary_player.as_ref()?;
     replay_meta
         .player_order()
-        .find(|player| player.remote_id == event.player_id)
+        .find(|player| player.remote_id == *player_id)
         .map(|player| player.name.as_str())
 }
 
 #[allow(dead_code)]
 pub fn assert_mechanic_event_roughly_at_in_meta<'a>(
     replay_meta: &'a ReplayMeta,
-    events: &'a [StatsTimelineTagEvent],
+    events: &'a [Event],
     kind: &str,
     player_name: &str,
     expected_start_time: f32,
     expected_end_time: f32,
     tolerance_seconds: f32,
-) -> &'a StatsTimelineTagEvent {
+) -> &'a Event {
     let event = events.iter().find(|event| {
-        if event.kind != kind {
+        if event.meta.stream != kind {
             return false;
         }
         if mechanic_event_player_name_in_meta(replay_meta, event) != Some(player_name) {
@@ -74,7 +76,7 @@ pub fn assert_mechanic_event_roughly_at_in_meta<'a>(
     event.unwrap_or_else(|| {
         let candidates = events
             .iter()
-            .filter(|event| event.kind == kind)
+            .filter(|event| event.meta.stream == kind)
             .map(|event| {
                 let (start_time, end_time) = mechanic_event_time_span(event);
                 let player =
@@ -99,10 +101,10 @@ pub fn assert_mechanic_event_roughly_at<'a>(
     expected_start_time: f32,
     expected_end_time: f32,
     tolerance_seconds: f32,
-) -> &'a StatsTimelineTagEvent {
+) -> &'a Event {
     assert_mechanic_event_roughly_at_in_meta(
         &timeline.replay_meta,
-        &timeline.events.mechanics,
+        &timeline.events.events,
         kind,
         player_name,
         expected_start_time,
@@ -112,30 +114,89 @@ pub fn assert_mechanic_event_roughly_at<'a>(
 }
 
 #[allow(dead_code)]
-pub fn mechanic_event_text_property<'a>(
-    event: &'a StatsTimelineTagEvent,
-    key: &str,
-) -> Option<&'a str> {
-    event.properties.iter().find_map(|property| {
+pub fn mechanic_event_text_property<'a>(event: &'a Event, key: &str) -> Option<&'a str> {
+    event.meta.properties.iter().find_map(|property| {
         (property.key == key)
             .then_some(&property.value)
             .and_then(|value| match value {
-                StatsEventPropertyValue::Text(value) => Some(value.as_str()),
+                EventPropertyValue::Text(value) => Some(value.as_str()),
                 _ => None,
             })
     })
 }
 
 #[allow(dead_code)]
-pub fn mechanic_event_unsigned_property(event: &StatsTimelineTagEvent, key: &str) -> Option<u32> {
-    event.properties.iter().find_map(|property| {
+pub fn mechanic_event_unsigned_property(event: &Event, key: &str) -> Option<u32> {
+    event.meta.properties.iter().find_map(|property| {
         (property.key == key)
             .then_some(&property.value)
             .and_then(|value| match value {
-                StatsEventPropertyValue::Unsigned(value) => Some(*value),
+                EventPropertyValue::Unsigned(value) => Some(*value),
                 _ => None,
             })
     })
+}
+
+pub trait TimelineEventsView {
+    fn timeline_events(&self) -> &ReplayStatsTimelineEvents;
+}
+
+impl TimelineEventsView for ReplayStatsTimeline {
+    fn timeline_events(&self) -> &ReplayStatsTimelineEvents {
+        &self.events
+    }
+}
+
+impl TimelineEventsView for ReplayStatsTimelineScaffold {
+    fn timeline_events(&self) -> &ReplayStatsTimelineEvents {
+        &self.events
+    }
+}
+
+#[allow(dead_code)]
+pub fn timeline_events_by_stream<'a, T>(timeline: &'a T, stream: &str) -> Vec<&'a Event>
+where
+    T: TimelineEventsView + ?Sized,
+{
+    timeline
+        .timeline_events()
+        .events
+        .iter()
+        .filter(|event| event.meta.stream == stream)
+        .collect()
+}
+
+#[allow(dead_code)]
+pub fn event_payloads<'a, T, V, F>(timeline: &'a V, mut extract: F) -> Vec<&'a T>
+where
+    V: TimelineEventsView + ?Sized,
+    F: FnMut(&'a EventPayload) -> Option<&'a T>,
+{
+    timeline
+        .timeline_events()
+        .events
+        .iter()
+        .filter_map(|event| extract(&event.payload))
+        .collect()
+}
+
+#[allow(dead_code)]
+pub fn event_payloads_by_stream<'a, T, V, F>(
+    timeline: &'a V,
+    stream: &str,
+    mut extract: F,
+) -> Vec<&'a T>
+where
+    V: TimelineEventsView + ?Sized,
+    F: FnMut(&'a EventPayload) -> Option<&'a T>,
+{
+    timeline
+        .timeline_events()
+        .events
+        .iter()
+        .filter(|event| event.meta.stream == stream)
+        .filter_map(|event| extract(&event.payload))
+        .collect()
 }
 
 #[allow(dead_code)]
@@ -154,277 +215,7 @@ fn compare_timeline_events(
     left: &ReplayStatsTimelineEvents,
     right: &ReplayStatsTimelineEvents,
 ) -> Option<String> {
-    compare_serialized_slice(
-        &format!("{label}.timeline"),
-        &left.timeline,
-        &right.timeline,
-    )
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.core_player"),
-            &left.core_player,
-            &right.core_player,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.core_player_goal_context"),
-            &left.core_player_goal_context,
-            &right.core_player_goal_context,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.possession"),
-            &left.possession,
-            &right.possession,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.pressure"),
-            &left.pressure,
-            &right.pressure,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.movement"),
-            &left.movement,
-            &right.movement,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.positioning_activity"),
-            &left.positioning_activity,
-            &right.positioning_activity,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.positioning_possession"),
-            &left.positioning_possession,
-            &right.positioning_possession,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.positioning_field_zone"),
-            &left.positioning_field_zone,
-            &right.positioning_field_zone,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.positioning_ball_depth"),
-            &left.positioning_ball_depth,
-            &right.positioning_ball_depth,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.positioning_teammate_role"),
-            &left.positioning_teammate_role,
-            &right.positioning_teammate_role,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.positioning_ball_proximity"),
-            &left.positioning_ball_proximity,
-            &right.positioning_ball_proximity,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.positioning_goal_context"),
-            &left.positioning_goal_context,
-            &right.positioning_goal_context,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.rotation_player"),
-            &left.rotation_player,
-            &right.rotation_player,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.rotation_role_span"),
-            &left.rotation_role_span,
-            &right.rotation_role_span,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.rotation_depth_span"),
-            &left.rotation_depth_span,
-            &right.rotation_depth_span,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.rotation_first_man_stint"),
-            &left.rotation_first_man_stint,
-            &right.rotation_first_man_stint,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.rotation_team"),
-            &left.rotation_team,
-            &right.rotation_team,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.mechanics"),
-            &left.mechanics,
-            &right.mechanics,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.goal_context"),
-            &left.goal_context,
-            &right.goal_context,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.backboard"),
-            &left.backboard,
-            &right.backboard,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.ceiling_shot"),
-            &left.ceiling_shot,
-            &right.ceiling_shot,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.wall_aerial"),
-            &left.wall_aerial,
-            &right.wall_aerial,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.wall_aerial_shot"),
-            &left.wall_aerial_shot,
-            &right.wall_aerial_shot,
-        )
-    })
-    .or_else(|| compare_serialized_slice(&format!("{label}.center"), &left.center, &right.center))
-    .or_else(|| compare_serialized_slice(&format!("{label}.flick"), &left.flick, &right.flick))
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.musty_flick"),
-            &left.musty_flick,
-            &right.musty_flick,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.dodge_reset"),
-            &left.dodge_reset,
-            &right.dodge_reset,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.double_tap"),
-            &left.double_tap,
-            &right.double_tap,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.fifty_fifty"),
-            &left.fifty_fifty,
-            &right.fifty_fifty,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.one_timer"),
-            &left.one_timer,
-            &right.one_timer,
-        )
-    })
-    .or_else(|| compare_serialized_slice(&format!("{label}.pass"), &left.pass, &right.pass))
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.ball_carry"),
-            &left.ball_carry,
-            &right.ball_carry,
-        )
-    })
-    .or_else(|| compare_serialized_slice(&format!("{label}.rush"), &left.rush, &right.rush))
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.speed_flip"),
-            &left.speed_flip,
-            &right.speed_flip,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.half_flip"),
-            &left.half_flip,
-            &right.half_flip,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.half_volley"),
-            &left.half_volley,
-            &right.half_volley,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.wavedash"),
-            &left.wavedash,
-            &right.wavedash,
-        )
-    })
-    .or_else(|| compare_serialized_slice(&format!("{label}.whiff"), &left.whiff, &right.whiff))
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.powerslide"),
-            &left.powerslide,
-            &right.powerslide,
-        )
-    })
-    .or_else(|| compare_serialized_slice(&format!("{label}.touch"), &left.touch, &right.touch))
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.boost_pickups"),
-            &left.boost_pickups,
-            &right.boost_pickups,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.boost_ledger"),
-            &left.boost_ledger,
-            &right.boost_ledger,
-        )
-    })
-    .or_else(|| {
-        compare_serialized_slice(
-            &format!("{label}.boost_state"),
-            &left.boost_state,
-            &right.boost_state,
-        )
-    })
-    .or_else(|| compare_serialized_slice(&format!("{label}.bump"), &left.bump, &right.bump))
+    compare_serialized_slice(&format!("{label}.events"), &left.events, &right.events)
 }
 
 fn compare_field<T: PartialEq + Serialize>(label: &str, left: &T, right: &T) -> Option<String> {

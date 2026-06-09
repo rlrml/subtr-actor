@@ -1,6 +1,6 @@
 mod common;
 
-use subtr_actor::{GoalTagKind, StatsTimelineEventCollector};
+use subtr_actor::{EventPayload, GoalTagKind, StatsTimelineEventCollector};
 
 const AIR_DRIBBLE_GOAL_MOUTH_REPLAY: &str = "assets/air-dribble-goal-mouth-2026-05-24.replay";
 
@@ -13,7 +13,7 @@ fn detects_air_dribble_goal_and_rejects_unrelated_half_volley_tag() {
 
     let event = common::assert_mechanic_event_roughly_at_in_meta(
         &timeline.replay_meta,
-        &timeline.events.mechanics,
+        &timeline.events.events,
         "air_dribble",
         "colonelpanic8",
         56.37,
@@ -30,17 +30,20 @@ fn detects_air_dribble_goal_and_rejects_unrelated_half_volley_tag() {
         "expected colonelpanic8 air dribble to include at least 3 touches"
     );
 
+    let goal_context = common::event_payloads(&timeline, |payload| match payload {
+        EventPayload::GoalContext(event) => Some(event),
+        _ => None,
+    });
+
     assert!(
-        timeline.events.goal_context.len() >= 6,
-        "expected at least six goals in replay; got {:?}",
-        timeline.events.goal_context
+        goal_context.len() >= 6,
+        "expected at least six goals in replay; got {goal_context:?}"
     );
     assert!(
-        !timeline.events.goal_context.get(5).is_some_and(|goal| goal
+        !goal_context.get(5).is_some_and(|goal| goal
             .tags
             .iter()
             .any(|tag| tag.kind() == GoalTagKind::HalfVolleyGoal)),
-        "expected sixth goal not to be tagged as a half volley; got {:?}",
-        timeline.events.goal_context
+        "expected sixth goal not to be tagged as a half volley; got {goal_context:?}"
     );
 }

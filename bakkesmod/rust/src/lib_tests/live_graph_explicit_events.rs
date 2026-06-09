@@ -306,14 +306,13 @@ fn process_frame_accepts_explicit_live_event_arrays_for_graph_input() {
     assert_eq!(written, json_len);
     let finalized_event_json: serde_json::Value =
         serde_json::from_slice(&event_json_bytes).expect("finalized events json should be valid");
-    let finalized_timeline = finalized_event_json["timeline"]
+    let finalized_timeline = finalized_event_json["events"]
         .as_array()
-        .expect("finalized events json timeline should be an array");
+        .expect("finalized events json events should be an array");
     assert!(
         finalized_timeline
             .iter()
-            .any(|event| event["kind"] == serde_json::json!("Goal")
-                && event["frame"] == serde_json::json!(1)),
+            .any(|event| timeline_payload_matches(event, "Goal", 1, None, false)),
         "explicit live goal events should serialize finalized goal timeline events"
     );
     let finalized_count = unsafe {
@@ -825,13 +824,12 @@ fn duplicate_explicit_live_goal_events_are_suppressed_for_graph_input() {
     assert_eq!(frame_events.goal_events.len(), 1);
     assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, 0);
     let event_json = live_events_json_value(engine);
-    let goal_count = event_json["timeline"]
+    let goal_count = event_json["events"]
         .as_array()
-        .expect("events json timeline should be an array")
+        .expect("events json events should be an array")
         .iter()
-        .filter(|event| event["kind"] == serde_json::json!("Goal"))
+        .filter(|event| timeline_payload_matches(event, "Goal", 1, None, false))
         .count();
     assert_eq!(goal_count, 1);
     unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
 }
-

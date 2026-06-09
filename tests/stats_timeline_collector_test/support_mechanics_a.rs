@@ -5,6 +5,16 @@ fn assert_quality_mechanic_events_reconstruct_serialized_partial_sums(
     const HALF_FLIP_HIGH_CONFIDENCE: f32 = 0.78;
     const WAVEDASH_HIGH_CONFIDENCE: f32 = 0.75;
 
+    let half_flip_events =
+        timeline_payloads_by_stream(timeline, "half_flip", |payload| match payload {
+            EventPayload::HalfFlip(event) => Some(event),
+            _ => None,
+        });
+    let wavedash_events =
+        timeline_payloads_by_stream(timeline, "wavedash", |payload| match payload {
+            EventPayload::Wavedash(event) => Some(event),
+            _ => None,
+        });
     let mut half_flip_event_index = 0;
     let mut wavedash_event_index = 0;
     let mut half_flip_players: HashMap<PlayerId, DerivedQualityMechanicStats> = HashMap::new();
@@ -18,10 +28,10 @@ fn assert_quality_mechanic_events_reconstruct_serialized_partial_sums(
 
     for frame in &timeline.frames {
         if frame.is_live_play {
-            while half_flip_event_index < timeline.events.half_flip.len()
-                && timeline.events.half_flip[half_flip_event_index].frame <= frame.frame_number
+            while half_flip_event_index < half_flip_events.len()
+                && half_flip_events[half_flip_event_index].frame <= frame.frame_number
             {
-                let event = &timeline.events.half_flip[half_flip_event_index];
+                let event = &half_flip_events[half_flip_event_index];
                 half_flip_players
                     .entry(event.player.clone())
                     .or_default()
@@ -37,10 +47,10 @@ fn assert_quality_mechanic_events_reconstruct_serialized_partial_sums(
                 half_flip_event_index += 1;
             }
 
-            while wavedash_event_index < timeline.events.wavedash.len()
-                && timeline.events.wavedash[wavedash_event_index].frame <= frame.frame_number
+            while wavedash_event_index < wavedash_events.len()
+                && wavedash_events[wavedash_event_index].frame <= frame.frame_number
             {
-                let event = &timeline.events.wavedash[wavedash_event_index];
+                let event = &wavedash_events[wavedash_event_index];
                 wavedash_players
                     .entry(event.player.clone())
                     .or_default()
@@ -122,12 +132,12 @@ fn assert_quality_mechanic_events_reconstruct_serialized_partial_sums(
 
     assert_eq!(
         half_flip_event_index,
-        timeline.events.half_flip.len(),
+        half_flip_events.len(),
         "{replay_path} unprocessed half-flip events"
     );
     assert_eq!(
         wavedash_event_index,
-        timeline.events.wavedash.len(),
+        wavedash_events.len(),
         "{replay_path} unprocessed wavedash events"
     );
 }
@@ -138,6 +148,11 @@ fn assert_speed_flip_events_reconstruct_serialized_partial_sums(
 ) {
     const SPEED_FLIP_HIGH_CONFIDENCE: f32 = 0.75;
 
+    let speed_flip_events =
+        timeline_payloads_by_stream(timeline, "speed_flip", |payload| match payload {
+            EventPayload::SpeedFlip(event) => Some(event),
+            _ => None,
+        });
     let mut speed_flip_event_index = 0;
     let mut speed_flip_players: HashMap<PlayerId, DerivedQualityMechanicStats> = HashMap::new();
     let mut speed_flip_frame_stats: HashMap<PlayerId, DerivedQualityMechanicFrameStats> =
@@ -147,11 +162,10 @@ fn assert_speed_flip_events_reconstruct_serialized_partial_sums(
     for frame in &timeline.frames {
         let speed_flip_stats_advance = frame.is_live_play || frame.ball_has_been_hit == Some(false);
         if speed_flip_stats_advance {
-            while speed_flip_event_index < timeline.events.speed_flip.len()
-                && timeline.events.speed_flip[speed_flip_event_index].resolved_frame
-                    <= frame.frame_number
+            while speed_flip_event_index < speed_flip_events.len()
+                && speed_flip_events[speed_flip_event_index].resolved_frame <= frame.frame_number
             {
-                let event = &timeline.events.speed_flip[speed_flip_event_index];
+                let event = &speed_flip_events[speed_flip_event_index];
                 speed_flip_players
                     .entry(event.player.clone())
                     .or_default()
@@ -203,7 +217,7 @@ fn assert_speed_flip_events_reconstruct_serialized_partial_sums(
 
     assert_eq!(
         speed_flip_event_index,
-        timeline.events.speed_flip.len(),
+        speed_flip_events.len(),
         "{replay_path} unprocessed speed-flip events"
     );
 }
@@ -354,7 +368,7 @@ fn assert_whiff_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.whiff.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "whiff", |payload| match payload { EventPayload::Whiff(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.resolved_frame
             .cmp(&right.resolved_frame)
@@ -503,7 +517,7 @@ fn assert_backboard_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.backboard.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "backboard", |payload| match payload { EventPayload::Backboard(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -655,7 +669,7 @@ fn assert_double_tap_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.double_tap.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "double_tap", |payload| match payload { EventPayload::DoubleTap(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -840,4 +854,3 @@ fn assert_pass_derived_player_stats_match(
         expected.time_since_last_completed_pass,
     );
 }
-

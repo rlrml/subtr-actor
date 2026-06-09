@@ -558,73 +558,72 @@ fn drains_player_owned_events_from_timeline_events() {
     let mut pending_goal_context_events = Vec::new();
     let mut emitted_goal_context_ids = HashSet::new();
     let timeline_events = ReplayStatsTimelineEvents {
-        timeline: vec![
-            TimelineEvent {
+        events: vec![
+            timeline_event_envelope(TimelineEvent {
                 time: 1.05,
                 frame: Some(10),
                 kind: TimelineEventKind::Goal,
                 player_id: Some(RemoteId::SplitScreen(0)),
                 player_position: None,
                 is_team_0: Some(true),
-            },
-            TimelineEvent {
+            }),
+            timeline_event_envelope(TimelineEvent {
                 time: 1.06,
                 frame: Some(10),
                 kind: TimelineEventKind::Shot,
                 player_id: Some(RemoteId::SplitScreen(0)),
                 player_position: None,
                 is_team_0: Some(true),
-            },
-            TimelineEvent {
+            }),
+            timeline_event_envelope(TimelineEvent {
                 time: 1.07,
                 frame: Some(10),
                 kind: TimelineEventKind::Save,
                 player_id: Some(RemoteId::SplitScreen(1)),
                 player_position: None,
                 is_team_0: Some(false),
-            },
-            TimelineEvent {
+            }),
+            timeline_event_envelope(TimelineEvent {
                 time: 1.08,
                 frame: Some(10),
                 kind: TimelineEventKind::Assist,
                 player_id: Some(RemoteId::SplitScreen(0)),
                 player_position: None,
                 is_team_0: Some(true),
-            },
-            TimelineEvent {
+            }),
+            timeline_event_envelope(TimelineEvent {
                 time: 1.35,
                 frame: Some(13),
                 kind: TimelineEventKind::Kill,
                 player_id: Some(RemoteId::SplitScreen(0)),
                 player_position: None,
                 is_team_0: Some(true),
-            },
-            TimelineEvent {
+            }),
+            timeline_event_envelope(TimelineEvent {
                 time: 1.35,
                 frame: Some(13),
                 kind: TimelineEventKind::Death,
                 player_id: Some(RemoteId::SplitScreen(1)),
                 player_position: None,
                 is_team_0: Some(false),
-            },
-        ],
-        goal_context: vec![GoalContextEvent {
-            tags: vec![goal_tag(GoalTagKind::FlickGoal)],
-            ..goal_context_event(10, 1.09)
-        }],
-        mechanics: vec![normalized_mechanic(
+            }),
+            goal_context_event_envelope(GoalContextEvent {
+                tags: vec![goal_tag(GoalTagKind::FlickGoal)],
+                ..goal_context_event(10, 1.09)
+            }),
+            normalized_mechanic(
             "speed_flip:15:0",
             "speed_flip",
             15,
             1.5,
-        )],
-        backboard: vec![backboard_event(11, 1.1)],
-        whiff: vec![whiff_event(12, 1.2, 0)],
-        boost_pickups: vec![boost_pickup_event(125, 1.25)],
-        bump: vec![bump_event(13, 1.3, 0.42)],
-        fifty_fifty: vec![fifty_fifty_event(9, 14, 1.4)],
-        rush: vec![rush_event(8, 16, 1.6, true)],
-        ..ReplayStatsTimelineEvents::default()
+            ),
+            backboard_event_envelope(backboard_event(11, 1.1)),
+            whiff_event_envelope(whiff_event(12, 1.2, 0)),
+            boost_pickup_event_envelope(boost_pickup_event(125, 1.25)),
+            bump_event_envelope(bump_event(13, 1.3, 0.42)),
+            fifty_fifty_event_envelope(fifty_fifty_event(9, 14, 1.4)),
+            rush_event_envelope(rush_event(8, 16, 1.6, true)),
+        ],
     };
 
     push_drainable_events_from_timeline(

@@ -307,7 +307,7 @@ pub enum EventPayload {
     DodgeReset(DodgeResetEvent),
     DoubleTap(DoubleTapEvent),
     FiftyFifty(FiftyFiftyEvent),
-    Kickoff(KickoffEvent),
+    Kickoff(Box<KickoffEvent>),
     OneTimer(OneTimerEvent),
     Pass(PassEvent),
     BallCarry(BallCarryEvent),

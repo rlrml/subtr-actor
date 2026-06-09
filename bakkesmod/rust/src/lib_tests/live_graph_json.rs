@@ -538,17 +538,14 @@ fn live_abi_explicit_player_stat_event_kinds_match_direct_full_graph() {
         "explicit player stat events should enter the same full graph path as replay processing"
     );
 
-    let timeline = live_events["timeline"]
+    let timeline = live_events["events"]
         .as_array()
-        .expect("events json timeline should be an array");
+        .expect("events json events should be an array");
     for (kind, is_team_0) in [("Shot", true), ("Save", false), ("Assist", true)] {
         assert!(
-            timeline.iter().any(|event| {
-                event["kind"] == serde_json::json!(kind)
-                    && event["frame"] == serde_json::json!(1)
-                    && event["is_team_0"] == serde_json::json!(is_team_0)
-                    && !event["player_id"].is_null()
-            }),
+            timeline
+                .iter()
+                .any(|event| timeline_payload_matches(event, kind, 1, Some(is_team_0), true)),
             "explicit live {kind} player stat events should serialize through the full graph"
         );
     }
@@ -897,4 +894,3 @@ fn live_abi_exposes_every_builtin_stats_module_by_name() {
     );
     unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
 }
-

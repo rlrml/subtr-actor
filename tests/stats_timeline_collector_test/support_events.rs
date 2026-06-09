@@ -2,7 +2,7 @@ fn assert_fifty_fifty_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.fifty_fifty.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "fifty_fifty", |payload| match payload { EventPayload::FiftyFifty(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.resolve_frame
             .cmp(&right.resolve_frame)
@@ -180,7 +180,7 @@ fn assert_one_timer_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.one_timer.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "one_timer", |payload| match payload { EventPayload::OneTimer(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -376,7 +376,7 @@ fn assert_half_volley_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.half_volley.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "half_volley", |payload| match payload { EventPayload::HalfVolley(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.sample_frame
             .cmp(&right.sample_frame)
