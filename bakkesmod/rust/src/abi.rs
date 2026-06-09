@@ -255,6 +255,7 @@ pub enum SaMechanicKind {
     PassingGoal = 40,
     BumpGoal = 41,
     DemoGoal = 42,
+    SustainedPressureGoal = 43,
 }
 
 #[repr(C)]

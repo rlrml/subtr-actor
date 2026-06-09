@@ -32,6 +32,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "own_half_goal",
             "empty_net_goal",
             "counter_attack_goal",
+            "sustained_pressure_goal",
             "flick_goal",
             "double_tap_goal",
             "one_timer_goal",

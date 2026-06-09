@@ -1395,6 +1395,19 @@ A goal whose buildup was classified as a counterattack.
 - Tag goals whose buildup kind is counterattack.
 - Attach goal-buildup evidence to the goal tag metadata.
 
+### Sustained Pressure Goal (`sustained_pressure_goal`)
+
+
+**Summary**
+
+A goal whose buildup was classified as sustained offensive pressure.
+
+**Approach**
+
+- Use the goal-buildup classification computed in goal context.
+- Tag goals whose buildup kind is sustained pressure.
+- Attach goal-buildup evidence to the goal tag metadata.
+
 ### Flick Goal (`flick_goal`)
 
 
@@ -1511,4 +1524,3 @@ A goal where the scorer's last touch matches a recent half-volley candidate.
 - Compare half-volley events against each goal's scorer-last-touch context.
 - Require the half-volley touch to be close enough to the goal and sufficiently aligned toward goal.
 - Attach a related half-volley event reference and half-volley evidence to the goal tag metadata.
-

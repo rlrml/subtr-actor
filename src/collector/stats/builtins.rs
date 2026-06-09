@@ -393,6 +393,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "own_half_goal",
         "empty_net_goal",
         "counter_attack_goal",
+        "sustained_pressure_goal",
         "flick_goal",
         "double_tap_goal",
         "one_timer_goal",
@@ -582,6 +583,12 @@ pub(crate) fn builtin_module_json(
         }
         "counter_attack_goal" => {
             let calculator = graph_state::<CounterAttackGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "sustained_pressure_goal" => {
+            let calculator = graph_state::<SustainedPressureGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
@@ -1297,6 +1304,7 @@ pub(crate) fn builtin_snapshot_frame_json(
         | "own_half_goal"
         | "empty_net_goal"
         | "counter_attack_goal"
+        | "sustained_pressure_goal"
         | "flick_goal"
         | "double_tap_goal"
         | "one_timer_goal"
@@ -1666,6 +1674,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "controlled_play"
         | "air_dribble"
         | "counter_attack_goal"
+        | "sustained_pressure_goal"
         | "boost"
         | "bump"
         | "movement"
