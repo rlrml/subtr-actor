@@ -1153,11 +1153,27 @@ pub(in crate::collector::stats::playback) fn parse_kickoff_event(
     value: &Value,
 ) -> SubtrActorResult<KickoffEvent> {
     let object = json_object(value, "kickoff event")?;
+    let start_time = json_required_f32(object, "start_time")?;
+    let start_frame = json_required_usize(object, "start_frame")?;
     Ok(KickoffEvent {
-        start_time: json_required_f32(object, "start_time")?,
-        start_frame: json_required_usize(object, "start_frame")?,
+        start_time,
+        start_frame,
         end_time: json_required_f32(object, "end_time")?,
         end_frame: json_required_usize(object, "end_frame")?,
+        movement_start_time: json_optional_f32(object.get("movement_start_time"))?
+            .unwrap_or(start_time),
+        movement_start_frame: json_optional_usize(object.get("movement_start_frame"))?
+            .unwrap_or(start_frame),
+        kickoff_type: object
+            .get("kickoff_type")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
+        kickoff_direction: object
+            .get("kickoff_direction")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
         first_touch_time: json_optional_f32(object.get("first_touch_time"))?,
         first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
         first_touch_team_is_team_0: json_optional_bool(object.get("first_touch_team_is_team_0")),

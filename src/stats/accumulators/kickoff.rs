@@ -136,6 +136,8 @@ impl KickoffStats {
         LabeledCounts::complete_from_label_sets(
             &[
                 &KICKOFF_OUTCOME_LABELS,
+                &KICKOFF_TYPE_LABELS,
+                &KICKOFF_DIRECTION_LABELS,
                 &KICKOFF_WIN_STRENGTH_LABELS,
                 &KICKOFF_POSSESSION_OUTCOME_LABELS,
                 &KICKOFF_GOAL_LABELS,

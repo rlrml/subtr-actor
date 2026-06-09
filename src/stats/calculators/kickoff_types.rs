@@ -29,6 +29,106 @@ impl KickoffSpawnPosition {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
+pub enum KickoffType {
+    Diagonal,
+    CenterOffset,
+    Center,
+    #[default]
+    Unknown,
+}
+
+impl KickoffType {
+    pub fn from_taker_spawns(
+        team_zero_spawn: Option<KickoffSpawnPosition>,
+        team_one_spawn: Option<KickoffSpawnPosition>,
+    ) -> Self {
+        match (team_zero_spawn, team_one_spawn) {
+            (
+                Some(KickoffSpawnPosition::DiagonalLeft),
+                Some(KickoffSpawnPosition::DiagonalLeft),
+            )
+            | (
+                Some(KickoffSpawnPosition::DiagonalRight),
+                Some(KickoffSpawnPosition::DiagonalRight),
+            ) => Self::Diagonal,
+            (
+                Some(KickoffSpawnPosition::OffCenterLeft),
+                Some(KickoffSpawnPosition::OffCenterLeft),
+            )
+            | (
+                Some(KickoffSpawnPosition::OffCenterRight),
+                Some(KickoffSpawnPosition::OffCenterRight),
+            ) => Self::CenterOffset,
+            (Some(KickoffSpawnPosition::Center), Some(KickoffSpawnPosition::Center)) => {
+                Self::Center
+            }
+            _ => Self::Unknown,
+        }
+    }
+
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::Diagonal => "diagonal",
+            Self::CenterOffset => "center_offset",
+            Self::Center => "center",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffDirection {
+    Left,
+    Right,
+    Center,
+    #[default]
+    Unknown,
+}
+
+impl KickoffDirection {
+    pub fn from_taker_spawns(
+        team_zero_spawn: Option<KickoffSpawnPosition>,
+        team_one_spawn: Option<KickoffSpawnPosition>,
+    ) -> Self {
+        match (team_zero_spawn, team_one_spawn) {
+            (
+                Some(KickoffSpawnPosition::DiagonalLeft),
+                Some(KickoffSpawnPosition::DiagonalLeft),
+            )
+            | (
+                Some(KickoffSpawnPosition::OffCenterLeft),
+                Some(KickoffSpawnPosition::OffCenterLeft),
+            ) => Self::Left,
+            (
+                Some(KickoffSpawnPosition::DiagonalRight),
+                Some(KickoffSpawnPosition::DiagonalRight),
+            )
+            | (
+                Some(KickoffSpawnPosition::OffCenterRight),
+                Some(KickoffSpawnPosition::OffCenterRight),
+            ) => Self::Right,
+            (Some(KickoffSpawnPosition::Center), Some(KickoffSpawnPosition::Center)) => {
+                Self::Center
+            }
+            _ => Self::Unknown,
+        }
+    }
+
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::Left => "left",
+            Self::Right => "right",
+            Self::Center => "center",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
 pub enum KickoffTakerOutcome {
     Touched,
     Fake,
@@ -202,6 +302,10 @@ pub struct KickoffEvent {
     pub start_frame: usize,
     pub end_time: f32,
     pub end_frame: usize,
+    pub movement_start_time: f32,
+    pub movement_start_frame: usize,
+    pub kickoff_type: KickoffType,
+    pub kickoff_direction: KickoffDirection,
     pub first_touch_time: Option<f32>,
     pub first_touch_frame: Option<usize>,
     pub first_touch_team_is_team_0: Option<bool>,

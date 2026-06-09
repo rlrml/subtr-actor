@@ -61,6 +61,8 @@ struct KickoffTouchSnapshot {
 struct ActiveKickoff {
     start_time: f32,
     start_frame: usize,
+    movement_start_time: Option<f32>,
+    movement_start_frame: Option<usize>,
     players: Vec<KickoffPlayerSnapshot>,
     first_touch_time: Option<f32>,
     first_touch_frame: Option<usize>,
@@ -92,6 +94,18 @@ pub(crate) const KICKOFF_SPAWN_LABELS: [StatLabel; 6] = [
     StatLabel::new("kickoff_spawn", "diagonal_left"),
     StatLabel::new("kickoff_spawn", "diagonal_right"),
     StatLabel::new("kickoff_spawn", "unknown"),
+];
+pub(crate) const KICKOFF_TYPE_LABELS: [StatLabel; 4] = [
+    StatLabel::new("kickoff_type", "diagonal"),
+    StatLabel::new("kickoff_type", "center_offset"),
+    StatLabel::new("kickoff_type", "center"),
+    StatLabel::new("kickoff_type", "unknown"),
+];
+pub(crate) const KICKOFF_DIRECTION_LABELS: [StatLabel; 4] = [
+    StatLabel::new("kickoff_direction", "left"),
+    StatLabel::new("kickoff_direction", "right"),
+    StatLabel::new("kickoff_direction", "center"),
+    StatLabel::new("kickoff_direction", "unknown"),
 ];
 pub(crate) const KICKOFF_TAKER_OUTCOME_LABELS: [StatLabel; 4] = [
     StatLabel::new("taker_outcome", "touched"),
@@ -139,6 +153,14 @@ pub(crate) const KICKOFF_GOAL_LABELS: [StatLabel; 2] = [
 
 pub(crate) fn kickoff_spawn_label(spawn: KickoffSpawnPosition) -> StatLabel {
     StatLabel::new("kickoff_spawn", spawn.as_label_value())
+}
+
+pub(crate) fn kickoff_type_label(kickoff_type: KickoffType) -> StatLabel {
+    StatLabel::new("kickoff_type", kickoff_type.as_label_value())
+}
+
+pub(crate) fn kickoff_direction_label(kickoff_direction: KickoffDirection) -> StatLabel {
+    StatLabel::new("kickoff_direction", kickoff_direction.as_label_value())
 }
 
 pub(crate) fn kickoff_taker_outcome_label(outcome: KickoffTakerOutcome) -> StatLabel {
@@ -238,8 +260,10 @@ impl KickoffPlayerEventRef<'_> {
 }
 
 impl KickoffEvent {
-    pub(crate) fn labels(&self) -> [StatLabel; 4] {
+    pub(crate) fn labels(&self) -> [StatLabel; 6] {
         [
+            kickoff_type_label(self.kickoff_type),
+            kickoff_direction_label(self.kickoff_direction),
             kickoff_outcome_label(self.outcome),
             kickoff_win_strength_label(self.win_strength_band),
             kickoff_possession_outcome_label(self.kickoff_possession_outcome),
@@ -324,6 +348,8 @@ impl KickoffCalculator {
         self.active = Some(ActiveKickoff {
             start_time: frame.time,
             start_frame: frame.frame_number,
+            movement_start_time: None,
+            movement_start_frame: None,
             players: players
                 .players
                 .iter()
@@ -335,6 +361,20 @@ impl KickoffCalculator {
             touches: Vec::new(),
             speed_flip_players: HashSet::new(),
         });
+    }
+
+    fn observe_movement_start(
+        active: &mut ActiveKickoff,
+        frame: &FrameInfo,
+        gameplay: &GameplayState,
+    ) {
+        if active.movement_start_time.is_none()
+            && gameplay.kickoff_phase_active()
+            && !gameplay.kickoff_countdown_active()
+        {
+            active.movement_start_time = Some(frame.time);
+            active.movement_start_frame = Some(frame.frame_number);
+        }
     }
 
     fn boost_amount(player: &PlayerSample) -> Option<f32> {
@@ -833,6 +873,14 @@ impl KickoffCalculator {
             .unwrap_or_default();
         let team_zero_taker = Self::expected_taker_by_team(&active.players, true);
         let team_one_taker = Self::expected_taker_by_team(&active.players, false);
+        let kickoff_type = KickoffType::from_taker_spawns(
+            team_zero_taker.map(|index| active.players[index].spawn_position),
+            team_one_taker.map(|index| active.players[index].spawn_position),
+        );
+        let kickoff_direction = KickoffDirection::from_taker_spawns(
+            team_zero_taker.map(|index| active.players[index].spawn_position),
+            team_one_taker.map(|index| active.players[index].spawn_position),
+        );
         let first_touch = active.touches.first();
         let first_touch_player = first_touch.and_then(|touch| touch.player.clone());
         let team_zero_taker_touch_time =
@@ -945,6 +993,10 @@ impl KickoffCalculator {
             start_frame: active.start_frame,
             end_time: frame.time,
             end_frame: frame.frame_number,
+            movement_start_time: active.movement_start_time.unwrap_or(active.start_time),
+            movement_start_frame: active.movement_start_frame.unwrap_or(active.start_frame),
+            kickoff_type,
+            kickoff_direction,
             first_touch_time: active.first_touch_time,
             first_touch_frame: active.first_touch_frame,
             first_touch_team_is_team_0: active.first_touch_team_is_team_0,
@@ -1010,6 +1062,7 @@ impl KickoffCalculator {
         let Some(active) = self.active.as_mut() else {
             return Ok(());
         };
+        Self::observe_movement_start(active, ctx.frame, ctx.gameplay);
         Self::apply_player_samples(active, ctx.frame, ctx.players);
         Self::apply_touches(active, ctx.touch_state);
         Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);

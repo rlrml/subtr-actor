@@ -183,6 +183,96 @@ fn kickoff_goal_does_not_override_immediate_outcome() {
 }
 
 #[test]
+fn kickoff_records_movement_start_after_countdown() {
+    let blue_taker = PlayerId::Steam(42);
+    let orange_taker = PlayerId::Steam(43);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                game_state: Some(GAME_STATE_KICKOFF_COUNTDOWN),
+                ball_has_been_hit: Some(false),
+                kickoff_countdown_time: Some(3),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(-2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(30, 3.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                kickoff_countdown_time: Some(0),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(40, 4.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(320.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker, true, 40, 4.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(55, 5.5),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(420.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.start_time, 0.0);
+    assert_eq!(event.start_frame, 0);
+    assert_eq!(event.movement_start_time, 3.0);
+    assert_eq!(event.movement_start_frame, 30);
+}
+
+#[test]
 fn kickoff_classifies_fake_and_missed_expected_takers() {
     let blue_taker = PlayerId::Steam(1);
     let blue_support = PlayerId::Steam(2);
@@ -1256,6 +1346,10 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
         start_frame: 0,
         end_time: 1.5,
         end_frame: 15,
+        movement_start_time: 0.0,
+        movement_start_frame: 0,
+        kickoff_type: KickoffType::Center,
+        kickoff_direction: KickoffDirection::Center,
         first_touch_time: Some(0.5),
         first_touch_frame: Some(5),
         first_touch_team_is_team_0: Some(true),
@@ -1326,4 +1420,75 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
     assert_eq!(player_stats.support_go_for_boosts, 0);
     assert_eq!(player_stats.kickoff_goal_count, 1);
     assert_eq!(player_stats.average_boost_after(), 11.0);
+}
+
+#[test]
+fn kickoff_type_only_names_symmetric_taker_spawns() {
+    assert_eq!(
+        KickoffType::from_taker_spawns(
+            Some(KickoffSpawnPosition::DiagonalLeft),
+            Some(KickoffSpawnPosition::DiagonalLeft),
+        ),
+        KickoffType::Diagonal
+    );
+    assert_eq!(
+        KickoffType::from_taker_spawns(
+            Some(KickoffSpawnPosition::OffCenterRight),
+            Some(KickoffSpawnPosition::OffCenterRight),
+        ),
+        KickoffType::CenterOffset
+    );
+    assert_eq!(
+        KickoffType::from_taker_spawns(
+            Some(KickoffSpawnPosition::OffCenterLeft),
+            Some(KickoffSpawnPosition::OffCenterLeft),
+        ),
+        KickoffType::CenterOffset
+    );
+    assert_eq!(
+        KickoffType::from_taker_spawns(
+            Some(KickoffSpawnPosition::Center),
+            Some(KickoffSpawnPosition::Center),
+        ),
+        KickoffType::Center
+    );
+    assert_eq!(
+        KickoffType::from_taker_spawns(
+            Some(KickoffSpawnPosition::DiagonalLeft),
+            Some(KickoffSpawnPosition::DiagonalRight),
+        ),
+        KickoffType::Unknown
+    );
+}
+
+#[test]
+fn kickoff_direction_tracks_symmetric_taker_spawn_side() {
+    assert_eq!(
+        KickoffDirection::from_taker_spawns(
+            Some(KickoffSpawnPosition::DiagonalLeft),
+            Some(KickoffSpawnPosition::DiagonalLeft),
+        ),
+        KickoffDirection::Left
+    );
+    assert_eq!(
+        KickoffDirection::from_taker_spawns(
+            Some(KickoffSpawnPosition::OffCenterRight),
+            Some(KickoffSpawnPosition::OffCenterRight),
+        ),
+        KickoffDirection::Right
+    );
+    assert_eq!(
+        KickoffDirection::from_taker_spawns(
+            Some(KickoffSpawnPosition::Center),
+            Some(KickoffSpawnPosition::Center),
+        ),
+        KickoffDirection::Center
+    );
+    assert_eq!(
+        KickoffDirection::from_taker_spawns(
+            Some(KickoffSpawnPosition::DiagonalLeft),
+            Some(KickoffSpawnPosition::DiagonalRight),
+        ),
+        KickoffDirection::Unknown
+    );
 }
