@@ -212,6 +212,12 @@ impl<C> InFlightLedger<C> {
         self.active.push(item);
     }
 
+    /// Discard every in-flight item without finalizing any (e.g. abandoning a
+    /// candidate that never earned an event).
+    pub fn clear(&mut self) {
+        self.active.clear();
+    }
+
     /// The items currently in flight.
     pub fn in_flight(&self) -> &[C] {
         &self.active
