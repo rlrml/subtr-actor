@@ -540,11 +540,35 @@ impl KickoffCalculator {
                     })
             })
             .or_else(|| {
+                // No tied candidate touched the ball (the team was beaten to the
+                // kickoff). Distance and first-touch can't disambiguate, so prefer
+                // the player who actually committed to the ball: greatest advance
+                // toward center, then most boost burned. The static left-side
+                // tiebreak is only a last resort for genuinely identical approaches.
                 tied_candidates.min_by(|(_, left), (_, right)| {
-                    Self::relative_left_value(left).total_cmp(&Self::relative_left_value(right))
+                    Self::center_progress(right)
+                        .total_cmp(&Self::center_progress(left))
+                        .then_with(|| {
+                            Self::boost_committed(right).total_cmp(&Self::boost_committed(left))
+                        })
+                        .then_with(|| {
+                            Self::relative_left_value(left)
+                                .total_cmp(&Self::relative_left_value(right))
+                        })
                 })
             })
             .map(|(index, _)| index)
+    }
+
+    /// Boost spent during the kickoff approach (`start_boost - min_boost`). A
+    /// player charging the ball burns boost; a teammate peeling off for a pad
+    /// does not, so this separates the true taker from support when neither
+    /// player touched the ball.
+    fn boost_committed(player: &KickoffPlayerSnapshot) -> f32 {
+        match (player.start_boost, player.approach_trace.min_boost) {
+            (Some(start_boost), Some(min_boost)) => (start_boost - min_boost).max(0.0),
+            _ => 0.0,
+        }
     }
 
     fn taker_outcome(

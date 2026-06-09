@@ -1531,6 +1531,60 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
 }
 
 #[test]
+fn kickoff_taker_prefers_ball_committer_when_no_touch() {
+    // Regression for a real 2v2 kickoff (a contested 50/50). The orange
+    // challenger drove in and contacted the ball, but the replay only emitted
+    // the opposing team's BallHitTeamNum marker, so subtr-actor recorded no
+    // touch for either orange player. Both orange players spawn on mirrored
+    // diagonals at equal distance from the ball, so the distance tie and the
+    // first-touch tiebreak can't disambiguate. The legacy fallback then picked
+    // the geometrically leftmost player (index 0) -- a back/cheat player that
+    // stayed ~3400uu from the ball -- instead of the challenger who drove from
+    // spawn into the ball and burned all boost (index 1). Selection must follow
+    // the commitment signal (advance toward the ball, then boost burned), not
+    // the static left-side tiebreak.
+    let kept_boost_player = PlayerId::Epic("kept-boost".to_owned());
+    let ball_committer = PlayerId::Epic("ball-committer".to_owned());
+
+    let players = [
+        KickoffPlayerSnapshot {
+            player: kept_boost_player,
+            is_team_0: false,
+            start_position: [2048.0, 2560.0, 17.0],
+            spawn_position: KickoffSpawnPosition::DiagonalLeft,
+            start_boost: Some(85.0),
+            first_touch_time: None,
+            first_touch_frame: None,
+            approach_trace: KickoffApproachTrace {
+                min_boost: Some(85.0),
+                last_position: Some([1900.0, 2400.0, 17.0]),
+                ..KickoffApproachTrace::default()
+            },
+        },
+        KickoffPlayerSnapshot {
+            player: ball_committer,
+            is_team_0: false,
+            start_position: [-2048.0, 2560.0, 17.0],
+            spawn_position: KickoffSpawnPosition::DiagonalRight,
+            start_boost: Some(85.0),
+            first_touch_time: None,
+            first_touch_frame: None,
+            approach_trace: KickoffApproachTrace {
+                min_boost: Some(0.0),
+                last_position: Some([-300.0, 700.0, 17.0]),
+                ..KickoffApproachTrace::default()
+            },
+        },
+    ];
+
+    // Legacy `relative_left_value` tiebreak would have returned Some(0).
+    assert_eq!(
+        KickoffCalculator::expected_taker_by_team(&players, false),
+        Some(1)
+    );
+}
+
+#[test]
 fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
     let player_id = PlayerId::Steam(1);
     let event = KickoffEvent {
