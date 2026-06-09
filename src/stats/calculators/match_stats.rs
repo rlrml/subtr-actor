@@ -9,6 +9,12 @@ const SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS: f32 = 7.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS: f32 = 3.5;
 const GOAL_CONTEXT_BOOST_LEADUP_SECONDS: f32 = 5.0;
 const BALL_GROUND_CONTACT_MAX_Z: f32 = BALL_RADIUS_Z + 5.0;
+// On the frame a goal is recorded, the ball's rigid body is the goal explosion
+// rather than a normal physics update, so its interpolated velocity reads as
+// zero. We carry forward the most recent meaningful ball velocity (anything
+// above this threshold, in uu/s) so `ball_speed_at_goal` reflects the speed of
+// the shot as it crossed the line instead of a spurious 0.
+const MIN_TRACKED_BALL_SPEED: f32 = 1.0;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -247,6 +253,7 @@ pub struct MatchStatsCalculator {
     last_touch_context_by_player: HashMap<PlayerId, GoalTouchContext>,
     boost_leadup_samples_by_player: HashMap<PlayerId, VecDeque<BoostLeadupSample>>,
     last_ball_ground_contact_time: Option<f32>,
+    last_ball_velocity: Option<glam::Vec3>,
 }
 
 impl MatchStatsCalculator {
@@ -661,6 +668,24 @@ impl MatchStatsCalculator {
         }
     }
 
+    fn update_ball_velocity(&mut self, ball: &BallFrameState) {
+        if let Some(velocity) = ball.velocity() {
+            if velocity.length() >= MIN_TRACKED_BALL_SPEED {
+                self.last_ball_velocity = Some(velocity);
+            }
+        }
+    }
+
+    // Speed of the ball as it crossed the goal line. The explosion frame itself
+    // carries no usable velocity, so fall back to the most recent tracked
+    // velocity from just before the goal.
+    fn ball_speed_at_goal(&self, ball: &BallFrameState) -> Option<f32> {
+        ball.velocity()
+            .filter(|velocity| velocity.length() >= MIN_TRACKED_BALL_SPEED)
+            .or(self.last_ball_velocity)
+            .map(|velocity| velocity.length())
+    }
+
     fn ball_air_time_before_goal(&self, goal_time: f32) -> Option<f32> {
         self.last_ball_ground_contact_time
             .map(|ground_contact_time| (goal_time - ground_contact_time).max(0.0))
@@ -800,7 +825,7 @@ impl MatchStatsCalculator {
         events: &FrameEventsState,
     ) {
         let ball_position = ball.position().map(GoalContextPosition::from);
-        let ball_speed_at_goal = ball.velocity().map(|velocity| velocity.length());
+        let ball_speed_at_goal = self.ball_speed_at_goal(ball);
         for goal_event in &events.goal_events {
             let scoring_team_most_back_player =
                 Self::most_back_player(players, goal_event.scoring_team_is_team_0);
@@ -998,6 +1023,7 @@ impl MatchStatsCalculator {
         self.update_kickoff_reference(gameplay, events);
         self.prune_goal_buildup_samples(frame.time);
         self.update_ball_ground_contact(frame, ball);
+        self.update_ball_velocity(ball);
         if live_play_state.is_live_play {
             self.record_goal_buildup_sample(frame, ball);
             self.record_goal_buildup_pressure_events(events);
@@ -1006,6 +1032,7 @@ impl MatchStatsCalculator {
             self.last_touch_context_by_player.clear();
             self.boost_leadup_samples_by_player.clear();
             self.last_ball_ground_contact_time = None;
+            self.last_ball_velocity = None;
         }
         self.update_last_touch_contexts(ball, players, &touch_state.touch_events);
         self.record_goal_context_events(ball, players, events);
