@@ -23,6 +23,29 @@ const KICKOFF_SUPPORT_CHEAT_MIN_CENTER_PROGRESS: f32 = 400.0;
 const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_LATERAL_MOVE: f32 = 600.0;
 const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_BOOST_GAIN: f32 = 10.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct KickoffBoostLedgerKey {
+    frame: usize,
+    time_bits: u32,
+    transaction: BoostLedgerTransactionKind,
+}
+
+impl KickoffBoostLedgerKey {
+    fn from_event(event: &BoostLedgerEvent) -> Self {
+        Self {
+            frame: event.frame,
+            time_bits: event.time.to_bits(),
+            transaction: event.transaction,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KickoffBoostLedgerTotal {
+    Collected,
+    Used,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct KickoffPlayerSnapshot {
     player: PlayerId,
@@ -44,6 +67,12 @@ struct KickoffApproachTrace {
     first_dodge_side_component: Option<f32>,
     max_speed: f32,
     min_boost: Option<f32>,
+    previous_boost: Option<f32>,
+    sampled_boost_collected: f32,
+    sampled_boost_used: f32,
+    ledger_boost_collected: f32,
+    ledger_boost_used: f32,
+    ledger_amounts: HashMap<KickoffBoostLedgerKey, f32>,
     last_position: Option<[f32; 3]>,
     previous_velocity: Option<glam::Vec3>,
     previous_dodge_active: bool,
@@ -87,6 +116,7 @@ pub(crate) struct KickoffUpdateContext<'a> {
     pub touch_state: &'a TouchState,
     pub events: &'a FrameEventsState,
     pub speed_flip_events: &'a [SpeedFlipEvent],
+    pub boost_ledger_events: &'a [BoostLedgerEvent],
 }
 
 pub(crate) const KICKOFF_SPAWN_LABELS: [StatLabel; 6] = [
@@ -401,6 +431,15 @@ impl KickoffCalculator {
             trace.boost_active_sample_count += 1;
         }
         if let Some(boost_amount) = Self::boost_amount(player) {
+            if let Some(previous_boost) = trace.previous_boost {
+                let delta = boost_amount - previous_boost;
+                if delta > 0.0 {
+                    trace.sampled_boost_collected += delta;
+                } else {
+                    trace.sampled_boost_used += -delta;
+                }
+            }
+            trace.previous_boost = Some(boost_amount);
             trace.min_boost = Some(
                 trace
                     .min_boost
@@ -445,10 +484,68 @@ impl KickoffCalculator {
         players: &PlayerFrameState,
     ) {
         for snapshot in &mut active.players {
+            if snapshot.first_touch_time.is_some() {
+                continue;
+            }
             let Some(player) = players.player(&snapshot.player) else {
                 continue;
             };
             Self::observe_player_approach(&mut snapshot.approach_trace, frame, player);
+        }
+    }
+
+    fn apply_boost_ledger_events(active: &mut ActiveKickoff, events: &[BoostLedgerEvent]) {
+        let movement_start_time = active.movement_start_time.unwrap_or(active.start_time);
+        for event in events {
+            if event.end_time < movement_start_time {
+                continue;
+            }
+            let Some(snapshot) = active
+                .players
+                .iter_mut()
+                .find(|player| player.player == event.player_id)
+            else {
+                continue;
+            };
+            if snapshot
+                .first_touch_time
+                .is_some_and(|touch_time| event.end_time > touch_time)
+            {
+                continue;
+            }
+            let Some(total) = Self::relevant_boost_ledger_total(event) else {
+                continue;
+            };
+            let key = KickoffBoostLedgerKey::from_event(event);
+            let previous_total = snapshot
+                .approach_trace
+                .ledger_amounts
+                .insert(key, event.amount)
+                .unwrap_or(0.0);
+            let amount_delta = (event.amount - previous_total).max(0.0);
+            if amount_delta <= 0.0 {
+                continue;
+            }
+            match total {
+                KickoffBoostLedgerTotal::Collected => {
+                    snapshot.approach_trace.ledger_boost_collected += amount_delta;
+                }
+                KickoffBoostLedgerTotal::Used => {
+                    snapshot.approach_trace.ledger_boost_used += amount_delta;
+                }
+            }
+        }
+    }
+
+    fn relevant_boost_ledger_total(event: &BoostLedgerEvent) -> Option<KickoffBoostLedgerTotal> {
+        match event.transaction {
+            BoostLedgerTransactionKind::Collected | BoostLedgerTransactionKind::Stolen => {
+                Some(KickoffBoostLedgerTotal::Collected)
+            }
+            BoostLedgerTransactionKind::Used => Some(KickoffBoostLedgerTotal::Used),
+            BoostLedgerTransactionKind::Overfill
+            | BoostLedgerTransactionKind::Respawn
+            | BoostLedgerTransactionKind::UsedAllocation => None,
         }
     }
 
@@ -606,6 +703,30 @@ impl KickoffCalculator {
             .or(boost_after)
             .unwrap_or(start_boost);
         (start_boost - lowest_boost).max(0.0)
+    }
+
+    fn taker_time_to_ball(player: &KickoffPlayerSnapshot, movement_start_time: f32) -> Option<f32> {
+        player
+            .first_touch_time
+            .map(|touch_time| (touch_time - movement_start_time).max(0.0))
+    }
+
+    fn taker_boost_collected(player: &KickoffPlayerSnapshot) -> f32 {
+        let trace = &player.approach_trace;
+        if !trace.ledger_amounts.is_empty() {
+            trace.ledger_boost_collected
+        } else {
+            trace.sampled_boost_collected
+        }
+    }
+
+    fn taker_boost_used(player: &KickoffPlayerSnapshot) -> f32 {
+        let trace = &player.approach_trace;
+        if !trace.ledger_amounts.is_empty() {
+            trace.ledger_boost_used
+        } else {
+            trace.sampled_boost_used
+        }
     }
 
     fn moved_distance(player: &KickoffPlayerSnapshot) -> f32 {
@@ -981,6 +1102,7 @@ impl KickoffCalculator {
         let mut team_one_taker_event = None;
         let mut team_zero_non_takers = Vec::new();
         let mut team_one_non_takers = Vec::new();
+        let movement_start_time = active.movement_start_time.unwrap_or(active.start_time);
         for (index, player) in active.players.iter().enumerate() {
             let expected_taker = if player.is_team_0 {
                 team_zero_taker
@@ -1007,6 +1129,9 @@ impl KickoffCalculator {
                     spawn_position: player.spawn_position,
                     start_boost: player.start_boost,
                     boost_after,
+                    time_to_ball: Self::taker_time_to_ball(player, movement_start_time),
+                    boost_collected: Self::taker_boost_collected(player),
+                    boost_used: Self::taker_boost_used(player),
                     first_touch_time: player.first_touch_time,
                     first_touch_frame: player.first_touch_frame,
                     outcome,
@@ -1050,7 +1175,7 @@ impl KickoffCalculator {
             end_frame: frame.frame_number,
             live_action_start_time: active.live_action_start_time,
             live_action_start_frame: active.live_action_start_frame,
-            movement_start_time: active.movement_start_time.unwrap_or(active.start_time),
+            movement_start_time,
             movement_start_frame: active.movement_start_frame.unwrap_or(active.start_frame),
             kickoff_type,
             kickoff_direction,
@@ -1104,6 +1229,7 @@ impl KickoffCalculator {
             touch_state,
             events,
             speed_flip_events: &[],
+            boost_ledger_events: &[],
         })
     }
 
@@ -1125,6 +1251,7 @@ impl KickoffCalculator {
         }
         Self::apply_player_samples(active, ctx.frame, ctx.players);
         Self::apply_touches(active, ctx.touch_state);
+        Self::apply_boost_ledger_events(active, ctx.boost_ledger_events);
         Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);
 
         if Self::should_finish(active, ctx.frame, ctx.gameplay, ctx.events) {

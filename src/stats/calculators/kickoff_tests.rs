@@ -682,6 +682,119 @@ fn kickoff_tracks_first_touch_taker_delay_exit_velocity_and_follow_up() {
 }
 
 #[test]
+fn kickoff_taker_tracks_time_to_ball_and_approach_boost_totals() {
+    let blue_taker = PlayerId::Steam(24);
+    let orange_taker = PlayerId::Steam(25);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                game_state: Some(GAME_STATE_KICKOFF_COUNTDOWN),
+                ball_has_been_hit: Some(false),
+                kickoff_countdown_time: Some(3),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(30, 3.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                kickoff_countdown_time: Some(0),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-1200.0, -1700.0, 17.0),
+                        30.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(1200.0, 1700.0, 17.0),
+                        32.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(35, 3.5),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(blue_taker.clone(), true, glam::Vec3::ZERO, 45.0),
+                    player(orange_taker.clone(), false, glam::Vec3::ZERO, 28.0),
+                ],
+            },
+            &TouchState {
+                touch_events: vec![touch(blue_taker.clone(), true, 35, 3.5)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(50, 5.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(360.0),
+            &PlayerFrameState {
+                players: vec![player(blue_taker.clone(), true, glam::Vec3::ZERO, 10.0)],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    let event = calculator.events().last().unwrap();
+    let blue_taker_event = event.team_zero_taker.as_ref().unwrap();
+    assert_eq!(blue_taker_event.player, blue_taker);
+    assert_eq!(blue_taker_event.time_to_ball, Some(0.5));
+    assert_eq!(blue_taker_event.boost_collected, 15.0);
+    assert_eq!(blue_taker_event.boost_used, 3.0);
+}
+
+#[test]
 fn kickoff_taker_touch_delay_is_non_negative_when_team_one_touches_first() {
     let blue_taker = PlayerId::Steam(26);
     let orange_taker = PlayerId::Steam(27);
@@ -1226,6 +1339,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
+            boost_ledger_events: &[],
         })
         .unwrap();
 
@@ -1244,6 +1358,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             },
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
+            boost_ledger_events: &[],
         })
         .unwrap();
 
@@ -1259,6 +1374,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
+            boost_ledger_events: &[],
         })
         .unwrap();
 
@@ -1630,6 +1746,9 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
             spawn_position: KickoffSpawnPosition::Center,
             start_boost: Some(33.0),
             boost_after: Some(11.0),
+            time_to_ball: None,
+            boost_collected: 0.0,
+            boost_used: 22.0,
             first_touch_time: None,
             first_touch_frame: None,
             outcome: KickoffTakerOutcome::Fake,
