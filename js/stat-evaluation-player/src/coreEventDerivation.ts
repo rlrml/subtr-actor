@@ -46,6 +46,7 @@ function defaultCorePlayerStats(): CorePlayerStats {
     goals_conceded_while_last_defender: 0,
     goals_for_while_most_back: 0,
     goals_against_while_most_back: 0,
+    caught_ahead_of_play_on_conceded_goals: 0,
     goal_against_boost_sample_count: 0,
     cumulative_boost_on_goals_against: 0,
     last_boost_on_goal_against: null,

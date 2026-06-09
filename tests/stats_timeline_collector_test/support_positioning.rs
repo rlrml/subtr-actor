@@ -404,11 +404,6 @@ fn assert_positioning_stats_close(
     assert_close_field!(time_behind_ball);
     assert_close_field!(time_level_with_ball);
     assert_close_field!(time_in_front_of_ball);
-    assert_eq!(
-        actual.times_caught_ahead_of_play_on_conceded_goals,
-        expected.times_caught_ahead_of_play_on_conceded_goals,
-        "{replay_path} {label}.times_caught_ahead_of_play_on_conceded_goals frame {frame_number}"
-    );
 }
 
 fn assert_positioning_events_reconstruct_final_serialized_sums(
@@ -428,11 +423,11 @@ fn assert_positioning_events_reconstruct_final_serialized_sums(
     }) {
         accumulator.apply_field_zone_event(&event);
     }
-    for event in timeline_payloads_by_stream(timeline, "positioning_ball_depth", |payload| match payload {
-        EventPayload::PositioningBallDepth(event) => Some(event),
+    for event in timeline_payloads_by_stream(timeline, "positioning_ball_relative_depth", |payload| match payload {
+        EventPayload::PositioningBallRelativeDepth(event) => Some(event),
         _ => None,
     }) {
-        accumulator.apply_ball_depth_event(&event);
+        accumulator.apply_ball_relative_depth_event(&event);
     }
     for event in timeline_payloads_by_stream(timeline, "positioning_teammate_role", |payload| match payload {
         EventPayload::PositioningTeammateRole(event) => Some(event),
@@ -446,23 +441,29 @@ fn assert_positioning_events_reconstruct_final_serialized_sums(
     }) {
         accumulator.apply_ball_proximity_event(&event);
     }
-    for event in timeline_payloads_by_stream(timeline, "positioning_goal_context", |payload| match payload {
-        EventPayload::PositioningGoalContext(event) => Some(event),
-        _ => None,
-    }) {
-        accumulator.apply_goal_context_event(&event);
-    }
 
     let final_frame = timeline
         .frames
         .last()
         .expect("positioning reconstruction requires at least one frame");
     for player in &final_frame.players {
-        let expected = accumulator
+        let mut expected = accumulator
             .player_stats()
             .get(&player.player_id)
             .cloned()
             .unwrap_or_default();
+        // Distance and possession time are continuous magnitudes that ride the per-player
+        // summary rather than the facet event streams, so they cannot be reconstructed from
+        // events. Pass them through from the serialized stats so the comparison below only
+        // exercises the event-derived fields.
+        expected.sum_distance_to_teammates = player.positioning.sum_distance_to_teammates;
+        expected.sum_distance_to_ball = player.positioning.sum_distance_to_ball;
+        expected.sum_distance_to_ball_has_possession =
+            player.positioning.sum_distance_to_ball_has_possession;
+        expected.time_has_possession = player.positioning.time_has_possession;
+        expected.sum_distance_to_ball_no_possession =
+            player.positioning.sum_distance_to_ball_no_possession;
+        expected.time_no_possession = player.positioning.time_no_possession;
         assert_positioning_stats_close(
             replay_path,
             &format!("player {} positioning", player.name),

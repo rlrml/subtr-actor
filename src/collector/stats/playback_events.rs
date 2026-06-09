@@ -286,29 +286,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         for (index, event) in self
             .module_player_events(
                 "positioning",
-                "possession_events",
-                parse_positioning_possession_event,
-            )?
-            .into_iter()
-            .enumerate()
-        {
-            events.push(make_event(
-                "positioning_possession",
-                index,
-                moment(event.frame, event.time),
-                EventPayload::PositioningPossession(event.clone()),
-                Some(event.player.clone()),
-                None,
-                Some(event.is_team_0),
-                event.player_position,
-                None,
-                None,
-            ));
-        }
-
-        for (index, event) in self
-            .module_player_events(
-                "positioning",
                 "field_zone_events",
                 parse_positioning_field_zone_event,
             )?
@@ -332,17 +309,17 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         for (index, event) in self
             .module_player_events(
                 "positioning",
-                "ball_depth_events",
-                parse_positioning_ball_depth_event,
+                "ball_relative_depth_events",
+                parse_positioning_ball_relative_depth_event,
             )?
             .into_iter()
             .enumerate()
         {
             events.push(make_event(
-                "positioning_ball_depth",
+                "positioning_ball_relative_depth",
                 index,
                 moment(event.frame, event.time),
-                EventPayload::PositioningBallDepth(event.clone()),
+                EventPayload::PositioningBallRelativeDepth(event.clone()),
                 Some(event.player.clone()),
                 None,
                 Some(event.is_team_0),
@@ -389,29 +366,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 index,
                 moment(event.frame, event.time),
                 EventPayload::PositioningBallProximity(event.clone()),
-                Some(event.player.clone()),
-                None,
-                Some(event.is_team_0),
-                event.player_position,
-                None,
-                None,
-            ));
-        }
-
-        for (index, event) in self
-            .module_player_events(
-                "positioning",
-                "goal_context_events",
-                parse_positioning_goal_context_event,
-            )?
-            .into_iter()
-            .enumerate()
-        {
-            events.push(make_event(
-                "positioning_goal_context",
-                index,
-                moment(event.frame, event.time),
-                EventPayload::PositioningGoalContext(event.clone()),
                 Some(event.player.clone()),
                 None,
                 Some(event.is_team_0),

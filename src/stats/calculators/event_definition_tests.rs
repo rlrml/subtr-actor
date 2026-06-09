@@ -38,10 +38,9 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<MovementEvent>();
     assert_stats_event::<PositioningActivityEvent>();
     assert_stats_event::<PositioningFieldZoneEvent>();
-    assert_stats_event::<PositioningBallDepthEvent>();
+    assert_stats_event::<PositioningBallRelativeDepthEvent>();
     assert_stats_event::<PositioningTeammateRoleEvent>();
     assert_stats_event::<PositioningBallProximityEvent>();
-    assert_stats_event::<PositioningGoalContextEvent>();
     assert_stats_event::<RotationPlayerEvent>();
     assert_stats_event::<RotationTeamEvent>();
     assert_stats_event::<FlipResetEvent>();

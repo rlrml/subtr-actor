@@ -490,21 +490,6 @@ fn build_replay_events(
         ));
     }
 
-    for (index, event) in positioning.possession_events().iter().enumerate() {
-        events.push(make_event(
-            "positioning_possession",
-            index,
-            moment(event.frame, event.time),
-            EventPayload::PositioningPossession(event.clone()),
-            Some(event.player.clone()),
-            None,
-            Some(event.is_team_0),
-            event.player_position,
-            None,
-            None,
-        ));
-    }
-
     for (index, event) in positioning.field_zone_events().iter().enumerate() {
         events.push(make_event(
             "positioning_field_zone",
@@ -520,12 +505,12 @@ fn build_replay_events(
         ));
     }
 
-    for (index, event) in positioning.ball_depth_events().iter().enumerate() {
+    for (index, event) in positioning.ball_relative_depth_events().iter().enumerate() {
         events.push(make_event(
-            "positioning_ball_depth",
+            "positioning_ball_relative_depth",
             index,
             moment(event.frame, event.time),
-            EventPayload::PositioningBallDepth(event.clone()),
+            EventPayload::PositioningBallRelativeDepth(event.clone()),
             Some(event.player.clone()),
             None,
             Some(event.is_team_0),
@@ -556,21 +541,6 @@ fn build_replay_events(
             index,
             moment(event.frame, event.time),
             EventPayload::PositioningBallProximity(event.clone()),
-            Some(event.player.clone()),
-            None,
-            Some(event.is_team_0),
-            event.player_position,
-            None,
-            None,
-        ));
-    }
-
-    for (index, event) in positioning.goal_context_events().iter().enumerate() {
-        events.push(make_event(
-            "positioning_goal_context",
-            index,
-            moment(event.frame, event.time),
-            EventPayload::PositioningGoalContext(event.clone()),
             Some(event.player.clone()),
             None,
             Some(event.is_team_0),

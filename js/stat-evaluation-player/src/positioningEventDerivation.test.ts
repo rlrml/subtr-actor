@@ -43,18 +43,6 @@ test("positioning event derivation prorates spans across the playhead", () => {
           demolished: true,
         },
       ],
-      positioning_possession: [
-        {
-          time: 1,
-          frame: 10,
-          end_time: 2,
-          end_frame: 20,
-          duration: 1,
-          player: playerId,
-          is_team_0: true,
-          possession_state: "has_possession",
-        },
-      ],
       positioning_field_zone: [
         {
           time: 1,
@@ -85,15 +73,6 @@ test("positioning event derivation prorates spans across the playhead", () => {
           farthest_from_ball: false,
         },
       ],
-      positioning_goal_context: [
-        {
-          time: 1.5,
-          frame: 15,
-          player: playerId,
-          is_team_0: true,
-          caught_ahead_of_play_on_conceded_goal: true,
-        },
-      ],
     },
     frames: [
       createStatsFrame({
@@ -119,9 +98,10 @@ test("positioning event derivation prorates spans across the playhead", () => {
     ],
   });
 
-  // Distance is a continuous magnitude computed over the whole match and shipped once as a
-  // per-player summary (not per frame, not events). Possession, by contrast, is categorical
-  // and comes from the positioning_possession event above.
+  // Distance and possession time are both continuous magnitudes computed over the whole match
+  // and shipped once as a per-player summary (not per frame, not events). Possession is an input
+  // to positioning rather than a positioning facet, so its split sums and the time that
+  // denominates them ride this same summary channel.
   for (const frame of timeline.frames) {
     Object.keys(frame.players[0]!.positioning).forEach((key) => {
       delete (frame.players[0]!.positioning as Record<string, unknown>)[key];
@@ -135,7 +115,9 @@ test("positioning event derivation prorates spans across the playhead", () => {
         sum_distance_to_teammates: 1000,
         sum_distance_to_ball: 2000,
         sum_distance_to_ball_has_possession: 2000,
+        time_has_possession: 1,
         sum_distance_to_ball_no_possession: 0,
+        time_no_possession: 0,
       },
     },
   ];
@@ -143,25 +125,25 @@ test("positioning event derivation prorates spans across the playhead", () => {
   const derived = applyPositioningEventDerivedStats(timeline);
   const positioningAt = (frameIndex: number) => derived.frames[frameIndex]!.players[0]!.positioning;
 
-  // Distance is the whole-match total, reported constant at every playhead.
+  // Distance and possession time are whole-match totals, reported constant at every playhead.
   assert.equal(positioningAt(0).tracked_time, 0);
   assertClose(positioningAt(0).sum_distance_to_ball, 2000);
+  assertClose(positioningAt(0).time_has_possession, 1);
   assertClose(positioningAt(1).sum_distance_to_ball, 2000);
   assertClose(positioningAt(3).sum_distance_to_teammates, 1000);
 
   // Frame 10: categorical spans have just begun, so no time has elapsed inside them yet.
   assertClose(positioningAt(1).tracked_time, 0);
-  assert.equal(positioningAt(1).times_caught_ahead_of_play_on_conceded_goals, 0);
 
   // Frame 15 (halfway): tracked span complete (0.5), demolished span just started (0), and the
-  // categorical full-window spans (zone, possession, proximity) are half elapsed.
+  // categorical full-window spans (zone, proximity) are half elapsed.
   assertClose(positioningAt(2).tracked_time, 0.5);
   assertClose(positioningAt(2).active_game_time, 0.5);
   assertClose(positioningAt(2).time_demolished, 0);
   assertClose(positioningAt(2).time_defensive_third, 0.25);
   assertClose(positioningAt(2).time_closest_to_ball, 0.5);
-  assertClose(positioningAt(2).time_has_possession, 0.5);
-  assert.equal(positioningAt(2).times_caught_ahead_of_play_on_conceded_goals, 1);
+  // Possession time is a whole-match summary total, not a prorated span.
+  assertClose(positioningAt(2).time_has_possession, 1);
 
   // Frame 20 (end): every categorical span is fully credited.
   assertClose(positioningAt(3).tracked_time, 0.5);

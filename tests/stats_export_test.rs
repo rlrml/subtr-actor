@@ -43,7 +43,6 @@ fn test_positioning_stats_export_includes_derived_metrics() {
         time_behind_ball: 7.0,
         time_level_with_ball: 1.0,
         time_in_front_of_ball: 2.0,
-        times_caught_ahead_of_play_on_conceded_goals: 0,
     };
 
     let fields = stats.stat_fields();

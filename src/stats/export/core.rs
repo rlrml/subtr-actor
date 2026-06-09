@@ -54,6 +54,12 @@ impl StatFieldProvider for CorePlayerStats {
         ));
         visitor(ExportedStat::unsigned(
             "core",
+            "times_caught_ahead_of_play_on_conceded_goals",
+            StatUnit::Count,
+            self.scoring_context.caught_ahead_of_play_on_conceded_goals,
+        ));
+        visitor(ExportedStat::unsigned(
+            "core",
             "goal_against_boost_sample_count",
             StatUnit::Count,
             self.scoring_context.goal_against_boost_sample_count,

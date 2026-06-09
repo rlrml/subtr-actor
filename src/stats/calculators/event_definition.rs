@@ -10,9 +10,9 @@ use super::{
     BoostPickupComparisonEvent, BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent,
     ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeEvent, DodgeResetEvent, DoubleTapEvent,
     FiftyFiftyEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
-    MustyFlickEvent, OneTimerEvent, PassEvent, PositioningActivityEvent, PositioningBallDepthEvent,
-    PositioningBallProximityEvent, PositioningFieldZoneEvent, PositioningGoalContextEvent,
-    PositioningPossessionEvent, PositioningTeammateRoleEvent, PossessionEvent, PowerslideEvent,
+    MustyFlickEvent, OneTimerEvent, PassEvent, PositioningActivityEvent,
+    PositioningBallProximityEvent, PositioningBallRelativeDepthEvent, PositioningFieldZoneEvent,
+    PositioningTeammateRoleEvent, PossessionEvent, PowerslideEvent,
     PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent,
     RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
     TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
@@ -645,13 +645,6 @@ define_stats_event!(
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningPossessionEvent,
-    POSITIONING_POSSESSION_EVENT_DEFINITION,
-    "positioning_possession",
-    "Positioning Possession",
-    EventCategory::Positioning
-);
-define_stats_event!(
     PositioningFieldZoneEvent,
     POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
     "positioning_field_zone",
@@ -659,10 +652,10 @@ define_stats_event!(
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningBallDepthEvent,
-    POSITIONING_BALL_DEPTH_EVENT_DEFINITION,
-    "positioning_ball_depth",
-    "Positioning Ball Depth",
+    PositioningBallRelativeDepthEvent,
+    POSITIONING_BALL_RELATIVE_DEPTH_EVENT_DEFINITION,
+    "positioning_ball_relative_depth",
+    "Positioning Ball-Relative Depth",
     EventCategory::Positioning
 );
 define_stats_event!(
@@ -677,13 +670,6 @@ define_stats_event!(
     POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
     "positioning_ball_proximity",
     "Positioning Ball Proximity",
-    EventCategory::Positioning
-);
-define_stats_event!(
-    PositioningGoalContextEvent,
-    POSITIONING_GOAL_CONTEXT_EVENT_DEFINITION,
-    "positioning_goal_context",
-    "Positioning Goal Context",
     EventCategory::Positioning
 );
 define_stats_event!(
@@ -783,12 +769,10 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     &MOVEMENT_EVENT_DEFINITION,
     &POSITIONING_ACTIVITY_EVENT_DEFINITION,
-    &POSITIONING_POSSESSION_EVENT_DEFINITION,
     &POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
-    &POSITIONING_BALL_DEPTH_EVENT_DEFINITION,
+    &POSITIONING_BALL_RELATIVE_DEPTH_EVENT_DEFINITION,
     &POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
     &POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
-    &POSITIONING_GOAL_CONTEXT_EVENT_DEFINITION,
     &ROTATION_PLAYER_EVENT_DEFINITION,
     &ROTATION_TEAM_EVENT_DEFINITION,
     &FLIP_RESET_EVENT_DEFINITION,
@@ -1048,19 +1032,13 @@ const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_POSSESSION_EVENT_DEFINITION,
-        "positioning",
-        "PositioningNode",
-        "PositioningCalculator",
-    ),
-    produced_event(
         &POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_BALL_DEPTH_EVENT_DEFINITION,
+        &POSITIONING_BALL_RELATIVE_DEPTH_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
@@ -1073,12 +1051,6 @@ const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
     produced_event(
         &POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
-        "positioning",
-        "PositioningNode",
-        "PositioningCalculator",
-    ),
-    produced_event(
-        &POSITIONING_GOAL_CONTEXT_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
