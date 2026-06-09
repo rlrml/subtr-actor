@@ -8,13 +8,14 @@ use crate::stats::calculators::{
     FiftyFiftyState, FlickCalculator, FlickGoalCalculator, FlipImpulseCalculator,
     FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState, HalfFlipCalculator,
     HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator, KickoffCalculator,
-    LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator,
-    MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
-    PassCalculator, PassingGoalCalculator, PlayerFrameState, PlayerVerticalState,
-    PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
-    PressureCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
-    SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchCalculator, TouchState,
-    WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
+    KickoffGoalCalculator, LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator,
+    MovementCalculator, MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator,
+    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerFrameState,
+    PlayerVerticalState, PositioningCalculator, PossessionCalculator, PossessionState,
+    PowerslideCalculator, PressureCalculator, RotationCalculator, RushCalculator,
+    SpeedFlipCalculator, SustainedPressureGoalCalculator, TerritorialPressureCalculator,
+    TouchCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
+    WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -113,7 +114,7 @@ pub use gameplay_state::GameplayStateNode;
 pub use goal_tags::{
     AerialGoalNode, AirDribbleGoalNode, BumpGoalNode, CounterAttackGoalNode, DemoGoalNode,
     EmptyNetGoalNode, FlickGoalNode, FlipResetGoalNode, HalfVolleyGoalNode, HighAerialGoalNode,
-    LongDistanceGoalNode, OneTimerGoalNode, OwnHalfGoalNode, PassingGoalNode,
+    KickoffGoalNode, LongDistanceGoalNode, OneTimerGoalNode, OwnHalfGoalNode, PassingGoalNode,
     SustainedPressureGoalNode,
 };
 #[allow(unused_imports)]
@@ -279,6 +280,10 @@ pub(crate) fn sustained_pressure_goal_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<SustainedPressureGoalCalculator>(
         goal_tags::boxed_sustained_pressure_goal,
     )
+}
+
+pub(crate) fn kickoff_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<KickoffGoalCalculator>(goal_tags::boxed_kickoff_goal)
 }
 
 pub(crate) fn flick_goal_dependency() -> AnalysisDependency {

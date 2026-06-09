@@ -62,6 +62,31 @@ fn goal_with_touch(
     }
 }
 
+fn core_scoring_goal_context(
+    goal: &GoalContextEvent,
+    time_after_kickoff: Option<f32>,
+) -> CorePlayerGoalContextEvent {
+    CorePlayerGoalContextEvent {
+        time: goal.time,
+        frame: goal.frame,
+        player: goal.scorer.clone().expect("test goal should have scorer"),
+        player_position: None,
+        is_team_0: goal.scoring_team_is_team_0,
+        scoring_team_is_team_0: goal.scoring_team_is_team_0,
+        goals_conceded_while_last_defender: false,
+        goals_for_while_most_back: false,
+        goals_against_while_most_back: false,
+        goal_against_boost_amount: None,
+        goal_against_average_boost_in_leadup: None,
+        goal_against_min_boost_in_leadup: None,
+        goal_against_position: None,
+        scoring_goal_last_touch_position: None,
+        time_after_kickoff,
+        goal_buildup: Some(goal.goal_buildup),
+        ball_air_time_before_goal: goal.ball_air_time_before_goal,
+    }
+}
+
 fn tag_kinds(events: &[GoalTagAssignment]) -> Vec<GoalTagKind> {
     let mut kinds: Vec<_> = events.iter().map(|event| event.tag.kind()).collect();
     kinds.sort_by_key(|kind| format!("{kind:?}"));
@@ -447,6 +472,35 @@ fn sustained_pressure_goal_rejects_other_buildup() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 120.0), Vec::new());
 
     let events = SustainedPressureGoalCalculator::new().tag_goals(&[goal]);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn kickoff_goal_tags_goals_scored_shortly_after_kickoff() {
+    let mut goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    goal.scorer_last_touch = None;
+    let core_context = core_scoring_goal_context(&goal, Some(2.7));
+    let calculator = KickoffGoalCalculator::new();
+
+    let events = calculator.tag_goals(&[goal], &[core_context]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::KickoffGoal]);
+    assert!(events[0]
+        .tag
+        .metadata()
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::GoalContext));
+}
+
+#[test]
+fn kickoff_goal_rejects_goals_at_or_after_ten_seconds_after_kickoff() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let core_context = core_scoring_goal_context(&goal, Some(10.0));
+    let calculator = KickoffGoalCalculator::new();
+
+    let events = calculator.tag_goals(&[goal], &[core_context]);
 
     assert!(events.is_empty());
 }

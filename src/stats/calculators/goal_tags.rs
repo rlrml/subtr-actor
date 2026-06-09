@@ -23,6 +23,7 @@ const DEFAULT_BUMP_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_DEMO_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_HALF_VOLLEY_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_HALF_VOLLEY_GOAL_MIN_GOAL_ALIGNMENT: f32 = 0.55;
+const DEFAULT_KICKOFF_GOAL_MAX_TIME_AFTER_KICKOFF_SECONDS: f32 = 10.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
@@ -44,6 +45,7 @@ pub enum GoalTagKind {
     BumpGoal,
     DemoGoal,
     HalfVolleyGoal,
+    KickoffGoal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
@@ -148,6 +150,7 @@ pub enum GoalTag {
     BumpGoal(GoalTagMetadata),
     DemoGoal(GoalTagMetadata),
     HalfVolleyGoal(GoalTagMetadata),
+    KickoffGoal(GoalTagMetadata),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -352,6 +355,17 @@ pub const ALL_GOAL_TAG_DEFINITIONS: &[GoalTagDefinition] = &[
             "Attach a related half-volley event reference and half-volley evidence to the goal tag metadata.",
         ],
     ),
+    goal_tag_definition(
+        GoalTagKind::KickoffGoal,
+        "kickoff_goal",
+        "Kickoff Goal",
+        "A goal scored shortly after the kickoff's first touch.",
+        &[
+            "Inspect the scorer's core goal context for time-after-kickoff data.",
+            "Require the goal to fall within the kickoff-goal timing window.",
+            "Attach goal-context evidence so the tag appears with the goal label.",
+        ],
+    ),
 ];
 
 impl GoalTag {
@@ -373,6 +387,7 @@ impl GoalTag {
             GoalTagKind::BumpGoal => Self::BumpGoal(metadata),
             GoalTagKind::DemoGoal => Self::DemoGoal(metadata),
             GoalTagKind::HalfVolleyGoal => Self::HalfVolleyGoal(metadata),
+            GoalTagKind::KickoffGoal => Self::KickoffGoal(metadata),
         }
     }
 
@@ -394,6 +409,7 @@ impl GoalTag {
             Self::BumpGoal(_) => GoalTagKind::BumpGoal,
             Self::DemoGoal(_) => GoalTagKind::DemoGoal,
             Self::HalfVolleyGoal(_) => GoalTagKind::HalfVolleyGoal,
+            Self::KickoffGoal(_) => GoalTagKind::KickoffGoal,
         }
     }
 
@@ -414,7 +430,8 @@ impl GoalTag {
             | Self::FlipResetGoal(metadata)
             | Self::BumpGoal(metadata)
             | Self::DemoGoal(metadata)
-            | Self::HalfVolleyGoal(metadata) => metadata,
+            | Self::HalfVolleyGoal(metadata)
+            | Self::KickoffGoal(metadata) => metadata,
         }
     }
 }
@@ -726,6 +743,11 @@ pub struct HalfVolleyGoalCalculator {
     events: EventStream<GoalTagAssignment>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct KickoffGoalCalculator {
+    events: EventStream<GoalTagAssignment>,
+}
+
 macro_rules! impl_goal_tag_calculator {
     ($calculator:ident, $config:ident) => {
         impl Default for $calculator {
@@ -839,6 +861,28 @@ impl HalfVolleyGoalCalculator {
 
     pub fn config(&self) -> &HalfVolleyGoalCalculatorConfig {
         &self.config
+    }
+
+    pub fn events(&self) -> &[GoalTagAssignment] {
+        self.events.all()
+    }
+
+    pub fn new_events(&self) -> &[GoalTagAssignment] {
+        self.events.new_events()
+    }
+}
+
+impl Default for KickoffGoalCalculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KickoffGoalCalculator {
+    pub fn new() -> Self {
+        Self {
+            events: EventStream::new(),
+        }
     }
 
     pub fn events(&self) -> &[GoalTagAssignment] {
@@ -1389,6 +1433,50 @@ impl HalfVolleyGoalCalculator {
             return false;
         };
         touch.player == candidate.player && touch.frame == candidate.frame
+    }
+}
+
+impl KickoffGoalCalculator {
+    pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
+        self.events.replace_all_assuming_append_only(self.tag_goals(
+            match_stats.goal_context_events(),
+            match_stats.core_player_goal_context_events(),
+        ));
+        Ok(())
+    }
+
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        core_goal_context_events: &[CorePlayerGoalContextEvent],
+    ) -> Vec<GoalTagAssignment> {
+        let mut tags = Vec::new();
+        for core_event in core_goal_context_events {
+            let Some(time_after_kickoff) = core_event.time_after_kickoff else {
+                continue;
+            };
+            if !(0.0..DEFAULT_KICKOFF_GOAL_MAX_TIME_AFTER_KICKOFF_SECONDS)
+                .contains(&time_after_kickoff)
+            {
+                continue;
+            }
+            let Some((goal_index, goal)) = goals.iter().enumerate().find(|(_, goal)| {
+                goal.time == core_event.time
+                    && goal.frame == core_event.frame
+                    && goal.scoring_team_is_team_0 == core_event.scoring_team_is_team_0
+                    && goal.scorer.as_ref() == Some(&core_event.player)
+            }) else {
+                continue;
+            };
+
+            tags.push(goal_tag(
+                GoalTaggingContext { goal_index },
+                GoalTagKind::KickoffGoal,
+                1.0,
+                vec![goal_context_evidence(goal)],
+            ));
+        }
+        tags
     }
 }
 

@@ -121,6 +121,8 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "Counter attack goal";
   case SaMechanicKindSustainedPressureGoal:
     return "Sustained pressure goal";
+  case SaMechanicKindKickoffGoal:
+    return "Kickoff goal";
   case SaMechanicKindDemo:
     return "Demo";
   case SaMechanicKindDeath:
