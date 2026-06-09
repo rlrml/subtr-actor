@@ -36,11 +36,13 @@ impl AnalysisNode for KickoffNode {
             touch_state_dependency(),
             frame_events_state_dependency(),
             speed_flip_dependency(),
+            boost_dependency(),
         ]
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         let speed_flip = ctx.get::<SpeedFlipCalculator>()?;
+        let boost_ledger_events = ctx.get::<BoostCalculator>()?.projected_ledger_events();
         self.calculator
             .update_with_speed_flips(KickoffUpdateContext {
                 frame: ctx.get::<FrameInfo>()?,
@@ -50,6 +52,7 @@ impl AnalysisNode for KickoffNode {
                 touch_state: ctx.get::<TouchState>()?,
                 events: ctx.get::<FrameEventsState>()?,
                 speed_flip_events: speed_flip.events(),
+                boost_ledger_events: &boost_ledger_events,
             })
     }
 
