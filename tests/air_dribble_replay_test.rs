@@ -21,12 +21,17 @@ fn detects_air_dribble_goal_and_rejects_unrelated_half_volley_tag() {
         0.25,
     );
 
+    let EventPayload::BallCarry(air_dribble) = &event.payload else {
+        panic!("expected air_dribble event payload to be BallCarry: {event:#?}");
+    };
     assert_eq!(
-        common::mechanic_event_text_property(event, "origin"),
+        air_dribble
+            .air_dribble_origin
+            .map(|origin| origin.as_label_value()),
         Some("ground_to_air")
     );
     assert!(
-        common::mechanic_event_unsigned_property(event, "touch_count").unwrap_or(0) >= 3,
+        air_dribble.touch_count >= 3,
         "expected colonelpanic8 air dribble to include at least 3 touches"
     );
 
