@@ -122,7 +122,7 @@ pub fn builtin_analysis_node_aliases() -> &'static [BuiltinAnalysisNodeAlias] {
     BUILTIN_ANALYSIS_NODE_ALIASES
 }
 
-fn canonical_builtin_analysis_node_name(name: &str) -> Option<&'static str> {
+pub(crate) fn canonical_builtin_analysis_node_name(name: &str) -> Option<&'static str> {
     builtin_analysis_node_aliases()
         .iter()
         .find_map(|alias| (alias.alias == name).then_some(alias.node_name))

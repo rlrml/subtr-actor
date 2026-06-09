@@ -184,7 +184,7 @@ constexpr std::array<const char *, 50> GRAPH_EVENT_FIELDS{
     "one_timer",
     "pass",
     "rush",
-    "flip_impulse",
+    "dodge",
     "speed_flip",
     "half_flip",
     "half_volley",
