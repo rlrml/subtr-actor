@@ -110,7 +110,7 @@ fn iced_space_duplicate_reported_small_boost_pickup_is_suppressed_by_processor()
         .filter(|pickup| pickup.player_id == iced_space)
         .collect::<Vec<_>>();
     let graph_events_for_iced_space = boost
-        .pickup_comparison_events()
+        .pickup_events()
         .iter()
         .filter(|event| event.player_id == iced_space)
         .collect::<Vec<_>>();
@@ -142,7 +142,7 @@ fn iced_space_duplicate_reported_small_boost_pickup_is_suppressed_by_processor()
 
     let graph_events_at_frame_1996 = graph_events_for_iced_space
         .iter()
-        .filter(|event| event.reported_frame == Some(1996))
+        .filter(|event| event.frame == 1996)
         .collect::<Vec<_>>();
     assert_eq!(
         graph_events_at_frame_1996.len(),
@@ -150,7 +150,7 @@ fn iced_space_duplicate_reported_small_boost_pickup_is_suppressed_by_processor()
         "the boost graph should not count both same-frame reported pickups"
     );
     let counted_pickup = graph_events_at_frame_1996[0];
-    assert_eq!(counted_pickup.comparison, BoostPickupComparison::Both);
+    assert_eq!(counted_pickup.detection, BoostPickupDetection::Both);
     assert_eq!(counted_pickup.pad_type, BoostPickupPadType::Small);
     assert_eq!(counted_pickup.boost_before, Some(0.0));
     assert_eq!(counted_pickup.boost_after, Some(31.0));
@@ -161,11 +161,11 @@ fn iced_space_duplicate_reported_small_boost_pickup_is_suppressed_by_processor()
         .collect::<Vec<_>>();
     let original_small_ordinal = small_graph_events
         .iter()
-        .position(|event| event.reported_frame == Some(1960))
+        .position(|event| event.frame == 1960)
         .map(|index| index + 1);
     let counted_small_ordinal = small_graph_events
         .iter()
-        .position(|event| event.reported_frame == Some(1996))
+        .position(|event| event.frame == 1996)
         .map(|index| index + 1);
     assert!(
         original_small_ordinal.is_some(),

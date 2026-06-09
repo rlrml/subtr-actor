@@ -2,14 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  applyBoostLedgerDerivedStats,
-  findBoostLedgerDerivationMismatches,
-} from "./boostLedgerDerivation.ts";
+  applyBoostTrackDerivedStats,
+  findBoostTrackDerivationMismatches,
+} from "./boostTrackDerivation.ts";
 import { createStatsFrame, createStatsTimeline } from "./testStatsTimeline.ts";
+import type { AccumulationTrack } from "./generated/AccumulationTrack.ts";
 import type { MaterializedStatsTimeline } from "./statsTimeline.ts";
 
 const playerId = { Steam: "ledger-player" } as Record<string, unknown>;
-const eventDerivedBoostFields = [
+const derivedBoostFields = [
   "tracked_time",
   "boost_integral",
   "time_zero_boost",
@@ -26,99 +27,40 @@ function assertClose(actual: number | undefined, expected: number): void {
   assert.ok(actual != null && Math.abs(actual - expected) < 0.000001);
 }
 
-function ledgerTimeline(): MaterializedStatsTimeline {
-  return createStatsTimeline({
+// The boost calculator now ships pickup/respawn events plus compressed per-frame accumulation
+// tracks instead of ledger/state events. The continuous integral / time-in-band fields are
+// reconstructed from the boost-amount track, so the expected partial sums match the former model.
+function trackTimeline(): MaterializedStatsTimeline {
+  const timeline = createStatsTimeline({
     events: {
-      boost_state: [
-        {
-          frame: 1,
-          time: 1,
-          player_id: playerId,
-          is_team_0: true,
-          boost_amount: 0,
-          boost_before: null,
-        },
+      boost_pickups: [
         {
           frame: 2,
           time: 2,
           player_id: playerId,
           is_team_0: true,
-          boost_amount: 32,
-          boost_before: 0,
-        },
-        {
-          frame: 3,
-          time: 3,
-          player_id: playerId,
-          is_team_0: true,
-          boost_amount: 27,
-          boost_before: 32,
-        },
-      ],
-      boost_ledger: [
-        {
-          frame: 1,
-          time: 1,
-          player_id: playerId,
-          is_team_0: true,
-          transaction: "respawn",
-          amount: 33,
-          count: 0,
-          labels: [{ key: "transaction", value: "respawn" }],
-          boost_before: 0,
-          boost_after: 33,
-        },
-        {
-          frame: 2,
-          time: 2,
-          player_id: playerId,
-          is_team_0: true,
-          transaction: "collected",
-          amount: 12,
-          count: 1,
-          labels: [
-            { key: "transaction", value: "collected" },
-            { key: "pad_size", value: "small" },
-            { key: "activity", value: "active" },
-            { key: "field_half", value: "own" },
-          ],
+          pad_type: "small",
+          field_half: "own",
+          activity: "active",
+          detection: "both",
+          is_steal: false,
+          collected_amount: 12,
+          overfill_amount: 0,
           boost_before: 20,
           boost_after: 32,
         },
+      ],
+      boost_respawn: [
         {
-          frame: 3,
-          time: 3,
+          frame: 1,
+          time: 1,
           player_id: playerId,
           is_team_0: true,
-          transaction: "used",
-          amount: 5,
-          count: 0,
-          labels: [
-            { key: "transaction", value: "used" },
-            { key: "vertical_state", value: "grounded" },
-            { key: "supersonic", value: "false" },
-          ],
-          boost_before: 32,
-          boost_after: 27,
-        },
-        {
-          frame: 3,
-          time: 3,
-          player_id: playerId,
-          is_team_0: true,
-          transaction: "used_allocation",
-          amount: 5,
-          count: 0,
-          labels: [
-            { key: "transaction", value: "used" },
-            { key: "vertical_state", value: "grounded" },
-            { key: "supersonic", value: "false" },
-          ],
-          boost_before: 32,
-          boost_after: 27,
+          kind: "kickoff",
+          boost_granted: 33,
         },
       ],
-    },
+    } as never,
     frames: [
       createStatsFrame({
         frame_number: 1,
@@ -126,23 +68,13 @@ function ledgerTimeline(): MaterializedStatsTimeline {
         dt: 0.1,
         is_live_play: true,
         team_zero: {
-          boost: {
-            tracked_time: 0.1,
-            time_zero_boost: 0.1,
-            time_boost_0_25: 0.1,
-            amount_respawned: 33,
-          },
+          boost: { tracked_time: 0.1, time_zero_boost: 0.1, time_boost_0_25: 0.1, amount_respawned: 33 },
         },
         players: [
           {
             player_id: playerId,
             is_team_0: true,
-            boost: {
-              tracked_time: 0.1,
-              time_zero_boost: 0.1,
-              time_boost_0_25: 0.1,
-              amount_respawned: 33,
-            },
+            boost: { tracked_time: 0.1, time_zero_boost: 0.1, time_boost_0_25: 0.1, amount_respawned: 33 },
           },
         ],
       }),
@@ -220,26 +152,53 @@ function ledgerTimeline(): MaterializedStatsTimeline {
       }),
     ],
   });
+
+  const tracks: AccumulationTrack[] = [
+    {
+      player_id: playerId as never,
+      is_team_0: true,
+      quantity: "boost_amount",
+      points: [
+        { frame: 1, value: 0 },
+        { frame: 2, value: 32 },
+        { frame: 3, value: 27 },
+      ],
+    },
+    {
+      player_id: playerId as never,
+      is_team_0: true,
+      quantity: "boost_used",
+      points: [{ frame: 3, value: 5 }],
+    },
+    {
+      player_id: playerId as never,
+      is_team_0: true,
+      quantity: "boost_used_grounded",
+      points: [{ frame: 3, value: 5 }],
+    },
+  ];
+  (timeline as { accumulation_tracks?: AccumulationTrack[] }).accumulation_tracks = tracks;
+  return timeline;
 }
 
-test("boost ledger derivation matches serialized boost partial sums", () => {
-  assert.deepEqual(findBoostLedgerDerivationMismatches(ledgerTimeline()), []);
+test("boost track derivation matches serialized boost partial sums", () => {
+  assert.deepEqual(findBoostTrackDerivationMismatches(trackTimeline()), []);
 });
 
-test("boost ledger derivation can populate boost partial sums for player rendering", () => {
-  const timeline = ledgerTimeline();
+test("boost track derivation can populate boost partial sums for player rendering", () => {
+  const timeline = trackTimeline();
   for (const frame of timeline.frames) {
-    for (const field of eventDerivedBoostFields) {
+    for (const field of derivedBoostFields) {
       delete (frame.team_zero.boost as Partial<typeof frame.team_zero.boost>)[field];
     }
     for (const player of frame.players) {
-      for (const field of eventDerivedBoostFields) {
+      for (const field of derivedBoostFields) {
         delete (player.boost as Partial<typeof player.boost>)[field];
       }
     }
   }
 
-  applyBoostLedgerDerivedStats(timeline);
+  applyBoostTrackDerivedStats(timeline);
 
   assert.equal(timeline.frames[2]?.players[0]?.boost.amount_respawned, 33);
   assertClose(timeline.frames[2]?.players[0]?.boost.tracked_time, 0.3);

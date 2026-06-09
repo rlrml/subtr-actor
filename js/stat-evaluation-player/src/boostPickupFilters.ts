@@ -1,10 +1,10 @@
 import type { BoostPickupAnimationPickup, ReplayModel } from "@rlrml/player";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
-import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
+import type { BoostPickupDetection } from "./generated/BoostPickupDetection.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
 import type { BoostPickupPadType } from "./generated/BoostPickupPadType.ts";
 import type { BoostPickupTimelineRangeOptions } from "./timelineRanges.ts";
-import type { BoostPickupComparisonEvent, StatsTimeline } from "./statsTimeline.ts";
+import type { BoostPickupEvent, StatsTimeline } from "./statsTimeline.ts";
 import { statsEventPayloads } from "./statsTimeline.ts";
 import { playerIdToString } from "./touchOverlay.ts";
 
@@ -43,7 +43,7 @@ export interface BoostPickupFilterController {
 
 export interface BoostPickupFilterConfig {
   readonly padTypes: BoostPickupPadType[];
-  readonly comparisons: BoostPickupComparison[];
+  readonly detections: BoostPickupDetection[];
   readonly activities: BoostPickupActivity[];
   readonly fieldHalves: BoostPickupFieldHalf[];
   readonly playerIds: string[] | null;
@@ -55,9 +55,11 @@ const BOOST_PICKUP_PAD_TYPE_OPTIONS = [
   { value: "ambiguous", label: "Ambiguous pads" },
 ] satisfies Array<BoostPickupFilterOption<BoostPickupPadType>>;
 
-const BOOST_PICKUP_COMPARISON_OPTIONS = [{ value: "both", label: "Pickup events" }] satisfies Array<
-  BoostPickupFilterOption<BoostPickupComparison>
->;
+const BOOST_PICKUP_DETECTION_OPTIONS = [
+  { value: "both", label: "Both detectors" },
+  { value: "inferred_only", label: "Inferred only" },
+  { value: "reported_only", label: "Reported only" },
+] satisfies Array<BoostPickupFilterOption<BoostPickupDetection>>;
 
 const BOOST_PICKUP_ACTIVITY_OPTIONS = [
   { value: "active", label: "Active play" },
@@ -81,22 +83,22 @@ function isBoostPickupPadTypeCompatible(
 export function getBoostPickupAnimationTimelineMatch(
   pickup: BoostPickupAnimationPickup,
   timeline: StatsTimeline | null,
-): BoostPickupComparisonEvent | null {
-  const comparisonEvents = timeline
-    ? boostPickupComparisonEvents(timeline, statsEventPayloads(timeline, "boost_pickup"))
+): BoostPickupEvent | null {
+  const pickupEvents = timeline
+    ? boostPickupEvents(timeline, statsEventPayloads(timeline, "boost_pickup"))
     : [];
-  if (comparisonEvents.length === 0) {
+  if (pickupEvents.length === 0) {
     return null;
   }
 
   return (
-    comparisonEvents.find((event) => {
+    pickupEvents.find((event) => {
       const playerId = playerIdToString(event.player_id);
-      const reportedFrame = event.reported_frame ?? event.frame;
       return (
         playerId === pickup.player.id &&
-        event.comparison === "both" &&
-        reportedFrame === pickup.event.frame &&
+        // A reported pad pickup corresponds to any pickup the pad-event detector saw.
+        event.detection !== "inferred_only" &&
+        event.frame === pickup.event.frame &&
         isBoostPickupPadTypeCompatible(event.pad_type, pickup.pad.size)
       );
     }) ?? null
@@ -107,28 +109,28 @@ export function hasBoostPickupAnimationTimelineMatch(
   pickup: BoostPickupAnimationPickup,
   timeline: StatsTimeline | null,
 ): boolean {
-  const comparisonEvents = timeline
-    ? boostPickupComparisonEvents(timeline, statsEventPayloads(timeline, "boost_pickup"))
+  const pickupEvents = timeline
+    ? boostPickupEvents(timeline, statsEventPayloads(timeline, "boost_pickup"))
     : [];
-  if (comparisonEvents.length === 0) {
+  if (pickupEvents.length === 0) {
     return true;
   }
 
   return getBoostPickupAnimationTimelineMatch(pickup, timeline) !== null;
 }
 
-function boostPickupComparisonEvents(
+function boostPickupEvents(
   timeline: StatsTimeline,
-  comparisonEvents: BoostPickupComparisonEvent[],
-): BoostPickupComparisonEvent[] {
-  if (comparisonEvents.length > 0) {
-    return comparisonEvents;
+  pickupEvents: BoostPickupEvent[],
+): BoostPickupEvent[] {
+  if (pickupEvents.length > 0) {
+    return pickupEvents;
   }
   const legacyEvents = (timeline as unknown as { events?: { boost_pickups?: unknown } }).events
     ?.boost_pickups;
   return Array.isArray(legacyEvents)
-    ? (legacyEvents as BoostPickupComparisonEvent[])
-    : comparisonEvents;
+    ? (legacyEvents as BoostPickupEvent[])
+    : pickupEvents;
 }
 
 export function createBoostPickupFilterController(
@@ -143,8 +145,8 @@ export function createBoostPickupFilterController(
   const activePadTypes = new Set<BoostPickupPadType>(
     BOOST_PICKUP_PAD_TYPE_OPTIONS.map((option) => option.value),
   );
-  const activeComparisons = new Set<BoostPickupComparison>(
-    BOOST_PICKUP_COMPARISON_OPTIONS.map((option) => option.value),
+  const activeDetections = new Set<BoostPickupDetection>(
+    BOOST_PICKUP_DETECTION_OPTIONS.map((option) => option.value),
   );
   const activeActivities = new Set<BoostPickupActivity>(
     BOOST_PICKUP_ACTIVITY_OPTIONS.map((option) => option.value),
@@ -292,8 +294,8 @@ export function createBoostPickupFilterController(
     switch (filterKey) {
       case "pad-type":
         return activePadTypes.has(value as BoostPickupPadType);
-      case "comparison":
-        return activeComparisons.has(value as BoostPickupComparison);
+      case "detection":
+        return activeDetections.has(value as BoostPickupDetection);
       case "activity":
         return activeActivities.has(value as BoostPickupActivity);
       case "field-half":
@@ -308,7 +310,7 @@ export function createBoostPickupFilterController(
     const visiblePlayerCount = activePlayerIds ? activePlayerIds.size : playerCount;
     const hidden =
       activePadTypes.size === 0 ||
-      activeComparisons.size === 0 ||
+      activeDetections.size === 0 ||
       activeActivities.size === 0 ||
       activeFieldHalves.size === 0 ||
       (activePlayerIds !== null && activePlayerIds.size === 0);
@@ -318,7 +320,7 @@ export function createBoostPickupFilterController(
 
     const constrainedGroups = [
       activePadTypes.size < BOOST_PICKUP_PAD_TYPE_OPTIONS.length,
-      activeComparisons.size < BOOST_PICKUP_COMPARISON_OPTIONS.length,
+      activeDetections.size < BOOST_PICKUP_DETECTION_OPTIONS.length,
       activeActivities.size < BOOST_PICKUP_ACTIVITY_OPTIONS.length,
       activeFieldHalves.size < BOOST_PICKUP_FIELD_HALF_OPTIONS.length,
       activePlayerIds !== null && visiblePlayerCount < playerCount,
@@ -335,7 +337,7 @@ export function createBoostPickupFilterController(
     if (!lastStatsTimeline || statsEventPayloads(lastStatsTimeline, "boost_pickup").length === 0) {
       return (
         activePadTypes.has(pickup.pad.size) &&
-        activeComparisons.has("both") &&
+        activeDetections.has("both") &&
         activeActivities.has("unknown") &&
         activeFieldHalves.has("unknown")
       );
@@ -348,7 +350,7 @@ export function createBoostPickupFilterController(
 
     return (
       activePadTypes.has(matchedEvent.pad_type) &&
-      activeComparisons.has(matchedEvent.comparison) &&
+      activeDetections.has(matchedEvent.detection) &&
       activeActivities.has(matchedEvent.activity) &&
       activeFieldHalves.has(matchedEvent.field_half)
     );
@@ -378,7 +380,7 @@ export function createBoostPickupFilterController(
   function getConfig(): BoostPickupFilterConfig {
     return {
       padTypes: [...activePadTypes],
-      comparisons: [...activeComparisons],
+      detections: [...activeDetections],
       activities: [...activeActivities],
       fieldHalves: [...activeFieldHalves],
       playerIds: activePlayerIds ? [...activePlayerIds] : null,
@@ -391,7 +393,7 @@ export function createBoostPickupFilterController(
     }
     const record = config as Record<string, unknown>;
     setActiveValues(activePadTypes, BOOST_PICKUP_PAD_TYPE_OPTIONS, record.padTypes);
-    setActiveValues(activeComparisons, BOOST_PICKUP_COMPARISON_OPTIONS, record.comparisons);
+    setActiveValues(activeDetections, BOOST_PICKUP_DETECTION_OPTIONS, record.detections);
     setActiveValues(activeActivities, BOOST_PICKUP_ACTIVITY_OPTIONS, record.activities);
     setActiveValues(activeFieldHalves, BOOST_PICKUP_FIELD_HALF_OPTIONS, record.fieldHalves);
     activePlayerIds = Array.isArray(record.playerIds)
@@ -427,7 +429,7 @@ export function createBoostPickupFilterController(
     getTimelineRangeOptions() {
       const options: BoostPickupTimelineRangeOptions = {
         padTypes: activePadTypes,
-        comparisons: activeComparisons,
+        detections: activeDetections,
         activities: activeActivities,
         fieldHalves: activeFieldHalves,
       };

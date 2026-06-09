@@ -28,9 +28,8 @@ test("boost pickup animation fallback matches counted timeline pickups", () => {
       pickup(120),
       timeline([
         {
-          comparison: "both",
-          frame: 121,
-          reported_frame: 120,
+          detection: "both",
+          frame: 120,
           player_id: { Steam: "player-1" },
           pad_type: "small",
         },
@@ -40,15 +39,14 @@ test("boost pickup animation fallback matches counted timeline pickups", () => {
   );
 });
 
-test("boost pickup animation fallback rejects legacy ghost timeline pickups", () => {
+test("boost pickup animation fallback rejects inferred-only timeline pickups", () => {
   assert.equal(
     hasBoostPickupAnimationTimelineMatch(
       pickup(120),
       timeline([
         {
-          comparison: "ghost",
+          detection: "inferred_only",
           frame: 120,
-          reported_frame: 120,
           player_id: { Steam: "player-1" },
           pad_type: "small",
         },
@@ -64,9 +62,8 @@ test("boost pickup animation fallback rejects unmatched raw pickup events", () =
       pickup(122),
       timeline([
         {
-          comparison: "both",
-          frame: 121,
-          reported_frame: 120,
+          detection: "both",
+          frame: 120,
           player_id: { Steam: "player-1" },
           pad_type: "small",
         },

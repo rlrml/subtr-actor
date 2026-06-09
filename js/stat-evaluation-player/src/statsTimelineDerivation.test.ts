@@ -156,7 +156,7 @@ test("event-derived stats frame lookup applies converted modules incrementally",
   ).map((applier) => applier.id);
   assert.deepEqual(incrementalApplierIds, [
     "event-counts",
-    "boost-ledger",
+    "boost-track",
     "core",
     "possession",
     "pressure",

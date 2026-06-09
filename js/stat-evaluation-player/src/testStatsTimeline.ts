@@ -117,9 +117,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "powerslide", stream: "powerslide", kind: "powerslide" },
   { field: "touch", stream: "touch", kind: "touch" },
   { field: "boost_pickups", stream: "boost_pickups", kind: "boost_pickup" },
-  { field: "boost_ledger", stream: "boost_ledger", kind: "boost_ledger" },
-  { field: "boost_bucket", stream: "boost_bucket", kind: "boost_bucket" },
-  { field: "boost_state", stream: "boost_state", kind: "boost_state" },
+  { field: "boost_respawn", stream: "boost_respawn", kind: "respawn" },
   { field: "bump", stream: "bump", kind: "bump" },
 ];
 
@@ -423,9 +421,7 @@ export function createLegacyStatsTimeline(
     rotation_first_man_stint_events?: PayloadList<"rotation_first_man_stint">;
     rotation_team_events?: PayloadList<"rotation_team">;
     boost_pickups?: PayloadList<"boost_pickup">;
-    boost_ledger?: PayloadList<"boost_ledger">;
-    boost_bucket?: PayloadList<"boost_bucket">;
-    boost_state?: PayloadList<"boost_state">;
+    boost_respawn?: PayloadList<"respawn">;
     bump_events?: PayloadList<"bump">;
   } = {},
 ): MaterializedStatsTimeline {
@@ -533,14 +529,8 @@ export function createLegacyStatsTimeline(
     ...(overrides.boost_pickups ?? []).map((event, index) =>
       payloadEvent("boost_pickups", "boost_pickup", event, index),
     ),
-    ...(overrides.boost_ledger ?? []).map((event, index) =>
-      payloadEvent("boost_ledger", "boost_ledger", event, index),
-    ),
-    ...(overrides.boost_bucket ?? []).map((event, index) =>
-      payloadEvent("boost_bucket", "boost_bucket", event, index),
-    ),
-    ...(overrides.boost_state ?? []).map((event, index) =>
-      payloadEvent("boost_state", "boost_state", event, index),
+    ...(overrides.boost_respawn ?? []).map((event, index) =>
+      payloadEvent("boost_respawn", "respawn", event, index),
     ),
     ...(overrides.bump_events ?? []).map((event, index) =>
       payloadEvent("bump", "bump", event, index),

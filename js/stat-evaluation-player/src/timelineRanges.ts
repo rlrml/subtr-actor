@@ -8,7 +8,7 @@ import {
   teamTimelineColor,
 } from "./timelinePresentation.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
-import type { BoostPickupComparison } from "./generated/BoostPickupComparison.ts";
+import type { BoostPickupDetection } from "./generated/BoostPickupDetection.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
 import type { BoostPickupPadType } from "./generated/BoostPickupPadType.ts";
 import type { FiftyFiftyEvent } from "./generated/FiftyFiftyEvent.ts";
@@ -25,17 +25,17 @@ const BOOST_PICKUP_COLORS: Record<ReplayBoostPadSize, string> = {
   big: "rgba(245, 158, 11, 0.92)",
   small: "rgba(52, 211, 153, 0.86)",
 };
-const BOOST_PICKUP_COMPARISON_COLORS: Record<BoostPickupComparison, string> = {
+const BOOST_PICKUP_DETECTION_COLORS: Record<BoostPickupDetection, string> = {
   both: "rgba(52, 211, 153, 0.86)",
-  ghost: "rgba(239, 68, 68, 0.9)",
-  missed: "rgba(59, 130, 246, 0.9)",
+  inferred_only: "rgba(239, 68, 68, 0.9)",
+  reported_only: "rgba(59, 130, 246, 0.9)",
 };
 type PressureHalfControlState = "team_zero_side" | "team_one_side" | "neutral";
 
 export interface BoostPickupTimelineRangeOptions {
   sizes?: Iterable<ReplayBoostPadSize>;
   padTypes?: Iterable<BoostPickupPadType>;
-  comparisons?: Iterable<BoostPickupComparison>;
+  detections?: Iterable<BoostPickupDetection>;
   activities?: Iterable<BoostPickupActivity>;
   fieldHalves?: Iterable<BoostPickupFieldHalf>;
   playerIds?: Iterable<string>;
@@ -572,7 +572,9 @@ function buildReplayBoostPickupTimelineRanges(
   options: BoostPickupTimelineRangeOptions = {},
 ): ReplayTimelineRange[] {
   const enabledPadTypes = padTypesFromOptions(options);
-  const enabledComparisons = new Set<BoostPickupComparison>(options.comparisons ?? ["both"]);
+  const enabledDetections = new Set<BoostPickupDetection>(
+    options.detections ?? ["both", "inferred_only", "reported_only"],
+  );
   const enabledActivities = new Set<BoostPickupActivity>(
     options.activities ?? ["active", "inactive", "unknown"],
   );
@@ -582,7 +584,7 @@ function buildReplayBoostPickupTimelineRanges(
   const enabledPlayerIds = options.playerIds ? new Set(options.playerIds) : null;
   if (
     enabledPadTypes.size === 0 ||
-    !enabledComparisons.has("both") ||
+    enabledDetections.size === 0 ||
     !enabledActivities.has("unknown") ||
     !enabledFieldHalves.has("unknown") ||
     enabledPlayerIds?.size === 0
@@ -673,23 +675,23 @@ function formatBoostPickupPadType(padType: BoostPickupPadType): string {
   }[padType];
 }
 
-function formatBoostPickupComparison(comparison: BoostPickupComparison): string {
+function formatBoostPickupDetection(detection: BoostPickupDetection): string {
   return {
     both: "counted",
-    ghost: "ghost",
-    missed: "missed",
-  }[comparison];
+    inferred_only: "inferred",
+    reported_only: "reported",
+  }[detection];
 }
 
 function boostPickupShortLabel(
-  comparison: BoostPickupComparison,
+  detection: BoostPickupDetection,
   padType: BoostPickupPadType,
 ): string {
-  if (comparison === "ghost") {
-    return "G";
+  if (detection === "inferred_only") {
+    return "I";
   }
-  if (comparison === "missed") {
-    return "M";
+  if (detection === "reported_only") {
+    return "R";
   }
   return {
     big: "100",
@@ -709,7 +711,9 @@ export function buildBoostPickupTimelineRanges(
   }
 
   const enabledPadTypes = padTypesFromOptions(options);
-  const enabledComparisons = new Set<BoostPickupComparison>(options.comparisons ?? ["both"]);
+  const enabledDetections = new Set<BoostPickupDetection>(
+    options.detections ?? ["both", "inferred_only", "reported_only"],
+  );
   const enabledActivities = new Set<BoostPickupActivity>(
     options.activities ?? ["active", "inactive", "unknown"],
   );
@@ -719,7 +723,7 @@ export function buildBoostPickupTimelineRanges(
   const enabledPlayerIds = options.playerIds ? new Set(options.playerIds) : null;
   if (
     enabledPadTypes.size === 0 ||
-    enabledComparisons.size === 0 ||
+    enabledDetections.size === 0 ||
     enabledActivities.size === 0 ||
     enabledFieldHalves.size === 0 ||
     enabledPlayerIds?.size === 0
@@ -733,7 +737,7 @@ export function buildBoostPickupTimelineRanges(
       const playerId = remoteIdToString(event.player_id as Record<string, unknown>);
       return (
         enabledPadTypes.has(event.pad_type) &&
-        enabledComparisons.has(event.comparison) &&
+        enabledDetections.has(event.detection) &&
         enabledActivities.has(event.activity) &&
         enabledFieldHalves.has(event.field_half) &&
         (!enabledPlayerIds || enabledPlayerIds.has(playerId))
@@ -743,25 +747,25 @@ export function buildBoostPickupTimelineRanges(
       const playerId = remoteIdToString(event.player_id as Record<string, unknown>);
       const playerName = playerNames.get(playerId) ?? playerId;
       const startTime = Math.max(0, getReplayFrameTime(replay, event.frame, event.time));
-      const comparisonLabel = formatBoostPickupComparison(event.comparison);
+      const detectionLabel = formatBoostPickupDetection(event.detection);
       const padLabel = formatBoostPickupPadType(event.pad_type);
       return {
-        id: `boost-pickup:${event.comparison}:${event.frame}:${playerId}:${index}`,
+        id: `boost-pickup:${event.detection}:${event.frame}:${playerId}:${index}`,
         startTime,
         endTime: Math.max(startTime + BOOST_PICKUP_TICK_SECONDS, startTime),
         lane: "boost-pickups",
         laneLabel: "Boost Pickups",
-        label: `${playerName} ${comparisonLabel} ${padLabel} boost pickup`,
-        shortLabel: boostPickupShortLabel(event.comparison, event.pad_type),
+        label: `${playerName} ${detectionLabel} ${padLabel} boost pickup`,
+        shortLabel: boostPickupShortLabel(event.detection, event.pad_type),
         color:
           teamTimelineColor(event.is_team_0) ??
-          (event.comparison === "both"
+          (event.detection === "both"
             ? event.pad_type === "big"
               ? BOOST_PICKUP_COLORS.big
               : event.pad_type === "small"
                 ? BOOST_PICKUP_COLORS.small
-                : BOOST_PICKUP_COMPARISON_COLORS.both
-            : BOOST_PICKUP_COMPARISON_COLORS[event.comparison]),
+                : BOOST_PICKUP_DETECTION_COLORS.both
+            : BOOST_PICKUP_DETECTION_COLORS[event.detection]),
         isTeamZero: event.is_team_0,
       };
     })

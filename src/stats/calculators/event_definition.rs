@@ -6,17 +6,15 @@ use serde::Serialize;
 use linkme::distributed_slice;
 
 use super::{
-    BackboardBounceEvent, BallCarryEvent, BoostBucketEvent, BoostLedgerEvent,
-    BoostPickupComparisonEvent, BoostStateEvent, BumpEvent, CeilingShotEvent, CenterEvent,
-    ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeEvent, DodgeResetEvent, DoubleTapEvent,
-    FiftyFiftyEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
-    MustyFlickEvent, OneTimerEvent, PassEvent, PositioningActivityEvent,
+    BackboardBounceEvent, BallCarryEvent, BoostPickupEvent, BumpEvent, CeilingShotEvent,
+    CenterEvent, ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeEvent, DodgeResetEvent,
+    DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent,
+    MovementEvent, MustyFlickEvent, OneTimerEvent, PassEvent, PositioningActivityEvent,
     PositioningBallProximityEvent, PositioningBallRelativeDepthEvent, PositioningFieldZoneEvent,
-    PositioningTeammateRoleEvent, PossessionEvent, PowerslideEvent,
-    PressureEvent, RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent,
-    RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
-    TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
-    WhiffEvent,
+    PositioningTeammateRoleEvent, PossessionEvent, PowerslideEvent, PressureEvent, RespawnEvent,
+    RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent, RotationRoleSpanEvent,
+    RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent,
+    TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::Event;
 
@@ -569,37 +567,17 @@ define_stats_event!(
     EventCategory::Other
 );
 define_stats_event!(
-    BoostPickupComparisonEvent,
-    BOOST_PICKUP_COMPARISON_EVENT_DEFINITION,
+    BoostPickupEvent,
+    BOOST_PICKUP_EVENT_DEFINITION,
     "boost_pickups",
     "Boost Pickup",
     EventCategory::Boost
 );
 define_stats_event!(
-    BoostLedgerEvent,
-    BOOST_LEDGER_EVENT_DEFINITION,
-    "boost_ledger",
-    "Boost Ledger",
-    EventCategory::Boost
-);
-define_stats_event!(
-    BoostBucketEvent,
-    BOOST_BUCKET_EVENT_DEFINITION,
-    "boost_bucket",
-    "Boost Bucket",
-    EventCategory::Boost,
-    summary = "A completed span for a player's display boost bucket.",
-    approach = [
-        "Bucket each live player boost sample into the fixed display ranges.",
-        "Hold the current bucket open while it remains unchanged.",
-        "Emit the completed bucket span only after a later sample shows the player entered a different bucket.",
-    ]
-);
-define_stats_event!(
-    BoostStateEvent,
-    BOOST_STATE_EVENT_DEFINITION,
-    "boost_state",
-    "Boost State",
+    RespawnEvent,
+    BOOST_RESPAWN_EVENT_DEFINITION,
+    "boost_respawn",
+    "Respawn",
     EventCategory::Boost
 );
 define_stats_event!(
@@ -759,10 +737,8 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &WHIFF_EVENT_DEFINITION,
     &POWERSLIDE_EVENT_DEFINITION,
     &TOUCH_CLASSIFICATION_EVENT_DEFINITION,
-    &BOOST_PICKUP_COMPARISON_EVENT_DEFINITION,
-    &BOOST_LEDGER_EVENT_DEFINITION,
-    &BOOST_BUCKET_EVENT_DEFINITION,
-    &BOOST_STATE_EVENT_DEFINITION,
+    &BOOST_PICKUP_EVENT_DEFINITION,
+    &BOOST_RESPAWN_EVENT_DEFINITION,
     &BUMP_EVENT_DEFINITION,
     &POSSESSION_EVENT_DEFINITION,
     &PRESSURE_EVENT_DEFINITION,
@@ -964,25 +940,13 @@ const TOUCH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 
 const BOOST_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
-        &BOOST_PICKUP_COMPARISON_EVENT_DEFINITION,
+        &BOOST_PICKUP_EVENT_DEFINITION,
         "boost",
         "BoostNode",
         "BoostCalculator",
     ),
     produced_event(
-        &BOOST_LEDGER_EVENT_DEFINITION,
-        "boost",
-        "BoostNode",
-        "BoostCalculator",
-    ),
-    produced_event(
-        &BOOST_BUCKET_EVENT_DEFINITION,
-        "boost",
-        "BoostNode",
-        "BoostCalculator",
-    ),
-    produced_event(
-        &BOOST_STATE_EVENT_DEFINITION,
+        &BOOST_RESPAWN_EVENT_DEFINITION,
         "boost",
         "BoostNode",
         "BoostCalculator",

@@ -1013,7 +1013,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
-            .module_player_events("boost", "events", parse_boost_pickup_comparison_event)?
+            .module_player_events("boost", "pickup_events", parse_boost_pickup_event)?
             .into_iter()
             .enumerate()
         {
@@ -1032,53 +1032,15 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
-            .module_player_events("boost", "ledger_events", parse_boost_ledger_event)?
+            .module_player_events("boost", "respawn_events", parse_boost_respawn_event)?
             .into_iter()
             .enumerate()
         {
             events.push(make_event(
-                "boost_ledger",
+                "boost_respawn",
                 index,
-                span(event.frame, event.end_frame, event.time, event.end_time),
-                EventPayload::BoostLedger(event.clone()),
-                Some(event.player_id.clone()),
-                None,
-                Some(event.is_team_0),
-                event.player_position,
-                None,
-                None,
-            ));
-        }
-
-        for (index, event) in self
-            .module_player_events("boost", "bucket_events", parse_boost_bucket_event)?
-            .into_iter()
-            .enumerate()
-        {
-            events.push(make_event(
-                "boost_bucket",
-                index,
-                span(event.frame, event.end_frame, event.time, event.end_time),
-                EventPayload::BoostBucket(event.clone()),
-                Some(event.player_id.clone()),
-                None,
-                Some(event.is_team_0),
-                event.player_position,
-                None,
-                None,
-            ));
-        }
-
-        for (index, event) in self
-            .module_player_events("boost", "state_events", parse_boost_state_event)?
-            .into_iter()
-            .enumerate()
-        {
-            events.push(make_event(
-                "boost_state",
-                index,
-                span(event.frame, event.end_frame, event.time, event.end_time),
-                EventPayload::BoostState(event.clone()),
+                moment(event.frame, event.time),
+                EventPayload::Respawn(event.clone()),
                 Some(event.player_id.clone()),
                 None,
                 Some(event.is_team_0),

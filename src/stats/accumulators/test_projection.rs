@@ -83,36 +83,15 @@ pub(crate) trait BoostTestProjection {
 
 impl BoostTestProjection for BoostCalculator {
     fn player_stats(&self) -> &HashMap<PlayerId, BoostStats> {
-        let mut stats = BoostStatsAccumulator::default();
-        for event in self.projected_state_events() {
-            stats.apply_state_event(&event);
-        }
-        for event in self.projected_ledger_events() {
-            stats.apply_ledger_event(&event);
-        }
-        leak_test_stats(stats.player_stats().clone())
+        leak_test_stats(self.boost_stats().player_stats().clone())
     }
 
     fn team_zero_stats(&self) -> &BoostStats {
-        let mut stats = BoostStatsAccumulator::default();
-        for event in self.projected_state_events() {
-            stats.apply_state_event(&event);
-        }
-        for event in self.projected_ledger_events() {
-            stats.apply_ledger_event(&event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
+        leak_test_stats(self.boost_stats().team_zero_stats().clone())
     }
 
     fn team_one_stats(&self) -> &BoostStats {
-        let mut stats = BoostStatsAccumulator::default();
-        for event in self.projected_state_events() {
-            stats.apply_state_event(&event);
-        }
-        for event in self.projected_ledger_events() {
-            stats.apply_ledger_event(&event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
+        leak_test_stats(self.boost_stats().team_one_stats().clone())
     }
 }
 

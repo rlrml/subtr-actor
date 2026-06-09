@@ -1,24 +1,5 @@
 #[test]
 #[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
-fn test_boost_stats_events_reconstruct_final_serialized_sums() {
-    let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
-    let replay = parse_replay(replay_path);
-    let timeline = StatsTimelineCollector::new()
-        .get_legacy_replay_stats_timeline(&replay)
-        .expect("Expected stats timeline data");
-    assert!(
-        timeline_has_stream(&timeline, "boost_ledger"),
-        "expected boost ledger events to be emitted"
-    );
-    assert!(
-        timeline_has_stream(&timeline, "boost_state"),
-        "expected boost state events to be emitted"
-    );
-    assert_boost_stats_events_reconstruct_final_serialized_sums(replay_path, &timeline);
-}
-
-#[test]
-#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_mechanic_events_reconstruct_serialized_partial_sums() {
     let replay_paths = [
         "assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay",
@@ -552,7 +533,6 @@ fn assert_converted_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    assert_boost_stats_events_reconstruct_final_serialized_sums(replay_path, timeline);
     assert_core_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_possession_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_pressure_events_reconstruct_serialized_partial_sums(replay_path, timeline);

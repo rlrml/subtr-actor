@@ -1,8 +1,7 @@
 import type { BackboardBounceEvent } from "./generated/BackboardBounceEvent.ts";
 import type { BallCarryEvent } from "./generated/BallCarryEvent.ts";
-import type { BoostLedgerEvent } from "./generated/BoostLedgerEvent.ts";
-import type { BoostLedgerTransactionKind } from "./generated/BoostLedgerTransactionKind.ts";
-import type { BoostPickupComparisonEvent } from "./generated/BoostPickupComparisonEvent.ts";
+import type { BoostPickupEvent } from "./generated/BoostPickupEvent.ts";
+import type { RespawnEvent } from "./generated/RespawnEvent.ts";
 import type { BumpEvent } from "./generated/BumpEvent.ts";
 import type { CeilingShotEvent } from "./generated/CeilingShotEvent.ts";
 import type { CorePlayerGoalContextEvent } from "./generated/CorePlayerGoalContextEvent.ts";
@@ -124,9 +123,8 @@ export type {
   WallAerialEvent,
   WallAerialShotEvent,
   WhiffEvent,
-  BoostLedgerEvent,
-  BoostLedgerTransactionKind,
-  BoostPickupComparisonEvent,
+  BoostPickupEvent,
+  RespawnEvent,
   BumpEvent,
   CorePlayerGoalContextEvent,
   CorePlayerScoreboardEvent,

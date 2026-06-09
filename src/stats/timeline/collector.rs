@@ -291,12 +291,18 @@ impl StatsTimelineEventCollector {
                     .unwrap_or_default(),
             })
             .collect();
+        let accumulation_tracks = self
+            .graph
+            .state::<BoostCalculator>()
+            .map(|calculator| calculator.accumulation_tracks())
+            .unwrap_or_default();
         Ok(ReplayStatsTimelineScaffold {
             config: default_stats_timeline_config(),
             replay_meta,
             events,
             frames: self.frames,
             positioning_summary,
+            accumulation_tracks,
         })
     }
 

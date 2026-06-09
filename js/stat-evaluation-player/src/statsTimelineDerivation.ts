@@ -11,9 +11,9 @@ import {
   createBumpEventDerivedStatsAccumulator,
 } from "./bumpEventDerivation.ts";
 import {
-  applyBoostLedgerDerivedStats,
-  createBoostLedgerDerivedStatsAccumulator,
-} from "./boostLedgerDerivation.ts";
+  applyBoostTrackDerivedStats,
+  createBoostTrackDerivedStatsAccumulator,
+} from "./boostTrackDerivation.ts";
 import {
   applyCeilingShotEventDerivedStats,
   createCeilingShotEventDerivedStatsAccumulator,
@@ -161,11 +161,11 @@ export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventD
     createFrameAccumulator: createEventCountDerivedStatsAccumulator,
   },
   {
-    id: "boost-ledger",
+    id: "boost-track",
     playerModules: ["boost"],
     teamModules: ["boost"],
-    apply: applyBoostLedgerDerivedStats,
-    createFrameAccumulator: createBoostLedgerDerivedStatsAccumulator,
+    apply: applyBoostTrackDerivedStats,
+    createFrameAccumulator: createBoostTrackDerivedStatsAccumulator,
   },
   {
     id: "core",

@@ -194,47 +194,38 @@ fn boost_ledger_replays_respawn_collection_and_use_totals() {
         .player_stats()
         .get(&player_id)
         .expect("player stats should be recorded");
-    let projected_ledger_events = calculator.projected_ledger_events();
-    let ledger_sum = |transaction| {
-        projected_ledger_events
+
+    assert!(
+        player_stats.amount_respawned > 0.0,
+        "the kickoff respawn grant should be recorded"
+    );
+    assert!(
+        (player_stats.amount_collected - SMALL_PAD_AMOUNT_RAW).abs() < 0.001,
+        "the small pad pickup should be credited"
+    );
+    assert!(
+        player_stats.amount_used > 0.0,
+        "the boost drain should be inferred as used"
+    );
+
+    assert!(
+        calculator
+            .respawn_events()
             .iter()
-            .filter(|event| event.transaction == transaction && event.player_id == player_id)
-            .map(|event| event.amount)
-            .sum::<f32>()
-    };
-
-    assert!(
-        (ledger_sum(BoostLedgerTransactionKind::Respawn) - player_stats.amount_respawned).abs()
-            < 0.001
+            .any(|event| event.player_id == player_id),
+        "a respawn event should be emitted"
     );
     assert!(
-        (ledger_sum(BoostLedgerTransactionKind::Collected) - player_stats.amount_collected).abs()
-            < 0.001
+        calculator
+            .pickup_events()
+            .iter()
+            .any(|event| event.player_id == player_id && event.collected_amount > 0.0),
+        "a collected pickup event should be emitted"
     );
-    assert!(
-        (ledger_sum(BoostLedgerTransactionKind::Stolen) - player_stats.amount_stolen).abs() < 0.001
-    );
-    assert!(
-        (ledger_sum(BoostLedgerTransactionKind::Used) - player_stats.amount_used).abs() < 0.001
-    );
-
-    let mut reconstructed = BoostStatsAccumulator::new();
-    for event in calculator.projected_state_events() {
-        reconstructed.apply_state_event(&event);
-    }
-    for event in calculator.projected_ledger_events() {
-        reconstructed.apply_ledger_event(&event);
-    }
-    assert_eq!(reconstructed.player_stats(), calculator.player_stats());
-    assert_eq!(
-        reconstructed.team_zero_stats(),
-        calculator.team_zero_stats()
-    );
-    assert_eq!(reconstructed.team_one_stats(), calculator.team_one_stats());
 }
 
 #[test]
-fn boost_bucket_events_emit_completed_span_when_bucket_changes() {
+fn boost_amount_track_records_change_points() {
     let mut calculator = BoostCalculator::new();
     let player_id = PlayerId::Steam(1);
     let position = glam::Vec3::new(0.0, 0.0, 17.0);
@@ -268,19 +259,19 @@ fn boost_bucket_events_emit_completed_span_when_bucket_changes() {
             .expect("boost update should succeed");
     }
 
-    assert_eq!(calculator.bucket_events().len(), 1);
-    let event = &calculator.bucket_events()[0];
-    assert_eq!(event.player_id, player_id);
-    assert_eq!(event.bucket, BoostBucket::Boost0To25);
-    assert_eq!(event.frame, 1);
-    assert_eq!(event.end_frame, 2);
-    assert!((event.end_time - 1.2).abs() < 0.001);
-    assert!((event.duration - 0.2).abs() < 0.001);
-
-    let projected = calculator.projected_bucket_events();
-    assert_eq!(projected.len(), 2);
-    assert_eq!(projected[1].bucket, BoostBucket::Boost25To50);
-    assert_eq!(projected[1].frame, 3);
+    let tracks = calculator.accumulation_tracks();
+    let boost_amount_track = tracks
+        .iter()
+        .find(|track| {
+            track.player_id == player_id && track.quantity == AccumulationQuantity::BoostAmount
+        })
+        .expect("a boost amount track should be recorded");
+    // 20 -> 30 -> 70 produces three distinct change-points.
+    assert_eq!(boost_amount_track.points.len(), 3);
+    assert!((boost_amount_track.points[0].value - 20.0).abs() < 0.001);
+    assert_eq!(boost_amount_track.points[0].frame, 1);
+    assert!((boost_amount_track.points[2].value - 70.0).abs() < 0.001);
+    assert_eq!(boost_amount_track.points[2].frame, 3);
 }
 
 #[test]
@@ -455,14 +446,6 @@ fn demo_reset_does_not_count_removed_boost_as_used() {
     assert_eq!(player_stats.amount_used, 0.0);
     assert_eq!(player_stats.amount_used_while_grounded, 0.0);
     assert_eq!(calculator.team_zero_stats().amount_used, 0.0);
-    assert!(calculator
-        .ledger_events()
-        .iter()
-        .filter(|event| event.player_id == player_id)
-        .all(
-            |event| event.transaction != BoostLedgerTransactionKind::Used
-                && event.transaction != BoostLedgerTransactionKind::UsedAllocation
-        ));
 }
 
 #[test]
@@ -738,12 +721,11 @@ fn stale_unreported_boost_increase_is_counted_as_ghost_pickup() {
             < 0.001
     );
 
-    let events = calculator.pickup_comparison_events();
+    let events = calculator.pickup_events();
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].comparison, BoostPickupComparison::Ghost);
+    assert_eq!(events[0].detection, BoostPickupDetection::InferredOnly);
     assert_eq!(events[0].pad_type, BoostPickupPadType::Big);
-    assert_eq!(events[0].reported_frame, None);
-    assert_eq!(events[0].inferred_frame, Some(2));
+    assert_eq!(events[0].frame, 2);
 }
 
 #[test]
@@ -799,7 +781,7 @@ fn non_live_boost_increase_is_not_counted_as_ghost_pickup() {
         .expect("initial respawn stats should be recorded");
     assert_eq!(player_stats.big_pads_collected, 0);
     assert_eq!(player_stats.amount_collected, 0.0);
-    assert!(calculator.pickup_comparison_events().is_empty());
+    assert!(calculator.pickup_events().is_empty());
 }
 
 #[test]
@@ -884,12 +866,11 @@ fn reported_pickup_without_observed_boost_increase_is_emitted_as_counted_pickup(
     assert_eq!(player_stats.amount_collected_small, 0.0);
     assert_eq!(player_stats.overfill_total, SMALL_PAD_AMOUNT_RAW);
 
-    let events = calculator.pickup_comparison_events();
+    let events = calculator.pickup_events();
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].comparison, BoostPickupComparison::Both);
+    assert_eq!(events[0].detection, BoostPickupDetection::ReportedOnly);
     assert_eq!(events[0].pad_type, BoostPickupPadType::Small);
-    assert_eq!(events[0].reported_frame, Some(2));
-    assert_eq!(events[0].inferred_frame, None);
+    assert_eq!(events[0].frame, 2);
 }
 
 #[test]
@@ -976,10 +957,13 @@ fn matches_two_small_pickups_from_one_observed_boost_increase() {
         .finish_calculation()
         .expect("pickup comparisons should flush");
 
-    let events = calculator.pickup_comparison_events();
+    let events = calculator.pickup_events();
     assert_eq!(events.len(), 2);
-    assert!(events.iter().all(|event| {
-        event.comparison == BoostPickupComparison::Both
-            && event.pad_type == BoostPickupPadType::Small
-    }));
+    assert!(events
+        .iter()
+        .all(|event| event.pad_type == BoostPickupPadType::Small));
+    // At least one of the two reported pickups is corroborated by the observed boost jump.
+    assert!(events
+        .iter()
+        .any(|event| event.detection == BoostPickupDetection::Both));
 }

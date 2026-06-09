@@ -212,36 +212,18 @@ build_analysis_player_event_indicator!(
     AnalysisPlayerBoostPickups,
     boost_dependency,
     BoostCalculator,
-    new_pickup_comparison_events,
-    |event: &BoostPickupComparisonEvent, player_id: &PlayerId| &event.player_id == player_id,
+    new_pickup_events,
+    |event: &BoostPickupEvent, player_id: &PlayerId| &event.player_id == player_id,
     "analysis boost pickup event",
 );
 
 build_analysis_player_event_indicator!(
-    AnalysisPlayerBoostLedgerEvents,
+    AnalysisPlayerBoostRespawns,
     boost_dependency,
     BoostCalculator,
-    new_ledger_events,
-    |event: &BoostLedgerEvent, player_id: &PlayerId| &event.player_id == player_id,
-    "analysis boost ledger event",
-);
-
-build_analysis_player_event_indicator!(
-    AnalysisPlayerBoostBucketEvents,
-    boost_dependency,
-    BoostCalculator,
-    new_bucket_events,
-    |event: &BoostBucketEvent, player_id: &PlayerId| &event.player_id == player_id,
-    "analysis boost bucket event",
-);
-
-build_analysis_player_event_indicator!(
-    AnalysisPlayerBoostStateEvents,
-    boost_dependency,
-    BoostCalculator,
-    new_state_events,
-    |event: &BoostStateEvent, player_id: &PlayerId| &event.player_id == player_id,
-    "analysis boost state event",
+    new_respawn_events,
+    |event: &RespawnEvent, player_id: &PlayerId| &event.player_id == player_id,
+    "analysis boost respawn event",
 );
 
 build_analysis_player_event_indicator!(
@@ -363,14 +345,8 @@ where
         "boost_pickup" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerBoostPickups::<F>::arc_new(),
         )),
-        "boost_ledger" => Some(NDArrayPlayerFeatureAdder::analysis(
-            AnalysisPlayerBoostLedgerEvents::<F>::arc_new(),
-        )),
-        "boost_bucket" => Some(NDArrayPlayerFeatureAdder::analysis(
-            AnalysisPlayerBoostBucketEvents::<F>::arc_new(),
-        )),
-        "boost_state" => Some(NDArrayPlayerFeatureAdder::analysis(
-            AnalysisPlayerBoostStateEvents::<F>::arc_new(),
+        "boost_respawn" => Some(NDArrayPlayerFeatureAdder::analysis(
+            AnalysisPlayerBoostRespawns::<F>::arc_new(),
         )),
         "bump" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerBumps::<F>::arc_new(),

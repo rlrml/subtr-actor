@@ -27,7 +27,7 @@ test("boost pickup player filters restored from config survive initial replay se
   controller.applyConfig({
     playerIds: ["Steam:player-1"],
     padTypes: ["big"],
-    comparisons: ["both"],
+    detections: ["both"],
     activities: ["active"],
     fieldHalves: ["own"],
   });
@@ -50,7 +50,7 @@ test("boost pickup player filters still reset across later replay changes", () =
   controller.applyConfig({
     playerIds: ["Steam:first"],
     padTypes: ["big"],
-    comparisons: ["both"],
+    detections: ["both"],
     activities: ["active"],
     fieldHalves: ["own"],
   });

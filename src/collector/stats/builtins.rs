@@ -836,10 +836,9 @@ pub(crate) fn builtin_module_json(
                 "team_zero": projection.boost.team_zero_stats(),
                 "team_one": projection.boost.team_one_stats(),
                 "player_stats": player_stats_entries(projection.boost.player_stats()),
-                "events": calculator.pickup_comparison_events(),
-                "ledger_events": calculator.ledger_events(),
-                "state_events": calculator.state_events(),
-                "bucket_events": calculator.bucket_events(),
+                "pickup_events": calculator.pickup_events(),
+                "respawn_events": calculator.respawn_events(),
+                "accumulation_tracks": calculator.accumulation_tracks(),
             }))
         }
         "bump" => {

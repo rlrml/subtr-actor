@@ -60,6 +60,10 @@ function parseStatsTimelineParts(
     frames: parts.frameChunks.flatMap((chunk) =>
       parseJsonBuffer<StatsTimeline["frames"]>(decoder, chunk),
     ),
+    accumulation_tracks: parseJsonBuffer<CompactStatsTimeline["accumulation_tracks"]>(
+      decoder,
+      parts.accumulationTracks,
+    ),
   } satisfies StatsTimeline;
   const statsFrameLookup = createStatsFrameLookup(statsTimeline, undefined, {
     materializationChunkSize: Math.max(1, statsTimeline.frames.length),
