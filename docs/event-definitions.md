@@ -92,64 +92,6 @@ _None documented._
 
 _None documented._
 
-### Boost Bucket (`boost_bucket`)
-
-- Category: `boost`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `boost` via `BoostNode` / `BoostCalculator`
-
-**Summary**
-
-A completed span for a player's display boost bucket.
-
-**Approach**
-
-- Bucket each live player boost sample into the fixed display ranges.
-- Hold the current bucket open while it remains unchanged.
-- Emit the completed bucket span only after a later sample shows the player entered a different bucket.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Boost Ledger (`boost_ledger`)
-
-- Category: `boost`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `boost` via `BoostNode` / `BoostCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
 ### Boost Pickup (`boost_pickups`)
 
 - Category: `boost`
@@ -178,7 +120,7 @@ _None documented._
 
 _None documented._
 
-### Boost State (`boost_state`)
+### Respawn (`boost_respawn`)
 
 - Category: `boost`
 - Confidence:
@@ -739,34 +681,6 @@ _None documented._
 
 _None documented._
 
-### Positioning Ball Depth (`positioning_ball_depth`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `positioning` via `PositioningNode` / `PositioningCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
 ### Positioning Ball Proximity (`positioning_ball_proximity`)
 
 - Category: `positioning`
@@ -795,63 +709,35 @@ _None documented._
 
 _None documented._
 
+### Positioning Ball-Relative Depth (`positioning_ball_relative_depth`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Positioning Field Zone (`positioning_field_zone`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `positioning` via `PositioningNode` / `PositioningCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Positioning Goal Context (`positioning_goal_context`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `positioning` via `PositioningNode` / `PositioningCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Positioning Possession (`positioning_possession`)
 
 - Category: `positioning`
 - Confidence:
