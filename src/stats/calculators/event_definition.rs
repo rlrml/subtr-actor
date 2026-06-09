@@ -1,6 +1,7 @@
 #![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 
 use serde::Serialize;
+use ts_rs::TS;
 
 #[cfg(not(target_arch = "wasm32"))]
 use linkme::distributed_slice;
@@ -33,10 +34,56 @@ pub struct EventDefinition {
     pub summary: &'static str,
     pub approach: &'static [&'static str],
     pub limitations: &'static [&'static str],
+    /// When true this definition is a label-like or expansion-parent row that
+    /// should not be offered as a selectable event type in the review UI.
+    pub hidden_from_review: bool,
+    /// Concrete event-type keys this definition expands into at serialization
+    /// time (e.g. `boost_ledger` -> `boost_ledger_collected`). Expansion parents
+    /// are typically also `hidden_from_review`; their variants are surfaced
+    /// instead. Empty for ordinary events.
+    pub variants: &'static [EventVariant],
+}
+
+impl EventDefinition {
+    /// Set whether this definition is hidden from the review picker. Named to
+    /// double as a `define_stats_event!` modifier (`hidden = true`).
+    pub const fn hidden(self, hidden: bool) -> Self {
+        let mut def = self;
+        def.hidden_from_review = hidden;
+        def
+    }
+
+    /// Attach the concrete variant keys this definition expands into. Named to
+    /// double as a `define_stats_event!` modifier (`variants = SLICE`).
+    pub const fn variants(self, variants: &'static [EventVariant]) -> Self {
+        let mut def = self;
+        def.variants = variants;
+        def
+    }
+}
+
+/// A concrete event-type key produced by expanding a parent [`EventDefinition`]
+/// (for example a boost-ledger transaction or a rotation role/depth state).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct EventVariant {
+    pub key: &'static str,
+    pub label: &'static str,
+    pub category: EventCategory,
+}
+
+impl EventVariant {
+    pub const fn new(key: &'static str, label: &'static str, category: EventCategory) -> Self {
+        Self {
+            key,
+            label,
+            category,
+        }
+    }
 }
 
 /// Coarse product/domain grouping for an event definition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum EventCategory {
     Core,
@@ -47,6 +94,9 @@ pub enum EventCategory {
     Movement,
     Annotation,
     Other,
+    /// Label-like metadata rows (e.g. goal context). These are hidden from the
+    /// review picker by default via [`EventDefinition::hidden_from_review`].
+    Context,
 }
 
 /// Multi-dimensional confidence metadata for an event detector.
@@ -144,6 +194,8 @@ pub const fn event_definition(
         summary,
         approach,
         limitations: &[],
+        hidden_from_review: false,
+        variants: &[],
     }
 }
 
@@ -221,6 +273,138 @@ pub fn event_producers() -> &'static [EventProducerDefinition] {
     &[]
 }
 
+/// Distributed catalog of every [`EventDefinition`].
+///
+/// `define_stats_event!` (and `register_event_definition!` for payload-less
+/// rows) register into this slice automatically, so defining an event is the
+/// only step required for it to appear everywhere definitions are consumed —
+/// there is no separate central list to keep in sync. Read it through
+/// [`all_event_definitions`], which sorts and de-duplicates by `id`.
+#[cfg(not(target_arch = "wasm32"))]
+#[distributed_slice]
+pub static EVENT_DEFINITIONS: [EventDefinition];
+
+/// All registered event definitions, sorted by `id` and de-duplicated.
+///
+/// `linkme` does not guarantee registration order, so this sorts for stable
+/// output and panics if two registrations share an `id` but disagree on
+/// contents (a real double-registration bug rather than something to hide).
+#[cfg(not(target_arch = "wasm32"))]
+pub fn all_event_definitions() -> &'static [EventDefinition] {
+    use std::sync::OnceLock;
+    static SORTED: OnceLock<Vec<EventDefinition>> = OnceLock::new();
+    SORTED.get_or_init(|| {
+        let mut defs: Vec<EventDefinition> = EVENT_DEFINITIONS.iter().copied().collect();
+        defs.sort_by(|left, right| left.id.cmp(right.id));
+        let mut deduped: Vec<EventDefinition> = Vec::with_capacity(defs.len());
+        for def in defs {
+            match deduped.last() {
+                Some(last) if last.id == def.id => {
+                    assert!(
+                        *last == def,
+                        "conflicting EventDefinition registrations for id {:?}",
+                        def.id
+                    );
+                }
+                _ => deduped.push(def),
+            }
+        }
+        deduped
+    })
+}
+
+// `linkme` is unavailable on wasm32, so the registry and `all_event_definitions()`
+// are host-only — there is intentionally no wasm fallback. The catalog is consumed
+// only by host/server tooling and by the build-time TypeScript codegen
+// (`event_definition_catalog()` + its export test); wasm/browser consumers use the
+// generated TS catalog instead. A wasm caller referencing it is a compile error
+// rather than a silently-empty list.
+
+/// A variant entry in the TypeScript event catalog (owned, ts-rs-exportable).
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct EventVariantTs {
+    pub key: String,
+    pub label: String,
+    pub category: EventCategory,
+}
+
+/// One entry in the TypeScript event catalog: the slim, viewer-relevant view of
+/// an [`EventDefinition`] (id/label/category/hidden + expansion variants). The
+/// browser viewer derives its event list from a generated array of these so it
+/// can never drift from the Rust registry. Confidence/approach metadata is
+/// intentionally omitted — it is host/docs-only.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct EventDefinitionCatalogEntry {
+    pub key: String,
+    pub label: String,
+    pub category: EventCategory,
+    pub hidden_from_review: bool,
+    pub variants: Vec<EventVariantTs>,
+}
+
+/// Build the TypeScript-facing catalog from the registry. Sorted/de-duplicated by
+/// id (inherited from [`all_event_definitions`]) so codegen output is stable.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn event_definition_catalog() -> Vec<EventDefinitionCatalogEntry> {
+    all_event_definitions()
+        .iter()
+        .map(|definition| EventDefinitionCatalogEntry {
+            key: definition.id.to_owned(),
+            label: definition.label.to_owned(),
+            category: definition.category,
+            hidden_from_review: definition.hidden_from_review,
+            variants: definition
+                .variants
+                .iter()
+                .map(|variant| EventVariantTs {
+                    key: variant.key.to_owned(),
+                    label: variant.label.to_owned(),
+                    category: variant.category,
+                })
+                .collect(),
+        })
+        .collect()
+}
+
+/// Build-time codegen for the TypeScript event catalog data file. ts-rs only
+/// generates *types*; this writes the *data* array next to them. Runs as part of
+/// the `generate:stats-types` npm script via the `export_bindings` test filter,
+/// writing to `$TS_RS_EXPORT_DIR` when set. Without the env var it still validates
+/// serialization but writes nothing, so a plain `cargo test` never touches the tree.
+#[cfg(test)]
+#[test]
+fn export_bindings_event_definition_catalog() {
+    let catalog = event_definition_catalog();
+    let json = serde_json::to_string_pretty(&catalog).expect("serialize event catalog");
+    let contents = format!(
+        "// This file was generated from the subtr-actor event-definition registry. \
+Do not edit this file manually.\n\
+import type {{ EventDefinitionCatalogEntry }} from \"./EventDefinitionCatalogEntry.ts\";\n\
+\n\
+export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = {json};\n"
+    );
+
+    if let Ok(dir) = std::env::var("TS_RS_EXPORT_DIR") {
+        let path = std::path::Path::new(&dir).join("eventDefinitionCatalog.generated.ts");
+        std::fs::write(&path, contents).expect("write event catalog data file");
+    }
+}
+
+/// Register an already-declared `EventDefinition` const into the
+/// [`EVENT_DEFINITIONS`] catalog. Used for payload-less rows (core scoreboard
+/// stats, goal context, expansion fallbacks) that have no [`StatsEvent`] type.
+macro_rules! register_stats_event_definition {
+    ($definition:ident) => {
+        paste::paste! {
+            #[cfg(not(target_arch = "wasm32"))]
+            #[distributed_slice(EVENT_DEFINITIONS)]
+            static [<$definition _REGISTRATION>]: EventDefinition = $definition;
+        }
+    };
+}
+
 macro_rules! define_stats_event {
     (
         $event_type:ty,
@@ -230,21 +414,36 @@ macro_rules! define_stats_event {
         $category:expr,
         summary = $summary:literal,
         approach = [$($approach:literal),* $(,)?]
+        $(, $modifier:ident = $modval:expr)* $(,)?
     ) => {
         pub const $definition: EventDefinition =
-            event_definition($id, $label, $category, $summary, &[$($approach),*]);
+            event_definition($id, $label, $category, $summary, &[$($approach),*])
+                $(.$modifier($modval))*;
 
         impl StatsEvent for $event_type {
             const DEFINITION: EventDefinition = $definition;
         }
+
+        register_stats_event_definition!($definition);
     };
 
-    ($event_type:ty, $definition:ident, $id:literal, $label:literal, $category:expr) => {
-        pub const $definition: EventDefinition = pending_event_definition($id, $label, $category);
+    (
+        $event_type:ty,
+        $definition:ident,
+        $id:literal,
+        $label:literal,
+        $category:expr
+        $(, $modifier:ident = $modval:expr)* $(,)?
+    ) => {
+        pub const $definition: EventDefinition =
+            pending_event_definition($id, $label, $category)
+                $(.$modifier($modval))*;
 
         impl StatsEvent for $event_type {
             const DEFINITION: EventDefinition = $definition;
         }
+
+        register_stats_event_definition!($definition);
     };
 }
 
@@ -259,19 +458,188 @@ macro_rules! register_event_producer {
     };
 }
 
+// Variant tables for expansion-parent definitions. Each parent is
+// `hidden_from_review` and surfaces these concrete keys instead. The keys must
+// match the ones serialized at runtime in the server's timeline expansion.
+const BOOST_PICKUP_VARIANTS: &[EventVariant] = &[
+    EventVariant::new(
+        "boost_pickup_both",
+        "Boost Pickup Both",
+        EventCategory::Boost,
+    ),
+    EventVariant::new(
+        "boost_pickup_ghost",
+        "Boost Pickup Ghost",
+        EventCategory::Boost,
+    ),
+    EventVariant::new(
+        "boost_pickup_missed",
+        "Boost Pickup Missed",
+        EventCategory::Boost,
+    ),
+];
+
+const BOOST_LEDGER_VARIANTS: &[EventVariant] = &[
+    EventVariant::new(
+        "boost_ledger_collected",
+        "Boost Ledger Collected",
+        EventCategory::Boost,
+    ),
+    EventVariant::new(
+        "boost_ledger_overfill",
+        "Boost Ledger Overfill",
+        EventCategory::Boost,
+    ),
+    EventVariant::new(
+        "boost_ledger_respawn",
+        "Boost Ledger Respawn",
+        EventCategory::Boost,
+    ),
+    EventVariant::new(
+        "boost_ledger_stolen",
+        "Boost Ledger Stolen",
+        EventCategory::Boost,
+    ),
+    EventVariant::new(
+        "boost_ledger_used",
+        "Boost Ledger Used",
+        EventCategory::Boost,
+    ),
+    EventVariant::new(
+        "boost_ledger_used_allocation",
+        "Boost Ledger Used Allocation",
+        EventCategory::Boost,
+    ),
+];
+
+const ROTATION_PLAYER_VARIANTS: &[EventVariant] = &[EventVariant::new(
+    "rotation_player_state_span",
+    "Player State Span",
+    EventCategory::Positioning,
+)];
+
+const ROTATION_ROLE_VARIANTS: &[EventVariant] = &[
+    EventVariant::new(
+        "rotation_role_ambiguous",
+        "Rotation Role Ambiguous",
+        EventCategory::Positioning,
+    ),
+    EventVariant::new(
+        "rotation_role_first_man",
+        "Rotation Role First Man",
+        EventCategory::Positioning,
+    ),
+    EventVariant::new(
+        "rotation_role_second_man",
+        "Rotation Role Second Man",
+        EventCategory::Positioning,
+    ),
+    EventVariant::new(
+        "rotation_role_third_man",
+        "Rotation Role Third Man",
+        EventCategory::Positioning,
+    ),
+    EventVariant::new(
+        "rotation_role_unknown",
+        "Rotation Role Unknown",
+        EventCategory::Positioning,
+    ),
+];
+
+const ROTATION_DEPTH_VARIANTS: &[EventVariant] = &[
+    EventVariant::new(
+        "rotation_depth_ahead_of_play",
+        "Rotation Depth Ahead Of Play",
+        EventCategory::Positioning,
+    ),
+    EventVariant::new(
+        "rotation_depth_behind_play",
+        "Rotation Depth Behind Play",
+        EventCategory::Positioning,
+    ),
+    EventVariant::new(
+        "rotation_depth_level_with_play",
+        "Rotation Depth Level With Play",
+        EventCategory::Positioning,
+    ),
+    EventVariant::new(
+        "rotation_depth_unknown",
+        "Rotation Depth Unknown",
+        EventCategory::Positioning,
+    ),
+];
+
+// Payload-less event definitions: native Rocket League scoreboard stats, goal
+// context labels, and the air-dribble mechanic kind. These have no `StatsEvent`
+// payload type but still belong in the catalog so they surface in the review
+// picker (or are explicitly hidden) without a separate hand-maintained list.
+pub const ASSIST_EVENT_DEFINITION: EventDefinition =
+    pending_event_definition("assist", "Assist", EventCategory::Core);
+register_stats_event_definition!(ASSIST_EVENT_DEFINITION);
+
+pub const DEATH_EVENT_DEFINITION: EventDefinition =
+    pending_event_definition("death", "Death", EventCategory::Core);
+register_stats_event_definition!(DEATH_EVENT_DEFINITION);
+
+pub const GOAL_EVENT_DEFINITION: EventDefinition =
+    pending_event_definition("goal", "Goal", EventCategory::Core);
+register_stats_event_definition!(GOAL_EVENT_DEFINITION);
+
+pub const KILL_EVENT_DEFINITION: EventDefinition =
+    pending_event_definition("kill", "Demolition", EventCategory::Core);
+register_stats_event_definition!(KILL_EVENT_DEFINITION);
+
+pub const SAVE_EVENT_DEFINITION: EventDefinition =
+    pending_event_definition("save", "Save", EventCategory::Core);
+register_stats_event_definition!(SAVE_EVENT_DEFINITION);
+
+pub const SHOT_EVENT_DEFINITION: EventDefinition =
+    pending_event_definition("shot", "Shot", EventCategory::Core);
+register_stats_event_definition!(SHOT_EVENT_DEFINITION);
+
+pub const KICKOFF_EVENT_DEFINITION: EventDefinition =
+    pending_event_definition("kickoff", "Kickoff", EventCategory::Possession);
+register_stats_event_definition!(KICKOFF_EVENT_DEFINITION);
+
+pub const GOAL_CONTEXT_EVENT_DEFINITION: EventDefinition =
+    pending_event_definition("goal_context", "Goal Context", EventCategory::Context).hidden(true);
+register_stats_event_definition!(GOAL_CONTEXT_EVENT_DEFINITION);
+
+pub const CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION: EventDefinition = pending_event_definition(
+    "core_player_goal_context",
+    "Core Player Goal Context",
+    EventCategory::Context,
+)
+.hidden(true);
+register_stats_event_definition!(CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION);
+
+pub const AIR_DRIBBLE_EVENT_DEFINITION: EventDefinition = event_definition(
+    "air_dribble",
+    "Air Dribble",
+    EventCategory::Mechanic,
+    "An airborne ball-control sequence where a player keeps the ball under control off the ground.",
+    &[
+        "Reuse the ball-carry sequence sampler's air-dribble carry kind, which tracks player-owned ball control while airborne.",
+        "Surface the span when a completed ball-carry sequence is classified as an air dribble rather than a grounded carry.",
+    ],
+);
+register_stats_event_definition!(AIR_DRIBBLE_EVENT_DEFINITION);
+
 define_stats_event!(
     TimelineEvent,
     TIMELINE_EVENT_DEFINITION,
     "timeline",
     "Replay Timeline Event",
-    EventCategory::Core
+    EventCategory::Core,
+    hidden = true
 );
 define_stats_event!(
     CorePlayerScoreboardEvent,
     CORE_PLAYER_SCOREBOARD_EVENT_DEFINITION,
     "core_player_scoreboard",
     "Core Player Scoreboard",
-    EventCategory::Core
+    EventCategory::Core,
+    hidden = true
 );
 define_stats_event!(
     BackboardBounceEvent,
@@ -572,14 +940,18 @@ define_stats_event!(
     BOOST_PICKUP_COMPARISON_EVENT_DEFINITION,
     "boost_pickups",
     "Boost Pickup",
-    EventCategory::Boost
+    EventCategory::Boost,
+    hidden = true,
+    variants = BOOST_PICKUP_VARIANTS
 );
 define_stats_event!(
     BoostLedgerEvent,
     BOOST_LEDGER_EVENT_DEFINITION,
     "boost_ledger",
     "Boost Ledger",
-    EventCategory::Boost
+    EventCategory::Boost,
+    hidden = true,
+    variants = BOOST_LEDGER_VARIANTS
 );
 define_stats_event!(
     BoostBucketEvent,
@@ -690,21 +1062,27 @@ define_stats_event!(
     ROTATION_PLAYER_EVENT_DEFINITION,
     "rotation_player",
     "Player Rotation",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    hidden = true,
+    variants = ROTATION_PLAYER_VARIANTS
 );
 define_stats_event!(
     RotationRoleSpanEvent,
     ROTATION_ROLE_SPAN_EVENT_DEFINITION,
     "rotation_role_span",
     "Rotation Role Span",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    hidden = true,
+    variants = ROTATION_ROLE_VARIANTS
 );
 define_stats_event!(
     RotationDepthSpanEvent,
     ROTATION_DEPTH_SPAN_EVENT_DEFINITION,
     "rotation_depth_span",
     "Rotation Depth Span",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    hidden = true,
+    variants = ROTATION_DEPTH_VARIANTS
 );
 define_stats_event!(
     RotationFirstManStintEvent,
@@ -747,52 +1125,10 @@ define_stats_event!(
     ]
 );
 
-pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
-    &TIMELINE_EVENT_DEFINITION,
-    &CORE_PLAYER_SCOREBOARD_EVENT_DEFINITION,
-    &BACKBOARD_BOUNCE_EVENT_DEFINITION,
-    &CEILING_SHOT_EVENT_DEFINITION,
-    &WALL_AERIAL_EVENT_DEFINITION,
-    &WALL_AERIAL_SHOT_EVENT_DEFINITION,
-    &CENTER_EVENT_DEFINITION,
-    &FLICK_EVENT_DEFINITION,
-    &MUSTY_FLICK_EVENT_DEFINITION,
-    &DODGE_RESET_EVENT_DEFINITION,
-    &DOUBLE_TAP_EVENT_DEFINITION,
-    &ONE_TIMER_EVENT_DEFINITION,
-    &PASS_EVENT_DEFINITION,
-    &BALL_CARRY_EVENT_DEFINITION,
-    &FIFTY_FIFTY_EVENT_DEFINITION,
-    &RUSH_EVENT_DEFINITION,
-    &DODGE_EVENT_DEFINITION,
-    &SPEED_FLIP_EVENT_DEFINITION,
-    &HALF_FLIP_EVENT_DEFINITION,
-    &HALF_VOLLEY_EVENT_DEFINITION,
-    &WAVEDASH_EVENT_DEFINITION,
-    &WHIFF_EVENT_DEFINITION,
-    &POWERSLIDE_EVENT_DEFINITION,
-    &TOUCH_CLASSIFICATION_EVENT_DEFINITION,
-    &BOOST_PICKUP_COMPARISON_EVENT_DEFINITION,
-    &BOOST_LEDGER_EVENT_DEFINITION,
-    &BOOST_BUCKET_EVENT_DEFINITION,
-    &BOOST_STATE_EVENT_DEFINITION,
-    &BUMP_EVENT_DEFINITION,
-    &POSSESSION_EVENT_DEFINITION,
-    &PRESSURE_EVENT_DEFINITION,
-    &TERRITORIAL_PRESSURE_EVENT_DEFINITION,
-    &MOVEMENT_EVENT_DEFINITION,
-    &POSITIONING_ACTIVITY_EVENT_DEFINITION,
-    &POSITIONING_POSSESSION_EVENT_DEFINITION,
-    &POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
-    &POSITIONING_BALL_DEPTH_EVENT_DEFINITION,
-    &POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
-    &POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
-    &POSITIONING_GOAL_CONTEXT_EVENT_DEFINITION,
-    &ROTATION_PLAYER_EVENT_DEFINITION,
-    &ROTATION_TEAM_EVENT_DEFINITION,
-    &FLIP_RESET_EVENT_DEFINITION,
-    &TIMELINE_ENVELOPE_EVENT_DEFINITION,
-];
+// The former hand-maintained `ALL_EVENT_DEFINITIONS` array has been replaced by
+// the auto-populated `EVENT_DEFINITIONS` distributed slice; read it through
+// `all_event_definitions()`. Defining an event via `define_stats_event!` (or
+// `register_stats_event_definition!`) is now the only registration step.
 
 const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
@@ -1093,6 +1429,24 @@ const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
     produced_event(
         &ROTATION_TEAM_EVENT_DEFINITION,
+        "rotation",
+        "RotationNode",
+        "RotationCalculator",
+    ),
+    produced_event(
+        &ROTATION_ROLE_SPAN_EVENT_DEFINITION,
+        "rotation",
+        "RotationNode",
+        "RotationCalculator",
+    ),
+    produced_event(
+        &ROTATION_DEPTH_SPAN_EVENT_DEFINITION,
+        "rotation",
+        "RotationNode",
+        "RotationCalculator",
+    ),
+    produced_event(
+        &ROTATION_FIRST_MAN_STINT_EVENT_DEFINITION,
         "rotation",
         "RotationNode",
         "RotationCalculator",
