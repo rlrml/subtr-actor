@@ -119,10 +119,26 @@ impl ActiveControlledPlay {
     }
 }
 
+impl InFlightItem for ActiveControlledPlay {
+    fn recognition(&self) -> Recognition {
+        // Speculative until the chain accumulates enough to be a real
+        // controlled play; only then does it count as having "happened".
+        Recognition::new(self.start_time, self.start_frame, self.is_valid())
+    }
+
+    fn on_boundary(&mut self, boundary: Boundary) -> Disposition {
+        if self.is_valid() {
+            Disposition::Finalize(FinalizeReason::Boundary(boundary))
+        } else {
+            Disposition::Discard
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ControlledPlayCalculator {
     events: EventStream<ControlledPlayEvent>,
-    active: Option<ActiveControlledPlay>,
+    active: InFlightLedger<ActiveControlledPlay>,
     previous_ball_position: Option<glam::Vec3>,
 }
 
@@ -139,11 +155,27 @@ impl ControlledPlayCalculator {
         self.events.new_events()
     }
 
+    /// Natural finalization (touch-chain gap or a superseding player): emit the
+    /// run if it qualifies, otherwise discard it.
     fn finish_active(&mut self) {
-        let Some(active) = self.active.take() else {
-            return;
-        };
-        if active.is_valid() {
+        let valid = self
+            .active
+            .in_flight()
+            .first()
+            .is_some_and(ActiveControlledPlay::is_valid);
+        if valid {
+            for (active, _reason) in self.active.finalize_all(FinalizeReason::Completed) {
+                self.events.push(active.into_event());
+            }
+        } else {
+            self.active.clear();
+        }
+    }
+
+    /// Resolve any in-flight run against a game-flow boundary, emitting it only
+    /// if it qualifies (handled uniformly via the ledger).
+    fn finish_active_at_boundary(&mut self, boundary: Boundary) {
+        for (active, _reason) in self.active.apply_boundary(boundary) {
             self.events.push(active.into_event());
         }
     }
@@ -167,7 +199,7 @@ impl ControlledPlayCalculator {
         ball_position: Option<glam::Vec3>,
         players: &PlayerFrameState,
     ) {
-        let Some(active) = self.active.as_mut() else {
+        let Some(active) = self.active.in_flight_mut().first_mut() else {
             self.previous_ball_position = ball_position;
             return;
         };
@@ -190,7 +222,7 @@ impl ControlledPlayCalculator {
     }
 
     fn expire_stale_candidate(&mut self, frame: &FrameInfo) {
-        let Some(active) = self.active.as_ref() else {
+        let Some(active) = self.active.in_flight().first() else {
             return;
         };
         if frame.time - active.last_touch_time > MAX_TOUCH_CHAIN_GAP_SECONDS {
@@ -205,17 +237,19 @@ impl ControlledPlayCalculator {
 
         let same_player = self
             .active
-            .as_ref()
+            .in_flight()
+            .first()
             .is_some_and(|active| active.player_id == player_id);
         if same_player {
-            if let Some(active) = self.active.as_mut() {
+            if let Some(active) = self.active.in_flight_mut().first_mut() {
                 active.record_touch(touch);
             }
             return;
         }
 
         self.finish_active();
-        self.active = Some(ActiveControlledPlay::from_touch(touch, player_id));
+        self.active
+            .arm(ActiveControlledPlay::from_touch(touch, player_id));
     }
 
     pub fn update(
@@ -228,7 +262,7 @@ impl ControlledPlayCalculator {
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         if !live_play_state.is_live_play {
-            self.finish_active();
+            self.finish_active_at_boundary(Boundary::LivePlayEnded);
             self.previous_ball_position = ball.position();
             return Ok(());
         }
@@ -243,7 +277,7 @@ impl ControlledPlayCalculator {
     }
 
     pub fn finish(&mut self) {
-        self.finish_active();
+        self.finish_active_at_boundary(Boundary::ReplayEnded);
     }
 }
 

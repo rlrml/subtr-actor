@@ -98,10 +98,22 @@ struct ActiveSpeedFlipCandidate {
     latest_frame: usize,
 }
 
+impl InFlightItem for ActiveSpeedFlipCandidate {
+    fn recognition(&self) -> Recognition {
+        // Speculative: a candidate can be pruned (stale), discarded at a
+        // boundary, or evaluate to no speed flip before emitting.
+        Recognition::speculative(self.start_time, self.start_frame)
+    }
+
+    fn on_boundary(&mut self, _boundary: Boundary) -> Disposition {
+        Disposition::Discard
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpeedFlipCalculator {
     events: EventStream<SpeedFlipEvent>,
-    active_candidates: HashMap<PlayerId, ActiveSpeedFlipCandidate>,
+    active_candidates: KeyedInFlightLedger<PlayerId, ActiveSpeedFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     last_ground_contacts: HashMap<PlayerId, f32>,
     kickoff_approach_active_last_frame: bool,
@@ -325,7 +337,7 @@ impl SpeedFlipCalculator {
         let forward_z = (rotation * glam::Vec3::X).z;
         let initial_boost_alignment = Self::boost_alignment(player);
 
-        self.active_candidates.insert(
+        self.active_candidates.arm(
             player.player_id.clone(),
             ActiveSpeedFlipCandidate {
                 is_team_0: player.is_team_0,
@@ -580,7 +592,7 @@ impl SpeedFlipCalculator {
     fn finalize_candidates(&mut self, frame: &FrameInfo, force_all: bool) {
         let mut finished_candidates = Vec::new();
 
-        for (player_id, candidate) in &self.active_candidates {
+        for (player_id, candidate) in self.active_candidates.iter() {
             let duration = frame.time - candidate.start_time;
             if force_all || duration >= SPEED_FLIP_EVALUATION_SECONDS {
                 finished_candidates.push((
@@ -600,7 +612,10 @@ impl SpeedFlipCalculator {
         });
 
         for (_, _, _, player_id) in finished_candidates {
-            let Some(candidate) = self.active_candidates.remove(&player_id) else {
+            let Some(candidate) = self
+                .active_candidates
+                .finalize(&player_id, FinalizeReason::Completed)
+            else {
                 continue;
             };
             if let Some(event) = Self::candidate_event(&player_id, candidate) {
@@ -620,7 +635,8 @@ impl SpeedFlipCalculator {
         self.events.begin_update();
         let kickoff_approach_active = Self::kickoff_approach_active(gameplay);
         if !live_play_state.is_live_play && !kickoff_approach_active {
-            self.active_candidates.clear();
+            self.active_candidates
+                .apply_boundary(Boundary::LivePlayEnded);
             self.current_kickoff_start_time = None;
             self.kickoff_approach_active_last_frame = false;
             self.last_ground_contacts.clear();
@@ -638,7 +654,7 @@ impl SpeedFlipCalculator {
             self.maybe_start_candidate(frame, gameplay, ball, player, live_play_state);
         }
 
-        for (player_id, candidate) in &mut self.active_candidates {
+        for (player_id, candidate) in self.active_candidates.iter_mut() {
             let Some(player) = Self::player_by_id(players, player_id) else {
                 continue;
             };

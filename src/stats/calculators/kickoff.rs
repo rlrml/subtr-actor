@@ -86,9 +86,26 @@ struct ActiveKickoff {
     resolution: Option<KickoffResolutionSnapshot>,
 }
 
+impl InFlightItem for ActiveKickoff {
+    fn recognition(&self) -> Recognition {
+        // A kickoff phase is always a real kickoff, so it is committed from the
+        // moment it is recognized.
+        Recognition::committed(self.start_time, self.start_frame)
+    }
+
+    fn on_boundary(&mut self, _boundary: Boundary) -> Disposition {
+        // A kickoff that is still in flight when the stream ends never reached a
+        // resolution; emitting a truncated event would be misleading, so it is
+        // discarded (preserving the previous "drop the unfinished kickoff"
+        // behavior, now handled structurally rather than by omission). Goal and
+        // live-play finalization happen earlier through `should_finish`.
+        Disposition::Discard
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct KickoffCalculator {
-    active: Option<ActiveKickoff>,
+    active: InFlightLedger<ActiveKickoff>,
     events: EventStream<KickoffEvent>,
 }
 
@@ -372,7 +389,7 @@ impl KickoffCalculator {
     }
 
     fn start_kickoff(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
-        self.active = Some(ActiveKickoff {
+        self.active.arm(ActiveKickoff {
             start_time: frame.time,
             start_frame: frame.frame_number,
             live_action_start_time: None,
@@ -391,6 +408,13 @@ impl KickoffCalculator {
             speed_flip_players: HashSet::new(),
             resolution: None,
         });
+    }
+
+    /// Finalize any in-flight kickoff at end of stream. Routed through the
+    /// ledger so the boundary is handled uniformly; an unresolved kickoff is
+    /// discarded rather than emitted (see `ActiveKickoff::on_boundary`).
+    pub fn finish(&mut self) {
+        let _ = self.active.finish();
     }
 
     fn observe_movement_start(
@@ -1238,11 +1262,11 @@ impl KickoffCalculator {
         ctx: KickoffUpdateContext<'_>,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if ctx.gameplay.kickoff_phase_active() && self.active.is_none() {
+        if ctx.gameplay.kickoff_phase_active() && self.active.is_empty() {
             self.start_kickoff(ctx.frame, ctx.players);
         }
 
-        let Some(active) = self.active.as_mut() else {
+        let Some(active) = self.active.in_flight_mut().first_mut() else {
             return Ok(());
         };
         Self::observe_movement_start(active, ctx.frame, ctx.gameplay);
@@ -1258,8 +1282,18 @@ impl KickoffCalculator {
             });
         }
 
-        if Self::should_finish(active, ctx.frame, ctx.gameplay, ctx.events) {
-            let active = self.active.take().expect("active kickoff should exist");
+        // Natural finalization: the kickoff resolves once `should_finish` is met
+        // (which already accounts for goals and goal-replay). The ledger keeps
+        // the in-flight kickoff queryable and guarantees it is resolved at the
+        // end of the stream.
+        let finished = self.active.advance(ctx.frame.time, |active| {
+            if Self::should_finish(active, ctx.frame, ctx.gameplay, ctx.events) {
+                Disposition::Finalize(FinalizeReason::Completed)
+            } else {
+                Disposition::Keep
+            }
+        });
+        for (active, _reason) in finished {
             let event = Self::finish_event(
                 active,
                 ctx.frame,

@@ -133,10 +133,24 @@ struct PendingTouchBallMovementCredit {
     movement: TouchBallMovement,
 }
 
+impl InFlightItem for PendingTouchBallMovementCredit {
+    fn recognition(&self) -> Recognition {
+        // A touch credit always corresponds to a real touch, so it is committed
+        // from the moment it is armed.
+        Recognition::committed(self.movement.start_time, self.movement.start_frame)
+    }
+
+    fn on_boundary(&mut self, boundary: Boundary) -> Disposition {
+        // The credit window always closes at a boundary: the accumulated travel
+        // up to the goal / stoppage / end of replay is exactly what we keep.
+        Disposition::Finalize(FinalizeReason::Boundary(boundary))
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchCalculator {
     events: EventStream<TouchClassificationEvent>,
-    pending_ball_movement_credit: Option<PendingTouchBallMovementCredit>,
+    ball_movement: InFlightLedger<PendingTouchBallMovementCredit>,
     active_touch_index_by_player: HashMap<PlayerId, usize>,
     previous_ball_velocity: Option<glam::Vec3>,
     previous_ball_position: Option<glam::Vec3>,
@@ -157,11 +171,31 @@ impl TouchCalculator {
     }
 
     pub fn flush_pending_ball_movement_credit(&mut self) {
-        let Some(pending) = self.pending_ball_movement_credit.take() else {
-            return;
-        };
-        if let Some(event) = self.events.get_mut(pending.touch_index) {
-            event.ball_movement = Some(pending.movement.finalized());
+        let finalized = self.ball_movement.finalize_all(FinalizeReason::Completed);
+        self.write_finalized_ball_movement(finalized);
+    }
+
+    /// Finalize any pending ball-movement credit at end of stream. Routed
+    /// through the ledger so the boundary is handled uniformly and can't be
+    /// forgotten.
+    pub fn finish(&mut self) {
+        let finalized = self.ball_movement.finish();
+        self.write_finalized_ball_movement(finalized);
+    }
+
+    fn finalize_ball_movement_at_boundary(&mut self, boundary: Boundary) {
+        let finalized = self.ball_movement.apply_boundary(boundary);
+        self.write_finalized_ball_movement(finalized);
+    }
+
+    fn write_finalized_ball_movement(
+        &mut self,
+        finalized: Vec<(PendingTouchBallMovementCredit, FinalizeReason)>,
+    ) {
+        for (pending, _reason) in finalized {
+            if let Some(event) = self.events.get_mut(pending.touch_index) {
+                event.ball_movement = Some(pending.movement.finalized());
+            }
         }
     }
 
@@ -365,35 +399,44 @@ impl TouchCalculator {
         let Some(&touch_index) = self.active_touch_index_by_player.get(player_id) else {
             return;
         };
-        let Some(pending) = self.pending_ball_movement_credit.as_mut() else {
-            if let Some(event) = self.events.get_mut(touch_index) {
-                event.player_position = player_position.or(event.player_position);
-                event.ball_movement = Some(movement.clone());
-            }
-            self.pending_ball_movement_credit = Some(PendingTouchBallMovementCredit {
-                touch_index,
-                movement,
-            });
-            return;
-        };
+        let pending_index = self
+            .ball_movement
+            .in_flight()
+            .first()
+            .map(|pending| pending.touch_index);
 
-        if pending.touch_index == touch_index {
-            pending.movement.absorb_delta(movement);
+        if pending_index == Some(touch_index) {
+            // Same touch still in flight: fold this frame's travel into it.
+            let merged = {
+                let pending = self
+                    .ball_movement
+                    .in_flight_mut()
+                    .first_mut()
+                    .expect("pending credit present");
+                pending.movement.absorb_delta(movement);
+                pending.movement.clone()
+            };
             if let Some(event) = self.events.get_mut(touch_index) {
                 event.player_position = player_position.or(event.player_position);
-                event.ball_movement = Some(pending.movement.clone());
+                event.ball_movement = Some(merged);
             }
-        } else {
-            self.flush_pending_ball_movement_credit();
-            if let Some(event) = self.events.get_mut(touch_index) {
-                event.player_position = player_position.or(event.player_position);
-                event.ball_movement = Some(movement.clone());
-            }
-            self.pending_ball_movement_credit = Some(PendingTouchBallMovementCredit {
-                touch_index,
-                movement,
-            });
+            return;
         }
+
+        // A different touch (or none) is in flight: supersede the old credit and
+        // arm a fresh one for this touch.
+        if pending_index.is_some() {
+            let finalized = self.ball_movement.finalize_all(FinalizeReason::Superseded);
+            self.write_finalized_ball_movement(finalized);
+        }
+        if let Some(event) = self.events.get_mut(touch_index) {
+            event.player_position = player_position.or(event.player_position);
+            event.ball_movement = Some(movement.clone());
+        }
+        self.ball_movement.arm(PendingTouchBallMovementCredit {
+            touch_index,
+            movement,
+        });
     }
 
     fn resolved_fifty_fifty_winner(event: &FiftyFiftyEvent) -> Option<(&PlayerId, bool)> {
@@ -483,7 +526,7 @@ impl TouchCalculator {
     ) {
         let current_ball_position = ball.position();
         if !live_play_state.is_live_play {
-            self.flush_pending_ball_movement_credit();
+            self.finalize_ball_movement_at_boundary(Boundary::LivePlayEnded);
             self.previous_ball_position = current_ball_position;
             self.pending_fifty_fifty_movement = None;
             return;
@@ -555,7 +598,7 @@ impl TouchCalculator {
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         if !live_play_state.is_live_play {
-            self.flush_pending_ball_movement_credit();
+            self.finalize_ball_movement_at_boundary(Boundary::LivePlayEnded);
             self.previous_ball_velocity = ball.velocity();
             self.previous_ball_position = ball.position();
             self.pending_fifty_fifty_movement = None;

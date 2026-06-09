@@ -47,6 +47,11 @@ impl AnalysisNode for WhiffNode {
         )
     }
 
+    fn finish(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        self.calculator.finish();
+        Ok(())
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
