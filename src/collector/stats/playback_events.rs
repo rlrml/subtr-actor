@@ -689,7 +689,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
-            .module_player_events("dodge_reset", "on_ball_events", parse_dodge_reset_event)?
+            .module_player_events("dodge_reset", "events", parse_dodge_reset_event)?
             .into_iter()
             .enumerate()
         {

@@ -107,6 +107,12 @@ fn on_ball_reset_alone_is_not_confirmed_flip_reset() {
 
     assert_eq!(calculator.player_stats()[&player_id].on_ball_count, 1);
     assert!(calculator.confirmed_flip_reset_events().is_empty());
+    let event = calculator.events().first().unwrap();
+    assert!(event.on_ball);
+    assert!(
+        !event.used,
+        "an unconfirmed on-ball reset must not be marked used"
+    );
 }
 
 #[test]
@@ -220,4 +226,17 @@ fn dodge_touch_after_on_ball_reset_confirms_flip_reset() {
     assert_eq!(event.reset_frame, 10);
     assert_eq!(event.frame, 13);
     assert!((event.time_since_reset - 0.3).abs() < 1e-5);
+
+    // The confirming touch should retroactively mark the originating on-ball
+    // dodge reset event as a used flip reset.
+    let reset = calculator
+        .events()
+        .iter()
+        .find(|event| event.frame == 10)
+        .expect("on-ball dodge reset event should be emitted");
+    assert!(reset.on_ball);
+    assert!(
+        reset.used,
+        "confirmed flip reset should set `used` on the reset"
+    );
 }

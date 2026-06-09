@@ -15,7 +15,21 @@ pub struct DodgeResetEvent {
     pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub counter_value: i32,
+    /// Whether the dodge refresh happened on the ball (i.e. this reset is a flip reset).
     pub on_ball: bool,
+    /// Whether an on-ball reset (flip reset) was later converted by a dodge-powered
+    /// touch. Always `false` for non-`on_ball` resets. Set retroactively once the
+    /// confirming touch is observed, so it is meaningful at finish time.
+    #[serde(default)]
+    pub used: bool,
+}
+
+/// Internal bookkeeping for an on-ball dodge reset awaiting confirmation, including
+/// the index of the emitted [`DodgeResetEvent`] so it can be marked `used` later.
+#[derive(Debug, Clone, PartialEq)]
+struct PendingOnBallReset {
+    reset: DodgeRefreshedEvent,
+    event_index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -35,9 +49,8 @@ pub struct ConfirmedFlipResetEvent {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DodgeResetCalculator {
     events: EventStream<DodgeResetEvent>,
-    on_ball_events: EventStream<DodgeRefreshedEvent>,
     confirmed_flip_reset_events: EventStream<ConfirmedFlipResetEvent>,
-    pending_on_ball_resets: HashMap<PlayerId, DodgeRefreshedEvent>,
+    pending_on_ball_resets: HashMap<PlayerId, PendingOnBallReset>,
     pending_reset_dodge_started: HashSet<PlayerId>,
     previous_dodge_active: HashMap<PlayerId, bool>,
 }
@@ -53,14 +66,6 @@ impl DodgeResetCalculator {
 
     pub fn new_events(&self) -> &[DodgeResetEvent] {
         self.events.new_events()
-    }
-
-    pub fn on_ball_events(&self) -> &[DodgeRefreshedEvent] {
-        self.on_ball_events.all()
-    }
-
-    pub fn new_on_ball_events(&self) -> &[DodgeRefreshedEvent] {
-        self.on_ball_events.new_events()
     }
 
     pub fn confirmed_flip_reset_events(&self) -> &[ConfirmedFlipResetEvent] {
@@ -168,9 +173,10 @@ impl DodgeResetCalculator {
             return;
         }
 
-        let Some(reset_event) = self.pending_on_ball_resets.get(player_id).cloned() else {
+        let Some(pending) = self.pending_on_ball_resets.get(player_id).cloned() else {
             return;
         };
+        let reset_event = &pending.reset;
         let time_since_reset = touch_event.time - reset_event.time;
         if !(FLIP_RESET_MIN_DODGE_TOUCH_DELAY_SECONDS..=FLIP_RESET_MAX_DODGE_TOUCH_DELAY_SECONDS)
             .contains(&time_since_reset)
@@ -197,6 +203,9 @@ impl DodgeResetCalculator {
                 counter_value: reset_event.counter_value,
                 time_since_reset,
             });
+        if let Some(reset) = self.events.get_mut(pending.event_index) {
+            reset.used = true;
+        }
         self.pending_on_ball_resets.remove(player_id);
         self.pending_reset_dodge_started.remove(player_id);
     }
@@ -209,7 +218,6 @@ impl DodgeResetCalculator {
         touch_state: &TouchState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        self.on_ball_events.begin_update();
         self.confirmed_flip_reset_events.begin_update();
         self.prune_pending_resets(players);
         for event in &events.dodge_refreshed_events {
@@ -223,11 +231,19 @@ impl DodgeResetCalculator {
                 is_team_0: event.is_team_0,
                 counter_value: event.counter_value,
                 on_ball,
+                used: false,
             };
             if on_ball {
-                self.on_ball_events.push(reset_event.clone());
-                self.pending_on_ball_resets
-                    .insert(event.player.clone(), reset_event);
+                // Index this event will occupy after the push below, so a later
+                // confirming touch can mark it `used`.
+                let event_index = self.events.all().len();
+                self.pending_on_ball_resets.insert(
+                    event.player.clone(),
+                    PendingOnBallReset {
+                        reset: reset_event,
+                        event_index,
+                    },
+                );
                 self.pending_reset_dodge_started.remove(&event.player);
             }
             self.events.push(event);
