@@ -170,7 +170,6 @@ pub fn stats_timeline_event_label(stream: &str) -> String {
     let label = match stream {
         "timeline" => "Timeline",
         "core_player" => "Core player",
-        "core_player_goal_context" => "Core player goal context",
         "possession" => "Possession",
         "ball_half" => "Ball Half",
         "territorial_pressure" => "Territorial pressure",
@@ -325,7 +324,6 @@ pub struct EventMeta {
 pub enum EventPayload {
     Timeline(TimelineEvent),
     CorePlayer(CorePlayerScoreboardEvent),
-    CorePlayerGoalContext(CorePlayerGoalContextEvent),
     Possession(PossessionEvent),
     BallHalf(BallHalfEvent),
     TerritorialPressure(TerritorialPressureEvent),

@@ -563,14 +563,6 @@ pub const GOAL_CONTEXT_EVENT_DEFINITION: EventDefinition =
     pending_event_definition("goal_context", "Goal Context", EventCategory::Context).hidden(true);
 register_stats_event_definition!(GOAL_CONTEXT_EVENT_DEFINITION);
 
-pub const CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION: EventDefinition = pending_event_definition(
-    "core_player_goal_context",
-    "Core Player Goal Context",
-    EventCategory::Context,
-)
-.hidden(true);
-register_stats_event_definition!(CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION);
-
 pub const AIR_DRIBBLE_EVENT_DEFINITION: EventDefinition = event_definition(
     "air_dribble",
     "Air Dribble",

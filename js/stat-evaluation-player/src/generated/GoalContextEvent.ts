@@ -13,4 +13,4 @@ export type GoalContextEvent = { time: number, frame: number, scoring_team_is_te
  * None for goals scored with no active pressure session (e.g. clean
  * counter-attacks). Filled in at finish once pressure sessions are final.
  */
-pressure_duration_before_goal?: number | null, goal_buildup: GoalBuildupKind, scorer_last_touch: GoalTouchContext | null, players: Array<GoalPlayerContext>, tags?: Array<GoalTag>, };
+pressure_duration_before_goal?: number | null, time_after_kickoff?: number | null, goal_buildup: GoalBuildupKind, scorer_last_touch: GoalTouchContext | null, players: Array<GoalPlayerContext>, tags?: Array<GoalTag>, };

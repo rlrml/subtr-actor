@@ -55,49 +55,6 @@ pub(in crate::collector::stats::playback) fn parse_core_player_scoreboard_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_core_player_goal_context_event(
-    value: &Value,
-) -> SubtrActorResult<CorePlayerGoalContextEvent> {
-    let object = json_object(value, "core player goal context event")?;
-    Ok(CorePlayerGoalContextEvent {
-        time: json_required_f32(object, "time")?,
-        frame: json_required_usize(object, "frame")?,
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        scoring_team_is_team_0: json_required_bool(object, "scoring_team_is_team_0")?,
-        goals_conceded_while_last_defender: json_required_bool(
-            object,
-            "goals_conceded_while_last_defender",
-        )?,
-        goals_for_while_most_back: json_required_bool(object, "goals_for_while_most_back")?,
-        goals_against_while_most_back: json_required_bool(object, "goals_against_while_most_back")?,
-        caught_ahead_of_play_on_conceded_goal: json_optional_bool(
-            object.get("caught_ahead_of_play_on_conceded_goal"),
-        )
-        .unwrap_or(false),
-        goal_against_boost_amount: json_optional_f32(object.get("goal_against_boost_amount"))?,
-        goal_against_average_boost_in_leadup: json_optional_f32(
-            object.get("goal_against_average_boost_in_leadup"),
-        )?,
-        goal_against_min_boost_in_leadup: json_optional_f32(
-            object.get("goal_against_min_boost_in_leadup"),
-        )?,
-        goal_against_position: json_optional_goal_context_position(
-            object.get("goal_against_position"),
-        )?,
-        scoring_goal_last_touch_position: json_optional_goal_context_position(
-            object.get("scoring_goal_last_touch_position"),
-        )?,
-        time_after_kickoff: json_optional_f32(object.get("time_after_kickoff"))?,
-        goal_buildup: object
-            .get("goal_buildup")
-            .map(|value| decode_json_value(value.clone()))
-            .transpose()?,
-        ball_air_time_before_goal: json_optional_f32(object.get("ball_air_time_before_goal"))?,
-    })
-}
-
 pub(in crate::collector::stats::playback) fn parse_possession_event(
     value: &Value,
 ) -> SubtrActorResult<PossessionEvent> {
@@ -590,6 +547,7 @@ pub(in crate::collector::stats::playback) fn parse_goal_context_event(
         pressure_duration_before_goal: json_optional_f32(
             object.get("pressure_duration_before_goal"),
         )?,
+        time_after_kickoff: json_optional_f32(object.get("time_after_kickoff"))?,
         goal_buildup: object
             .get("goal_buildup")
             .map(|value| decode_json_value(value.clone()))

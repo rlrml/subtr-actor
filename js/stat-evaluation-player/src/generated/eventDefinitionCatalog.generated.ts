@@ -86,13 +86,6 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "core_player_goal_context",
-    "label": "Core Player Goal Context",
-    "category": "context",
-    "hidden_from_review": true,
-    "variants": []
-  },
-  {
     "key": "core_player_scoreboard",
     "label": "Core Player Scoreboard",
     "category": "core",
