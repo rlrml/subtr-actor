@@ -317,7 +317,8 @@ impl FlipImpulseCalculator {
         self.events.begin_update();
 
         if !live_play_state.counts_toward_player_motion() {
-            self.active_candidates.apply_boundary(Boundary::LivePlayEnded);
+            self.active_candidates
+                .apply_boundary(Boundary::LivePlayEnded);
             return Ok(());
         }
 

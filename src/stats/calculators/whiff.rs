@@ -331,7 +331,8 @@ impl WhiffCalculator {
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         if !live_play_state.is_live_play {
-            self.active_candidates.apply_boundary(Boundary::LivePlayEnded);
+            self.active_candidates
+                .apply_boundary(Boundary::LivePlayEnded);
             return Ok(());
         }
         self.finish_touched_candidates(frame, touch_state);

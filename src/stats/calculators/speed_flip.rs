@@ -635,7 +635,8 @@ impl SpeedFlipCalculator {
         self.events.begin_update();
         let kickoff_approach_active = Self::kickoff_approach_active(gameplay);
         if !live_play_state.is_live_play && !kickoff_approach_active {
-            self.active_candidates.apply_boundary(Boundary::LivePlayEnded);
+            self.active_candidates
+                .apply_boundary(Boundary::LivePlayEnded);
             self.current_kickoff_start_time = None;
             self.kickoff_approach_active_last_frame = false;
             self.last_ground_contacts.clear();
