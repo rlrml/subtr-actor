@@ -809,7 +809,7 @@ define_stats_event!(
     DODGE_EVENT_DEFINITION,
     "dodge",
     "Dodge",
-    EventCategory::Movement,
+    EventCategory::Other,
     summary = "A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.",
     approach = [
         "Start on the replay's dodge-active rising edge for each player.",
@@ -887,7 +887,7 @@ define_stats_event!(
     POWERSLIDE_EVENT_DEFINITION,
     "powerslide",
     "Powerslide",
-    EventCategory::Movement,
+    EventCategory::Other,
     summary = "A state-change event for effective grounded powerslide use.",
     approach = [
         "Read each player's powerslide-active input/state on every frame.",

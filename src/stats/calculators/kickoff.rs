@@ -7,6 +7,7 @@ const KICKOFF_OFF_CENTER_MIN_ABS_Y: f32 = 3300.0;
 const KICKOFF_DIAGONAL_MIN_ABS_X: f32 = 1500.0;
 const KICKOFF_DIAGONAL_MAX_ABS_Y: f32 = 3300.0;
 const KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS: f32 = 1.25;
+const KICKOFF_FOLLOW_UP_AFTER_FIRST_TOUCH_SECONDS: f32 = 2.0;
 const KICKOFF_GOAL_MAX_SECONDS: f32 = 10.0;
 const KICKOFF_WIN_MIN_BALL_Y: f32 = 180.0;
 const KICKOFF_WIN_MIN_BALL_SPEED_Y: f32 = 220.0;
@@ -63,7 +64,12 @@ struct KickoffTouchSnapshot {
     player: Option<PlayerId>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
+struct KickoffResolutionSnapshot {
+    ball: BallFrameState,
+}
+
+#[derive(Debug, Clone)]
 struct ActiveKickoff {
     start_time: f32,
     start_frame: usize,
@@ -77,9 +83,10 @@ struct ActiveKickoff {
     first_touch_team_is_team_0: Option<bool>,
     touches: Vec<KickoffTouchSnapshot>,
     speed_flip_players: HashSet<PlayerId>,
+    resolution: Option<KickoffResolutionSnapshot>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default)]
 pub struct KickoffCalculator {
     active: Option<ActiveKickoff>,
     events: EventStream<KickoffEvent>,
@@ -382,6 +389,7 @@ impl KickoffCalculator {
             first_touch_team_is_team_0: None,
             touches: Vec::new(),
             speed_flip_players: HashSet::new(),
+            resolution: None,
         });
     }
 
@@ -884,6 +892,20 @@ impl KickoffCalculator {
         None
     }
 
+    fn first_follow_up_touch_for_active(active: &ActiveKickoff) -> Option<&KickoffTouchSnapshot> {
+        let team_zero_taker = Self::expected_taker_by_team(&active.players, true);
+        let team_one_taker = Self::expected_taker_by_team(&active.players, false);
+        let team_zero_taker_player = team_zero_taker.map(|index| &active.players[index].player);
+        let team_one_taker_player = team_one_taker.map(|index| &active.players[index].player);
+        Self::first_follow_up_touch(
+            &active.touches,
+            active.first_touch_time,
+            active.first_touch_frame,
+            team_zero_taker_player,
+            team_one_taker_player,
+        )
+    }
+
     fn is_non_taker_touch(
         touch: &KickoffTouchSnapshot,
         team_zero_taker_player: Option<&PlayerId>,
@@ -907,9 +929,14 @@ impl KickoffCalculator {
     fn kickoff_possession_outcome(
         touches: &[KickoffTouchSnapshot],
         first_follow_up_touch: Option<&KickoffTouchSnapshot>,
+        winning_team_is_team_0: Option<bool>,
     ) -> (KickoffPossessionOutcome, Option<bool>) {
         let Some(first_follow_up_touch) = first_follow_up_touch else {
-            return (KickoffPossessionOutcome::Contested, None);
+            return match winning_team_is_team_0 {
+                Some(true) => (KickoffPossessionOutcome::TeamZeroPossession, Some(true)),
+                Some(false) => (KickoffPossessionOutcome::TeamOnePossession, Some(false)),
+                None => (KickoffPossessionOutcome::Contested, None),
+            };
         };
         let possession = match touches.iter().find(|touch| {
             Self::touch_after(
@@ -963,8 +990,16 @@ impl KickoffCalculator {
         let Some(first_touch_time) = active.first_touch_time else {
             return gameplay.game_state == Some(GAME_STATE_GOAL_SCORED_REPLAY);
         };
-        frame.time - first_touch_time >= KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS
+        (active.resolution.is_some() && Self::first_follow_up_touch_for_active(active).is_some())
+            || frame.time - first_touch_time >= KICKOFF_FOLLOW_UP_AFTER_FIRST_TOUCH_SECONDS
             || gameplay.game_state == Some(GAME_STATE_GOAL_SCORED_REPLAY)
+    }
+
+    fn should_capture_resolution(active: &ActiveKickoff, frame: &FrameInfo) -> bool {
+        active.resolution.is_none()
+            && active.first_touch_time.is_some_and(|first_touch_time| {
+                frame.time - first_touch_time >= KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS
+            })
     }
 
     fn finish_event(
@@ -977,7 +1012,12 @@ impl KickoffCalculator {
     ) -> KickoffEvent {
         let mut active = active;
         Self::apply_speed_flip_events(&mut active, frame, speed_flip_events);
-        let (outcome, winning_team_is_team_0, win_strength) = Self::win_from_ball(ball);
+        let resolution_ball = active
+            .resolution
+            .as_ref()
+            .map(|resolution| &resolution.ball)
+            .unwrap_or(ball);
+        let (outcome, winning_team_is_team_0, win_strength) = Self::win_from_ball(resolution_ball);
         let scoring_goal = events.goal_events.iter().min_by(|left, right| {
             left.time
                 .total_cmp(&right.time)
@@ -1020,7 +1060,7 @@ impl KickoffCalculator {
                 }
                 _ => None,
             };
-        let exit_velocity = Self::exit_velocity(ball);
+        let exit_velocity = Self::exit_velocity(resolution_ball);
         let exit_speed = Self::exit_speed(exit_velocity);
         let exit_y_velocity = exit_velocity.map(|velocity| velocity[1]);
         let team_zero_taker_player = team_zero_taker.map(|index| &active.players[index].player);
@@ -1035,11 +1075,12 @@ impl KickoffCalculator {
         let first_follow_up_touch_team_is_team_0 =
             first_follow_up_touch.map(|touch| touch.team_is_team_0);
         let (mut kickoff_possession_outcome, mut kickoff_possession_team_is_team_0) =
-            Self::kickoff_possession_outcome(&active.touches, first_follow_up_touch);
-        if kickoff_goal
-            && first_follow_up_touch.is_none()
-            && kickoff_possession_outcome == KickoffPossessionOutcome::Contested
-        {
+            Self::kickoff_possession_outcome(
+                &active.touches,
+                first_follow_up_touch,
+                winning_team_is_team_0,
+            );
+        if kickoff_goal && first_follow_up_touch.is_none() {
             if let Some(goal) = scoring_goal {
                 kickoff_possession_outcome = if goal.scoring_team_is_team_0 {
                     KickoffPossessionOutcome::TeamZeroPossession
@@ -1211,6 +1252,11 @@ impl KickoffCalculator {
         Self::apply_player_samples(active, ctx.frame, ctx.players);
         Self::apply_touches(active, ctx.touch_state);
         Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);
+        if Self::should_capture_resolution(active, ctx.frame) {
+            active.resolution = Some(KickoffResolutionSnapshot {
+                ball: ctx.ball.clone(),
+            });
+        }
 
         if Self::should_finish(active, ctx.frame, ctx.gameplay, ctx.events) {
             let active = self.active.take().expect("active kickoff should exist");
