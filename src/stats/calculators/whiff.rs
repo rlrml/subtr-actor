@@ -82,9 +82,23 @@ struct ActiveWhiffCandidate {
     aerial: bool,
 }
 
+impl InFlightItem for ActiveWhiffCandidate {
+    fn recognition(&self) -> Recognition {
+        // A whiff candidate is speculative: it only becomes an event if the
+        // player misses (exit/timeout) or is beaten to the ball. A touch by the
+        // candidate's own player, or a boundary, discards it.
+        Recognition::speculative(self.start_time, self.closest_frame)
+    }
+
+    fn on_boundary(&mut self, _boundary: Boundary) -> Disposition {
+        // An in-flight candidate at a boundary never resolved into a whiff.
+        Disposition::Discard
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WhiffCalculator {
-    active_candidates: HashMap<PlayerId, ActiveWhiffCandidate>,
+    active_candidates: KeyedInFlightLedger<PlayerId, ActiveWhiffCandidate>,
     events: EventStream<WhiffEvent>,
 }
 
@@ -191,14 +205,25 @@ impl WhiffCalculator {
 
         let candidate_players = self.active_candidates.keys().cloned().collect::<Vec<_>>();
         for player_id in candidate_players {
-            let Some(candidate) = self.active_candidates.remove(&player_id) else {
+            let Some((candidate_player, candidate_team)) = self
+                .active_candidates
+                .get(&player_id)
+                .map(|candidate| (candidate.player.clone(), candidate.is_team_0))
+            else {
                 continue;
             };
-            if touched_players.contains(&candidate.player) {
-                continue;
-            }
-            if touched_teams.contains(&!candidate.is_team_0) {
-                self.emit_candidate(candidate, frame, WhiffEventKind::BeatenToBall);
+            if touched_players.contains(&candidate_player) {
+                // The candidate's own player touched the ball: not a whiff.
+                self.active_candidates.discard(&player_id);
+            } else if touched_teams.contains(&!candidate_team) {
+                if let Some(candidate) = self
+                    .active_candidates
+                    .finalize(&player_id, FinalizeReason::Completed)
+                {
+                    self.emit_candidate(candidate, frame, WhiffEventKind::BeatenToBall);
+                }
+            } else {
+                self.active_candidates.discard(&player_id);
             }
         }
     }
@@ -268,7 +293,10 @@ impl WhiffCalculator {
                 if distance > WHIFF_EXIT_DISTANCE
                     || frame.time - candidate.start_time > WHIFF_MAX_CANDIDATE_SECONDS
                 {
-                    if let Some(candidate) = self.active_candidates.remove(&player_id) {
+                    if let Some(candidate) = self
+                        .active_candidates
+                        .finalize(&player_id, FinalizeReason::Completed)
+                    {
                         self.emit_candidate(candidate, frame, WhiffEventKind::Whiff);
                     }
                 }
@@ -278,7 +306,7 @@ impl WhiffCalculator {
             if let Some(candidate) =
                 Self::whiff_candidate(frame, ball_position, ball_velocity, player)
             {
-                self.active_candidates.insert(player_id, candidate);
+                self.active_candidates.arm(player_id, candidate);
             }
         }
 
@@ -289,7 +317,7 @@ impl WhiffCalculator {
             .cloned()
             .collect::<Vec<_>>();
         for player_id in missing_players {
-            self.active_candidates.remove(&player_id);
+            self.active_candidates.discard(&player_id);
         }
     }
 
@@ -303,7 +331,7 @@ impl WhiffCalculator {
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         if !live_play_state.is_live_play {
-            self.active_candidates.clear();
+            self.active_candidates.apply_boundary(Boundary::LivePlayEnded);
             return Ok(());
         }
         self.finish_touched_candidates(frame, touch_state);
@@ -318,6 +346,13 @@ impl WhiffCalculator {
             }
         }
         Ok(())
+    }
+
+    /// Resolve any in-flight candidates at end of stream. An unresolved
+    /// candidate never became a whiff, so it is discarded (handled uniformly via
+    /// the ledger rather than left to drop implicitly).
+    pub fn finish(&mut self) {
+        self.active_candidates.finish();
     }
 }
 
