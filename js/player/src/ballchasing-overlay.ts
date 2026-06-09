@@ -4,6 +4,7 @@ import type {
   ReplayPlayerPluginContext,
   ReplayPlayerRenderContext,
 } from "./types";
+import { boostAmountToPercent } from "./boost-units";
 
 export interface BallchasingOverlayPluginOptions {
   showFloatingNames?: boolean;
@@ -280,7 +281,7 @@ function setBoostBar(
     return;
   }
 
-  const percent = Math.max(0, Math.min(100, Math.round((amount / 255) * 100)));
+  const percent = Math.max(0, Math.min(100, Math.round(boostAmountToPercent(amount))));
   fill.style.width = `${percent}%`;
   text.textContent = `${percent} ${playerName}`;
 }

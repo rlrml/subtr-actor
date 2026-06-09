@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { ReplayModel } from "./types";
+import { boostAmountToPercent } from "./boost-units";
 import { getReplayHitboxOverlayTransform, type ReplayHitboxSpec } from "./hitboxes";
 
 const HITBOX_OVERLAY_FILL_OPACITY = 0.08;
@@ -818,7 +819,7 @@ export function updateBoostMeter(
   meter.fillMesh.position.x = -(1 - fraction) * halfWidth;
   meter.fillMesh.position.y = -18;
 
-  const percent = Math.max(0, Math.min(100, Math.round((amount / 255) * 100)));
+  const percent = Math.max(0, Math.min(100, Math.round(boostAmountToPercent(amount))));
   if (meter.lastPercent !== percent) {
     const { labelContext, labelCanvas, labelTexture } = meter;
     labelContext.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
