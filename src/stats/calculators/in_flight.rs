@@ -211,6 +211,20 @@ impl<C: InFlightItem> InFlightLedger<C> {
         self.apply_boundary(Boundary::ReplayEnded)
     }
 
+    /// Imperatively finalize every in-flight item with `reason`, returning them
+    /// for the caller to convert into events. For calculators that drive
+    /// finalization from specific code paths (e.g. emit-early, patch-in-place)
+    /// rather than a per-frame step or a [`Boundary`].
+    pub fn finalize_all(&mut self, reason: FinalizeReason) -> Vec<(C, FinalizeReason)> {
+        let mut finalized = Vec::with_capacity(self.active.len());
+        for item in std::mem::take(&mut self.active) {
+            self.log_finalized(&item);
+            finalized.push((item, reason));
+        }
+        self.prune_history();
+        finalized
+    }
+
     fn resolve_each(
         &mut self,
         mut decide: impl FnMut(&mut C) -> Disposition,
@@ -236,6 +250,10 @@ impl<C: InFlightItem> InFlightLedger<C> {
     fn log_finalized(&mut self, item: &C) {
         let mut recognition = item.recognition();
         recognition.committed = true;
+        // Keep `last_time` roughly current even for imperative flows that don't
+        // go through `advance`, so the history still prunes (recognition time is
+        // a lower bound on the current time).
+        self.last_time = self.last_time.max(recognition.time);
         self.finalized.push_back(recognition);
     }
 

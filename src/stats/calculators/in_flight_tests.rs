@@ -135,6 +135,20 @@ fn finish_flushes_everything_still_in_flight() {
 }
 
 #[test]
+fn finalize_all_drains_and_logs_every_item() {
+    let mut ledger = InFlightLedger::<TestCandidate>::new();
+    ledger.arm(TestCandidate::new("a", 1.0, 10));
+    ledger.arm(TestCandidate::new("b", 1.0, 11));
+
+    let finalized = ledger.finalize_all(FinalizeReason::Superseded);
+    assert_eq!(finalized.len(), 2);
+    assert!(finalized.iter().all(|(_, reason)| *reason == FinalizeReason::Superseded));
+    assert!(ledger.is_empty());
+    // Both are now queryable as having happened (committed, by recognition time).
+    assert!(ledger.happened_within(1.0, 1.0, true));
+}
+
+#[test]
 fn happened_within_counts_finalized_events_by_recognition_time() {
     let mut ledger = InFlightLedger::<TestCandidate>::new();
     let mut candidate = TestCandidate::new("c", 1.0, 10);
