@@ -161,6 +161,12 @@ pub struct GoalContextEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ball_speed_at_goal: Option<f32>,
     pub ball_air_time_before_goal: Option<f32>,
+    /// How long the scoring team's established territorial-pressure session had
+    /// been running when the goal was scored (goal_time - session.start_time).
+    /// None for goals scored with no active pressure session (e.g. clean
+    /// counter-attacks). Filled in at finish once pressure sessions are final.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pressure_duration_before_goal: Option<f32>,
     #[serde(default)]
     pub goal_buildup: GoalBuildupKind,
     pub scorer_last_touch: Option<GoalTouchContext>,
@@ -858,6 +864,8 @@ impl MatchStatsCalculator {
                 ball_position,
                 ball_speed_at_goal,
                 ball_air_time_before_goal,
+                // Filled in at finish once territorial-pressure sessions are final.
+                pressure_duration_before_goal: None,
                 goal_buildup,
                 scorer_last_touch,
                 players: self.goal_player_contexts(
@@ -1000,6 +1008,32 @@ impl MatchStatsCalculator {
             GoalBuildupKind::SustainedPressure
         } else {
             GoalBuildupKind::Other
+        }
+    }
+
+    /// Attach to each recorded goal how long the scoring team's established
+    /// territorial-pressure session had been running when the goal was scored
+    /// (`goal_time - session.start_time`). The session is the scoring team's
+    /// pressure session that spans the goal frame. Goals scored with no active
+    /// pressure session (e.g. clean counter-attacks) are left as None.
+    ///
+    /// Runs at finish, after territorial-pressure sessions are finalized, so it
+    /// must be fed the pressure calculator's projected (final) sessions.
+    pub fn attach_goal_pressure_durations(
+        &mut self,
+        pressure_sessions: &[TerritorialPressureEvent],
+    ) {
+        for goal in self.goal_context_events.iter_mut() {
+            let goal_time = goal.time;
+            let scoring_team_is_team_0 = goal.scoring_team_is_team_0;
+            goal.pressure_duration_before_goal = pressure_sessions
+                .iter()
+                .find(|session| {
+                    session.team_is_team_0 == scoring_team_is_team_0
+                        && session.start_time <= goal_time
+                        && goal_time <= session.end_time
+                })
+                .map(|session| (goal_time - session.start_time).max(0.0));
         }
     }
 }
