@@ -13,7 +13,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "core_player",
   "core_player_goal_context",
   "possession",
-  "pressure",
+  "ball_half",
   "territorial_pressure",
   "movement",
   "positioning_activity",

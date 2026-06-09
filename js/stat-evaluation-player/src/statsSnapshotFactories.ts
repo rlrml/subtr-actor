@@ -73,7 +73,7 @@ export function createTeamStatsSnapshot(
         neutral_time: 0,
         labeled_time: { entries: [] },
       },
-      pressure: {
+      ball_half: {
         tracked_time: 0,
         defensive_half_time: 0,
         offensive_half_time: 0,

@@ -45,7 +45,7 @@ const CURATED_STATS_EVENT_STREAM_IDS = new Set<string>([
 ]);
 const SPAN_BASED_STATS_EVENT_STREAM_IDS = new Set<string>([
   "possession",
-  "pressure",
+  "ball_half",
   "territorial_pressure",
   "positioning_field_zone",
   "rotation_role_span",

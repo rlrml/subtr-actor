@@ -35,7 +35,7 @@ import type { PositioningBallProximityEvent } from "./generated/PositioningBallP
 import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
 import type { PositioningGoalContextEvent } from "./generated/PositioningGoalContextEvent.ts";
 import type { PositioningTeammateRoleEvent } from "./generated/PositioningTeammateRoleEvent.ts";
-import type { PressureEvent } from "./generated/PressureEvent.ts";
+import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
 import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
 import type { ReplayMeta } from "./generated/ReplayMeta.ts";
 import type { ReplayStatsFrame } from "./generated/ReplayStatsFrame.ts";
@@ -110,7 +110,7 @@ export type {
   PositioningFieldZoneEvent,
   PositioningGoalContextEvent,
   PositioningTeammateRoleEvent,
-  PressureEvent,
+  BallHalfEvent,
   PowerslideEvent,
   ReplayMeta,
   RotationPlayerEvent,
