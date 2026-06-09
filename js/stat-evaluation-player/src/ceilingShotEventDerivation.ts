@@ -3,6 +3,7 @@ import type { CeilingShotStats } from "./generated/CeilingShotStats.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const CEILING_SHOT_HIGH_CONFIDENCE = 0.78;
 
@@ -182,7 +183,7 @@ export function createCeilingShotEventDerivedStatsAccumulator(
 ): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortCeilingShotEvents(timeline.events.ceiling_shot ?? []);
+  const events = sortCeilingShotEvents(statsEventPayloads(timeline, "ceiling_shot"));
 
   let eventIndex = 0;
   let lastCeilingShotPlayer: string | null = null;

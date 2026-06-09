@@ -16,10 +16,12 @@ import type { LabeledCountEntry } from "./generated/LabeledCountEntry.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { LabeledFloatSumEntry } from "./generated/LabeledFloatSumEntry.ts";
 import type { LabeledFloatSums } from "./generated/LabeledFloatSums.ts";
-import type { StatsTimelineTagEvent } from "./generated/StatsTimelineTagEvent.ts";
-import type { StatsEventProperty } from "./generated/StatsEventProperty.ts";
-import type { StatsEventPropertyValue } from "./generated/StatsEventPropertyValue.ts";
-import type { StatsEventTiming } from "./generated/StatsEventTiming.ts";
+import type { Event } from "./generated/Event.ts";
+import type { EventMeta } from "./generated/EventMeta.ts";
+import type { EventPayload } from "./generated/EventPayload.ts";
+import type { EventProperty } from "./generated/EventProperty.ts";
+import type { EventPropertyValue } from "./generated/EventPropertyValue.ts";
+import type { EventTiming } from "./generated/EventTiming.ts";
 import type { MovementEvent } from "./generated/MovementEvent.ts";
 import type { MustyFlickEvent } from "./generated/MustyFlickEvent.ts";
 import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
@@ -67,6 +69,11 @@ export type StatsTimeline = MaterializedStatsTimeline | CompactStatsTimeline;
 export type StatsFrame = ReplayStatsFrame;
 export type StatsFrameScaffold = ReplayStatsFrameScaffold;
 export type StatsEvents = ReplayStatsTimelineEvents;
+export type StatsEventPayloadKind = EventPayload["kind"];
+export type StatsEventPayload<K extends StatsEventPayloadKind> = Extract<
+  EventPayload,
+  { kind: K }
+>["payload"];
 export type TeamStatsSnapshot = GeneratedTeamStatsSnapshot & { event_counts?: EventCountStats };
 export type PlayerStatsSnapshot = GeneratedPlayerStatsSnapshot & { event_counts?: EventCountStats };
 export type BackboardEvent = BackboardBounceEvent;
@@ -85,10 +92,12 @@ export type {
   LabeledFloatSumEntry,
   LabeledFloatSums,
   BallCarryEvent,
-  StatsTimelineTagEvent,
-  StatsEventProperty,
-  StatsEventPropertyValue,
-  StatsEventTiming,
+  Event,
+  EventMeta,
+  EventPayload,
+  EventProperty,
+  EventPropertyValue,
+  EventTiming,
   MovementEvent,
   MustyFlickEvent,
   OneTimerEvent,
@@ -127,6 +136,37 @@ export type {
   CorePlayerScoreboardEvent,
   DodgeResetEvent,
 };
+
+export function statsEventEnvelopes(statsTimeline: StatsTimeline): Event[] {
+  return statsTimeline.events?.events ?? [];
+}
+
+export function statsEventsByStream(statsTimeline: StatsTimeline, stream: string): Event[] {
+  return statsEventEnvelopes(statsTimeline).filter((event) => event.meta.stream === stream);
+}
+
+export function statsEventPayloads<K extends StatsEventPayloadKind>(
+  statsTimeline: StatsTimeline,
+  kind: K,
+): Array<StatsEventPayload<K>> {
+  return statsEventEnvelopes(statsTimeline)
+    .filter((event): event is Event & { payload: Extract<EventPayload, { kind: K }> } => {
+      return event.payload.kind === kind;
+    })
+    .map((event) => event.payload.payload) as Array<StatsEventPayload<K>>;
+}
+
+export function statsEventPayloadsByStream<K extends StatsEventPayloadKind>(
+  statsTimeline: StatsTimeline,
+  stream: string,
+  kind: K,
+): Array<StatsEventPayload<K>> {
+  return statsEventEnvelopes(statsTimeline)
+    .filter((event): event is Event & { payload: Extract<EventPayload, { kind: K }> } => {
+      return event.meta.stream === stream && event.payload.kind === kind;
+    })
+    .map((event) => event.payload.payload) as Array<StatsEventPayload<K>>;
+}
 
 const PLAYER_IDENTITY_FIELDS = new Set(["is_team_0", "name", "player_id"]);
 

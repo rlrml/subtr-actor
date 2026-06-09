@@ -2,6 +2,7 @@ import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
 import type { OneTimerPlayerStats } from "./generated/OneTimerPlayerStats.ts";
 import type { OneTimerTeamStats } from "./generated/OneTimerTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -100,7 +101,7 @@ export function applyOneTimerEventDerivedStats(
 export function createOneTimerEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortOneTimerEvents(timeline.events.one_timer ?? []);
+  const events = sortOneTimerEvents(statsEventPayloads(timeline, "one_timer"));
 
   let eventIndex = 0;
   let lastOneTimerPlayer: string | null = null;

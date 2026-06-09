@@ -1,5 +1,9 @@
 import type {
+  Event,
+  EventPayload,
   PlayerStatsSnapshot,
+  StatsEventPayload,
+  StatsEventPayloadKind,
   StatsEvents,
   StatsFrame,
   MaterializedStatsTimeline,
@@ -14,61 +18,274 @@ import {
 export { createPlayerStatsSnapshot, createTeamStatsSnapshot } from "./statsSnapshotFactories.ts";
 
 export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEvents {
-  return merge<StatsEvents>(
+  const merged = merge<StatsEvents>(
     {
-      timeline: [],
-      core_player: [],
-      core_player_goal_context: [],
-      possession: [],
-      pressure: [],
-      territorial_pressure: [],
-      movement: [],
-      positioning_activity: [],
-      positioning_possession: [],
-      positioning_field_zone: [],
-      positioning_ball_depth: [],
-      positioning_teammate_role: [],
-      positioning_ball_proximity: [],
-      positioning_goal_context: [],
-      rotation_player: [],
-      rotation_role_span: [],
-      rotation_depth_span: [],
-      rotation_first_man_stint: [],
-      rotation_team: [],
-      mechanics: [],
-      goal_context: [],
-      backboard: [],
-      ceiling_shot: [],
-      wall_aerial: [],
-      wall_aerial_shot: [],
-      center: [],
-      flick: [],
-      musty_flick: [],
-      dodge_reset: [],
-      double_tap: [],
-      fifty_fifty: [],
-      kickoff: [],
-      one_timer: [],
-      pass: [],
-      ball_carry: [],
-      controlled_play: [],
-      rush: [],
-      dodge: [],
-      speed_flip: [],
-      half_flip: [],
-      half_volley: [],
-      wavedash: [],
-      whiff: [],
-      powerslide: [],
-      touch: [],
-      boost_pickups: [],
-      boost_ledger: [],
-      boost_bucket: [],
-      boost_state: [],
-      bump: [],
+      events: [],
     },
     overrides,
   );
+  return {
+    events: [
+      ...(merged.events ?? []),
+      ...legacyBucketEvents(overrides as Record<string, unknown> | undefined),
+      ...legacyMechanicEvents(overrides as Record<string, unknown> | undefined),
+    ],
+  };
+}
+
+type PayloadList<K extends StatsEventPayloadKind> = Array<StatsEventPayload<K>>;
+
+type LegacyEventBucket = {
+  field: string;
+  stream: string;
+  kind: StatsEventPayloadKind;
+};
+
+const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
+  { field: "timeline", stream: "timeline", kind: "timeline" },
+  { field: "core_player", stream: "core_player", kind: "core_player" },
+  {
+    field: "core_player_goal_context",
+    stream: "core_player_goal_context",
+    kind: "core_player_goal_context",
+  },
+  { field: "possession", stream: "possession", kind: "possession" },
+  { field: "pressure", stream: "pressure", kind: "pressure" },
+  {
+    field: "territorial_pressure",
+    stream: "territorial_pressure",
+    kind: "territorial_pressure",
+  },
+  { field: "movement", stream: "movement", kind: "movement" },
+  {
+    field: "positioning_activity",
+    stream: "positioning_activity",
+    kind: "positioning_activity",
+  },
+  {
+    field: "positioning_possession",
+    stream: "positioning_possession",
+    kind: "positioning_possession",
+  },
+  {
+    field: "positioning_field_zone",
+    stream: "positioning_field_zone",
+    kind: "positioning_field_zone",
+  },
+  {
+    field: "positioning_ball_depth",
+    stream: "positioning_ball_depth",
+    kind: "positioning_ball_depth",
+  },
+  {
+    field: "positioning_teammate_role",
+    stream: "positioning_teammate_role",
+    kind: "positioning_teammate_role",
+  },
+  {
+    field: "positioning_ball_proximity",
+    stream: "positioning_ball_proximity",
+    kind: "positioning_ball_proximity",
+  },
+  {
+    field: "positioning_goal_context",
+    stream: "positioning_goal_context",
+    kind: "positioning_goal_context",
+  },
+  { field: "rotation_player", stream: "rotation_player", kind: "rotation_player" },
+  { field: "rotation_role_span", stream: "rotation_role_span", kind: "rotation_role_span" },
+  { field: "rotation_depth_span", stream: "rotation_depth_span", kind: "rotation_depth_span" },
+  {
+    field: "rotation_first_man_stint",
+    stream: "rotation_first_man_stint",
+    kind: "rotation_first_man_stint",
+  },
+  { field: "rotation_team", stream: "rotation_team", kind: "rotation_team" },
+  { field: "goal_context", stream: "goal_context", kind: "goal_context" },
+  { field: "backboard", stream: "backboard", kind: "backboard" },
+  { field: "ceiling_shot", stream: "ceiling_shot", kind: "ceiling_shot" },
+  { field: "wall_aerial", stream: "wall_aerial", kind: "wall_aerial" },
+  { field: "wall_aerial_shot", stream: "wall_aerial_shot", kind: "wall_aerial_shot" },
+  { field: "center", stream: "center", kind: "center" },
+  { field: "flick", stream: "flick", kind: "flick" },
+  { field: "musty_flick", stream: "musty_flick", kind: "musty_flick" },
+  { field: "dodge_reset", stream: "dodge_reset", kind: "dodge_reset" },
+  { field: "double_tap", stream: "double_tap", kind: "double_tap" },
+  { field: "fifty_fifty", stream: "fifty_fifty", kind: "fifty_fifty" },
+  { field: "kickoff", stream: "kickoff", kind: "kickoff" },
+  { field: "one_timer", stream: "one_timer", kind: "one_timer" },
+  { field: "pass", stream: "pass", kind: "pass" },
+  { field: "ball_carry", stream: "ball_carry", kind: "ball_carry" },
+  { field: "controlled_play", stream: "controlled_play", kind: "controlled_play" },
+  { field: "rush", stream: "rush", kind: "rush" },
+  { field: "dodge", stream: "dodge", kind: "dodge" },
+  { field: "speed_flip", stream: "speed_flip", kind: "speed_flip" },
+  { field: "half_flip", stream: "half_flip", kind: "half_flip" },
+  { field: "half_volley", stream: "half_volley", kind: "half_volley" },
+  { field: "wavedash", stream: "wavedash", kind: "wavedash" },
+  { field: "whiff", stream: "whiff", kind: "whiff" },
+  { field: "powerslide", stream: "powerslide", kind: "powerslide" },
+  { field: "touch", stream: "touch", kind: "touch" },
+  { field: "boost_pickups", stream: "boost_pickups", kind: "boost_pickup" },
+  { field: "boost_ledger", stream: "boost_ledger", kind: "boost_ledger" },
+  { field: "boost_bucket", stream: "boost_bucket", kind: "boost_bucket" },
+  { field: "boost_state", stream: "boost_state", kind: "boost_state" },
+  { field: "bump", stream: "bump", kind: "bump" },
+];
+
+function legacyBucketEvents(record: Record<string, unknown> | undefined): Event[] {
+  if (!record) {
+    return [];
+  }
+  return LEGACY_EVENT_BUCKETS.flatMap(({ field, stream, kind }) => {
+    const values = record[field];
+    if (!Array.isArray(values)) {
+      return [];
+    }
+    return values.map((event, index) =>
+      payloadEvent(stream, kind, event as StatsEventPayload<typeof kind>, index),
+    );
+  });
+}
+
+function legacyMechanicEvents(record: Record<string, unknown> | undefined): Event[] {
+  if (!record) {
+    return [];
+  }
+  const values = [
+    ...(Array.isArray(record.mechanics) ? record.mechanics : []),
+    ...(Array.isArray(record.mechanic_events) ? record.mechanic_events : []),
+  ];
+  return values.map((event, index) => {
+    const record = event as Record<string, unknown>;
+    const stream = typeof record.kind === "string" ? record.kind : "mechanics";
+    const timing = eventTiming(record);
+    return {
+      meta: {
+        id: typeof record.id === "string" ? record.id : `${stream}:${index}`,
+        stream,
+        label: titleCaseStream(stream),
+        timing,
+        primary_player:
+          (record.player as Event["meta"]["primary_player"]) ??
+          (record.player_id as Event["meta"]["primary_player"]),
+        secondary_player: record.secondary_player as Event["meta"]["secondary_player"],
+        player_position: record.player_position as Event["meta"]["player_position"],
+        ball_position: record.ball_position as Event["meta"]["ball_position"],
+        team_is_team_0: record.is_team_0 as Event["meta"]["team_is_team_0"],
+        confidence: record.confidence as Event["meta"]["confidence"],
+        properties: Array.isArray(record.properties)
+          ? (record.properties as Event["meta"]["properties"])
+          : [],
+      },
+      payload: {
+        kind: "timeline",
+        payload: {
+          time: timing.type === "span" ? timing.end_time : timing.time,
+          frame: timing.type === "span" ? timing.end_frame : timing.frame,
+          kind: stream,
+        },
+      } as EventPayload,
+    };
+  });
+}
+
+function titleCaseStream(stream: string): string {
+  return stream
+    .split("_")
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function eventTiming(payload: Record<string, unknown>): Event["meta"]["timing"] {
+  const explicitTiming = payload.timing;
+  if (
+    explicitTiming &&
+    typeof explicitTiming === "object" &&
+    !Array.isArray(explicitTiming) &&
+    "type" in explicitTiming
+  ) {
+    return explicitTiming as Event["meta"]["timing"];
+  }
+  const startFrame = payload.start_frame;
+  const endFrame = payload.end_frame ?? payload.resolve_frame;
+  const startTime = payload.start_time;
+  const endTime = payload.end_time ?? payload.resolve_time;
+  if (
+    typeof startFrame === "number" &&
+    typeof endFrame === "number" &&
+    typeof startTime === "number" &&
+    typeof endTime === "number"
+  ) {
+    return {
+      type: "span",
+      start_frame: startFrame,
+      end_frame: endFrame,
+      start_time: startTime,
+      end_time: endTime,
+    };
+  }
+  if (
+    typeof payload.frame === "number" &&
+    typeof endFrame === "number" &&
+    typeof payload.time === "number" &&
+    typeof endTime === "number"
+  ) {
+    return {
+      type: "span",
+      start_frame: payload.frame,
+      end_frame: endFrame,
+      start_time: payload.time,
+      end_time: endTime,
+    };
+  }
+  return {
+    type: "moment",
+    frame: typeof payload.frame === "number" ? payload.frame : 0,
+    time: typeof payload.time === "number" ? payload.time : 0,
+  };
+}
+
+function payloadEvent<K extends StatsEventPayloadKind>(
+  stream: string,
+  kind: K,
+  payload: StatsEventPayload<K>,
+  index: number,
+): Event {
+  const record = payload as Record<string, unknown>;
+  const timing = eventTiming(record);
+  const frameId =
+    timing.type === "span" ? `${timing.start_frame}:${timing.end_frame}` : `${timing.frame}`;
+  return {
+    meta: {
+      id: `${stream}:${frameId}:${index}`,
+      stream,
+      label: titleCaseStream(stream),
+      timing,
+      primary_player:
+        (record.player as Event["meta"]["primary_player"]) ??
+        (record.player_id as Event["meta"]["primary_player"]) ??
+        (record.scorer as Event["meta"]["primary_player"]),
+      secondary_player:
+        (record.receiver as Event["meta"]["secondary_player"]) ??
+        (record.victim as Event["meta"]["secondary_player"]),
+      player_position:
+        (record.player_position as Event["meta"]["player_position"]) ??
+        (record.end_position as Event["meta"]["player_position"]),
+      ball_position:
+        (record.ball_position as Event["meta"]["ball_position"]) ??
+        (record.end_ball_position as Event["meta"]["ball_position"]),
+      team_is_team_0:
+        (record.is_team_0 as Event["meta"]["team_is_team_0"]) ??
+        (record.team_is_team_0 as Event["meta"]["team_is_team_0"]) ??
+        (record.scoring_team_is_team_0 as Event["meta"]["team_is_team_0"]) ??
+        (record.initiator_is_team_0 as Event["meta"]["team_is_team_0"]),
+      confidence: record.confidence as Event["meta"]["confidence"],
+      properties: [],
+    },
+    payload: { kind, payload } as EventPayload,
+  };
 }
 
 export function createTouchStats(
@@ -147,6 +364,7 @@ export function createStatsTimeline(
         empty_net_min_defender_distance: 0,
         empty_net_max_touch_attacking_y: 0,
         flick_goal_max_event_to_goal_seconds: 0,
+        ceiling_shot_goal_max_event_to_goal_seconds: 0,
         double_tap_goal_max_event_to_goal_seconds: 0,
         one_timer_goal_max_event_to_goal_seconds: 0,
         air_dribble_goal_max_end_to_goal_seconds: 0,
@@ -182,113 +400,172 @@ export function createStatsTimeline(
 
 export function createLegacyStatsTimeline(
   overrides: DeepPartial<MaterializedStatsTimeline> & {
-    timeline_events?: StatsEvents["timeline"];
-    backboard_events?: StatsEvents["backboard"];
-    ceiling_shot_events?: StatsEvents["ceiling_shot"];
-    wall_aerial_events?: StatsEvents["wall_aerial"];
-    wall_aerial_shot_events?: StatsEvents["wall_aerial_shot"];
-    center_events?: StatsEvents["center"];
-    flick_events?: StatsEvents["flick"];
-    musty_flick_events?: StatsEvents["musty_flick"];
-    dodge_reset_events?: StatsEvents["dodge_reset"];
-    double_tap_events?: StatsEvents["double_tap"];
-    fifty_fifty_events?: StatsEvents["fifty_fifty"];
-    one_timer_events?: StatsEvents["one_timer"];
-    pass_events?: StatsEvents["pass"];
-    ball_carry_events?: StatsEvents["ball_carry"];
-    controlled_play_events?: StatsEvents["controlled_play"];
-    mechanic_events?: StatsEvents["mechanics"];
-    rush_events?: StatsEvents["rush"];
-    speed_flip_events?: StatsEvents["speed_flip"];
-    half_flip_events?: StatsEvents["half_flip"];
-    half_volley_events?: StatsEvents["half_volley"];
-    wavedash_events?: StatsEvents["wavedash"];
-    whiff_events?: StatsEvents["whiff"];
-    powerslide_events?: StatsEvents["powerslide"];
-    positioning_activity_events?: StatsEvents["positioning_activity"];
-    positioning_possession_events?: StatsEvents["positioning_possession"];
-    positioning_field_zone_events?: StatsEvents["positioning_field_zone"];
-    positioning_ball_depth_events?: StatsEvents["positioning_ball_depth"];
-    positioning_teammate_role_events?: StatsEvents["positioning_teammate_role"];
-    positioning_ball_proximity_events?: StatsEvents["positioning_ball_proximity"];
-    positioning_goal_context_events?: StatsEvents["positioning_goal_context"];
-    rotation_player_events?: StatsEvents["rotation_player"];
-    rotation_role_span_events?: StatsEvents["rotation_role_span"];
-    rotation_depth_span_events?: StatsEvents["rotation_depth_span"];
-    rotation_first_man_stint_events?: StatsEvents["rotation_first_man_stint"];
-    rotation_team_events?: StatsEvents["rotation_team"];
-    boost_pickups?: StatsEvents["boost_pickups"];
-    boost_ledger?: StatsEvents["boost_ledger"];
-    boost_bucket?: StatsEvents["boost_bucket"];
-    boost_state?: StatsEvents["boost_state"];
-    bump_events?: StatsEvents["bump"];
+    timeline_events?: PayloadList<"timeline">;
+    backboard_events?: PayloadList<"backboard">;
+    ceiling_shot_events?: PayloadList<"ceiling_shot">;
+    wall_aerial_events?: PayloadList<"wall_aerial">;
+    wall_aerial_shot_events?: PayloadList<"wall_aerial_shot">;
+    center_events?: PayloadList<"center">;
+    flick_events?: PayloadList<"flick">;
+    musty_flick_events?: PayloadList<"musty_flick">;
+    dodge_reset_events?: PayloadList<"dodge_reset">;
+    double_tap_events?: PayloadList<"double_tap">;
+    fifty_fifty_events?: PayloadList<"fifty_fifty">;
+    one_timer_events?: PayloadList<"one_timer">;
+    pass_events?: PayloadList<"pass">;
+    ball_carry_events?: PayloadList<"ball_carry">;
+    controlled_play_events?: PayloadList<"controlled_play">;
+    rush_events?: PayloadList<"rush">;
+    speed_flip_events?: PayloadList<"speed_flip">;
+    half_flip_events?: PayloadList<"half_flip">;
+    half_volley_events?: PayloadList<"half_volley">;
+    wavedash_events?: PayloadList<"wavedash">;
+    whiff_events?: PayloadList<"whiff">;
+    powerslide_events?: PayloadList<"powerslide">;
+    positioning_activity_events?: PayloadList<"positioning_activity">;
+    positioning_possession_events?: PayloadList<"positioning_possession">;
+    positioning_field_zone_events?: PayloadList<"positioning_field_zone">;
+    positioning_ball_depth_events?: PayloadList<"positioning_ball_depth">;
+    positioning_teammate_role_events?: PayloadList<"positioning_teammate_role">;
+    positioning_ball_proximity_events?: PayloadList<"positioning_ball_proximity">;
+    positioning_goal_context_events?: PayloadList<"positioning_goal_context">;
+    rotation_player_events?: PayloadList<"rotation_player">;
+    rotation_role_span_events?: PayloadList<"rotation_role_span">;
+    rotation_depth_span_events?: PayloadList<"rotation_depth_span">;
+    rotation_first_man_stint_events?: PayloadList<"rotation_first_man_stint">;
+    rotation_team_events?: PayloadList<"rotation_team">;
+    boost_pickups?: PayloadList<"boost_pickup">;
+    boost_ledger?: PayloadList<"boost_ledger">;
+    boost_bucket?: PayloadList<"boost_bucket">;
+    boost_state?: PayloadList<"boost_state">;
+    bump_events?: PayloadList<"bump">;
   } = {},
 ): MaterializedStatsTimeline {
+  const events = [
+    ...(overrides.events?.events ?? []),
+    ...legacyBucketEvents(overrides.events as Record<string, unknown> | undefined),
+    ...legacyMechanicEvents(overrides.events as Record<string, unknown> | undefined),
+    ...legacyMechanicEvents(overrides as Record<string, unknown> | undefined),
+    ...(overrides.timeline_events ?? []).map((event, index) =>
+      payloadEvent("timeline", "timeline", event, index),
+    ),
+    ...(overrides.backboard_events ?? []).map((event, index) =>
+      payloadEvent("backboard", "backboard", event, index),
+    ),
+    ...(overrides.ceiling_shot_events ?? []).map((event, index) =>
+      payloadEvent("ceiling_shot", "ceiling_shot", event, index),
+    ),
+    ...(overrides.wall_aerial_events ?? []).map((event, index) =>
+      payloadEvent("wall_aerial", "wall_aerial", event, index),
+    ),
+    ...(overrides.wall_aerial_shot_events ?? []).map((event, index) =>
+      payloadEvent("wall_aerial_shot", "wall_aerial_shot", event, index),
+    ),
+    ...(overrides.center_events ?? []).map((event, index) =>
+      payloadEvent("center", "center", event, index),
+    ),
+    ...(overrides.flick_events ?? []).map((event, index) =>
+      payloadEvent("flick", "flick", event, index),
+    ),
+    ...(overrides.musty_flick_events ?? []).map((event, index) =>
+      payloadEvent("musty_flick", "musty_flick", event, index),
+    ),
+    ...(overrides.dodge_reset_events ?? []).map((event, index) =>
+      payloadEvent("dodge_reset", "dodge_reset", event, index),
+    ),
+    ...(overrides.double_tap_events ?? []).map((event, index) =>
+      payloadEvent("double_tap", "double_tap", event, index),
+    ),
+    ...(overrides.fifty_fifty_events ?? []).map((event, index) =>
+      payloadEvent("fifty_fifty", "fifty_fifty", event, index),
+    ),
+    ...(overrides.one_timer_events ?? []).map((event, index) =>
+      payloadEvent("one_timer", "one_timer", event, index),
+    ),
+    ...(overrides.pass_events ?? []).map((event, index) =>
+      payloadEvent("pass", "pass", event, index),
+    ),
+    ...(overrides.ball_carry_events ?? []).map((event, index) =>
+      payloadEvent("ball_carry", "ball_carry", event, index),
+    ),
+    ...(overrides.controlled_play_events ?? []).map((event, index) =>
+      payloadEvent("controlled_play", "controlled_play", event, index),
+    ),
+    ...(overrides.rush_events ?? []).map((event, index) =>
+      payloadEvent("rush", "rush", event, index),
+    ),
+    ...(overrides.speed_flip_events ?? []).map((event, index) =>
+      payloadEvent("speed_flip", "speed_flip", event, index),
+    ),
+    ...(overrides.half_flip_events ?? []).map((event, index) =>
+      payloadEvent("half_flip", "half_flip", event, index),
+    ),
+    ...(overrides.half_volley_events ?? []).map((event, index) =>
+      payloadEvent("half_volley", "half_volley", event, index),
+    ),
+    ...(overrides.wavedash_events ?? []).map((event, index) =>
+      payloadEvent("wavedash", "wavedash", event, index),
+    ),
+    ...(overrides.whiff_events ?? []).map((event, index) =>
+      payloadEvent("whiff", "whiff", event, index),
+    ),
+    ...(overrides.powerslide_events ?? []).map((event, index) =>
+      payloadEvent("powerslide", "powerslide", event, index),
+    ),
+    ...(overrides.positioning_activity_events ?? []).map((event, index) =>
+      payloadEvent("positioning_activity", "positioning_activity", event, index),
+    ),
+    ...(overrides.positioning_possession_events ?? []).map((event, index) =>
+      payloadEvent("positioning_possession", "positioning_possession", event, index),
+    ),
+    ...(overrides.positioning_field_zone_events ?? []).map((event, index) =>
+      payloadEvent("positioning_field_zone", "positioning_field_zone", event, index),
+    ),
+    ...(overrides.positioning_ball_depth_events ?? []).map((event, index) =>
+      payloadEvent("positioning_ball_depth", "positioning_ball_depth", event, index),
+    ),
+    ...(overrides.positioning_teammate_role_events ?? []).map((event, index) =>
+      payloadEvent("positioning_teammate_role", "positioning_teammate_role", event, index),
+    ),
+    ...(overrides.positioning_ball_proximity_events ?? []).map((event, index) =>
+      payloadEvent("positioning_ball_proximity", "positioning_ball_proximity", event, index),
+    ),
+    ...(overrides.positioning_goal_context_events ?? []).map((event, index) =>
+      payloadEvent("positioning_goal_context", "positioning_goal_context", event, index),
+    ),
+    ...(overrides.rotation_player_events ?? []).map((event, index) =>
+      payloadEvent("rotation_player", "rotation_player", event, index),
+    ),
+    ...(overrides.rotation_role_span_events ?? []).map((event, index) =>
+      payloadEvent("rotation_role_span", "rotation_role_span", event, index),
+    ),
+    ...(overrides.rotation_depth_span_events ?? []).map((event, index) =>
+      payloadEvent("rotation_depth_span", "rotation_depth_span", event, index),
+    ),
+    ...(overrides.rotation_first_man_stint_events ?? []).map((event, index) =>
+      payloadEvent("rotation_first_man_stint", "rotation_first_man_stint", event, index),
+    ),
+    ...(overrides.rotation_team_events ?? []).map((event, index) =>
+      payloadEvent("rotation_team", "rotation_team", event, index),
+    ),
+    ...(overrides.boost_pickups ?? []).map((event, index) =>
+      payloadEvent("boost_pickups", "boost_pickup", event, index),
+    ),
+    ...(overrides.boost_ledger ?? []).map((event, index) =>
+      payloadEvent("boost_ledger", "boost_ledger", event, index),
+    ),
+    ...(overrides.boost_bucket ?? []).map((event, index) =>
+      payloadEvent("boost_bucket", "boost_bucket", event, index),
+    ),
+    ...(overrides.boost_state ?? []).map((event, index) =>
+      payloadEvent("boost_state", "boost_state", event, index),
+    ),
+    ...(overrides.bump_events ?? []).map((event, index) =>
+      payloadEvent("bump", "bump", event, index),
+    ),
+  ];
   return createStatsTimeline({
     ...overrides,
-    events: {
-      ...(overrides.events ?? {}),
-      timeline: overrides.timeline_events ?? overrides.events?.timeline ?? [],
-      mechanics: overrides.mechanic_events ?? overrides.events?.mechanics ?? [],
-      backboard: overrides.backboard_events ?? overrides.events?.backboard ?? [],
-      ceiling_shot: overrides.ceiling_shot_events ?? overrides.events?.ceiling_shot ?? [],
-      wall_aerial: overrides.wall_aerial_events ?? overrides.events?.wall_aerial ?? [],
-      wall_aerial_shot:
-        overrides.wall_aerial_shot_events ?? overrides.events?.wall_aerial_shot ?? [],
-      center: overrides.center_events ?? overrides.events?.center ?? [],
-      flick: overrides.flick_events ?? overrides.events?.flick ?? [],
-      musty_flick: overrides.musty_flick_events ?? overrides.events?.musty_flick ?? [],
-      dodge_reset: overrides.dodge_reset_events ?? overrides.events?.dodge_reset ?? [],
-      double_tap: overrides.double_tap_events ?? overrides.events?.double_tap ?? [],
-      fifty_fifty: overrides.fifty_fifty_events ?? overrides.events?.fifty_fifty ?? [],
-      kickoff: overrides.events?.kickoff ?? [],
-      one_timer: overrides.one_timer_events ?? overrides.events?.one_timer ?? [],
-      pass: overrides.pass_events ?? overrides.events?.pass ?? [],
-      ball_carry: overrides.ball_carry_events ?? overrides.events?.ball_carry ?? [],
-      controlled_play: overrides.controlled_play_events ?? overrides.events?.controlled_play ?? [],
-      rush: overrides.rush_events ?? overrides.events?.rush ?? [],
-      dodge: overrides.events?.dodge ?? [],
-      speed_flip: overrides.speed_flip_events ?? overrides.events?.speed_flip ?? [],
-      half_flip: overrides.half_flip_events ?? overrides.events?.half_flip ?? [],
-      half_volley: overrides.half_volley_events ?? overrides.events?.half_volley ?? [],
-      wavedash: overrides.wavedash_events ?? overrides.events?.wavedash ?? [],
-      whiff: overrides.whiff_events ?? overrides.events?.whiff ?? [],
-      powerslide: overrides.powerslide_events ?? overrides.events?.powerslide ?? [],
-      positioning_activity:
-        overrides.positioning_activity_events ?? overrides.events?.positioning_activity ?? [],
-      positioning_possession:
-        overrides.positioning_possession_events ?? overrides.events?.positioning_possession ?? [],
-      positioning_field_zone:
-        overrides.positioning_field_zone_events ?? overrides.events?.positioning_field_zone ?? [],
-      positioning_ball_depth:
-        overrides.positioning_ball_depth_events ?? overrides.events?.positioning_ball_depth ?? [],
-      positioning_teammate_role:
-        overrides.positioning_teammate_role_events ??
-        overrides.events?.positioning_teammate_role ??
-        [],
-      positioning_ball_proximity:
-        overrides.positioning_ball_proximity_events ??
-        overrides.events?.positioning_ball_proximity ??
-        [],
-      positioning_goal_context:
-        overrides.positioning_goal_context_events ??
-        overrides.events?.positioning_goal_context ??
-        [],
-      rotation_player: overrides.rotation_player_events ?? overrides.events?.rotation_player ?? [],
-      rotation_role_span:
-        overrides.rotation_role_span_events ?? overrides.events?.rotation_role_span ?? [],
-      rotation_depth_span:
-        overrides.rotation_depth_span_events ?? overrides.events?.rotation_depth_span ?? [],
-      rotation_first_man_stint:
-        overrides.rotation_first_man_stint_events ??
-        overrides.events?.rotation_first_man_stint ??
-        [],
-      rotation_team: overrides.rotation_team_events ?? overrides.events?.rotation_team ?? [],
-      boost_pickups: overrides.boost_pickups ?? overrides.events?.boost_pickups ?? [],
-      boost_ledger: overrides.boost_ledger ?? overrides.events?.boost_ledger ?? [],
-      boost_bucket: overrides.boost_bucket ?? overrides.events?.boost_bucket ?? [],
-      boost_state: overrides.boost_state ?? overrides.events?.boost_state ?? [],
-      bump: overrides.bump_events ?? overrides.events?.bump ?? [],
-    },
+    events: { events },
   });
 }

@@ -6,6 +6,8 @@ import {
   type StatsPlayerConfig,
 } from "./playerConfig.ts";
 import { playerIdToString } from "./touchOverlay.ts";
+export type { GoalContextEvent } from "./generated/GoalContextEvent.ts";
+import type { GoalContextEvent } from "./generated/GoalContextEvent.ts";
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
@@ -17,7 +19,6 @@ import type {
 export type StatsTarget = PlayerStatsSnapshot | TeamStatsSnapshot;
 export type ChartKind = "bar" | "pie";
 export type ReportPageId = "overview" | "goals" | "boost" | "territory" | "involvement" | "dump";
-export type GoalContextEvent = StatsTimeline["events"]["goal_context"][number];
 export type GoalTag = NonNullable<GoalContextEvent["tags"]>[number];
 export type GoalPlayerContext = GoalContextEvent["players"][number];
 export type GoalContextPosition = NonNullable<GoalContextEvent["ball_position"]>;

@@ -14,6 +14,7 @@ const DEFAULT_EMPTY_NET_MIN_DEFENDER_Y_MARGIN: f32 = 700.0;
 const DEFAULT_EMPTY_NET_MIN_DEFENDER_DISTANCE: f32 = 1000.0;
 const DEFAULT_EMPTY_NET_MAX_TOUCH_ATTACKING_Y: f32 = 3600.0;
 const DEFAULT_FLICK_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
+const DEFAULT_CEILING_SHOT_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_DOUBLE_TAP_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_PASSING_GOAL_MAX_PASS_TO_GOAL_SECONDS: f32 = 3.0;
@@ -37,6 +38,7 @@ pub enum GoalTagKind {
     CounterAttackGoal,
     SustainedPressureGoal,
     FlickGoal,
+    CeilingShotGoal,
     DoubleTapGoal,
     OneTimerGoal,
     PassingGoal,
@@ -53,6 +55,7 @@ pub enum GoalTagKind {
 #[ts(export)]
 pub enum GoalTagEventStream {
     Flick,
+    CeilingShot,
     DoubleTap,
     OneTimer,
     Pass,
@@ -72,6 +75,7 @@ pub enum GoalTagEvidenceKind {
     DefenderPosition,
     GoalBuildup,
     Flick,
+    CeilingShot,
     DoubleTap,
     OneTimer,
     Pass,
@@ -142,6 +146,7 @@ pub enum GoalTag {
     CounterAttackGoal(GoalTagMetadata),
     SustainedPressureGoal(GoalTagMetadata),
     FlickGoal(GoalTagMetadata),
+    CeilingShotGoal(GoalTagMetadata),
     DoubleTapGoal(GoalTagMetadata),
     OneTimerGoal(GoalTagMetadata),
     PassingGoal(GoalTagMetadata),
@@ -268,6 +273,17 @@ pub const ALL_GOAL_TAG_DEFINITIONS: &[GoalTagDefinition] = &[
         ],
     ),
     goal_tag_definition(
+        GoalTagKind::CeilingShotGoal,
+        "ceiling_shot_goal",
+        "Ceiling-Shot Goal",
+        "A goal linked to a recent ceiling-shot event.",
+        &[
+            "Compare recent ceiling-shot events against each goal's scorer-last-touch context.",
+            "Require the ceiling shot to fall within the configured event-to-goal window.",
+            "Attach a related ceiling-shot event reference and ceiling-shot evidence to the goal tag metadata.",
+        ],
+    ),
+    goal_tag_definition(
         GoalTagKind::DoubleTapGoal,
         "double_tap_goal",
         "Double-Tap Goal",
@@ -379,6 +395,7 @@ impl GoalTag {
             GoalTagKind::CounterAttackGoal => Self::CounterAttackGoal(metadata),
             GoalTagKind::SustainedPressureGoal => Self::SustainedPressureGoal(metadata),
             GoalTagKind::FlickGoal => Self::FlickGoal(metadata),
+            GoalTagKind::CeilingShotGoal => Self::CeilingShotGoal(metadata),
             GoalTagKind::DoubleTapGoal => Self::DoubleTapGoal(metadata),
             GoalTagKind::OneTimerGoal => Self::OneTimerGoal(metadata),
             GoalTagKind::PassingGoal => Self::PassingGoal(metadata),
@@ -401,6 +418,7 @@ impl GoalTag {
             Self::CounterAttackGoal(_) => GoalTagKind::CounterAttackGoal,
             Self::SustainedPressureGoal(_) => GoalTagKind::SustainedPressureGoal,
             Self::FlickGoal(_) => GoalTagKind::FlickGoal,
+            Self::CeilingShotGoal(_) => GoalTagKind::CeilingShotGoal,
             Self::DoubleTapGoal(_) => GoalTagKind::DoubleTapGoal,
             Self::OneTimerGoal(_) => GoalTagKind::OneTimerGoal,
             Self::PassingGoal(_) => GoalTagKind::PassingGoal,
@@ -423,6 +441,7 @@ impl GoalTag {
             | Self::CounterAttackGoal(metadata)
             | Self::SustainedPressureGoal(metadata)
             | Self::FlickGoal(metadata)
+            | Self::CeilingShotGoal(metadata)
             | Self::DoubleTapGoal(metadata)
             | Self::OneTimerGoal(metadata)
             | Self::PassingGoal(metadata)
@@ -526,6 +545,20 @@ impl Default for FlickGoalCalculatorConfig {
     fn default() -> Self {
         Self {
             max_event_to_goal_seconds: DEFAULT_FLICK_GOAL_MAX_EVENT_TO_GOAL_SECONDS,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct CeilingShotGoalCalculatorConfig {
+    pub max_event_to_goal_seconds: f32,
+}
+
+impl Default for CeilingShotGoalCalculatorConfig {
+    fn default() -> Self {
+        Self {
+            max_event_to_goal_seconds: DEFAULT_CEILING_SHOT_GOAL_MAX_EVENT_TO_GOAL_SECONDS,
         }
     }
 }
@@ -696,6 +729,12 @@ pub struct FlickGoalCalculator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct CeilingShotGoalCalculator {
+    config: CeilingShotGoalCalculatorConfig,
+    events: EventStream<GoalTagAssignment>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct DoubleTapGoalCalculator {
     config: DoubleTapGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
@@ -789,6 +828,7 @@ impl_goal_tag_calculator!(LongDistanceGoalCalculator, LongDistanceGoalCalculator
 impl_goal_tag_calculator!(OwnHalfGoalCalculator, OwnHalfGoalCalculatorConfig);
 impl_goal_tag_calculator!(EmptyNetGoalCalculator, EmptyNetGoalCalculatorConfig);
 impl_goal_tag_calculator!(FlickGoalCalculator, FlickGoalCalculatorConfig);
+impl_goal_tag_calculator!(CeilingShotGoalCalculator, CeilingShotGoalCalculatorConfig);
 impl_goal_tag_calculator!(DoubleTapGoalCalculator, DoubleTapGoalCalculatorConfig);
 impl_goal_tag_calculator!(OneTimerGoalCalculator, OneTimerGoalCalculatorConfig);
 impl_goal_tag_calculator!(PassingGoalCalculator, PassingGoalCalculatorConfig);
@@ -1087,6 +1127,32 @@ impl FlickGoalCalculator {
             goals,
             events,
             GoalTagKind::FlickGoal,
+            self.config.max_event_to_goal_seconds,
+        )
+    }
+}
+
+impl CeilingShotGoalCalculator {
+    pub fn update(
+        &mut self,
+        match_stats: &MatchStatsCalculator,
+        ceiling_shot: &CeilingShotCalculator,
+    ) -> SubtrActorResult<()> {
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), ceiling_shot.events()),
+        );
+        Ok(())
+    }
+
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        events: &[CeilingShotEvent],
+    ) -> Vec<GoalTagAssignment> {
+        tag_goals_by_point_mechanic_event(
+            goals,
+            events,
+            GoalTagKind::CeilingShotGoal,
             self.config.max_event_to_goal_seconds,
         )
     }
@@ -1524,6 +1590,36 @@ impl GoalMechanicPointEvent for FlickEvent {
 
     fn event_stream(&self) -> GoalTagEventStream {
         GoalTagEventStream::Flick
+    }
+}
+
+impl GoalMechanicPointEvent for CeilingShotEvent {
+    fn event_time(&self) -> f32 {
+        self.time
+    }
+
+    fn event_frame(&self) -> usize {
+        self.frame
+    }
+
+    fn event_player(&self) -> &PlayerId {
+        &self.player
+    }
+
+    fn event_team_is_team_0(&self) -> bool {
+        self.is_team_0
+    }
+
+    fn event_confidence(&self) -> f32 {
+        self.confidence
+    }
+
+    fn evidence_kind(&self) -> GoalTagEvidenceKind {
+        GoalTagEvidenceKind::CeilingShot
+    }
+
+    fn event_stream(&self) -> GoalTagEventStream {
+        GoalTagEventStream::CeilingShot
     }
 }
 

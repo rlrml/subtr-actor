@@ -56,79 +56,12 @@ fn asset_replay_fixture_paths() -> Vec<String> {
     replay_paths
 }
 
-fn event_set_counts(events: &ReplayStatsTimelineEvents) -> Vec<(&'static str, usize)> {
-    vec![
-        ("timeline", events.timeline.len()),
-        ("core_player", events.core_player.len()),
-        (
-            "core_player_goal_context",
-            events.core_player_goal_context.len(),
-        ),
-        ("possession", events.possession.len()),
-        ("pressure", events.pressure.len()),
-        ("movement", events.movement.len()),
-        ("positioning_activity", events.positioning_activity.len()),
-        (
-            "positioning_possession",
-            events.positioning_possession.len(),
-        ),
-        (
-            "positioning_field_zone",
-            events.positioning_field_zone.len(),
-        ),
-        (
-            "positioning_ball_depth",
-            events.positioning_ball_depth.len(),
-        ),
-        (
-            "positioning_teammate_role",
-            events.positioning_teammate_role.len(),
-        ),
-        (
-            "positioning_ball_proximity",
-            events.positioning_ball_proximity.len(),
-        ),
-        (
-            "positioning_goal_context",
-            events.positioning_goal_context.len(),
-        ),
-        ("rotation_player", events.rotation_player.len()),
-        ("rotation_role_span", events.rotation_role_span.len()),
-        ("rotation_depth_span", events.rotation_depth_span.len()),
-        (
-            "rotation_first_man_stint",
-            events.rotation_first_man_stint.len(),
-        ),
-        ("rotation_team", events.rotation_team.len()),
-        ("mechanics", events.mechanics.len()),
-        ("goal_context", events.goal_context.len()),
-        ("backboard", events.backboard.len()),
-        ("ceiling_shot", events.ceiling_shot.len()),
-        ("wall_aerial", events.wall_aerial.len()),
-        ("wall_aerial_shot", events.wall_aerial_shot.len()),
-        ("center", events.center.len()),
-        ("flick", events.flick.len()),
-        ("musty_flick", events.musty_flick.len()),
-        ("dodge_reset", events.dodge_reset.len()),
-        ("double_tap", events.double_tap.len()),
-        ("fifty_fifty", events.fifty_fifty.len()),
-        ("one_timer", events.one_timer.len()),
-        ("pass", events.pass.len()),
-        ("ball_carry", events.ball_carry.len()),
-        ("rush", events.rush.len()),
-        ("speed_flip", events.speed_flip.len()),
-        ("half_flip", events.half_flip.len()),
-        ("half_volley", events.half_volley.len()),
-        ("wavedash", events.wavedash.len()),
-        ("whiff", events.whiff.len()),
-        ("powerslide", events.powerslide.len()),
-        ("touch", events.touch.len()),
-        ("boost_pickups", events.boost_pickups.len()),
-        ("boost_ledger", events.boost_ledger.len()),
-        ("boost_bucket", events.boost_bucket.len()),
-        ("boost_state", events.boost_state.len()),
-        ("bump", events.bump.len()),
-    ]
+fn event_set_counts(events: &ReplayStatsTimelineEvents) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for event in &events.events {
+        *counts.entry(event.meta.stream.clone()).or_insert(0) += 1;
+    }
+    counts
 }
 
 fn canonical_event_sets(events: &ReplayStatsTimelineEvents) -> BTreeMap<String, Vec<String>> {
@@ -304,51 +237,6 @@ fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(r
             assert_eq!(
                 scaffold_player.is_team_0, full_player.is_team_0,
                 "{replay_path} scaffold player team should match"
-            );
-        }
-    }
-
-    // Distance is a continuous magnitude shipped once as a whole-match summary (not per
-    // frame), so it must match the full timeline's final accumulated distance for each player.
-    let final_full_frame = full_timeline
-        .frames
-        .last()
-        .expect("full timeline should have at least one frame");
-    for summary in &scaffold_timeline.positioning_summary {
-        let Some(full_player) = final_full_frame
-            .players
-            .iter()
-            .find(|player| player.player_id == summary.player_id)
-        else {
-            continue;
-        };
-        let distance = &summary.distance;
-        let positioning = &full_player.positioning;
-        for (label, summary_value, stat_value) in [
-            (
-                "sum_distance_to_ball",
-                distance.sum_distance_to_ball,
-                positioning.sum_distance_to_ball,
-            ),
-            (
-                "sum_distance_to_teammates",
-                distance.sum_distance_to_teammates,
-                positioning.sum_distance_to_teammates,
-            ),
-            (
-                "sum_distance_to_ball_has_possession",
-                distance.sum_distance_to_ball_has_possession,
-                positioning.sum_distance_to_ball_has_possession,
-            ),
-            (
-                "sum_distance_to_ball_no_possession",
-                distance.sum_distance_to_ball_no_possession,
-                positioning.sum_distance_to_ball_no_possession,
-            ),
-        ] {
-            assert_eq!(
-                summary_value, stat_value,
-                "{replay_path} positioning_summary.{label} should match full timeline final frame"
             );
         }
     }

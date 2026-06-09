@@ -6,6 +6,7 @@ import type { KickoffTeamStats } from "./generated/KickoffTeamStats.ts";
 import type { LabeledCounts } from "./generated/LabeledCounts.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 type KickoffPlayerStatsWithLabels = KickoffPlayerStats & {
   labeled_event_counts?: LabeledCounts;
@@ -287,7 +288,7 @@ export function applyKickoffEventDerivedStats(
 export function createKickoffEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortKickoffEvents(timeline.events.kickoff ?? []);
+  const events = sortKickoffEvents(statsEventPayloads(timeline, "kickoff"));
 
   let eventIndex = 0;
   const teamZero = defaultKickoffTeamStats();

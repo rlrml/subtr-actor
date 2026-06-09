@@ -19,6 +19,24 @@ const MECHANIC_SHORT_LABELS: Record<string, string> = {
   wavedash: "WD",
 };
 const HIDDEN_MECHANIC_KINDS = new Set(["wavedash"]);
+const VISIBLE_MECHANIC_KINDS = new Set([
+  "air_dribble",
+  "ball_carry",
+  "ceiling_shot",
+  "center",
+  "double_tap",
+  "flick",
+  "flip_reset",
+  "half_flip",
+  "half_volley",
+  "musty_flick",
+  "one_timer",
+  "pass",
+  "speed_flip",
+  "wall_aerial",
+  "wall_aerial_shot",
+  "wavedash",
+]);
 
 export function formatMechanicKind(kind: string): string {
   return kind
@@ -42,7 +60,7 @@ export function mechanicShortLabel(kind: string): string {
 }
 
 export function isVisibleMechanicKind(kind: string): boolean {
-  return !HIDDEN_MECHANIC_KINDS.has(kind);
+  return VISIBLE_MECHANIC_KINDS.has(kind) && !HIDDEN_MECHANIC_KINDS.has(kind);
 }
 
 export function teamTimelineColor(isTeamZero: boolean | null | undefined): string | null {

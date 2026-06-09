@@ -8,7 +8,7 @@ import type {
 import { getStatDefinitionSearchMatches } from "./statSearch.ts";
 import type { StatDefinition, StatScopeKind } from "./statRegistry.ts";
 import { getTeamClass } from "./statModules.ts";
-import { getStatsFrameForReplayFrame } from "./statsTimeline.ts";
+import { getStatsFrameForReplayFrame, statsEventPayloads } from "./statsTimeline.ts";
 import type {
   PlayerStatsSnapshot,
   StatsFrame,
@@ -629,7 +629,7 @@ export class StatsWindowsController {
       return;
     }
 
-    const goalContexts = [...(timeline.events.goal_context ?? [])].sort(
+    const goalContexts = [...statsEventPayloads(timeline, "goal_context")].sort(
       (left, right) => left.time - right.time,
     );
     const orderedGoalIndexes = goalContexts.map((_, index) => index);

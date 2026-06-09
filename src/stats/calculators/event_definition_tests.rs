@@ -49,7 +49,7 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<FlipResetEvent>();
     assert_stats_event::<PostWallDodgeEvent>();
     assert_stats_event::<FlipResetFollowupDodgeEvent>();
-    assert_stats_event::<StatsTimelineTagEvent>();
+    assert_stats_event::<Event>();
 }
 
 #[test]

@@ -2,9 +2,9 @@ mod common;
 
 use serde_json::Value;
 use subtr_actor::{
-    builtin_stats_module_names, Collector, FrameRateDecorator, GoalTagKind, NDArrayCollector,
-    PlayerFrame, ReplayDataCollector, ReplayGameType, ReplayProcessor, StatsCollector,
-    StatsFrameResolution, StatsTimelineCollector, StatsTimelineEventCollector,
+    builtin_stats_module_names, Collector, EventPayload, FrameRateDecorator, GoalTagKind,
+    NDArrayCollector, PlayerFrame, ReplayDataCollector, ReplayGameType, ReplayProcessor,
+    StatsCollector, StatsFrameResolution, StatsTimelineCollector, StatsTimelineEventCollector,
 };
 
 struct PostEacFixture {
@@ -98,12 +98,16 @@ fn post_eac_ranked_standard_goal_tags_handle_late_touch_and_low_touch_cases() {
     let timeline = StatsTimelineEventCollector::new()
         .get_replay_stats_timeline_scaffold(&replay)
         .expect("failed to collect stats timeline for post-EAC standard replay");
+    let goal_context = common::event_payloads(&timeline, |payload| match payload {
+        EventPayload::GoalContext(event) => Some(event),
+        _ => None,
+    });
 
     assert!(
-        timeline.events.goal_context.len() >= 2,
+        goal_context.len() >= 2,
         "expected at least two goals in post-EAC standard replay"
     );
-    let second_goal = &timeline.events.goal_context[1];
+    let second_goal = goal_context[1];
     let scorer_last_touch = second_goal
         .scorer_last_touch
         .as_ref()
@@ -120,16 +124,14 @@ fn post_eac_ranked_standard_goal_tags_handle_late_touch_and_low_touch_cases() {
         "expected second goal scorer touch to be in the orange attacking half"
     );
     assert!(
-        !timeline.events.goal_context.get(1).is_some_and(|goal| goal
+        !goal_context.get(1).is_some_and(|goal| goal
             .tags
             .iter()
             .any(|tag| tag.kind() == GoalTagKind::OwnHalfGoal)),
         "second goal should not be tagged as own-half"
     );
 
-    let third_goal = timeline
-        .events
-        .goal_context
+    let third_goal = goal_context
         .get(2)
         .expect("expected at least three goals in post-EAC standard replay");
     let last_touch_z = third_goal
@@ -139,7 +141,7 @@ fn post_eac_ranked_standard_goal_tags_handle_late_touch_and_low_touch_cases() {
         .map(|position| position.z);
 
     assert!(
-        !timeline.events.goal_context.get(2).is_some_and(|goal| goal
+        !goal_context.get(2).is_some_and(|goal| goal
             .tags
             .iter()
             .any(|tag| tag.kind() == GoalTagKind::AerialGoal)),

@@ -3,6 +3,7 @@ import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { PossessionTeamStats } from "./generated/PossessionTeamStats.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 interface RawPossessionStats {
   tracked_time: number;
@@ -177,7 +178,7 @@ export function applyPossessionEventDerivedStats(
 export function createPossessionEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortPossessionEvents(timeline.events.possession ?? []);
+  const events = sortPossessionEvents(statsEventPayloads(timeline, "possession"));
 
   let eventIndex = 0;
   const raw = defaultRawPossessionStats();

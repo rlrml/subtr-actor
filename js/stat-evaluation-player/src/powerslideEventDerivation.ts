@@ -1,6 +1,7 @@
 import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
 import type { PowerslideStats } from "./generated/PowerslideStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 interface PowerslideState {
   active: boolean;
@@ -65,7 +66,7 @@ export function applyPowerslideEventDerivedStats(
 export function createPowerslideEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortPowerslideEvents(timeline.events.powerslide ?? []);
+  const events = sortPowerslideEvents(statsEventPayloads(timeline, "powerslide"));
 
   let eventIndex = 0;
   const activeStates = new Map<string, PowerslideState>();

@@ -7,6 +7,7 @@ import type { StatLabel } from "./generated/StatLabel.ts";
 import type { WavedashEvent } from "./generated/WavedashEvent.ts";
 import type { WavedashStats } from "./generated/WavedashStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const SPEED_FLIP_HIGH_CONFIDENCE = 0.75;
 const HALF_FLIP_HIGH_CONFIDENCE = 0.78;
@@ -326,9 +327,9 @@ export function applyMechanicEventDerivedStats(
 export function createMechanicEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const speedFlipEvents = sortResolvedEvents(timeline.events.speed_flip ?? []);
-  const halfFlipEvents = sortEvents(timeline.events.half_flip ?? []);
-  const wavedashEvents = sortEvents(timeline.events.wavedash ?? []);
+  const speedFlipEvents = sortResolvedEvents(statsEventPayloads(timeline, "speed_flip"));
+  const halfFlipEvents = sortEvents(statsEventPayloads(timeline, "half_flip"));
+  const wavedashEvents = sortEvents(statsEventPayloads(timeline, "wavedash"));
 
   let speedFlipIndex = 0;
   let halfFlipIndex = 0;

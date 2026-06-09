@@ -498,25 +498,6 @@ fn parse_touch_ball_movement(value: &Value) -> SubtrActorResult<TouchBallMovemen
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_flick_mechanic_event(
-    value: &Value,
-    index: usize,
-) -> SubtrActorResult<StatsTimelineTagEvent> {
-    let object = json_object(value, "flick mechanic event")?;
-    let mut mechanic_event = span_mechanic_event(
-        "flick",
-        index,
-        json_required_usize(object, "setup_start_frame")?,
-        json_required_usize(object, "frame")?,
-        json_required_f32(object, "setup_start_time")?,
-        json_required_f32(object, "time")?,
-        json_required_remote_id(object, "player")?,
-        json_required_bool(object, "is_team_0")?,
-    );
-    mechanic_event.properties = flick_mechanic_event_properties(object);
-    Ok(mechanic_event)
-}
-
 pub(in crate::collector::stats::playback) fn parse_flick_event(
     value: &Value,
 ) -> SubtrActorResult<FlickEvent> {
@@ -565,23 +546,6 @@ pub(in crate::collector::stats::playback) fn parse_flick_event(
             .to_owned(),
         confidence: json_required_f32(object, "confidence")?,
     })
-}
-
-pub(in crate::collector::stats::playback) fn parse_musty_flick_mechanic_event(
-    value: &Value,
-    index: usize,
-) -> SubtrActorResult<StatsTimelineTagEvent> {
-    let object = json_object(value, "musty flick mechanic event")?;
-    Ok(span_mechanic_event(
-        "musty_flick",
-        index,
-        json_required_usize(object, "dodge_frame")?,
-        json_required_usize(object, "frame")?,
-        json_required_f32(object, "dodge_time")?,
-        json_required_f32(object, "time")?,
-        json_required_remote_id(object, "player")?,
-        json_required_bool(object, "is_team_0")?,
-    ))
 }
 
 pub(in crate::collector::stats::playback) fn parse_musty_flick_event(

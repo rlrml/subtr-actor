@@ -1,6 +1,7 @@
 import type { WallAerialEvent } from "./generated/WallAerialEvent.ts";
 import type { WallAerialStats } from "./generated/WallAerialStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const WALL_AERIAL_HIGH_CONFIDENCE = 0.78;
 
@@ -132,7 +133,7 @@ export function applyWallAerialEventDerivedStats(
 export function createWallAerialEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortWallAerialEvents(timeline.events.wall_aerial ?? []);
+  const events = sortWallAerialEvents(statsEventPayloads(timeline, "wall_aerial"));
 
   let eventIndex = 0;
   let lastWallAerialPlayer: string | null = null;

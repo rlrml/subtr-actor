@@ -115,7 +115,13 @@
 //!     .unwrap();
 //!
 //! println!("timeline frames: {}", timeline.frames.len());
-//! println!("rush events: {}", timeline.events.rush.len());
+//! let rush_events = timeline
+//!     .events
+//!     .events
+//!     .iter()
+//!     .filter(|event| event.meta.stream == "rush")
+//!     .count();
+//! println!("rush events: {rush_events}");
 //! ```
 
 #[path = "domain/boost_units.rs"]

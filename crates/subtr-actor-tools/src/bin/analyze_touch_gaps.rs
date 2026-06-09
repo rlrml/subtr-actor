@@ -389,7 +389,7 @@ fn is_physics_candidate(
     let Some(velocity_deviation) = sample.trajectory_velocity_deviation else {
         return false;
     };
-    scoring_config.accepts_contact_gap(gap, velocity_deviation)
+    scoring_config.accepts_contact_gap(gap, 0.0, velocity_deviation)
 }
 
 fn primary_physics_candidates(

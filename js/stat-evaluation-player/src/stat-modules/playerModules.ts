@@ -13,11 +13,8 @@ import {
   buildWavedashTimelineEvents,
   buildWhiffTimelineEvents,
 } from "../timelineMarkers.ts";
-import {
-  buildBoostPickupTimelineRanges,
-  buildPowerslideTimelineRanges,
-} from "../timelineRanges.ts";
-import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
+import { buildBoostPickupTimelineRanges } from "../timelineRanges.ts";
+import { getStatsFrameForReplayFrame, statsEventPayloads } from "../statsTimeline.ts";
 import { playerIdToString } from "../touchOverlay.ts";
 import { createPlayerStatsModule } from "./playerStatsModule.ts";
 import {
@@ -479,7 +476,7 @@ export function createDodgeModule(): StatModule {
           count: 0,
         });
       }
-      for (const event of ctx.statsTimeline.events.dodge ?? []) {
+      for (const event of statsEventPayloads(ctx.statsTimeline, "dodge")) {
         const id = playerIdToString(event.player);
         const player = ctx.replay.players.find((candidate) => candidate.id === id) ?? null;
         const entry = eventsByPlayer.get(id) ?? {
@@ -525,7 +522,7 @@ export function createDodgeModule(): StatModule {
     },
 
     renderFocusedPlayerStats(playerId, _frameIndex, ctx) {
-      const count = (ctx.statsTimeline.events.dodge ?? []).filter((event) => {
+      const count = statsEventPayloads(ctx.statsTimeline, "dodge").filter((event) => {
         return playerIdToString(event.player) === playerId;
       }).length;
       return `<div class="stat-grid"><div class="stat-row"><span class="label">Events</span><span class="value">${count}</span></div></div>`;
@@ -788,9 +785,6 @@ export function createPowerslideModule(): StatModule {
     render: (powerslide) => renderPowerslideStats(powerslide),
     getTimelineEvents(ctx) {
       return buildPowerslideTimelineEvents(ctx.statsTimeline, ctx.replay);
-    },
-    getTimelineRanges(ctx) {
-      return buildPowerslideTimelineRanges(ctx.statsTimeline, ctx.replay);
     },
   });
 }

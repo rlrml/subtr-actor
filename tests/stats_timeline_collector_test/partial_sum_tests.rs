@@ -7,11 +7,11 @@ fn test_boost_stats_events_reconstruct_final_serialized_sums() {
         .get_legacy_replay_stats_timeline(&replay)
         .expect("Expected stats timeline data");
     assert!(
-        !timeline.events.boost_ledger.is_empty(),
+        timeline_has_stream(&timeline, "boost_ledger"),
         "expected boost ledger events to be emitted"
     );
     assert!(
-        !timeline.events.boost_state.is_empty(),
+        timeline_has_stream(&timeline, "boost_state"),
         "expected boost state events to be emitted"
     );
     assert_boost_stats_events_reconstruct_final_serialized_sums(replay_path, &timeline);
@@ -33,13 +33,13 @@ fn test_mechanic_events_reconstruct_serialized_partial_sums() {
             .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
 
-        if timeline.events.half_flip.is_empty() && timeline.events.wavedash.is_empty() {
+        if !timeline_has_stream(&timeline, "half_flip") && !timeline_has_stream(&timeline, "wavedash") {
             continue;
         }
 
         assert_quality_mechanic_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
-        saw_half_flip_event |= !timeline.events.half_flip.is_empty();
-        saw_wavedash_event |= !timeline.events.wavedash.is_empty();
+        saw_half_flip_event |= timeline_has_stream(&timeline, "half_flip");
+        saw_wavedash_event |= timeline_has_stream(&timeline, "wavedash");
 
         if saw_half_flip_event && saw_wavedash_event {
             break;
@@ -66,7 +66,7 @@ fn test_speed_flip_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.speed_flip.is_empty(),
+        timeline_has_stream(&timeline, "speed_flip"),
         "expected speed-flip fixture to contain speed-flip events"
     );
     assert_speed_flip_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -87,7 +87,7 @@ fn test_whiff_events_reconstruct_serialized_partial_sums() {
         let timeline = StatsTimelineCollector::new()
             .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
-        if !timeline.events.whiff.is_empty() {
+        if timeline_has_stream(&timeline, "whiff") {
             found_timeline = Some((replay_path, timeline));
             break;
         }
@@ -108,7 +108,7 @@ fn test_backboard_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.backboard.is_empty(),
+        timeline_has_stream(&timeline, "backboard"),
         "expected backboard fixture to contain backboard events"
     );
     assert_backboard_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -124,7 +124,7 @@ fn test_double_tap_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.double_tap.is_empty(),
+        timeline_has_stream(&timeline, "double_tap"),
         "expected double-tap fixture to contain double-tap events"
     );
     assert_double_tap_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -146,7 +146,7 @@ fn test_one_timer_events_reconstruct_serialized_partial_sums() {
         let timeline = StatsTimelineCollector::new()
             .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
-        if !timeline.events.one_timer.is_empty() {
+        if timeline_has_stream(&timeline, "one_timer") {
             found_timeline = Some((replay_path, timeline));
             break;
         }
@@ -173,7 +173,7 @@ fn test_pass_events_reconstruct_serialized_partial_sums() {
         let timeline = StatsTimelineCollector::new()
             .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
-        if !timeline.events.pass.is_empty() {
+        if timeline_has_stream(&timeline, "pass") {
             found_timeline = Some((replay_path, timeline));
             break;
         }
@@ -194,7 +194,7 @@ fn test_rush_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.rush.is_empty(),
+        timeline_has_stream(&timeline, "rush"),
         "expected rush fixture to contain rush events"
     );
     assert_rush_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -217,7 +217,7 @@ fn test_bump_events_reconstruct_serialized_partial_sums() {
         let timeline = StatsTimelineCollector::new()
             .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
-        if !timeline.events.bump.is_empty() {
+        if timeline_has_stream(&timeline, "bump") {
             found_timeline = Some((replay_path, timeline));
             break;
         }
@@ -238,10 +238,12 @@ fn test_demo_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        timeline.events.timeline.iter().any(|event| matches!(
-            event.kind,
-            TimelineEventKind::Kill | TimelineEventKind::Death
-        )),
+        timeline_payloads_by_stream(&timeline, "timeline", |payload| match payload {
+            EventPayload::Timeline(event) => Some(event),
+            _ => None,
+        })
+        .iter()
+        .any(|event| matches!(event.kind, TimelineEventKind::Kill | TimelineEventKind::Death)),
         "expected demo fixture to contain kill/death timeline events"
     );
     assert_demo_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -257,7 +259,7 @@ fn test_fifty_fifty_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.fifty_fifty.is_empty(),
+        timeline_has_stream(&timeline, "fifty_fifty"),
         "expected fifty-fifty fixture to contain fifty-fifty events"
     );
     assert_fifty_fifty_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -280,7 +282,7 @@ fn test_half_volley_events_reconstruct_serialized_partial_sums() {
         let timeline = StatsTimelineCollector::new()
             .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
-        if !timeline.events.half_volley.is_empty() {
+        if timeline_has_stream(&timeline, "half_volley") {
             found_timeline = Some((replay_path, timeline));
             break;
         }
@@ -305,7 +307,7 @@ fn test_ball_carry_events_reconstruct_serialized_partial_sums() {
         let timeline = StatsTimelineCollector::new()
             .get_legacy_replay_stats_timeline(&replay)
             .unwrap_or_else(|_| panic!("Expected stats timeline data for {replay_path}"));
-        if !timeline.events.ball_carry.is_empty() {
+        if timeline_has_stream(&timeline, "ball_carry") {
             found_timeline = Some((replay_path, timeline));
             break;
         }
@@ -326,7 +328,7 @@ fn test_wall_aerial_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.wall_aerial.is_empty(),
+        timeline_has_stream(&timeline, "wall_aerial"),
         "expected wall-aerial fixture to contain wall-aerial events"
     );
     assert_wall_aerial_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -342,7 +344,7 @@ fn test_wall_aerial_shot_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.wall_aerial_shot.is_empty(),
+        timeline_has_stream(&timeline, "wall_aerial_shot"),
         "expected wall-aerial fixture to contain wall-aerial-shot events"
     );
     assert_wall_aerial_shot_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -358,7 +360,7 @@ fn test_flick_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.flick.is_empty(),
+        timeline_has_stream(&timeline, "flick"),
         "expected flick fixture to contain flick events"
     );
     assert_flick_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -374,7 +376,7 @@ fn test_musty_flick_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.musty_flick.is_empty(),
+        timeline_has_stream(&timeline, "musty_flick"),
         "expected musty-flick fixture to contain musty-flick events"
     );
     assert_musty_flick_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -390,15 +392,16 @@ fn test_dodge_reset_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.dodge_reset.is_empty(),
+        timeline_has_stream(&timeline, "dodge_reset"),
         "expected dodge-reset fixture to contain dodge-reset events"
     );
     assert!(
-        timeline
-            .events
-            .dodge_reset
-            .iter()
-            .any(|event| event.on_ball),
+        timeline_payloads_by_stream(&timeline, "dodge_reset", |payload| match payload {
+            EventPayload::DodgeReset(event) => Some(event),
+            _ => None,
+        })
+        .iter()
+        .any(|event| event.on_ball),
         "expected dodge-reset fixture to contain on-ball dodge-reset events"
     );
     assert_dodge_reset_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -414,7 +417,7 @@ fn test_powerslide_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.powerslide.is_empty(),
+        timeline_has_stream(&timeline, "powerslide"),
         "expected powerslide fixture to contain powerslide events"
     );
     assert_powerslide_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -430,15 +433,16 @@ fn test_touch_events_reconstruct_final_serialized_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.touch.is_empty(),
+        timeline_has_stream(&timeline, "touch"),
         "expected touch fixture to contain touch events"
     );
     assert!(
-        timeline
-            .events
-            .touch
-            .iter()
-            .any(|event| event.ball_movement.is_some()),
+        timeline_payloads_by_stream(&timeline, "touch", |payload| match payload {
+            EventPayload::Touch(event) => Some(event),
+            _ => None,
+        })
+        .iter()
+        .any(|event| event.ball_movement.is_some()),
         "expected touch fixture to contain ball movement credits"
     );
     assert_touch_events_reconstruct_final_serialized_sums(replay_path, &timeline);
@@ -454,11 +458,11 @@ fn test_core_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.core_player.is_empty(),
+        timeline_has_stream(&timeline, "core_player"),
         "expected core fixture to contain player scoreboard events"
     );
     assert!(
-        !timeline.events.core_player_goal_context.is_empty(),
+        timeline_has_stream(&timeline, "core_player_goal_context"),
         "expected core fixture to contain player goal-context events"
     );
     assert_core_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -474,7 +478,7 @@ fn test_possession_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.possession.is_empty(),
+        timeline_has_stream(&timeline, "possession"),
         "expected possession fixture to contain possession events"
     );
     assert_possession_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -490,7 +494,7 @@ fn test_pressure_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.pressure.is_empty(),
+        timeline_has_stream(&timeline, "pressure"),
         "expected pressure fixture to contain pressure events"
     );
     assert_pressure_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -506,7 +510,7 @@ fn test_movement_events_reconstruct_final_serialized_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.movement.is_empty(),
+        timeline_has_stream(&timeline, "movement"),
         "expected movement fixture to contain movement events"
     );
     assert_movement_events_reconstruct_final_serialized_sums(replay_path, &timeline);
@@ -522,7 +526,7 @@ fn test_positioning_events_reconstruct_final_serialized_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.positioning_activity.is_empty(),
+        timeline_has_stream(&timeline, "positioning_activity"),
         "expected positioning fixture to contain positioning events"
     );
     assert_positioning_events_reconstruct_final_serialized_sums(replay_path, &timeline);
@@ -538,7 +542,7 @@ fn test_rotation_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        !timeline.events.rotation_player.is_empty(),
+        timeline_has_stream(&timeline, "rotation_player"),
         "expected rotation fixture to contain rotation player events"
     );
     assert_rotation_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
@@ -738,8 +742,10 @@ fn test_ceiling_shot_events_reconstruct_serialized_partial_sums() {
             all_headers: Vec::new(),
         },
         events: ReplayStatsTimelineEvents {
-            ceiling_shot: vec![blue_event, orange_event],
-            ..Default::default()
+            events: vec![
+                test_event_envelope("ceiling_shot", 0, EventPayload::CeilingShot(blue_event)),
+                test_event_envelope("ceiling_shot", 1, EventPayload::CeilingShot(orange_event)),
+            ],
         },
         frames: vec![
             frame(

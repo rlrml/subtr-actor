@@ -349,8 +349,7 @@ fn live_abi_exposes_every_builtin_analysis_node_by_name() {
         live_stats_module_json_value(engine, "core")
     );
     let timeline_events = live_analysis_node_json_value(engine, "stats_timeline_events");
-    assert!(timeline_events["timeline"].is_array());
-    assert!(timeline_events["mechanics"].is_array());
+    assert!(timeline_events["events"].is_array());
     let timeline_frame = live_analysis_node_json_value(engine, "stats_timeline_frame");
     assert_eq!(timeline_frame["frame_number"], serde_json::json!(12));
     assert!(timeline_frame["players"].is_array());

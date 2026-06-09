@@ -1,5 +1,6 @@
 import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "@rlrml/player";
 import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
+import { statsEventEnvelopes, statsEventPayloads } from "./statsTimeline.ts";
 import {
   formatMechanicKind,
   isVisibleMechanicKind,
@@ -65,41 +66,42 @@ export function buildMechanicTimelineRanges(
   const enabled = enabledKinds ? new Set(enabledKinds) : null;
   const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
 
-  return (statsTimeline.events.mechanics ?? [])
+  return statsEventEnvelopes(statsTimeline)
     .filter(
       (event) =>
-        isVisibleMechanicKind(event.kind) &&
-        event.timing.type === "span" &&
-        (!enabled || enabled.has(event.kind)),
+        isVisibleMechanicKind(event.meta.stream) &&
+        event.payload.kind === "timeline" &&
+        event.meta.timing.type === "span" &&
+        (!enabled || enabled.has(event.meta.stream)),
     )
     .map((event): ReplayTimelineRange => {
-      if (event.timing.type !== "span") {
+      if (event.meta.timing.type !== "span") {
         throw new Error("unreachable non-span mechanic event");
       }
 
-      const playerId = remoteIdToString(event.player_id as Record<string, unknown>);
+      const playerId = remoteIdToString(event.meta.primary_player as Record<string, unknown>);
       const playerName = playerNames.get(playerId) ?? playerId;
-      const mechanicLabel = formatMechanicKind(event.kind);
+      const mechanicLabel = formatMechanicKind(event.meta.stream);
       const startTime = getReplayFrameTime(
         replay,
-        event.timing.start_frame,
-        event.timing.start_time,
+        event.meta.timing.start_frame,
+        event.meta.timing.start_time,
       );
       const endTime = Math.max(
         startTime,
-        getReplayFrameTime(replay, event.timing.end_frame, event.timing.end_time),
+        getReplayFrameTime(replay, event.meta.timing.end_frame, event.meta.timing.end_time),
       );
 
       return {
-        id: event.id,
+        id: event.meta.id,
         startTime,
         endTime,
-        lane: `mechanic:${event.kind}`,
+        lane: `mechanic:${event.meta.stream}`,
         laneLabel: mechanicLabel,
         label: `${playerName} ${mechanicLabel.toLowerCase()}`,
-        shortLabel: mechanicShortLabel(event.kind),
-        isTeamZero: event.is_team_0,
-        color: teamTimelineColor(event.is_team_0) ?? undefined,
+        shortLabel: mechanicShortLabel(event.meta.stream),
+        isTeamZero: event.meta.team_is_team_0 ?? false,
+        color: teamTimelineColor(event.meta.team_is_team_0 ?? null) ?? undefined,
       };
     })
     .sort((left, right) => {
@@ -190,7 +192,7 @@ function buildPossessionTimelineRangesFromEvents(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  const events = sortTimelineEvents(timeline.events?.possession ?? []);
+  const events = sortTimelineEvents(statsEventPayloads(timeline, "possession"));
   const ranges: ReplayTimelineRange[] = [];
   let eventIndex = 0;
   let active = false;
@@ -258,7 +260,7 @@ export function buildPossessionTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  if ((timeline.events?.possession?.length ?? 0) > 0) {
+  if (statsEventPayloads(timeline, "possession").length > 0) {
     return buildPossessionTimelineRangesFromEvents(timeline, replay);
   }
 
@@ -343,7 +345,7 @@ function buildPressureTimelineRangesFromEvents(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  const events = sortTimelineEvents(timeline.events?.pressure ?? []);
+  const events = sortTimelineEvents(statsEventPayloads(timeline, "pressure"));
   const ranges: ReplayTimelineRange[] = [];
   let eventIndex = 0;
   let active = false;
@@ -378,7 +380,7 @@ export function buildPressureTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  if ((timeline.events?.pressure?.length ?? 0) > 0) {
+  if (statsEventPayloads(timeline, "pressure").length > 0) {
     return buildPressureTimelineRangesFromEvents(timeline, replay);
   }
 
@@ -432,7 +434,7 @@ export function buildFiftyFiftyTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  return (timeline.events?.fifty_fifty ?? [])
+  return statsEventPayloads(timeline, "fifty_fifty")
     .map((event: FiftyFiftyEvent, index): ReplayTimelineRange => {
       const startTime = getReplayFrameTime(replay, event.start_frame, event.start_time);
       const endTime = Math.max(
@@ -476,7 +478,7 @@ export function buildRushTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  return timeline.events.rush.map((event, index) => {
+  return statsEventPayloads(timeline, "rush").map((event, index) => {
     const startTime = replay?.frames[event.start_frame]?.time ?? event.start_time;
     const endTime = replay?.frames[event.end_frame]?.time ?? event.end_time;
     const matchupLabel = `${event.attackers}v${event.defenders}`;
@@ -499,7 +501,7 @@ export function buildPowerslideTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  const events = sortTimelineEvents(timeline.events?.powerslide ?? []);
+  const events = sortTimelineEvents(statsEventPayloads(timeline, "powerslide"));
   const activeByPlayer = new Map<string, PowerslideEvent>();
   const ranges: ReplayTimelineRange[] = [];
   const playerNames = new Map((replay?.players ?? []).map((player) => [player.id, player.name]));
@@ -701,7 +703,7 @@ export function buildBoostPickupTimelineRanges(
   replay?: ReplayModel,
   options: BoostPickupTimelineRangeOptions = {},
 ): ReplayTimelineRange[] {
-  const events = timeline.events?.boost_pickups ?? [];
+  const events = statsEventPayloads(timeline, "boost_pickup");
   if (events.length === 0 && replay) {
     return buildReplayBoostPickupTimelineRanges(replay, options);
   }
@@ -855,7 +857,7 @@ function buildTimeInZoneTimelineRangesFromEvents(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  const events = sortTimelineEvents(timeline.events?.positioning_field_zone ?? []);
+  const events = sortTimelineEvents(statsEventPayloads(timeline, "positioning_field_zone"));
   const ranges: ReplayTimelineRange[] = [];
   const lastRangeByLane = new Map<string, ReplayTimelineRange>();
   let eventIndex = 0;
@@ -933,7 +935,7 @@ export function buildTimeInZoneTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  if ((timeline.events?.positioning_field_zone?.length ?? 0) > 0) {
+  if (statsEventPayloads(timeline, "positioning_field_zone").length > 0) {
     return buildTimeInZoneTimelineRangesFromEvents(timeline, replay);
   }
 

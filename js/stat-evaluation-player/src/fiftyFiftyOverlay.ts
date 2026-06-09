@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { ReplayModel, ReplayScene } from "@rlrml/player";
 import type { FiftyFiftyEvent, StatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const STYLE_ID = "subtr-actor-fifty-fifty-overlay-styles";
 const BLUE_COLOR = 0x59c3ff;
@@ -82,7 +83,7 @@ export function buildFiftyFiftyMarkers(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): FiftyFiftyMarker[] {
-  return statsTimeline.events.fifty_fifty.map((event) => {
+  return statsEventPayloads(statsTimeline, "fifty_fifty").map((event) => {
     const label = formatWinnerLabel(event, replay);
     const teamZeroPosition = new THREE.Vector3(...event.team_zero_position);
     const teamOnePosition = new THREE.Vector3(...event.team_one_position);

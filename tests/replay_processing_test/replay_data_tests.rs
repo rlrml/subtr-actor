@@ -685,13 +685,22 @@ fn test_touch_attribution_usually_matches_goal_scorer() {
 
     let mut matched = 0usize;
     let mut total_with_scorer = 0usize;
+    let touch_events = timeline
+        .events
+        .events
+        .iter()
+        .filter_map(|event| match &event.payload {
+            EventPayload::Touch(touch) => Some(touch),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
     for goal_event in processor
         .goal_events
         .iter()
         .filter(|event| event.player.is_some())
     {
         total_with_scorer += 1;
-        let last_touch = timeline.events.touch.iter().rev().find(|touch| {
+        let last_touch = touch_events.iter().rev().find(|touch| {
             touch.frame <= goal_event.frame
                 && touch.is_team_0 == goal_event.scoring_team_is_team_0
         });

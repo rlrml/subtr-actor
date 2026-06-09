@@ -92,7 +92,7 @@ fn assert_pressure_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.pressure.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "pressure", |payload| match payload { EventPayload::Pressure(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -247,7 +247,7 @@ fn assert_movement_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.movement.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "movement", |payload| match payload { EventPayload::Movement(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -315,8 +315,13 @@ fn assert_movement_events_reconstruct_final_serialized_sums(
     let mut players: HashMap<PlayerId, MovementStats> = HashMap::new();
     let mut team_zero = MovementStats::default();
     let mut team_one = MovementStats::default();
+    let movement_events =
+        timeline_payloads_by_stream(timeline, "movement", |payload| match payload {
+            EventPayload::Movement(event) => Some(event),
+            _ => None,
+        });
 
-    for event in &timeline.events.movement {
+    for event in &movement_events {
         apply_movement_event_for_derivation(players.entry(event.player.clone()).or_default(), event);
         if event.is_team_0 {
             apply_movement_event_for_derivation(&mut team_zero, event);
@@ -411,26 +416,41 @@ fn assert_positioning_events_reconstruct_final_serialized_sums(
     timeline: &ReplayStatsTimeline,
 ) {
     let mut accumulator = PositioningStatsAccumulator::new();
-    for event in &timeline.events.positioning_activity {
-        accumulator.apply_activity_event(event);
+    for event in timeline_payloads_by_stream(timeline, "positioning_activity", |payload| match payload {
+        EventPayload::PositioningActivity(event) => Some(event),
+        _ => None,
+    }) {
+        accumulator.apply_activity_event(&event);
     }
-    for event in &timeline.events.positioning_possession {
-        accumulator.apply_possession_event(event);
+    for event in timeline_payloads_by_stream(timeline, "positioning_field_zone", |payload| match payload {
+        EventPayload::PositioningFieldZone(event) => Some(event),
+        _ => None,
+    }) {
+        accumulator.apply_field_zone_event(&event);
     }
-    for event in &timeline.events.positioning_field_zone {
-        accumulator.apply_field_zone_event(event);
+    for event in timeline_payloads_by_stream(timeline, "positioning_ball_depth", |payload| match payload {
+        EventPayload::PositioningBallDepth(event) => Some(event),
+        _ => None,
+    }) {
+        accumulator.apply_ball_depth_event(&event);
     }
-    for event in &timeline.events.positioning_ball_depth {
-        accumulator.apply_ball_depth_event(event);
+    for event in timeline_payloads_by_stream(timeline, "positioning_teammate_role", |payload| match payload {
+        EventPayload::PositioningTeammateRole(event) => Some(event),
+        _ => None,
+    }) {
+        accumulator.apply_teammate_role_event(&event);
     }
-    for event in &timeline.events.positioning_teammate_role {
-        accumulator.apply_teammate_role_event(event);
+    for event in timeline_payloads_by_stream(timeline, "positioning_ball_proximity", |payload| match payload {
+        EventPayload::PositioningBallProximity(event) => Some(event),
+        _ => None,
+    }) {
+        accumulator.apply_ball_proximity_event(&event);
     }
-    for event in &timeline.events.positioning_ball_proximity {
-        accumulator.apply_ball_proximity_event(event);
-    }
-    for event in &timeline.events.positioning_goal_context {
-        accumulator.apply_goal_context_event(event);
+    for event in timeline_payloads_by_stream(timeline, "positioning_goal_context", |payload| match payload {
+        EventPayload::PositioningGoalContext(event) => Some(event),
+        _ => None,
+    }) {
+        accumulator.apply_goal_context_event(&event);
     }
 
     let final_frame = timeline
@@ -438,21 +458,11 @@ fn assert_positioning_events_reconstruct_final_serialized_sums(
         .last()
         .expect("positioning reconstruction requires at least one frame");
     for player in &final_frame.players {
-        let mut expected = accumulator
+        let expected = accumulator
             .player_stats()
             .get(&player.player_id)
             .cloned()
             .unwrap_or_default();
-        // Distance magnitudes are a continuous signal shipped on the frame snapshot, not
-        // reconstructed from events, so carry them through from the authoritative snapshot.
-        // (The signal itself is validated against the export in the scaffold parity test.)
-        // Possession time IS event-reconstructed (positioning_possession), so it is asserted.
-        expected.sum_distance_to_teammates = player.positioning.sum_distance_to_teammates;
-        expected.sum_distance_to_ball = player.positioning.sum_distance_to_ball;
-        expected.sum_distance_to_ball_has_possession =
-            player.positioning.sum_distance_to_ball_has_possession;
-        expected.sum_distance_to_ball_no_possession =
-            player.positioning.sum_distance_to_ball_no_possession;
         assert_positioning_stats_close(
             replay_path,
             &format!("player {} positioning", player.name),
@@ -535,13 +545,13 @@ fn assert_rotation_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut player_events = timeline.events.rotation_player.clone();
+    let mut player_events = timeline_payloads_by_stream(timeline, "rotation_player", |payload| match payload { EventPayload::RotationPlayer(event) => Some(event), _ => None });
     player_events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
             .then_with(|| left.time.total_cmp(&right.time))
     });
-    let mut team_events = timeline.events.rotation_team.clone();
+    let mut team_events = timeline_payloads_by_stream(timeline, "rotation_team", |payload| match payload { EventPayload::RotationTeam(event) => Some(event), _ => None });
     team_events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)

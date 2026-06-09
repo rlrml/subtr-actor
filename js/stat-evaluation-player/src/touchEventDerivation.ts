@@ -3,6 +3,7 @@ import type { TouchBallMovement } from "./generated/TouchBallMovement.ts";
 import type { TouchStats } from "./generated/TouchStats.ts";
 import type { TouchClassificationEvent } from "./generated/TouchClassificationEvent.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const TOUCH_KINDS = ["control", "hard_hit", "medium_hit"] as const;
 const TOUCH_HEIGHT_BANDS = ["ground", "high_air", "low_air"] as const;
@@ -245,7 +246,7 @@ export function applyTouchEventDerivedStats(
 export function createTouchEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const touchEvents = sortBySample(timeline.events.touch ?? []);
+  const touchEvents = sortBySample(statsEventPayloads(timeline, "touch"));
   const movementEvents = touchEvents
     .flatMap((event): TouchMovementCredit[] =>
       event.ball_movement ? [{ player: event.player, movement: event.ball_movement }] : [],

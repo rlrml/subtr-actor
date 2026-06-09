@@ -1,10 +1,12 @@
 import type {
+  Event,
   MaterializedStatsTimeline,
   PlayerStatsSnapshot,
-  StatsEvents,
   StatsFrame,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
+import { statsEventEnvelopes } from "./statsTimeline.ts";
+import { isVisibleMechanicKind } from "./timelinePresentation.ts";
 
 export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "timeline",
@@ -26,7 +28,6 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "rotation_depth_span",
   "rotation_first_man_stint",
   "rotation_team",
-  "mechanics",
   "goal_context",
   "backboard",
   "ceiling_shot",
@@ -56,17 +57,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "boost_ledger",
   "boost_bucket",
   "bump",
-] as const satisfies readonly (keyof StatsEvents)[];
-
-type InternalStatsEventStreamType = Extract<keyof StatsEvents, "boost_state">;
-
-type AssertNever<T extends never> = T;
-type _StatsEventStreamCountTypesCoverAll = AssertNever<
-  Exclude<
-    keyof StatsEvents,
-    (typeof STATS_EVENT_STREAM_COUNT_TYPES)[number] | InternalStatsEventStreamType
-  >
->;
+] as const;
 
 export const STATS_MECHANIC_EVENT_COUNT_TYPES = [
   "air_dribble",
@@ -91,13 +82,10 @@ export const STATS_EVENT_COUNT_TYPES = [
   ...new Set([...STATS_EVENT_STREAM_COUNT_TYPES, ...STATS_MECHANIC_EVENT_COUNT_TYPES]),
 ] as const;
 
-const STATS_EVENT_STREAM_COUNT_TYPE_SET = new Set<string>(STATS_EVENT_STREAM_COUNT_TYPES);
 const STATS_MECHANIC_EVENT_COUNT_TYPE_SET = new Set<string>(STATS_MECHANIC_EVENT_COUNT_TYPES);
 
 export type StatsEventCountType = (typeof STATS_EVENT_COUNT_TYPES)[number];
-export type StatsEventStreamCountType = (typeof STATS_EVENT_STREAM_COUNT_TYPES)[number];
 export type EventCountStats = Record<StatsEventCountType, number>;
-type TimelineEventRecord = Record<string, unknown>;
 
 export type EventCountedPlayerStatsSnapshot = PlayerStatsSnapshot & {
   event_counts: EventCountStats;
@@ -139,57 +127,35 @@ function remoteIdKey(playerId: unknown): string | null {
   return `${kind}:${typeof value === "string" ? value : JSON.stringify(value)}`;
 }
 
-function eventPlayerKey(event: TimelineEventRecord): string | null {
-  return remoteIdKey(event.player ?? event.player_id ?? event.scorer);
+function eventPlayerKey(event: Event): string | null {
+  return remoteIdKey(event.meta.primary_player);
 }
 
-function eventTeamIsTeam0(event: TimelineEventRecord): boolean | null {
-  const teamValue = event.is_team_0 ?? event.scoring_team_is_team_0;
-  return typeof teamValue === "boolean" ? teamValue : null;
+function eventTeamIsTeam0(event: Event): boolean | null {
+  return event.meta.team_is_team_0 ?? null;
 }
 
-function mechanicEventCountType(event: TimelineEventRecord): StatsEventCountType | null {
-  const kind = event.kind;
-  if (
-    typeof kind !== "string" ||
-    !STATS_MECHANIC_EVENT_COUNT_TYPE_SET.has(kind) ||
-    STATS_EVENT_STREAM_COUNT_TYPE_SET.has(kind) ||
-    !isStatsEventCountType(kind)
-  ) {
+function mechanicEventCountType(event: Event): StatsEventCountType | null {
+  const kind = event.meta.stream === "dodge_reset" ? "flip_reset" : event.meta.stream;
+  if (!STATS_MECHANIC_EVENT_COUNT_TYPE_SET.has(kind) || !isStatsEventCountType(kind)) {
     return null;
   }
   return kind;
 }
 
-function eventFrame(event: TimelineEventRecord): number | null {
-  const timing = event.timing;
+function eventFrame(event: Event): number | null {
   const frame =
-    event.resolved_frame ??
-    event.frame ??
-    (timing && typeof timing === "object" && "frame" in timing
-      ? (timing as Record<string, unknown>).frame
-      : undefined) ??
-    (timing && typeof timing === "object" && "end_frame" in timing
-      ? (timing as Record<string, unknown>).end_frame
-      : undefined);
+    event.meta.timing.type === "span" ? event.meta.timing.end_frame : event.meta.timing.frame;
   return typeof frame === "number" && Number.isFinite(frame) ? frame : null;
 }
 
-function eventTime(event: TimelineEventRecord): number | null {
-  const timing = event.timing;
+function eventTime(event: Event): number | null {
   const time =
-    event.resolved_time ??
-    event.time ??
-    (timing && typeof timing === "object" && "time" in timing
-      ? (timing as Record<string, unknown>).time
-      : undefined) ??
-    (timing && typeof timing === "object" && "end_time" in timing
-      ? (timing as Record<string, unknown>).end_time
-      : undefined);
+    event.meta.timing.type === "span" ? event.meta.timing.end_time : event.meta.timing.time;
   return typeof time === "number" && Number.isFinite(time) ? time : null;
 }
 
-function eventOccursOnOrBeforeFrame(event: TimelineEventRecord, frame: StatsFrame): boolean {
+function eventOccursOnOrBeforeFrame(event: Event, frame: StatsFrame): boolean {
   const frameNumber = eventFrame(event);
   if (frameNumber !== null) {
     return frameNumber <= frame.frame_number;
@@ -198,24 +164,22 @@ function eventOccursOnOrBeforeFrame(event: TimelineEventRecord, frame: StatsFram
   return time !== null && time <= frame.time;
 }
 
-function sortEvents(events: readonly unknown[]): TimelineEventRecord[] {
-  return [...events]
-    .filter((event): event is TimelineEventRecord => !!event && typeof event === "object")
-    .sort((left, right) => {
-      const leftFrame = eventFrame(left);
-      const rightFrame = eventFrame(right);
-      if (leftFrame !== rightFrame) {
-        return (leftFrame ?? Number.POSITIVE_INFINITY) - (rightFrame ?? Number.POSITIVE_INFINITY);
-      }
+function sortEvents(events: readonly Event[]): Event[] {
+  return [...events].sort((left, right) => {
+    const leftFrame = eventFrame(left);
+    const rightFrame = eventFrame(right);
+    if (leftFrame !== rightFrame) {
+      return (leftFrame ?? Number.POSITIVE_INFINITY) - (rightFrame ?? Number.POSITIVE_INFINITY);
+    }
 
-      const leftTime = eventTime(left);
-      const rightTime = eventTime(right);
-      if (leftTime !== rightTime) {
-        return (leftTime ?? Number.POSITIVE_INFINITY) - (rightTime ?? Number.POSITIVE_INFINITY);
-      }
+    const leftTime = eventTime(left);
+    const rightTime = eventTime(right);
+    if (leftTime !== rightTime) {
+      return (leftTime ?? Number.POSITIVE_INFINITY) - (rightTime ?? Number.POSITIVE_INFINITY);
+    }
 
-      return (eventPlayerKey(left) ?? "").localeCompare(eventPlayerKey(right) ?? "");
-    });
+    return (eventPlayerKey(left) ?? "").localeCompare(eventPlayerKey(right) ?? "");
+  });
 }
 
 export function applyEventCountDerivedStats(
@@ -233,9 +197,11 @@ export function applyEventCountDerivedStats(
 export function createEventCountDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const eventGroups = STATS_EVENT_STREAM_COUNT_TYPES.map((eventType) => ({
+  const eventGroups = STATS_EVENT_COUNT_TYPES.map((eventType) => ({
     eventType,
-    events: sortEvents(timeline.events[eventType] ?? []),
+    events: sortEvents(
+      statsEventEnvelopes(timeline).filter((event) => event.meta.stream === eventType),
+    ),
     index: 0,
   }));
   const playerCounts = new Map<string, EventCountStats>();
@@ -253,14 +219,17 @@ export function createEventCountDerivedStatsAccumulator(timeline: MaterializedSt
         ) {
           const event = group.events[group.index]!;
           const playerKey = eventPlayerKey(event);
-          const mechanicEventType =
-            group.eventType === "mechanics" ? mechanicEventCountType(event) : null;
+          const mechanicEventType = mechanicEventCountType(event);
           if (playerKey !== null) {
             const counts = playerCounts.get(playerKey) ?? createEmptyEventCountStats();
             playerCounts.set(playerKey, counts);
             incrementEventCount(counts, group.eventType);
-            if (mechanicEventType !== null) {
+            if (mechanicEventType !== null && mechanicEventType !== group.eventType) {
               incrementEventCount(counts, mechanicEventType);
+            }
+            if (isVisibleMechanicKind(event.meta.stream)) {
+              (counts as Record<string, number>).mechanics =
+                ((counts as Record<string, number>).mechanics ?? 0) + 1;
             }
           }
 
@@ -268,8 +237,12 @@ export function createEventCountDerivedStatsAccumulator(timeline: MaterializedSt
           if (isTeamZero !== null) {
             const counts = isTeamZero ? teamCounts.teamZero : teamCounts.teamOne;
             incrementEventCount(counts, group.eventType);
-            if (mechanicEventType !== null) {
+            if (mechanicEventType !== null && mechanicEventType !== group.eventType) {
               incrementEventCount(counts, mechanicEventType);
+            }
+            if (isVisibleMechanicKind(event.meta.stream)) {
+              (counts as Record<string, number>).mechanics =
+                ((counts as Record<string, number>).mechanics ?? 0) + 1;
             }
           }
 

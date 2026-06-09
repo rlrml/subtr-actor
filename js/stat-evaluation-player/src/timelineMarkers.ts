@@ -3,7 +3,9 @@ import { buildFiftyFiftyMarkers } from "./fiftyFiftyOverlay.ts";
 import { buildCeilingShotMarkers } from "./ceilingShotOverlay.ts";
 import { buildTouchMarkers, playerIdToString } from "./touchOverlay.ts";
 import type { GoalTag } from "./generated/GoalTag.ts";
+import type { WhiffEvent } from "./generated/WhiffEvent.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
+import { statsEventEnvelopes, statsEventPayloads } from "./statsTimeline.ts";
 import {
   BLUE_TIMELINE_COLOR,
   ORANGE_TIMELINE_COLOR,
@@ -76,11 +78,13 @@ function flickMarkerKindLabel(event: { kind?: string; setup_rotation_direction?:
 }
 
 export function getMechanicKinds(statsTimeline: StatsTimeline | null): string[] {
+  const events = statsTimeline ? statsEventEnvelopes(statsTimeline) : [];
   return [
     ...new Set(
-      (statsTimeline?.events.mechanics ?? [])
-        .filter((event) => isVisibleMechanicKind(event.kind))
-        .map((event) => event.kind),
+      events
+        .filter((event) => event.payload.kind === "timeline")
+        .map((event) => event.meta.stream)
+        .filter((kind) => isVisibleMechanicKind(kind)),
     ),
   ].sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
 }
@@ -97,32 +101,33 @@ export function buildMechanicTimelineEvents(
   const enabled = enabledKinds ? new Set(enabledKinds) : null;
   const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
 
-  return (statsTimeline.events.mechanics ?? [])
+  return statsEventEnvelopes(statsTimeline)
     .filter(
       (event) =>
-        isVisibleMechanicKind(event.kind) &&
-        event.timing.type === "moment" &&
-        (!enabled || enabled.has(event.kind)),
+        isVisibleMechanicKind(event.meta.stream) &&
+        event.payload.kind === "timeline" &&
+        event.meta.timing.type === "moment" &&
+        (!enabled || enabled.has(event.meta.stream)),
     )
     .map((event) => {
-      const playerId = playerIdToString(event.player_id);
+      const playerId = event.meta.primary_player ? playerIdToString(event.meta.primary_player) : "";
       const playerName = playerNames.get(playerId) ?? playerId;
-      const mechanicLabel = formatMechanicKind(event.kind);
-      if (event.timing.type !== "moment") {
+      const mechanicLabel = formatMechanicKind(event.meta.stream);
+      if (event.meta.timing.type !== "moment") {
         throw new Error("unreachable non-moment mechanic event");
       }
 
       return {
-        id: event.id,
-        time: getReplayFrameTime(replay, event.timing.frame, event.timing.time),
-        frame: event.timing.frame,
-        kind: event.kind,
+        id: event.meta.id,
+        time: getReplayFrameTime(replay, event.meta.timing.frame, event.meta.timing.time),
+        frame: event.meta.timing.frame,
+        kind: event.meta.stream,
         label: `${playerName} ${mechanicLabel.toLowerCase()}`,
-        shortLabel: mechanicShortLabel(event.kind),
+        shortLabel: mechanicShortLabel(event.meta.stream),
         playerId,
         playerName,
-        isTeamZero: event.is_team_0,
-        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+        isTeamZero: event.meta.team_is_team_0 ?? false,
+        color: event.meta.team_is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
       };
     });
 }
@@ -135,34 +140,39 @@ export function buildMechanicPlaylistEvents(
   const enabled = enabledKinds ? new Set(enabledKinds) : null;
   const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
 
-  return (statsTimeline.events.mechanics ?? [])
-    .filter((event) => isVisibleMechanicKind(event.kind) && (!enabled || enabled.has(event.kind)))
+  return statsEventEnvelopes(statsTimeline)
+    .filter(
+      (event) =>
+        isVisibleMechanicKind(event.meta.stream) &&
+        event.payload.kind === "timeline" &&
+        (!enabled || enabled.has(event.meta.stream)),
+    )
     .map((event) => {
-      const playerId = playerIdToString(event.player_id);
+      const playerId = event.meta.primary_player ? playerIdToString(event.meta.primary_player) : "";
       const playerName = playerNames.get(playerId) ?? playerId;
-      const mechanicLabel = formatMechanicKind(event.kind);
+      const mechanicLabel = formatMechanicKind(event.meta.stream);
       const timing =
-        event.timing.type === "moment"
+        event.meta.timing.type === "moment"
           ? {
-              frame: event.timing.frame,
-              time: event.timing.time,
+              frame: event.meta.timing.frame,
+              time: event.meta.timing.time,
             }
           : {
-              frame: event.timing.end_frame,
-              time: event.timing.end_time,
+              frame: event.meta.timing.end_frame,
+              time: event.meta.timing.end_time,
             };
 
       return {
-        id: `${event.id}:playlist`,
+        id: `${event.meta.id}:playlist`,
         time: getReplayFrameTime(replay, timing.frame, timing.time),
         frame: timing.frame,
-        kind: event.kind,
+        kind: event.meta.stream,
         label: `${playerName} ${mechanicLabel.toLowerCase()}`,
-        shortLabel: mechanicShortLabel(event.kind),
+        shortLabel: mechanicShortLabel(event.meta.stream),
         playerId,
         playerName,
-        isTeamZero: event.is_team_0,
-        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
+        isTeamZero: event.meta.team_is_team_0 ?? false,
+        color: event.meta.team_is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
       };
     });
 }
@@ -219,7 +229,7 @@ export function buildMustyFlickTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.events?.musty_flick ?? []).map((event, index) => {
+  return (statsEventPayloads(statsTimeline, "musty_flick") ?? []).map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = getReplayPlayerName(replay, playerId);
     return {
@@ -241,7 +251,7 @@ export function buildFlickTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.events?.flick ?? []).map((event, index) => {
+  return (statsEventPayloads(statsTimeline, "flick") ?? []).map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = getReplayPlayerName(replay, playerId);
     const kindLabel = flickMarkerKindLabel(event);
@@ -282,7 +292,7 @@ export function buildBackboardTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.backboard.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "backboard").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
     return {
@@ -322,7 +332,7 @@ export function buildWallAerialTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.wall_aerial.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "wall_aerial").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = getReplayPlayerName(replay, playerId);
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
@@ -348,7 +358,7 @@ export function buildWallAerialShotTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.wall_aerial_shot.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "wall_aerial_shot").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = getReplayPlayerName(replay, playerId);
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
@@ -374,7 +384,7 @@ export function buildDoubleTapTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.double_tap.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "double_tap").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = getReplayPlayerName(replay, playerId);
     return {
@@ -396,7 +406,7 @@ export function buildCenterTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.center.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "center").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = getReplayPlayerName(replay, playerId);
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
@@ -421,7 +431,7 @@ export function buildOneTimerTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.one_timer.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "one_timer").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const passerId = playerIdToString(event.passer);
     const playerName = getReplayPlayerName(replay, playerId);
@@ -454,7 +464,7 @@ export function buildPassTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.pass.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "pass").map((event, index) => {
     const passerId = playerIdToString(event.passer);
     const receiverId = playerIdToString(event.receiver);
     const passerName = getReplayPlayerName(replay, passerId);
@@ -484,7 +494,7 @@ export function buildHalfVolleyTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.half_volley.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "half_volley").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = getReplayPlayerName(replay, playerId);
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
@@ -509,7 +519,7 @@ export function buildRushTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.rush.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "rush").map((event, index) => {
     const eventTime = getReplayFrameTime(replay, event.end_frame, event.end_time);
     const matchupLabel = `${event.attackers}v${event.defenders}`;
     const teamName = event.is_team_0 ? "Blue" : "Orange";
@@ -537,7 +547,7 @@ export function buildGoalTagTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.events.goal_context ?? []).flatMap((goal, goalIndex) => {
+  return (statsEventPayloads(statsTimeline, "goal_context") ?? []).flatMap((goal, goalIndex) => {
     return (goal.tags ?? []).map((tag, tagIndex) => {
       const scorerId = goal.scorer ? playerIdToString(goal.scorer) : null;
       const scorerName = scorerId ? getReplayPlayerName(replay, scorerId) : null;
@@ -570,7 +580,7 @@ export function buildGoalContextTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.goal_context.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "goal_context").map((event, index) => {
     const scorerId = event.scorer ? playerIdToString(event.scorer) : null;
     const scorerName = scorerId ? getReplayPlayerName(replay, scorerId) : null;
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
@@ -594,7 +604,7 @@ export function buildDodgeResetTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.events?.dodge_reset ?? [])
+  return (statsEventPayloads(statsTimeline, "dodge_reset") ?? [])
     .filter((event) => !event.on_ball)
     .map((event) => {
       const playerId = playerIdToString(event.player);
@@ -618,7 +628,7 @@ export function buildBallCarryTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.events?.ball_carry ?? [])
+  return (statsEventPayloads(statsTimeline, "ball_carry") ?? [])
     .filter((event) => event.kind === "carry")
     .map((event, index) => {
       const playerId = playerIdToString(event.player_id);
@@ -642,7 +652,7 @@ export function buildPowerslideTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.events?.powerslide ?? [])
+  return (statsEventPayloads(statsTimeline, "powerslide") ?? [])
     .filter((event) => event.active)
     .map((event, index) => {
       const playerId = playerIdToString(event.player);
@@ -666,7 +676,7 @@ export function buildSpeedFlipTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.speed_flip.map((event) => {
+  return statsEventPayloads(statsTimeline, "speed_flip").map((event) => {
     const playerId = event.player ? playerIdToString(event.player) : null;
     const playerName = playerId
       ? (replay.players.find((player) => player.id === playerId)?.name ?? playerId)
@@ -693,25 +703,20 @@ export function buildDodgeTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return (statsTimeline.events.dodge ?? []).map((event, index) => {
+  return (statsEventPayloads(statsTimeline, "dodge") ?? []).map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
-    const confidencePercent =
-      event.dodge_impulse == null ? null : Math.round(event.dodge_impulse.confidence * 100);
-    const directionLabel = event.dodge_impulse?.direction_label.replaceAll("_", " ");
-    const impulseLabel =
-      directionLabel == null || confidencePercent == null
-        ? ""
-        : ` ${directionLabel} ${confidencePercent}%`;
+    const confidencePercent = Math.round((event.dodge_impulse?.confidence ?? 1) * 100);
+    const directionLabel = (event.dodge_impulse?.direction_label ?? "dodge").replaceAll("_", " ");
 
     return {
       id: `dodge:${event.frame}:${playerId}:${index}`,
       time: eventTime,
       frame: event.frame,
       kind: "dodge",
-      label: `${playerName} dodge${impulseLabel}`,
-      shortLabel: "DG",
+      label: `${playerName} flip impulse ${directionLabel} ${confidencePercent}%`,
+      shortLabel: "FI",
       playerId,
       playerName,
       isTeamZero: event.is_team_0,
@@ -724,7 +729,7 @@ export function buildHalfFlipTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.half_flip.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "half_flip").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
@@ -750,7 +755,7 @@ export function buildWavedashTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.wavedash.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "wavedash").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);
@@ -776,7 +781,7 @@ export function buildBumpTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.bump.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "bump").map((event, index) => {
     const initiatorId = playerIdToString(event.initiator);
     const victimId = playerIdToString(event.victim);
     const initiatorName =
@@ -800,7 +805,7 @@ export function buildBumpTimelineEvents(
   });
 }
 
-function getWhiffShortLabel(event: StatsTimeline["events"]["whiff"][number]): string {
+function getWhiffShortLabel(event: WhiffEvent): string {
   if (event.kind === "beaten_to_ball") {
     return "BT";
   }
@@ -813,7 +818,7 @@ function getWhiffShortLabel(event: StatsTimeline["events"]["whiff"][number]): st
   return "W";
 }
 
-function getWhiffKindLabel(event: StatsTimeline["events"]["whiff"][number]): string {
+function getWhiffKindLabel(event: WhiffEvent): string {
   const labels = [event.aerial ? "aerial" : "grounded"];
   if (event.dodge_active) {
     labels.push("dodge");
@@ -821,7 +826,7 @@ function getWhiffKindLabel(event: StatsTimeline["events"]["whiff"][number]): str
   return labels.join(" ");
 }
 
-function getWhiffOutcomeLabel(event: StatsTimeline["events"]["whiff"][number]): string {
+function getWhiffOutcomeLabel(event: WhiffEvent): string {
   return event.kind === "beaten_to_ball" ? "beaten to ball" : "whiff";
 }
 
@@ -829,7 +834,7 @@ export function buildWhiffTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
 ): ReplayTimelineEvent[] {
-  return statsTimeline.events.whiff.map((event, index) => {
+  return statsEventPayloads(statsTimeline, "whiff").map((event, index) => {
     const playerId = playerIdToString(event.player);
     const playerName = replay.players.find((player) => player.id === playerId)?.name ?? playerId;
     const eventTime = getReplayFrameTime(replay, event.frame, event.time);

@@ -2,6 +2,7 @@ import type { DoubleTapEvent } from "./generated/DoubleTapEvent.ts";
 import type { DoubleTapPlayerStats } from "./generated/DoubleTapPlayerStats.ts";
 import type { DoubleTapTeamStats } from "./generated/DoubleTapTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -94,7 +95,7 @@ export function applyDoubleTapEventDerivedStats(
 export function createDoubleTapEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortDoubleTapEvents(timeline.events.double_tap ?? []);
+  const events = sortDoubleTapEvents(statsEventPayloads(timeline, "double_tap"));
 
   let eventIndex = 0;
   let teamZeroCount = 0;

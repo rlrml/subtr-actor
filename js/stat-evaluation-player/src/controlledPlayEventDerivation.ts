@@ -1,6 +1,7 @@
 import type { ControlledPlayEvent } from "./generated/ControlledPlayEvent.ts";
 import type { ControlledPlayStats } from "./generated/ControlledPlayStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function f32(value: number): number {
   return Math.fround(value);
@@ -78,7 +79,7 @@ export function createControlledPlayEventDerivedStatsAccumulator(
 ): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortControlledPlayEvents(timeline.events.controlled_play ?? []);
+  const events = sortControlledPlayEvents(statsEventPayloads(timeline, "controlled_play"));
 
   let eventIndex = 0;
   const players = new Map<string, ControlledPlayStats>();

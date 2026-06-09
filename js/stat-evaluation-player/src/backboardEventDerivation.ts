@@ -2,6 +2,7 @@ import type { BackboardBounceEvent } from "./generated/BackboardBounceEvent.ts";
 import type { BackboardPlayerStats } from "./generated/BackboardPlayerStats.ts";
 import type { BackboardTeamStats } from "./generated/BackboardTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -94,7 +95,7 @@ export function applyBackboardEventDerivedStats(
 export function createBackboardEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortBackboardEvents(timeline.events.backboard ?? []);
+  const events = sortBackboardEvents(statsEventPayloads(timeline, "backboard"));
 
   let eventIndex = 0;
   let teamZeroCount = 0;

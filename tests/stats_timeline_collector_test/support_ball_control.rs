@@ -55,7 +55,7 @@ fn assert_ball_carry_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.ball_carry.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "ball_carry", |payload| match payload { EventPayload::BallCarry(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.end_frame
             .cmp(&right.end_frame)
@@ -286,7 +286,7 @@ fn assert_wall_aerial_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.wall_aerial.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "wall_aerial", |payload| match payload { EventPayload::WallAerial(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.sample_frame
             .cmp(&right.sample_frame)
@@ -480,7 +480,7 @@ fn assert_wall_aerial_shot_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.wall_aerial_shot.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "wall_aerial_shot", |payload| match payload { EventPayload::WallAerialShot(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -585,7 +585,7 @@ fn assert_ceiling_shot_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.ceiling_shot.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "ceiling_shot", |payload| match payload { EventPayload::CeilingShot(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
@@ -700,7 +700,7 @@ fn assert_flick_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.flick.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "flick", |payload| match payload { EventPayload::Flick(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.sample_frame
             .cmp(&right.sample_frame)
@@ -797,7 +797,7 @@ fn assert_musty_flick_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.musty_flick.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "musty_flick", |payload| match payload { EventPayload::MustyFlick(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.sample_frame
             .cmp(&right.sample_frame)
@@ -866,7 +866,7 @@ fn assert_dodge_reset_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline.events.dodge_reset.clone();
+    let mut events = timeline_payloads_by_stream(timeline, "dodge_reset", |payload| match payload { EventPayload::DodgeReset(event) => Some(event), _ => None });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)

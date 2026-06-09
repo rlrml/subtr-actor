@@ -8,7 +8,7 @@ import {
   isScorerGoalTag,
   isTeammatePerformedGoalTag,
 } from "./timelineMarkers.ts";
-import { createStatsFrameLookup } from "./statsTimeline.ts";
+import { createStatsFrameLookup, statsEventPayloads } from "./statsTimeline.ts";
 import type { PlayerStatsSnapshot, StatsFrame } from "./statsTimeline.ts";
 import {
   BOOST_TANK_COLORS,
@@ -315,7 +315,7 @@ function renderGoalsPage(state: ReportState, finalFrame: StatsFrame): HTMLElemen
     ),
   );
 
-  const goalContexts = [...(state.statsTimeline.events.goal_context ?? [])].sort(
+  const goalContexts = [...statsEventPayloads(state.statsTimeline, "goal_context")].sort(
     (left, right) => left.time - right.time,
   );
   const goalTags = goalContexts.flatMap((goal) => goal.tags ?? []);

@@ -1,6 +1,7 @@
 import type { DodgeResetEvent } from "./generated/DodgeResetEvent.ts";
 import type { DodgeResetStats } from "./generated/DodgeResetStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -61,7 +62,7 @@ export function applyDodgeResetEventDerivedStats(
 export function createDodgeResetEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortDodgeResetEvents(timeline.events.dodge_reset ?? []);
+  const events = sortDodgeResetEvents(statsEventPayloads(timeline, "dodge_reset"));
 
   let eventIndex = 0;
   const players = new Map<string, DodgeResetStats>();

@@ -161,6 +161,28 @@ fn flick_event(time: f32, frame: usize, player: PlayerId) -> FlickEvent {
     }
 }
 
+fn ceiling_shot_event(time: f32, frame: usize, player: PlayerId) -> CeilingShotEvent {
+    CeilingShotEvent {
+        time,
+        frame,
+        player,
+        player_position: None,
+        is_team_0: true,
+        ceiling_contact_time: time - 0.8,
+        ceiling_contact_frame: frame.saturating_sub(8),
+        time_since_ceiling_contact: 0.8,
+        ceiling_contact_position: [0.0, 900.0, 2044.0],
+        touch_position: [0.0, 1800.0, 820.0],
+        local_ball_position: [0.0, 120.0, -60.0],
+        separation_from_ceiling: 600.0,
+        roof_alignment: 0.9,
+        forward_alignment: 0.8,
+        forward_approach_speed: 1100.0,
+        ball_speed_change: 700.0,
+        confidence: 0.84,
+    }
+}
+
 fn one_timer_event(time: f32, frame: usize, player: PlayerId) -> OneTimerEvent {
     OneTimerEvent {
         time,
@@ -596,6 +618,46 @@ fn passing_goal_rejects_pass_not_received_by_scorer() {
     let goal = goal_with_touch(true, position(0.0, 2000.0, 120.0), Vec::new());
     let events = PassingGoalCalculator::new()
         .tag_goals(&[goal], &[pass_event(9.5, 95, player_id(2), player_id(3))]);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn ceiling_shot_goal_tags_matching_ceiling_shot_before_goal() {
+    let goal = goal_with_touch(true, position(0.0, 2400.0, 800.0), Vec::new());
+    let events = CeilingShotGoalCalculator::new()
+        .tag_goals(&[goal], &[ceiling_shot_event(9.4, 94, player_id(1))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::CeilingShotGoal]);
+    assert_eq!(events[0].tag.metadata().confidence, 0.84);
+    assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Scorer));
+    assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
+    assert!(events[0]
+        .tag
+        .metadata()
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::CeilingShot));
+}
+
+#[test]
+fn ceiling_shot_goal_can_be_created_by_scoring_teammate() {
+    let goal = goal_with_touch(true, position(0.0, 2400.0, 800.0), Vec::new());
+    let events = CeilingShotGoalCalculator::new()
+        .tag_goals(&[goal], &[ceiling_shot_event(9.4, 94, player_id(2))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::CeilingShotGoal]);
+    assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Teammate));
+    assert!(!has_modifier(&events[0], GoalTagModifier::ByScorer));
+}
+
+#[test]
+fn ceiling_shot_goal_rejects_stale_events() {
+    let goal = goal_with_touch(true, position(0.0, 2400.0, 800.0), Vec::new());
+    let calculator = CeilingShotGoalCalculator::with_config(CeilingShotGoalCalculatorConfig {
+        max_event_to_goal_seconds: 0.3,
+    });
+    let events = calculator.tag_goals(&[goal], &[ceiling_shot_event(9.4, 94, player_id(1))]);
 
     assert!(events.is_empty());
 }

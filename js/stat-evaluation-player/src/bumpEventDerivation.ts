@@ -2,6 +2,7 @@ import type { BumpEvent } from "./generated/BumpEvent.ts";
 import type { BumpPlayerStats } from "./generated/BumpPlayerStats.ts";
 import type { BumpTeamStats } from "./generated/BumpTeamStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -99,7 +100,7 @@ export function applyBumpEventDerivedStats(
 export function createBumpEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortBumpEvents(timeline.events.bump ?? []);
+  const events = sortBumpEvents(statsEventPayloads(timeline, "bump"));
 
   let eventIndex = 0;
   const players = new Map<string, BumpPlayerStats>();

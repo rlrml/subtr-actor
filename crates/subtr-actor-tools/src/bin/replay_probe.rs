@@ -6,7 +6,8 @@ use replay_probe_rotation::LegacyRotationProbe;
 use subtr_actor_tools::replay_plausibility::evaluate_replay_plausibility;
 
 use subtr_actor::{
-    Collector, PlayerFrame, ReplayDataCollector, ReplayProcessor, StatsTimelineCollector,
+    Collector, EventPayload, PlayerFrame, ReplayDataCollector, ReplayProcessor,
+    StatsTimelineCollector,
 };
 
 const DEFAULT_REPLAY_PATH: &str =
@@ -127,20 +128,36 @@ fn print_mechanics(path: &str) {
     let timeline = StatsTimelineCollector::new()
         .get_legacy_replay_stats_timeline(&replay)
         .unwrap_or_else(|error| panic!("failed to collect stats timeline for {path}: {error:?}"));
-    for event in &timeline.events.flick {
+    for event in timeline
+        .events
+        .events
+        .iter()
+        .filter_map(|event| match &event.payload {
+            EventPayload::Flick(event) => Some(event),
+            _ => None,
+        })
+    {
         println!(
             "flick {}",
             serde_json::to_string(event).expect("flick event should serialize")
         );
     }
-    for event in &timeline.events.dodge_reset {
+    for event in timeline
+        .events
+        .events
+        .iter()
+        .filter_map(|event| match &event.payload {
+            EventPayload::DodgeReset(event) => Some(event),
+            _ => None,
+        })
+    {
         println!(
             "dodge_reset {}",
             serde_json::to_string(event).expect("dodge-reset event should serialize")
         );
     }
-    for event in &timeline.events.mechanics {
-        if event.kind == "flip_reset" || event.kind == "flick" {
+    for event in &timeline.events.events {
+        if event.meta.stream == "dodge_reset" || event.meta.stream == "flick" {
             println!(
                 "mechanic {}",
                 serde_json::to_string(event).expect("mechanic event should serialize")

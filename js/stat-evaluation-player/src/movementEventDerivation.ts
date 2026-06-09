@@ -3,6 +3,7 @@ import type { MovementEvent } from "./generated/MovementEvent.ts";
 import type { MovementStats } from "./generated/MovementStats.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 const MOVEMENT_SPEED_BANDS = ["boost", "slow", "supersonic"] as const;
 const MOVEMENT_HEIGHT_BANDS = ["ground", "high_air", "low_air"] as const;
@@ -175,7 +176,7 @@ export function applyMovementEventDerivedStats(
 export function createMovementEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortMovementEvents(timeline.events.movement ?? []);
+  const events = sortMovementEvents(statsEventPayloads(timeline, "movement"));
 
   let eventIndex = 0;
   const players = new Map<string, MovementStats>();

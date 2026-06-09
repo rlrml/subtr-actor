@@ -12,8 +12,6 @@ import {
   getEventPlaylistSelectedSourceIds,
   getEventPlaylistSources,
   getEventTimelineSources,
-  STATS_EVENT_STREAM_TIMELINE_PRESENTATION,
-  STATS_EVENT_STREAM_TIMELINE_PRESENTATION_OVERRIDES,
 } from "./eventTimelineSources.ts";
 import { createStatsTimeline } from "./testStatsTimeline.ts";
 
@@ -72,22 +70,6 @@ test("event timeline sources include empty canonical stats streams", () => {
   assert.equal(
     streamSources.every((source) => source.count === 0),
     true,
-  );
-});
-
-test("every stats event stream has an explicit timeline presentation policy", () => {
-  assert.deepEqual(
-    Object.keys(STATS_EVENT_STREAM_TIMELINE_PRESENTATION).sort(),
-    [...STATS_EVENT_STREAM_COUNT_TYPES].sort(),
-  );
-  assert.equal(STATS_EVENT_STREAM_TIMELINE_PRESENTATION.touch, "marker");
-  assert.equal(STATS_EVENT_STREAM_TIMELINE_PRESENTATION.territorial_pressure, "span");
-  assert.equal(STATS_EVENT_STREAM_TIMELINE_PRESENTATION.powerslide, "mixed");
-  assert.deepEqual(
-    Object.keys(STATS_EVENT_STREAM_TIMELINE_PRESENTATION_OVERRIDES).sort(),
-    STATS_EVENT_STREAM_COUNT_TYPES.filter(
-      (streamId) => STATS_EVENT_STREAM_TIMELINE_PRESENTATION[streamId] !== "marker",
-    ).sort(),
   );
 });
 
@@ -255,64 +237,10 @@ test("span-based stats event streams build ranges instead of timeline markers", 
       endTime: 5,
       lane: "stats-stream:territorial_pressure",
       laneLabel: "Territorial Pressure",
-      label: "Orange Territorial Pressure",
+      label: "Orange territorial pressure",
       shortLabel: "TP",
       isTeamZero: false,
       color: "#f97316",
-    },
-  ]);
-});
-
-test("player-scoped span stats event streams use per-player range lanes", () => {
-  const replay = {
-    frames: Array.from({ length: 4 }, (_, frame) => ({ time: frame })),
-    players: [{ id: "Steam:blue-id", name: "Blue" }],
-    timelineEvents: [],
-  } as ReplayModel;
-  const statsTimeline = createStatsTimeline({
-    events: {
-      positioning_possession: [
-        {
-          time: 1,
-          frame: 1,
-          end_time: 3,
-          end_frame: 3,
-          duration: 2,
-          player: { Steam: "blue-id" },
-          player_position: null,
-          is_team_0: true,
-          possession_state: "has_possession",
-        },
-      ],
-    },
-  });
-  const ctx = {
-    replay,
-    statsTimeline,
-  } as StatModuleContext;
-
-  const source = getEventTimelineSources({
-    ctx,
-    modules: [],
-    activeTimelineEventSourceIds: new Set(["stats-stream:positioning_possession"]),
-    activeMechanicTimelineKinds: new Set(),
-    toggleEventSource() {},
-    setMechanicTimelineKind() {},
-  }).find((candidate) => candidate.id === "stats-stream:positioning_possession");
-
-  assert.ok(source);
-  assert.deepEqual(source.buildTimelineEvents(), []);
-  assert.deepEqual(source.buildTimelineRanges?.(), [
-    {
-      id: "stats-stream:positioning_possession:1:3:0",
-      startTime: 1,
-      endTime: 3,
-      lane: "stats-stream:positioning_possession:Steam:blue-id",
-      laneLabel: "Blue",
-      label: "Blue Has Possession",
-      shortLabel: "PP",
-      isTeamZero: true,
-      color: "#3b82f6",
     },
   ]);
 });

@@ -30,10 +30,12 @@ fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
         }),
         "Expected collected boost to accumulate monotonically"
     );
+    let timeline_events = timeline_payloads_by_stream(&timeline, "timeline", |payload| match payload {
+        EventPayload::Timeline(event) => Some(event),
+        _ => None,
+    });
     assert!(
-        timeline
-            .events
-            .timeline
+        timeline_events
             .windows(2)
             .all(|events| events[1].time >= events[0].time),
         "Expected emitted timeline events to be time sorted"
@@ -227,9 +229,10 @@ fn test_stats_timeline_boost_monotonic_dodges_replay() {
     }
 
     // Diagnostic: count goals to verify kickoff count
-    let goal_count = timeline
-        .events
-        .timeline
+    let goal_count = timeline_payloads_by_stream(&timeline, "timeline", |payload| match payload {
+        EventPayload::Timeline(event) => Some(event),
+        _ => None,
+    })
         .iter()
         .filter(|e| matches!(e.kind, TimelineEventKind::Goal))
         .count();

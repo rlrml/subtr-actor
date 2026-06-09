@@ -1,4 +1,6 @@
-use subtr_actor::{PlayerId, ReplayMeta, StatsTimelineEventCollector};
+use subtr_actor::{
+    EventPayload, PlayerId, ReplayMeta, SpeedFlipEvent, StatsTimelineEventCollector,
+};
 
 const COLONELPANIC_NO_SPEED_FLIP_REPLAY: &str =
     "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
@@ -23,6 +25,18 @@ fn player_ids_by_name<'a>(replay_meta: &'a ReplayMeta, name: &str) -> Vec<&'a Pl
         .collect()
 }
 
+fn speed_flip_events(timeline: &subtr_actor::ReplayStatsTimelineScaffold) -> Vec<&SpeedFlipEvent> {
+    timeline
+        .events
+        .events
+        .iter()
+        .filter_map(|event| match &event.payload {
+            EventPayload::SpeedFlip(event) => Some(event),
+            _ => None,
+        })
+        .collect()
+}
+
 #[test]
 fn colonelpanic_replay_has_no_speed_flip_at_normalized_28_1_seconds() {
     let replay = parse_replay(COLONELPANIC_NO_SPEED_FLIP_REPLAY);
@@ -34,9 +48,8 @@ fn colonelpanic_replay_has_no_speed_flip_at_normalized_28_1_seconds() {
         !colonelpanic_ids.is_empty(),
         "fixture should contain colonelpanic8"
     );
-    let colonelpanic_speed_flips = timeline
-        .events
-        .speed_flip
+    let speed_flip_events = speed_flip_events(&timeline);
+    let colonelpanic_speed_flips = speed_flip_events
         .iter()
         .filter(|event| colonelpanic_ids.contains(&&event.player))
         .collect::<Vec<_>>();
@@ -61,18 +74,18 @@ fn reviewed_post_eac_duel_keeps_confirmed_speed_flip_and_rejects_nearby_false_po
     assert!(!oside_ids.is_empty(), "fixture should contain OSIDE_SMURF");
     assert!(!adamboi_ids.is_empty(), "fixture should contain Adamboi04");
 
-    let oside_confirmed = timeline.events.speed_flip.iter().any(|event| {
+    let speed_flip_events = speed_flip_events(&timeline);
+    let oside_confirmed = speed_flip_events.iter().any(|event| {
         oside_ids.contains(&&event.player)
             && (event.frame.abs_diff(1848) <= 3 || (event.time - 90.561_89).abs() <= 0.15)
     });
     assert!(
         oside_confirmed,
-        "expected the Rocket Sense confirmed OSIDE_SMURF speed flip near frame 1848; got {:#?}",
-        timeline.events.speed_flip
+        "expected the Rocket Sense confirmed OSIDE_SMURF speed flip near frame 1848; got {speed_flip_events:#?}"
     );
 
     let adamboi_rejected = [110_usize, 576, 1020, 1557, 1644, 1850];
-    let adamboi_false_positive = timeline.events.speed_flip.iter().find(|event| {
+    let adamboi_false_positive = speed_flip_events.iter().find(|event| {
         adamboi_ids.contains(&&event.player)
             && adamboi_rejected
                 .iter()

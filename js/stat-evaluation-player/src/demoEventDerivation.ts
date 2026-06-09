@@ -2,6 +2,7 @@ import type { DemoPlayerStats } from "./generated/DemoPlayerStats.ts";
 import type { DemoTeamStats } from "./generated/DemoTeamStats.ts";
 import type { TimelineEvent } from "./generated/TimelineEvent.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 
 function remoteIdKey(playerId: unknown): string {
   if (!playerId || typeof playerId !== "object") {
@@ -63,7 +64,7 @@ export function applyDemoEventDerivedStats(
 export function createDemoEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortDemoTimelineEvents(timeline.events.timeline ?? []);
+  const events = sortDemoTimelineEvents(statsEventPayloads(timeline, "timeline"));
 
   let eventIndex = 0;
   const players = new Map<string, DemoPlayerStats>();

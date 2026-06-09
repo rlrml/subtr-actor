@@ -5,6 +5,7 @@ import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
 import type { BoostPickupPadType } from "./generated/BoostPickupPadType.ts";
 import type { BoostPickupTimelineRangeOptions } from "./timelineRanges.ts";
 import type { BoostPickupComparisonEvent, StatsTimeline } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 import { playerIdToString } from "./touchOverlay.ts";
 
 type BoostPickupFilterOption<T extends string> = {
@@ -81,7 +82,9 @@ export function getBoostPickupAnimationTimelineMatch(
   pickup: BoostPickupAnimationPickup,
   timeline: StatsTimeline | null,
 ): BoostPickupComparisonEvent | null {
-  const comparisonEvents = timeline?.events.boost_pickups ?? [];
+  const comparisonEvents = timeline
+    ? boostPickupComparisonEvents(timeline, statsEventPayloads(timeline, "boost_pickup"))
+    : [];
   if (comparisonEvents.length === 0) {
     return null;
   }
@@ -104,12 +107,28 @@ export function hasBoostPickupAnimationTimelineMatch(
   pickup: BoostPickupAnimationPickup,
   timeline: StatsTimeline | null,
 ): boolean {
-  const comparisonEvents = timeline?.events.boost_pickups ?? [];
+  const comparisonEvents = timeline
+    ? boostPickupComparisonEvents(timeline, statsEventPayloads(timeline, "boost_pickup"))
+    : [];
   if (comparisonEvents.length === 0) {
     return true;
   }
 
   return getBoostPickupAnimationTimelineMatch(pickup, timeline) !== null;
+}
+
+function boostPickupComparisonEvents(
+  timeline: StatsTimeline,
+  comparisonEvents: BoostPickupComparisonEvent[],
+): BoostPickupComparisonEvent[] {
+  if (comparisonEvents.length > 0) {
+    return comparisonEvents;
+  }
+  const legacyEvents = (timeline as unknown as { events?: { boost_pickups?: unknown } }).events
+    ?.boost_pickups;
+  return Array.isArray(legacyEvents)
+    ? (legacyEvents as BoostPickupComparisonEvent[])
+    : comparisonEvents;
 }
 
 export function createBoostPickupFilterController(
@@ -313,7 +332,7 @@ export function createBoostPickupFilterController(
       return false;
     }
 
-    if ((lastStatsTimeline?.events.boost_pickups ?? []).length === 0) {
+    if (!lastStatsTimeline || statsEventPayloads(lastStatsTimeline, "boost_pickup").length === 0) {
       return (
         activePadTypes.has(pickup.pad.size) &&
         activeComparisons.has("both") &&

@@ -19,7 +19,7 @@ use super::{
     TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
     WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
-use crate::stats::timeline::StatsTimelineTagEvent;
+use crate::stats::timeline::Event;
 
 /// Static, English-language metadata for a stat event type.
 ///
@@ -787,16 +787,16 @@ define_stats_event!(
     ]
 );
 define_stats_event!(
-    StatsTimelineTagEvent,
-    STATS_TIMELINE_TAG_EVENT_DEFINITION,
-    "mechanics",
-    "Mechanic Timeline Tag",
+    Event,
+    TIMELINE_ENVELOPE_EVENT_DEFINITION,
+    "event",
+    "Event",
     EventCategory::Mechanic,
-    summary = "A normalized timeline representation of mechanic detections for playback and visualization.",
+    summary = "A shared event envelope with common metadata and a typed event payload.",
     approach = [
-        "Collect completed mechanic events from the analysis graph at finish time.",
-        "Convert point mechanics into moment tags and span mechanics into duration tags with stable IDs.",
-        "Attach selected mechanic-specific properties, such as air-dribble origin and touch count, for timeline consumers.",
+        "Collect completed events from the analysis graph at finish time.",
+        "Wrap each typed event payload with common timing, participant, team, position, confidence, and stream metadata.",
+        "Serialize timeline events as a single heterogeneous event list for playback and analysis consumers.",
     ]
 );
 
@@ -848,7 +848,7 @@ pub const ALL_EVENT_DEFINITIONS: &[&EventDefinition] = &[
     &FLIP_RESET_EVENT_DEFINITION,
     &POST_WALL_DODGE_EVENT_DEFINITION,
     &FLIP_RESET_FOLLOWUP_DODGE_EVENT_DEFINITION,
-    &STATS_TIMELINE_TAG_EVENT_DEFINITION,
+    &TIMELINE_ENVELOPE_EVENT_DEFINITION,
 ];
 
 const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
@@ -1171,7 +1171,7 @@ const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
 ];
 
 const STATS_TIMELINE_EVENTS_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
-    &STATS_TIMELINE_TAG_EVENT_DEFINITION,
+    &TIMELINE_ENVELOPE_EVENT_DEFINITION,
     "stats_timeline_events",
     "StatsTimelineEventsNode",
     "StatsTimelineEventsState",

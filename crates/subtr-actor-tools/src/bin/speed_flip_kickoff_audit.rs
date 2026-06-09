@@ -4,7 +4,10 @@ use std::path::Path;
 use anyhow::Context;
 use clap::Parser;
 use serde::Serialize;
-use subtr_actor::{GameplayPhase, PlayerId, ReplayMeta, ReplayStatsFrame, StatsTimelineCollector};
+use subtr_actor::{
+    EventPayload, GameplayPhase, PlayerId, ReplayMeta, ReplayStatsFrame, SpeedFlipEvent,
+    StatsTimelineCollector,
+};
 
 const DETECTION_WINDOW_SECONDS: f32 = 1.5;
 
@@ -73,15 +76,22 @@ fn audit_replay(path: &str) -> anyhow::Result<ReplayAudit> {
         .map_err(|error| anyhow::anyhow!("failed to build stats timeline for {path}: {error:?}"))?;
     let player_names = player_name_map(&timeline.replay_meta);
     let kickoff_start_indices = kickoff_start_indices(&timeline.frames);
+    let speed_flip_events = timeline
+        .events
+        .events
+        .iter()
+        .filter_map(|event| match &event.payload {
+            EventPayload::SpeedFlip(event) => Some(event),
+            _ => None,
+        })
+        .collect::<Vec<&SpeedFlipEvent>>();
     let mut kickoffs = Vec::new();
 
     for (index, frame_index) in kickoff_start_indices.into_iter().enumerate() {
         let frame = &timeline.frames[frame_index];
         let start_time = frame.time;
         let end_time = start_time + DETECTION_WINDOW_SECONDS;
-        let blue_detected = timeline
-            .events
-            .speed_flip
+        let blue_detected = speed_flip_events
             .iter()
             .filter(|event| event.is_team_0)
             .filter(|event| event.time >= start_time && event.time <= end_time)
@@ -96,9 +106,7 @@ fn audit_replay(path: &str) -> anyhow::Result<ReplayAudit> {
                 max_speed: event.max_speed,
             })
             .collect();
-        let orange_detected = timeline
-            .events
-            .speed_flip
+        let orange_detected = speed_flip_events
             .iter()
             .filter(|event| !event.is_team_0)
             .filter(|event| event.time >= start_time && event.time <= end_time)
@@ -145,7 +153,7 @@ fn audit_replay(path: &str) -> anyhow::Result<ReplayAudit> {
         kickoff_count: kickoffs.len(),
         team_kickoff_opportunities,
         detected_team_kickoffs,
-        speed_flip_event_count: timeline.events.speed_flip.len(),
+        speed_flip_event_count: speed_flip_events.len(),
         kickoffs,
     })
 }
