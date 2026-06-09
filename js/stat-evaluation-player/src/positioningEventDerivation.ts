@@ -20,7 +20,7 @@ type PositioningTimedEvent =
   | PositioningGoalContextEvent;
 
 interface EventStreamCursor {
-  applyThroughFrame(frameNumber: number): void;
+  applyThroughFrame(frame: StatsFrame): void;
 }
 
 function addF32(left: number, right: number): number {
@@ -242,15 +242,59 @@ function createEventStreamCursor<TEvent extends PositioningTimedEvent>(
   apply: (event: TEvent) => void,
 ): EventStreamCursor {
   const sortedEvents = sortPositioningEvents(events);
-  let index = 0;
+  const creditedDurations = new Array(sortedEvents.length).fill(0) as number[];
+  const appliedMomentEvents = new Set<number>();
   return {
-    applyThroughFrame(frameNumber: number): void {
-      while (index < sortedEvents.length && sortedEvents[index]!.frame <= frameNumber) {
-        apply(sortedEvents[index]!);
-        index += 1;
+    applyThroughFrame(frame: StatsFrame): void {
+      for (let index = 0; index < sortedEvents.length; index += 1) {
+        const event = sortedEvents[index]!;
+        if (event.frame > frame.frame_number) {
+          break;
+        }
+        if (!isSpanPositioningEvent(event)) {
+          if (!appliedMomentEvents.has(index)) {
+            apply(event);
+            appliedMomentEvents.add(index);
+          }
+          continue;
+        }
+
+        const targetDuration = creditedDurationThroughFrame(event, frame);
+        const delta = targetDuration - creditedDurations[index]!;
+        if (delta > 0) {
+          creditedDurations[index] = targetDuration;
+          apply({ ...event, duration: delta });
+        }
       }
     },
   };
+}
+
+function isSpanPositioningEvent(event: PositioningTimedEvent): event is PositioningTimedEvent & {
+  duration: number;
+  end_frame: number;
+  end_time: number;
+} {
+  return (
+    typeof (event as { duration?: unknown }).duration === "number" &&
+    typeof (event as { end_frame?: unknown }).end_frame === "number" &&
+    typeof (event as { end_time?: unknown }).end_time === "number"
+  );
+}
+
+function creditedDurationThroughFrame(
+  event: PositioningTimedEvent & { duration: number; end_frame: number; end_time: number },
+  frame: StatsFrame,
+): number {
+  if (frame.frame_number >= event.end_frame) {
+    return event.duration;
+  }
+  const totalTime = event.end_time - event.time;
+  if (totalTime <= 0) {
+    return 0;
+  }
+  const elapsedTime = Math.max(0, frame.time - event.time);
+  return event.duration * Math.min(1, elapsedTime / totalTime);
 }
 
 export function applyPositioningEventDerivedStats(
@@ -305,14 +349,37 @@ export function createPositioningEventDerivedStatsAccumulator(
   return {
     applyFrame(frame: StatsFrame): void {
       for (const stream of streams) {
-        stream.applyThroughFrame(frame.frame_number);
+        stream.applyThroughFrame(frame);
       }
 
       assignPositioningTeamStats(frame.team_zero.positioning, teamZero);
       assignPositioningTeamStats(frame.team_one.positioning, teamOne);
       for (const player of frame.players) {
         assignPositioningStats(player.positioning, players.get(remoteIdKey(player.player_id)));
+        assignPositioningSummary(player.positioning, timeline, player.player_id);
       }
     },
   };
+}
+
+function assignPositioningSummary(
+  target: PositioningStats,
+  timeline: MaterializedStatsTimeline,
+  playerId: unknown,
+): void {
+  const summaries = (timeline as unknown as { positioning_summary?: unknown }).positioning_summary;
+  if (!Array.isArray(summaries)) {
+    return;
+  }
+  const playerKey = remoteIdKey(playerId);
+  const summary = summaries.find((candidate) => {
+    if (!candidate || typeof candidate !== "object") {
+      return false;
+    }
+    return remoteIdKey((candidate as { player_id?: unknown }).player_id) === playerKey;
+  }) as { distance?: Partial<PositioningStats> } | undefined;
+  if (!summary?.distance) {
+    return;
+  }
+  Object.assign(target, summary.distance);
 }

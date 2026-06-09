@@ -18,15 +18,177 @@ import {
 export { createPlayerStatsSnapshot, createTeamStatsSnapshot } from "./statsSnapshotFactories.ts";
 
 export function createStatsEvents(overrides?: DeepPartial<StatsEvents>): StatsEvents {
-  return merge<StatsEvents>(
+  const merged = merge<StatsEvents>(
     {
       events: [],
     },
     overrides,
   );
+  return {
+    events: [
+      ...(merged.events ?? []),
+      ...legacyBucketEvents(overrides as Record<string, unknown> | undefined),
+      ...legacyMechanicEvents(overrides as Record<string, unknown> | undefined),
+    ],
+  };
 }
 
 type PayloadList<K extends StatsEventPayloadKind> = Array<StatsEventPayload<K>>;
+
+type LegacyEventBucket = {
+  field: string;
+  stream: string;
+  kind: StatsEventPayloadKind;
+};
+
+const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
+  { field: "timeline", stream: "timeline", kind: "timeline" },
+  { field: "core_player", stream: "core_player", kind: "core_player" },
+  {
+    field: "core_player_goal_context",
+    stream: "core_player_goal_context",
+    kind: "core_player_goal_context",
+  },
+  { field: "possession", stream: "possession", kind: "possession" },
+  { field: "pressure", stream: "pressure", kind: "pressure" },
+  {
+    field: "territorial_pressure",
+    stream: "territorial_pressure",
+    kind: "territorial_pressure",
+  },
+  { field: "movement", stream: "movement", kind: "movement" },
+  {
+    field: "positioning_activity",
+    stream: "positioning_activity",
+    kind: "positioning_activity",
+  },
+  {
+    field: "positioning_possession",
+    stream: "positioning_possession",
+    kind: "positioning_possession",
+  },
+  {
+    field: "positioning_field_zone",
+    stream: "positioning_field_zone",
+    kind: "positioning_field_zone",
+  },
+  {
+    field: "positioning_ball_depth",
+    stream: "positioning_ball_depth",
+    kind: "positioning_ball_depth",
+  },
+  {
+    field: "positioning_teammate_role",
+    stream: "positioning_teammate_role",
+    kind: "positioning_teammate_role",
+  },
+  {
+    field: "positioning_ball_proximity",
+    stream: "positioning_ball_proximity",
+    kind: "positioning_ball_proximity",
+  },
+  {
+    field: "positioning_goal_context",
+    stream: "positioning_goal_context",
+    kind: "positioning_goal_context",
+  },
+  { field: "rotation_player", stream: "rotation_player", kind: "rotation_player" },
+  { field: "rotation_role_span", stream: "rotation_role_span", kind: "rotation_role_span" },
+  { field: "rotation_depth_span", stream: "rotation_depth_span", kind: "rotation_depth_span" },
+  {
+    field: "rotation_first_man_stint",
+    stream: "rotation_first_man_stint",
+    kind: "rotation_first_man_stint",
+  },
+  { field: "rotation_team", stream: "rotation_team", kind: "rotation_team" },
+  { field: "goal_context", stream: "goal_context", kind: "goal_context" },
+  { field: "backboard", stream: "backboard", kind: "backboard" },
+  { field: "ceiling_shot", stream: "ceiling_shot", kind: "ceiling_shot" },
+  { field: "wall_aerial", stream: "wall_aerial", kind: "wall_aerial" },
+  { field: "wall_aerial_shot", stream: "wall_aerial_shot", kind: "wall_aerial_shot" },
+  { field: "center", stream: "center", kind: "center" },
+  { field: "flick", stream: "flick", kind: "flick" },
+  { field: "musty_flick", stream: "musty_flick", kind: "musty_flick" },
+  { field: "dodge_reset", stream: "dodge_reset", kind: "dodge_reset" },
+  { field: "double_tap", stream: "double_tap", kind: "double_tap" },
+  { field: "fifty_fifty", stream: "fifty_fifty", kind: "fifty_fifty" },
+  { field: "kickoff", stream: "kickoff", kind: "kickoff" },
+  { field: "one_timer", stream: "one_timer", kind: "one_timer" },
+  { field: "pass", stream: "pass", kind: "pass" },
+  { field: "ball_carry", stream: "ball_carry", kind: "ball_carry" },
+  { field: "controlled_play", stream: "controlled_play", kind: "controlled_play" },
+  { field: "rush", stream: "rush", kind: "rush" },
+  { field: "dodge", stream: "dodge", kind: "dodge" },
+  { field: "speed_flip", stream: "speed_flip", kind: "speed_flip" },
+  { field: "half_flip", stream: "half_flip", kind: "half_flip" },
+  { field: "half_volley", stream: "half_volley", kind: "half_volley" },
+  { field: "wavedash", stream: "wavedash", kind: "wavedash" },
+  { field: "whiff", stream: "whiff", kind: "whiff" },
+  { field: "powerslide", stream: "powerslide", kind: "powerslide" },
+  { field: "touch", stream: "touch", kind: "touch" },
+  { field: "boost_pickups", stream: "boost_pickups", kind: "boost_pickup" },
+  { field: "boost_ledger", stream: "boost_ledger", kind: "boost_ledger" },
+  { field: "boost_bucket", stream: "boost_bucket", kind: "boost_bucket" },
+  { field: "boost_state", stream: "boost_state", kind: "boost_state" },
+  { field: "bump", stream: "bump", kind: "bump" },
+];
+
+function legacyBucketEvents(record: Record<string, unknown> | undefined): Event[] {
+  if (!record) {
+    return [];
+  }
+  return LEGACY_EVENT_BUCKETS.flatMap(({ field, stream, kind }) => {
+    const values = record[field];
+    if (!Array.isArray(values)) {
+      return [];
+    }
+    return values.map((event, index) =>
+      payloadEvent(stream, kind, event as StatsEventPayload<typeof kind>, index),
+    );
+  });
+}
+
+function legacyMechanicEvents(record: Record<string, unknown> | undefined): Event[] {
+  if (!record) {
+    return [];
+  }
+  const values = [
+    ...(Array.isArray(record.mechanics) ? record.mechanics : []),
+    ...(Array.isArray(record.mechanic_events) ? record.mechanic_events : []),
+  ];
+  return values.map((event, index) => {
+    const record = event as Record<string, unknown>;
+    const stream = typeof record.kind === "string" ? record.kind : "mechanics";
+    const timing = eventTiming(record);
+    return {
+      meta: {
+        id: typeof record.id === "string" ? record.id : `${stream}:${index}`,
+        stream,
+        label: titleCaseStream(stream),
+        timing,
+        primary_player:
+          (record.player as Event["meta"]["primary_player"]) ??
+          (record.player_id as Event["meta"]["primary_player"]),
+        secondary_player: record.secondary_player as Event["meta"]["secondary_player"],
+        player_position: record.player_position as Event["meta"]["player_position"],
+        ball_position: record.ball_position as Event["meta"]["ball_position"],
+        team_is_team_0: record.is_team_0 as Event["meta"]["team_is_team_0"],
+        confidence: record.confidence as Event["meta"]["confidence"],
+        properties: Array.isArray(record.properties)
+          ? (record.properties as Event["meta"]["properties"])
+          : [],
+      },
+      payload: {
+        kind: "timeline",
+        payload: {
+          time: timing.type === "span" ? timing.end_time : timing.time,
+          frame: timing.type === "span" ? timing.end_frame : timing.frame,
+          kind: stream,
+        },
+      } as EventPayload,
+    };
+  });
+}
 
 function titleCaseStream(stream: string): string {
   return stream
@@ -37,6 +199,15 @@ function titleCaseStream(stream: string): string {
 }
 
 function eventTiming(payload: Record<string, unknown>): Event["meta"]["timing"] {
+  const explicitTiming = payload.timing;
+  if (
+    explicitTiming &&
+    typeof explicitTiming === "object" &&
+    !Array.isArray(explicitTiming) &&
+    "type" in explicitTiming
+  ) {
+    return explicitTiming as Event["meta"]["timing"];
+  }
   const startFrame = payload.start_frame;
   const endFrame = payload.end_frame ?? payload.resolve_frame;
   const startTime = payload.start_time;
@@ -52,6 +223,20 @@ function eventTiming(payload: Record<string, unknown>): Event["meta"]["timing"] 
       start_frame: startFrame,
       end_frame: endFrame,
       start_time: startTime,
+      end_time: endTime,
+    };
+  }
+  if (
+    typeof payload.frame === "number" &&
+    typeof endFrame === "number" &&
+    typeof payload.time === "number" &&
+    typeof endTime === "number"
+  ) {
+    return {
+      type: "span",
+      start_frame: payload.frame,
+      end_frame: endFrame,
+      start_time: payload.time,
       end_time: endTime,
     };
   }
@@ -93,6 +278,7 @@ function payloadEvent<K extends StatsEventPayloadKind>(
         (record.end_ball_position as Event["meta"]["ball_position"]),
       team_is_team_0:
         (record.is_team_0 as Event["meta"]["team_is_team_0"]) ??
+        (record.team_is_team_0 as Event["meta"]["team_is_team_0"]) ??
         (record.scoring_team_is_team_0 as Event["meta"]["team_is_team_0"]) ??
         (record.initiator_is_team_0 as Event["meta"]["team_is_team_0"]),
       confidence: record.confidence as Event["meta"]["confidence"],
@@ -257,6 +443,9 @@ export function createLegacyStatsTimeline(
 ): MaterializedStatsTimeline {
   const events = [
     ...(overrides.events?.events ?? []),
+    ...legacyBucketEvents(overrides.events as Record<string, unknown> | undefined),
+    ...legacyMechanicEvents(overrides.events as Record<string, unknown> | undefined),
+    ...legacyMechanicEvents(overrides as Record<string, unknown> | undefined),
     ...(overrides.timeline_events ?? []).map((event, index) =>
       payloadEvent("timeline", "timeline", event, index),
     ),

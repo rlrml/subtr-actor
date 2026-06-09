@@ -81,7 +81,10 @@ export function getMechanicKinds(statsTimeline: StatsTimeline | null): string[] 
   const events = statsTimeline ? statsEventEnvelopes(statsTimeline) : [];
   return [
     ...new Set(
-      events.map((event) => event.meta.stream).filter((kind) => isVisibleMechanicKind(kind)),
+      events
+        .filter((event) => event.payload.kind === "timeline")
+        .map((event) => event.meta.stream)
+        .filter((kind) => isVisibleMechanicKind(kind)),
     ),
   ].sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
 }
@@ -102,6 +105,7 @@ export function buildMechanicTimelineEvents(
     .filter(
       (event) =>
         isVisibleMechanicKind(event.meta.stream) &&
+        event.payload.kind === "timeline" &&
         event.meta.timing.type === "moment" &&
         (!enabled || enabled.has(event.meta.stream)),
     )
@@ -139,7 +143,9 @@ export function buildMechanicPlaylistEvents(
   return statsEventEnvelopes(statsTimeline)
     .filter(
       (event) =>
-        isVisibleMechanicKind(event.meta.stream) && (!enabled || enabled.has(event.meta.stream)),
+        isVisibleMechanicKind(event.meta.stream) &&
+        event.payload.kind === "timeline" &&
+        (!enabled || enabled.has(event.meta.stream)),
     )
     .map((event) => {
       const playerId = event.meta.primary_player ? playerIdToString(event.meta.primary_player) : "";

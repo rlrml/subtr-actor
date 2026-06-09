@@ -70,6 +70,7 @@ export function buildMechanicTimelineRanges(
     .filter(
       (event) =>
         isVisibleMechanicKind(event.meta.stream) &&
+        event.payload.kind === "timeline" &&
         event.meta.timing.type === "span" &&
         (!enabled || enabled.has(event.meta.stream)),
     )

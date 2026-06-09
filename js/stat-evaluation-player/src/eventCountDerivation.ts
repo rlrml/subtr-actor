@@ -6,6 +6,7 @@ import type {
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
 import { statsEventEnvelopes } from "./statsTimeline.ts";
+import { isVisibleMechanicKind } from "./timelinePresentation.ts";
 
 export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "timeline",
@@ -196,7 +197,7 @@ export function applyEventCountDerivedStats(
 export function createEventCountDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const eventGroups = STATS_EVENT_STREAM_COUNT_TYPES.map((eventType) => ({
+  const eventGroups = STATS_EVENT_COUNT_TYPES.map((eventType) => ({
     eventType,
     events: sortEvents(
       statsEventEnvelopes(timeline).filter((event) => event.meta.stream === eventType),
@@ -223,8 +224,12 @@ export function createEventCountDerivedStatsAccumulator(timeline: MaterializedSt
             const counts = playerCounts.get(playerKey) ?? createEmptyEventCountStats();
             playerCounts.set(playerKey, counts);
             incrementEventCount(counts, group.eventType);
-            if (mechanicEventType !== null) {
+            if (mechanicEventType !== null && mechanicEventType !== group.eventType) {
               incrementEventCount(counts, mechanicEventType);
+            }
+            if (isVisibleMechanicKind(event.meta.stream)) {
+              (counts as Record<string, number>).mechanics =
+                ((counts as Record<string, number>).mechanics ?? 0) + 1;
             }
           }
 
@@ -232,8 +237,12 @@ export function createEventCountDerivedStatsAccumulator(timeline: MaterializedSt
           if (isTeamZero !== null) {
             const counts = isTeamZero ? teamCounts.teamZero : teamCounts.teamOne;
             incrementEventCount(counts, group.eventType);
-            if (mechanicEventType !== null) {
+            if (mechanicEventType !== null && mechanicEventType !== group.eventType) {
               incrementEventCount(counts, mechanicEventType);
+            }
+            if (isVisibleMechanicKind(event.meta.stream)) {
+              (counts as Record<string, number>).mechanics =
+                ((counts as Record<string, number>).mechanics ?? 0) + 1;
             }
           }
 

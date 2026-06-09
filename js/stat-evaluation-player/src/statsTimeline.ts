@@ -138,18 +138,18 @@ export type {
 };
 
 export function statsEventEnvelopes(statsTimeline: StatsTimeline): Event[] {
-  return statsTimeline.events.events;
+  return statsTimeline.events?.events ?? [];
 }
 
 export function statsEventsByStream(statsTimeline: StatsTimeline, stream: string): Event[] {
-  return statsTimeline.events.events.filter((event) => event.meta.stream === stream);
+  return statsEventEnvelopes(statsTimeline).filter((event) => event.meta.stream === stream);
 }
 
 export function statsEventPayloads<K extends StatsEventPayloadKind>(
   statsTimeline: StatsTimeline,
   kind: K,
 ): Array<StatsEventPayload<K>> {
-  return statsTimeline.events.events
+  return statsEventEnvelopes(statsTimeline)
     .filter((event): event is Event & { payload: Extract<EventPayload, { kind: K }> } => {
       return event.payload.kind === kind;
     })
@@ -161,7 +161,7 @@ export function statsEventPayloadsByStream<K extends StatsEventPayloadKind>(
   stream: string,
   kind: K,
 ): Array<StatsEventPayload<K>> {
-  return statsTimeline.events.events
+  return statsEventEnvelopes(statsTimeline)
     .filter((event): event is Event & { payload: Extract<EventPayload, { kind: K }> } => {
       return event.meta.stream === stream && event.payload.kind === kind;
     })

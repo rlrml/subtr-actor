@@ -82,7 +82,9 @@ export function getBoostPickupAnimationTimelineMatch(
   pickup: BoostPickupAnimationPickup,
   timeline: StatsTimeline | null,
 ): BoostPickupComparisonEvent | null {
-  const comparisonEvents = timeline ? statsEventPayloads(timeline, "boost_pickup") : [];
+  const comparisonEvents = timeline
+    ? boostPickupComparisonEvents(timeline, statsEventPayloads(timeline, "boost_pickup"))
+    : [];
   if (comparisonEvents.length === 0) {
     return null;
   }
@@ -105,12 +107,28 @@ export function hasBoostPickupAnimationTimelineMatch(
   pickup: BoostPickupAnimationPickup,
   timeline: StatsTimeline | null,
 ): boolean {
-  const comparisonEvents = timeline ? statsEventPayloads(timeline, "boost_pickup") : [];
+  const comparisonEvents = timeline
+    ? boostPickupComparisonEvents(timeline, statsEventPayloads(timeline, "boost_pickup"))
+    : [];
   if (comparisonEvents.length === 0) {
     return true;
   }
 
   return getBoostPickupAnimationTimelineMatch(pickup, timeline) !== null;
+}
+
+function boostPickupComparisonEvents(
+  timeline: StatsTimeline,
+  comparisonEvents: BoostPickupComparisonEvent[],
+): BoostPickupComparisonEvent[] {
+  if (comparisonEvents.length > 0) {
+    return comparisonEvents;
+  }
+  const legacyEvents = (timeline as unknown as { events?: { boost_pickups?: unknown } }).events
+    ?.boost_pickups;
+  return Array.isArray(legacyEvents)
+    ? (legacyEvents as BoostPickupComparisonEvent[])
+    : comparisonEvents;
 }
 
 export function createBoostPickupFilterController(
