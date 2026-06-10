@@ -258,6 +258,7 @@ pub enum SaMechanicKind {
     CeilingShotGoal = 43,
     SustainedPressureGoal = 44,
     KickoffGoal = 45,
+    FlipIntoBallGoal = 46,
 }
 
 #[repr(C)]

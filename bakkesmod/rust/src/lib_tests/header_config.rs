@@ -382,6 +382,10 @@ fn checked_in_header_matches_event_abi_enums() {
                 SaMechanicKind::KickoffGoal as i32,
             ),
             (
+                "SaMechanicKindFlipIntoBallGoal".to_owned(),
+                SaMechanicKind::FlipIntoBallGoal as i32,
+            ),
+            (
                 "SaMechanicKindFlickGoal".to_owned(),
                 SaMechanicKind::FlickGoal as i32,
             ),
