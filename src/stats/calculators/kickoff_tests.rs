@@ -179,6 +179,7 @@ fn kickoff_goal_does_not_override_immediate_outcome() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.outcome, KickoffOutcome::TeamZeroWin);
     assert_eq!(event.winning_team_is_team_0, Some(true));
@@ -274,6 +275,7 @@ fn kickoff_records_movement_start_after_countdown() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.start_time, 0.0);
     assert_eq!(event.start_frame, 0);
@@ -362,6 +364,7 @@ fn kickoff_classifies_fake_and_missed_expected_takers() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.outcome, KickoffOutcome::TeamZeroWin);
     assert_eq!(event.win_strength, Some(2.0));
@@ -519,6 +522,7 @@ fn kickoff_classifies_support_players_as_cheating_or_going_for_boost() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     let blue_taker_event = event.team_zero_taker.as_ref().unwrap();
     assert_eq!(blue_taker_event.player, blue_taker);
@@ -663,6 +667,7 @@ fn kickoff_tracks_first_touch_taker_delay_exit_velocity_and_follow_up() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.first_touch_player, Some(blue_taker.clone()));
     assert_eq!(event.first_touch_team_is_team_0, Some(true));
@@ -823,6 +828,7 @@ fn kickoff_taker_tracks_time_to_ball_and_approach_boost_totals() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     let blue_taker_event = event.team_zero_taker.as_ref().unwrap();
     assert_eq!(blue_taker_event.player, blue_taker);
@@ -914,6 +920,7 @@ fn kickoff_taker_touch_delay_is_non_negative_when_team_one_touches_first() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.team_zero_taker_touch_time, Some(1.2));
     assert_eq!(event.team_one_taker_touch_time, Some(1.0));
@@ -1029,6 +1036,7 @@ fn kickoff_waits_past_resolution_to_capture_first_follow_up_touch() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.outcome, KickoffOutcome::TeamOneWin);
     assert_eq!(event.exit_velocity, Some([0.0, -500.0, 0.0]));
@@ -1109,6 +1117,7 @@ fn kickoff_without_follow_up_remains_contested_when_ball_resolution_is_neutral()
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.first_follow_up_touch_time, None);
     assert_eq!(
@@ -1259,6 +1268,7 @@ fn kickoff_follow_up_clean_possession_uses_unchallenged_touch_sequence() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.outcome, KickoffOutcome::TeamZeroWin);
     assert_eq!(event.first_follow_up_touch_time, Some(1.2));
@@ -1399,6 +1409,7 @@ fn kickoff_goal_preserves_actual_follow_up_contest() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert!(event.kickoff_goal);
     assert_eq!(event.scoring_team_is_team_0, Some(false));
@@ -1528,6 +1539,7 @@ fn kickoff_possession_outcome_tracks_team_advantage_before_late_challenge() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.first_follow_up_touch_time, Some(1.6));
     assert_eq!(event.first_follow_up_touch_frame, Some(18));
@@ -1610,6 +1622,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
         })
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     let blue_taker_event = event.team_zero_taker.as_ref().unwrap();
     assert_eq!(blue_taker_event.player, blue_taker);
@@ -1841,6 +1854,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
         )
         .unwrap();
 
+    calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(
         event.team_zero_taker.as_ref().map(|player| &player.player),
@@ -2096,4 +2110,218 @@ fn kickoff_direction_tracks_symmetric_taker_spawn_side() {
         ),
         KickoffDirection::Unknown
     );
+}
+
+/// Drives a kickoff through countdown, a first touch at t=1.0, an opposing
+/// contest touch, resolution capture, and a follow-up touch at t=2.6 that
+/// closes the kickoff. Returns the calculator with the kickoff concluded but
+/// not yet emitted (awaiting goal attribution).
+fn concluded_kickoff_awaiting_attribution(
+    blue_taker: &PlayerId,
+    blue_support: &PlayerId,
+    orange_taker: &PlayerId,
+) -> KickoffCalculator {
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-256.0, -3840.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        blue_support.clone(),
+                        true,
+                        glam::Vec3::new(0.0, -4608.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(256.0, 3840.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(10, 1.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker.clone(), true, 10, 1.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(26, 2.3),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball_with_velocity(360.0, glam::Vec3::new(0.0, 900.0, 0.0)),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(31, 2.6),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball_with_velocity(360.0, glam::Vec3::new(0.0, 900.0, 0.0)),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_support.clone(), true, 31, 2.6)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    // The kickoff has reached its logical close, but emission is deferred
+    // while a goal could still be attributed to it.
+    assert!(calculator.events().is_empty());
+    calculator
+}
+
+#[test]
+fn kickoff_goal_after_logical_close_is_attributed_within_window() {
+    let blue_taker = PlayerId::Steam(60);
+    let blue_support = PlayerId::Steam(61);
+    let orange_taker = PlayerId::Steam(62);
+    let mut calculator =
+        concluded_kickoff_awaiting_attribution(&blue_taker, &blue_support, &orange_taker);
+
+    calculator
+        .update(
+            &frame(40, 3.4),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(5200.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState {
+                goal_events: vec![goal(true, 40, 3.4)],
+                ..FrameEventsState::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert!(event.kickoff_goal);
+    let time_to_goal = event.time_to_goal.unwrap();
+    assert!((time_to_goal - 2.4).abs() < 1e-4);
+    assert_eq!(event.scoring_team_is_team_0, Some(true));
+    // Event content stays frozen at the logical close.
+    assert_eq!(event.end_time, 2.6);
+    assert_eq!(event.end_frame, 31);
+    assert_eq!(event.first_follow_up_touch_time, Some(2.6));
+}
+
+#[test]
+fn kickoff_goal_attribution_window_closes_after_max_seconds() {
+    let blue_taker = PlayerId::Steam(63);
+    let blue_support = PlayerId::Steam(64);
+    let orange_taker = PlayerId::Steam(65);
+    let mut calculator =
+        concluded_kickoff_awaiting_attribution(&blue_taker, &blue_support, &orange_taker);
+
+    calculator
+        .update(
+            &frame(140, 11.2),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert!(!event.kickoff_goal);
+    assert_eq!(event.time_to_goal, None);
+    assert_eq!(event.end_time, 2.6);
+
+    // A goal landing after the window stays unattributed.
+    calculator
+        .update(
+            &frame(145, 11.6),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(5200.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState {
+                goal_events: vec![goal(true, 145, 11.6)],
+                ..FrameEventsState::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(calculator.events().len(), 1);
+    assert!(!calculator.events().last().unwrap().kickoff_goal);
+}
+
+#[test]
+fn next_kickoff_phase_flushes_kickoff_awaiting_attribution() {
+    let blue_taker = PlayerId::Steam(66);
+    let blue_support = PlayerId::Steam(67);
+    let orange_taker = PlayerId::Steam(68);
+    let mut calculator =
+        concluded_kickoff_awaiting_attribution(&blue_taker, &blue_support, &orange_taker);
+
+    calculator
+        .update(
+            &frame(60, 5.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert!(!event.kickoff_goal);
+    assert_eq!(event.end_time, 2.6);
 }

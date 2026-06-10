@@ -84,6 +84,12 @@ struct ActiveKickoff {
     touches: Vec<KickoffTouchSnapshot>,
     speed_flip_players: HashSet<PlayerId>,
     resolution: Option<KickoffResolutionSnapshot>,
+    /// The fully built event, frozen at the kickoff's logical close
+    /// (`should_finish`). The item then stays in flight, awaiting goal
+    /// attribution: a goal scored within [`KICKOFF_GOAL_MAX_SECONDS`] of the
+    /// first touch still counts as a kickoff goal even though it lands after
+    /// the kickoff itself has closed.
+    concluded: Option<Box<KickoffEvent>>,
 }
 
 impl InFlightItem for ActiveKickoff {
@@ -93,13 +99,19 @@ impl InFlightItem for ActiveKickoff {
         Recognition::committed(self.start_time, self.start_frame)
     }
 
-    fn on_boundary(&mut self, _boundary: Boundary) -> Disposition {
-        // A kickoff that is still in flight when the stream ends never reached a
-        // resolution; emitting a truncated event would be misleading, so it is
-        // discarded (preserving the previous "drop the unfinished kickoff"
-        // behavior, now handled structurally rather than by omission). Goal and
-        // live-play finalization happen earlier through `should_finish`.
-        Disposition::Discard
+    fn on_boundary(&mut self, boundary: Boundary) -> Disposition {
+        // A concluded kickoff is a complete event that is merely waiting for
+        // late goal attribution; the stream ending just means no further goal
+        // can arrive, so it is emitted as-is. A kickoff that never reached its
+        // logical close has no resolution; emitting a truncated event would be
+        // misleading, so it is discarded (preserving the previous "drop the
+        // unfinished kickoff" behavior, now handled structurally rather than
+        // by omission).
+        if self.concluded.is_some() {
+            Disposition::Finalize(FinalizeReason::Boundary(boundary))
+        } else {
+            Disposition::Discard
+        }
     }
 }
 
@@ -407,14 +419,20 @@ impl KickoffCalculator {
             touches: Vec::new(),
             speed_flip_players: HashSet::new(),
             resolution: None,
+            concluded: None,
         });
     }
 
     /// Finalize any in-flight kickoff at end of stream. Routed through the
-    /// ledger so the boundary is handled uniformly; an unresolved kickoff is
-    /// discarded rather than emitted (see `ActiveKickoff::on_boundary`).
+    /// ledger so the boundary is handled uniformly; a concluded kickoff that
+    /// was only waiting for late goal attribution is emitted, while an
+    /// unresolved kickoff is discarded (see `ActiveKickoff::on_boundary`).
     pub fn finish(&mut self) {
-        let _ = self.active.finish();
+        for (active, _reason) in self.active.finish() {
+            if let Some(event) = active.concluded {
+                self.events.push(*event);
+            }
+        }
     }
 
     fn observe_movement_start(
@@ -1026,6 +1044,39 @@ impl KickoffCalculator {
             })
     }
 
+    fn earliest_goal(events: &FrameEventsState) -> Option<&GoalEvent> {
+        events.goal_events.iter().min_by(|left, right| {
+            left.time
+                .total_cmp(&right.time)
+                .then_with(|| left.frame.cmp(&right.frame))
+        })
+    }
+
+    /// Attribute a goal that landed after the kickoff's logical close but
+    /// within [`KICKOFF_GOAL_MAX_SECONDS`] of the first touch to the concluded
+    /// kickoff event. Mirrors the attribution `finish_event` performs when the
+    /// goal arrives while the kickoff is still open.
+    fn attribute_goal(event: &mut KickoffEvent, goal: &GoalEvent) {
+        let Some(first_touch_time) = event.first_touch_time else {
+            return;
+        };
+        let time_to_goal = goal.time - first_touch_time;
+        if !(0.0..KICKOFF_GOAL_MAX_SECONDS).contains(&time_to_goal) {
+            return;
+        }
+        event.time_to_goal = Some(time_to_goal);
+        event.kickoff_goal = true;
+        event.scoring_team_is_team_0 = Some(goal.scoring_team_is_team_0);
+        if event.first_follow_up_touch_time.is_none() {
+            event.kickoff_possession_outcome = if goal.scoring_team_is_team_0 {
+                KickoffPossessionOutcome::TeamZeroPossession
+            } else {
+                KickoffPossessionOutcome::TeamOnePossession
+            };
+            event.kickoff_possession_team_is_team_0 = Some(goal.scoring_team_is_team_0);
+        }
+    }
+
     fn finish_event(
         active: ActiveKickoff,
         frame: &FrameInfo,
@@ -1262,47 +1313,99 @@ impl KickoffCalculator {
         ctx: KickoffUpdateContext<'_>,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if ctx.gameplay.kickoff_phase_active() && self.active.is_empty() {
-            self.start_kickoff(ctx.frame, ctx.players);
+        if ctx.gameplay.kickoff_phase_active() {
+            // Once the next kickoff phase begins, no further goal can belong
+            // to a previous kickoff: flush any concluded kickoff still held
+            // for goal attribution before arming the new one.
+            let flushed = self.active.advance(ctx.frame.time, |active| {
+                if active.concluded.is_some() {
+                    Disposition::Finalize(FinalizeReason::Completed)
+                } else {
+                    Disposition::Keep
+                }
+            });
+            for (active, _reason) in flushed {
+                if let Some(event) = active.concluded {
+                    self.events.push(*event);
+                }
+            }
+            if self.active.is_empty() {
+                self.start_kickoff(ctx.frame, ctx.players);
+            }
         }
 
         let Some(active) = self.active.in_flight_mut().first_mut() else {
             return Ok(());
         };
-        Self::observe_movement_start(active, ctx.frame, ctx.gameplay);
-        if ctx.gameplay.kickoff_phase_active() && !ctx.gameplay.kickoff_countdown_active() {
-            Self::observe_live_action_start(active, ctx.frame);
-        }
-        Self::apply_player_samples(active, ctx.frame, ctx.players);
-        Self::apply_touches(active, ctx.touch_state);
-        Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);
-        if Self::should_capture_resolution(active, ctx.frame) {
-            active.resolution = Some(KickoffResolutionSnapshot {
-                ball: ctx.ball.clone(),
-            });
+        if active.concluded.is_none() {
+            Self::observe_movement_start(active, ctx.frame, ctx.gameplay);
+            if ctx.gameplay.kickoff_phase_active() && !ctx.gameplay.kickoff_countdown_active() {
+                Self::observe_live_action_start(active, ctx.frame);
+            }
+            Self::apply_player_samples(active, ctx.frame, ctx.players);
+            Self::apply_touches(active, ctx.touch_state);
+            Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);
+            if Self::should_capture_resolution(active, ctx.frame) {
+                active.resolution = Some(KickoffResolutionSnapshot {
+                    ball: ctx.ball.clone(),
+                });
+            }
         }
 
-        // Natural finalization: the kickoff resolves once `should_finish` is met
-        // (which already accounts for goals and goal-replay). The ledger keeps
-        // the in-flight kickoff queryable and guarantees it is resolved at the
-        // end of the stream.
+        // Natural finalization happens in two stages. The kickoff *concludes*
+        // once `should_finish` is met: its event content is frozen there
+        // (touches, possession, exit ball state). It then stays in flight,
+        // awaiting goal attribution, until a goal arrives, the attribution
+        // window closes, or the next kickoff begins. This lets a goal scored
+        // after the kickoff's logical close — but still within
+        // `KICKOFF_GOAL_MAX_SECONDS` of the first touch — count as a kickoff
+        // goal. The ledger keeps the in-flight kickoff queryable and
+        // guarantees it is resolved at the end of the stream.
         let finished = self.active.advance(ctx.frame.time, |active| {
-            if Self::should_finish(active, ctx.frame, ctx.gameplay, ctx.events) {
-                Disposition::Finalize(FinalizeReason::Completed)
-            } else {
-                Disposition::Keep
+            if let Some(event) = active.concluded.as_deref_mut() {
+                if let Some(goal) = Self::earliest_goal(ctx.events) {
+                    Self::attribute_goal(event, goal);
+                    return Disposition::Finalize(FinalizeReason::Completed);
+                }
+                let attribution_window_closed = active
+                    .first_touch_time
+                    .map(|first_touch_time| {
+                        ctx.frame.time - first_touch_time >= KICKOFF_GOAL_MAX_SECONDS
+                    })
+                    .unwrap_or(true);
+                if attribution_window_closed
+                    || ctx.gameplay.game_state == Some(GAME_STATE_GOAL_SCORED_REPLAY)
+                {
+                    return Disposition::Finalize(FinalizeReason::Completed);
+                }
+                return Disposition::Keep;
             }
+            if Self::should_finish(active, ctx.frame, ctx.gameplay, ctx.events) {
+                let event = Self::finish_event(
+                    active.clone(),
+                    ctx.frame,
+                    ctx.ball,
+                    ctx.players,
+                    ctx.events,
+                    ctx.speed_flip_events,
+                );
+                active.concluded = Some(Box::new(event));
+                // A goal (or goal replay) at the close frame is already
+                // attributed by `finish_event`; nothing further can change the
+                // event, so emit immediately.
+                if !ctx.events.goal_events.is_empty()
+                    || ctx.gameplay.game_state == Some(GAME_STATE_GOAL_SCORED_REPLAY)
+                {
+                    return Disposition::Finalize(FinalizeReason::Completed);
+                }
+                return Disposition::Keep;
+            }
+            Disposition::Keep
         });
         for (active, _reason) in finished {
-            let event = Self::finish_event(
-                active,
-                ctx.frame,
-                ctx.ball,
-                ctx.players,
-                ctx.events,
-                ctx.speed_flip_events,
-            );
-            self.events.push(event);
+            if let Some(event) = active.concluded {
+                self.events.push(*event);
+            }
         }
         Ok(())
     }
