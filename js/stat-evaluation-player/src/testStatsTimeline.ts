@@ -368,6 +368,7 @@ export function createStatsTimeline(
         team_zero: [],
         team_one: [],
         all_headers: [],
+        season: null,
         game_type: {
           game_type: "Unknown",
           header_match_type: null,
