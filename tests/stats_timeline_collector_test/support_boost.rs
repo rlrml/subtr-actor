@@ -246,6 +246,7 @@ fn empty_stats_timeline_config() -> StatsTimelineConfig {
         one_timer_goal_max_event_to_goal_seconds: 0.0,
         air_dribble_goal_max_end_to_goal_seconds: 0.0,
         flip_reset_goal_max_event_to_goal_seconds: 0.0,
+        flip_into_ball_goal_max_touch_to_goal_seconds: 0.0,
         bump_goal_max_event_to_goal_seconds: 0.0,
         demo_goal_max_event_to_goal_seconds: 0.0,
         half_volley_max_bounce_to_touch_seconds: 0.0,

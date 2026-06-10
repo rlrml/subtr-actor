@@ -402,6 +402,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "passing_goal",
         "air_dribble_goal",
         "flip_reset_goal",
+        "flip_into_ball_goal",
         "bump_goal",
         "demo_goal",
         "half_volley_goal",
@@ -639,6 +640,12 @@ pub(crate) fn builtin_module_json(
         }
         "flip_reset_goal" => {
             let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
+        "flip_into_ball_goal" => {
+            let calculator = graph_state::<FlipIntoBallGoalCalculator>(graph, module_name)?;
             serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
@@ -1326,6 +1333,7 @@ pub(crate) fn builtin_snapshot_frame_json(
         | "passing_goal"
         | "air_dribble_goal"
         | "flip_reset_goal"
+        | "flip_into_ball_goal"
         | "bump_goal"
         | "demo_goal"
         | "half_volley_goal" => serialize_to_json_value(&serde_json::json!({}))?,
@@ -1642,6 +1650,12 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<FlipResetGoalCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "flip_reset_goal_max_event_to_goal_seconds": calculator.config().max_event_to_goal_seconds,
+            }))?)
+        }
+        "flip_into_ball_goal" => {
+            let calculator = graph_state::<FlipIntoBallGoalCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "flip_into_ball_goal_max_touch_to_goal_seconds": calculator.config().max_touch_to_goal_seconds,
             }))?)
         }
         "bump_goal" => {

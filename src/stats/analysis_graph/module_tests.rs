@@ -3,12 +3,13 @@ use crate::{
     builtin_analysis_node_json, builtin_analysis_nodes_json, builtin_stats_module_names,
     AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BallCarryCalculator,
     BumpCalculator, CenterCalculator, CounterAttackGoalCalculator, DoubleTapGoalCalculator,
-    EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator, FlipResetGoalCalculator,
-    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
-    LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
-    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerVerticalState,
-    PossessionState, RotationCalculator, StatsTimelineCollector, SustainedPressureGoalCalculator,
-    TerritorialPressureCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
+    EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator, FlipIntoBallGoalCalculator,
+    FlipResetGoalCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
+    HighAerialGoalCalculator, LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator,
+    OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator,
+    PlayerVerticalState, PossessionState, RotationCalculator, StatsTimelineCollector,
+    SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchState,
+    WallAerialCalculator, WallAerialShotCalculator,
 };
 use std::any::TypeId;
 use std::collections::HashSet;
@@ -273,6 +274,7 @@ fn assert_all_reducer_states_are_present(graph: &AnalysisGraph) {
     assert!(graph.state::<PassingGoalCalculator>().is_some());
     assert!(graph.state::<AirDribbleGoalCalculator>().is_some());
     assert!(graph.state::<FlipResetGoalCalculator>().is_some());
+    assert!(graph.state::<FlipIntoBallGoalCalculator>().is_some());
     assert!(graph.state::<HalfVolleyGoalCalculator>().is_some());
 }
 

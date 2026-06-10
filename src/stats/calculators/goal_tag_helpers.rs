@@ -292,6 +292,20 @@ pub(super) fn air_dribble_evidence(event: &BallCarryEvent) -> GoalTagEvidence {
     }
 }
 
+pub(super) fn flip_into_ball_evidence(event: &TouchClassificationEvent) -> GoalTagEvidence {
+    GoalTagEvidence {
+        kind: GoalTagEvidenceKind::FlipIntoBall,
+        time: event.time,
+        frame: event.frame,
+        player: Some(event.player.clone()),
+        player_position: event.player_position.map(|position| GoalContextPosition {
+            x: position[0],
+            y: position[1],
+            z: position[2],
+        }),
+    }
+}
+
 pub(super) fn bump_evidence(event: &BumpEvent) -> GoalTagEvidence {
     GoalTagEvidence {
         kind: GoalTagEvidenceKind::Bump,

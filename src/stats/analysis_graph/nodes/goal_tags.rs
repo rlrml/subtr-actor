@@ -169,6 +169,13 @@ mechanic_goal_tag_node!(
     DodgeResetCalculator
 );
 mechanic_goal_tag_node!(
+    FlipIntoBallGoalNode,
+    FlipIntoBallGoalCalculator,
+    "flip_into_ball_goal",
+    touch_dependency,
+    TouchCalculator
+);
+mechanic_goal_tag_node!(
     BumpGoalNode,
     BumpGoalCalculator,
     "bump_goal",
@@ -282,6 +289,10 @@ pub(crate) fn boxed_air_dribble_goal() -> Box<dyn AnalysisNodeDyn> {
 
 pub(crate) fn boxed_flip_reset_goal() -> Box<dyn AnalysisNodeDyn> {
     Box::new(FlipResetGoalNode::new())
+}
+
+pub(crate) fn boxed_flip_into_ball_goal() -> Box<dyn AnalysisNodeDyn> {
+    Box::new(FlipIntoBallGoalNode::new())
 }
 
 pub(crate) fn boxed_bump_goal() -> Box<dyn AnalysisNodeDyn> {

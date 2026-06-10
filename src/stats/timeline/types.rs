@@ -35,6 +35,7 @@ pub struct StatsTimelineConfig {
     pub one_timer_goal_max_event_to_goal_seconds: f32,
     pub air_dribble_goal_max_end_to_goal_seconds: f32,
     pub flip_reset_goal_max_event_to_goal_seconds: f32,
+    pub flip_into_ball_goal_max_touch_to_goal_seconds: f32,
     pub bump_goal_max_event_to_goal_seconds: f32,
     pub demo_goal_max_event_to_goal_seconds: f32,
     pub half_volley_max_bounce_to_touch_seconds: f32,
