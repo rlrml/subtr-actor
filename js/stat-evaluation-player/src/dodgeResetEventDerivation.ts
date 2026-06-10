@@ -18,6 +18,10 @@ function defaultDodgeResetStats(): DodgeResetStats {
   return {
     count: 0,
     on_ball_count: 0,
+    flip_reset_used_count: 0,
+    flip_reset_unused_count: 0,
+    flip_reset_total_time_to_use: 0,
+    flip_reset_min_time_to_use: null,
   };
 }
 
