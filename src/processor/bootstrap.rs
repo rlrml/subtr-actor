@@ -187,9 +187,20 @@ impl<'a> ReplayProcessor<'a> {
     }
 }
 
+/// Derive a human-facing name from a player's remote id for use when no in-game
+/// name is available. Without this, callers fall back to the `Debug` formatting
+/// of the id (e.g. `Epic("3f67e5d2349f491c8b99825ec396a2…")`), which leaks the
+/// Rust enum representation into user-facing output.
 fn remote_id_display_name(player_id: &PlayerId) -> Option<String> {
-    match player_id {
-        boxcars::RemoteId::PlayStation(id) if !id.name.is_empty() => Some(id.name.clone()),
-        _ => None,
-    }
+    Some(match player_id {
+        boxcars::RemoteId::PlayStation(id) if !id.name.is_empty() => id.name.clone(),
+        boxcars::RemoteId::PlayStation(id) => id.online_id.to_string(),
+        boxcars::RemoteId::PsyNet(id) => id.online_id.to_string(),
+        boxcars::RemoteId::SplitScreen(id) => id.to_string(),
+        boxcars::RemoteId::Steam(id) => id.to_string(),
+        boxcars::RemoteId::Switch(id) => id.online_id.to_string(),
+        boxcars::RemoteId::Xbox(id) => id.to_string(),
+        boxcars::RemoteId::QQ(id) => id.to_string(),
+        boxcars::RemoteId::Epic(id) => id.clone(),
+    })
 }
