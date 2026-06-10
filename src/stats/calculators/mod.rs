@@ -106,6 +106,8 @@ pub mod territorial_pressure;
 pub use territorial_pressure::*;
 pub mod touch;
 pub use touch::*;
+pub mod touch_intention;
+pub use touch_intention::*;
 pub mod touch_state;
 pub use touch_state::*;
 pub mod wall_aerial;

@@ -36,6 +36,7 @@ impl AnalysisNode for TouchNode {
             touch_state_dependency(),
             possession_state_dependency(),
             fifty_fifty_state_dependency(),
+            frame_events_state_dependency(),
             live_play_dependency(),
         ]
     }
@@ -50,6 +51,7 @@ impl AnalysisNode for TouchNode {
             touch_state,
             ctx.get::<PossessionState>()?,
             ctx.get::<FiftyFiftyState>()?,
+            ctx.get::<FrameEventsState>()?,
             ctx.get::<LivePlayState>()?,
         )
     }

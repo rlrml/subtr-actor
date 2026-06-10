@@ -2,4 +2,4 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { TouchBallMovement } from "./TouchBallMovement.ts";
 
-export type TouchClassificationEvent = { time: number, frame: number, sample_time: number, sample_frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, kind: string, height_band: string, surface: string, dodge_state: string, ball_speed_change: number, ball_movement?: TouchBallMovement | null, };
+export type TouchClassificationEvent = { time: number, frame: number, sample_time: number, sample_frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, kind: string, height_band: string, surface: string, dodge_state: string, intention: string, first_touch: boolean, contested: boolean, ball_speed_change: number, ball_movement?: TouchBallMovement | null, };

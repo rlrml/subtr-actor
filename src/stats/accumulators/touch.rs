@@ -3,6 +3,16 @@ use super::*;
 const TOUCH_KIND_LABEL_VALUES: [&str; 3] = ["control", "medium_hit", "hard_hit"];
 const TOUCH_SURFACE_LABEL_VALUES: [&str; 3] = ["ground", "air", "wall"];
 const TOUCH_DODGE_STATE_LABEL_VALUES: [&str; 2] = ["no_dodge", "dodge"];
+const TOUCH_INTENTION_LABEL_VALUES: [&str; 7] = [
+    "control",
+    "shot",
+    "save",
+    "challenge",
+    "clear",
+    "pass",
+    "neutral",
+];
+const TOUCH_RECEPTION_LABEL_VALUES: [&str; 2] = ["first_touch", "continuation"];
 
 fn touch_kind_label(value: &str) -> StatLabel {
     match value {
@@ -35,6 +45,29 @@ fn touch_dodge_state_label(value: &str) -> StatLabel {
     }
 }
 
+fn touch_intention_label(value: &str) -> StatLabel {
+    match value {
+        "control" => StatLabel::new("intention", "control"),
+        "shot" => StatLabel::new("intention", "shot"),
+        "save" => StatLabel::new("intention", "save"),
+        "challenge" => StatLabel::new("intention", "challenge"),
+        "clear" => StatLabel::new("intention", "clear"),
+        "pass" => StatLabel::new("intention", "pass"),
+        _ => StatLabel::new("intention", "neutral"),
+    }
+}
+
+fn touch_reception_label(first_touch: bool) -> StatLabel {
+    StatLabel::new(
+        "reception",
+        if first_touch {
+            "first_touch"
+        } else {
+            "continuation"
+        },
+    )
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchStats {
@@ -46,6 +79,8 @@ pub struct TouchStats {
     pub high_aerial_touch_count: u32,
     #[serde(default)]
     pub wall_touch_count: u32,
+    #[serde(default)]
+    pub first_touch_count: u32,
     pub is_last_touch: bool,
     pub last_touch_time: Option<f32>,
     pub last_touch_frame: Option<usize>,
@@ -62,6 +97,8 @@ pub struct TouchStats {
     pub total_ball_retreat_distance: f32,
     #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
     pub labeled_touch_counts: LabeledCounts,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_intention_counts: LabeledCounts,
 }
 
 impl TouchStats {
@@ -89,6 +126,43 @@ impl TouchStats {
             StatLabel::new("dodge_state", "dodge"),
             StatLabel::new("kind", "hard_hit"),
         ])
+    }
+
+    pub fn intention_count(&self, intention: &str) -> u32 {
+        self.labeled_intention_counts
+            .count_matching(&[touch_intention_label(intention)])
+    }
+
+    pub fn first_touch_intention_count(&self, intention: &str) -> u32 {
+        self.labeled_intention_counts.count_matching(&[
+            touch_intention_label(intention),
+            touch_reception_label(true),
+        ])
+    }
+
+    pub fn complete_labeled_intention_counts(&self) -> LabeledCounts {
+        let mut entries: Vec<_> = TOUCH_INTENTION_LABEL_VALUES
+            .into_iter()
+            .flat_map(|intention| {
+                TOUCH_RECEPTION_LABEL_VALUES
+                    .into_iter()
+                    .map(move |reception| {
+                        let mut labels = vec![
+                            StatLabel::new("intention", intention),
+                            StatLabel::new("reception", reception),
+                        ];
+                        labels.sort();
+                        LabeledCountEntry {
+                            count: self.labeled_intention_counts.count_exact(&labels),
+                            labels,
+                        }
+                    })
+            })
+            .collect();
+
+        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
+
+        LabeledCounts { entries }
     }
 
     pub fn complete_labeled_touch_counts(&self) -> LabeledCounts {
@@ -126,6 +200,7 @@ impl TouchStats {
 
     pub fn with_complete_labeled_touch_counts(mut self) -> Self {
         self.labeled_touch_counts = self.complete_labeled_touch_counts();
+        self.labeled_intention_counts = self.complete_labeled_intention_counts();
         self
     }
 }
@@ -182,6 +257,13 @@ impl TouchStatsAccumulator {
             touch_height_band_label(&event.height_band),
             touch_surface_label(&event.surface),
             touch_dodge_state_label(&event.dodge_state),
+        ]);
+        if event.first_touch {
+            stats.first_touch_count += 1;
+        }
+        stats.labeled_intention_counts.increment([
+            touch_intention_label(&event.intention),
+            touch_reception_label(event.first_touch),
         ]);
         stats.last_touch_time = Some(event.time);
         stats.last_touch_frame = Some(event.frame);

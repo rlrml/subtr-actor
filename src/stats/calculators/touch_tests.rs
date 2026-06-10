@@ -132,6 +132,7 @@ fn touch_stats_at_height(height: f32) -> TouchStats {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -179,6 +180,7 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -191,6 +193,7 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -216,6 +219,7 @@ fn dodge_active_hit_counts_as_dodge_hit() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -228,6 +232,7 @@ fn dodge_active_hit_counts_as_dodge_hit() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -264,6 +269,7 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -276,6 +282,7 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
             &dodge_contact_touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -300,6 +307,7 @@ fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -315,6 +323,7 @@ fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -343,6 +352,7 @@ fn touch_on_wall_gets_wall_surface_classification() {
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -376,6 +386,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &initial_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -388,6 +399,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &followup_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -400,6 +412,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &followup_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -430,6 +443,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &initial_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -442,6 +456,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &followup_touch_state,
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -454,6 +469,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &followup_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -552,6 +568,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 active_event: Some(active_fifty.clone()),
                 ..FiftyFiftyState::default()
             },
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -567,6 +584,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 active_event: Some(active_fifty),
                 ..FiftyFiftyState::default()
             },
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -582,6 +600,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 resolved_events: vec![resolved_fifty],
                 ..FiftyFiftyState::default()
             },
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -634,6 +653,7 @@ fn touch_classification_events_follow_chronological_touch_event_order() {
             &touch_state,
             &PossessionState::default(),
             &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
         .unwrap();
@@ -642,4 +662,104 @@ fn touch_classification_events_follow_chronological_touch_event_order() {
     assert_eq!(events.len(), 2);
     assert_eq!(events[0].frame, 1);
     assert_eq!(events[1].frame, 4);
+}
+
+#[test]
+fn soft_touch_followed_by_staying_with_ball_upgrades_intention_to_control() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+    let followup_touch_state = TouchState {
+        last_touch_player: Some(player_id.clone()),
+        last_touch_team_is_team_0: Some(true),
+        ..TouchState::default()
+    };
+
+    calculator
+        .update(
+            &frame(1),
+            &ball(0.0, 0.0),
+            &player_frame_state(&player_id, glam::Vec3::new(0.0, 0.0, 17.0)),
+            &vertical_state(&player_id, 0.0),
+            &touch_state(1, &player_id),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events()[0].intention, "neutral");
+    assert!(calculator.events()[0].first_touch);
+
+    // Stay glued to the (stationary) ball until the control-follow window
+    // ages out and resolves.
+    for frame_number in 2..=15 {
+        calculator
+            .update(
+                &frame(frame_number),
+                &ball(0.0, 0.0),
+                &player_frame_state(&player_id, glam::Vec3::new(0.0, 0.0, 17.0)),
+                &vertical_state(&player_id, 0.0),
+                &followup_touch_state,
+                &PossessionState::default(),
+                &FiftyFiftyState::default(),
+                &FrameEventsState::default(),
+                &LivePlayState::active_play(),
+            )
+            .unwrap();
+    }
+
+    assert_eq!(calculator.events()[0].intention, "control");
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.intention_count("control"), 1);
+    assert_eq!(stats.first_touch_intention_count("control"), 1);
+    assert_eq!(stats.first_touch_count, 1);
+}
+
+#[test]
+fn touch_where_ball_leaves_the_player_stays_neutral() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+    let followup_touch_state = TouchState {
+        last_touch_player: Some(player_id.clone()),
+        last_touch_team_is_team_0: Some(true),
+        ..TouchState::default()
+    };
+
+    calculator
+        .update(
+            &frame(1),
+            &ball_with_velocity(0.0, 0.0, glam::Vec3::new(1000.0, 0.0, 0.0)),
+            &player_frame_state(&player_id, glam::Vec3::new(0.0, -100.0, 17.0)),
+            &vertical_state(&player_id, 0.0),
+            &touch_state(1, &player_id),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    // The ball races away while the player stays put.
+    for frame_number in 2..=15 {
+        let time = frame_number as f32 * 0.1;
+        calculator
+            .update(
+                &frame(frame_number),
+                &ball_with_velocity(time * 1000.0, 0.0, glam::Vec3::new(1000.0, 0.0, 0.0)),
+                &player_frame_state(&player_id, glam::Vec3::new(0.0, -100.0, 17.0)),
+                &vertical_state(&player_id, 0.0),
+                &followup_touch_state,
+                &PossessionState::default(),
+                &FiftyFiftyState::default(),
+                &FrameEventsState::default(),
+                &LivePlayState::active_play(),
+            )
+            .unwrap();
+    }
+
+    assert_eq!(calculator.events()[0].intention, "neutral");
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.intention_count("control"), 0);
+    assert_eq!(stats.intention_count("neutral"), 1);
 }

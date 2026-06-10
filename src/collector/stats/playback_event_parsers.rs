@@ -439,6 +439,13 @@ pub(in crate::collector::stats::playback) fn parse_touch_stats_event(
         height_band: json_required_str(object, "height_band")?.to_owned(),
         surface: json_required_str(object, "surface")?.to_owned(),
         dodge_state: json_required_str(object, "dodge_state")?.to_owned(),
+        intention: object
+            .get("intention")
+            .and_then(Value::as_str)
+            .unwrap_or("neutral")
+            .to_owned(),
+        first_touch: json_optional_bool(object.get("first_touch")).unwrap_or(false),
+        contested: json_optional_bool(object.get("contested")).unwrap_or(false),
         ball_speed_change: json_required_f32(object, "ball_speed_change")?,
         ball_movement: object
             .get("ball_movement")
