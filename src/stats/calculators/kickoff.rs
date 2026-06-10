@@ -82,6 +82,8 @@ struct ActiveKickoff {
     first_touch_time: Option<f32>,
     first_touch_frame: Option<usize>,
     first_touch_team_is_team_0: Option<bool>,
+    first_touch_ball_position: Option<[f32; 3]>,
+    first_touch_ball_velocity: Option<[f32; 3]>,
     touches: Vec<KickoffTouchSnapshot>,
     speed_flip_players: HashSet<PlayerId>,
     resolution: Option<KickoffResolutionSnapshot>,
@@ -424,6 +426,8 @@ impl KickoffCalculator {
             first_touch_time: None,
             first_touch_frame: None,
             first_touch_team_is_team_0: None,
+            first_touch_ball_position: None,
+            first_touch_ball_velocity: None,
             touches: Vec::new(),
             speed_flip_players: HashSet::new(),
             resolution: None,
@@ -542,7 +546,7 @@ impl KickoffCalculator {
         }
     }
 
-    fn apply_touches(active: &mut ActiveKickoff, touch_state: &TouchState) {
+    fn apply_touches(active: &mut ActiveKickoff, touch_state: &TouchState, ball: &BallFrameState) {
         for touch in chronological_touch_events(&touch_state.touch_events) {
             active.touches.push(KickoffTouchSnapshot {
                 time: touch.time,
@@ -554,6 +558,10 @@ impl KickoffCalculator {
                 active.first_touch_time = Some(touch.time);
                 active.first_touch_frame = Some(touch.frame);
                 active.first_touch_team_is_team_0 = Some(touch.team_is_team_0);
+                active.first_touch_ball_position =
+                    ball.position().map(|position| position.to_array());
+                active.first_touch_ball_velocity =
+                    ball.velocity().map(|velocity| velocity.to_array());
             }
             let Some(player_id) = touch.player.as_ref() else {
                 continue;
@@ -1226,6 +1234,9 @@ impl KickoffCalculator {
                 }
                 _ => None,
             };
+        let first_touch_ball_position = active.first_touch_ball_position;
+        let first_touch_ball_abs_x = first_touch_ball_position.map(|position| position[0].abs());
+        let first_touch_ball_height = first_touch_ball_position.map(|position| position[2]);
         let exit_velocity = Self::exit_velocity(resolution_ball);
         let exit_speed = Self::exit_speed(exit_velocity);
         let exit_y_velocity = exit_velocity.map(|velocity| velocity[1]);
@@ -1350,6 +1361,10 @@ impl KickoffCalculator {
             first_touch_frame: active.first_touch_frame,
             first_touch_team_is_team_0: active.first_touch_team_is_team_0,
             first_touch_player,
+            first_touch_ball_position,
+            first_touch_ball_abs_x,
+            first_touch_ball_height,
+            first_touch_ball_velocity: active.first_touch_ball_velocity,
             team_zero_taker_touch_time,
             team_zero_taker_touch_frame,
             team_one_taker_touch_time,
@@ -1434,7 +1449,7 @@ impl KickoffCalculator {
                 Self::observe_live_action_start(active, ctx.frame);
             }
             Self::apply_player_samples(active, ctx.frame, ctx.players);
-            Self::apply_touches(active, ctx.touch_state);
+            Self::apply_touches(active, ctx.touch_state, ctx.ball);
             Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);
             if Self::should_capture_resolution(active, ctx.frame) {
                 active.resolution = Some(KickoffResolutionSnapshot {
@@ -1445,7 +1460,7 @@ impl KickoffCalculator {
             // The frozen event no longer changes, but the kickoff-goal gates
             // still need the touch chain and ball-position history through the
             // attribution window.
-            Self::apply_touches(active, ctx.touch_state);
+            Self::apply_touches(active, ctx.touch_state, ctx.ball);
         }
         Self::observe_ball_extent(active, ctx.ball);
 

@@ -339,6 +339,17 @@ pub struct KickoffEvent {
     pub first_touch_team_is_team_0: Option<bool>,
     #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub first_touch_player: Option<PlayerId>,
+    /// Ball position (field coordinates) at the frame of the first kickoff touch.
+    pub first_touch_ball_position: Option<[f32; 3]>,
+    /// Lateral centrality of the first-touch contact: `abs(x)` of the ball
+    /// position at first touch. `0.0` means the ball was struck dead center.
+    pub first_touch_ball_abs_x: Option<f32>,
+    /// Ball height (z) at first touch. On a standard kickoff the ball rests at
+    /// center field, so values above the resting radius indicate the ball was
+    /// popped or hit upward.
+    pub first_touch_ball_height: Option<f32>,
+    /// Ball velocity at the first-touch frame (immediately after contact).
+    pub first_touch_ball_velocity: Option<[f32; 3]>,
     pub team_zero_taker_touch_time: Option<f32>,
     pub team_zero_taker_touch_frame: Option<usize>,
     pub team_one_taker_touch_time: Option<f32>,

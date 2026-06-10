@@ -1147,6 +1147,10 @@ pub(in crate::collector::stats::playback) fn parse_kickoff_event(
         first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
         first_touch_team_is_team_0: json_optional_bool(object.get("first_touch_team_is_team_0")),
         first_touch_player: json_optional_remote_id(object.get("first_touch_player"))?,
+        first_touch_ball_position: json_optional_vec3(object.get("first_touch_ball_position"))?,
+        first_touch_ball_abs_x: json_optional_f32(object.get("first_touch_ball_abs_x"))?,
+        first_touch_ball_height: json_optional_f32(object.get("first_touch_ball_height"))?,
+        first_touch_ball_velocity: json_optional_vec3(object.get("first_touch_ball_velocity"))?,
         team_zero_taker_touch_time: json_optional_f32(object.get("team_zero_taker_touch_time"))?,
         team_zero_taker_touch_frame: json_optional_usize(
             object.get("team_zero_taker_touch_frame"),
