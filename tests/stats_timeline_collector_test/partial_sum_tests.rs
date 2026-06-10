@@ -719,6 +719,7 @@ fn test_ceiling_shot_events_reconstruct_serialized_partial_sums() {
             team_zero: Vec::new(),
             team_one: Vec::new(),
             game_type: Default::default(),
+            season: None,
             all_headers: Vec::new(),
         },
         events: ReplayStatsTimelineEvents {

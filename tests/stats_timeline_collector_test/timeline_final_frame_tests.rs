@@ -71,6 +71,7 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
             team_zero: Vec::new(),
             team_one: Vec::new(),
             game_type: Default::default(),
+            season: None,
             all_headers: Vec::new(),
         },
         events: ReplayStatsTimelineEvents::default(),

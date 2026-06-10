@@ -81,3 +81,59 @@ fn shot_event_metadata_uses_orange_goal_direction() {
     assert!(metadata.ball_goal_alignment.unwrap() > 0.99);
     assert!(metadata.ball_speed_toward_goal.unwrap() > 1490.0);
 }
+
+fn date_header(value: &str) -> Vec<(String, boxcars::HeaderProp)> {
+    vec![(
+        "Date".to_string(),
+        boxcars::HeaderProp::Str(value.to_string()),
+    )]
+}
+
+#[test]
+fn parse_header_date_handles_replay_and_rfc3339_formats() {
+    assert_eq!(
+        parse_header_date("2026-04-28 14-30-00"),
+        Some((2026, 4, 28))
+    );
+    assert_eq!(
+        parse_header_date("2026-04-17T15:01:25-07:00"),
+        Some((2026, 4, 17))
+    );
+    assert_eq!(parse_header_date("not-a-date"), None);
+    assert_eq!(parse_header_date(""), None);
+}
+
+#[test]
+fn season_for_date_returns_most_recent_started_season() {
+    let f21 = ReplaySeason::new(SeasonEra::FreeToPlay, 21);
+    // Exactly on a boundary resolves to that season.
+    assert_eq!(season_for_date((2026, 1, 14)), Some(f21));
+    // Between boundaries resolves to the earlier one.
+    assert_eq!(season_for_date((2026, 4, 17)), Some(f21));
+    assert_eq!(
+        season_for_date((2024, 12, 4)),
+        Some(ReplaySeason::new(SeasonEra::FreeToPlay, 17))
+    );
+    // Legacy era resolves before the free-to-play reset.
+    assert_eq!(
+        season_for_date((2019, 9, 1)),
+        Some(ReplaySeason::new(SeasonEra::Legacy, 9))
+    );
+    // Dates before the first known season are unclassified.
+    assert_eq!(season_for_date((2015, 1, 1)), None);
+}
+
+#[test]
+fn season_code_round_trips_era_and_number() {
+    assert_eq!(ReplaySeason::new(SeasonEra::FreeToPlay, 21).code(), "f21");
+    assert_eq!(ReplaySeason::new(SeasonEra::Legacy, 14).code(), "s14");
+}
+
+#[test]
+fn season_from_headers_resolves_from_date() {
+    assert_eq!(
+        season_from_headers(&date_header("2026-04-17T15:01:25-07:00")),
+        Some(ReplaySeason::new(SeasonEra::FreeToPlay, 21))
+    );
+    assert_eq!(season_from_headers(&[]), None);
+}
