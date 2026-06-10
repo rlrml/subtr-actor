@@ -85,6 +85,11 @@ pub struct TouchClassificationEvent {
     pub height_band: String,
     pub surface: String,
     pub dodge_state: String,
+    pub intention: String,
+    #[serde(default)]
+    pub first_touch: bool,
+    #[serde(default)]
+    pub contested: bool,
     pub ball_speed_change: f32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ball_movement: Option<TouchBallMovement>,
@@ -155,6 +160,8 @@ pub struct TouchCalculator {
     previous_ball_velocity: Option<glam::Vec3>,
     previous_ball_position: Option<glam::Vec3>,
     pending_fifty_fifty_movement: Option<PendingFiftyFiftyMovement>,
+    intention_classifier: TouchIntentionClassifier,
+    control_follow: ControlFollowTracker,
 }
 
 impl TouchCalculator {
@@ -181,6 +188,8 @@ impl TouchCalculator {
     pub fn finish(&mut self) {
         let finalized = self.ball_movement.finish();
         self.write_finalized_ball_movement(finalized);
+        let resolution = self.control_follow.flush();
+        self.apply_control_resolution(resolution);
     }
 
     fn finalize_ball_movement_at_boundary(&mut self, boundary: Boundary) {
@@ -300,6 +309,19 @@ impl TouchCalculator {
             .is_some_and(|player| player.dodge_active)
     }
 
+    fn teammate_positions(
+        players: &PlayerFrameState,
+        player_id: &PlayerId,
+        is_team_0: bool,
+    ) -> Vec<glam::Vec3> {
+        players
+            .players
+            .iter()
+            .filter(|player| player.is_team_0 == is_team_0 && &player.player_id != player_id)
+            .filter_map(PlayerSample::position)
+            .collect()
+    }
+
     fn apply_touch_events(
         &mut self,
         frame: &FrameInfo,
@@ -307,9 +329,11 @@ impl TouchCalculator {
         players: &PlayerFrameState,
         vertical_state: &PlayerVerticalState,
         touch_events: &[TouchEvent],
-        _primary_touch: Option<&TouchEvent>,
+        fifty_fifty_state: &FiftyFiftyState,
     ) {
         let ball_speed_change = Self::ball_speed_change(frame, ball, self.previous_ball_velocity);
+        let contested_frame = touch_events.iter().any(|touch| touch.team_is_team_0)
+            && touch_events.iter().any(|touch| !touch.team_is_team_0);
 
         for touch_event in touch_events {
             let Some(player_id) = touch_event.player.as_ref() else {
@@ -329,6 +353,31 @@ impl TouchCalculator {
                 ball_speed_change,
                 controlled_touch_kind,
             );
+            let contested = contested_frame
+                || fifty_fifty_state
+                    .active_event
+                    .as_ref()
+                    .is_some_and(|active| {
+                        fifty_fifty_involves_player(active, player_id, touch_event.team_is_team_0)
+                    });
+            let teammate_positions =
+                Self::teammate_positions(players, player_id, touch_event.team_is_team_0);
+            let control_resolution = self
+                .control_follow
+                .observe_touch(player_id, touch_event.time);
+            self.apply_control_resolution(control_resolution);
+            let resolution = self.intention_classifier.classify(
+                touch_event,
+                player_id,
+                &TouchIntentionFrameContext {
+                    ball_position: ball.position(),
+                    ball_velocity: ball.velocity(),
+                    previous_ball_position: self.previous_ball_position,
+                    previous_ball_velocity: self.previous_ball_velocity,
+                    teammate_positions: &teammate_positions,
+                    contested,
+                },
+            );
             let event = TouchClassificationEvent {
                 time: touch_event.time,
                 frame: touch_event.frame,
@@ -347,6 +396,9 @@ impl TouchCalculator {
                 height_band: classification.height_band.as_label().value.to_owned(),
                 surface: classification.surface.as_label_value().to_owned(),
                 dodge_state: classification.dodge_state.as_label_value().to_owned(),
+                intention: resolution.intention.as_label_value().to_owned(),
+                first_touch: resolution.first_touch,
+                contested: resolution.contested,
                 ball_speed_change,
                 ball_movement: None,
             };
@@ -354,7 +406,53 @@ impl TouchCalculator {
             self.events.push(event);
             self.active_touch_index_by_player
                 .insert(player_id.clone(), touch_index);
+            if matches!(
+                resolution.intention,
+                TouchIntention::Pass | TouchIntention::Neutral
+            ) {
+                self.control_follow
+                    .open(touch_index, player_id, touch_event.time);
+            }
         }
+    }
+
+    /// Apply a closed control-follow window: upgrade the touch's intention to
+    /// control when the toucher stayed with the ball or earned the follow-up.
+    fn apply_control_resolution(&mut self, resolution: Option<ControlResolution>) {
+        let Some(resolution) = resolution else {
+            return;
+        };
+        if !resolution.control {
+            return;
+        }
+        if let Some(event) = self.events.get_mut(resolution.touch_index) {
+            event.intention = TouchIntention::Control.as_label_value().to_owned();
+        }
+    }
+
+    /// Feed this frame's ball and toucher samples to any open control-follow
+    /// window and apply its resolution once it ages out.
+    fn advance_control_follow(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+    ) {
+        let Some(window_player) = self.control_follow.window_player().cloned() else {
+            return;
+        };
+        let player_sample = players
+            .players
+            .iter()
+            .find(|player| player.player_id == window_player);
+        let resolution = self.control_follow.advance(
+            frame,
+            ball.position(),
+            ball.velocity(),
+            player_sample.and_then(PlayerSample::position),
+            player_sample.and_then(PlayerSample::velocity),
+        );
+        self.apply_control_resolution(resolution);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -594,6 +692,7 @@ impl TouchCalculator {
         touch_state: &TouchState,
         possession_state: &PossessionState,
         fifty_fifty_state: &FiftyFiftyState,
+        events_state: &FrameEventsState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
@@ -602,16 +701,22 @@ impl TouchCalculator {
             self.previous_ball_velocity = ball.velocity();
             self.previous_ball_position = ball.position();
             self.pending_fifty_fifty_movement = None;
+            self.intention_classifier.reset();
+            let resolution = self.control_follow.flush();
+            self.apply_control_resolution(resolution);
             return Ok(());
         }
+        self.intention_classifier
+            .begin_frame(frame, &events_state.player_stat_events);
         self.apply_touch_events(
             frame,
             ball,
             players,
             vertical_state,
             &touch_state.touch_events,
-            touch_state.primary_touch_event(),
+            fifty_fifty_state,
         );
+        self.advance_control_follow(frame, ball, players);
         self.credit_ball_movement(
             frame,
             ball,

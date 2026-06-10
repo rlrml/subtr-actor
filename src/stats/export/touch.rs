@@ -46,10 +46,25 @@ impl StatFieldProvider for TouchStats {
             StatUnit::Count,
             self.wall_touch_count,
         ));
+        visitor(ExportedStat::unsigned(
+            "touch",
+            "first_touch_count",
+            StatUnit::Count,
+            self.first_touch_count,
+        ));
         for entry in self.complete_labeled_touch_counts().entries {
             visitor(ExportedStat::unsigned_labeled(
                 "touch",
                 "touch_count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
+        for entry in self.complete_labeled_intention_counts().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "touch",
+                "intention_touch_count",
                 StatUnit::Count,
                 entry.labels,
                 entry.count,
