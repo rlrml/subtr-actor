@@ -448,6 +448,151 @@ fn replay_game_type_from_header_match_type(match_type: &str) -> Option<ReplayGam
     }
 }
 
+/// Which competitive-season numbering era a replay belongs to.
+///
+/// Rocket League restarted its season counter at 1 when it went free-to-play in
+/// September 2020, so the era is required to disambiguate (e.g. legacy Season 8
+/// vs free-to-play Season 8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub enum SeasonEra {
+    /// Pre-free-to-play numbered competitive seasons (Season 1–14, 2016–2020).
+    Legacy,
+    /// Free-to-play seasons (Season 1 onward, from September 2020).
+    FreeToPlay,
+}
+
+impl SeasonEra {
+    /// Single-character code prefix used in the canonical season code.
+    fn code_prefix(self) -> char {
+        match self {
+            SeasonEra::Legacy => 's',
+            SeasonEra::FreeToPlay => 'f',
+        }
+    }
+}
+
+/// A resolved competitive season, identified by its numbering era and number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ReplaySeason {
+    /// Which numbering era the season belongs to.
+    pub era: SeasonEra,
+    /// Season number within its era (1-based).
+    pub number: u8,
+}
+
+impl ReplaySeason {
+    const fn new(era: SeasonEra, number: u8) -> Self {
+        Self { era, number }
+    }
+
+    /// Canonical short code, e.g. `f21` (free-to-play) or `s14` (legacy). Used as
+    /// the stable string key for storage, filtering, and display.
+    pub fn code(self) -> String {
+        format!("{}{}", self.era.code_prefix(), self.number)
+    }
+}
+
+/// Competitive-season start dates, ascending by date.
+///
+/// Rocket League replays do not record the competitive season directly, so it is
+/// resolved from the recorded match `Date` against this table. Each entry records
+/// only the date a season *began*; a season runs until the next entry's start.
+/// Seasons are contiguous, so storing only the start (rather than start/end pairs)
+/// keeps the table impossible to leave with gaps or overlaps.
+///
+/// `(year, month, day)` tuples are `const`-constructible and already order
+/// correctly, so the table needs no parsing or lazy initialization. Day
+/// granularity is intentional: the replay `Date` header is local wall-clock with
+/// no timezone, and a replay recorded within a day of a boundary is inherently
+/// ambiguous.
+///
+/// TODO(season-dates): these start dates are best-effort and should be verified
+/// against an authoritative source (e.g. ballchasing's season numbering) before
+/// being relied on. The free-to-play numbering is anchored so that April 2026
+/// resolves to free-to-play Season 21, matching observed ballchasing metadata.
+const SEASON_BOUNDARIES: &[((i32, u32, u32), ReplaySeason)] = &[
+    // Pre-free-to-play numbered competitive seasons.
+    ((2016, 2, 10), ReplaySeason::new(SeasonEra::Legacy, 1)),
+    ((2016, 6, 20), ReplaySeason::new(SeasonEra::Legacy, 2)),
+    ((2016, 9, 8), ReplaySeason::new(SeasonEra::Legacy, 3)),
+    ((2017, 3, 22), ReplaySeason::new(SeasonEra::Legacy, 4)),
+    ((2017, 9, 13), ReplaySeason::new(SeasonEra::Legacy, 5)),
+    ((2018, 3, 7), ReplaySeason::new(SeasonEra::Legacy, 6)),
+    ((2018, 9, 25), ReplaySeason::new(SeasonEra::Legacy, 7)),
+    ((2019, 3, 27), ReplaySeason::new(SeasonEra::Legacy, 8)),
+    ((2019, 8, 22), ReplaySeason::new(SeasonEra::Legacy, 9)),
+    ((2019, 12, 4), ReplaySeason::new(SeasonEra::Legacy, 10)),
+    ((2020, 4, 8), ReplaySeason::new(SeasonEra::Legacy, 11)),
+    ((2020, 7, 8), ReplaySeason::new(SeasonEra::Legacy, 12)),
+    // Free-to-play era.
+    ((2020, 9, 23), ReplaySeason::new(SeasonEra::FreeToPlay, 1)),
+    ((2020, 12, 9), ReplaySeason::new(SeasonEra::FreeToPlay, 2)),
+    ((2021, 4, 7), ReplaySeason::new(SeasonEra::FreeToPlay, 3)),
+    ((2021, 8, 11), ReplaySeason::new(SeasonEra::FreeToPlay, 4)),
+    ((2021, 11, 17), ReplaySeason::new(SeasonEra::FreeToPlay, 5)),
+    ((2022, 3, 9), ReplaySeason::new(SeasonEra::FreeToPlay, 6)),
+    ((2022, 6, 15), ReplaySeason::new(SeasonEra::FreeToPlay, 7)),
+    ((2022, 9, 7), ReplaySeason::new(SeasonEra::FreeToPlay, 8)),
+    ((2022, 12, 7), ReplaySeason::new(SeasonEra::FreeToPlay, 9)),
+    ((2023, 3, 8), ReplaySeason::new(SeasonEra::FreeToPlay, 10)),
+    ((2023, 6, 7), ReplaySeason::new(SeasonEra::FreeToPlay, 11)),
+    ((2023, 9, 6), ReplaySeason::new(SeasonEra::FreeToPlay, 12)),
+    ((2023, 12, 6), ReplaySeason::new(SeasonEra::FreeToPlay, 13)),
+    ((2024, 3, 6), ReplaySeason::new(SeasonEra::FreeToPlay, 14)),
+    ((2024, 6, 5), ReplaySeason::new(SeasonEra::FreeToPlay, 15)),
+    ((2024, 9, 4), ReplaySeason::new(SeasonEra::FreeToPlay, 16)),
+    ((2024, 12, 4), ReplaySeason::new(SeasonEra::FreeToPlay, 17)),
+    ((2025, 3, 5), ReplaySeason::new(SeasonEra::FreeToPlay, 18)),
+    ((2025, 6, 4), ReplaySeason::new(SeasonEra::FreeToPlay, 19)),
+    ((2025, 9, 17), ReplaySeason::new(SeasonEra::FreeToPlay, 20)),
+    ((2026, 1, 14), ReplaySeason::new(SeasonEra::FreeToPlay, 21)),
+];
+
+/// Resolves the competitive season from replay headers via the recorded match
+/// date. Returns `None` when no usable date is present or the replay predates the
+/// first known season.
+pub fn season_from_headers(headers: &[(String, HeaderProp)]) -> Option<ReplaySeason> {
+    headers
+        .iter()
+        .find(|(key, _)| {
+            ["Date", "ReplayDate", "RecordDate"]
+                .iter()
+                .any(|name| key.eq_ignore_ascii_case(name))
+        })
+        .and_then(|(_, value)| value.as_string())
+        .and_then(parse_header_date)
+        .and_then(season_for_date)
+}
+
+/// Returns the most recent season that began on or before `date`.
+fn season_for_date(date: (i32, u32, u32)) -> Option<ReplaySeason> {
+    SEASON_BOUNDARIES
+        .iter()
+        .rev()
+        .find(|(start, _)| *start <= date)
+        .map(|(_, season)| *season)
+}
+
+/// Parses the leading calendar date (`YYYY-MM-DD`) from a replay `Date` header.
+///
+/// Replay dates appear as `"2026-04-28 14-30-00"` or RFC3339
+/// `"2026-04-17T15:01:25-07:00"`; both begin with the calendar date, which is all
+/// season resolution needs.
+fn parse_header_date(value: &str) -> Option<(i32, u32, u32)> {
+    let date = value.trim().split(['T', ' ']).next()?;
+    let mut parts = date.split('-');
+    let year: i32 = parts.next()?.parse().ok()?;
+    let month: u32 = parts.next()?.parse().ok()?;
+    let day: u32 = parts.next()?.parse().ok()?;
+    if (1..=12).contains(&month) && (1..=31).contains(&day) {
+        Some((year, month, day))
+    } else {
+        None
+    }
+}
+
 /// [`ReplayMeta`] struct represents metadata about the replay being processed.
 ///
 /// This includes information about the players in the match and all replay headers.
@@ -460,6 +605,8 @@ pub struct ReplayMeta {
     pub team_one: Vec<PlayerInfo>,
     /// Normalized and raw game-type signals inferred from headers and network data.
     pub game_type: ReplayGameTypeDetails,
+    /// Competitive season (era + number) resolved from the replay date, when known.
+    pub season: Option<ReplaySeason>,
     /// A vector of tuples containing the names and properties of all the headers in the replay.
     #[ts(as = "Vec<(String, crate::interop::ts_bindings::HeaderPropTs)>")]
     pub all_headers: Vec<(String, HeaderProp)>,

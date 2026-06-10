@@ -181,6 +181,7 @@ impl<'a> ReplayProcessor<'a> {
             team_zero: team_zero?,
             team_one: team_one?,
             game_type: self.get_replay_game_type_details(),
+            season: season_from_headers(&self.replay.properties),
             all_headers: self.replay.properties.clone(),
         })
     }

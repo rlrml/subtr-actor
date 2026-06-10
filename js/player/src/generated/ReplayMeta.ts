@@ -2,6 +2,7 @@
 import type { HeaderPropTs } from "./HeaderPropTs.ts";
 import type { PlayerInfo } from "./PlayerInfo.ts";
 import type { ReplayGameTypeDetails } from "./ReplayGameTypeDetails.ts";
+import type { ReplaySeason } from "./ReplaySeason.ts";
 
 /**
  * [`ReplayMeta`] struct represents metadata about the replay being processed.
@@ -21,6 +22,10 @@ team_one: Array<PlayerInfo>,
  * Normalized and raw game-type signals inferred from headers and network data.
  */
 game_type: ReplayGameTypeDetails,
+/**
+ * Competitive season (era + number) resolved from the replay date, when known.
+ */
+season: ReplaySeason | null,
 /**
  * A vector of tuples containing the names and properties of all the headers in the replay.
  */

@@ -215,3 +215,17 @@ fn replay_game_type_metadata_is_consistent_across_fixture_corpus() {
         );
     }
 }
+
+#[test]
+fn season_is_resolved_from_fixture_replay_date() {
+    let replay = common::parse_replay("assets/post-eac-ranked-doubles-2026-04-28.replay");
+    let mut processor = ReplayProcessor::new(&replay).expect("failed to build processor");
+    let replay_meta = processor
+        .process_and_get_replay_meta()
+        .expect("failed to build replay meta");
+    // Recorded 2026-04-28, which falls in free-to-play season 21.
+    let season = replay_meta.season.expect("season should be resolved");
+    assert_eq!(season.era, subtr_actor::SeasonEra::FreeToPlay);
+    assert_eq!(season.number, 21);
+    assert_eq!(season.code(), "f21");
+}
