@@ -785,6 +785,7 @@ pub(crate) fn live_replay_meta(players: &[SaPlayerFrame]) -> ReplayMeta {
         team_zero,
         team_one,
         game_type: Default::default(),
+        season: None,
         all_headers: Vec::new(),
     }
 }

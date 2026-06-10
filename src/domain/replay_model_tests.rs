@@ -91,7 +91,10 @@ fn date_header(value: &str) -> Vec<(String, boxcars::HeaderProp)> {
 
 #[test]
 fn parse_header_date_handles_replay_and_rfc3339_formats() {
-    assert_eq!(parse_header_date("2026-04-28 14-30-00"), Some((2026, 4, 28)));
+    assert_eq!(
+        parse_header_date("2026-04-28 14-30-00"),
+        Some((2026, 4, 28))
+    );
     assert_eq!(
         parse_header_date("2026-04-17T15:01:25-07:00"),
         Some((2026, 4, 17))
