@@ -1,4 +1,5 @@
 use super::*;
+use crate::stats::calculators::rotation::{PlayDepthState, RoleState};
 
 fn player_id(value: u64) -> PlayerId {
     boxcars::RemoteId::Steam(value)
