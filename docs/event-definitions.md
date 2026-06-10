@@ -1122,11 +1122,15 @@ _None documented._
 
 **Summary**
 
-Definition pending.
+A classified ball touch with strength kind, surface/height context, and an inferred intention.
 
 **Approach**
 
-_None documented._
+- Classify each touch's strength kind (control, medium hit, hard hit) from the ball speed change it produces.
+- Record surface, height band, and dodge context for the touching player at contact time.
+- Resolve a single mutually-exclusive intention by precedence: replay-confirmed saves and shots first, then contested challenges, then geometric save/shot trajectory projections, then clears out of the defensive third, then passes led toward a teammate, falling back to neutral.
+- Retroactively upgrade pass/neutral touches to a control intention by outcome: the toucher stayed close to the ball while matching its velocity for most of a short follow window, or earned the follow-up touch themselves.
+- Mark a touch as a first touch when it starts a new reception: the previous global touch was by a different player or far enough in the past.
 
 **Limitations**
 

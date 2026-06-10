@@ -76,6 +76,7 @@ function defaultTouchStats(): TouchStats {
     aerial_touch_count: 0,
     high_aerial_touch_count: 0,
     wall_touch_count: 0,
+    first_touch_count: 0,
     is_last_touch: false,
     last_touch_time: null,
     last_touch_frame: null,
