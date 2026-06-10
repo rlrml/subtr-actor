@@ -134,6 +134,7 @@ struct StatsProjectionCursors {
     flick: usize,
     musty_flick: usize,
     dodge_reset: usize,
+    dodge_reset_flip_reset_outcome: usize,
     ball_carry: usize,
     bump: usize,
     half_volley: usize,
@@ -421,6 +422,12 @@ impl StatsProjectionNode {
         let dodge_reset = ctx.get::<DodgeResetCalculator>()?;
         for event in Self::events_since(&mut self.cursors.dodge_reset, dodge_reset.events()) {
             self.state.dodge_reset.apply_event(event);
+        }
+        for event in Self::events_since(
+            &mut self.cursors.dodge_reset_flip_reset_outcome,
+            dodge_reset.flip_reset_outcome_events(),
+        ) {
+            self.state.dodge_reset.apply_flip_reset_outcome_event(event);
         }
         let ball_carry = ctx.get::<BallCarryCalculator>()?;
         for event in Self::events_since(&mut self.cursors.ball_carry, ball_carry.carry_events()) {

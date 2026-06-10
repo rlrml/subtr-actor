@@ -14,6 +14,12 @@ pub(in crate::collector::stats::playback) fn parse_dodge_reset_event(
         counter_value: json_required_i32(object, "counter_value")?,
         on_ball: json_required_bool(object, "on_ball")?,
         used: json_optional_bool(object.get("used")).unwrap_or(false),
+        outcome: object
+            .get("outcome")
+            .filter(|value| !value.is_null())
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?,
+        time_to_use: json_optional_f32(object.get("time_to_use"))?,
     })
 }
 
