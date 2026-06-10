@@ -1488,11 +1488,12 @@ A goal where the scorer's last touch matches a recent half-volley candidate.
 
 **Summary**
 
-A goal scored shortly after the kickoff's first touch.
+A goal flowing directly from the kickoff exchange.
 
 **Approach**
 
-- Inspect the scorer's core goal context for time-after-kickoff data.
-- Require the goal to fall within the kickoff-goal timing window.
+- Use the kickoff calculator's goal attribution as the source of truth.
+- Require the goal to land within the kickoff-goal timing window of the first touch.
+- Reject goals where the conceding team settled possession or the play reset through the scoring team's own half.
 - Attach goal-context evidence so the tag appears with the goal label.
 
