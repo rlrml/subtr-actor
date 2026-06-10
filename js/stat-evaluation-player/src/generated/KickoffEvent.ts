@@ -8,4 +8,23 @@ import type { KickoffType } from "./KickoffType.ts";
 import type { KickoffWinStrengthBand } from "./KickoffWinStrengthBand.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type KickoffEvent = { start_time: number, start_frame: number, end_time: number, end_frame: number, live_action_start_time: number | null, live_action_start_frame: number | null, movement_start_time: number, movement_start_frame: number, kickoff_type: KickoffType, kickoff_direction: KickoffDirection, first_touch_time: number | null, first_touch_frame: number | null, first_touch_team_is_team_0: boolean | null, first_touch_player: RemoteIdTs | null, team_zero_taker_touch_time: number | null, team_zero_taker_touch_frame: number | null, team_one_taker_touch_time: number | null, team_one_taker_touch_frame: number | null, taker_touch_delay_seconds: number | null, exit_velocity: [number, number, number] | null, exit_speed: number | null, exit_y_velocity: number | null, first_follow_up_touch_time: number | null, first_follow_up_touch_frame: number | null, first_follow_up_touch_team_is_team_0: boolean | null, first_follow_up_touch_player: RemoteIdTs | null, outcome: KickoffOutcome, winning_team_is_team_0: boolean | null, win_strength: number | null, win_strength_band: KickoffWinStrengthBand, kickoff_possession_outcome: KickoffPossessionOutcome, kickoff_possession_team_is_team_0: boolean | null, kickoff_goal: boolean, scoring_team_is_team_0: boolean | null, time_to_goal: number | null, team_zero_taker: KickoffTakerEvent | null, team_one_taker: KickoffTakerEvent | null, team_zero_non_takers: Array<KickoffSupportEvent>, team_one_non_takers: Array<KickoffSupportEvent>, };
+export type KickoffEvent = { start_time: number, start_frame: number, end_time: number, end_frame: number, live_action_start_time: number | null, live_action_start_frame: number | null, movement_start_time: number, movement_start_frame: number, kickoff_type: KickoffType, kickoff_direction: KickoffDirection, first_touch_time: number | null, first_touch_frame: number | null, first_touch_team_is_team_0: boolean | null, first_touch_player: RemoteIdTs | null,
+/**
+ * Ball position (field coordinates) at the frame of the first kickoff touch.
+ */
+first_touch_ball_position: [number, number, number] | null,
+/**
+ * Lateral centrality of the first-touch contact: `abs(x)` of the ball
+ * position at first touch. `0.0` means the ball was struck dead center.
+ */
+first_touch_ball_abs_x: number | null,
+/**
+ * Ball height (z) at first touch. On a standard kickoff the ball rests at
+ * center field, so values above the resting radius indicate the ball was
+ * popped or hit upward.
+ */
+first_touch_ball_height: number | null,
+/**
+ * Ball velocity at the first-touch frame (immediately after contact).
+ */
+first_touch_ball_velocity: [number, number, number] | null, team_zero_taker_touch_time: number | null, team_zero_taker_touch_frame: number | null, team_one_taker_touch_time: number | null, team_one_taker_touch_frame: number | null, taker_touch_delay_seconds: number | null, exit_velocity: [number, number, number] | null, exit_speed: number | null, exit_y_velocity: number | null, first_follow_up_touch_time: number | null, first_follow_up_touch_frame: number | null, first_follow_up_touch_team_is_team_0: boolean | null, first_follow_up_touch_player: RemoteIdTs | null, outcome: KickoffOutcome, winning_team_is_team_0: boolean | null, win_strength: number | null, win_strength_band: KickoffWinStrengthBand, kickoff_possession_outcome: KickoffPossessionOutcome, kickoff_possession_team_is_team_0: boolean | null, kickoff_goal: boolean, scoring_team_is_team_0: boolean | null, time_to_goal: number | null, team_zero_taker: KickoffTakerEvent | null, team_one_taker: KickoffTakerEvent | null, team_zero_non_takers: Array<KickoffSupportEvent>, team_one_non_takers: Array<KickoffSupportEvent>, };
