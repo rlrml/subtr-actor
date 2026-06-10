@@ -90,6 +90,10 @@ pub struct TouchClassificationEvent {
     pub first_touch: bool,
     #[serde(default)]
     pub contested: bool,
+    #[serde(default)]
+    pub role: RoleState,
+    #[serde(default)]
+    pub play_depth: PlayDepthState,
     pub ball_speed_change: f32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ball_movement: Option<TouchBallMovement>,
@@ -322,12 +326,14 @@ impl TouchCalculator {
             .collect()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn apply_touch_events(
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
         players: &PlayerFrameState,
         vertical_state: &PlayerVerticalState,
+        rotation: &RotationCalculator,
         touch_events: &[TouchEvent],
         fifty_fifty_state: &FiftyFiftyState,
     ) {
@@ -346,6 +352,7 @@ impl TouchCalculator {
                 touch_event.dodge_contact || Self::player_dodge_active(players, player_id),
             );
             let controlled_touch_kind = Self::controlled_touch_kind(ball, players, player_id);
+            let (role, play_depth) = rotation.current_role_and_depth(player_id);
             let classification = Self::classify_touch(
                 height_band,
                 surface,
@@ -399,6 +406,8 @@ impl TouchCalculator {
                 intention: resolution.intention.as_label_value().to_owned(),
                 first_touch: resolution.first_touch,
                 contested: resolution.contested,
+                role,
+                play_depth,
                 ball_speed_change,
                 ball_movement: None,
             };
@@ -689,6 +698,7 @@ impl TouchCalculator {
         ball: &BallFrameState,
         players: &PlayerFrameState,
         vertical_state: &PlayerVerticalState,
+        rotation: &RotationCalculator,
         touch_state: &TouchState,
         possession_state: &PossessionState,
         fifty_fifty_state: &FiftyFiftyState,
@@ -713,6 +723,7 @@ impl TouchCalculator {
             ball,
             players,
             vertical_state,
+            rotation,
             &touch_state.touch_events,
             fifty_fifty_state,
         );

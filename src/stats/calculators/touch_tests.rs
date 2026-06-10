@@ -129,6 +129,7 @@ fn touch_stats_at_height(height: f32) -> TouchStats {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &vertical_state(&player_id, height),
+            &RotationCalculator::default(),
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -177,6 +178,7 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -190,6 +192,7 @@ fn uncontrolled_ground_touch_with_medium_impulse_counts_as_medium_hit() {
             &ball_with_velocity(0.0, 0.0, glam::Vec3::new(0.0, 500.0, 0.0)),
             &PlayerFrameState::default(),
             &vertical_state(&player_id, 0.0),
+            &RotationCalculator::default(),
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -216,6 +219,7 @@ fn dodge_active_hit_counts_as_dodge_hit() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -229,6 +233,7 @@ fn dodge_active_hit_counts_as_dodge_hit() {
             &ball_with_velocity(0.0, 0.0, glam::Vec3::new(0.0, 500.0, 0.0)),
             &player_frame_state_with_dodge_active(&player_id, glam::Vec3::ZERO, true),
             &vertical_state(&player_id, 0.0),
+            &RotationCalculator::default(),
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -266,6 +271,7 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -279,6 +285,7 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
             &ball_with_velocity(0.0, 0.0, glam::Vec3::new(0.0, 500.0, 0.0)),
             &player_frame_state_with_dodge_active(&player_id, glam::Vec3::ZERO, false),
             &vertical_state(&player_id, 0.0),
+            &RotationCalculator::default(),
             &dodge_contact_touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -304,6 +311,7 @@ fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &TouchState::default(),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -320,6 +328,7 @@ fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
             ),
             &player_frame_state(&player_id, glam::Vec3::new(0.0, 0.0, 17.0)),
             &vertical_state(&player_id, 0.0),
+            &RotationCalculator::default(),
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -349,6 +358,7 @@ fn touch_on_wall_gets_wall_surface_classification() {
             &ball_with_position_and_velocity(glam::Vec3::new(3720.0, 0.0, 520.0), glam::Vec3::ZERO),
             &player_frame_state(&player_id, glam::Vec3::new(3650.0, 0.0, 360.0)),
             &vertical_state(&player_id, 360.0),
+            &RotationCalculator::default(),
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -383,6 +393,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &initial_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
@@ -396,6 +407,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &ball(0.0, 100.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &followup_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
@@ -409,6 +421,7 @@ fn credits_ball_travel_and_goal_advancement_to_possession_player() {
             &ball(40.0, 70.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &followup_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
@@ -440,6 +453,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &initial_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
@@ -453,6 +467,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &ball(0.0, 100.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &followup_touch_state,
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -466,6 +481,7 @@ fn skips_ball_movement_without_a_possession_player() {
             &ball(0.0, 160.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &followup_touch_state,
             &possession(&player_id, true),
             &FiftyFiftyState::default(),
@@ -562,6 +578,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
             &ball(0.0, 0.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &initial_touch_state,
             &PossessionState::default(),
             &FiftyFiftyState {
@@ -578,6 +595,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
             &ball(0.0, 100.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &followup_touch_state,
             &PossessionState::default(),
             &FiftyFiftyState {
@@ -594,6 +612,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
             &ball(0.0, 170.0),
             &PlayerFrameState::default(),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &followup_touch_state,
             &PossessionState::default(),
             &FiftyFiftyState {
@@ -613,6 +632,112 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
     assert_eq!(orange_stats.total_ball_travel_distance, 0.0);
     assert_eq!(orange_stats.total_ball_advance_distance, 0.0);
     assert_eq!(orange_stats.total_ball_retreat_distance, 0.0);
+}
+
+fn rotation_player(player_id: PlayerId, is_team_0: bool, position: glam::Vec3) -> PlayerSample {
+    PlayerSample {
+        player_id,
+        is_team_0,
+        hitbox: default_car_hitbox(),
+        rigid_body: Some(rigid_body(position, glam::Vec3::ZERO)),
+        boost_amount: None,
+        last_boost_amount: None,
+        boost_active: false,
+        dodge_active: false,
+        powerslide_active: false,
+        match_goals: None,
+        match_assists: None,
+        match_saves: None,
+        match_shots: None,
+        match_score: None,
+    }
+}
+
+#[test]
+fn touch_events_capture_rotation_role_and_play_depth() {
+    let toucher = boxcars::RemoteId::Steam(1);
+    let teammate = boxcars::RemoteId::Steam(2);
+    let mut rotation = RotationCalculator::with_config(RotationCalculatorConfig {
+        first_man_debounce_seconds: 0.0,
+        ..RotationCalculatorConfig::default()
+    });
+    let players = PlayerFrameState {
+        players: vec![
+            rotation_player(toucher.clone(), true, glam::Vec3::new(0.0, -2000.0, 17.0)),
+            rotation_player(teammate.clone(), true, glam::Vec3::new(0.0, -300.0, 17.0)),
+            rotation_player(
+                boxcars::RemoteId::Steam(3),
+                false,
+                glam::Vec3::new(3000.0, 3000.0, 17.0),
+            ),
+            rotation_player(
+                boxcars::RemoteId::Steam(4),
+                false,
+                glam::Vec3::new(-3000.0, 3000.0, 17.0),
+            ),
+        ],
+    };
+    let gameplay = GameplayState {
+        ball_has_been_hit: Some(true),
+        current_in_game_team_player_counts: [2, 2],
+        ..GameplayState::default()
+    };
+    rotation
+        .update(
+            &frame(1),
+            &gameplay,
+            &ball(0.0, 0.0),
+            &players,
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    assert_eq!(
+        rotation.current_role_and_depth(&toucher),
+        (RoleState::SecondMan, PlayDepthState::BehindPlay)
+    );
+
+    let mut calculator = TouchCalculator::new();
+    calculator
+        .update(
+            &frame(1),
+            &ball(0.0, 0.0),
+            &players,
+            &vertical_state(&toucher, 0.0),
+            &rotation,
+            &touch_state(1, &toucher),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    let event = &calculator.events()[0];
+    assert_eq!(event.role, RoleState::SecondMan);
+    assert_eq!(event.play_depth, PlayDepthState::BehindPlay);
+
+    let stats = calculator.player_stats().get(&toucher).unwrap();
+    assert_eq!(stats.touches_as_second_man(), 1);
+    assert_eq!(stats.touches_as_first_man(), 0);
+    assert_eq!(stats.touches_as_third_man(), 0);
+    assert_eq!(stats.touches_behind_play(), 1);
+    assert_eq!(stats.touches_ahead_of_play(), 0);
+}
+
+#[test]
+fn touch_with_default_rotation_state_records_unknown_role_and_depth() {
+    let stats = touch_stats_at_height(0.0);
+
+    assert_eq!(stats.touch_count, 1);
+    assert_eq!(stats.touch_count_with_role(RoleState::Unknown), 1);
+    assert_eq!(
+        stats.touch_count_with_play_depth(PlayDepthState::Unknown),
+        1
+    );
+    assert_eq!(stats.touches_as_first_man(), 0);
+    assert_eq!(stats.touches_as_second_man(), 0);
+    assert_eq!(stats.touches_as_third_man(), 0);
 }
 
 #[test]
@@ -650,6 +775,7 @@ fn touch_classification_events_follow_chronological_touch_event_order() {
             &ball(0.0, 0.0),
             &player_frame_state(&player, glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z)),
             &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
             &touch_state,
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -680,6 +806,7 @@ fn soft_touch_followed_by_staying_with_ball_upgrades_intention_to_control() {
             &ball(0.0, 0.0),
             &player_frame_state(&player_id, glam::Vec3::new(0.0, 0.0, 17.0)),
             &vertical_state(&player_id, 0.0),
+            &RotationCalculator::default(),
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -700,6 +827,7 @@ fn soft_touch_followed_by_staying_with_ball_upgrades_intention_to_control() {
                 &ball(0.0, 0.0),
                 &player_frame_state(&player_id, glam::Vec3::new(0.0, 0.0, 17.0)),
                 &vertical_state(&player_id, 0.0),
+                &RotationCalculator::default(),
                 &followup_touch_state,
                 &PossessionState::default(),
                 &FiftyFiftyState::default(),
@@ -732,6 +860,7 @@ fn touch_where_ball_leaves_the_player_stays_neutral() {
             &ball_with_velocity(0.0, 0.0, glam::Vec3::new(1000.0, 0.0, 0.0)),
             &player_frame_state(&player_id, glam::Vec3::new(0.0, -100.0, 17.0)),
             &vertical_state(&player_id, 0.0),
+            &RotationCalculator::default(),
             &touch_state(1, &player_id),
             &PossessionState::default(),
             &FiftyFiftyState::default(),
@@ -749,6 +878,7 @@ fn touch_where_ball_leaves_the_player_stays_neutral() {
                 &ball_with_velocity(time * 1000.0, 0.0, glam::Vec3::new(1000.0, 0.0, 0.0)),
                 &player_frame_state(&player_id, glam::Vec3::new(0.0, -100.0, 17.0)),
                 &vertical_state(&player_id, 0.0),
+                &RotationCalculator::default(),
                 &followup_touch_state,
                 &PossessionState::default(),
                 &FiftyFiftyState::default(),

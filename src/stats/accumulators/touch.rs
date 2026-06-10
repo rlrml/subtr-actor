@@ -99,6 +99,10 @@ pub struct TouchStats {
     pub labeled_touch_counts: LabeledCounts,
     #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
     pub labeled_intention_counts: LabeledCounts,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub touch_counts_by_role: LabeledCounts,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub touch_counts_by_play_depth: LabeledCounts,
 }
 
 impl TouchStats {
@@ -162,6 +166,65 @@ impl TouchStats {
 
         entries.sort_by(|left, right| left.labels.cmp(&right.labels));
 
+        LabeledCounts { entries }
+    }
+
+    pub fn touch_count_with_role(&self, role: RoleState) -> u32 {
+        self.touch_counts_by_role.count_exact(&[role.as_label()])
+    }
+
+    pub fn touch_count_with_play_depth(&self, play_depth: PlayDepthState) -> u32 {
+        self.touch_counts_by_play_depth
+            .count_exact(&[play_depth.as_label()])
+    }
+
+    pub fn touches_as_first_man(&self) -> u32 {
+        self.touch_count_with_role(RoleState::FirstMan)
+    }
+
+    pub fn touches_as_second_man(&self) -> u32 {
+        self.touch_count_with_role(RoleState::SecondMan)
+    }
+
+    pub fn touches_as_third_man(&self) -> u32 {
+        self.touch_count_with_role(RoleState::ThirdMan)
+    }
+
+    pub fn touches_behind_play(&self) -> u32 {
+        self.touch_count_with_play_depth(PlayDepthState::BehindPlay)
+    }
+
+    pub fn touches_ahead_of_play(&self) -> u32 {
+        self.touch_count_with_play_depth(PlayDepthState::AheadOfPlay)
+    }
+
+    pub fn complete_touch_counts_by_role(&self) -> LabeledCounts {
+        let mut entries: Vec<_> = ALL_ROLE_STATES
+            .into_iter()
+            .map(|role| {
+                let labels = vec![role.as_label()];
+                LabeledCountEntry {
+                    count: self.touch_counts_by_role.count_exact(&labels),
+                    labels,
+                }
+            })
+            .collect();
+        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
+        LabeledCounts { entries }
+    }
+
+    pub fn complete_touch_counts_by_play_depth(&self) -> LabeledCounts {
+        let mut entries: Vec<_> = ALL_PLAY_DEPTH_STATES
+            .into_iter()
+            .map(|play_depth| {
+                let labels = vec![play_depth.as_label()];
+                LabeledCountEntry {
+                    count: self.touch_counts_by_play_depth.count_exact(&labels),
+                    labels,
+                }
+            })
+            .collect();
+        entries.sort_by(|left, right| left.labels.cmp(&right.labels));
         LabeledCounts { entries }
     }
 
@@ -265,6 +328,12 @@ impl TouchStatsAccumulator {
             touch_intention_label(&event.intention),
             touch_reception_label(event.first_touch),
         ]);
+        stats
+            .touch_counts_by_role
+            .increment([event.role.as_label()]);
+        stats
+            .touch_counts_by_play_depth
+            .increment([event.play_depth.as_label()]);
         stats.last_touch_time = Some(event.time);
         stats.last_touch_frame = Some(event.frame);
         stats.time_since_last_touch = Some((frame.time - event.time).max(0.0));

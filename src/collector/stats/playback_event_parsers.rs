@@ -446,6 +446,18 @@ pub(in crate::collector::stats::playback) fn parse_touch_stats_event(
             .to_owned(),
         first_touch: json_optional_bool(object.get("first_touch")).unwrap_or(false),
         contested: json_optional_bool(object.get("contested")).unwrap_or(false),
+        role: object
+            .get("role")
+            .filter(|value| !value.is_null())
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
+        play_depth: object
+            .get("play_depth")
+            .filter(|value| !value.is_null())
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
         ball_speed_change: json_required_f32(object, "ball_speed_change")?,
         ball_movement: object
             .get("ball_movement")

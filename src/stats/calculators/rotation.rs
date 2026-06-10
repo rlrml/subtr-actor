@@ -17,6 +17,27 @@ pub enum RoleState {
     Ambiguous,
 }
 
+pub const ALL_ROLE_STATES: [RoleState; 5] = [
+    RoleState::Unknown,
+    RoleState::FirstMan,
+    RoleState::SecondMan,
+    RoleState::ThirdMan,
+    RoleState::Ambiguous,
+];
+
+impl RoleState {
+    pub fn as_label(self) -> StatLabel {
+        let value = match self {
+            Self::Unknown => "unknown",
+            Self::FirstMan => "first_man",
+            Self::SecondMan => "second_man",
+            Self::ThirdMan => "third_man",
+            Self::Ambiguous => "ambiguous",
+        };
+        StatLabel::new("role", value)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -26,6 +47,25 @@ pub enum PlayDepthState {
     BehindPlay,
     LevelWithPlay,
     AheadOfPlay,
+}
+
+pub const ALL_PLAY_DEPTH_STATES: [PlayDepthState; 4] = [
+    PlayDepthState::Unknown,
+    PlayDepthState::BehindPlay,
+    PlayDepthState::LevelWithPlay,
+    PlayDepthState::AheadOfPlay,
+];
+
+impl PlayDepthState {
+    pub fn as_label(self) -> StatLabel {
+        let value = match self {
+            Self::Unknown => "unknown",
+            Self::BehindPlay => "behind_play",
+            Self::LevelWithPlay => "level_with_play",
+            Self::AheadOfPlay => "ahead_of_play",
+        };
+        StatLabel::new("play_depth", value)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -322,6 +362,14 @@ impl RotationCalculator {
             .get(player_id)
             .copied()
             .unwrap_or_default()
+    }
+
+    /// The rotation role and play-depth the player currently holds, as of the
+    /// most recently processed frame. Used by downstream consumers (e.g. touch
+    /// classification) to tag events with the toucher's rotation context.
+    pub fn current_role_and_depth(&self, player_id: &PlayerId) -> (RoleState, PlayDepthState) {
+        let state = self.current_player_state(player_id);
+        (state.current_role_state, state.current_depth_state)
     }
 
     pub fn update(
