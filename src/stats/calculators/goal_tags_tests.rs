@@ -1,4 +1,5 @@
 use super::*;
+use crate::stats::calculators::rotation::{PlayDepthState, RoleState};
 
 fn player_id(value: u64) -> PlayerId {
     boxcars::RemoteId::Steam(value)
@@ -257,6 +258,34 @@ fn confirmed_flip_reset_event(
     }
 }
 
+fn touch_classification_event(
+    time: f32,
+    frame: usize,
+    player: PlayerId,
+    dodge_state: &str,
+) -> TouchClassificationEvent {
+    TouchClassificationEvent {
+        time,
+        frame,
+        sample_time: time,
+        sample_frame: frame,
+        player,
+        player_position: Some([0.0, 2200.0, 60.0]),
+        is_team_0: true,
+        kind: "medium_hit".to_owned(),
+        height_band: "ground".to_owned(),
+        surface: "ground".to_owned(),
+        dodge_state: dodge_state.to_owned(),
+        intention: "neutral".to_owned(),
+        first_touch: false,
+        contested: false,
+        role: RoleState::Unknown,
+        play_depth: PlayDepthState::Unknown,
+        ball_speed_change: 800.0,
+        ball_movement: None,
+    }
+}
+
 fn bump_event(time: f32, frame: usize, initiator: PlayerId, victim: PlayerId) -> BumpEvent {
     BumpEvent {
         time,
@@ -495,6 +524,10 @@ fn kickoff_event_for_goal(
         first_touch_frame: None,
         first_touch_team_is_team_0: None,
         first_touch_player: None,
+        first_touch_ball_position: None,
+        first_touch_ball_abs_x: None,
+        first_touch_ball_height: None,
+        first_touch_ball_velocity: None,
         team_zero_taker_touch_time: None,
         team_zero_taker_touch_frame: None,
         team_one_taker_touch_time: None,
@@ -798,6 +831,84 @@ fn flip_reset_goal_can_be_created_by_scoring_teammate() {
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlipResetGoal]);
     assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Teammate));
     assert!(!has_modifier(&events[0], GoalTagModifier::ByScorer));
+}
+
+#[test]
+fn flip_into_ball_goal_tags_dodge_scoring_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let touches = vec![touch_classification_event(9.5, 95, player_id(1), "dodge")];
+
+    let events = FlipIntoBallGoalCalculator::new().tag_goals(&[goal], &touches);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlipIntoBallGoal]);
+    assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Scorer));
+    assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
+    assert!(events[0]
+        .tag
+        .metadata()
+        .evidence
+        .iter()
+        .any(|evidence| evidence.kind == GoalTagEvidenceKind::FlipIntoBall));
+    assert_eq!(
+        events[0].tag.metadata().related_events,
+        vec![GoalTagEventRef {
+            stream: GoalTagEventStream::Touch,
+            index: 0,
+        }]
+    );
+}
+
+#[test]
+fn flip_into_ball_goal_rejects_non_dodge_scoring_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let touches = vec![touch_classification_event(
+        9.5,
+        95,
+        player_id(1),
+        "no_dodge",
+    )];
+
+    let events = FlipIntoBallGoalCalculator::new().tag_goals(&[goal], &touches);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn flip_into_ball_goal_requires_dodge_on_the_scoring_touch_itself() {
+    // A flip-reset-style refresh: an earlier dodge touch by the scorer, but
+    // the scoring touch itself was not a dodge contact.
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let touches = vec![
+        touch_classification_event(8.0, 80, player_id(1), "dodge"),
+        touch_classification_event(9.5, 95, player_id(1), "no_dodge"),
+    ];
+
+    let events = FlipIntoBallGoalCalculator::new().tag_goals(&[goal], &touches);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn flip_into_ball_goal_requires_the_scorer_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let touches = vec![touch_classification_event(9.5, 95, player_id(2), "dodge")];
+
+    let events = FlipIntoBallGoalCalculator::new().tag_goals(&[goal], &touches);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn flip_into_ball_goal_rejects_stale_touches() {
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let calculator = FlipIntoBallGoalCalculator::with_config(FlipIntoBallGoalCalculatorConfig {
+        max_touch_to_goal_seconds: 0.3,
+    });
+    let touches = vec![touch_classification_event(9.5, 95, player_id(1), "dodge")];
+
+    let events = calculator.tag_goals(&[goal], &touches);
+
+    assert!(events.is_empty());
 }
 
 #[test]

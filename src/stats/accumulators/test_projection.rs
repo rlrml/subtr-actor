@@ -200,6 +200,9 @@ impl DodgeResetTestProjection for DodgeResetCalculator {
         for event in self.events() {
             stats.apply_event(event);
         }
+        for event in self.flip_reset_outcome_events() {
+            stats.apply_flip_reset_outcome_event(event);
+        }
         leak_test_stats(stats.player_stats().clone())
     }
 }

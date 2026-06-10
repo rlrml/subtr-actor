@@ -710,7 +710,8 @@ define_stats_event!(
     approach = [
         "Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.",
         "Classify the refresh as on-ball (a flip reset) when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.",
-        "Keep on-ball resets pending until the player lands; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` to record that the flip reset was converted.",
+        "Keep on-ball resets pending in an in-flight ledger; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` with its reset-to-use latency.",
+        "Resolve every pending reset into an outcome: used, landed, superseded by a newer reset, expired, or cut off by a goal, live play ending, or the replay ending.",
     ]
 );
 define_stats_event!(

@@ -321,6 +321,10 @@ fn test_dodge_reset_stats_export_includes_on_ball_count() {
     let stats = DodgeResetStats {
         count: 4,
         on_ball_count: 3,
+        flip_reset_used_count: 2,
+        flip_reset_unused_count: 1,
+        flip_reset_total_time_to_use: 1.5,
+        flip_reset_min_time_to_use: Some(0.5),
     };
 
     let fields = stats.stat_fields();
@@ -332,6 +336,28 @@ fn test_dodge_reset_stats_export_includes_on_ball_count() {
     assert_eq!(
         find_field(&fields, "dodge_reset", "on_ball_count").value,
         StatValue::Unsigned(3)
+    );
+    assert_eq!(
+        find_field(&fields, "dodge_reset", "flip_reset_used_count").value,
+        StatValue::Unsigned(2)
+    );
+    assert_eq!(
+        find_field(&fields, "dodge_reset", "flip_reset_unused_count").value,
+        StatValue::Unsigned(1)
+    );
+    assert_eq!(
+        find_field(&fields, "dodge_reset", "flip_reset_mean_time_to_use")
+            .descriptor
+            .unit,
+        StatUnit::Seconds
+    );
+    assert_eq!(
+        find_field(&fields, "dodge_reset", "flip_reset_mean_time_to_use").value,
+        StatValue::Float(0.75)
+    );
+    assert_eq!(
+        find_field(&fields, "dodge_reset", "flip_reset_min_time_to_use").value,
+        StatValue::Float(0.5)
     );
 }
 

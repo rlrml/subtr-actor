@@ -70,6 +70,24 @@ impl StatFieldProvider for TouchStats {
                 entry.count,
             ));
         }
+        for entry in self.complete_touch_counts_by_role().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "touch",
+                "role_touch_count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
+        for entry in self.complete_touch_counts_by_play_depth().entries {
+            visitor(ExportedStat::unsigned_labeled(
+                "touch",
+                "play_depth_touch_count",
+                StatUnit::Count,
+                entry.labels,
+                entry.count,
+            ));
+        }
         visitor(ExportedStat::unsigned(
             "touch",
             "is_last_touch",

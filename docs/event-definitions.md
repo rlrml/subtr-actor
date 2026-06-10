@@ -344,7 +344,8 @@ A frame-level dodge refresh observed from replay state, marked as occurring on t
 
 - Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.
 - Classify the refresh as on-ball (a flip reset) when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.
-- Keep on-ball resets pending until the player lands; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` to record that the flip reset was converted.
+- Keep on-ball resets pending in an in-flight ledger; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` with its reset-to-use latency.
+- Resolve every pending reset into an outcome: used, landed, superseded by a newer reset, expired, or cut off by a goal, live play ending, or the replay ending.
 
 **Limitations**
 
@@ -1443,6 +1444,19 @@ A goal linked to a recent on-ball dodge reset or flip-reset event.
 - Compare reset-related mechanic events against each goal's scorer-last-touch context.
 - Require the reset evidence to fall within the configured event-to-goal window.
 - Prefer by-scorer evidence when the reset player matches the scorer's last touch.
+
+### Flip-Into-Ball Goal (`flip_into_ball_goal`)
+
+
+**Summary**
+
+A goal where the scorer flipped (dodged) into the ball on the scoring touch.
+
+**Approach**
+
+- Match the scorer's last touch to its touch-classification event by player and frame.
+- Require the scoring touch's dodge state to be active and the touch to fall within the touch-to-goal window.
+- Limitation: the dodge state covers any active dodge overlapping the touch, so incidental flips that happen to contact the ball can also qualify; dodge direction toward the ball is not yet verified.
 
 ### Bump Goal (`bump_goal`)
 

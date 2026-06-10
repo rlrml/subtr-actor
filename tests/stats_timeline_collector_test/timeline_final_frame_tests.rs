@@ -55,6 +55,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 .max_end_to_goal_seconds,
             flip_reset_goal_max_event_to_goal_seconds: FlipResetGoalCalculatorConfig::default()
                 .max_event_to_goal_seconds,
+            flip_into_ball_goal_max_touch_to_goal_seconds:
+                FlipIntoBallGoalCalculatorConfig::default().max_touch_to_goal_seconds,
             bump_goal_max_event_to_goal_seconds: BumpGoalCalculatorConfig::default()
                 .max_event_to_goal_seconds,
             demo_goal_max_event_to_goal_seconds: DemoGoalCalculatorConfig::default()

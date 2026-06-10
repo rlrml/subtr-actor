@@ -20,6 +20,9 @@ const DEFAULT_ONE_TIMER_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_PASSING_GOAL_MAX_PASS_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_AIR_DRIBBLE_GOAL_MAX_END_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_FLIP_RESET_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 8.0;
+const DEFAULT_FLIP_INTO_BALL_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 3.0;
+// Matches `TouchDodgeState::Dodge.as_label_value()` in the touch calculator.
+const FLIP_INTO_BALL_DODGE_STATE_LABEL: &str = "dodge";
 const DEFAULT_BUMP_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_DEMO_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_HALF_VOLLEY_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 3.0;
@@ -47,6 +50,7 @@ pub enum GoalTagKind {
     PassingGoal,
     AirDribbleGoal,
     FlipResetGoal,
+    FlipIntoBallGoal,
     BumpGoal,
     DemoGoal,
     HalfVolleyGoal,
@@ -64,6 +68,7 @@ pub enum GoalTagEventStream {
     Pass,
     BallCarry,
     DodgeReset,
+    Touch,
     Bump,
     Demo,
     HalfVolley,
@@ -84,6 +89,7 @@ pub enum GoalTagEvidenceKind {
     Pass,
     AirDribble,
     FlipReset,
+    FlipIntoBall,
     Bump,
     Demo,
     HalfVolley,
@@ -155,6 +161,7 @@ pub enum GoalTag {
     PassingGoal(GoalTagMetadata),
     AirDribbleGoal(GoalTagMetadata),
     FlipResetGoal(GoalTagMetadata),
+    FlipIntoBallGoal(GoalTagMetadata),
     BumpGoal(GoalTagMetadata),
     DemoGoal(GoalTagMetadata),
     HalfVolleyGoal(GoalTagMetadata),
@@ -342,6 +349,17 @@ pub const ALL_GOAL_TAG_DEFINITIONS: &[GoalTagDefinition] = &[
         ],
     ),
     goal_tag_definition(
+        GoalTagKind::FlipIntoBallGoal,
+        "flip_into_ball_goal",
+        "Flip-Into-Ball Goal",
+        "A goal where the scorer flipped (dodged) into the ball on the scoring touch.",
+        &[
+            "Match the scorer's last touch to its touch-classification event by player and frame.",
+            "Require the scoring touch's dodge state to be active and the touch to fall within the touch-to-goal window.",
+            "Limitation: the dodge state covers any active dodge overlapping the touch, so incidental flips that happen to contact the ball can also qualify; dodge direction toward the ball is not yet verified.",
+        ],
+    ),
+    goal_tag_definition(
         GoalTagKind::BumpGoal,
         "bump_goal",
         "Bump Goal",
@@ -405,6 +423,7 @@ impl GoalTag {
             GoalTagKind::PassingGoal => Self::PassingGoal(metadata),
             GoalTagKind::AirDribbleGoal => Self::AirDribbleGoal(metadata),
             GoalTagKind::FlipResetGoal => Self::FlipResetGoal(metadata),
+            GoalTagKind::FlipIntoBallGoal => Self::FlipIntoBallGoal(metadata),
             GoalTagKind::BumpGoal => Self::BumpGoal(metadata),
             GoalTagKind::DemoGoal => Self::DemoGoal(metadata),
             GoalTagKind::HalfVolleyGoal => Self::HalfVolleyGoal(metadata),
@@ -428,6 +447,7 @@ impl GoalTag {
             Self::PassingGoal(_) => GoalTagKind::PassingGoal,
             Self::AirDribbleGoal(_) => GoalTagKind::AirDribbleGoal,
             Self::FlipResetGoal(_) => GoalTagKind::FlipResetGoal,
+            Self::FlipIntoBallGoal(_) => GoalTagKind::FlipIntoBallGoal,
             Self::BumpGoal(_) => GoalTagKind::BumpGoal,
             Self::DemoGoal(_) => GoalTagKind::DemoGoal,
             Self::HalfVolleyGoal(_) => GoalTagKind::HalfVolleyGoal,
@@ -451,6 +471,7 @@ impl GoalTag {
             | Self::PassingGoal(metadata)
             | Self::AirDribbleGoal(metadata)
             | Self::FlipResetGoal(metadata)
+            | Self::FlipIntoBallGoal(metadata)
             | Self::BumpGoal(metadata)
             | Self::DemoGoal(metadata)
             | Self::HalfVolleyGoal(metadata)
@@ -639,6 +660,20 @@ impl Default for FlipResetGoalCalculatorConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
+pub struct FlipIntoBallGoalCalculatorConfig {
+    pub max_touch_to_goal_seconds: f32,
+}
+
+impl Default for FlipIntoBallGoalCalculatorConfig {
+    fn default() -> Self {
+        Self {
+            max_touch_to_goal_seconds: DEFAULT_FLIP_INTO_BALL_GOAL_MAX_TOUCH_TO_GOAL_SECONDS,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct BumpGoalCalculatorConfig {
     pub max_event_to_goal_seconds: f32,
 }
@@ -769,6 +804,12 @@ pub struct FlipResetGoalCalculator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct FlipIntoBallGoalCalculator {
+    config: FlipIntoBallGoalCalculatorConfig,
+    events: EventStream<GoalTagAssignment>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct BumpGoalCalculator {
     config: BumpGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
@@ -838,6 +879,7 @@ impl_goal_tag_calculator!(OneTimerGoalCalculator, OneTimerGoalCalculatorConfig);
 impl_goal_tag_calculator!(PassingGoalCalculator, PassingGoalCalculatorConfig);
 impl_goal_tag_calculator!(AirDribbleGoalCalculator, AirDribbleGoalCalculatorConfig);
 impl_goal_tag_calculator!(FlipResetGoalCalculator, FlipResetGoalCalculatorConfig);
+impl_goal_tag_calculator!(FlipIntoBallGoalCalculator, FlipIntoBallGoalCalculatorConfig);
 impl_goal_tag_calculator!(BumpGoalCalculator, BumpGoalCalculatorConfig);
 impl_goal_tag_calculator!(DemoGoalCalculator, DemoGoalCalculatorConfig);
 
@@ -1311,6 +1353,81 @@ impl FlipResetGoalCalculator {
             GoalTagKind::FlipResetGoal,
             self.config.max_event_to_goal_seconds,
         )
+    }
+}
+
+impl FlipIntoBallGoalCalculator {
+    pub fn update(
+        &mut self,
+        match_stats: &MatchStatsCalculator,
+        touch: &TouchCalculator,
+    ) -> SubtrActorResult<()> {
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), touch.events()),
+        );
+        Ok(())
+    }
+
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        touch_events: &[TouchClassificationEvent],
+    ) -> Vec<GoalTagAssignment> {
+        let mut tags = Vec::new();
+        for (goal_index, goal) in goals.iter().enumerate() {
+            let ctx = GoalTaggingContext { goal_index };
+            let Some((event_index, event)) =
+                self.scoring_touch_dodge_classification(goal, touch_events)
+            else {
+                continue;
+            };
+
+            tags.push(mechanic_goal_tag(
+                ctx,
+                GoalTagKind::FlipIntoBallGoal,
+                1.0,
+                mechanic_goal_performer(goal, &event.player),
+                mechanic_goal_modifiers(goal, &event.player),
+                mechanic_goal_evidence(goal, flip_into_ball_evidence(event)),
+                vec![GoalTagEventRef {
+                    stream: GoalTagEventStream::Touch,
+                    index: event_index,
+                }],
+            ));
+        }
+        tags
+    }
+
+    fn scoring_touch_dodge_classification<'a>(
+        &self,
+        goal: &GoalContextEvent,
+        touch_events: &'a [TouchClassificationEvent],
+    ) -> Option<(usize, &'a TouchClassificationEvent)> {
+        let touch = goal.scorer_last_touch.as_ref()?;
+        if goal.time - touch.time > self.config.max_touch_to_goal_seconds {
+            return None;
+        }
+        touch_events
+            .iter()
+            .enumerate()
+            .filter(|(_, event)| Self::candidate_matches_scoring_touch(event, touch, goal))
+            .max_by(|left, right| {
+                left.1
+                    .time
+                    .total_cmp(&right.1.time)
+                    .then_with(|| left.1.frame.cmp(&right.1.frame))
+            })
+    }
+
+    fn candidate_matches_scoring_touch(
+        candidate: &TouchClassificationEvent,
+        touch: &GoalTouchContext,
+        goal: &GoalContextEvent,
+    ) -> bool {
+        candidate.is_team_0 == goal.scoring_team_is_team_0
+            && candidate.player == touch.player
+            && candidate.frame == touch.frame
+            && candidate.dodge_state == FLIP_INTO_BALL_DODGE_STATE_LABEL
     }
 }
 

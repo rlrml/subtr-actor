@@ -1969,6 +1969,10 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
         first_touch_frame: Some(5),
         first_touch_team_is_team_0: Some(true),
         first_touch_player: Some(player_id.clone()),
+        first_touch_ball_position: Some([0.0, 0.0, 92.0]),
+        first_touch_ball_abs_x: Some(0.0),
+        first_touch_ball_height: Some(92.0),
+        first_touch_ball_velocity: Some([0.0, 300.0, 0.0]),
         team_zero_taker_touch_time: None,
         team_zero_taker_touch_frame: None,
         team_one_taker_touch_time: None,
@@ -2078,6 +2082,166 @@ fn kickoff_type_only_names_symmetric_taker_spawns() {
         ),
         KickoffType::Unknown
     );
+}
+
+#[test]
+fn kickoff_captures_ball_contact_position_and_velocity_at_first_touch() {
+    let blue_taker = PlayerId::Steam(60);
+    let orange_taker = PlayerId::Steam(61);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(10, 1.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball_at(
+                glam::Vec3::new(-120.0, 30.0, 140.0),
+                glam::Vec3::new(200.0, 600.0, 50.0),
+            ),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker.clone(), true, 10, 1.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    // A later touch must not overwrite the first-touch ball snapshot.
+    calculator
+        .update(
+            &frame(14, 1.4),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball_at(
+                glam::Vec3::new(400.0, 900.0, 300.0),
+                glam::Vec3::new(-100.0, -200.0, 0.0),
+            ),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(orange_taker.clone(), false, 14, 1.4)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(35, 3.1),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(360.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator.finish();
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.first_touch_player, Some(blue_taker));
+    assert_eq!(event.first_touch_ball_position, Some([-120.0, 30.0, 140.0]));
+    assert_eq!(event.first_touch_ball_abs_x, Some(120.0));
+    assert_eq!(event.first_touch_ball_height, Some(140.0));
+    assert_eq!(event.first_touch_ball_velocity, Some([200.0, 600.0, 50.0]));
+}
+
+#[test]
+fn kickoff_without_touch_has_no_first_touch_ball_contact() {
+    let blue_taker = PlayerId::Steam(62);
+    let orange_taker = PlayerId::Steam(63);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker,
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(12, 1.2),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(360.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState {
+                goal_events: vec![goal(true, 12, 1.2)],
+                ..FrameEventsState::default()
+            },
+        )
+        .unwrap();
+
+    calculator.finish();
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.first_touch_time, None);
+    assert_eq!(event.first_touch_ball_position, None);
+    assert_eq!(event.first_touch_ball_abs_x, None);
+    assert_eq!(event.first_touch_ball_height, None);
+    assert_eq!(event.first_touch_ball_velocity, None);
 }
 
 #[test]

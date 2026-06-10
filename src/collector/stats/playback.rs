@@ -235,6 +235,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             .config
             .get("flip_reset_goal")
             .and_then(Value::as_object);
+        let flip_into_ball_goal_config = self
+            .config
+            .get("flip_into_ball_goal")
+            .and_then(Value::as_object);
         let bump_goal_config = self.config.get("bump_goal").and_then(Value::as_object);
         let demo_goal_config = self.config.get("demo_goal").and_then(Value::as_object);
         let half_volley_config = self.config.get("half_volley").and_then(Value::as_object);
@@ -380,6 +384,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "flip_reset_goal_max_event_to_touch_seconds",
             )
             .unwrap_or(FlipResetGoalCalculatorConfig::default().max_event_to_goal_seconds),
+            flip_into_ball_goal_max_touch_to_goal_seconds: flip_into_ball_goal_config
+                .and_then(|config| config.get("flip_into_ball_goal_max_touch_to_goal_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(FlipIntoBallGoalCalculatorConfig::default().max_touch_to_goal_seconds),
             bump_goal_max_event_to_goal_seconds: json_config_f32(
                 bump_goal_config,
                 "bump_goal_max_event_to_goal_seconds",
@@ -444,6 +452,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let flip_reset_goal_config = self
             .config
             .get("flip_reset_goal")
+            .and_then(Value::as_object);
+        let flip_into_ball_goal_config = self
+            .config
+            .get("flip_into_ball_goal")
             .and_then(Value::as_object);
         let bump_goal_config = self.config.get("bump_goal").and_then(Value::as_object);
         let demo_goal_config = self.config.get("demo_goal").and_then(Value::as_object);
@@ -666,6 +678,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 flip_reset_goal_config,
                 "flip_reset_goal_max_event_to_goal_seconds",
                 FlipResetGoalCalculatorConfig::default().max_event_to_goal_seconds,
+            ),
+            (
+                flip_into_ball_goal_config,
+                "flip_into_ball_goal_max_touch_to_goal_seconds",
+                FlipIntoBallGoalCalculatorConfig::default().max_touch_to_goal_seconds,
             ),
             (
                 bump_goal_config,

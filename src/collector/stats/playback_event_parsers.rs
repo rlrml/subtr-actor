@@ -14,6 +14,12 @@ pub(in crate::collector::stats::playback) fn parse_dodge_reset_event(
         counter_value: json_required_i32(object, "counter_value")?,
         on_ball: json_required_bool(object, "on_ball")?,
         used: json_optional_bool(object.get("used")).unwrap_or(false),
+        outcome: object
+            .get("outcome")
+            .filter(|value| !value.is_null())
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?,
+        time_to_use: json_optional_f32(object.get("time_to_use"))?,
     })
 }
 
@@ -446,6 +452,18 @@ pub(in crate::collector::stats::playback) fn parse_touch_stats_event(
             .to_owned(),
         first_touch: json_optional_bool(object.get("first_touch")).unwrap_or(false),
         contested: json_optional_bool(object.get("contested")).unwrap_or(false),
+        role: object
+            .get("role")
+            .filter(|value| !value.is_null())
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
+        play_depth: object
+            .get("play_depth")
+            .filter(|value| !value.is_null())
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
         ball_speed_change: json_required_f32(object, "ball_speed_change")?,
         ball_movement: object
             .get("ball_movement")
@@ -1147,6 +1165,10 @@ pub(in crate::collector::stats::playback) fn parse_kickoff_event(
         first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
         first_touch_team_is_team_0: json_optional_bool(object.get("first_touch_team_is_team_0")),
         first_touch_player: json_optional_remote_id(object.get("first_touch_player"))?,
+        first_touch_ball_position: json_optional_vec3(object.get("first_touch_ball_position"))?,
+        first_touch_ball_abs_x: json_optional_f32(object.get("first_touch_ball_abs_x"))?,
+        first_touch_ball_height: json_optional_f32(object.get("first_touch_ball_height"))?,
+        first_touch_ball_velocity: json_optional_vec3(object.get("first_touch_ball_velocity"))?,
         team_zero_taker_touch_time: json_optional_f32(object.get("team_zero_taker_touch_time"))?,
         team_zero_taker_touch_frame: json_optional_usize(
             object.get("team_zero_taker_touch_frame"),
