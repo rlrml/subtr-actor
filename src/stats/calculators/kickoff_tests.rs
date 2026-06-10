@@ -2299,6 +2299,267 @@ fn kickoff_goal_attribution_window_closes_after_max_seconds() {
 }
 
 #[test]
+fn kickoff_goal_rejected_when_conceding_team_settles_possession_before_close() {
+    let blue_taker = PlayerId::Steam(70);
+    let orange_taker = PlayerId::Steam(71);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(10, 1.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker.clone(), true, 10, 1.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    // The conceding (orange) team settles the ball: two touches spaced past
+    // the immediate-contest window with no blue touch between them.
+    for (frame_number, time) in [(15usize, 1.5f32), (21, 2.1)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &GameplayState {
+                    ball_has_been_hit: Some(true),
+                    ..GameplayState::default()
+                },
+                &ball(0.0),
+                &PlayerFrameState::default(),
+                &TouchState {
+                    touch_events: vec![touch(orange_taker.clone(), false, frame_number, time)],
+                    ..TouchState::default()
+                },
+                &FrameEventsState::default(),
+            )
+            .unwrap();
+    }
+
+    // Kickoff reaches its logical close (2s past the first touch).
+    calculator
+        .update(
+            &frame(31, 3.1),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+    assert!(calculator.events().is_empty());
+
+    // Blue wins the ball back and scores within the timing window, but the
+    // chain was broken by orange's settled possession.
+    calculator
+        .update(
+            &frame(50, 5.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(5200.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState {
+                goal_events: vec![goal(true, 50, 5.0)],
+                ..FrameEventsState::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert!(!event.kickoff_goal);
+    assert_eq!(event.time_to_goal, None);
+}
+
+#[test]
+fn kickoff_goal_rejected_when_conceding_team_settles_possession_after_close() {
+    let blue_taker = PlayerId::Steam(72);
+    let blue_support = PlayerId::Steam(73);
+    let orange_taker = PlayerId::Steam(74);
+    let mut calculator =
+        concluded_kickoff_awaiting_attribution(&blue_taker, &blue_support, &orange_taker);
+
+    // After the logical close, orange settles the ball (two spaced touches)
+    // before blue regains it and scores.
+    for (frame_number, time) in [(35usize, 3.0f32), (42, 3.6)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &GameplayState {
+                    ball_has_been_hit: Some(true),
+                    ..GameplayState::default()
+                },
+                &ball(0.0),
+                &PlayerFrameState::default(),
+                &TouchState {
+                    touch_events: vec![touch(orange_taker.clone(), false, frame_number, time)],
+                    ..TouchState::default()
+                },
+                &FrameEventsState::default(),
+            )
+            .unwrap();
+    }
+
+    calculator
+        .update(
+            &frame(55, 5.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(5200.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState {
+                goal_events: vec![goal(true, 55, 5.0)],
+                ..FrameEventsState::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert!(!event.kickoff_goal);
+    assert_eq!(event.time_to_goal, None);
+}
+
+#[test]
+fn kickoff_goal_rejected_when_ball_resets_into_scoring_half() {
+    let blue_taker = PlayerId::Steam(75);
+    let blue_support = PlayerId::Steam(76);
+    let orange_taker = PlayerId::Steam(77);
+    let mut calculator =
+        concluded_kickoff_awaiting_attribution(&blue_taker, &blue_support, &orange_taker);
+
+    // The ball is cleared deep into blue's defensive half: the play reset, so
+    // a later blue goal is buildup rather than a kickoff goal.
+    calculator
+        .update(
+            &frame(45, 4.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(-2000.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(55, 5.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(5200.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState {
+                goal_events: vec![goal(true, 55, 5.0)],
+                ..FrameEventsState::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert!(!event.kickoff_goal);
+    assert_eq!(event.time_to_goal, None);
+}
+
+#[test]
+fn kickoff_goal_allows_deep_ball_in_conceding_half() {
+    let blue_taker = PlayerId::Steam(78);
+    let blue_support = PlayerId::Steam(79);
+    let orange_taker = PlayerId::Steam(80);
+    let mut calculator =
+        concluded_kickoff_awaiting_attribution(&blue_taker, &blue_support, &orange_taker);
+
+    // The ball traveling deep into orange's half is the normal shape of a
+    // blue kickoff goal and must not trip the field-position gate.
+    calculator
+        .update(
+            &frame(45, 4.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(4000.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(55, 5.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(5200.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState {
+                goal_events: vec![goal(true, 55, 5.0)],
+                ..FrameEventsState::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert!(event.kickoff_goal);
+    let time_to_goal = event.time_to_goal.unwrap();
+    assert!((time_to_goal - 4.0).abs() < 1e-4);
+}
+
+#[test]
 fn next_kickoff_phase_flushes_kickoff_awaiting_attribution() {
     let blue_taker = PlayerId::Steam(66);
     let blue_support = PlayerId::Steam(67);

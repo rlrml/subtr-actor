@@ -63,32 +63,6 @@ fn goal_with_touch(
     }
 }
 
-fn core_scoring_goal_context(
-    goal: &GoalContextEvent,
-    time_after_kickoff: Option<f32>,
-) -> CorePlayerGoalContextEvent {
-    CorePlayerGoalContextEvent {
-        time: goal.time,
-        frame: goal.frame,
-        player: goal.scorer.clone().expect("test goal should have scorer"),
-        player_position: None,
-        is_team_0: goal.scoring_team_is_team_0,
-        scoring_team_is_team_0: goal.scoring_team_is_team_0,
-        goals_conceded_while_last_defender: false,
-        goals_for_while_most_back: false,
-        goals_against_while_most_back: false,
-        caught_ahead_of_play_on_conceded_goal: false,
-        goal_against_boost_amount: None,
-        goal_against_average_boost_in_leadup: None,
-        goal_against_min_boost_in_leadup: None,
-        goal_against_position: None,
-        scoring_goal_last_touch_position: None,
-        time_after_kickoff,
-        goal_buildup: Some(goal.goal_buildup),
-        ball_air_time_before_goal: goal.ball_air_time_before_goal,
-    }
-}
-
 fn tag_kinds(events: &[GoalTagAssignment]) -> Vec<GoalTagKind> {
     let mut kinds: Vec<_> = events.iter().map(|event| event.tag.kind()).collect();
     kinds.sort_by_key(|kind| format!("{kind:?}"));
@@ -500,14 +474,64 @@ fn sustained_pressure_goal_rejects_other_buildup() {
     assert!(events.is_empty());
 }
 
+fn kickoff_event_for_goal(
+    scoring_team_is_team_0: Option<bool>,
+    first_touch_time: Option<f32>,
+    time_to_goal: Option<f32>,
+    kickoff_goal: bool,
+) -> KickoffEvent {
+    KickoffEvent {
+        start_time: first_touch_time.unwrap_or(0.0) - 1.0,
+        start_frame: 0,
+        end_time: first_touch_time.unwrap_or(0.0) + 2.0,
+        end_frame: 30,
+        live_action_start_time: None,
+        live_action_start_frame: None,
+        movement_start_time: 0.0,
+        movement_start_frame: 0,
+        kickoff_type: KickoffType::Center,
+        kickoff_direction: KickoffDirection::Center,
+        first_touch_time,
+        first_touch_frame: None,
+        first_touch_team_is_team_0: None,
+        first_touch_player: None,
+        team_zero_taker_touch_time: None,
+        team_zero_taker_touch_frame: None,
+        team_one_taker_touch_time: None,
+        team_one_taker_touch_frame: None,
+        taker_touch_delay_seconds: None,
+        exit_velocity: None,
+        exit_speed: None,
+        exit_y_velocity: None,
+        first_follow_up_touch_time: None,
+        first_follow_up_touch_frame: None,
+        first_follow_up_touch_team_is_team_0: None,
+        first_follow_up_touch_player: None,
+        outcome: KickoffOutcome::Unknown,
+        winning_team_is_team_0: None,
+        win_strength: None,
+        win_strength_band: KickoffWinStrengthBand::Unknown,
+        kickoff_possession_outcome: KickoffPossessionOutcome::Contested,
+        kickoff_possession_team_is_team_0: None,
+        kickoff_goal,
+        scoring_team_is_team_0,
+        time_to_goal,
+        team_zero_taker: None,
+        team_one_taker: None,
+        team_zero_non_takers: Vec::new(),
+        team_one_non_takers: Vec::new(),
+    }
+}
+
 #[test]
-fn kickoff_goal_tags_goals_scored_shortly_after_kickoff() {
-    let mut goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
-    goal.scorer_last_touch = None;
-    let core_context = core_scoring_goal_context(&goal, Some(2.7));
+fn kickoff_goal_tags_goals_attributed_by_a_kickoff_event() {
+    // goal_with_touch builds a goal at t=10.0; the kickoff attributed it as
+    // first touch at 7.3 + 2.7 to goal.
+    let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    let kickoff_event = kickoff_event_for_goal(Some(true), Some(7.3), Some(2.7), true);
     let calculator = KickoffGoalCalculator::new();
 
-    let events = calculator.tag_goals(&[goal], &[core_context]);
+    let events = calculator.tag_goals(&[goal], &[kickoff_event]);
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::KickoffGoal]);
     assert!(events[0]
@@ -519,12 +543,17 @@ fn kickoff_goal_tags_goals_scored_shortly_after_kickoff() {
 }
 
 #[test]
-fn kickoff_goal_rejects_goals_at_or_after_ten_seconds_after_kickoff() {
+fn kickoff_goal_rejects_goals_without_a_matching_kickoff_attribution() {
     let goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
-    let core_context = core_scoring_goal_context(&goal, Some(10.0));
+    let unattributed = kickoff_event_for_goal(Some(true), Some(7.3), None, false);
+    let different_goal_time = kickoff_event_for_goal(Some(true), Some(1.0), Some(2.0), true);
+    let different_team = kickoff_event_for_goal(Some(false), Some(7.3), Some(2.7), true);
     let calculator = KickoffGoalCalculator::new();
 
-    let events = calculator.tag_goals(&[goal], &[core_context]);
+    let events = calculator.tag_goals(
+        &[goal],
+        &[unattributed, different_goal_time, different_team],
+    );
 
     assert!(events.is_empty());
 }
