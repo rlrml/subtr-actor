@@ -461,23 +461,14 @@ macro_rules! register_event_producer {
 // Variant tables for expansion-parent definitions. Each parent is
 // `hidden_from_review` and surfaces these concrete keys instead. The keys must
 // match the ones serialized at runtime in the server's timeline expansion.
-const BOOST_PICKUP_VARIANTS: &[EventVariant] = &[
-    EventVariant::new(
-        "boost_pickup_both",
-        "Boost Pickup Both",
-        EventCategory::Boost,
-    ),
-    EventVariant::new(
-        "boost_pickup_ghost",
-        "Boost Pickup Ghost",
-        EventCategory::Boost,
-    ),
-    EventVariant::new(
-        "boost_pickup_missed",
-        "Boost Pickup Missed",
-        EventCategory::Boost,
-    ),
-];
+// All pickups surface under one key; the `detection` payload field
+// (`both` | `inferred_only` | `reported_only`) records corroboration provenance and is a
+// filter facet, not an event-type split.
+const BOOST_PICKUP_VARIANTS: &[EventVariant] = &[EventVariant::new(
+    "boost_pickup",
+    "Boost Pickup",
+    EventCategory::Boost,
+)];
 
 const ROTATION_PLAYER_VARIANTS: &[EventVariant] = &[EventVariant::new(
     "rotation_player_state_span",

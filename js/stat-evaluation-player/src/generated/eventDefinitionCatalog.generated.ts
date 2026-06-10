@@ -44,18 +44,8 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "hidden_from_review": true,
     "variants": [
       {
-        "key": "boost_pickup_both",
-        "label": "Boost Pickup Both",
-        "category": "boost"
-      },
-      {
-        "key": "boost_pickup_ghost",
-        "label": "Boost Pickup Ghost",
-        "category": "boost"
-      },
-      {
-        "key": "boost_pickup_missed",
-        "label": "Boost Pickup Missed",
+        "key": "boost_pickup",
+        "label": "Boost Pickup",
         "category": "boost"
       }
     ]

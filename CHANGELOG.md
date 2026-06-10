@@ -6,6 +6,11 @@ README, or refactor-only commit.
 
 ## Unreleased
 
+- Dissolve the `boost_pickup_both` / `boost_pickup_ghost` / `boost_pickup_missed`
+  event-variant split: all boost pickups now surface under a single
+  `boost_pickup` review key. Corroboration provenance is still available as the
+  pickup payload's `detection` field (`both` | `inferred_only` | `reported_only`).
+
 ## v0.12.0 - 2026-05-28
 
 - Add stats-player event count derivation so timeline event totals can be
