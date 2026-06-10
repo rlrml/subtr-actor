@@ -36,6 +36,7 @@ fn player(player_id: PlayerId, is_team_0: bool, position: glam::Vec3) -> PlayerS
 
 fn touch(player_id: PlayerId, is_team_0: bool, dodge_contact: bool) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time: 1.0,
         frame: 10,
         team_is_team_0: is_team_0,
@@ -48,6 +49,7 @@ fn touch(player_id: PlayerId, is_team_0: bool, dodge_contact: bool) -> TouchEven
 
 fn touch_at(player_id: PlayerId, is_team_0: bool, time: f32, frame: usize) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame,
         team_is_team_0: is_team_0,

@@ -1454,7 +1454,7 @@ A goal where the scorer flipped (dodged) into the ball on the scoring touch.
 
 **Approach**
 
-- Match the scorer's last touch to its touch-classification event by player and frame.
+- Match the scorer's last touch to its touch-classification event by touch id (player and frame for data predating touch ids).
 - Require the scoring touch's dodge state to be active and the touch to fall within the touch-to-goal window.
 - Limitation: the dodge state covers any active dodge overlapping the touch, so incidental flips that happen to contact the ball can also qualify; dodge direction toward the ball is not yet verified.
 

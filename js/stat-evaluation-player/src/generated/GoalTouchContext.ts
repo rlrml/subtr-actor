@@ -3,4 +3,10 @@ import type { GoalContextPosition } from "./GoalContextPosition.ts";
 import type { GoalPlayerContext } from "./GoalPlayerContext.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type GoalTouchContext = { time: number, frame: number, player: RemoteIdTs, is_team_0: boolean, ball_position: GoalContextPosition | null, ball_speed_after_touch?: number | null, player_position: GoalContextPosition | null, players: Array<GoalPlayerContext>, };
+export type GoalTouchContext = {
+/**
+ * Identity of the source [`TouchEvent`](crate::TouchEvent) for this
+ * scoring touch. Join on this instead of player + frame. `None` only for
+ * data serialized before touch ids existed.
+ */
+touch_id?: number, time: number, frame: number, player: RemoteIdTs, is_team_0: boolean, ball_position: GoalContextPosition | null, ball_speed_after_touch?: number | null, player_position: GoalContextPosition | null, players: Array<GoalPlayerContext>, };

@@ -339,6 +339,11 @@ pub struct KickoffEvent {
     pub first_touch_team_is_team_0: Option<bool>,
     #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub first_touch_player: Option<PlayerId>,
+    /// Identity of the first kickoff [`TouchEvent`](crate::TouchEvent). Join on
+    /// this instead of player + frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(type = "number")]
+    pub first_touch_id: Option<u64>,
     /// Ball position (field coordinates) at the frame of the first kickoff touch.
     pub first_touch_ball_position: Option<[f32; 3]>,
     /// Lateral centrality of the first-touch contact: `abs(x)` of the ball

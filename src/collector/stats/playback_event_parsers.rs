@@ -434,6 +434,7 @@ pub(in crate::collector::stats::playback) fn parse_touch_stats_event(
     let time = json_required_f32(object, "time")?;
     let frame = json_required_usize(object, "frame")?;
     Ok(TouchClassificationEvent {
+        touch_id: json_optional_u64(object.get("touch_id"))?,
         time,
         frame,
         sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
@@ -629,6 +630,7 @@ pub(in crate::collector::stats::playback) fn parse_goal_touch_context(
 ) -> SubtrActorResult<GoalTouchContext> {
     let object = json_object(value, "goal touch context")?;
     Ok(GoalTouchContext {
+        touch_id: json_optional_u64(object.get("touch_id"))?,
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         player: json_required_remote_id(object, "player")?,
@@ -1165,6 +1167,7 @@ pub(in crate::collector::stats::playback) fn parse_kickoff_event(
         first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
         first_touch_team_is_team_0: json_optional_bool(object.get("first_touch_team_is_team_0")),
         first_touch_player: json_optional_remote_id(object.get("first_touch_player"))?,
+        first_touch_id: json_optional_u64(object.get("first_touch_id"))?,
         first_touch_ball_position: json_optional_vec3(object.get("first_touch_ball_position"))?,
         first_touch_ball_abs_x: json_optional_f32(object.get("first_touch_ball_abs_x"))?,
         first_touch_ball_height: json_optional_f32(object.get("first_touch_ball_height"))?,

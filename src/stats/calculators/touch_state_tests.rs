@@ -176,6 +176,7 @@ fn team_only_explicit_touch_events_without_physics_candidate_are_ignored() {
     };
     let events = FrameEventsState {
         touch_events: vec![TouchEvent {
+            touch_id: None,
             time: 0.1,
             frame: 1,
             team_is_team_0: true,
@@ -207,6 +208,7 @@ fn team_only_explicit_touch_events_keep_event_time_when_enriched_from_recent_cac
     calculator.recent_touch_candidates.insert(
         player_id.clone(),
         TouchEvent {
+            touch_id: None,
             time: 0.1,
             frame: 1,
             team_is_team_0: true,
@@ -222,6 +224,7 @@ fn team_only_explicit_touch_events_keep_event_time_when_enriched_from_recent_cac
     };
     let events = FrameEventsState {
         touch_events: vec![TouchEvent {
+            touch_id: None,
             time: 0.3,
             frame: 3,
             team_is_team_0: true,
@@ -259,6 +262,7 @@ fn team_only_explicit_touch_events_ignore_expired_recent_cache_candidates() {
     calculator.recent_touch_candidates.insert(
         player_id.clone(),
         TouchEvent {
+            touch_id: None,
             time: 0.1,
             frame: 1,
             team_is_team_0: true,
@@ -274,6 +278,7 @@ fn team_only_explicit_touch_events_ignore_expired_recent_cache_candidates() {
     };
     let events = FrameEventsState {
         touch_events: vec![TouchEvent {
+            touch_id: None,
             time: 0.6,
             frame: 6,
             team_is_team_0: true,
@@ -307,6 +312,7 @@ fn dodge_refresh_touch_events_keep_refresh_time_when_enriched_from_recent_cache(
     calculator.recent_touch_candidates.insert(
         player_id.clone(),
         TouchEvent {
+            touch_id: None,
             time: 0.1,
             frame: 1,
             team_is_team_0: true,
@@ -359,6 +365,7 @@ fn dodge_refresh_touch_events_ignore_expired_recent_cache_candidates() {
     calculator.recent_touch_candidates.insert(
         player_id.clone(),
         TouchEvent {
+            touch_id: None,
             time: 0.1,
             frame: 1,
             team_is_team_0: true,
@@ -407,6 +414,7 @@ fn player_explicit_touch_events_without_physics_candidate_are_accepted() {
     };
     let events = FrameEventsState {
         touch_events: vec![TouchEvent {
+            touch_id: None,
             time: 0.1,
             frame: 1,
             team_is_team_0: false,
@@ -469,6 +477,7 @@ fn player_explicit_touch_events_without_physics_choose_best_current_gap() {
     let events = FrameEventsState {
         touch_events: vec![
             TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: false,
@@ -478,6 +487,7 @@ fn player_explicit_touch_events_without_physics_choose_best_current_gap() {
                 dodge_contact: false,
             },
             TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: true,
@@ -518,6 +528,7 @@ fn player_explicit_touch_events_prefer_current_frame_over_stale_cache() {
     calculator.recent_touch_candidates.insert(
         player_id.clone(),
         TouchEvent {
+            touch_id: None,
             time: 0.1,
             frame: 1,
             team_is_team_0: false,
@@ -533,6 +544,7 @@ fn player_explicit_touch_events_prefer_current_frame_over_stale_cache() {
     };
     let events = FrameEventsState {
         touch_events: vec![TouchEvent {
+            touch_id: None,
             time: 0.2,
             frame: 2,
             team_is_team_0: false,
@@ -586,6 +598,7 @@ fn explicit_touch_events_respect_same_player_cooldown() {
         &players,
         &FrameEventsState {
             touch_events: vec![TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: true,
@@ -604,6 +617,7 @@ fn explicit_touch_events_respect_same_player_cooldown() {
         &players,
         &FrameEventsState {
             touch_events: vec![TouchEvent {
+                touch_id: None,
                 time: 0.2,
                 frame: 2,
                 team_is_team_0: true,
@@ -622,6 +636,7 @@ fn explicit_touch_events_respect_same_player_cooldown() {
         &players,
         &FrameEventsState {
             touch_events: vec![TouchEvent {
+                touch_id: None,
                 time: 0.4,
                 frame: 4,
                 team_is_team_0: true,
@@ -655,6 +670,7 @@ fn aggregate_explicit_touch_cooldown_processes_events_chronologically() {
     let events = FrameEventsState {
         touch_events: vec![
             TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: true,
@@ -664,6 +680,7 @@ fn aggregate_explicit_touch_cooldown_processes_events_chronologically() {
                 dodge_contact: false,
             },
             TouchEvent {
+                touch_id: None,
                 time: 0.4,
                 frame: 4,
                 team_is_team_0: true,
@@ -712,6 +729,7 @@ fn aggregate_last_touch_uses_latest_touch_not_best_older_touch() {
     let events = FrameEventsState {
         touch_events: vec![
             TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: true,
@@ -721,6 +739,7 @@ fn aggregate_last_touch_uses_latest_touch_not_best_older_touch() {
                 dodge_contact: false,
             },
             TouchEvent {
+                touch_id: None,
                 time: 0.4,
                 frame: 4,
                 team_is_team_0: true,
@@ -765,6 +784,7 @@ fn explicit_touch_events_are_enriched_with_proximity_distance() {
     };
     let events = FrameEventsState {
         touch_events: vec![TouchEvent {
+            touch_id: None,
             time: 0.1,
             frame: 1,
             team_is_team_0: true,
@@ -935,6 +955,7 @@ fn current_frame_physics_candidate_wins_over_explicit_team_hint() {
         &players,
         &FrameEventsState {
             touch_events: vec![TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: true,
@@ -992,6 +1013,7 @@ fn player_explicit_touch_events_are_kept_alongside_physics_candidates() {
         &players,
         &FrameEventsState {
             touch_events: vec![TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: false,
@@ -1039,6 +1061,7 @@ fn duplicate_player_explicit_touch_event_does_not_duplicate_physics_candidate() 
         &players,
         &FrameEventsState {
             touch_events: vec![TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: true,
@@ -1325,6 +1348,7 @@ fn primary_touch_prefers_current_candidate_over_older_equal_contested_candidate(
     calculator.recent_touch_candidates.insert(
         cached_opponent_id.clone(),
         TouchEvent {
+            touch_id: None,
             time: 0.1,
             frame: 1,
             team_is_team_0: false,
@@ -1371,6 +1395,7 @@ fn primary_touch_prefers_current_candidate_over_older_equal_contested_candidate(
 fn primary_touch_event_only_uses_current_frame_touch_events() {
     let player_id = boxcars::RemoteId::Steam(1);
     let stale_touch = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: true,
@@ -1394,6 +1419,7 @@ fn primary_touch_event_scores_current_events_without_last_touch_hint() {
     let best_player_id = boxcars::RemoteId::Steam(1);
     let secondary_player_id = boxcars::RemoteId::Steam(2);
     let best_touch = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: true,
@@ -1403,6 +1429,7 @@ fn primary_touch_event_scores_current_events_without_last_touch_hint() {
         dodge_contact: false,
     };
     let secondary_touch = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: false,
@@ -1431,6 +1458,7 @@ fn primary_touch_event_tie_breaks_by_player_id() {
     let lower_player_id = boxcars::RemoteId::Steam(2);
     let higher_player_id = boxcars::RemoteId::Steam(10);
     let lower_player_touch = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: true,
@@ -1440,6 +1468,7 @@ fn primary_touch_event_tie_breaks_by_player_id() {
         dodge_contact: false,
     };
     let higher_player_touch = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: true,
@@ -1468,6 +1497,7 @@ fn best_candidate_for_team_tie_breaks_by_player_id() {
     let lower_player_id = boxcars::RemoteId::Steam(2);
     let higher_player_id = boxcars::RemoteId::Steam(10);
     let lower_player_touch = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: true,
@@ -1477,6 +1507,7 @@ fn best_candidate_for_team_tie_breaks_by_player_id() {
         dodge_contact: false,
     };
     let higher_player_touch = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: true,
@@ -1504,6 +1535,7 @@ fn best_candidate_for_team_tie_breaks_by_player_id() {
 #[test]
 fn contested_touch_candidates_include_all_close_opponents() {
     let primary = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: true,
@@ -1513,6 +1545,7 @@ fn contested_touch_candidates_include_all_close_opponents() {
         dodge_contact: false,
     };
     let close_opponent = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: false,
@@ -1522,6 +1555,7 @@ fn contested_touch_candidates_include_all_close_opponents() {
         dodge_contact: false,
     };
     let second_close_opponent = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: false,
@@ -1531,6 +1565,7 @@ fn contested_touch_candidates_include_all_close_opponents() {
         dodge_contact: false,
     };
     let loose_opponent = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: false,
@@ -1558,6 +1593,7 @@ fn contested_touch_candidates_include_all_close_opponents() {
 #[test]
 fn contested_touch_candidates_ignore_stale_opponents() {
     let primary = TouchEvent {
+        touch_id: None,
         time: 0.5,
         frame: 5,
         team_is_team_0: true,
@@ -1567,6 +1603,7 @@ fn contested_touch_candidates_ignore_stale_opponents() {
         dodge_contact: false,
     };
     let adjacent_opponent = TouchEvent {
+        touch_id: None,
         time: 0.4,
         frame: 4,
         team_is_team_0: false,
@@ -1576,6 +1613,7 @@ fn contested_touch_candidates_ignore_stale_opponents() {
         dodge_contact: false,
     };
     let stale_opponent = TouchEvent {
+        touch_id: None,
         time: 0.2,
         frame: 2,
         team_is_team_0: false,
@@ -1594,4 +1632,47 @@ fn contested_touch_candidates_ignore_stale_opponents() {
     let contested = calculator.contested_touch_candidates(&primary);
 
     assert_eq!(contested, vec![adjacent_opponent]);
+}
+
+#[test]
+fn confirmed_touches_receive_unique_monotonic_touch_ids() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let players = players(player_id.clone());
+    let mut calculator = TouchStateCalculator::new();
+    let live_play = LivePlayState {
+        gameplay_phase: GameplayPhase::ActivePlay,
+        is_live_play: true,
+    };
+
+    calculator.update(
+        &frame(0),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+    let first_touch = calculator.update(
+        &frame(1),
+        &ball(glam::Vec3::new(300.0, 0.0, 0.0)),
+        &players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+    let second_touch = calculator.update(
+        &frame(4),
+        &ball(glam::Vec3::new(1000.0, 0.0, 0.0)),
+        &players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+
+    let first_id = first_touch.touch_events[0].touch_id;
+    let second_id = second_touch.touch_events[0].touch_id;
+    assert!(first_id.is_some());
+    assert!(second_id.is_some());
+    assert!(second_id > first_id);
+    assert_eq!(
+        second_touch.last_touch.as_ref().unwrap().touch_id,
+        second_id
+    );
 }

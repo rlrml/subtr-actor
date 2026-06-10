@@ -2,6 +2,7 @@ use super::*;
 
 fn touch(player_id: u64, contact_gap: f32) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time: 2.0,
         frame: 20,
         team_is_team_0: true,

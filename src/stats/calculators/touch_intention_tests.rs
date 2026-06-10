@@ -15,6 +15,7 @@ fn frame_at(time: f32) -> FrameInfo {
 
 fn touch_at(player_id: &PlayerId, time: f32) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame: (time * 10.0).round() as usize,
         team_is_team_0: true,

@@ -137,6 +137,7 @@ fn live_processor_view_satisfies_processor_surface_from_live_frame() {
     frame.has_scored_on_team = 1;
 
     let touch_events = vec![TouchEvent {
+        touch_id: None,
         time: frame.time,
         frame: frame.frame_number as usize,
         player: Some(RemoteId::SplitScreen(2)),
@@ -417,6 +418,7 @@ fn live_processor_view_exposes_cumulative_history_for_aggregate_inputs() {
                 },
             }],
             touch_events: vec![TouchEvent {
+                touch_id: None,
                 time,
                 frame,
                 team_is_team_0: true,

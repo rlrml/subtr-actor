@@ -131,6 +131,7 @@ fn touch_cancels_active_whiff_candidate() {
             },
             &TouchState {
                 touch_events: vec![TouchEvent {
+                    touch_id: None,
                     time: 0.2,
                     frame: 2,
                     team_is_team_0: true,
@@ -176,6 +177,7 @@ fn opponent_touch_counts_as_beaten_to_ball_not_whiff() {
             },
             &TouchState {
                 touch_events: vec![TouchEvent {
+                    touch_id: None,
                     time: 0.2,
                     frame: 2,
                     team_is_team_0: false,
@@ -224,6 +226,7 @@ fn teammate_touch_cancels_active_whiff_candidate() {
             },
             &TouchState {
                 touch_events: vec![TouchEvent {
+                    touch_id: None,
                     time: 0.2,
                     frame: 2,
                     team_is_team_0: true,

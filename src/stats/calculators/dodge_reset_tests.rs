@@ -87,6 +87,7 @@ fn reset_event_at(
 
 fn touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame,
         team_is_team_0: true,
@@ -99,6 +100,7 @@ fn touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
 
 fn raw_team_touch_event(time: f32, frame: usize) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame,
         team_is_team_0: true,

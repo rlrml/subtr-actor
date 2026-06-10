@@ -274,6 +274,14 @@ pub struct PlayerStatEvent {
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchEvent {
+    /// Stable identity for an attributed touch, assigned monotonically when the
+    /// stats pipeline confirms the touch. `None` for raw replay team markers,
+    /// which exist before attribution. Downstream events that reference a touch
+    /// carry this id so consumers can join exactly instead of matching on
+    /// player + frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(type = "number")]
+    pub touch_id: Option<u64>,
     pub time: f32,
     pub frame: usize,
     pub team_is_team_0: bool,

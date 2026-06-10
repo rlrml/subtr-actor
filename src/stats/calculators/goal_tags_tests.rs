@@ -14,6 +14,7 @@ fn scorer_touch(
     players: Vec<GoalPlayerContext>,
 ) -> GoalTouchContext {
     GoalTouchContext {
+        touch_id: None,
         time: 9.5,
         frame: 95,
         player: player_id(1),
@@ -265,6 +266,7 @@ fn touch_classification_event(
     dodge_state: &str,
 ) -> TouchClassificationEvent {
     TouchClassificationEvent {
+        touch_id: None,
         time,
         frame,
         sample_time: time,
@@ -524,6 +526,7 @@ fn kickoff_event_for_goal(
         first_touch_frame: None,
         first_touch_team_is_team_0: None,
         first_touch_player: None,
+        first_touch_id: None,
         first_touch_ball_position: None,
         first_touch_ball_abs_x: None,
         first_touch_ball_height: None,
@@ -909,6 +912,27 @@ fn flip_into_ball_goal_rejects_stale_touches() {
     let events = calculator.tag_goals(&[goal], &touches);
 
     assert!(events.is_empty());
+}
+
+#[test]
+fn flip_into_ball_goal_joins_by_touch_id_when_present() {
+    let mut goal = goal_with_touch(true, position(0.0, 2200.0, 130.0), Vec::new());
+    goal.scorer_last_touch.as_mut().unwrap().touch_id = Some(7);
+
+    // Same player + frame as the scoring touch, but a different identity:
+    // an id-bearing candidate that is not the scoring touch must not match.
+    let mut other_touch = touch_classification_event(9.5, 95, player_id(1), "dodge");
+    other_touch.touch_id = Some(6);
+    assert!(FlipIntoBallGoalCalculator::new()
+        .tag_goals(std::slice::from_ref(&goal), &[other_touch.clone()])
+        .is_empty());
+
+    // The candidate carrying the matching id is the scoring touch.
+    let mut scoring_touch = other_touch;
+    scoring_touch.touch_id = Some(7);
+    let events =
+        FlipIntoBallGoalCalculator::new().tag_goals(std::slice::from_ref(&goal), &[scoring_touch]);
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlipIntoBallGoal]);
 }
 
 #[test]

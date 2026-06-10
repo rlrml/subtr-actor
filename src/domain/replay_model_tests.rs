@@ -17,6 +17,7 @@ fn rigid_body(position: glam::Vec3, velocity: Option<glam::Vec3>) -> boxcars::Ri
 
 fn touch_event(frame: usize, time: f32) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame,
         team_is_team_0: true,
