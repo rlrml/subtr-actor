@@ -112,7 +112,13 @@ goal_tag_node!(
     SustainedPressureGoalCalculator,
     "sustained_pressure_goal"
 );
-goal_tag_node!(KickoffGoalNode, KickoffGoalCalculator, "kickoff_goal");
+mechanic_goal_tag_node!(
+    KickoffGoalNode,
+    KickoffGoalCalculator,
+    "kickoff_goal",
+    kickoff_dependency,
+    KickoffCalculator
+);
 mechanic_goal_tag_node!(
     FlickGoalNode,
     FlickGoalCalculator,

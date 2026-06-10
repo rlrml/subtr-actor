@@ -9,6 +9,7 @@ const KICKOFF_DIAGONAL_MAX_ABS_Y: f32 = 3300.0;
 const KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS: f32 = 1.25;
 const KICKOFF_FOLLOW_UP_AFTER_FIRST_TOUCH_SECONDS: f32 = 2.0;
 const KICKOFF_GOAL_MAX_SECONDS: f32 = 10.0;
+const KICKOFF_GOAL_MAX_DEFENSIVE_BALL_Y: f32 = 1280.0;
 const KICKOFF_WIN_MIN_BALL_Y: f32 = 180.0;
 const KICKOFF_WIN_MIN_BALL_SPEED_Y: f32 = 220.0;
 const KICKOFF_BALL_DIRECTION_MIN_ABS_X: f32 = 180.0;
@@ -84,6 +85,13 @@ struct ActiveKickoff {
     touches: Vec<KickoffTouchSnapshot>,
     speed_flip_players: HashSet<PlayerId>,
     resolution: Option<KickoffResolutionSnapshot>,
+    /// Running ball-y extremes observed since the kickoff's first touch,
+    /// including frames after the kickoff's logical close. Used by the
+    /// kickoff-goal field-position gate: if the ball retreated meaningfully
+    /// into the eventual scoring team's own half, the goal came from a reset
+    /// play rather than the kickoff exchange.
+    min_ball_y_after_first_touch: Option<f32>,
+    max_ball_y_after_first_touch: Option<f32>,
     /// The fully built event, frozen at the kickoff's logical close
     /// (`should_finish`). The item then stays in flight, awaiting goal
     /// attribution: a goal scored within [`KICKOFF_GOAL_MAX_SECONDS`] of the
@@ -419,6 +427,8 @@ impl KickoffCalculator {
             touches: Vec::new(),
             speed_flip_players: HashSet::new(),
             resolution: None,
+            min_ball_y_after_first_touch: None,
+            max_ball_y_after_first_touch: None,
             concluded: None,
         });
     }
@@ -1052,19 +1062,100 @@ impl KickoffCalculator {
         })
     }
 
-    /// Attribute a goal that landed after the kickoff's logical close but
-    /// within [`KICKOFF_GOAL_MAX_SECONDS`] of the first touch to the concluded
-    /// kickoff event. Mirrors the attribution `finish_event` performs when the
-    /// goal arrives while the kickoff is still open.
+    /// Track the ball's y extremes from the kickoff's first touch onward,
+    /// including frames after the kickoff's logical close while it awaits
+    /// goal attribution.
+    fn observe_ball_extent(active: &mut ActiveKickoff, ball: &BallFrameState) {
+        if active.first_touch_time.is_none() {
+            return;
+        }
+        let Some(sample) = ball.sample() else {
+            return;
+        };
+        let y = sample.position().y;
+        active.min_ball_y_after_first_touch = Some(
+            active
+                .min_ball_y_after_first_touch
+                .map_or(y, |current| current.min(y)),
+        );
+        active.max_ball_y_after_first_touch = Some(
+            active
+                .max_ball_y_after_first_touch
+                .map_or(y, |current| current.max(y)),
+        );
+    }
+
+    /// Whether a goal qualifies as a kickoff goal. The goal must land within
+    /// [`KICKOFF_GOAL_MAX_SECONDS`] of the first touch, but proximity in time
+    /// alone is not enough: the goal also has to flow from the kickoff
+    /// exchange itself, so the conceding team must never have settled the ball
+    /// in between, and the play must not have reset through the scoring
+    /// team's own half.
+    fn kickoff_goal_qualifies(active: &ActiveKickoff, goal: &GoalEvent) -> bool {
+        let Some(first_touch_time) = active.first_touch_time else {
+            return false;
+        };
+        let time_to_goal = goal.time - first_touch_time;
+        (0.0..KICKOFF_GOAL_MAX_SECONDS).contains(&time_to_goal)
+            && !Self::conceding_team_established_possession(&active.touches, goal)
+            && !Self::ball_reset_into_scoring_half(active, goal)
+    }
+
+    /// The conceding team "established possession" when it recorded two
+    /// touches separated by more than the immediate-contest window with no
+    /// scoring-team touch in between — they settled the ball rather than
+    /// merely deflecting it during the kickoff scramble. A single conceding
+    /// touch (a failed clear or deflection straight into punishment) does not
+    /// break the kickoff-goal chain.
+    fn conceding_team_established_possession(
+        touches: &[KickoffTouchSnapshot],
+        goal: &GoalEvent,
+    ) -> bool {
+        let conceding_is_team_0 = !goal.scoring_team_is_team_0;
+        let mut first_conceding_touch_time: Option<f32> = None;
+        for touch in touches.iter().filter(|touch| touch.time <= goal.time) {
+            if touch.team_is_team_0 == conceding_is_team_0 {
+                match first_conceding_touch_time {
+                    Some(anchor)
+                        if touch.time - anchor > KICKOFF_POSSESSION_IMMEDIATE_CONTEST_SECONDS =>
+                    {
+                        return true;
+                    }
+                    Some(_) => {}
+                    None => first_conceding_touch_time = Some(touch.time),
+                }
+            } else {
+                first_conceding_touch_time = None;
+            }
+        }
+        false
+    }
+
+    /// Whether the ball retreated past [`KICKOFF_GOAL_MAX_DEFENSIVE_BALL_Y`]
+    /// into the scoring team's own half between the kickoff's first touch and
+    /// the goal. Team zero attacks positive y, so its defensive half is
+    /// negative y.
+    fn ball_reset_into_scoring_half(active: &ActiveKickoff, goal: &GoalEvent) -> bool {
+        if goal.scoring_team_is_team_0 {
+            active
+                .min_ball_y_after_first_touch
+                .is_some_and(|y| y < -KICKOFF_GOAL_MAX_DEFENSIVE_BALL_Y)
+        } else {
+            active
+                .max_ball_y_after_first_touch
+                .is_some_and(|y| y > KICKOFF_GOAL_MAX_DEFENSIVE_BALL_Y)
+        }
+    }
+
+    /// Attribute a qualifying goal (see [`Self::kickoff_goal_qualifies`]) that
+    /// landed after the kickoff's logical close to the concluded kickoff
+    /// event. Mirrors the attribution `finish_event` performs when the goal
+    /// arrives while the kickoff is still open.
     fn attribute_goal(event: &mut KickoffEvent, goal: &GoalEvent) {
         let Some(first_touch_time) = event.first_touch_time else {
             return;
         };
-        let time_to_goal = goal.time - first_touch_time;
-        if !(0.0..KICKOFF_GOAL_MAX_SECONDS).contains(&time_to_goal) {
-            return;
-        }
-        event.time_to_goal = Some(time_to_goal);
+        event.time_to_goal = Some(goal.time - first_touch_time);
         event.kickoff_goal = true;
         event.scoring_team_is_team_0 = Some(goal.scoring_team_is_team_0);
         if event.first_follow_up_touch_time.is_none() {
@@ -1104,7 +1195,7 @@ impl KickoffCalculator {
                 .map(|first_touch| goal.time - first_touch)
         });
         let kickoff_goal =
-            time_to_goal.is_some_and(|time| (0.0..KICKOFF_GOAL_MAX_SECONDS).contains(&time));
+            scoring_goal.is_some_and(|goal| Self::kickoff_goal_qualifies(&active, goal));
         let win_strength_band = win_strength
             .map(Self::win_strength_band)
             .unwrap_or_default();
@@ -1350,7 +1441,13 @@ impl KickoffCalculator {
                     ball: ctx.ball.clone(),
                 });
             }
+        } else {
+            // The frozen event no longer changes, but the kickoff-goal gates
+            // still need the touch chain and ball-position history through the
+            // attribution window.
+            Self::apply_touches(active, ctx.touch_state);
         }
+        Self::observe_ball_extent(active, ctx.ball);
 
         // Natural finalization happens in two stages. The kickoff *concludes*
         // once `should_finish` is met: its event content is frozen there
@@ -1362,9 +1459,17 @@ impl KickoffCalculator {
         // goal. The ledger keeps the in-flight kickoff queryable and
         // guarantees it is resolved at the end of the stream.
         let finished = self.active.advance(ctx.frame.time, |active| {
-            if let Some(event) = active.concluded.as_deref_mut() {
+            if active.concluded.is_some() {
                 if let Some(goal) = Self::earliest_goal(ctx.events) {
-                    Self::attribute_goal(event, goal);
+                    if Self::kickoff_goal_qualifies(active, goal) {
+                        let event = active
+                            .concluded
+                            .as_deref_mut()
+                            .expect("concluded checked above");
+                        Self::attribute_goal(event, goal);
+                    }
+                    // Whether or not the goal qualified, play stops here; no
+                    // later goal can belong to this kickoff.
                     return Disposition::Finalize(FinalizeReason::Completed);
                 }
                 let attribution_window_closed = active

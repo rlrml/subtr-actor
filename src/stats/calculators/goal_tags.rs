@@ -24,7 +24,10 @@ const DEFAULT_BUMP_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_DEMO_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_HALF_VOLLEY_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_HALF_VOLLEY_GOAL_MIN_GOAL_ALIGNMENT: f32 = 0.55;
-const DEFAULT_KICKOFF_GOAL_MAX_TIME_AFTER_KICKOFF_SECONDS: f32 = 10.0;
+// Kickoff events record the attributed goal as first_touch_time +
+// time_to_goal; this epsilon absorbs the float round-trip when matching that
+// back to a goal context's timestamp.
+const KICKOFF_GOAL_TAG_MATCH_EPSILON_SECONDS: f32 = 0.05;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
@@ -375,10 +378,11 @@ pub const ALL_GOAL_TAG_DEFINITIONS: &[GoalTagDefinition] = &[
         GoalTagKind::KickoffGoal,
         "kickoff_goal",
         "Kickoff Goal",
-        "A goal scored shortly after the kickoff's first touch.",
+        "A goal flowing directly from the kickoff exchange.",
         &[
-            "Inspect the scorer's core goal context for time-after-kickoff data.",
-            "Require the goal to fall within the kickoff-goal timing window.",
+            "Use the kickoff calculator's goal attribution as the source of truth.",
+            "Require the goal to land within the kickoff-goal timing window of the first touch.",
+            "Reject goals where the conceding team settled possession or the play reset through the scoring team's own half.",
             "Attach goal-context evidence so the tag appears with the goal label.",
         ],
     ),
@@ -1503,46 +1507,56 @@ impl HalfVolleyGoalCalculator {
 }
 
 impl KickoffGoalCalculator {
-    pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
-        self.events.replace_all_assuming_append_only(self.tag_goals(
-            match_stats.goal_context_events(),
-            match_stats.core_player_goal_context_events(),
-        ));
+    pub fn update(
+        &mut self,
+        match_stats: &MatchStatsCalculator,
+        kickoff: &KickoffCalculator,
+    ) -> SubtrActorResult<()> {
+        self.events.replace_all_assuming_append_only(
+            self.tag_goals(match_stats.goal_context_events(), kickoff.events()),
+        );
         Ok(())
     }
 
+    /// The kickoff calculator is the source of truth for what counts as a
+    /// kickoff goal (timing window, unbroken possession chain, and
+    /// field-position gates); this tags exactly the goals some kickoff event
+    /// attributed to itself.
     fn tag_goals(
         &self,
         goals: &[GoalContextEvent],
-        core_goal_context_events: &[CorePlayerGoalContextEvent],
+        kickoff_events: &[KickoffEvent],
     ) -> Vec<GoalTagAssignment> {
-        let mut tags = Vec::new();
-        for core_event in core_goal_context_events {
-            let Some(time_after_kickoff) = core_event.time_after_kickoff else {
-                continue;
-            };
-            if !(0.0..DEFAULT_KICKOFF_GOAL_MAX_TIME_AFTER_KICKOFF_SECONDS)
-                .contains(&time_after_kickoff)
-            {
-                continue;
-            }
-            let Some((goal_index, goal)) = goals.iter().enumerate().find(|(_, goal)| {
-                goal.time == core_event.time
-                    && goal.frame == core_event.frame
-                    && goal.scoring_team_is_team_0 == core_event.scoring_team_is_team_0
-                    && goal.scorer.as_ref() == Some(&core_event.player)
-            }) else {
-                continue;
-            };
+        goals
+            .iter()
+            .enumerate()
+            .filter(|(_, goal)| {
+                kickoff_events
+                    .iter()
+                    .any(|event| kickoff_event_attributes_goal(event, goal))
+            })
+            .map(|(goal_index, goal)| {
+                goal_tag(
+                    GoalTaggingContext { goal_index },
+                    GoalTagKind::KickoffGoal,
+                    1.0,
+                    vec![goal_context_evidence(goal)],
+                )
+            })
+            .collect()
+    }
+}
 
-            tags.push(goal_tag(
-                GoalTaggingContext { goal_index },
-                GoalTagKind::KickoffGoal,
-                1.0,
-                vec![goal_context_evidence(goal)],
-            ));
+fn kickoff_event_attributes_goal(event: &KickoffEvent, goal: &GoalContextEvent) -> bool {
+    if !event.kickoff_goal || event.scoring_team_is_team_0 != Some(goal.scoring_team_is_team_0) {
+        return false;
+    }
+    match (event.first_touch_time, event.time_to_goal) {
+        (Some(first_touch_time), Some(time_to_goal)) => {
+            (first_touch_time + time_to_goal - goal.time).abs()
+                <= KICKOFF_GOAL_TAG_MATCH_EPSILON_SECONDS
         }
-        tags
+        _ => false,
     }
 }
 
