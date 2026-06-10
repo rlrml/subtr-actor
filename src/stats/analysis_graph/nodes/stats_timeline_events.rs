@@ -110,6 +110,7 @@ impl StatsTimelineEventsNode {
             bump_goal_dependency(),
             demo_goal_dependency(),
             half_volley_goal_dependency(),
+            kickoff_goal_dependency(),
         ]
     }
 
@@ -153,6 +154,7 @@ impl StatsTimelineEventsNode {
         let bump_goal = ctx.get::<BumpGoalCalculator>()?;
         let demo_goal = ctx.get::<DemoGoalCalculator>()?;
         let half_volley_goal = ctx.get::<HalfVolleyGoalCalculator>()?;
+        let kickoff_goal = ctx.get::<KickoffGoalCalculator>()?;
         let rush = ctx.get::<RushCalculator>()?;
         let flip_impulse = ctx.get::<FlipImpulseCalculator>()?;
         let speed_flip = ctx.get::<SpeedFlipCalculator>()?;
@@ -185,6 +187,7 @@ impl StatsTimelineEventsNode {
             bump_goal.events(),
             demo_goal.events(),
             half_volley_goal.events(),
+            kickoff_goal.events(),
         ]);
         let goal_context =
             goal_context_events_with_tags(match_stats.goal_context_events(), &goal_tag_assignments);

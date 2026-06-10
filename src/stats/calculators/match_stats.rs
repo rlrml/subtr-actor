@@ -520,15 +520,22 @@ impl MatchStatsCalculator {
     }
 
     fn update_kickoff_reference(&mut self, gameplay: &GameplayState, events: &FrameEventsState) {
-        if let Some(first_touch_time) = events
-            .touch_events
-            .iter()
-            .map(|event| event.time)
-            .min_by(|a, b| a.total_cmp(b))
-        {
-            self.active_kickoff_touch_time = Some(first_touch_time);
-            self.kickoff_waiting_for_first_touch = false;
-            return;
+        // Only the first touch after a kickoff reset establishes the kickoff
+        // reference. Without this gate, every later touch in open play would
+        // overwrite the reference, turning `time_after_kickoff` into "time
+        // since the most recent touch" instead of "time since the kickoff's
+        // first touch".
+        if self.kickoff_waiting_for_first_touch {
+            if let Some(first_touch_time) = events
+                .touch_events
+                .iter()
+                .map(|event| event.time)
+                .min_by(|a, b| a.total_cmp(b))
+            {
+                self.active_kickoff_touch_time = Some(first_touch_time);
+                self.kickoff_waiting_for_first_touch = false;
+                return;
+            }
         }
 
         if Self::kickoff_phase_active(gameplay) {

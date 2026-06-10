@@ -547,3 +547,104 @@ fn counter_attack_buildup_requires_a_defensive_pressure_signal() {
         GoalBuildupKind::Other
     );
 }
+
+#[test]
+fn time_after_kickoff_uses_kickoff_first_touch_not_latest_touch() {
+    let scorer = PlayerId::Steam(1);
+    let mut calculator = MatchStatsCalculator::new();
+
+    let touch_event = |time: f32, frame: usize| TouchEvent {
+        time,
+        frame,
+        team_is_team_0: true,
+        player: Some(scorer.clone()),
+        player_position: None,
+        closest_approach_distance: Some(0.0),
+        dodge_contact: false,
+    };
+
+    fn update_with(
+        calculator: &mut MatchStatsCalculator,
+        frame_info: FrameInfo,
+        kickoff_phase: bool,
+        player_goals: i32,
+        touch_events: Vec<TouchEvent>,
+        goal_events: Vec<GoalEvent>,
+    ) {
+        let scorer = PlayerId::Steam(1);
+        calculator
+            .update_parts(
+                &frame_info,
+                &GameplayState {
+                    ball_has_been_hit: Some(!kickoff_phase),
+                    team_zero_score: Some(player_goals),
+                    team_one_score: Some(0),
+                    ..GameplayState::default()
+                },
+                &ball(BALL_GROUND_CONTACT_MAX_Z),
+                &PlayerFrameState {
+                    players: vec![player(scorer, true, player_goals)],
+                },
+                &FrameEventsState {
+                    touch_events,
+                    goal_events,
+                    ..FrameEventsState::default()
+                },
+                &LivePlayState {
+                    gameplay_phase: GameplayPhase::ActivePlay,
+                    is_live_play: !kickoff_phase,
+                },
+                &TouchState::default(),
+            )
+            .unwrap();
+    }
+
+    // Kickoff countdown: waiting for the kickoff's first touch.
+    update_with(
+        &mut calculator,
+        frame(0, 0.0),
+        true,
+        0,
+        Vec::new(),
+        Vec::new(),
+    );
+    // Kickoff first touch at t=1.0 establishes the reference.
+    update_with(
+        &mut calculator,
+        frame(10, 1.0),
+        false,
+        0,
+        vec![touch_event(1.0, 10)],
+        Vec::new(),
+    );
+    // A mid-rally touch much later must not reset the kickoff reference.
+    update_with(
+        &mut calculator,
+        frame(200, 20.0),
+        false,
+        0,
+        vec![touch_event(20.0, 200)],
+        Vec::new(),
+    );
+    // Goal at t=21.0: time after kickoff is 20s, not 1s.
+    update_with(
+        &mut calculator,
+        frame(210, 21.0),
+        false,
+        1,
+        Vec::new(),
+        vec![goal_event(21.0, 210, scorer.clone())],
+    );
+
+    let core_event = calculator
+        .core_player_goal_context_events()
+        .last()
+        .expect("goal should emit a core goal context event");
+    let time_after_kickoff = core_event
+        .time_after_kickoff
+        .expect("time_after_kickoff should be set");
+    assert!(
+        (time_after_kickoff - 20.0).abs() < 1e-4,
+        "expected time_after_kickoff to measure from the kickoff first touch, got {time_after_kickoff}"
+    );
+}

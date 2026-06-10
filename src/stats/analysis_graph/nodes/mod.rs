@@ -8,14 +8,14 @@ use crate::stats::calculators::{
     DoubleTapGoalCalculator, EmptyNetGoalCalculator, FiftyFiftyCalculator, FiftyFiftyState,
     FlickCalculator, FlickGoalCalculator, FlipImpulseCalculator, FlipResetGoalCalculator,
     FrameEventsState, FrameInfo, GameplayState, HalfFlipCalculator, HalfVolleyCalculator,
-    HalfVolleyGoalCalculator, HighAerialGoalCalculator, KickoffCalculator, LivePlayState,
-    LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator, MustyFlickCalculator,
-    OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator,
-    PassingGoalCalculator, PlayerFrameState, PlayerVerticalState, PositioningCalculator,
-    PossessionCalculator, PossessionState, PowerslideCalculator, RotationCalculator,
-    RushCalculator, SpeedFlipCalculator, TerritorialPressureCalculator, TouchCalculator,
-    TouchState, WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator,
-    WhiffCalculator,
+    HalfVolleyGoalCalculator, HighAerialGoalCalculator, KickoffCalculator, KickoffGoalCalculator,
+    LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator,
+    MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
+    PassCalculator, PassingGoalCalculator, PlayerFrameState, PlayerVerticalState,
+    PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
+    RotationCalculator, RushCalculator, SpeedFlipCalculator, TerritorialPressureCalculator,
+    TouchCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
+    WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -315,6 +315,10 @@ pub(crate) fn demo_goal_dependency() -> AnalysisDependency {
 
 pub(crate) fn half_volley_goal_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<HalfVolleyGoalCalculator>(goal_tags::boxed_half_volley_goal)
+}
+
+pub(crate) fn kickoff_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<KickoffGoalCalculator>(goal_tags::boxed_kickoff_goal)
 }
 
 pub(crate) fn backboard_dependency() -> AnalysisDependency {
