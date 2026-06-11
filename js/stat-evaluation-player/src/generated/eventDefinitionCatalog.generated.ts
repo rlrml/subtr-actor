@@ -268,6 +268,13 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "player_possession",
+    "label": "Player Possession",
+    "category": "other",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
     "key": "possession",
     "label": "Possession",
     "category": "other",
