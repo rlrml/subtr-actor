@@ -77,6 +77,38 @@ pub(in crate::collector::stats::playback) fn parse_possession_event(
     })
 }
 
+pub(in crate::collector::stats::playback) fn parse_player_possession_event(
+    value: &Value,
+) -> SubtrActorResult<PlayerPossessionEvent> {
+    let object = json_object(value, "player_possession event")?;
+    let optional_str = |key: &str| -> SubtrActorResult<Option<String>> {
+        Ok(match object.get(key) {
+            None | Some(Value::Null) => None,
+            Some(_) => Some(json_required_str(object, key)?.to_owned()),
+        })
+    };
+    Ok(PlayerPossessionEvent {
+        player_id: json_required_remote_id(object, "player_id")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        start_frame: json_required_usize(object, "start_frame")?,
+        end_frame: json_required_usize(object, "end_frame")?,
+        start_time: json_required_f32(object, "start_time")?,
+        end_time: json_required_f32(object, "end_time")?,
+        duration: json_required_f32(object, "duration")?,
+        touch_count: json_required_u32(object, "touch_count")?,
+        aerial_touch_count: json_required_u32(object, "aerial_touch_count")?,
+        wall_touch_count: json_required_u32(object, "wall_touch_count")?,
+        advance_distance: json_required_f32(object, "advance_distance")?,
+        retreat_distance: json_required_f32(object, "retreat_distance")?,
+        carry_time: json_required_f32(object, "carry_time")?,
+        air_dribble_time: json_required_f32(object, "air_dribble_time")?,
+        carry_count: json_required_u32(object, "carry_count")?,
+        air_dribble_count: json_required_u32(object, "air_dribble_count")?,
+        start_field_third: optional_str("start_field_third")?,
+        end_field_third: optional_str("end_field_third")?,
+    })
+}
+
 pub(in crate::collector::stats::playback) fn parse_ball_half_event(
     value: &Value,
 ) -> SubtrActorResult<BallHalfEvent> {

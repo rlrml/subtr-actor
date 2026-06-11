@@ -23,14 +23,14 @@ impl PossessionStateLabel {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::enum_variant_names)]
-enum FieldThirdLabel {
+pub(crate) enum FieldThirdLabel {
     TeamZeroThird,
     NeutralThird,
     TeamOneThird,
 }
 
 impl FieldThirdLabel {
-    fn from_ball(ball: &BallSample) -> Self {
+    pub(crate) fn from_ball(ball: &BallSample) -> Self {
         let ball_y = ball.position().y;
         if ball_y < -FIELD_ZONE_BOUNDARY_Y {
             Self::TeamZeroThird
@@ -41,7 +41,7 @@ impl FieldThirdLabel {
         }
     }
 
-    fn as_label_value(self) -> &'static str {
+    pub(crate) fn as_label_value(self) -> &'static str {
         match self {
             Self::TeamZeroThird => "team_zero_third",
             Self::NeutralThird => "neutral_third",

@@ -172,6 +172,30 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
+            .module_player_events("player_possession", "events", parse_player_possession_event)?
+            .into_iter()
+            .enumerate()
+        {
+            events.push(make_event(
+                "player_possession",
+                index,
+                span(
+                    event.start_frame,
+                    event.end_frame,
+                    event.start_time,
+                    event.end_time,
+                ),
+                EventPayload::PlayerPossession(event.clone()),
+                Some(event.player_id.clone()),
+                None,
+                Some(event.is_team_0),
+                None,
+                None,
+                None,
+            ));
+        }
+
+        for (index, event) in self
             .module_player_events("ball_half", "events", parse_ball_half_event)?
             .into_iter()
             .enumerate()

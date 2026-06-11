@@ -407,6 +407,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "half_volley_goal",
         "fifty_fifty",
         "kickoff",
+        "player_possession",
         "possession",
         "ball_half",
         "territorial_pressure",
@@ -689,6 +690,12 @@ pub(crate) fn builtin_module_json(
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsWithEventsExport {
                 stats: projection.possession.stats(),
+                events: calculator.events(),
+            })
+        }
+        "player_possession" => {
+            let calculator = graph_state::<PlayerPossessionCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
         }
@@ -1382,7 +1389,9 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: projection.rush.stats(),
             })?
         }
-        "dodge" | "flip_impulse" => serialize_to_json_value(&serde_json::json!({}))?,
+        "dodge" | "flip_impulse" | "player_possession" => {
+            serialize_to_json_value(&serde_json::json!({}))?
+        }
         "touch" => {
             let projection = projected_stats(graph, module_name)?;
             let player_stats = projection
@@ -1694,6 +1703,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "pass"
         | "fifty_fifty"
         | "kickoff"
+        | "player_possession"
         | "possession"
         | "dodge"
         | "flip_impulse"

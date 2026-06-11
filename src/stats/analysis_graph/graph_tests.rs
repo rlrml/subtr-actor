@@ -378,6 +378,7 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "field_third",
         "field_half",
         "depth_role",
+        "player_possession",
         "possession",
         "powerslide",
         "ball_half",
