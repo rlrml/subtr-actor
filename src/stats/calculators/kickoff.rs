@@ -457,10 +457,21 @@ impl KickoffCalculator {
         frame: &FrameInfo,
         gameplay: &GameplayState,
     ) {
-        if active.movement_start_time.is_none()
-            && gameplay.kickoff_phase_active()
-            && !gameplay.kickoff_countdown_active()
-        {
+        // A kickoff is always armed while the countdown is still active, so the
+        // first armed frame on which the countdown is no longer active marks the
+        // "GO" — the moment players are released toward the ball.
+        //
+        // We deliberately do not also require `kickoff_phase_active()` here. On
+        // the opening kickoff of a match the engine reports
+        // `ball_has_been_hit == None` (rather than `Some(false)`) until the ball
+        // is first touched, so the kickoff phase never registers as active in the
+        // window between the countdown ending and the first touch. Requiring it
+        // left `movement_start` unset on the first kickoff, falling back to the
+        // countdown's *start* and inflating every taker's `time_to_ball` by the
+        // full countdown (~3s). Gating on the countdown alone keeps movement
+        // start aligned with "GO" on the opening kickoff and matches the
+        // behavior on every subsequent kickoff.
+        if active.movement_start_time.is_none() && !gameplay.kickoff_countdown_active() {
             active.movement_start_time = Some(frame.time);
             active.movement_start_frame = Some(frame.frame_number);
         }
@@ -1443,7 +1454,7 @@ impl KickoffCalculator {
         };
         if active.concluded.is_none() {
             Self::observe_movement_start(active, ctx.frame, ctx.gameplay);
-            if ctx.gameplay.kickoff_phase_active() && !ctx.gameplay.kickoff_countdown_active() {
+            if !ctx.gameplay.kickoff_countdown_active() {
                 Self::observe_live_action_start(active, ctx.frame);
             }
             Self::apply_player_samples(active, ctx.frame, ctx.players);
