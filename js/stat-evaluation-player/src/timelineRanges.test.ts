@@ -371,7 +371,7 @@ test("buildBallHalfTimelineRanges derives half-control spans from labeled deltas
       lane: "half-control",
       laneLabel: "Half Control",
       label: "Blue half control",
-      color: "rgba(89, 195, 255, 0.76)",
+      color: "#3b82f6",
       isTeamZero: true,
     },
     {
@@ -392,12 +392,14 @@ test("buildBallHalfTimelineRanges derives spans from compact event timelines", (
     events: {
       ball_half: [
         { frame: 1, time: 0.5, active: true, field_half: "team_zero_side" },
-        { frame: 2, time: 1, active: true, field_half: "neutral" },
+        { frame: 2, time: 1, active: true, field_half: "team_one_side" },
+        { frame: 3, time: 1.5, active: true, field_half: "neutral" },
       ],
     },
     frames: [
       { frame_number: 1, time: 0.5, dt: 0.5, team_zero: {}, team_one: {}, players: [] },
       { frame_number: 2, time: 1, dt: 0.5, team_zero: {}, team_one: {}, players: [] },
+      { frame_number: 3, time: 1.5, dt: 0.5, team_zero: {}, team_one: {}, players: [] },
     ],
   });
 
@@ -409,13 +411,23 @@ test("buildBallHalfTimelineRanges derives spans from compact event timelines", (
       lane: "half-control",
       laneLabel: "Half Control",
       label: "Blue half control",
-      color: "rgba(89, 195, 255, 0.76)",
+      color: "#3b82f6",
       isTeamZero: true,
     },
     {
-      id: "half-control:neutral:0.500",
+      id: "half-control:team_one_side:0.500",
       startTime: 0.5,
       endTime: 1,
+      lane: "half-control",
+      laneLabel: "Half Control",
+      label: "Orange half control",
+      color: "#f59e0b",
+      isTeamZero: false,
+    },
+    {
+      id: "half-control:neutral:1.000",
+      startTime: 1,
+      endTime: 1.5,
       lane: "half-control",
       laneLabel: "Half Control",
       label: "Neutral half control",
@@ -827,7 +839,7 @@ test("buildBallHalfTimelineRanges uses replay centerline fallback for legacy hal
       lane: "half-control",
       laneLabel: "Half Control",
       label: "Blue half control",
-      color: "rgba(89, 195, 255, 0.76)",
+      color: "#3b82f6",
       isTeamZero: true,
     },
     {

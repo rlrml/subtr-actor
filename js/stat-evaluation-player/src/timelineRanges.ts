@@ -168,7 +168,7 @@ function createBallHalfRange(
     lane: "half-control",
     laneLabel: "Half Control",
     label: isTeamZero ? "Blue half control" : "Orange half control",
-    color: isTeamZero ? "rgba(89, 195, 255, 0.76)" : "rgba(255, 193, 92, 0.76)",
+    color: teamTimelineColor(isTeamZero) ?? undefined,
     isTeamZero,
   };
 }
