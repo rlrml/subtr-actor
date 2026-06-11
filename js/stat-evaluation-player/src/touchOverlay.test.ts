@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 
 import type { ReplayModel } from "@rlrml/player";
 import type { StatsFrame } from "./statsTimeline.ts";
-import { buildTouchMarkers, getLastTouchPlayer, getVisibleTouchMarkers } from "./touchOverlay.ts";
+import {
+  buildTouchMarkers,
+  getLastTouchPlayer,
+  getVisibleTouchMarkers,
+  touchMarkerColor,
+  type TouchMarker,
+} from "./touchOverlay.ts";
 import {
   createLegacyStatsTimeline,
   createPlayerStatsSnapshot,
@@ -121,6 +127,8 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
       isTeamZero: true,
       playerId: "Steam:blue-id",
       playerName: "Blue",
+      kind: "control",
+      intention: null,
       position: { x: 100, y: -250, z: 320 },
       endPosition: { x: 100, y: -250, z: 320 },
       totalBallAdvanceDistance: 0,
@@ -309,6 +317,8 @@ test("getVisibleTouchMarkers returns markers inside the decay window", () => {
       isTeamZero: true,
       playerId: "Steam:blue-id",
       playerName: "Blue",
+      kind: null,
+      intention: null,
       position: { x: 0, y: 0, z: 0 },
       endPosition: { x: 0, y: 0, z: 0 },
       totalBallAdvanceDistance: 0,
@@ -322,6 +332,8 @@ test("getVisibleTouchMarkers returns markers inside the decay window", () => {
       isTeamZero: false,
       playerId: "Steam:orange-id",
       playerName: "Orange",
+      kind: null,
+      intention: null,
       position: { x: 0, y: 0, z: 0 },
       endPosition: { x: 0, y: 0, z: 0 },
       totalBallAdvanceDistance: 0,
@@ -334,4 +346,30 @@ test("getVisibleTouchMarkers returns markers inside the decay window", () => {
     getVisibleTouchMarkers(markers, 10, 5).map((marker) => marker.id),
     ["touch:2"],
   );
+});
+
+test("touchMarkerColor selects palettes by color mode with fallbacks", () => {
+  const marker: TouchMarker = {
+    id: "touch:1",
+    time: 0,
+    frame: 0,
+    isTeamZero: false,
+    playerId: "Steam:orange-id",
+    playerName: "Orange",
+    kind: "hard_hit",
+    intention: "shot",
+    position: { x: 0, y: 0, z: 0 },
+    endPosition: { x: 0, y: 0, z: 0 },
+    totalBallAdvanceDistance: 0,
+    totalBallRetreatDistance: 0,
+    totalBallTravelDistance: 0,
+  };
+
+  assert.equal(touchMarkerColor(marker, "team"), 0xffc15c);
+  assert.equal(touchMarkerColor({ ...marker, isTeamZero: true }, "team"), 0x59c3ff);
+  assert.equal(touchMarkerColor(marker, "intention"), 0xff5d6c);
+  assert.equal(touchMarkerColor(marker, "kind"), 0xff5d6c);
+  assert.equal(touchMarkerColor({ ...marker, kind: "control" }, "kind"), 0x4ade80);
+  assert.equal(touchMarkerColor({ ...marker, intention: null }, "intention"), 0x9aa5b1);
+  assert.equal(touchMarkerColor({ ...marker, kind: "mystery" }, "kind"), 0x9aa5b1);
 });
