@@ -11,6 +11,7 @@ import { isVisibleMechanicKind } from "./timelinePresentation.ts";
 export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "timeline",
   "core_player",
+  "player_possession",
   "possession",
   "ball_half",
   "territorial_pressure",
