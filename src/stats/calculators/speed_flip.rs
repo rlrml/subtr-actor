@@ -16,8 +16,10 @@ const SPEED_FLIP_MIN_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.88;
 const SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.95;
 const SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT: f32 = 0.82;
 const SPEED_FLIP_MIN_DIAGONAL_SCORE: f32 = 0.35;
-const SPEED_FLIP_MIN_STRONG_DIAGONAL_SCORE: f32 = 0.90;
+const SPEED_FLIP_MIN_STRONG_DIAGONAL_SCORE: f32 = 0.75;
 const SPEED_FLIP_MIN_UP_ROTATION_DEGREES: f32 = 90.0;
+const SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES: f32 = 45.0;
+const SPEED_FLIP_MIN_BOOST_ALIGNMENT: f32 = 0.80;
 const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
 const BOOST_ACCELERATION_UU_PER_SECOND_SQUARED: f32 = 991.6667;
 
@@ -536,7 +538,15 @@ impl SpeedFlipCalculator {
                 .contains(&estimated_dodge_side_component)
             && estimated_dodge_up_component <= SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT
             && candidate.best_diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
-        if !(has_strong_diagonal_rotation || has_diagonal_impulse) {
+        // Boost-through speed flips suppress the estimated dodge impulse (the
+        // boost compensation swallows it) and sloppier flips land below the
+        // strong-rotation score, but the flip cancel itself leaves a crisp
+        // signature: the car's up vector sweeps through the dodge rotation
+        // while the nose barely pitches because the cancel levels it out.
+        let has_cancelled_diagonal_dodge = candidate.max_forward_rotation_degrees
+            <= SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES
+            && candidate.best_diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
+        if !(has_strong_diagonal_rotation || has_diagonal_impulse || has_cancelled_diagonal_dodge) {
             return None;
         }
         let boost_alignment_score =
@@ -548,7 +558,10 @@ impl SpeedFlipCalculator {
             + 0.05 * boost_alignment_score
             + 0.05 * timeliness_score;
 
-        if boost_alignment_score < 0.25 {
+        // Mid-flip the car is yawed off its velocity axis, so raw alignment of
+        // a boost-through speed flip tops out around ~0.82 inside the short
+        // evaluation window; gate on the raw alignment rather than the score.
+        if candidate.best_boost_alignment < SPEED_FLIP_MIN_BOOST_ALIGNMENT {
             return None;
         }
         if cancel_score < 0.35 || confidence < SPEED_FLIP_MIN_CONFIDENCE {
