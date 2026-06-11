@@ -96,8 +96,8 @@ checksum = "40ce3582fb888755eb1a77668e69f90c3b317fdcc85bbeacd0d9bdfa89427173"
 
 [[package]]
 name = "boxcars"
-version = "0.11.1"
-source = "git+https://github.com/colonelpanic8/boxcars.git?rev=70be5375a2e6fd52e82c267d8147522659580a31#70be5375a2e6fd52e82c267d8147522659580a31"
+version = "0.11.2"
+source = "git+https://github.com/colonelpanic8/boxcars.git?rev=342509319b5aa725abe0bbcfdb8a1f7a7a70a26d#342509319b5aa725abe0bbcfdb8a1f7a7a70a26d"
 dependencies = [
  "bitter",
  "encoding_rs",
