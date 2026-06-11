@@ -1,25 +1,21 @@
-//! Clip-based variant of the speed-flip regression coverage in
-//! `speed_flip_replay_regression_test.rs`.
+//! Clip-based replacement for `speed_flip_replay_regression_test.rs`.
 //!
-//! Instead of running the stats timeline over the entire replay, this clips a
-//! small window around the Rocket Sense reviewed events and asserts the same
-//! detections on the clip. This is the intended workflow for event-level
-//! regression tests: process the full replay once to *find* a case, then pin it
-//! with a clip so the test only ever processes the frames that matter.
+//! The original scanned whole replays for speed-flip detections at scattered
+//! frames; this reproduces every one of those assertions on small clips. Each
+//! reviewed point is covered by a clip window wide enough to contain it, with
+//! generous warm-up so the dodge/movement trackers feeding speed-flip detection
+//! are fully seeded. This is the intended workflow for event-level regression
+//! tests: process the full replay once to *find* a case, then pin it with a
+//! clip so the test only ever processes the frames that matter.
 
 use subtr_actor::{
-    clip_replay_around, EventPayload, PlayerId, ReplayMeta, SpeedFlipEvent,
-    StatsTimelineEventCollector,
+    clip_replay_around, EventPayload, PlayerId, ReplayClip, ReplayMeta,
+    ReplayStatsTimelineScaffold, SpeedFlipEvent, StatsTimelineEventCollector,
 };
 
+const COLONELPANIC_NO_SPEED_FLIP_REPLAY: &str =
+    "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
 const ROCKET_SENSE_REVIEWED_DUEL_REPLAY: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
-
-/// Source-replay frame of the Rocket Sense confirmed OSIDE_SMURF speed flip.
-const CONFIRMED_SPEED_FLIP_FRAME: usize = 1848;
-/// Source-replay time of the confirmed speed flip.
-const CONFIRMED_SPEED_FLIP_TIME: f32 = 90.561_89;
-/// Rocket Sense rejected Adamboi04 candidate that falls inside the clip window.
-const REJECTED_CANDIDATE_FRAME: usize = 1850;
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let data = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read replay file: {path}"));
@@ -40,7 +36,7 @@ fn player_ids_by_name<'a>(replay_meta: &'a ReplayMeta, name: &str) -> Vec<&'a Pl
         .collect()
 }
 
-fn speed_flip_events(timeline: &subtr_actor::ReplayStatsTimelineScaffold) -> Vec<&SpeedFlipEvent> {
+fn speed_flip_events(timeline: &ReplayStatsTimelineScaffold) -> Vec<&SpeedFlipEvent> {
     timeline
         .events
         .events
@@ -52,70 +48,120 @@ fn speed_flip_events(timeline: &subtr_actor::ReplayStatsTimelineScaffold) -> Vec
         .collect()
 }
 
+/// Build a clip around `[region_start, region_end]` and run the stats timeline
+/// over it. Returns the clip (for provenance) and the resulting scaffold.
+fn clip_timeline(
+    replay: &boxcars::Replay,
+    region_start: usize,
+    region_end: usize,
+) -> (ReplayClip, ReplayStatsTimelineScaffold) {
+    let clip = clip_replay_around(replay, region_start, region_end, 120, 60).expect("clip builds");
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&clip.to_replay())
+        .expect("stats timeline should build from a clip");
+    (clip, timeline)
+}
+
+/// Assert no speed flip for `player_ids` lands within 3 frames of any
+/// `source_frame` that falls inside the clip (mapped through provenance).
+fn assert_no_speed_flip_at_source_frames(
+    clip: &ReplayClip,
+    timeline: &ReplayStatsTimelineScaffold,
+    player_ids: &[&PlayerId],
+    source_frames: &[usize],
+    context: &str,
+) {
+    let events = speed_flip_events(timeline);
+    for &source_frame in source_frames {
+        let Some(clip_frame) = clip.provenance.clip_index_of(source_frame) else {
+            continue; // outside this clip window; covered elsewhere
+        };
+        let false_positive = events.iter().find(|event| {
+            player_ids.contains(&&event.player) && event.frame.abs_diff(clip_frame) <= 3
+        });
+        assert!(
+            false_positive.is_none(),
+            "[{context}] unexpected speed flip near rejected source frame {source_frame} \
+             (clip frame {clip_frame}): {false_positive:#?}"
+        );
+    }
+}
+
 #[test]
-fn clip_reproduces_reviewed_speed_flip_detections() {
+fn clip_colonelpanic_replay_has_no_speed_flip_at_normalized_28_1_seconds() {
+    // Rocket Sense rejected candidate: colonelpanic8 near raw frame 837 / 31.7s.
+    let replay = parse_replay(COLONELPANIC_NO_SPEED_FLIP_REPLAY);
+    let (clip, timeline) = clip_timeline(&replay, 837, 837);
+    let colonelpanic_ids = player_ids_by_name(&timeline.replay_meta, "colonelpanic8");
+    assert!(
+        !colonelpanic_ids.is_empty(),
+        "clip keyframe should preserve colonelpanic8 identity"
+    );
+    assert_no_speed_flip_at_source_frames(
+        &clip,
+        &timeline,
+        &colonelpanic_ids,
+        &[837],
+        "colonelpanic8 frame 837",
+    );
+    // Also assert by preserved source time, independent of frame mapping.
+    let by_time = speed_flip_events(&timeline).iter().any(|event| {
+        colonelpanic_ids.contains(&&event.player) && (event.time - 31.695_719).abs() <= 0.15
+    });
+    assert!(
+        !by_time,
+        "unexpected colonelpanic8 speed flip near 31.7s in clip"
+    );
+}
+
+#[test]
+fn clip_reviewed_post_eac_duel_keeps_confirmed_speed_flip_and_rejects_nearby_false_positive() {
     let replay = parse_replay(ROCKET_SENSE_REVIEWED_DUEL_REPLAY);
 
-    // Window around the reviewed events, with generous warm-up so the dodge and
-    // movement trackers feeding speed-flip detection are fully seeded.
-    let clip = clip_replay_around(
-        &replay,
-        CONFIRMED_SPEED_FLIP_FRAME - 60,
-        REJECTED_CANDIDATE_FRAME + 60,
-        90,
-        30,
-    )
-    .expect("clip should build");
-    let clip_replay = clip.to_replay();
-    assert!(
-        clip_replay.network_frames.as_ref().unwrap().frames.len() < 400,
-        "clip should be a small fraction of the full replay"
-    );
+    // The confirmed OSIDE_SMURF speed flip (source frame 1848) and the
+    // adjacent rejected Adamboi04 candidates clustered around it.
+    let (cluster_clip, cluster_timeline) = clip_timeline(&replay, 1540, 1900);
+    let oside_ids = player_ids_by_name(&cluster_timeline.replay_meta, "OSIDE_SMURF");
+    let adamboi_ids = player_ids_by_name(&cluster_timeline.replay_meta, "Adamboi04");
+    assert!(!oside_ids.is_empty(), "clip should contain OSIDE_SMURF");
+    assert!(!adamboi_ids.is_empty(), "clip should contain Adamboi04");
 
-    let timeline = StatsTimelineEventCollector::new()
-        .get_replay_stats_timeline_scaffold(&clip_replay)
-        .expect("stats timeline should build from a clip");
-
-    let oside_ids = player_ids_by_name(&timeline.replay_meta, "OSIDE_SMURF");
-    let adamboi_ids = player_ids_by_name(&timeline.replay_meta, "Adamboi04");
-    assert!(
-        !oside_ids.is_empty(),
-        "clip keyframe should preserve OSIDE_SMURF identity"
-    );
-    assert!(
-        !adamboi_ids.is_empty(),
-        "clip keyframe should preserve Adamboi04 identity"
-    );
-
-    let speed_flip_events = speed_flip_events(&timeline);
-
-    // Frame indices shift inside a clip, so match the confirmed event by time
-    // (preserved from the source replay) and by provenance-mapped frame.
-    let expected_clip_frame = clip
+    let confirmed_clip_frame = cluster_clip
         .provenance
-        .clip_index_of(CONFIRMED_SPEED_FLIP_FRAME)
-        .expect("confirmed frame should be inside the clip");
-    let oside_confirmed = speed_flip_events.iter().any(|event| {
+        .clip_index_of(1848)
+        .expect("confirmed frame should be inside the cluster clip");
+    let oside_confirmed = speed_flip_events(&cluster_timeline).iter().any(|event| {
         oside_ids.contains(&&event.player)
-            && ((event.time - CONFIRMED_SPEED_FLIP_TIME).abs() <= 0.15
-                || event.frame.abs_diff(expected_clip_frame) <= 3)
+            && (event.frame.abs_diff(confirmed_clip_frame) <= 3
+                || (event.time - 90.561_89).abs() <= 0.15)
     });
     assert!(
         oside_confirmed,
-        "expected the Rocket Sense confirmed OSIDE_SMURF speed flip near source frame \
-         {CONFIRMED_SPEED_FLIP_FRAME} (clip frame {expected_clip_frame}); got {speed_flip_events:#?}"
+        "expected the Rocket Sense confirmed OSIDE_SMURF speed flip near source frame 1848; \
+         got {:#?}",
+        speed_flip_events(&cluster_timeline)
+    );
+    assert_no_speed_flip_at_source_frames(
+        &cluster_clip,
+        &cluster_timeline,
+        &adamboi_ids,
+        &[1557, 1644, 1850],
+        "Adamboi04 cluster",
     );
 
-    let rejected_clip_frame = clip
-        .provenance
-        .clip_index_of(REJECTED_CANDIDATE_FRAME)
-        .expect("rejected frame should be inside the clip");
-    let adamboi_false_positive = speed_flip_events.iter().find(|event| {
-        adamboi_ids.contains(&&event.player) && event.frame.abs_diff(rejected_clip_frame) <= 3
-    });
+    // The earlier rejected Adamboi04 candidates, covered by a clip taken from
+    // the start of the replay (no synthetic keyframe).
+    let (early_clip, early_timeline) = clip_timeline(&replay, 0, 1100);
+    let early_adamboi_ids = player_ids_by_name(&early_timeline.replay_meta, "Adamboi04");
     assert!(
-        adamboi_false_positive.is_none(),
-        "unexpected speed flip for Rocket Sense rejected Adamboi04 candidate: \
-         {adamboi_false_positive:#?}"
+        !early_adamboi_ids.is_empty(),
+        "early clip should contain Adamboi04"
+    );
+    assert_no_speed_flip_at_source_frames(
+        &early_clip,
+        &early_timeline,
+        &early_adamboi_ids,
+        &[110, 576, 1020],
+        "Adamboi04 early",
     );
 }
