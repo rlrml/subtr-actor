@@ -620,6 +620,41 @@ fn flick_goal_tags_matching_scorer_flick_before_last_touch() {
 }
 
 #[test]
+fn flick_goal_carries_flick_kind_details() {
+    let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
+    let mut reverse_flick = flick_event(9.3, 93, player_id(1));
+    reverse_flick.kind = "reverse".to_owned();
+    reverse_flick.setup_rotation_direction = "left".to_owned();
+
+    let events = FlickGoalCalculator::new().tag_goals(&[goal], &[reverse_flick]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlickGoal]);
+    let details = &events[0].tag.metadata().details;
+    assert!(details
+        .iter()
+        .any(|detail| detail.key == "kind" && detail.value == "reverse"));
+    assert!(details
+        .iter()
+        .any(|detail| detail.key == "setup_rotation_direction" && detail.value == "left"));
+}
+
+#[test]
+fn flick_goal_omits_unknown_setup_rotation_direction_detail() {
+    let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
+    let events =
+        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(9.3, 93, player_id(1))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlickGoal]);
+    let details = &events[0].tag.metadata().details;
+    assert!(details
+        .iter()
+        .any(|detail| detail.key == "kind" && detail.value == "other"));
+    assert!(!details
+        .iter()
+        .any(|detail| detail.key == "setup_rotation_direction"));
+}
+
+#[test]
 fn flick_goal_rejects_stale_flicks() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
     let events =

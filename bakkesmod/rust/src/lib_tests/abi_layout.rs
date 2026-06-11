@@ -530,6 +530,7 @@ fn goal_tag(kind: GoalTagKind) -> GoalTag {
             performer: None,
             modifiers: Vec::new(),
             related_events: Vec::new(),
+            details: Vec::new(),
             evidence: Vec::new(),
         },
     )

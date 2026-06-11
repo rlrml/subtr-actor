@@ -97,6 +97,7 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
             mechanic_goal_modifiers(goal, event.event_player()),
             mechanic_goal_evidence(goal, point_mechanic_evidence(event)),
             vec![event.event_ref(event_index)],
+            event.goal_tag_details(),
         ));
     }
     tags
@@ -160,6 +161,7 @@ pub(super) fn tag_goals_by_air_dribble_event(
                 stream: GoalTagEventStream::BallCarry,
                 index: event_index,
             }],
+            Vec::new(),
         ));
     }
     tags
@@ -400,6 +402,7 @@ pub(super) fn goal_tag(
     goal_tag_with_modifiers(ctx, kind, confidence, Vec::new(), evidence, Vec::new())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn mechanic_goal_tag(
     ctx: GoalTaggingContext,
     kind: GoalTagKind,
@@ -408,6 +411,7 @@ pub(super) fn mechanic_goal_tag(
     modifiers: Vec<GoalTagModifier>,
     evidence: Vec<GoalTagEvidence>,
     related_events: Vec<GoalTagEventRef>,
+    details: Vec<GoalTagDetail>,
 ) -> GoalTagAssignment {
     goal_tag_with_metadata(
         ctx,
@@ -417,6 +421,7 @@ pub(super) fn mechanic_goal_tag(
             performer: Some(performer),
             modifiers,
             related_events,
+            details,
             evidence,
         },
     )
@@ -438,6 +443,7 @@ pub(super) fn goal_tag_with_modifiers(
             performer: None,
             modifiers,
             related_events,
+            details: Vec::new(),
             evidence,
         },
     )

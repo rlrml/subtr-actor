@@ -815,6 +815,10 @@ pub(in crate::collector::stats::playback) fn parse_goal_tag(
             .iter()
             .map(|event_ref| decode_json_value(event_ref.clone()))
             .collect::<SubtrActorResult<Vec<_>>>()?,
+        details: json_optional_array(metadata_object.get("details"))?
+            .iter()
+            .map(|detail| decode_json_value(detail.clone()))
+            .collect::<SubtrActorResult<Vec<_>>>()?,
         evidence: json_optional_array(metadata_object.get("evidence"))?
             .iter()
             .map(parse_goal_tag_evidence)
