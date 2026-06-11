@@ -414,9 +414,7 @@ export class TouchEventOverlay {
         "sap-touch-overlay-label-orange",
         teamTinted && !marker.isTeamZero,
       );
-      view.label.style.borderColor = teamTinted
-        ? ""
-        : `#${color.toString(16).padStart(6, "0")}cc`;
+      view.label.style.borderColor = teamTinted ? "" : `#${color.toString(16).padStart(6, "0")}cc`;
 
       this.updateArrow(view, marker, baseOpacity);
 
