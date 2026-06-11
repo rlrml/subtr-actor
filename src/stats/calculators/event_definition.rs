@@ -86,9 +86,7 @@ impl EventVariant {
 pub enum EventCategory {
     Core,
     Mechanic,
-    Possession,
     Positioning,
-    Boost,
     Movement,
     Annotation,
     Other,
@@ -465,7 +463,7 @@ macro_rules! register_event_producer {
 const BOOST_PICKUP_VARIANTS: &[EventVariant] = &[EventVariant::new(
     "boost_pickup",
     "Boost Pickup",
-    EventCategory::Boost,
+    EventCategory::Other,
 )];
 
 // Payload-less event definitions: native Rocket League scoreboard stats, goal
@@ -497,7 +495,7 @@ pub const SHOT_EVENT_DEFINITION: EventDefinition =
 register_stats_event_definition!(SHOT_EVENT_DEFINITION);
 
 pub const KICKOFF_EVENT_DEFINITION: EventDefinition =
-    pending_event_definition("kickoff", "Kickoff", EventCategory::Possession);
+    pending_event_definition("kickoff", "Kickoff", EventCategory::Core);
 register_stats_event_definition!(KICKOFF_EVENT_DEFINITION);
 
 pub const GOAL_CONTEXT_EVENT_DEFINITION: EventDefinition =
@@ -629,7 +627,7 @@ define_stats_event!(
     DODGE_RESET_EVENT_DEFINITION,
     "dodge_reset",
     "Dodge Reset",
-    EventCategory::Other,
+    EventCategory::Mechanic,
     summary = "A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.",
     approach = [
         "Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.",
@@ -669,7 +667,7 @@ define_stats_event!(
     PASS_EVENT_DEFINITION,
     "pass",
     "Pass",
-    EventCategory::Other,
+    EventCategory::Mechanic,
     summary = "A same-team touch sequence where one player sends the ball to a different teammate.",
     approach = [
         "Track the last attributed touch in live play and compare it to each new touch.",
@@ -695,7 +693,7 @@ define_stats_event!(
     CONTROLLED_PLAY_EVENT_DEFINITION,
     "controlled_play",
     "Controlled Play",
-    EventCategory::Possession,
+    EventCategory::Mechanic,
     summary = "A same-player possession episode with multiple touches and sustained close-ball time.",
     approach = [
         "Start a player-owned candidate from an attributed touch during live play.",
@@ -721,7 +719,7 @@ define_stats_event!(
     RUSH_EVENT_DEFINITION,
     "rush",
     "Rush",
-    EventCategory::Possession,
+    EventCategory::Other,
     summary = "A quick possession transition where the attacking team has numbers moving out of its defensive half.",
     approach = [
         "Start from a possession change when the ball is still in the new attacking team's defensive half.",
@@ -734,7 +732,7 @@ define_stats_event!(
     DODGE_EVENT_DEFINITION,
     "dodge",
     "Dodge",
-    EventCategory::Other,
+    EventCategory::Mechanic,
     summary = "A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.",
     approach = [
         "Start on the replay's dodge-active rising edge for each player.",
@@ -812,7 +810,7 @@ define_stats_event!(
     POWERSLIDE_EVENT_DEFINITION,
     "powerslide",
     "Powerslide",
-    EventCategory::Other,
+    EventCategory::Mechanic,
     summary = "A state-change event for effective grounded powerslide use.",
     approach = [
         "Read each player's powerslide-active input/state on every frame.",
@@ -840,7 +838,7 @@ define_stats_event!(
     BOOST_PICKUP_EVENT_DEFINITION,
     "boost_pickups",
     "Boost Pickup",
-    EventCategory::Boost,
+    EventCategory::Other,
     hidden = true,
     variants = BOOST_PICKUP_VARIANTS
 );
@@ -849,7 +847,7 @@ define_stats_event!(
     BOOST_RESPAWN_EVENT_DEFINITION,
     "boost_respawn",
     "Respawn",
-    EventCategory::Boost
+    EventCategory::Other
 );
 define_stats_event!(
     BumpEvent,
@@ -863,28 +861,28 @@ define_stats_event!(
     POSSESSION_EVENT_DEFINITION,
     "possession",
     "Possession",
-    EventCategory::Possession
+    EventCategory::Other
 );
 define_stats_event!(
     BallHalfEvent,
     PRESSURE_EVENT_DEFINITION,
     "ball_half",
     "Ball Half",
-    EventCategory::Possession
+    EventCategory::Other
 );
 define_stats_event!(
     TerritorialPressureEvent,
     TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     "territorial_pressure",
     "Territorial Pressure",
-    EventCategory::Possession
+    EventCategory::Other
 );
 define_stats_event!(
     MovementEvent,
     MOVEMENT_EVENT_DEFINITION,
     "movement",
     "Movement",
-    EventCategory::Other
+    EventCategory::Movement
 );
 define_stats_event!(
     PlayerActivityEvent,

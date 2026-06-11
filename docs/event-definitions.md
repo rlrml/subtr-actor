@@ -94,7 +94,7 @@ _None documented._
 
 ### Ball Half (`ball_half`)
 
-- Category: `possession`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -150,7 +150,7 @@ _None documented._
 
 ### Boost Pickup (`boost_pickups`)
 
-- Category: `boost`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -178,7 +178,7 @@ _None documented._
 
 ### Respawn (`boost_respawn`)
 
-- Category: `boost`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -294,7 +294,7 @@ _None documented._
 
 ### Controlled Play (`controlled_play`)
 
-- Category: `possession`
+- Category: `mechanic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -380,7 +380,7 @@ _None documented._
 
 ### Dodge (`dodge`)
 
-- Category: `other`
+- Category: `mechanic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -410,7 +410,7 @@ _None documented._
 
 ### Dodge Reset (`dodge_reset`)
 
-- Category: `other`
+- Category: `mechanic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -706,7 +706,7 @@ _None documented._
 
 ### Movement (`movement`)
 
-- Category: `other`
+- Category: `movement`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -794,7 +794,7 @@ _None documented._
 
 ### Pass (`pass`)
 
-- Category: `other`
+- Category: `mechanic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -852,7 +852,7 @@ _None documented._
 
 ### Possession (`possession`)
 
-- Category: `possession`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -880,7 +880,7 @@ _None documented._
 
 ### Powerslide (`powerslide`)
 
-- Category: `other`
+- Category: `mechanic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -938,7 +938,7 @@ _None documented._
 
 ### Rush (`rush`)
 
-- Category: `possession`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -998,7 +998,7 @@ _None documented._
 
 ### Territorial Pressure (`territorial_pressure`)
 
-- Category: `possession`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`

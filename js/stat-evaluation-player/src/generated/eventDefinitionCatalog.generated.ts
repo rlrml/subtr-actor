@@ -40,7 +40,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "ball_half",
     "label": "Ball Half",
-    "category": "possession",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
@@ -54,20 +54,20 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "boost_pickups",
     "label": "Boost Pickup",
-    "category": "boost",
+    "category": "other",
     "hidden_from_review": true,
     "variants": [
       {
         "key": "boost_pickup",
         "label": "Boost Pickup",
-        "category": "boost"
+        "category": "other"
       }
     ]
   },
   {
     "key": "boost_respawn",
     "label": "Respawn",
-    "category": "boost",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
@@ -95,7 +95,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "controlled_play",
     "label": "Controlled Play",
-    "category": "possession",
+    "category": "mechanic",
     "hidden_from_review": false,
     "variants": []
   },
@@ -123,14 +123,14 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "dodge",
     "label": "Dodge",
-    "category": "other",
+    "category": "mechanic",
     "hidden_from_review": false,
     "variants": []
   },
   {
     "key": "dodge_reset",
     "label": "Dodge Reset",
-    "category": "other",
+    "category": "mechanic",
     "hidden_from_review": false,
     "variants": []
   },
@@ -221,7 +221,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "kickoff",
     "label": "Kickoff",
-    "category": "possession",
+    "category": "core",
     "hidden_from_review": false,
     "variants": []
   },
@@ -235,7 +235,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "movement",
     "label": "Movement",
-    "category": "other",
+    "category": "movement",
     "hidden_from_review": false,
     "variants": []
   },
@@ -256,7 +256,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "pass",
     "label": "Pass",
-    "category": "other",
+    "category": "mechanic",
     "hidden_from_review": false,
     "variants": []
   },
@@ -270,14 +270,14 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "possession",
     "label": "Possession",
-    "category": "possession",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
   {
     "key": "powerslide",
     "label": "Powerslide",
-    "category": "other",
+    "category": "mechanic",
     "hidden_from_review": false,
     "variants": []
   },
@@ -291,7 +291,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "rush",
     "label": "Rush",
-    "category": "possession",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
@@ -319,7 +319,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "territorial_pressure",
     "label": "Territorial Pressure",
-    "category": "possession",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
