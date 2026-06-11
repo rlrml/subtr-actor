@@ -126,6 +126,7 @@
 
 #[path = "domain/boost_units.rs"]
 pub mod boost_units;
+pub mod clip;
 pub mod collector;
 #[path = "domain/error.rs"]
 pub mod error;
@@ -155,6 +156,7 @@ pub mod actor_state {
 
 pub use crate::actor_state::*;
 pub use crate::boost_units::*;
+pub use crate::clip::*;
 pub use crate::collector::*;
 pub use crate::error::*;
 pub use crate::geometry::*;
