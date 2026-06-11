@@ -51,8 +51,15 @@ struct KickoffApproachTrace {
     max_speed: f32,
     min_boost: Option<f32>,
     previous_boost: Option<f32>,
-    sampled_boost_collected: f32,
     sampled_boost_used: f32,
+    /// Boost collected from pad pickups (including steals; overfill excluded)
+    /// during the approach window, summed from the `BoostCalculator`'s
+    /// deduplicated pickup events. This deliberately does NOT come from gross
+    /// frame-to-frame `boost_amount` deltas: a single pad pickup can show up as
+    /// a `+jump` one frame and a `-correction` the next as the inferred and
+    /// reported boost balances reconcile, so summing positive deltas
+    /// double-counts and can push `boost_used` past a full tank.
+    pickup_boost_collected: f32,
     last_position: Option<[f32; 3]>,
     previous_velocity: Option<glam::Vec3>,
     previous_dodge_active: bool,
@@ -141,6 +148,10 @@ pub(crate) struct KickoffUpdateContext<'a> {
     pub touch_state: &'a TouchState,
     pub events: &'a FrameEventsState,
     pub speed_flip_events: &'a [SpeedFlipEvent],
+    /// Boost pickup events newly emitted this frame by the `BoostCalculator`.
+    /// Used to attribute deduplicated boost collected to in-flight kickoff
+    /// players during their approach window.
+    pub boost_pickups: &'a [BoostPickupEvent],
 }
 
 pub(crate) const KICKOFF_SPAWN_LABELS: [StatLabel; 6] = [
@@ -499,9 +510,11 @@ impl KickoffCalculator {
         if let Some(boost_amount) = Self::boost_amount(player) {
             if let Some(previous_boost) = trace.previous_boost {
                 let delta = boost_amount - previous_boost;
-                if delta > 0.0 {
-                    trace.sampled_boost_collected += delta;
-                } else {
+                if delta < 0.0 {
+                    // Only the depletion side is sampled here, as a fallback for
+                    // `boost_used` when a player's first-touch boost is unknown.
+                    // Collected boost is sourced from deduplicated pickup events
+                    // (see `apply_boost_pickups`), not gross positive deltas.
                     trace.sampled_boost_used += -delta;
                 }
             }
@@ -594,6 +607,41 @@ impl KickoffCalculator {
                 player.first_touch_time = Some(touch.time);
                 player.first_touch_frame = Some(touch.frame);
             }
+        }
+    }
+
+    /// Attribute deduplicated boost pickups to in-flight kickoff players during
+    /// their approach window (from movement start through their first touch).
+    ///
+    /// `pickups` are the events newly emitted this frame by the
+    /// `BoostCalculator`, whose `collected_amount` already folds the former
+    /// Collected/Stolen ledger transactions into one accurate, capped figure
+    /// (overfill and respawn excluded). Summing these is what keeps
+    /// `boost_used = start_boost + collected - first_touch_boost` from
+    /// overcounting the way gross frame-to-frame `boost_amount` deltas did.
+    fn apply_boost_pickups(active: &mut ActiveKickoff, pickups: &[BoostPickupEvent]) {
+        if pickups.is_empty() {
+            return;
+        }
+        let lower_bound = active.movement_start_time.unwrap_or(active.start_time);
+        for pickup in pickups {
+            if pickup.time < lower_bound {
+                continue;
+            }
+            let Some(snapshot) = active
+                .players
+                .iter_mut()
+                .find(|player| player.player == pickup.player_id)
+            else {
+                continue;
+            };
+            if snapshot
+                .first_touch_time
+                .is_some_and(|touch_time| pickup.time > touch_time)
+            {
+                continue;
+            }
+            snapshot.approach_trace.pickup_boost_collected += pickup.collected_amount;
         }
     }
 
@@ -730,7 +778,7 @@ impl KickoffCalculator {
     }
 
     fn taker_boost_collected(player: &KickoffPlayerSnapshot) -> f32 {
-        player.approach_trace.sampled_boost_collected
+        player.approach_trace.pickup_boost_collected
     }
 
     fn taker_boost_used(player: &KickoffPlayerSnapshot) -> f32 {
@@ -1420,6 +1468,7 @@ impl KickoffCalculator {
             touch_state,
             events,
             speed_flip_events: &[],
+            boost_pickups: &[],
         })
     }
 
@@ -1459,6 +1508,7 @@ impl KickoffCalculator {
             }
             Self::apply_player_samples(active, ctx.frame, ctx.players);
             Self::apply_touches(active, ctx.touch_state, ctx.ball);
+            Self::apply_boost_pickups(active, ctx.boost_pickups);
             Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);
             if Self::should_capture_resolution(active, ctx.frame) {
                 active.resolution = Some(KickoffResolutionSnapshot {

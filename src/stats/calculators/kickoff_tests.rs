@@ -34,6 +34,31 @@ fn player(player_id: PlayerId, is_team_0: bool, position: glam::Vec3, boost: f32
     }
 }
 
+fn boost_pickup(
+    player_id: PlayerId,
+    is_team_0: bool,
+    frame: usize,
+    time: f32,
+    collected_amount: f32,
+) -> BoostPickupEvent {
+    BoostPickupEvent {
+        frame,
+        time,
+        player_id,
+        player_position: None,
+        is_team_0,
+        pad_type: BoostPickupPadType::Big,
+        field_half: BoostPickupFieldHalf::Own,
+        activity: BoostPickupActivity::Active,
+        detection: BoostPickupDetection::Both,
+        is_steal: false,
+        collected_amount,
+        overfill_amount: 0.0,
+        boost_before: None,
+        boost_after: None,
+    }
+}
+
 fn frame(frame_number: usize, time: f32) -> FrameInfo {
     FrameInfo {
         frame_number,
@@ -996,26 +1021,32 @@ fn kickoff_taker_tracks_time_to_ball_and_approach_boost_totals() {
         )
         .unwrap();
 
+    // Blue ends the approach at 45 boost after dipping to 30: the gain back up
+    // is a real pad pickup, delivered as a deduplicated BoostPickupEvent rather
+    // than inferred from the gross boost-amount jump. boost_used is then the
+    // balance start(33) + collected(15) - first_touch(45) = 3.
     calculator
-        .update(
-            &frame(35, 3.5),
-            &GameplayState {
+        .update_with_speed_flips(KickoffUpdateContext {
+            frame: &frame(35, 3.5),
+            gameplay: &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
             },
-            &ball(0.0),
-            &PlayerFrameState {
+            ball: &ball(0.0),
+            players: &PlayerFrameState {
                 players: vec![
                     player(blue_taker.clone(), true, glam::Vec3::ZERO, 45.0),
                     player(orange_taker.clone(), false, glam::Vec3::ZERO, 28.0),
                 ],
             },
-            &TouchState {
+            touch_state: &TouchState {
                 touch_events: vec![touch(blue_taker.clone(), true, 35, 3.5)],
                 ..TouchState::default()
             },
-            &FrameEventsState::default(),
-        )
+            events: &FrameEventsState::default(),
+            speed_flip_events: &[],
+            boost_pickups: &[boost_pickup(blue_taker.clone(), true, 35, 3.5, 15.0)],
+        })
         .unwrap();
 
     calculator
@@ -1792,6 +1823,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
+            boost_pickups: &[],
         })
         .unwrap();
 
@@ -1810,6 +1842,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             },
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
+            boost_pickups: &[],
         })
         .unwrap();
 
@@ -1825,6 +1858,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
+            boost_pickups: &[],
         })
         .unwrap();
 
