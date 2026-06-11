@@ -388,6 +388,109 @@ fn kickoff_records_movement_start_after_countdown() {
     assert_eq!(event.movement_start_frame, 30);
 }
 
+/// On the opening kickoff of a match the engine reports
+/// `ball_has_been_hit == None` (not `Some(false)`) until the first touch, so
+/// the post-countdown window never registers as an active kickoff phase.
+/// Movement start must still be captured at the "GO" moment rather than
+/// falling back to the countdown's start, which inflated `time_to_ball` by
+/// the full countdown.
+#[test]
+fn first_kickoff_records_movement_start_when_ball_has_been_hit_is_unset() {
+    let blue_taker = PlayerId::Steam(44);
+    let orange_taker = PlayerId::Steam(45);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                game_state: Some(GAME_STATE_KICKOFF_COUNTDOWN),
+                ball_has_been_hit: None,
+                kickoff_countdown_time: Some(3),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(-2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    // Countdown over, but the opening kickoff still reports
+    // `ball_has_been_hit: None` until the first touch.
+    calculator
+        .update(
+            &frame(30, 3.0),
+            &GameplayState {
+                ball_has_been_hit: None,
+                kickoff_countdown_time: Some(0),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(50, 5.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(320.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker, true, 50, 5.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(80, 8.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(420.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator.finish();
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.movement_start_time, 3.0);
+    assert_eq!(event.movement_start_frame, 30);
+    assert_eq!(event.live_action_start_time, Some(3.0));
+    assert_eq!(event.live_action_start_frame, Some(30));
+    let taker = event.team_zero_taker.as_ref().unwrap();
+    // time_to_ball is measured from "GO" (t=3.0) to the touch (t=5.0), not
+    // from the countdown's start (t=0.0).
+    assert_eq!(taker.time_to_ball, Some(2.0));
+}
+
 #[test]
 fn kickoff_classifies_fake_and_missed_expected_takers() {
     let blue_taker = PlayerId::Steam(1);
