@@ -64,6 +64,34 @@ _None documented._
 
 _None documented._
 
+### Ball Depth (`ball_depth`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Ball Half (`ball_half`)
 
 - Category: `possession`
@@ -75,6 +103,34 @@ _None documented._
   - Testing: `untested`
 - Producers:
   - `ball_half` via `BallHalfNode` / `BallHalfCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Ball Proximity (`ball_proximity`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
 
 **Summary**
 
@@ -294,6 +350,34 @@ _None documented._
 
 _None documented._
 
+### Depth Role (`depth_role`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Dodge (`dodge`)
 
 - Category: `other`
@@ -415,6 +499,62 @@ _None documented._
 
 _None documented._
 
+### Field Half (`field_half`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Field Third (`field_third`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### 50/50 (`fifty_fifty`)
 
 - Category: `other`
@@ -436,6 +576,34 @@ A contested ball interaction involving touches or pressure from both teams in a 
 - Start an active 50/50 when a frame contains touches from both teams, including kickoff-specific tracking.
 - Continue the contest for short follow-up touch windows while either involved team remains in contact.
 - Resolve after a delay once ball movement, possession state, or max duration gives a winner, possession outcome, or neutral result.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### First-Man Change (`first_man_change`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `rotation` via `RotationNode` / `RotationCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
 
 **Limitations**
 
@@ -654,119 +822,7 @@ _None documented._
 
 _None documented._
 
-### Positioning Activity (`positioning_activity`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `positioning` via `PositioningNode` / `PositioningCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Positioning Ball Proximity (`positioning_ball_proximity`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `positioning` via `PositioningNode` / `PositioningCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Positioning Ball-Relative Depth (`positioning_ball_relative_depth`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `positioning` via `PositioningNode` / `PositioningCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Positioning Field Zone (`positioning_field_zone`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `positioning` via `PositioningNode` / `PositioningCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Positioning Teammate Role (`positioning_teammate_role`)
+### Player Activity (`player_activity`)
 
 - Category: `positioning`
 - Confidence:
@@ -852,119 +908,7 @@ _None documented._
 
 _None documented._
 
-### Rotation Depth Span (`rotation_depth_span`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `rotation` via `RotationNode` / `RotationCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### First Man Stint (`rotation_first_man_stint`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `rotation` via `RotationNode` / `RotationCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Player Rotation (`rotation_player`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `rotation` via `RotationNode` / `RotationCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Rotation Role Span (`rotation_role_span`)
-
-- Category: `positioning`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `rotation` via `RotationNode` / `RotationCalculator`
-
-**Summary**
-
-Definition pending.
-
-**Approach**
-
-_None documented._
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
-### Team Rotation (`rotation_team`)
+### Rotation Role (`rotation_role`)
 
 - Category: `positioning`
 - Confidence:
