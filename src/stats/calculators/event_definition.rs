@@ -12,9 +12,10 @@ use super::{
     CorePlayerScoreboardEvent, DepthRoleEvent, DodgeEvent, DodgeResetEvent, DoubleTapEvent,
     FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent, FirstManChangeEvent, FlickEvent,
     FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent,
-    PassEvent, PlayerActivityEvent, PossessionEvent, PowerslideEvent, RespawnEvent,
-    RotationRoleEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent,
-    TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
+    PassEvent, PlayerActivityEvent, PlayerPossessionEvent, PossessionEvent, PowerslideEvent,
+    RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
+    TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
+    WhiffEvent,
 };
 use crate::stats::timeline::Event;
 
@@ -864,6 +865,19 @@ define_stats_event!(
     EventCategory::Other
 );
 define_stats_event!(
+    PlayerPossessionEvent,
+    PLAYER_POSSESSION_EVENT_DEFINITION,
+    "player_possession",
+    "Player Possession",
+    EventCategory::Other,
+    summary = "A contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity.",
+    approach = [
+        "Follow the shared possession tracker's controlling player and open a span when a player establishes control.",
+        "Bridge contested or pending-turnover interruptions shorter than the merge gap when the same player re-establishes control, excluding the gap from possessed duration.",
+        "Accumulate distinct touches (with aerial/wall classification), signed ball travel toward the opponent goal, and per-frame carry/air-dribble samples while the span is active.",
+    ]
+);
+define_stats_event!(
     BallHalfEvent,
     PRESSURE_EVENT_DEFINITION,
     "ball_half",
@@ -1184,6 +1198,13 @@ const POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "PossessionCalculator",
 )];
 
+const PLAYER_POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &PLAYER_POSSESSION_EVENT_DEFINITION,
+    "player_possession",
+    "PlayerPossessionNode",
+    "PlayerPossessionCalculator",
+)];
+
 const BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &PRESSURE_EVENT_DEFINITION,
     "ball_half",
@@ -1361,6 +1382,11 @@ register_event_producer!(
     POSSESSION_EVENT_PRODUCER,
     "possession",
     POSSESSION_EMITTED_EVENTS
+);
+register_event_producer!(
+    PLAYER_POSSESSION_EVENT_PRODUCER,
+    "player_possession",
+    PLAYER_POSSESSION_EMITTED_EVENTS
 );
 register_event_producer!(
     BALL_HALF_EVENT_PRODUCER,

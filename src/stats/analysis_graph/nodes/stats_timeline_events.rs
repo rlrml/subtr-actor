@@ -72,6 +72,7 @@ impl StatsTimelineEventsNode {
             fifty_fifty_dependency(),
             kickoff_dependency(),
             possession_dependency(),
+            player_possession_dependency(),
             ball_half_dependency(),
             territorial_pressure_dependency(),
             rotation_dependency(),
@@ -119,6 +120,7 @@ impl StatsTimelineEventsNode {
     fn capture_events(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         let match_stats = ctx.get::<MatchStatsCalculator>()?;
         let possession = ctx.get::<PossessionCalculator>()?;
+        let player_possession = ctx.get::<PlayerPossessionCalculator>()?;
         let ball_half = ctx.get::<BallHalfCalculator>()?;
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
         let movement = ctx.get::<MovementCalculator>()?;
@@ -203,6 +205,7 @@ impl StatsTimelineEventsNode {
                 &timeline,
                 match_stats,
                 possession,
+                player_possession,
                 ball_half,
                 territorial_pressure,
                 movement,
@@ -335,6 +338,7 @@ fn build_replay_events(
     timeline: &[TimelineEvent],
     match_stats: &MatchStatsCalculator,
     possession: &PossessionCalculator,
+    player_possession: &PlayerPossessionCalculator,
     ball_half: &BallHalfCalculator,
     territorial_pressure: &TerritorialPressureCalculator,
     movement: &MovementCalculator,
@@ -409,6 +413,26 @@ fn build_replay_events(
             event.player_id.clone(),
             None,
             None,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in player_possession.events().iter().enumerate() {
+        events.push(make_event(
+            "player_possession",
+            index,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::PlayerPossession(event.clone()),
+            Some(event.player_id.clone()),
+            None,
+            Some(event.is_team_0),
             None,
             None,
             None,
