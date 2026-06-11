@@ -10,12 +10,13 @@ const KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS: f32 = 1.25;
 const KICKOFF_FOLLOW_UP_AFTER_FIRST_TOUCH_SECONDS: f32 = 2.0;
 const KICKOFF_GOAL_MAX_SECONDS: f32 = 10.0;
 const KICKOFF_GOAL_MAX_DEFENSIVE_BALL_Y: f32 = 1280.0;
-const KICKOFF_WIN_MIN_BALL_Y: f32 = 180.0;
-const KICKOFF_WIN_MIN_BALL_SPEED_Y: f32 = 220.0;
+const KICKOFF_WIN_PROJECTION_SECONDS: f32 = 0.5;
+const KICKOFF_FIELD_HALF_LENGTH: f32 = 5120.0;
+const KICKOFF_WIN_MIN_PROJECTED_BALL_Y: f32 = 300.0;
 const KICKOFF_BALL_DIRECTION_MIN_ABS_X: f32 = 180.0;
 const KICKOFF_BALL_DIRECTION_MIN_ABS_SPEED_X: f32 = 220.0;
-const KICKOFF_CLEAR_WIN_STRENGTH: f32 = 1.5;
-const KICKOFF_STRONG_WIN_STRENGTH: f32 = 2.5;
+const KICKOFF_CLEAR_WIN_STRENGTH: f32 = 0.25;
+const KICKOFF_STRONG_WIN_STRENGTH: f32 = 0.5;
 const KICKOFF_TAKER_DISTANCE_TIE_EPSILON: f32 = 150.0;
 const KICKOFF_POSSESSION_IMMEDIATE_CONTEST_SECONDS: f32 = 0.35;
 const KICKOFF_TOUCH_CLUSTER_MAX_GAP_SECONDS: f32 = 0.35;
@@ -854,39 +855,33 @@ impl KickoffCalculator {
         }
     }
 
+    /// Decide the kickoff outcome from the resolution ball sample by projecting
+    /// the ball's y position [`KICKOFF_WIN_PROJECTION_SECONDS`] ahead so the
+    /// direction of travel counts: a ball barely across the center line but
+    /// flying back toward it is not a win for the side it currently sits in.
+    /// Strength is the projected depth as a fraction of the half-field length,
+    /// so it lands in `0.0..=1.0`.
     fn win_from_ball(ball: &BallFrameState) -> (KickoffOutcome, Option<bool>, Option<f32>) {
         let Some(ball) = ball.sample() else {
             return (KickoffOutcome::Unknown, None, None);
         };
-        let position_y = ball.position().y;
-        if position_y.abs() >= KICKOFF_WIN_MIN_BALL_Y {
-            let toward_team_zero_win = position_y > 0.0;
-            let strength = position_y.abs() / KICKOFF_WIN_MIN_BALL_Y;
-            return (
-                if toward_team_zero_win {
-                    KickoffOutcome::TeamZeroWin
-                } else {
-                    KickoffOutcome::TeamOneWin
-                },
-                Some(toward_team_zero_win),
-                Some(strength),
-            );
+        let projected_y = (ball.position().y
+            + ball.velocity().y * KICKOFF_WIN_PROJECTION_SECONDS)
+            .clamp(-KICKOFF_FIELD_HALF_LENGTH, KICKOFF_FIELD_HALF_LENGTH);
+        if projected_y.abs() < KICKOFF_WIN_MIN_PROJECTED_BALL_Y {
+            return (KickoffOutcome::Neutral, None, None);
         }
-        let velocity_y = ball.velocity().y;
-        if velocity_y.abs() >= KICKOFF_WIN_MIN_BALL_SPEED_Y {
-            let toward_team_zero_win = velocity_y > 0.0;
-            let strength = velocity_y.abs() / KICKOFF_WIN_MIN_BALL_SPEED_Y;
-            return (
-                if toward_team_zero_win {
-                    KickoffOutcome::TeamZeroWin
-                } else {
-                    KickoffOutcome::TeamOneWin
-                },
-                Some(toward_team_zero_win),
-                Some(strength),
-            );
-        }
-        (KickoffOutcome::Neutral, None, None)
+        let toward_team_zero_win = projected_y > 0.0;
+        let strength = projected_y.abs() / KICKOFF_FIELD_HALF_LENGTH;
+        (
+            if toward_team_zero_win {
+                KickoffOutcome::TeamZeroWin
+            } else {
+                KickoffOutcome::TeamOneWin
+            },
+            Some(toward_team_zero_win),
+            Some(strength),
+        )
     }
 
     fn ball_direction(ball: &BallFrameState, is_team_0: bool) -> KickoffBallDirection {
