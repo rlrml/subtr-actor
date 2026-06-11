@@ -194,6 +194,60 @@
             runHook postInstall
           '';
         };
+        # The publishable npm package layout for @rlrml/subtr-actor, byte-for-byte
+        # equivalent to what `npm publish` ships (wasm-pack --no-pack output +
+        # prepare-wasm-package.mjs manifest). Downstream consumers can vendor this
+        # directly instead of the npm registry tarball, guaranteeing the wasm is
+        # built from this repo's Cargo.lock (including [patch.crates-io] forks).
+        packages.js-wasm-pkg =
+          pkgs.runCommand "rlrml-subtr-actor-npm-pkg"
+            { nativeBuildInputs = [ pkgs.nodejs ]; }
+            ''
+              mkdir -p build/js/pkg
+              cp ${./js/package.json} build/js/package.json
+              cp -r ${./js/scripts} build/js/scripts
+              cp -r ${self.packages.${system}.js-web-wasm}/. build/js/pkg/
+              chmod -R u+w build
+              # Mirror the publish flow (wasm-pack --no-pack): drop wasm-pack's own
+              # manifest so prepare-wasm-package.mjs regenerates the publishable one.
+              rm -f build/js/pkg/package.json
+              node build/js/scripts/prepare-wasm-package.mjs
+              mkdir -p $out
+              for f in package.json rl_replay_subtr_actor.js rl_replay_subtr_actor.d.ts rl_replay_subtr_actor_bg.wasm; do
+                install -m 644 "build/js/pkg/$f" "$out/$f"
+              done
+            '';
+        # The publishable npm package layout for @rlrml/player (dist/ + manifest via
+        # prepare-package.mjs), built against this repo's js-wasm-pkg bindings.
+        packages.js-player-pkg = pkgs.buildNpmPackage {
+          pname = "rlrml-player-npm-pkg";
+          version = projectVersion;
+          src = ./.;
+          npmRoot = "js/player";
+          npmDeps = pkgs.importNpmLock { npmRoot = ./js/player; };
+          npmConfigHook = pkgs.importNpmLock.npmConfigHook;
+          preBuild = ''
+            rm -rf js/pkg
+            mkdir -p js/pkg
+            cp -r ${self.packages.${system}.js-web-wasm}/. js/pkg/
+          '';
+          buildPhase = ''
+            runHook preBuild
+            pushd js/player
+            npm run build:dist
+            popd
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            pushd js/player
+            staged="$(node ./scripts/prepare-package.mjs)"
+            popd
+            mkdir -p $out
+            cp -R "$staged"/. $out/
+            runHook postInstall
+          '';
+        };
         packages.xwin-msvc-sysroot = xwinMsvcSysroot;
         packages.bakkesmod-plugin = rustPlatform.buildRustPackage {
           pname = "subtr-actor-bakkesmod-plugin";
