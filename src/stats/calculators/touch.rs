@@ -4,6 +4,15 @@ const SOFT_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 320.0;
 const HARD_TOUCH_BALL_SPEED_CHANGE_THRESHOLD: f32 = 900.0;
 const AERIAL_TOUCH_MIN_PLAYER_Z: f32 = AIR_DRIBBLE_MIN_PLAYER_Z;
 
+/// How long after a touch we keep watching the toucher's dodge component before
+/// giving up on associating a flip with it. The `CarComponent_Dodge`
+/// `ReplicatedActive` byte routinely replicates a frame or two *after* the
+/// ball-hit it produced (the hit and the dodge-activation land on adjacent
+/// frames), so a flip-into-ball contact can be sampled on the one frame where
+/// the dodge flag has not yet flipped on. Re-checking for a brief window lets
+/// such touches be recognized as dodge contacts after the fact.
+const DODGE_LAG_TOLERANCE_SECONDS: f32 = 0.12;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TouchKind {
     Control,
@@ -135,6 +144,16 @@ impl TouchBallMovement {
     }
 }
 
+/// A `no_dodge` touch still within [`DODGE_LAG_TOLERANCE_SECONDS`] of being
+/// retroactively upgraded to a dodge contact, should the toucher's dodge
+/// component go active in the frames immediately following the hit.
+#[derive(Debug, Clone, PartialEq)]
+struct PendingDodgeUpgrade {
+    touch_index: usize,
+    player_id: PlayerId,
+    touch_time: f32,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 struct PendingFiftyFiftyMovement {
     start_frame: usize,
@@ -170,6 +189,7 @@ pub struct TouchCalculator {
     previous_ball_velocity: Option<glam::Vec3>,
     previous_ball_position: Option<glam::Vec3>,
     pending_fifty_fifty_movement: Option<PendingFiftyFiftyMovement>,
+    pending_dodge_upgrades: Vec<PendingDodgeUpgrade>,
     intention_classifier: TouchIntentionClassifier,
     control_follow: ControlFollowTracker,
 }
@@ -422,6 +442,16 @@ impl TouchCalculator {
             self.events.push(event);
             self.active_touch_index_by_player
                 .insert(player_id.clone(), touch_index);
+            // The dodge byte often lags the hit by a frame or two; if this touch
+            // looked dodge-less, keep watching the toucher's dodge component so a
+            // flip-into-ball contact still gets recognized once it activates.
+            if matches!(classification.dodge_state, TouchDodgeState::NoDodge) {
+                self.pending_dodge_upgrades.push(PendingDodgeUpgrade {
+                    touch_index,
+                    player_id: player_id.clone(),
+                    touch_time: touch_event.time,
+                });
+            }
             if matches!(
                 resolution.intention,
                 TouchIntention::Pass | TouchIntention::Neutral
@@ -443,6 +473,34 @@ impl TouchCalculator {
         }
         if let Some(event) = self.events.get_mut(resolution.touch_index) {
             event.intention = TouchIntention::Control.as_label_value().to_owned();
+        }
+    }
+
+    /// Re-examine recent `no_dodge` touches against this frame's dodge state.
+    /// The dodge component's active byte frequently replicates a frame or two
+    /// after the ball-hit it caused, so a flip-into-ball contact can be sampled
+    /// on the one frame where the flag has not yet flipped on. Any pending touch
+    /// whose toucher is now dodging within [`DODGE_LAG_TOLERANCE_SECONDS`] is
+    /// upgraded to a dodge contact; entries that age out are dropped.
+    fn advance_dodge_upgrades(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
+        if self.pending_dodge_upgrades.is_empty() {
+            return;
+        }
+        let mut resolved = Vec::new();
+        self.pending_dodge_upgrades.retain(|pending| {
+            if frame.time - pending.touch_time > DODGE_LAG_TOLERANCE_SECONDS {
+                return false;
+            }
+            if Self::player_dodge_active(players, &pending.player_id) {
+                resolved.push(pending.touch_index);
+                return false;
+            }
+            true
+        });
+        for touch_index in resolved {
+            if let Some(event) = self.events.get_mut(touch_index) {
+                event.dodge_state = TouchDodgeState::Dodge.as_label_value().to_owned();
+            }
         }
     }
 
@@ -718,6 +776,7 @@ impl TouchCalculator {
             self.previous_ball_velocity = ball.velocity();
             self.previous_ball_position = ball.position();
             self.pending_fifty_fifty_movement = None;
+            self.pending_dodge_upgrades.clear();
             self.intention_classifier.reset();
             let resolution = self.control_follow.flush();
             self.apply_control_resolution(resolution);
@@ -734,6 +793,7 @@ impl TouchCalculator {
             &touch_state.touch_events,
             fifty_fifty_state,
         );
+        self.advance_dodge_upgrades(frame, players);
         self.advance_control_follow(frame, ball, players);
         self.credit_ball_movement(
             frame,
