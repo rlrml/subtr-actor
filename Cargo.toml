@@ -65,4 +65,7 @@ status = "actively-developed"
 # what downstream consumers still resolve.)
 # See https://github.com/colonelpanic8/boxcars/tree/fix/worldcup-ball
 [patch.crates-io]
-boxcars = { git = "https://github.com/colonelpanic8/boxcars.git", rev = "36598aa6db6ff9248502f9f762139ed3bdd94a34" }
+# Pinned past the World Cup fix to the frame `Deserialize` support
+# (nickbabcock/boxcars#284, stacked on #283) that `ReplayClip` fixtures need to
+# read decoded frames back in.
+boxcars = { git = "https://github.com/colonelpanic8/boxcars.git", rev = "70be5375a2e6fd52e82c267d8147522659580a31" }
