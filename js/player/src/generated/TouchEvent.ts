@@ -2,7 +2,15 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { Vector3fTs } from "./Vector3fTs.ts";
 
-export type TouchEvent = { time: number, frame: number, team_is_team_0: boolean, player: RemoteIdTs | null, player_position?: Vector3fTs | null,
+export type TouchEvent = {
+/**
+ * Stable identity for an attributed touch, assigned monotonically when the
+ * stats pipeline confirms the touch. `None` for raw replay team markers,
+ * which exist before attribution. Downstream events that reference a touch
+ * carry this id so consumers can join exactly instead of matching on
+ * player + frame.
+ */
+touch_id?: number, time: number, frame: number, team_is_team_0: boolean, player: RemoteIdTs | null, player_position?: Vector3fTs | null,
 /**
  * Ball-to-car hitbox contact gap in uu for attributed touches, when estimated.
  *

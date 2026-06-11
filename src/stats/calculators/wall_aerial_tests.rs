@@ -67,6 +67,7 @@ fn touch_state_with_touch(frame: usize, time: f32) -> TouchState {
     let player = boxcars::RemoteId::Steam(1);
     TouchState {
         touch_events: vec![TouchEvent {
+            touch_id: None,
             time,
             frame,
             team_is_team_0: true,
@@ -76,6 +77,7 @@ fn touch_state_with_touch(frame: usize, time: f32) -> TouchState {
             dodge_contact: false,
         }],
         last_touch: Some(TouchEvent {
+            touch_id: None,
             time,
             frame,
             team_is_team_0: true,

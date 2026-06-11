@@ -354,7 +354,7 @@ pub const ALL_GOAL_TAG_DEFINITIONS: &[GoalTagDefinition] = &[
         "Flip-Into-Ball Goal",
         "A goal where the scorer flipped (dodged) into the ball on the scoring touch.",
         &[
-            "Match the scorer's last touch to its touch-classification event by player and frame.",
+            "Match the scorer's last touch to its touch-classification event by touch id (player and frame for data predating touch ids).",
             "Require the scoring touch's dodge state to be active and the touch to fall within the touch-to-goal window.",
             "Limitation: the dodge state covers any active dodge overlapping the touch, so incidental flips that happen to contact the ball can also qualify; dodge direction toward the ball is not yet verified.",
         ],
@@ -1424,9 +1424,14 @@ impl FlipIntoBallGoalCalculator {
         touch: &GoalTouchContext,
         goal: &GoalContextEvent,
     ) -> bool {
-        candidate.is_team_0 == goal.scoring_team_is_team_0
-            && candidate.player == touch.player
-            && candidate.frame == touch.frame
+        // Joining by touch identity is exact; player + frame remains as a
+        // fallback for data serialized before touch ids existed.
+        let same_touch = match (candidate.touch_id, touch.touch_id) {
+            (Some(candidate_id), Some(touch_id)) => candidate_id == touch_id,
+            _ => candidate.player == touch.player && candidate.frame == touch.frame,
+        };
+        same_touch
+            && candidate.is_team_0 == goal.scoring_team_is_team_0
             && candidate.dodge_state == FLIP_INTO_BALL_DODGE_STATE_LABEL
     }
 }

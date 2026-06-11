@@ -10,6 +10,11 @@ import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
 export type KickoffEvent = { start_time: number, start_frame: number, end_time: number, end_frame: number, live_action_start_time: number | null, live_action_start_frame: number | null, movement_start_time: number, movement_start_frame: number, kickoff_type: KickoffType, kickoff_direction: KickoffDirection, first_touch_time: number | null, first_touch_frame: number | null, first_touch_team_is_team_0: boolean | null, first_touch_player: RemoteIdTs | null,
 /**
+ * Identity of the first kickoff [`TouchEvent`](crate::TouchEvent). Join on
+ * this instead of player + frame.
+ */
+first_touch_id?: number,
+/**
  * Ball position (field coordinates) at the frame of the first kickoff touch.
  */
 first_touch_ball_position: [number, number, number] | null,

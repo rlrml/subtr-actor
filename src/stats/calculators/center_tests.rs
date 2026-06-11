@@ -37,6 +37,7 @@ fn touch(
     is_team_0: bool,
 ) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame: frame_number,
         team_is_team_0: is_team_0,
@@ -55,6 +56,7 @@ fn touch_with_gap(
     contact_gap: f32,
 ) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         closest_approach_distance: Some(contact_gap),
         ..touch(frame_number, time, player_id, is_team_0)
     }

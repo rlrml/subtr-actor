@@ -197,6 +197,7 @@ fn goal_context_links_scorer_touch_with_ball_location_and_speeds() {
             },
             &TouchState {
                 touch_events: vec![TouchEvent {
+                    touch_id: None,
                     time: 1.0,
                     frame: 10,
                     team_is_team_0: true,
@@ -554,6 +555,7 @@ fn time_after_kickoff_uses_kickoff_first_touch_not_latest_touch() {
     let mut calculator = MatchStatsCalculator::new();
 
     let touch_event = |time: f32, frame: usize| TouchEvent {
+        touch_id: None,
         time,
         frame,
         team_is_team_0: true,

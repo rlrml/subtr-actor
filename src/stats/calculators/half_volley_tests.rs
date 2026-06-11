@@ -57,6 +57,7 @@ fn players(player_id: PlayerId, z: f32, dodge_active: bool) -> PlayerFrameState 
 
 fn touch(frame_number: usize, player_id: PlayerId) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time: frame_number as f32 * 0.1,
         frame: frame_number,
         team_is_team_0: true,

@@ -32,6 +32,7 @@ fn frame(frame_number: usize, time: f32) -> FrameInfo {
 
 fn touch(frame_number: usize, time: f32, player_id: PlayerId, is_team_0: bool) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame: frame_number,
         team_is_team_0: is_team_0,

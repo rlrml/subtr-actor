@@ -82,6 +82,7 @@ struct ActiveKickoff {
     first_touch_time: Option<f32>,
     first_touch_frame: Option<usize>,
     first_touch_team_is_team_0: Option<bool>,
+    first_touch_id: Option<u64>,
     first_touch_ball_position: Option<[f32; 3]>,
     first_touch_ball_velocity: Option<[f32; 3]>,
     touches: Vec<KickoffTouchSnapshot>,
@@ -426,6 +427,7 @@ impl KickoffCalculator {
             first_touch_time: None,
             first_touch_frame: None,
             first_touch_team_is_team_0: None,
+            first_touch_id: None,
             first_touch_ball_position: None,
             first_touch_ball_velocity: None,
             touches: Vec::new(),
@@ -558,6 +560,7 @@ impl KickoffCalculator {
                 active.first_touch_time = Some(touch.time);
                 active.first_touch_frame = Some(touch.frame);
                 active.first_touch_team_is_team_0 = Some(touch.team_is_team_0);
+                active.first_touch_id = touch.touch_id;
                 active.first_touch_ball_position =
                     ball.position().map(|position| position.to_array());
                 active.first_touch_ball_velocity =
@@ -1361,6 +1364,7 @@ impl KickoffCalculator {
             first_touch_frame: active.first_touch_frame,
             first_touch_team_is_team_0: active.first_touch_team_is_team_0,
             first_touch_player,
+            first_touch_id: active.first_touch_id,
             first_touch_ball_position,
             first_touch_ball_abs_x,
             first_touch_ball_height,

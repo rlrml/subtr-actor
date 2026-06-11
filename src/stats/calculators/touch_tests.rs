@@ -50,6 +50,7 @@ fn possession(player_id: &PlayerId, is_team_0: bool) -> PossessionState {
 fn touch_state(frame_number: usize, player_id: &PlayerId) -> TouchState {
     TouchState {
         touch_events: vec![TouchEvent {
+            touch_id: None,
             time: frame_number as f32 * 0.1,
             frame: frame_number,
             team_is_team_0: true,
@@ -67,6 +68,7 @@ fn touch_state(frame_number: usize, player_id: &PlayerId) -> TouchState {
 fn dodge_contact_touch_state(frame_number: usize, player_id: &PlayerId) -> TouchState {
     TouchState {
         touch_events: vec![TouchEvent {
+            touch_id: None,
             time: frame_number as f32 * 0.1,
             frame: frame_number,
             team_is_team_0: true,
@@ -503,6 +505,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
     let initial_touch_state = TouchState {
         touch_events: vec![
             TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: true,
@@ -512,6 +515,7 @@ fn credits_fifty_fifty_direction_to_resolved_winner_not_last_touch() {
                 dodge_contact: false,
             },
             TouchEvent {
+                touch_id: None,
                 time: 0.1,
                 frame: 1,
                 team_is_team_0: false,
@@ -744,6 +748,7 @@ fn touch_with_default_rotation_state_records_unknown_role_and_depth() {
 fn touch_classification_events_follow_chronological_touch_event_order() {
     let player = boxcars::RemoteId::Steam(1);
     let early_touch = TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: true,
@@ -753,6 +758,7 @@ fn touch_classification_events_follow_chronological_touch_event_order() {
         dodge_contact: false,
     };
     let late_touch = TouchEvent {
+        touch_id: None,
         time: 0.4,
         frame: 4,
         team_is_team_0: true,

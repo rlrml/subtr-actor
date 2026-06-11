@@ -2,6 +2,7 @@ use super::*;
 
 fn touch(frame: usize, time: f32, player: PlayerId, team_is_team_0: bool) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame,
         team_is_team_0,

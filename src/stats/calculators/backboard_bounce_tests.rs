@@ -55,6 +55,7 @@ fn players(samples: Vec<PlayerSample>) -> PlayerFrameState {
 
 fn touch(player: PlayerId, is_team_0: bool, gap: f32) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time: 0.1,
         frame: 1,
         team_is_team_0: is_team_0,

@@ -368,6 +368,19 @@ pub(in crate::collector::stats::playback) fn json_optional_usize(
     }
 }
 
+pub(in crate::collector::stats::playback) fn json_optional_u64(
+    value: Option<&Value>,
+) -> SubtrActorResult<Option<u64>> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => value.as_u64().map(Some).ok_or_else(|| {
+            SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
+                "Expected optional JSON value to be an unsigned integer".to_owned(),
+            ))
+        }),
+    }
+}
+
 pub(in crate::collector::stats::playback) fn json_optional_u32(
     value: Option<&Value>,
 ) -> SubtrActorResult<Option<u32>> {

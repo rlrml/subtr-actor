@@ -75,6 +75,7 @@ fn players(player_one_y: f32, player_two_y: f32) -> PlayerFrameState {
 
 fn touch(frame_number: usize, time: f32, player: PlayerId, is_team_0: bool) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame: frame_number,
         team_is_team_0: is_team_0,

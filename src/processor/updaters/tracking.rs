@@ -8,6 +8,7 @@ impl<'a> ReplayProcessor<'a> {
         team_is_team_0: bool,
     ) -> TouchEvent {
         TouchEvent {
+            touch_id: None,
             time: frame.time,
             frame: frame_index,
             team_is_team_0,

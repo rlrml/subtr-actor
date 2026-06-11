@@ -264,6 +264,7 @@ pub(crate) fn explicit_touch_events(
             continue;
         }
         accepted.push(TouchEvent {
+            touch_id: None,
             time,
             frame: frame_number,
             team_is_team_0,
@@ -647,6 +648,7 @@ impl SaLiveEventGenerator {
             touch_events = dodge_refreshed_events
                 .iter()
                 .map(|event| TouchEvent {
+                    touch_id: None,
                     time: event.time,
                     frame: event.frame,
                     team_is_team_0: event.is_team_0,

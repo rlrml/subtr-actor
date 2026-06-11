@@ -72,6 +72,12 @@ struct TouchClassification {
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchClassificationEvent {
+    /// Identity of the source [`TouchEvent`](crate::TouchEvent) this
+    /// classification was derived from. Join on this instead of player + frame.
+    /// `None` only for data serialized before touch ids existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(type = "number")]
+    pub touch_id: Option<u64>,
     pub time: f32,
     pub frame: usize,
     pub sample_time: f32,
@@ -386,6 +392,7 @@ impl TouchCalculator {
                 },
             );
             let event = TouchClassificationEvent {
+                touch_id: touch_event.touch_id,
                 time: touch_event.time,
                 frame: touch_event.frame,
                 sample_time: frame.time,

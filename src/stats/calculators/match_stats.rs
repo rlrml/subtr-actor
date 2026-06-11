@@ -139,6 +139,12 @@ pub struct GoalPlayerContext {
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalTouchContext {
+    /// Identity of the source [`TouchEvent`](crate::TouchEvent) for this
+    /// scoring touch. Join on this instead of player + frame. `None` only for
+    /// data serialized before touch ids existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(type = "number")]
+    pub touch_id: Option<u64>,
     pub time: f32,
     pub frame: usize,
     #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
@@ -641,6 +647,7 @@ impl MatchStatsCalculator {
             self.last_touch_context_by_player.insert(
                 player_id.clone(),
                 GoalTouchContext {
+                    touch_id: touch.touch_id,
                     time: touch.time,
                     frame: touch.frame,
                     player: player_id.clone(),

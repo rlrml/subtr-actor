@@ -59,6 +59,7 @@ fn ball_at(position: glam::Vec3, velocity: glam::Vec3) -> BallFrameState {
 
 fn touch(player: PlayerId, team_is_team_0: bool, frame: usize, time: f32) -> TouchEvent {
     TouchEvent {
+        touch_id: None,
         time,
         frame,
         team_is_team_0,
@@ -1969,6 +1970,7 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
         first_touch_frame: Some(5),
         first_touch_team_is_team_0: Some(true),
         first_touch_player: Some(player_id.clone()),
+        first_touch_id: None,
         first_touch_ball_position: Some([0.0, 0.0, 92.0]),
         first_touch_ball_abs_x: Some(0.0),
         first_touch_ball_height: Some(92.0),

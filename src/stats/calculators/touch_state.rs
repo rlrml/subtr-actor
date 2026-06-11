@@ -128,6 +128,7 @@ pub struct TouchStateCalculator {
     recent_touch_candidates: HashMap<PlayerId, TouchEvent>,
     last_touch_times: HashMap<TouchCooldownKey, f32>,
     recent_team_touches: Vec<RecentTeamTouch>,
+    next_touch_id: u64,
 }
 
 impl TouchStateCalculator {
@@ -184,6 +185,7 @@ impl TouchStateCalculator {
                 }
 
                 Some(TouchEvent {
+                    touch_id: None,
                     time: frame.time,
                     frame: frame.frame_number,
                     team_is_team_0: player.is_team_0,
@@ -292,6 +294,7 @@ impl TouchStateCalculator {
                 *closest_contact_gap <= MARKER_CONTACT_ATTRIBUTION_MAX_GAP
             })
             .map(|(closest_contact_gap, player, rigid_body)| TouchEvent {
+                touch_id: None,
                 time: event.time,
                 frame: event.frame,
                 team_is_team_0: event.team_is_team_0,
@@ -346,6 +349,7 @@ impl TouchStateCalculator {
         };
 
         Some(TouchEvent {
+            touch_id: None,
             time: event.time,
             frame: event.frame,
             team_is_team_0: event.team_is_team_0,
@@ -403,6 +407,7 @@ impl TouchStateCalculator {
         candidate: TouchEvent,
     ) -> TouchEvent {
         TouchEvent {
+            touch_id: None,
             time: dodge_refresh.time,
             frame: dodge_refresh.frame,
             team_is_team_0: dodge_refresh.is_team_0,
@@ -494,6 +499,7 @@ impl TouchStateCalculator {
                     return None;
                 }
                 Some(TouchEvent {
+                    touch_id: None,
                     time: frame.time,
                     frame: frame.frame_number,
                     team_is_team_0: player.is_team_0,
@@ -658,7 +664,11 @@ impl TouchStateCalculator {
             self.prune_recent_touch_candidates(frame.frame_number);
             self.update_recent_touch_candidates(frame, ball, players);
             let touch_events = self.confirmed_touch_events(frame, ball, players, events);
-            let touch_events = self.apply_touch_cooldown(touch_events);
+            let mut touch_events = self.apply_touch_cooldown(touch_events);
+            for event in &mut touch_events {
+                event.touch_id = Some(self.next_touch_id);
+                self.next_touch_id += 1;
+            }
             self.record_recent_team_touches(frame.frame_number, &touch_events);
             touch_events
         } else {

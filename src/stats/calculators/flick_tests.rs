@@ -139,6 +139,7 @@ fn counts_controlled_dodge_touch_with_large_ball_impulse() {
             ),
             &players(true),
             &touch_state(vec![TouchEvent {
+                touch_id: None,
                 time: 0.4,
                 frame: 4,
                 team_is_team_0: true,
@@ -198,6 +199,7 @@ fn labels_reverse_flicks_with_backflip_pitch_forward_impulse_and_rotation_under_
                 glam::Vec3::new(0.0, -5.0, 0.0),
             ),
             &touch_state(vec![TouchEvent {
+                touch_id: None,
                 time: 0.4,
                 frame: 4,
                 team_is_team_0: true,
@@ -272,6 +274,7 @@ fn labels_left_reverse_flicks_from_negative_setup_rotation() {
                 glam::Vec3::new(0.0, -5.0, 0.0),
             ),
             &touch_state(vec![TouchEvent {
+                touch_id: None,
                 time: 0.4,
                 frame: 4,
                 team_is_team_0: true,
@@ -334,6 +337,7 @@ fn frontflip_pitch_forward_impulse_is_not_labeled_reverse() {
             ),
             &players_with_yaw_and_angular_velocity(true, final_yaw, glam::Vec3::new(0.0, 5.0, 0.0)),
             &touch_state(vec![TouchEvent {
+                touch_id: None,
                 time: 0.4,
                 frame: 4,
                 team_is_team_0: true,
@@ -383,6 +387,7 @@ fn rejects_dodge_touch_without_controlled_setup() {
             &players(true),
             &TouchState {
                 touch_events: vec![TouchEvent {
+                    touch_id: None,
                     time: 0.2,
                     frame: 2,
                     team_is_team_0: true,
@@ -414,6 +419,7 @@ fn setup_with_multiple_control_touches_can_count_after_minimum_duration() {
                 &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
                 &players(frame_number == 3),
                 &touch_state(vec![TouchEvent {
+                    touch_id: None,
                     time,
                     frame: frame_number,
                     team_is_team_0: true,
@@ -436,6 +442,7 @@ fn setup_with_multiple_control_touches_can_count_after_minimum_duration() {
             ),
             &players(true),
             &touch_state(vec![TouchEvent {
+                touch_id: None,
                 time: 0.4,
                 frame: 4,
                 team_is_team_0: true,
@@ -471,6 +478,7 @@ fn rejects_tiny_multi_touch_setup() {
                 &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
                 &players(frame_number == 2),
                 &touch_state(vec![TouchEvent {
+                    touch_id: None,
                     time,
                     frame: frame_number,
                     team_is_team_0: true,
@@ -498,6 +506,7 @@ fn rejects_tiny_multi_touch_setup() {
             ),
             &players(true),
             &touch_state(vec![TouchEvent {
+                touch_id: None,
                 time: 0.06,
                 frame: 3,
                 team_is_team_0: true,
@@ -550,6 +559,7 @@ fn rejects_dodge_after_ball_has_left_car() {
             ),
             &players(true),
             &touch_state(vec![TouchEvent {
+                touch_id: None,
                 time: 0.5,
                 frame: 5,
                 team_is_team_0: true,
