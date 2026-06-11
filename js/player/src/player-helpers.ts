@@ -7,7 +7,7 @@ import {
   isPostGoalTransitionFrame,
 } from "./player-internals/timeline";
 import {
-  interpolatePosition,
+  interpolatePositionHermite,
   interpolateQuaternion,
   rootPosition,
   worldPosition,
@@ -179,13 +179,16 @@ export function updateReplayBallRender({
   replay: ReplayModel;
   sceneState: ReplayScene;
   fieldScale: number;
-  frameWindow: { frameIndex: number; nextFrameIndex: number; alpha: number };
+  frameWindow: { frameIndex: number; nextFrameIndex: number; alpha: number; dt: number };
 }): ReplayBallRenderResult {
   const ballFrame = replay.ballFrames[frameWindow.frameIndex] ?? null;
   const nextBallFrame = replay.ballFrames[frameWindow.nextFrameIndex] ?? ballFrame;
-  const interpolatedBallPosition = interpolatePosition(
+  const interpolatedBallPosition = interpolatePositionHermite(
     ballFrame?.position ?? null,
     nextBallFrame?.position ?? null,
+    ballFrame?.linearVelocity ?? null,
+    nextBallFrame?.linearVelocity ?? null,
+    frameWindow.dt,
     frameWindow.alpha,
   );
   const ballPosition = interpolatedBallPosition

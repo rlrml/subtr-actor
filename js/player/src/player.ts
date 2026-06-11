@@ -32,7 +32,7 @@ import {
 import {
   getFreeCameraPreset,
   interpolateQuaternion,
-  interpolatePosition,
+  interpolatePositionHermite,
   rootPosition,
   updateFreeCameraTransition,
   updateAttachedCamera,
@@ -661,9 +661,12 @@ export class ReplayPlayer extends EventTarget {
         continue;
       }
 
-      interpolatedPosition = interpolatePosition(
+      interpolatedPosition = interpolatePositionHermite(
         frame?.position ?? null,
         nextFrame?.position ?? null,
+        frame?.linearVelocity ?? null,
+        nextFrame?.linearVelocity ?? null,
+        frameWindow.dt,
         frameWindow.alpha,
       );
       const activeDemoEvent = getActiveDemoEvent(
@@ -830,6 +833,9 @@ export class ReplayPlayer extends EventTarget {
       cameraDistanceScale: this.cameraDistanceScale,
       customCameraSettings: this.customCameraSettings,
       frameIndex,
+      nextFrameIndex: frameWindow.nextFrameIndex,
+      alpha: frameWindow.alpha,
+      dt: frameWindow.dt,
       attachedPlayerUnavailable:
         this.attachedPlayerId !== null &&
         getActiveDemoEvent(this.replay.timelineEvents, this.attachedPlayerId, this.currentTime) !==
