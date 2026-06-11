@@ -533,9 +533,9 @@ impl KickoffCalculator {
             trace.max_speed = trace.max_speed.max(speed);
         }
 
-        if player.dodge_active && !trace.previous_dodge_active {
-            trace.first_dodge_time.get_or_insert(frame.time);
-            trace.first_dodge_frame.get_or_insert(frame.frame_number);
+        if player.dodge_active && !trace.previous_dodge_active && trace.first_dodge_time.is_none() {
+            trace.first_dodge_time = Some(frame.time);
+            trace.first_dodge_frame = Some(frame.frame_number);
             if let (Some(previous_velocity), Some(velocity), Some(rigid_body)) = (
                 trace.previous_velocity,
                 player.velocity(),

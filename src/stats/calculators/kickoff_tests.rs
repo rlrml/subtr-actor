@@ -2022,6 +2022,53 @@ fn kickoff_classifies_known_taker_approaches() {
 }
 
 #[test]
+fn kickoff_first_dodge_direction_is_not_overwritten_by_later_dodges() {
+    let player_id = PlayerId::Steam(10);
+    let mut trace = KickoffApproachTrace::default();
+
+    let player_at = |velocity: glam::Vec3, dodge_active: bool| {
+        let mut sample = player(player_id.clone(), true, glam::Vec3::ZERO, 33.0);
+        sample.rigid_body = Some(rigid_body(glam::Vec3::ZERO, velocity));
+        sample.dodge_active = dodge_active;
+        sample
+    };
+
+    // Identity rotation: nose is +X, right is +Y. Establish previous velocity,
+    // then dodge sideways (+Y delta), release, then dodge forward (+X delta)
+    // as happens when the taker flips again into the ball at first touch.
+    KickoffCalculator::observe_player_approach(
+        &mut trace,
+        &frame(1, 0.1),
+        &player_at(glam::Vec3::new(500.0, 0.0, 0.0), false),
+    );
+    KickoffCalculator::observe_player_approach(
+        &mut trace,
+        &frame(2, 0.2),
+        &player_at(glam::Vec3::new(500.0, 600.0, 0.0), true),
+    );
+    KickoffCalculator::observe_player_approach(
+        &mut trace,
+        &frame(3, 0.3),
+        &player_at(glam::Vec3::new(500.0, 600.0, 0.0), false),
+    );
+    KickoffCalculator::observe_player_approach(
+        &mut trace,
+        &frame(4, 0.4),
+        &player_at(glam::Vec3::new(1100.0, 600.0, 0.0), true),
+    );
+
+    assert_eq!(trace.first_dodge_time, Some(0.2));
+    assert_eq!(trace.first_dodge_frame, Some(2));
+    let forward = trace.first_dodge_forward_component.expect("forward set");
+    let side = trace.first_dodge_side_component.expect("side set");
+    assert!(
+        forward.abs() < 0.01 && (side - 1.0).abs() < 0.01,
+        "components should describe the first (sideways) dodge, got \
+         forward={forward} side={side}"
+    );
+}
+
+#[test]
 fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
     let left_player = PlayerId::Steam(10);
     let right_player = PlayerId::Steam(11);
