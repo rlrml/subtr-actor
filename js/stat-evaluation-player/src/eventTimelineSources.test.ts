@@ -180,11 +180,138 @@ test("event playlist sources include generic stats event streams such as positio
         sourceLabel: "Positioning Activity",
         time: 1.25,
         frame: 12,
-        label: "Blue positioning activity",
+        label: "Blue positioning active | 0.05s",
         shortLabel: "PA",
         playerId: "Steam:blue-id",
         playerName: "Blue",
         isTeamZero: true,
+      },
+    ],
+  );
+});
+
+test("controlled play timeline source renders spans as timeline ranges", () => {
+  const replay = {
+    frames: Array.from({ length: 13 }, (_, frame) => ({
+      time: frame === 5 ? 0.55 : frame === 12 ? 1.25 : frame,
+    })),
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      controlled_play: [
+        {
+          player_id: { Steam: "blue-id" },
+          is_team_0: true,
+          start_frame: 5,
+          end_frame: 12,
+          start_time: 0.5,
+          end_time: 1.2,
+          duration: 0.7,
+          first_touch_frame: 5,
+          last_touch_frame: 12,
+          first_touch_time: 0.5,
+          last_touch_time: 1.2,
+          touch_count: 2,
+          close_duration: 0.6,
+          total_advance_distance: 400,
+        },
+      ],
+    },
+  });
+  const ctx = {
+    replay,
+    statsTimeline,
+  } as StatModuleContext;
+
+  const timelineSources = getTestTimelineSources(ctx);
+  const controlledPlaySource = timelineSources.find(
+    (source) => source.id === "stats-stream:controlled_play",
+  );
+
+  assert.ok(controlledPlaySource);
+  assert.equal(controlledPlaySource.count, 1);
+  assert.deepEqual(controlledPlaySource.buildTimelineEvents(), []);
+  assert.deepEqual(controlledPlaySource.buildTimelineRanges?.(), [
+    {
+      id: "stats-stream:controlled_play:5:12:0",
+      startTime: 0.55,
+      endTime: 1.25,
+      lane: "stats-stream:controlled_play",
+      laneLabel: "Controlled Play",
+      label: "Blue controlled play",
+      shortLabel: "CP",
+      isTeamZero: true,
+      color: "#3b82f6",
+    },
+  ]);
+});
+
+test("generic ball half playlist events include field half and duration", () => {
+  const replay = {
+    frames: Array.from({ length: 8 }, (_, frame) => ({ time: frame * 0.5 })),
+    players: [],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      ball_half: [
+        {
+          time: 1,
+          frame: 2,
+          end_time: 2.5,
+          end_frame: 5,
+          active: true,
+          duration: 1.5,
+          field_half: "team_zero_side",
+        },
+        {
+          time: 2.5,
+          frame: 5,
+          end_time: 3,
+          end_frame: 6,
+          active: false,
+          duration: 0.5,
+          field_half: "neutral",
+        },
+      ],
+    },
+  });
+  const ctx = {
+    replay,
+    statsTimeline,
+  } as StatModuleContext;
+  const playlistSources = getEventPlaylistSources(ctx, getTestTimelineSources(ctx));
+
+  const items = buildEventPlaylistItems({
+    sources: playlistSources,
+    activeSourceIds: new Set(["stats-stream:ball_half"]),
+    replayPlayers: replay.players,
+  });
+
+  assert.deepEqual(
+    items.map((item) => ({
+      sourceId: item.sourceId,
+      time: item.event.time,
+      frame: item.event.frame,
+      label: item.event.label,
+      shortLabel: item.event.shortLabel,
+    })),
+    [
+      {
+        sourceId: "stats-stream:ball_half",
+        time: 2.5,
+        frame: 5,
+        label: "Ball on blue side | 1.5s",
+        shortLabel: "BH",
+      },
+      {
+        sourceId: "stats-stream:ball_half",
+        time: 3,
+        frame: 6,
+        label: "Ball half inactive | 0.5s",
+        shortLabel: "BH",
       },
     ],
   );

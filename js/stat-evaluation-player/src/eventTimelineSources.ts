@@ -47,6 +47,7 @@ const SPAN_BASED_STATS_EVENT_STREAM_IDS = new Set<string>([
   "possession",
   "ball_half",
   "territorial_pressure",
+  "controlled_play",
   "positioning_field_zone",
   "rotation_role_span",
   "rotation_depth_span",
@@ -170,6 +171,141 @@ function eventStreamShortLabel(streamId: string): string {
   );
 }
 
+function formatSeconds(value: unknown): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const digits = Math.abs(value) < 1 ? 2 : 1;
+  const seconds = value
+    .toFixed(digits)
+    .replace(/\.0+$/, "")
+    .replace(/(\.\d*[1-9])0+$/, "$1");
+  return `${seconds}s`;
+}
+
+function titleCaseValue(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0) {
+    return null;
+  }
+
+  return value
+    .split(/[_-]+/)
+    .filter((part) => part.length > 0)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function formatFieldHalf(value: unknown): string | null {
+  if (value === "team_zero_side") return "Blue side";
+  if (value === "team_one_side") return "Orange side";
+  if (value === "neutral") return "Neutral zone";
+  return titleCaseValue(value);
+}
+
+function formatFieldThird(value: unknown): string | null {
+  const label = titleCaseValue(value);
+  return label ? `${label.toLowerCase()} third` : null;
+}
+
+function payloadRecord(event: Event): Record<string, unknown> {
+  return isRecord(event.payload.payload) ? event.payload.payload : {};
+}
+
+function joinEventDetails(parts: Array<string | null>): string {
+  return parts.filter((part): part is string => Boolean(part)).join(" | ");
+}
+
+function formatGenericStatsEventLabel({
+  event,
+  playerName,
+  streamLabel,
+  teamLabel,
+}: {
+  event: Event;
+  playerName: string | null;
+  streamLabel: string;
+  teamLabel: string | null;
+}): string {
+  const payload = payloadRecord(event);
+  const duration = formatSeconds(payload.duration);
+
+  if (event.payload.kind === "ball_half") {
+    const half = formatFieldHalf(payload.field_half);
+    const state =
+      payload.active === false
+        ? "Ball half inactive"
+        : half
+          ? `Ball on ${half.toLowerCase()}`
+          : null;
+    return joinEventDetails([state ?? streamLabel, duration]);
+  }
+
+  if (event.payload.kind === "territorial_pressure") {
+    const reason = titleCaseValue(payload.end_reason);
+    const main = `${teamLabel ?? ""} territorial pressure`.trim();
+    return joinEventDetails([reason ? `${main} ended: ${reason.toLowerCase()}` : main, duration]);
+  }
+
+  if (event.payload.kind === "possession") {
+    const state = titleCaseValue(payload.possession_state);
+    const third = formatFieldThird(payload.field_third);
+    const main = state ? `${state} possession` : streamLabel;
+    return joinEventDetails([main, third, duration]);
+  }
+
+  if (event.payload.kind === "controlled_play") {
+    const prefix = playerName ? `${playerName} controlled play` : streamLabel;
+    return joinEventDetails([prefix, duration]);
+  }
+
+  if (event.payload.kind === "positioning_activity") {
+    const state =
+      payload.demolished === true
+        ? "demolished"
+        : payload.active === false
+          ? "inactive"
+          : payload.tracked === false
+            ? "untracked"
+            : "active";
+    const prefix = playerName ? `${playerName} positioning` : streamLabel;
+    return joinEventDetails([`${prefix} ${state}`, duration]);
+  }
+
+  if (event.payload.kind === "positioning_field_zone") {
+    const defensive = Number(payload.defensive_zone_fraction ?? 0);
+    const neutral = Number(payload.neutral_zone_fraction ?? 0);
+    const offensive = Number(payload.offensive_zone_fraction ?? 0);
+    const zone =
+      defensive >= neutral && defensive >= offensive
+        ? "defensive zone"
+        : offensive >= neutral
+          ? "offensive zone"
+          : "neutral zone";
+    const prefix = playerName ? `${playerName} positioning` : streamLabel;
+    return joinEventDetails([`${prefix} in ${zone}`, duration]);
+  }
+
+  if (event.payload.kind === "rotation_role_span") {
+    const role = titleCaseValue(payload.current_role_state);
+    const prefix = playerName ? `${playerName} rotation` : streamLabel;
+    return joinEventDetails([role ? `${prefix}: ${role.toLowerCase()}` : prefix, duration]);
+  }
+
+  if (event.payload.kind === "rotation_depth_span") {
+    const depth = titleCaseValue(payload.current_depth_state);
+    const prefix = playerName ? `${playerName} rotation depth` : streamLabel;
+    return joinEventDetails([depth ? `${prefix}: ${depth.toLowerCase()}` : prefix, duration]);
+  }
+
+  if (event.payload.kind === "rotation_first_man_stint") {
+    const prefix = playerName ? `${playerName} first-man stint` : streamLabel;
+    return joinEventDetails([prefix, duration]);
+  }
+
+  return playerName ? `${playerName} ${streamLabel.toLowerCase()}` : streamLabel;
+}
+
 function buildGenericStatsEventTimelineEvents(
   ctx: StatModuleContext,
   streamId: string,
@@ -186,6 +322,7 @@ function buildGenericStatsEventTimelineEvents(
     const playerId = remoteIdToString(event.meta.primary_player);
     const playerName = playerId ? (playerNames.get(playerId) ?? playerId) : null;
     const isTeamZero = event.meta.team_is_team_0 ?? null;
+    const teamLabel = isTeamZero == null ? null : isTeamZero ? "Blue" : "Orange";
     const eventId = event.meta.id || `${streamId}:${timing.frame ?? timing.time}:${index}`;
 
     return [
@@ -194,7 +331,12 @@ function buildGenericStatsEventTimelineEvents(
         time: ctx.replay.frames[timing.frame ?? -1]?.time ?? timing.time,
         frame: timing.frame,
         kind: streamId,
-        label: playerName ? `${playerName} ${streamLabel.toLowerCase()}` : streamLabel,
+        label: formatGenericStatsEventLabel({
+          event,
+          playerName,
+          streamLabel,
+          teamLabel,
+        }),
         shortLabel: eventStreamShortLabel(streamId),
         playerId,
         playerName,
@@ -216,6 +358,7 @@ function buildGenericStatsEventTimelineRanges(
   events: readonly Event[],
 ): ReplayTimelineRange[] {
   const streamLabel = formatMechanicKind(streamId);
+  const playerNames = new Map(ctx.replay.players.map((player) => [player.id, player.name]));
 
   return events
     .flatMap((event, index) => {
@@ -231,9 +374,16 @@ function buildGenericStatsEventTimelineRanges(
 
       const isTeamZero = event.meta.team_is_team_0 ?? null;
       const teamLabel = isTeamZero == null ? null : isTeamZero ? "Blue" : "Orange";
+      const playerId = remoteIdToString(event.meta.primary_player);
+      const playerName = playerId ? (playerNames.get(playerId) ?? playerId) : null;
       const eventId =
         event.meta.id ||
         `${streamId}:${timing.startFrame ?? timing.startTime}:${timing.endFrame ?? timing.endTime}:${index}`;
+      const label = playerName
+        ? `${playerName} ${streamLabel.toLowerCase()}`
+        : teamLabel
+          ? `${teamLabel} ${streamLabel.toLowerCase()}`
+          : streamLabel;
 
       return [
         {
@@ -245,7 +395,7 @@ function buildGenericStatsEventTimelineRanges(
           ),
           lane: `stats-stream:${streamId}`,
           laneLabel: streamLabel,
-          label: teamLabel ? `${teamLabel} ${streamLabel.toLowerCase()}` : streamLabel,
+          label,
           shortLabel: eventStreamShortLabel(streamId),
           isTeamZero,
           color:
