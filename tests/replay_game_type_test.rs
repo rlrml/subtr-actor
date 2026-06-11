@@ -223,9 +223,10 @@ fn season_is_resolved_from_fixture_replay_date() {
     let replay_meta = processor
         .process_and_get_replay_meta()
         .expect("failed to build replay meta");
-    // Recorded 2026-04-28, which falls in free-to-play season 21.
+    // Recorded 2026-04-28, which falls in free-to-play season 22
+    // (S22 went live 2026-03-11, S23 on 2026-06-10).
     let season = replay_meta.season.expect("season should be resolved");
     assert_eq!(season.era, subtr_actor::SeasonEra::FreeToPlay);
-    assert_eq!(season.number, 21);
-    assert_eq!(season.code(), "f21");
+    assert_eq!(season.number, 22);
+    assert_eq!(season.code(), "f22");
 }

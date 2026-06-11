@@ -500,6 +500,64 @@ impl ReplaySeason {
     pub fn code(self) -> String {
         format!("{}{}", self.era.code_prefix(), self.number)
     }
+
+    /// The UTC instant this season went live, from [`SEASON_BOUNDARIES`].
+    ///
+    /// Always `Some` for a season produced by resolution, since resolved seasons
+    /// come from the table; returns `None` only for a hand-constructed
+    /// [`ReplaySeason`] that has no boundary entry.
+    pub fn start(self) -> Option<SeasonStart> {
+        SEASON_BOUNDARIES
+            .iter()
+            .find(|(_, season)| *season == self)
+            .map(|(start, _)| *start)
+    }
+}
+
+/// The UTC instant a competitive season went live.
+///
+/// Stored per season so callers can display or reason about a boundary at finer
+/// than day precision. Season *resolution* still uses only the date (see
+/// [`season_for_date`]): the replay `Date` header is timezone-less local
+/// wall-clock, so its time-of-day cannot be meaningfully compared against a UTC
+/// instant. The time is therefore informational, and rough for older seasons
+/// (see [`SEASON_BOUNDARIES`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct SeasonStart {
+    /// UTC calendar year.
+    pub year: i32,
+    /// UTC month, 1-based.
+    pub month: u32,
+    /// UTC day of month, 1-based.
+    pub day: u32,
+    /// UTC hour, 0–23.
+    pub hour: u32,
+    /// UTC minute, 0–59.
+    pub minute: u32,
+}
+
+impl SeasonStart {
+    const fn new(year: i32, month: u32, day: u32, hour: u32, minute: u32) -> Self {
+        Self {
+            year,
+            month,
+            day,
+            hour,
+            minute,
+        }
+    }
+
+    /// The `(year, month, day)` UTC date portion, used for day-granular
+    /// resolution against the replay's local-wall-clock date.
+    const fn date(self) -> (i32, u32, u32) {
+        (self.year, self.month, self.day)
+    }
+
+    /// Full UTC datetime as a comparable tuple `(year, month, day, hour, minute)`.
+    const fn as_datetime_tuple(self) -> (i32, u32, u32, u32, u32) {
+        (self.year, self.month, self.day, self.hour, self.minute)
+    }
 }
 
 /// Competitive-season start dates, ascending by date.
@@ -510,52 +568,169 @@ impl ReplaySeason {
 /// Seasons are contiguous, so storing only the start (rather than start/end pairs)
 /// keeps the table impossible to leave with gaps or overlaps.
 ///
-/// `(year, month, day)` tuples are `const`-constructible and already order
-/// correctly, so the table needs no parsing or lazy initialization. Day
-/// granularity is intentional: the replay `Date` header is local wall-clock with
-/// no timezone, and a replay recorded within a day of a boundary is inherently
-/// ambiguous.
+/// Each entry is the UTC instant the season went live (see [`SeasonStart`]).
+/// [`SeasonStart::new`] is `const` and the entries already order correctly, so
+/// the table needs no parsing or lazy initialization.
 ///
-/// TODO(season-dates): these start dates are best-effort and should be verified
-/// against an authoritative source (e.g. ballchasing's season numbering) before
-/// being relied on. The free-to-play numbering is anchored so that April 2026
-/// resolves to free-to-play Season 21, matching observed ballchasing metadata.
-const SEASON_BOUNDARIES: &[((i32, u32, u32), ReplaySeason)] = &[
-    // Pre-free-to-play numbered competitive seasons.
-    ((2016, 2, 10), ReplaySeason::new(SeasonEra::Legacy, 1)),
-    ((2016, 6, 20), ReplaySeason::new(SeasonEra::Legacy, 2)),
-    ((2016, 9, 8), ReplaySeason::new(SeasonEra::Legacy, 3)),
-    ((2017, 3, 22), ReplaySeason::new(SeasonEra::Legacy, 4)),
-    ((2017, 9, 13), ReplaySeason::new(SeasonEra::Legacy, 5)),
-    ((2018, 3, 7), ReplaySeason::new(SeasonEra::Legacy, 6)),
-    ((2018, 9, 25), ReplaySeason::new(SeasonEra::Legacy, 7)),
-    ((2019, 3, 27), ReplaySeason::new(SeasonEra::Legacy, 8)),
-    ((2019, 8, 22), ReplaySeason::new(SeasonEra::Legacy, 9)),
-    ((2019, 12, 4), ReplaySeason::new(SeasonEra::Legacy, 10)),
-    ((2020, 4, 8), ReplaySeason::new(SeasonEra::Legacy, 11)),
-    ((2020, 7, 8), ReplaySeason::new(SeasonEra::Legacy, 12)),
-    // Free-to-play era.
-    ((2020, 9, 23), ReplaySeason::new(SeasonEra::FreeToPlay, 1)),
-    ((2020, 12, 9), ReplaySeason::new(SeasonEra::FreeToPlay, 2)),
-    ((2021, 4, 7), ReplaySeason::new(SeasonEra::FreeToPlay, 3)),
-    ((2021, 8, 11), ReplaySeason::new(SeasonEra::FreeToPlay, 4)),
-    ((2021, 11, 17), ReplaySeason::new(SeasonEra::FreeToPlay, 5)),
-    ((2022, 3, 9), ReplaySeason::new(SeasonEra::FreeToPlay, 6)),
-    ((2022, 6, 15), ReplaySeason::new(SeasonEra::FreeToPlay, 7)),
-    ((2022, 9, 7), ReplaySeason::new(SeasonEra::FreeToPlay, 8)),
-    ((2022, 12, 7), ReplaySeason::new(SeasonEra::FreeToPlay, 9)),
-    ((2023, 3, 8), ReplaySeason::new(SeasonEra::FreeToPlay, 10)),
-    ((2023, 6, 7), ReplaySeason::new(SeasonEra::FreeToPlay, 11)),
-    ((2023, 9, 6), ReplaySeason::new(SeasonEra::FreeToPlay, 12)),
-    ((2023, 12, 6), ReplaySeason::new(SeasonEra::FreeToPlay, 13)),
-    ((2024, 3, 6), ReplaySeason::new(SeasonEra::FreeToPlay, 14)),
-    ((2024, 6, 5), ReplaySeason::new(SeasonEra::FreeToPlay, 15)),
-    ((2024, 9, 4), ReplaySeason::new(SeasonEra::FreeToPlay, 16)),
-    ((2024, 12, 4), ReplaySeason::new(SeasonEra::FreeToPlay, 17)),
-    ((2025, 3, 5), ReplaySeason::new(SeasonEra::FreeToPlay, 18)),
-    ((2025, 6, 4), ReplaySeason::new(SeasonEra::FreeToPlay, 19)),
-    ((2025, 9, 17), ReplaySeason::new(SeasonEra::FreeToPlay, 20)),
-    ((2026, 1, 14), ReplaySeason::new(SeasonEra::FreeToPlay, 21)),
+/// Resolution itself is day-granular (see [`season_for_date`]): the replay
+/// `Date` header is local wall-clock with no timezone, so a replay recorded
+/// within a day of a boundary is inherently ambiguous and the stored time-of-day
+/// cannot be compared against it. The time is stored per season purely as data
+/// for callers that want it (display, reporting).
+///
+/// Time precision by source:
+/// - Free-to-play S3 and S18–S23: exact go-live time from the official
+///   Rocket League "Season N Live" patch notes (which the season megathreads on
+///   r/RocketLeague cite). These announce a time like "9 AM PT / 4 PM UTC".
+/// - All other seasons: the date is the launch date, but the time is the
+///   *approximate* standard ~9 AM Pacific launch converted to UTC (16:00 in
+///   PDT, 17:00 in PST). Treat the hour for these as rough.
+///
+/// TODO(season-dates): the legacy (pre-free-to-play) start dates are still
+/// best-effort and have not been cross-checked against patch notes.
+const SEASON_BOUNDARIES: &[(SeasonStart, ReplaySeason)] = &[
+    // Pre-free-to-play numbered competitive seasons. Times approximate (~9 AM PT).
+    (
+        SeasonStart::new(2016, 2, 10, 17, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 1),
+    ),
+    (
+        SeasonStart::new(2016, 6, 20, 16, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 2),
+    ),
+    (
+        SeasonStart::new(2016, 9, 8, 16, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 3),
+    ),
+    (
+        SeasonStart::new(2017, 3, 22, 16, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 4),
+    ),
+    (
+        SeasonStart::new(2017, 9, 13, 16, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 5),
+    ),
+    (
+        SeasonStart::new(2018, 3, 7, 17, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 6),
+    ),
+    (
+        SeasonStart::new(2018, 9, 25, 16, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 7),
+    ),
+    (
+        SeasonStart::new(2019, 3, 27, 16, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 8),
+    ),
+    (
+        SeasonStart::new(2019, 8, 22, 16, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 9),
+    ),
+    (
+        SeasonStart::new(2019, 12, 4, 17, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 10),
+    ),
+    (
+        SeasonStart::new(2020, 4, 8, 16, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 11),
+    ),
+    (
+        SeasonStart::new(2020, 7, 8, 16, 0),
+        ReplaySeason::new(SeasonEra::Legacy, 12),
+    ),
+    // Free-to-play era. Times approximate (~9 AM PT) except where noted "verified".
+    (
+        SeasonStart::new(2020, 9, 23, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 1),
+    ),
+    (
+        SeasonStart::new(2020, 12, 9, 17, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 2),
+    ),
+    (
+        SeasonStart::new(2021, 4, 7, 15, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 3),
+    ), // verified: 8 AM PDT
+    (
+        SeasonStart::new(2021, 8, 11, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 4),
+    ),
+    (
+        SeasonStart::new(2021, 11, 17, 17, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 5),
+    ),
+    (
+        SeasonStart::new(2022, 3, 9, 17, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 6),
+    ),
+    (
+        SeasonStart::new(2022, 6, 15, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 7),
+    ),
+    (
+        SeasonStart::new(2022, 9, 7, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 8),
+    ),
+    (
+        SeasonStart::new(2022, 12, 7, 17, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 9),
+    ),
+    (
+        SeasonStart::new(2023, 3, 8, 17, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 10),
+    ),
+    (
+        SeasonStart::new(2023, 6, 7, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 11),
+    ),
+    (
+        SeasonStart::new(2023, 9, 6, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 12),
+    ),
+    (
+        SeasonStart::new(2023, 12, 6, 17, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 13),
+    ),
+    (
+        SeasonStart::new(2024, 3, 6, 17, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 14),
+    ),
+    (
+        SeasonStart::new(2024, 6, 5, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 15),
+    ),
+    (
+        SeasonStart::new(2024, 9, 4, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 16),
+    ),
+    (
+        SeasonStart::new(2024, 12, 4, 17, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 17),
+    ),
+    (
+        SeasonStart::new(2025, 3, 14, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 18),
+    ), // verified: 9 AM PDT
+    (
+        SeasonStart::new(2025, 6, 18, 15, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 19),
+    ), // verified: 8 AM PDT
+    (
+        SeasonStart::new(2025, 9, 17, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 20),
+    ), // verified: 9 AM PDT
+    (
+        SeasonStart::new(2025, 12, 10, 17, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 21),
+    ), // verified: 9 AM PST
+    (
+        SeasonStart::new(2026, 3, 11, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 22),
+    ), // verified: 9 AM PDT
+    (
+        SeasonStart::new(2026, 6, 10, 16, 0),
+        ReplaySeason::new(SeasonEra::FreeToPlay, 23),
+    ), // verified: 9 AM PDT
 ];
 
 /// Resolves the competitive season from replay headers via the recorded match
@@ -570,8 +745,20 @@ pub fn season_from_headers(headers: &[(String, HeaderProp)]) -> Option<ReplaySea
                 .any(|name| key.eq_ignore_ascii_case(name))
         })
         .and_then(|(_, value)| value.as_string())
-        .and_then(parse_header_date)
-        .and_then(season_for_date)
+        .and_then(|s| {
+            parse_header_datetime_utc(s)
+                .and_then(season_for_datetime)
+                .or_else(|| parse_header_date(s).and_then(season_for_date))
+        })
+}
+
+/// Returns the most recent season whose start is on or before `dt` (UTC).
+fn season_for_datetime(dt: (i32, u32, u32, u32, u32)) -> Option<ReplaySeason> {
+    SEASON_BOUNDARIES
+        .iter()
+        .rev()
+        .find(|(start, _)| start.as_datetime_tuple() <= dt)
+        .map(|(_, season)| *season)
 }
 
 /// Returns the most recent season that began on or before `date`.
@@ -579,15 +766,64 @@ fn season_for_date(date: (i32, u32, u32)) -> Option<ReplaySeason> {
     SEASON_BOUNDARIES
         .iter()
         .rev()
-        .find(|(start, _)| *start <= date)
+        .find(|(start, _)| start.date() <= date)
         .map(|(_, season)| *season)
+}
+
+/// Parses the replay `Date` header as a UTC `(year, month, day, hour, minute)` tuple.
+///
+/// The timezone-less format `"YYYY-MM-DD HH-MM-SS"` is assumed to be US Eastern
+/// Standard Time (UTC−5). The RFC3339 format `"YYYY-MM-DDTHH:MM:SS±HH:MM"` uses
+/// the provided UTC offset. Returns `None` if the time component is absent or
+/// unparseable; callers should fall back to [`parse_header_date`] in that case.
+fn parse_header_datetime_utc(value: &str) -> Option<(i32, u32, u32, u32, u32)> {
+    let s = value.trim();
+    if let Some(t_pos) = s.find('T') {
+        // RFC3339: "2026-04-17T15:01:25-07:00"
+        let (year, month, day) = parse_header_date(&s[..t_pos])?;
+        let rest = s.get(t_pos + 1..)?;
+        let hour: u32 = rest.get(..2)?.parse().ok()?;
+        let minute: u32 = rest.get(3..5)?.parse().ok()?;
+        // Offset starts after "HH:MM:SS" (8 chars)
+        let offset = rest.get(8..)?;
+        let sign: i32 = if offset.starts_with('-') { -1 } else { 1 };
+        let off_h: i32 = offset.get(1..3)?.parse().ok()?;
+        let utc_mins = hour as i32 * 60 + minute as i32 - sign * off_h * 60;
+        return normalize_utc_datetime(year, month, day, utc_mins);
+    }
+    // Plain format: "2026-04-28 14-30-00", assume US Eastern Standard Time (UTC-5).
+    let (date_part, time_part) = s.split_once(' ')?;
+    let (year, month, day) = parse_header_date(date_part)?;
+    let mut tp = time_part.split('-');
+    let hour: u32 = tp.next()?.parse().ok()?;
+    let minute: u32 = tp.next()?.parse().ok()?;
+    normalize_utc_datetime(year, month, day, hour as i32 * 60 + minute as i32 + 5 * 60)
+}
+
+/// Converts `(year, month, day)` + total UTC minutes into a `(year, month, day,
+/// hour, minute)` tuple, carrying over into the next day as needed. Month/year
+/// overflow is not handled — no season boundaries fall on the last day of a month.
+fn normalize_utc_datetime(
+    year: i32,
+    month: u32,
+    day: u32,
+    utc_mins: i32,
+) -> Option<(i32, u32, u32, u32, u32)> {
+    let extra_days = utc_mins.div_euclid(24 * 60);
+    let mins = utc_mins.rem_euclid(24 * 60);
+    Some((
+        year,
+        month,
+        (day as i32 + extra_days) as u32,
+        (mins / 60) as u32,
+        (mins % 60) as u32,
+    ))
 }
 
 /// Parses the leading calendar date (`YYYY-MM-DD`) from a replay `Date` header.
 ///
 /// Replay dates appear as `"2026-04-28 14-30-00"` or RFC3339
-/// `"2026-04-17T15:01:25-07:00"`; both begin with the calendar date, which is all
-/// season resolution needs.
+/// `"2026-04-17T15:01:25-07:00"`; both begin with the calendar date.
 fn parse_header_date(value: &str) -> Option<(i32, u32, u32)> {
     let date = value.trim().split(['T', ' ']).next()?;
     let mut parts = date.split('-');
