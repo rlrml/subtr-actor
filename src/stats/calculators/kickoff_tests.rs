@@ -193,6 +193,108 @@ fn kickoff_goal_does_not_override_immediate_outcome() {
     assert_eq!(event.kickoff_possession_team_is_team_0, Some(false));
 }
 
+fn kickoff_event_with_resolution_ball(resolution_ball: BallFrameState) -> KickoffEvent {
+    let blue_taker = PlayerId::Steam(50);
+    let orange_taker = PlayerId::Steam(51);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(10, 1.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker, true, 10, 1.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(35, 3.1),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &resolution_ball,
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator.finish();
+    calculator.events().last().unwrap().clone()
+}
+
+#[test]
+fn kickoff_win_direction_follows_projected_ball() {
+    // Ball sits just inside the orange half but is flying back toward blue's
+    // net: the projection (400 - 2000 * 0.5 = -600) must hand the win to
+    // team one instead of crediting the side the ball currently sits in.
+    let event = kickoff_event_with_resolution_ball(ball_with_velocity(
+        400.0,
+        glam::Vec3::new(0.0, -2000.0, 0.0),
+    ));
+    assert_eq!(event.outcome, KickoffOutcome::TeamOneWin);
+    assert_eq!(event.winning_team_is_team_0, Some(false));
+    assert_eq!(event.win_strength, Some(600.0 / 5120.0));
+    assert_eq!(event.win_strength_band, KickoffWinStrengthBand::Narrow);
+}
+
+#[test]
+fn kickoff_win_strength_bands_scale_with_projected_depth() {
+    // Projected 2600uu deep (1600 + 2000 * 0.5) is past half of the half-field.
+    let event = kickoff_event_with_resolution_ball(ball_with_velocity(
+        1600.0,
+        glam::Vec3::new(0.0, 2000.0, 0.0),
+    ));
+    assert_eq!(event.outcome, KickoffOutcome::TeamZeroWin);
+    assert_eq!(event.win_strength, Some(2600.0 / 5120.0));
+    assert_eq!(event.win_strength_band, KickoffWinStrengthBand::Strong);
+
+    // A stationary ball just off center stays neutral under the projection gate.
+    let event = kickoff_event_with_resolution_ball(ball(250.0));
+    assert_eq!(event.outcome, KickoffOutcome::Neutral);
+    assert_eq!(event.win_strength, None);
+    assert_eq!(event.win_strength_band, KickoffWinStrengthBand::Unknown);
+}
+
 #[test]
 fn kickoff_records_movement_start_after_countdown() {
     let blue_taker = PlayerId::Steam(42);
@@ -352,7 +454,7 @@ fn kickoff_classifies_fake_and_missed_expected_takers() {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
             },
-            &ball(360.0),
+            &ball(1600.0),
             &PlayerFrameState {
                 players: vec![
                     player(blue_taker.clone(), true, glam::Vec3::ZERO, 21.0),
@@ -368,7 +470,7 @@ fn kickoff_classifies_fake_and_missed_expected_takers() {
     calculator.finish();
     let event = calculator.events().last().unwrap();
     assert_eq!(event.outcome, KickoffOutcome::TeamZeroWin);
-    assert_eq!(event.win_strength, Some(2.0));
+    assert_eq!(event.win_strength, Some(0.3125));
     assert_eq!(event.win_strength_band, KickoffWinStrengthBand::Clear);
     assert_eq!(
         event.team_zero_taker.as_ref().map(|player| &player.player),

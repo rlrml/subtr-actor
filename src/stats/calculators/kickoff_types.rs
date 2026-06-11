@@ -370,6 +370,10 @@ pub struct KickoffEvent {
     pub first_follow_up_touch_player: Option<PlayerId>,
     pub outcome: KickoffOutcome,
     pub winning_team_is_team_0: Option<bool>,
+    /// Projected depth of the ball into the losing half at kickoff resolution,
+    /// as a fraction of the half-field length (`0.0..=1.0`). The projection
+    /// adds half a second of the ball's y velocity so direction of travel
+    /// counts toward (or against) the win.
     pub win_strength: Option<f32>,
     pub win_strength_band: KickoffWinStrengthBand,
     pub kickoff_possession_outcome: KickoffPossessionOutcome,
