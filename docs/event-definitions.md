@@ -850,6 +850,36 @@ _None documented._
 
 _None documented._
 
+### Player Possession (`player_possession`)
+
+- Category: `other`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `player_possession` via `PlayerPossessionNode` / `PlayerPossessionCalculator`
+
+**Summary**
+
+A contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity.
+
+**Approach**
+
+- Follow the shared possession tracker's controlling player and open a span when a player establishes control.
+- Bridge contested or pending-turnover interruptions shorter than the merge gap when the same player re-establishes control, excluding the gap from possessed duration.
+- Accumulate distinct touches (with aerial/wall classification), signed ball travel toward the opponent goal, and per-frame carry/air-dribble samples while the span is active.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Possession (`possession`)
 
 - Category: `other`

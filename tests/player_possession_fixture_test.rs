@@ -49,6 +49,16 @@ fn player_possession_spans_are_sane_for_post_eac_doubles_replay() {
             span.carry_time + span.air_dribble_time <= span.duration + 1e-3,
             "sustained-control time cannot exceed possessed duration"
         );
+        assert!(
+            span.close_time <= span.duration + 1e-3,
+            "close time cannot exceed possessed duration"
+        );
+        if span.sustained_control {
+            assert!(
+                span.touch_count >= 2 && span.duration >= 1.0,
+                "sustained-control spans must meet the controlled-play criteria"
+            );
+        }
         per_player
             .entry(format!("{:?}", span.player_id))
             .or_default()
@@ -76,5 +86,9 @@ fn player_possession_spans_are_sane_for_post_eac_doubles_replay() {
     assert!(
         touches.iter().any(|touch| touch.first_touch),
         "expected at least one first touch in a real match"
+    );
+    assert!(
+        spans.iter().any(|span| span.sustained_control),
+        "expected at least one sustained-control possession in a real match"
     );
 }

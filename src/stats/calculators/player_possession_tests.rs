@@ -332,6 +332,80 @@ fn accumulates_carry_time_when_ball_rides_the_player() {
 }
 
 #[test]
+fn labels_sustained_control_using_controlled_play_criteria() {
+    let mut calculator = PlayerPossessionCalculator::new();
+    // Ball hovers 300uu over the player: inside the 700uu proximity radius,
+    // so close time accrues every frame.
+    let players = players_at(glam::Vec3::new(0.0, 0.0, 17.0));
+    let ball = ball_at(0.0, 300.0);
+    let state = possession(Some(1), Some(true));
+
+    // Two distinct touches 1.5s apart over a 2s possession with constant
+    // proximity: meets every controlled-play criterion.
+    for step in 0..8 {
+        let time = step as f32 * DT;
+        let touches = if step == 0 || step == 6 {
+            vec![touch(step, time, 1, glam::Vec3::new(0.0, 0.0, 17.0))]
+        } else {
+            vec![]
+        };
+        update(
+            &mut calculator,
+            step,
+            time,
+            &ball,
+            &players,
+            &state,
+            touches,
+        );
+    }
+    calculator.finish();
+
+    let events = calculator.events();
+    assert_eq!(events.len(), 1);
+    let event = &events[0];
+    assert!(event.close_time > 0.0, "proximity time should accrue");
+    assert!(
+        event.sustained_control,
+        "two spaced touches with sustained proximity qualify as controlled play"
+    );
+}
+
+#[test]
+fn single_touch_span_is_not_sustained_control() {
+    let mut calculator = PlayerPossessionCalculator::new();
+    let players = players_at(glam::Vec3::new(0.0, 0.0, 17.0));
+    let ball = ball_at(0.0, 1000.0);
+    let state = possession(Some(1), Some(true));
+
+    for step in 0..8 {
+        let time = step as f32 * DT;
+        let touches = if step == 0 {
+            vec![touch(step, time, 1, glam::Vec3::new(0.0, 0.0, 17.0))]
+        } else {
+            vec![]
+        };
+        update(
+            &mut calculator,
+            step,
+            time,
+            &ball,
+            &players,
+            &state,
+            touches,
+        );
+    }
+    calculator.finish();
+
+    let events = calculator.events();
+    assert_eq!(events.len(), 1);
+    assert!(
+        !events[0].sustained_control,
+        "a single touch never qualifies as controlled play"
+    );
+}
+
+#[test]
 fn classifies_aerial_and_wall_touches() {
     let mut calculator = PlayerPossessionCalculator::new();
     let players = players_at(glam::Vec3::new(0.0, 0.0, 17.0));

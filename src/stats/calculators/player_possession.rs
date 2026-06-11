@@ -38,6 +38,14 @@ pub struct PlayerPossessionEvent {
     pub air_dribble_time: f32,
     pub carry_count: u32,
     pub air_dribble_count: u32,
+    /// Seconds of the span the owner spent within close range of the ball
+    /// (same proximity signal as controlled play).
+    pub close_time: f32,
+    /// True when the span meets the controlled-play qualifying criteria
+    /// (touch count, possessed duration, first-to-last touch span, and close
+    /// time). Controlled play is conceptually a labeled subset of player
+    /// possession; this label lets consumers treat it that way.
+    pub sustained_control: bool,
     pub start_field_third: Option<String>,
     pub end_field_third: Option<String>,
 }
@@ -54,7 +62,9 @@ struct ActivePlayerPossession {
     touch_count: u32,
     aerial_touch_count: u32,
     wall_touch_count: u32,
+    first_touch_time: Option<f32>,
     last_touch_time: Option<f32>,
+    close_time: f32,
     advance_distance: f32,
     retreat_distance: f32,
     carry_time: f32,
@@ -87,7 +97,9 @@ impl ActivePlayerPossession {
             touch_count: 0,
             aerial_touch_count: 0,
             wall_touch_count: 0,
+            first_touch_time: None,
             last_touch_time: None,
+            close_time: 0.0,
             advance_distance: 0.0,
             retreat_distance: 0.0,
             carry_time: 0.0,
@@ -116,6 +128,9 @@ impl ActivePlayerPossession {
         {
             return;
         }
+        if self.first_touch_time.is_none() {
+            self.first_touch_time = Some(touch.time);
+        }
         self.last_touch_time = Some(touch.time);
         self.touch_count += 1;
         let Some(position) = touch.player_position.as_ref().map(vec_to_glam) else {
@@ -138,6 +153,42 @@ impl ActivePlayerPossession {
         }
     }
 
+    fn record_proximity_sample(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+    ) {
+        let Some(ball_position) = ball.position() else {
+            return;
+        };
+        let close = players
+            .player(&self.player_id)
+            .and_then(PlayerSample::position)
+            .is_some_and(|player_position| {
+                player_position.distance(ball_position) <= controlled_play::CLOSE_DISTANCE_3D
+            });
+        if close {
+            self.close_time += frame.dt.max(0.0);
+        }
+    }
+
+    fn touch_span(&self) -> f32 {
+        match (self.first_touch_time, self.last_touch_time) {
+            (Some(first), Some(last)) => (last - first).max(0.0),
+            _ => 0.0,
+        }
+    }
+
+    /// Controlled play's qualifying criteria, applied to this span. Kept in
+    /// lockstep via the shared constants in `controlled_play`.
+    fn is_sustained_control(&self) -> bool {
+        self.touch_count >= controlled_play::MIN_TOUCHES
+            && self.duration >= controlled_play::MIN_EPISODE_DURATION_SECONDS
+            && self.touch_span() >= controlled_play::MIN_FIRST_TO_LAST_TOUCH_DURATION_SECONDS
+            && self.close_time >= controlled_play::MIN_CLOSE_DURATION_SECONDS
+    }
+
     fn record_carry_sample(&mut self, frame: &FrameInfo, kind: Option<BallCarryKind>) {
         if let Some(kind) = kind {
             if self.last_carry_kind != Some(kind) {
@@ -155,6 +206,7 @@ impl ActivePlayerPossession {
     }
 
     fn into_event(self) -> PlayerPossessionEvent {
+        let sustained_control = self.is_sustained_control();
         PlayerPossessionEvent {
             player_id: self.player_id,
             is_team_0: self.is_team_0,
@@ -172,6 +224,8 @@ impl ActivePlayerPossession {
             air_dribble_time: self.air_dribble_time,
             carry_count: self.carry_count,
             air_dribble_count: self.air_dribble_count,
+            close_time: self.close_time,
+            sustained_control,
             start_field_third: self.start_field_third,
             end_field_third: self.end_field_third,
         }
@@ -317,6 +371,7 @@ impl PlayerPossessionCalculator {
         };
 
         active.record_frame(frame, field_third);
+        active.record_proximity_sample(frame, ball, players);
         if let (Some(previous_ball_y), Some(ball_y)) = (self.previous_ball_y, ball_y) {
             active.record_ball_movement(previous_ball_y, ball_y);
         }

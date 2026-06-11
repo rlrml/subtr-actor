@@ -104,6 +104,8 @@ pub(in crate::collector::stats::playback) fn parse_player_possession_event(
         air_dribble_time: json_required_f32(object, "air_dribble_time")?,
         carry_count: json_required_u32(object, "carry_count")?,
         air_dribble_count: json_required_u32(object, "air_dribble_count")?,
+        close_time: json_required_f32(object, "close_time")?,
+        sustained_control: json_required_bool(object, "sustained_control")?,
         start_field_third: optional_str("start_field_third")?,
         end_field_third: optional_str("end_field_third")?,
     })
