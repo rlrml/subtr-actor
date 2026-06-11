@@ -25,6 +25,10 @@ const KICKOFF_APPROACH_MIN_FAKE_MOVE_DISTANCE: f32 = 350.0;
 const KICKOFF_APPROACH_FRONT_FLIP_FORWARD_COMPONENT: f32 = 0.45;
 const KICKOFF_APPROACH_DIAGONAL_FLIP_SIDE_COMPONENT: f32 = 0.35;
 const KICKOFF_SUPPORT_CHEAT_MIN_CENTER_PROGRESS: f32 = 400.0;
+const KICKOFF_SETTLED_POSSESSION_MIN_RUN_SECONDS: f32 = 1.25;
+const KICKOFF_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y: f32 = 200.0;
+const KICKOFF_PRESSURE_MIN_ESTABLISH_SECONDS: f32 = 2.0;
+const KICKOFF_PRESSURE_MIN_ESTABLISH_THIRD_SECONDS: f32 = 0.75;
 const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_LATERAL_MOVE: f32 = 600.0;
 const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_BOOST_GAIN: f32 = 10.0;
 
@@ -78,6 +82,159 @@ struct KickoffResolutionSnapshot {
     ball: BallFrameState,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KickoffSettlementKind {
+    Possession,
+    Pressure,
+    Goal,
+}
+
+#[derive(Debug, Clone)]
+struct SettledKickoff {
+    kind: KickoffSettlementKind,
+    team_is_team_0: bool,
+    time: f32,
+    frame: usize,
+    player: Option<PlayerId>,
+}
+
+/// Watches the play that follows a kickoff to decide who the kickoff was
+/// actually good for (see [`KickoffSettlement`]), running through the same
+/// post-conclusion in-flight window used for late goal attribution.
+///
+/// Two competing detectors race; the first to fire settles the kickoff:
+///
+/// - **Possession run**: consecutive touches by one team — no opposing touch
+///   in between — spanning at least
+///   [`KICKOFF_SETTLED_POSSESSION_MIN_RUN_SECONDS`]. This is what credits the
+///   team that *lost* the opening exchange but cleanly collected the ball,
+///   even deep in its own half.
+/// - **Anchored pressure**: the ball held beyond the neutral band in the
+///   opponent's half long enough to establish territorial pressure. The
+///   clocks only run once the attacking team has touched the ball inside that
+///   zone (the anchor); a hard poke sailing deep while the defense calmly
+///   retrieves it never anchors and so never reads as pressure. Defensive
+///   panic touches do not reset the clocks — a defense that strings real
+///   possession together wins the race through the possession run instead.
+#[derive(Debug, Clone, Default)]
+struct KickoffSettlementWatcher {
+    settled: Option<SettledKickoff>,
+    touches_seen: usize,
+    run_team_is_team_0: Option<bool>,
+    run_start_time: f32,
+    pressure_team_is_team_0: Option<bool>,
+    pressure_anchored: bool,
+    pressure_zone_seconds: f32,
+    pressure_third_seconds: f32,
+}
+
+impl KickoffSettlementWatcher {
+    fn zone_side(ball: &BallFrameState) -> Option<bool> {
+        let ball_y = ball.sample()?.position().y;
+        if ball_y > KICKOFF_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y {
+            Some(true)
+        } else if ball_y < -KICKOFF_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    fn reset_pressure(&mut self) {
+        self.pressure_team_is_team_0 = None;
+        self.pressure_anchored = false;
+        self.pressure_zone_seconds = 0.0;
+        self.pressure_third_seconds = 0.0;
+    }
+
+    fn settle_goal(&mut self, goal: &GoalEvent) {
+        if self.settled.is_some() {
+            return;
+        }
+        self.settled = Some(SettledKickoff {
+            kind: KickoffSettlementKind::Goal,
+            team_is_team_0: goal.scoring_team_is_team_0,
+            time: goal.time,
+            frame: goal.frame,
+            player: goal.player.clone(),
+        });
+    }
+
+    fn observe(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        touches: &[KickoffTouchSnapshot],
+    ) {
+        if self.settled.is_some() {
+            self.touches_seen = touches.len();
+            return;
+        }
+        let zone_side = Self::zone_side(ball);
+        if self.pressure_team_is_team_0 != zone_side {
+            self.reset_pressure();
+            self.pressure_team_is_team_0 = zone_side;
+        }
+
+        for touch in &touches[self.touches_seen..] {
+            if self.run_team_is_team_0 == Some(touch.team_is_team_0) {
+                if touch.time - self.run_start_time >= KICKOFF_SETTLED_POSSESSION_MIN_RUN_SECONDS {
+                    self.settled = Some(SettledKickoff {
+                        kind: KickoffSettlementKind::Possession,
+                        team_is_team_0: touch.team_is_team_0,
+                        time: touch.time,
+                        frame: touch.frame,
+                        player: touch.player.clone(),
+                    });
+                    break;
+                }
+            } else {
+                self.run_team_is_team_0 = Some(touch.team_is_team_0);
+                self.run_start_time = touch.time;
+            }
+            if zone_side == Some(touch.team_is_team_0) {
+                self.pressure_anchored = true;
+            }
+        }
+        self.touches_seen = touches.len();
+        if self.settled.is_some() {
+            return;
+        }
+
+        let Some(attacking_team_is_team_0) = zone_side else {
+            return;
+        };
+        if !self.pressure_anchored {
+            return;
+        }
+        self.pressure_zone_seconds += frame.dt;
+        let normalized_ball_y = ball
+            .sample()
+            .map(|sample| {
+                if attacking_team_is_team_0 {
+                    sample.position().y
+                } else {
+                    -sample.position().y
+                }
+            })
+            .unwrap_or(0.0);
+        if normalized_ball_y > FIELD_ZONE_BOUNDARY_Y {
+            self.pressure_third_seconds += frame.dt;
+        }
+        if self.pressure_zone_seconds >= KICKOFF_PRESSURE_MIN_ESTABLISH_SECONDS
+            || self.pressure_third_seconds >= KICKOFF_PRESSURE_MIN_ESTABLISH_THIRD_SECONDS
+        {
+            self.settled = Some(SettledKickoff {
+                kind: KickoffSettlementKind::Pressure,
+                team_is_team_0: attacking_team_is_team_0,
+                time: frame.time,
+                frame: frame.frame_number,
+                player: None,
+            });
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct ActiveKickoff {
     start_time: f32,
@@ -103,6 +260,10 @@ struct ActiveKickoff {
     /// play rather than the kickoff exchange.
     min_ball_y_after_first_touch: Option<f32>,
     max_ball_y_after_first_touch: Option<f32>,
+    /// Keeps watching after the kickoff's logical close (alongside goal
+    /// attribution) to decide who the kickoff settled in favor of; its result
+    /// is written onto the concluded event at emission.
+    settlement: KickoffSettlementWatcher,
     /// The fully built event, frozen at the kickoff's logical close
     /// (`should_finish`). The item then stays in flight, awaiting goal
     /// attribution: a goal scored within [`KICKOFF_GOAL_MAX_SECONDS`] of the
@@ -223,6 +384,15 @@ pub(crate) const KICKOFF_GOAL_LABELS: [StatLabel; 2] = [
     StatLabel::new("kickoff_goal", "false"),
     StatLabel::new("kickoff_goal", "true"),
 ];
+pub(crate) const KICKOFF_SETTLEMENT_LABELS: [StatLabel; 7] = [
+    StatLabel::new("kickoff_settlement", "team_zero_possession"),
+    StatLabel::new("kickoff_settlement", "team_one_possession"),
+    StatLabel::new("kickoff_settlement", "team_zero_pressure"),
+    StatLabel::new("kickoff_settlement", "team_one_pressure"),
+    StatLabel::new("kickoff_settlement", "team_zero_goal"),
+    StatLabel::new("kickoff_settlement", "team_one_goal"),
+    StatLabel::new("kickoff_settlement", "unsettled"),
+];
 
 pub(crate) fn kickoff_spawn_label(spawn: KickoffSpawnPosition) -> StatLabel {
     StatLabel::new("kickoff_spawn", spawn.as_label_value())
@@ -254,6 +424,10 @@ pub(crate) fn kickoff_possession_outcome_label(outcome: KickoffPossessionOutcome
 
 pub(crate) fn kickoff_goal_label(kickoff_goal: bool) -> StatLabel {
     StatLabel::new("kickoff_goal", if kickoff_goal { "true" } else { "false" })
+}
+
+pub(crate) fn kickoff_settlement_label(settlement: KickoffSettlement) -> StatLabel {
+    StatLabel::new("kickoff_settlement", settlement.as_label_value())
 }
 
 pub(crate) fn kickoff_approach_label(approach: KickoffApproach) -> StatLabel {
@@ -338,7 +512,7 @@ impl KickoffPlayerEventRef<'_> {
 }
 
 impl KickoffEvent {
-    pub(crate) fn labels(&self) -> [StatLabel; 6] {
+    pub(crate) fn labels(&self) -> [StatLabel; 7] {
         [
             kickoff_type_label(self.kickoff_type),
             kickoff_direction_label(self.kickoff_direction),
@@ -346,6 +520,7 @@ impl KickoffEvent {
             kickoff_win_strength_label(self.win_strength_band),
             kickoff_possession_outcome_label(self.kickoff_possession_outcome),
             kickoff_goal_label(self.kickoff_goal),
+            kickoff_settlement_label(self.settlement),
         ]
     }
 
@@ -447,6 +622,7 @@ impl KickoffCalculator {
             resolution: None,
             min_ball_y_after_first_touch: None,
             max_ball_y_after_first_touch: None,
+            settlement: KickoffSettlementWatcher::default(),
             concluded: None,
         });
     }
@@ -457,10 +633,46 @@ impl KickoffCalculator {
     /// unresolved kickoff is discarded (see `ActiveKickoff::on_boundary`).
     pub fn finish(&mut self) {
         for (active, _reason) in self.active.finish() {
-            if let Some(event) = active.concluded {
-                self.events.push(*event);
-            }
+            Self::emit_concluded(&mut self.events, active);
         }
+    }
+
+    /// Emit a concluded kickoff, stamping the settlement watcher's verdict
+    /// onto the frozen event. Settlement usually lands after the kickoff's
+    /// logical close, so it is applied here — at emission — rather than in
+    /// `finish_event`.
+    fn emit_concluded(events: &mut EventStream<KickoffEvent>, active: ActiveKickoff) {
+        let ActiveKickoff {
+            concluded,
+            settlement,
+            ..
+        } = active;
+        let Some(mut event) = concluded else {
+            return;
+        };
+        Self::apply_settlement(&mut event, &settlement);
+        events.push(*event);
+    }
+
+    fn apply_settlement(event: &mut KickoffEvent, watcher: &KickoffSettlementWatcher) {
+        let Some(settled) = watcher.settled.as_ref() else {
+            return;
+        };
+        event.settlement = match (settled.kind, settled.team_is_team_0) {
+            (KickoffSettlementKind::Possession, true) => KickoffSettlement::TeamZeroPossession,
+            (KickoffSettlementKind::Possession, false) => KickoffSettlement::TeamOnePossession,
+            (KickoffSettlementKind::Pressure, true) => KickoffSettlement::TeamZeroPressure,
+            (KickoffSettlementKind::Pressure, false) => KickoffSettlement::TeamOnePressure,
+            (KickoffSettlementKind::Goal, true) => KickoffSettlement::TeamZeroGoal,
+            (KickoffSettlementKind::Goal, false) => KickoffSettlement::TeamOneGoal,
+        };
+        event.settlement_team_is_team_0 = Some(settled.team_is_team_0);
+        event.settlement_time = Some(settled.time);
+        event.settlement_frame = Some(settled.frame);
+        event.settlement_seconds_after_first_touch = event
+            .first_touch_time
+            .map(|first_touch_time| settled.time - first_touch_time);
+        event.settlement_player = settled.player.clone();
     }
 
     fn observe_movement_start(
@@ -1444,6 +1656,14 @@ impl KickoffCalculator {
             kickoff_goal,
             scoring_team_is_team_0: scoring_goal.map(|goal| goal.scoring_team_is_team_0),
             time_to_goal,
+            // Settlement usually resolves after the kickoff's logical close;
+            // the watcher's verdict is stamped on at emission (`emit_concluded`).
+            settlement: KickoffSettlement::Unsettled,
+            settlement_team_is_team_0: None,
+            settlement_time: None,
+            settlement_frame: None,
+            settlement_seconds_after_first_touch: None,
+            settlement_player: None,
             team_zero_taker: team_zero_taker_event,
             team_one_taker: team_one_taker_event,
             team_zero_non_takers,
@@ -1489,9 +1709,7 @@ impl KickoffCalculator {
                 }
             });
             for (active, _reason) in flushed {
-                if let Some(event) = active.concluded {
-                    self.events.push(*event);
-                }
+                Self::emit_concluded(&mut self.events, active);
             }
             if self.active.is_empty() {
                 self.start_kickoff(ctx.frame, ctx.players);
@@ -1522,6 +1740,14 @@ impl KickoffCalculator {
             Self::apply_touches(active, ctx.touch_state, ctx.ball);
         }
         Self::observe_ball_extent(active, ctx.ball);
+        if let Some(goal) = Self::earliest_goal(ctx.events) {
+            if Self::kickoff_goal_qualifies(active, goal) {
+                active.settlement.settle_goal(goal);
+            }
+        }
+        active
+            .settlement
+            .observe(ctx.frame, ctx.ball, &active.touches);
 
         // Natural finalization happens in two stages. The kickoff *concludes*
         // once `should_finish` is met: its event content is frozen there
@@ -1582,9 +1808,7 @@ impl KickoffCalculator {
             Disposition::Keep
         });
         for (active, _reason) in finished {
-            if let Some(event) = active.concluded {
-                self.events.push(*event);
-            }
+            Self::emit_concluded(&mut self.events, active);
         }
         Ok(())
     }

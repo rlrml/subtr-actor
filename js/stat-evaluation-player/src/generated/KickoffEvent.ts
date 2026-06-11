@@ -2,6 +2,7 @@
 import type { KickoffDirection } from "./KickoffDirection.ts";
 import type { KickoffOutcome } from "./KickoffOutcome.ts";
 import type { KickoffPossessionOutcome } from "./KickoffPossessionOutcome.ts";
+import type { KickoffSettlement } from "./KickoffSettlement.ts";
 import type { KickoffSupportEvent } from "./KickoffSupportEvent.ts";
 import type { KickoffTakerEvent } from "./KickoffTakerEvent.ts";
 import type { KickoffType } from "./KickoffType.ts";
@@ -39,4 +40,16 @@ first_touch_ball_velocity: [number, number, number] | null, team_zero_taker_touc
  * adds half a second of the ball's y velocity so direction of travel
  * counts toward (or against) the win.
  */
-win_strength: number | null, win_strength_band: KickoffWinStrengthBand, kickoff_possession_outcome: KickoffPossessionOutcome, kickoff_possession_team_is_team_0: boolean | null, kickoff_goal: boolean, scoring_team_is_team_0: boolean | null, time_to_goal: number | null, team_zero_taker: KickoffTakerEvent | null, team_one_taker: KickoffTakerEvent | null, team_zero_non_takers: Array<KickoffSupportEvent>, team_one_non_takers: Array<KickoffSupportEvent>, };
+win_strength: number | null, win_strength_band: KickoffWinStrengthBand, kickoff_possession_outcome: KickoffPossessionOutcome, kickoff_possession_team_is_team_0: boolean | null, kickoff_goal: boolean, scoring_team_is_team_0: boolean | null, time_to_goal: number | null,
+/**
+ * See [`KickoffSettlement`]. Unlike `outcome` and
+ * `kickoff_possession_outcome`, which read the immediate exchange, this
+ * answers "who did the kickoff actually end up being good for" once play
+ * settled.
+ */
+settlement: KickoffSettlement, settlement_team_is_team_0: boolean | null, settlement_time: number | null, settlement_frame: number | null, settlement_seconds_after_first_touch: number | null,
+/**
+ * For possession settlements, the player whose touch completed the
+ * possession run. Pressure and goal settlements are team-level.
+ */
+settlement_player: RemoteIdTs | null, team_zero_taker: KickoffTakerEvent | null, team_one_taker: KickoffTakerEvent | null, team_zero_non_takers: Array<KickoffSupportEvent>, team_one_non_takers: Array<KickoffSupportEvent>, };
