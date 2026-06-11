@@ -25,7 +25,7 @@ const KICKOFF_APPROACH_MIN_FAKE_MOVE_DISTANCE: f32 = 350.0;
 const KICKOFF_APPROACH_FRONT_FLIP_FORWARD_COMPONENT: f32 = 0.45;
 const KICKOFF_APPROACH_DIAGONAL_FLIP_SIDE_COMPONENT: f32 = 0.35;
 const KICKOFF_SUPPORT_CHEAT_MIN_CENTER_PROGRESS: f32 = 400.0;
-const KICKOFF_SETTLED_POSSESSION_MIN_RUN_SECONDS: f32 = 1.25;
+const KICKOFF_ADVANTAGE_POSSESSION_MIN_RUN_SECONDS: f32 = 1.25;
 const KICKOFF_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y: f32 = 200.0;
 const KICKOFF_PRESSURE_MIN_ESTABLISH_SECONDS: f32 = 2.0;
 const KICKOFF_PRESSURE_MIN_ESTABLISH_THIRD_SECONDS: f32 = 0.75;
@@ -83,15 +83,15 @@ struct KickoffResolutionSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum KickoffSettlementKind {
+enum KickoffAdvantageKind {
     Possession,
     Pressure,
     Goal,
 }
 
 #[derive(Debug, Clone)]
-struct SettledKickoff {
-    kind: KickoffSettlementKind,
+struct EstablishedKickoffAdvantage {
+    kind: KickoffAdvantageKind,
     team_is_team_0: bool,
     time: f32,
     frame: usize,
@@ -99,14 +99,14 @@ struct SettledKickoff {
 }
 
 /// Watches the play that follows a kickoff to decide who the kickoff was
-/// actually good for (see [`KickoffSettlement`]), running through the same
+/// actually good for (see [`KickoffAdvantage`]), running through the same
 /// post-conclusion in-flight window used for late goal attribution.
 ///
 /// Two competing detectors race; the first to fire settles the kickoff:
 ///
 /// - **Possession run**: consecutive touches by one team — no opposing touch
 ///   in between — spanning at least
-///   [`KICKOFF_SETTLED_POSSESSION_MIN_RUN_SECONDS`]. This is what credits the
+///   [`KICKOFF_ADVANTAGE_POSSESSION_MIN_RUN_SECONDS`]. This is what credits the
 ///   team that *lost* the opening exchange but cleanly collected the ball,
 ///   even deep in its own half.
 /// - **Anchored pressure**: the ball held beyond the neutral band in the
@@ -117,8 +117,8 @@ struct SettledKickoff {
 ///   panic touches do not reset the clocks — a defense that strings real
 ///   possession together wins the race through the possession run instead.
 #[derive(Debug, Clone, Default)]
-struct KickoffSettlementWatcher {
-    settled: Option<SettledKickoff>,
+struct KickoffAdvantageWatcher {
+    established: Option<EstablishedKickoffAdvantage>,
     touches_seen: usize,
     run_team_is_team_0: Option<bool>,
     run_start_time: f32,
@@ -128,7 +128,7 @@ struct KickoffSettlementWatcher {
     pressure_third_seconds: f32,
 }
 
-impl KickoffSettlementWatcher {
+impl KickoffAdvantageWatcher {
     fn zone_side(ball: &BallFrameState) -> Option<bool> {
         let ball_y = ball.sample()?.position().y;
         if ball_y > KICKOFF_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y {
@@ -147,12 +147,12 @@ impl KickoffSettlementWatcher {
         self.pressure_third_seconds = 0.0;
     }
 
-    fn settle_goal(&mut self, goal: &GoalEvent) {
-        if self.settled.is_some() {
+    fn establish_goal(&mut self, goal: &GoalEvent) {
+        if self.established.is_some() {
             return;
         }
-        self.settled = Some(SettledKickoff {
-            kind: KickoffSettlementKind::Goal,
+        self.established = Some(EstablishedKickoffAdvantage {
+            kind: KickoffAdvantageKind::Goal,
             team_is_team_0: goal.scoring_team_is_team_0,
             time: goal.time,
             frame: goal.frame,
@@ -166,7 +166,7 @@ impl KickoffSettlementWatcher {
         ball: &BallFrameState,
         touches: &[KickoffTouchSnapshot],
     ) {
-        if self.settled.is_some() {
+        if self.established.is_some() {
             self.touches_seen = touches.len();
             return;
         }
@@ -178,9 +178,10 @@ impl KickoffSettlementWatcher {
 
         for touch in &touches[self.touches_seen..] {
             if self.run_team_is_team_0 == Some(touch.team_is_team_0) {
-                if touch.time - self.run_start_time >= KICKOFF_SETTLED_POSSESSION_MIN_RUN_SECONDS {
-                    self.settled = Some(SettledKickoff {
-                        kind: KickoffSettlementKind::Possession,
+                if touch.time - self.run_start_time >= KICKOFF_ADVANTAGE_POSSESSION_MIN_RUN_SECONDS
+                {
+                    self.established = Some(EstablishedKickoffAdvantage {
+                        kind: KickoffAdvantageKind::Possession,
                         team_is_team_0: touch.team_is_team_0,
                         time: touch.time,
                         frame: touch.frame,
@@ -197,7 +198,7 @@ impl KickoffSettlementWatcher {
             }
         }
         self.touches_seen = touches.len();
-        if self.settled.is_some() {
+        if self.established.is_some() {
             return;
         }
 
@@ -224,8 +225,8 @@ impl KickoffSettlementWatcher {
         if self.pressure_zone_seconds >= KICKOFF_PRESSURE_MIN_ESTABLISH_SECONDS
             || self.pressure_third_seconds >= KICKOFF_PRESSURE_MIN_ESTABLISH_THIRD_SECONDS
         {
-            self.settled = Some(SettledKickoff {
-                kind: KickoffSettlementKind::Pressure,
+            self.established = Some(EstablishedKickoffAdvantage {
+                kind: KickoffAdvantageKind::Pressure,
                 team_is_team_0: attacking_team_is_team_0,
                 time: frame.time,
                 frame: frame.frame_number,
@@ -261,9 +262,9 @@ struct ActiveKickoff {
     min_ball_y_after_first_touch: Option<f32>,
     max_ball_y_after_first_touch: Option<f32>,
     /// Keeps watching after the kickoff's logical close (alongside goal
-    /// attribution) to decide who the kickoff settled in favor of; its result
-    /// is written onto the concluded event at emission.
-    settlement: KickoffSettlementWatcher,
+    /// attribution) to decide who came out of the kickoff with the advantage;
+    /// its result is written onto the concluded event at emission.
+    advantage: KickoffAdvantageWatcher,
     /// The fully built event, frozen at the kickoff's logical close
     /// (`should_finish`). The item then stays in flight, awaiting goal
     /// attribution: a goal scored within [`KICKOFF_GOAL_MAX_SECONDS`] of the
@@ -384,14 +385,14 @@ pub(crate) const KICKOFF_GOAL_LABELS: [StatLabel; 2] = [
     StatLabel::new("kickoff_goal", "false"),
     StatLabel::new("kickoff_goal", "true"),
 ];
-pub(crate) const KICKOFF_SETTLEMENT_LABELS: [StatLabel; 7] = [
-    StatLabel::new("kickoff_settlement", "team_zero_possession"),
-    StatLabel::new("kickoff_settlement", "team_one_possession"),
-    StatLabel::new("kickoff_settlement", "team_zero_pressure"),
-    StatLabel::new("kickoff_settlement", "team_one_pressure"),
-    StatLabel::new("kickoff_settlement", "team_zero_goal"),
-    StatLabel::new("kickoff_settlement", "team_one_goal"),
-    StatLabel::new("kickoff_settlement", "unsettled"),
+pub(crate) const KICKOFF_ADVANTAGE_LABELS: [StatLabel; 7] = [
+    StatLabel::new("kickoff_advantage", "team_zero_possession"),
+    StatLabel::new("kickoff_advantage", "team_one_possession"),
+    StatLabel::new("kickoff_advantage", "team_zero_pressure"),
+    StatLabel::new("kickoff_advantage", "team_one_pressure"),
+    StatLabel::new("kickoff_advantage", "team_zero_goal"),
+    StatLabel::new("kickoff_advantage", "team_one_goal"),
+    StatLabel::new("kickoff_advantage", "no_advantage"),
 ];
 
 pub(crate) fn kickoff_spawn_label(spawn: KickoffSpawnPosition) -> StatLabel {
@@ -426,8 +427,8 @@ pub(crate) fn kickoff_goal_label(kickoff_goal: bool) -> StatLabel {
     StatLabel::new("kickoff_goal", if kickoff_goal { "true" } else { "false" })
 }
 
-pub(crate) fn kickoff_settlement_label(settlement: KickoffSettlement) -> StatLabel {
-    StatLabel::new("kickoff_settlement", settlement.as_label_value())
+pub(crate) fn kickoff_advantage_label(advantage: KickoffAdvantage) -> StatLabel {
+    StatLabel::new("kickoff_advantage", advantage.as_label_value())
 }
 
 pub(crate) fn kickoff_approach_label(approach: KickoffApproach) -> StatLabel {
@@ -520,7 +521,7 @@ impl KickoffEvent {
             kickoff_win_strength_label(self.win_strength_band),
             kickoff_possession_outcome_label(self.kickoff_possession_outcome),
             kickoff_goal_label(self.kickoff_goal),
-            kickoff_settlement_label(self.settlement),
+            kickoff_advantage_label(self.advantage),
         ]
     }
 
@@ -622,7 +623,7 @@ impl KickoffCalculator {
             resolution: None,
             min_ball_y_after_first_touch: None,
             max_ball_y_after_first_touch: None,
-            settlement: KickoffSettlementWatcher::default(),
+            advantage: KickoffAdvantageWatcher::default(),
             concluded: None,
         });
     }
@@ -637,42 +638,42 @@ impl KickoffCalculator {
         }
     }
 
-    /// Emit a concluded kickoff, stamping the settlement watcher's verdict
-    /// onto the frozen event. Settlement usually lands after the kickoff's
+    /// Emit a concluded kickoff, stamping the advantage watcher's verdict
+    /// onto the frozen event. The advantage usually lands after the kickoff's
     /// logical close, so it is applied here — at emission — rather than in
     /// `finish_event`.
     fn emit_concluded(events: &mut EventStream<KickoffEvent>, active: ActiveKickoff) {
         let ActiveKickoff {
             concluded,
-            settlement,
+            advantage,
             ..
         } = active;
         let Some(mut event) = concluded else {
             return;
         };
-        Self::apply_settlement(&mut event, &settlement);
+        Self::apply_advantage(&mut event, &advantage);
         events.push(*event);
     }
 
-    fn apply_settlement(event: &mut KickoffEvent, watcher: &KickoffSettlementWatcher) {
-        let Some(settled) = watcher.settled.as_ref() else {
+    fn apply_advantage(event: &mut KickoffEvent, watcher: &KickoffAdvantageWatcher) {
+        let Some(established) = watcher.established.as_ref() else {
             return;
         };
-        event.settlement = match (settled.kind, settled.team_is_team_0) {
-            (KickoffSettlementKind::Possession, true) => KickoffSettlement::TeamZeroPossession,
-            (KickoffSettlementKind::Possession, false) => KickoffSettlement::TeamOnePossession,
-            (KickoffSettlementKind::Pressure, true) => KickoffSettlement::TeamZeroPressure,
-            (KickoffSettlementKind::Pressure, false) => KickoffSettlement::TeamOnePressure,
-            (KickoffSettlementKind::Goal, true) => KickoffSettlement::TeamZeroGoal,
-            (KickoffSettlementKind::Goal, false) => KickoffSettlement::TeamOneGoal,
+        event.advantage = match (established.kind, established.team_is_team_0) {
+            (KickoffAdvantageKind::Possession, true) => KickoffAdvantage::TeamZeroPossession,
+            (KickoffAdvantageKind::Possession, false) => KickoffAdvantage::TeamOnePossession,
+            (KickoffAdvantageKind::Pressure, true) => KickoffAdvantage::TeamZeroPressure,
+            (KickoffAdvantageKind::Pressure, false) => KickoffAdvantage::TeamOnePressure,
+            (KickoffAdvantageKind::Goal, true) => KickoffAdvantage::TeamZeroGoal,
+            (KickoffAdvantageKind::Goal, false) => KickoffAdvantage::TeamOneGoal,
         };
-        event.settlement_team_is_team_0 = Some(settled.team_is_team_0);
-        event.settlement_time = Some(settled.time);
-        event.settlement_frame = Some(settled.frame);
-        event.settlement_seconds_after_first_touch = event
+        event.advantage_team_is_team_0 = Some(established.team_is_team_0);
+        event.advantage_time = Some(established.time);
+        event.advantage_frame = Some(established.frame);
+        event.advantage_seconds_after_first_touch = event
             .first_touch_time
-            .map(|first_touch_time| settled.time - first_touch_time);
-        event.settlement_player = settled.player.clone();
+            .map(|first_touch_time| established.time - first_touch_time);
+        event.advantage_player = established.player.clone();
     }
 
     fn observe_movement_start(
@@ -1656,14 +1657,15 @@ impl KickoffCalculator {
             kickoff_goal,
             scoring_team_is_team_0: scoring_goal.map(|goal| goal.scoring_team_is_team_0),
             time_to_goal,
-            // Settlement usually resolves after the kickoff's logical close;
-            // the watcher's verdict is stamped on at emission (`emit_concluded`).
-            settlement: KickoffSettlement::Unsettled,
-            settlement_team_is_team_0: None,
-            settlement_time: None,
-            settlement_frame: None,
-            settlement_seconds_after_first_touch: None,
-            settlement_player: None,
+            // The advantage usually resolves after the kickoff's logical
+            // close; the watcher's verdict is stamped on at emission
+            // (`emit_concluded`).
+            advantage: KickoffAdvantage::NoAdvantage,
+            advantage_team_is_team_0: None,
+            advantage_time: None,
+            advantage_frame: None,
+            advantage_seconds_after_first_touch: None,
+            advantage_player: None,
             team_zero_taker: team_zero_taker_event,
             team_one_taker: team_one_taker_event,
             team_zero_non_takers,
@@ -1742,11 +1744,11 @@ impl KickoffCalculator {
         Self::observe_ball_extent(active, ctx.ball);
         if let Some(goal) = Self::earliest_goal(ctx.events) {
             if Self::kickoff_goal_qualifies(active, goal) {
-                active.settlement.settle_goal(goal);
+                active.advantage.establish_goal(goal);
             }
         }
         active
-            .settlement
+            .advantage
             .observe(ctx.frame, ctx.ball, &active.touches);
 
         // Natural finalization happens in two stages. The kickoff *concludes*

@@ -2282,12 +2282,12 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
         kickoff_goal: true,
         scoring_team_is_team_0: Some(true),
         time_to_goal: Some(4.0),
-        settlement: KickoffSettlement::Unsettled,
-        settlement_team_is_team_0: None,
-        settlement_time: None,
-        settlement_frame: None,
-        settlement_seconds_after_first_touch: None,
-        settlement_player: None,
+        advantage: KickoffAdvantage::NoAdvantage,
+        advantage_team_is_team_0: None,
+        advantage_time: None,
+        advantage_frame: None,
+        advantage_seconds_after_first_touch: None,
+        advantage_player: None,
         team_zero_taker: Some(KickoffTakerEvent {
             player: player_id.clone(),
             is_team_0: true,
@@ -3054,7 +3054,7 @@ fn live_gameplay() -> GameplayState {
 
 /// Arm a 1v2 kickoff (blue taker vs orange taker + orange back man) and apply
 /// the blue taker's first touch at t=1.0 with the ball still at center field.
-fn settlement_kickoff(
+fn advantage_kickoff(
     blue_taker: &PlayerId,
     orange_taker: &PlayerId,
     orange_back: &PlayerId,
@@ -3137,7 +3137,7 @@ fn lost_kickoff_settles_for_collecting_team() {
     let blue_taker = PlayerId::Steam(90);
     let orange_taker = PlayerId::Steam(91);
     let orange_back = PlayerId::Steam(92);
-    let mut calculator = settlement_kickoff(&blue_taker, &orange_taker, &orange_back);
+    let mut calculator = advantage_kickoff(&blue_taker, &orange_taker, &orange_back);
 
     // Blue wins the opening touch and pokes the ball deep into orange's half,
     // but never touches it there: no anchor, so no pressure clock runs while
@@ -3164,12 +3164,12 @@ fn lost_kickoff_settles_for_collecting_team() {
 
     assert_eq!(calculator.events().len(), 1);
     let event = calculator.events().last().unwrap();
-    assert_eq!(event.settlement, KickoffSettlement::TeamOnePossession);
-    assert_eq!(event.settlement_team_is_team_0, Some(false));
-    assert_eq!(event.settlement_player, Some(orange_back));
-    assert_eq!(event.settlement_time, Some(4.3));
-    assert_eq!(event.settlement_frame, Some(43));
-    let seconds_after = event.settlement_seconds_after_first_touch.unwrap();
+    assert_eq!(event.advantage, KickoffAdvantage::TeamOnePossession);
+    assert_eq!(event.advantage_team_is_team_0, Some(false));
+    assert_eq!(event.advantage_player, Some(orange_back));
+    assert_eq!(event.advantage_time, Some(4.3));
+    assert_eq!(event.advantage_frame, Some(43));
+    let seconds_after = event.advantage_seconds_after_first_touch.unwrap();
     assert!((seconds_after - 3.3).abs() < 1e-4);
     // The immediate exchange still reads as a blue win.
     assert_eq!(event.outcome, KickoffOutcome::TeamZeroWin);
@@ -3180,7 +3180,7 @@ fn engaged_pressure_settles_for_attacking_team() {
     let blue_taker = PlayerId::Steam(93);
     let orange_taker = PlayerId::Steam(94);
     let orange_back = PlayerId::Steam(95);
-    let mut calculator = settlement_kickoff(&blue_taker, &orange_taker, &orange_back);
+    let mut calculator = advantage_kickoff(&blue_taker, &orange_taker, &orange_back);
 
     // Ball lands in orange's third; blue follows up with a touch there (the
     // anchor), and an orange panic touch neither resets the pressure clocks
@@ -3211,13 +3211,13 @@ fn engaged_pressure_settles_for_attacking_team() {
 
     assert_eq!(calculator.events().len(), 1);
     let event = calculator.events().last().unwrap();
-    assert_eq!(event.settlement, KickoffSettlement::TeamZeroPressure);
-    assert_eq!(event.settlement_team_is_team_0, Some(true));
-    assert_eq!(event.settlement_player, None);
-    let settlement_time = event.settlement_time.unwrap();
+    assert_eq!(event.advantage, KickoffAdvantage::TeamZeroPressure);
+    assert_eq!(event.advantage_team_is_team_0, Some(true));
+    assert_eq!(event.advantage_player, None);
+    let advantage_time = event.advantage_time.unwrap();
     assert!(
-        (2.0..=3.0).contains(&settlement_time),
-        "expected pressure to establish ~0.75s after the in-zone anchor, got {settlement_time}",
+        (2.0..=3.0).contains(&advantage_time),
+        "expected pressure to establish ~0.75s after the in-zone anchor, got {advantage_time}",
     );
 }
 
@@ -3226,7 +3226,7 @@ fn contested_kickoff_stays_unsettled() {
     let blue_taker = PlayerId::Steam(96);
     let orange_taker = PlayerId::Steam(97);
     let orange_back = PlayerId::Steam(98);
-    let mut calculator = settlement_kickoff(&blue_taker, &orange_taker, &orange_back);
+    let mut calculator = advantage_kickoff(&blue_taker, &orange_taker, &orange_back);
 
     // Alternating touches around midfield: no run ever spans the minimum and
     // the ball never sits in either offensive zone.
@@ -3254,10 +3254,10 @@ fn contested_kickoff_stays_unsettled() {
 
     assert_eq!(calculator.events().len(), 1);
     let event = calculator.events().last().unwrap();
-    assert_eq!(event.settlement, KickoffSettlement::Unsettled);
-    assert_eq!(event.settlement_team_is_team_0, None);
-    assert_eq!(event.settlement_time, None);
-    assert_eq!(event.settlement_player, None);
+    assert_eq!(event.advantage, KickoffAdvantage::NoAdvantage);
+    assert_eq!(event.advantage_team_is_team_0, None);
+    assert_eq!(event.advantage_time, None);
+    assert_eq!(event.advantage_player, None);
 }
 
 #[test]
@@ -3265,7 +3265,7 @@ fn qualifying_kickoff_goal_settles_for_scoring_team() {
     let blue_taker = PlayerId::Steam(99);
     let orange_taker = PlayerId::Steam(100);
     let orange_back = PlayerId::Steam(101);
-    let mut calculator = settlement_kickoff(&blue_taker, &orange_taker, &orange_back);
+    let mut calculator = advantage_kickoff(&blue_taker, &orange_taker, &orange_back);
 
     calculator
         .update(
@@ -3285,7 +3285,7 @@ fn qualifying_kickoff_goal_settles_for_scoring_team() {
     assert_eq!(calculator.events().len(), 1);
     let event = calculator.events().last().unwrap();
     assert!(event.kickoff_goal);
-    assert_eq!(event.settlement, KickoffSettlement::TeamOneGoal);
-    assert_eq!(event.settlement_team_is_team_0, Some(false));
-    assert_eq!(event.settlement_time, Some(1.2));
+    assert_eq!(event.advantage, KickoffAdvantage::TeamOneGoal);
+    assert_eq!(event.advantage_team_is_team_0, Some(false));
+    assert_eq!(event.advantage_time, Some(1.2));
 }

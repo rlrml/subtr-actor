@@ -979,18 +979,18 @@ pub(in crate::collector::stats::playback) fn parse_kickoff_event(
         kickoff_goal: json_required_bool(object, "kickoff_goal")?,
         scoring_team_is_team_0: json_optional_bool(object.get("scoring_team_is_team_0")),
         time_to_goal: json_optional_f32(object.get("time_to_goal"))?,
-        settlement: object
-            .get("settlement")
+        advantage: object
+            .get("advantage")
             .map(|value| decode_json_value(value.clone()))
             .transpose()?
             .unwrap_or_default(),
-        settlement_team_is_team_0: json_optional_bool(object.get("settlement_team_is_team_0")),
-        settlement_time: json_optional_f32(object.get("settlement_time"))?,
-        settlement_frame: json_optional_usize(object.get("settlement_frame"))?,
-        settlement_seconds_after_first_touch: json_optional_f32(
-            object.get("settlement_seconds_after_first_touch"),
+        advantage_team_is_team_0: json_optional_bool(object.get("advantage_team_is_team_0")),
+        advantage_time: json_optional_f32(object.get("advantage_time"))?,
+        advantage_frame: json_optional_usize(object.get("advantage_frame"))?,
+        advantage_seconds_after_first_touch: json_optional_f32(
+            object.get("advantage_seconds_after_first_touch"),
         )?,
-        settlement_player: json_optional_remote_id(object.get("settlement_player"))?,
+        advantage_player: json_optional_remote_id(object.get("advantage_player"))?,
         team_zero_taker: parse_optional_kickoff_taker_event(object.get("team_zero_taker"))?,
         team_one_taker: parse_optional_kickoff_taker_event(object.get("team_one_taker"))?,
         team_zero_non_takers: parse_kickoff_support_event_array(object, "team_zero_non_takers")?,
