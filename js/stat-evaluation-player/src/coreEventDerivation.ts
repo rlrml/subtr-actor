@@ -113,10 +113,7 @@ type ScoringGoalContext = Pick<
   "time_after_kickoff" | "goal_buildup" | "ball_air_time_before_goal"
 >;
 
-function applyScoringGoalContextToTeam(
-  stats: CoreTeamStats,
-  event: ScoringGoalContext,
-): void {
+function applyScoringGoalContextToTeam(stats: CoreTeamStats, event: ScoringGoalContext): void {
   if (event.time_after_kickoff != null) {
     const time = Math.max(0, event.time_after_kickoff);
     if (time < 10) {
@@ -152,10 +149,7 @@ function normalizedY(isTeam0: boolean, position: GoalContextPosition): number {
   return isTeam0 ? position.y : -position.y;
 }
 
-function isCaughtAheadOnConcededGoal(
-  goal: GoalContextEvent,
-  player: GoalPlayerContext,
-): boolean {
+function isCaughtAheadOnConcededGoal(goal: GoalContextEvent, player: GoalPlayerContext): boolean {
   if (goal.ball_position == null || player.position == null) {
     return false;
   }
