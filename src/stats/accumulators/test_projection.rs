@@ -447,7 +447,27 @@ pub(crate) trait PositioningTestProjection {
 impl PositioningTestProjection for PositioningCalculator {
     fn player_stats(&self) -> &HashMap<PlayerId, PositioningStats> {
         let mut stats = PositioningStatsAccumulator::default();
-        stats.apply_events(self.events());
+        for event in self.activity_events().iter() {
+            stats.apply_activity_event(event);
+        }
+        for event in self.field_third_events().iter() {
+            stats.apply_field_third_event(event);
+        }
+        for event in self.field_half_events().iter() {
+            stats.apply_field_half_event(event);
+        }
+        for event in self.ball_depth_events().iter() {
+            stats.apply_ball_depth_event(event);
+        }
+        for event in self.depth_role_events().iter() {
+            stats.apply_depth_role_event(event);
+        }
+        for event in self.ball_proximity_events().iter() {
+            stats.apply_ball_proximity_event(event);
+        }
+        for (player, signal) in self.signals() {
+            stats.apply_signal(player, signal);
+        }
         leak_test_stats(stats.player_stats().clone())
     }
 }
@@ -460,46 +480,29 @@ pub(crate) trait RotationTestProjection {
 
 impl RotationTestProjection for RotationCalculator {
     fn player_stats(&self) -> &HashMap<PlayerId, RotationPlayerStats> {
-        let mut stats = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
-            self.config().first_man_debounce_seconds,
-        );
-        let projected_player_events = self.projected_player_events();
-        for event in &projected_player_events {
-            stats.apply_player_event(event);
-        }
-        for event in self.team_events() {
-            stats.apply_team_event(event);
-        }
-        leak_test_stats(stats.player_stats().clone())
+        leak_test_stats(rotation_projection(self).player_stats().clone())
     }
 
     fn team_zero_stats(&self) -> &RotationTeamStats {
-        let mut stats = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
-            self.config().first_man_debounce_seconds,
-        );
-        let projected_player_events = self.projected_player_events();
-        for event in &projected_player_events {
-            stats.apply_player_event(event);
-        }
-        for event in self.team_events() {
-            stats.apply_team_event(event);
-        }
-        leak_test_stats(stats.team_zero_stats().clone())
+        leak_test_stats(rotation_projection(self).team_zero_stats().clone())
     }
 
     fn team_one_stats(&self) -> &RotationTeamStats {
-        let mut stats = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
-            self.config().first_man_debounce_seconds,
-        );
-        let projected_player_events = self.projected_player_events();
-        for event in &projected_player_events {
-            stats.apply_player_event(event);
-        }
-        for event in self.team_events() {
-            stats.apply_team_event(event);
-        }
-        leak_test_stats(stats.team_one_stats().clone())
+        leak_test_stats(rotation_projection(self).team_one_stats().clone())
     }
+}
+
+fn rotation_projection(calculator: &RotationCalculator) -> RotationStatsAccumulator {
+    let mut stats = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
+        calculator.config().first_man_stint_end_grace_seconds,
+    );
+    for event in calculator.role_events().iter() {
+        stats.apply_role_event(event);
+    }
+    for event in calculator.first_man_change_events() {
+        stats.apply_first_man_change_event(event);
+    }
+    stats
 }
 
 pub(crate) trait RushTestProjection {

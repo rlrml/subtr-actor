@@ -53,39 +53,17 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   },
   { field: "movement", stream: "movement", kind: "movement" },
   {
-    field: "positioning_activity",
-    stream: "positioning_activity",
-    kind: "positioning_activity",
+    field: "player_activity",
+    stream: "player_activity",
+    kind: "player_activity",
   },
-  {
-    field: "positioning_field_zone",
-    stream: "positioning_field_zone",
-    kind: "positioning_field_zone",
-  },
-  {
-    field: "positioning_ball_relative_depth",
-    stream: "positioning_ball_relative_depth",
-    kind: "positioning_ball_relative_depth",
-  },
-  {
-    field: "positioning_teammate_role",
-    stream: "positioning_teammate_role",
-    kind: "positioning_teammate_role",
-  },
-  {
-    field: "positioning_ball_proximity",
-    stream: "positioning_ball_proximity",
-    kind: "positioning_ball_proximity",
-  },
-  { field: "rotation_player", stream: "rotation_player", kind: "rotation_player" },
-  { field: "rotation_role_span", stream: "rotation_role_span", kind: "rotation_role_span" },
-  { field: "rotation_depth_span", stream: "rotation_depth_span", kind: "rotation_depth_span" },
-  {
-    field: "rotation_first_man_stint",
-    stream: "rotation_first_man_stint",
-    kind: "rotation_first_man_stint",
-  },
-  { field: "rotation_team", stream: "rotation_team", kind: "rotation_team" },
+  { field: "field_third", stream: "field_third", kind: "field_third" },
+  { field: "field_half", stream: "field_half", kind: "field_half" },
+  { field: "ball_depth", stream: "ball_depth", kind: "ball_depth" },
+  { field: "depth_role", stream: "depth_role", kind: "depth_role" },
+  { field: "ball_proximity", stream: "ball_proximity", kind: "ball_proximity" },
+  { field: "rotation_role", stream: "rotation_role", kind: "rotation_role" },
+  { field: "first_man_change", stream: "first_man_change", kind: "first_man_change" },
   { field: "goal_context", stream: "goal_context", kind: "goal_context" },
   { field: "backboard", stream: "backboard", kind: "backboard" },
   { field: "ceiling_shot", stream: "ceiling_shot", kind: "ceiling_shot" },
@@ -335,6 +313,7 @@ export function createStatsTimeline(
         rotation_role_depth_margin: 0,
         rotation_first_man_ambiguity_margin: 0,
         rotation_first_man_debounce_seconds: 0,
+        rotation_first_man_stint_end_grace_seconds: 0,
         rush_max_start_y: 0,
         rush_attack_support_distance_y: 0,
         rush_defender_distance_y: 0,
@@ -407,16 +386,14 @@ export function createLegacyStatsTimeline(
     wavedash_events?: PayloadList<"wavedash">;
     whiff_events?: PayloadList<"whiff">;
     powerslide_events?: PayloadList<"powerslide">;
-    positioning_activity_events?: PayloadList<"positioning_activity">;
-    positioning_field_zone_events?: PayloadList<"positioning_field_zone">;
-    positioning_ball_relative_depth_events?: PayloadList<"positioning_ball_relative_depth">;
-    positioning_teammate_role_events?: PayloadList<"positioning_teammate_role">;
-    positioning_ball_proximity_events?: PayloadList<"positioning_ball_proximity">;
-    rotation_player_events?: PayloadList<"rotation_player">;
-    rotation_role_span_events?: PayloadList<"rotation_role_span">;
-    rotation_depth_span_events?: PayloadList<"rotation_depth_span">;
-    rotation_first_man_stint_events?: PayloadList<"rotation_first_man_stint">;
-    rotation_team_events?: PayloadList<"rotation_team">;
+    player_activity_events?: PayloadList<"player_activity">;
+    field_third_events?: PayloadList<"field_third">;
+    field_half_events?: PayloadList<"field_half">;
+    ball_depth_events?: PayloadList<"ball_depth">;
+    depth_role_events?: PayloadList<"depth_role">;
+    ball_proximity_events?: PayloadList<"ball_proximity">;
+    rotation_role_events?: PayloadList<"rotation_role">;
+    first_man_change_events?: PayloadList<"first_man_change">;
     boost_pickups?: PayloadList<"boost_pickup">;
     boost_respawn?: PayloadList<"respawn">;
     bump_events?: PayloadList<"bump">;
@@ -493,40 +470,29 @@ export function createLegacyStatsTimeline(
     ...(overrides.powerslide_events ?? []).map((event, index) =>
       payloadEvent("powerslide", "powerslide", event, index),
     ),
-    ...(overrides.positioning_activity_events ?? []).map((event, index) =>
-      payloadEvent("positioning_activity", "positioning_activity", event, index),
+    ...(overrides.player_activity_events ?? []).map((event, index) =>
+      payloadEvent("player_activity", "player_activity", event, index),
     ),
-    ...(overrides.positioning_field_zone_events ?? []).map((event, index) =>
-      payloadEvent("positioning_field_zone", "positioning_field_zone", event, index),
+    ...(overrides.field_third_events ?? []).map((event, index) =>
+      payloadEvent("field_third", "field_third", event, index),
     ),
-    ...(overrides.positioning_ball_relative_depth_events ?? []).map((event, index) =>
-      payloadEvent(
-        "positioning_ball_relative_depth",
-        "positioning_ball_relative_depth",
-        event,
-        index,
-      ),
+    ...(overrides.field_half_events ?? []).map((event, index) =>
+      payloadEvent("field_half", "field_half", event, index),
     ),
-    ...(overrides.positioning_teammate_role_events ?? []).map((event, index) =>
-      payloadEvent("positioning_teammate_role", "positioning_teammate_role", event, index),
+    ...(overrides.ball_depth_events ?? []).map((event, index) =>
+      payloadEvent("ball_depth", "ball_depth", event, index),
     ),
-    ...(overrides.positioning_ball_proximity_events ?? []).map((event, index) =>
-      payloadEvent("positioning_ball_proximity", "positioning_ball_proximity", event, index),
+    ...(overrides.depth_role_events ?? []).map((event, index) =>
+      payloadEvent("depth_role", "depth_role", event, index),
     ),
-    ...(overrides.rotation_player_events ?? []).map((event, index) =>
-      payloadEvent("rotation_player", "rotation_player", event, index),
+    ...(overrides.ball_proximity_events ?? []).map((event, index) =>
+      payloadEvent("ball_proximity", "ball_proximity", event, index),
     ),
-    ...(overrides.rotation_role_span_events ?? []).map((event, index) =>
-      payloadEvent("rotation_role_span", "rotation_role_span", event, index),
+    ...(overrides.rotation_role_events ?? []).map((event, index) =>
+      payloadEvent("rotation_role", "rotation_role", event, index),
     ),
-    ...(overrides.rotation_depth_span_events ?? []).map((event, index) =>
-      payloadEvent("rotation_depth_span", "rotation_depth_span", event, index),
-    ),
-    ...(overrides.rotation_first_man_stint_events ?? []).map((event, index) =>
-      payloadEvent("rotation_first_man_stint", "rotation_first_man_stint", event, index),
-    ),
-    ...(overrides.rotation_team_events ?? []).map((event, index) =>
-      payloadEvent("rotation_team", "rotation_team", event, index),
+    ...(overrides.first_man_change_events ?? []).map((event, index) =>
+      payloadEvent("first_man_change", "first_man_change", event, index),
     ),
     ...(overrides.boost_pickups ?? []).map((event, index) =>
       payloadEvent("boost_pickups", "boost_pickup", event, index),

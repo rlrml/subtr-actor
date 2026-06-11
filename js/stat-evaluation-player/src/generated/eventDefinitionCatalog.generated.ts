@@ -31,9 +31,23 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "ball_depth",
+    "label": "Ball Depth",
+    "category": "positioning",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
     "key": "ball_half",
     "label": "Ball Half",
     "category": "possession",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
+    "key": "ball_proximity",
+    "label": "Ball Proximity",
+    "category": "positioning",
     "hidden_from_review": false,
     "variants": []
   },
@@ -100,6 +114,13 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "depth_role",
+    "label": "Depth Role",
+    "category": "positioning",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
     "key": "dodge",
     "label": "Dodge",
     "category": "other",
@@ -128,9 +149,30 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "field_half",
+    "label": "Field Half",
+    "category": "positioning",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
+    "key": "field_third",
+    "label": "Field Third",
+    "category": "positioning",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
     "key": "fifty_fifty",
     "label": "50/50",
     "category": "other",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
+    "key": "first_man_change",
+    "label": "First-Man Change",
+    "category": "positioning",
     "hidden_from_review": false,
     "variants": []
   },
@@ -219,36 +261,8 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "positioning_activity",
-    "label": "Positioning Activity",
-    "category": "positioning",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "positioning_ball_proximity",
-    "label": "Positioning Ball Proximity",
-    "category": "positioning",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "positioning_ball_relative_depth",
-    "label": "Positioning Ball-Relative Depth",
-    "category": "positioning",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "positioning_field_zone",
-    "label": "Positioning Field Zone",
-    "category": "positioning",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "positioning_teammate_role",
-    "label": "Positioning Teammate Role",
+    "key": "player_activity",
+    "label": "Player Activity",
     "category": "positioning",
     "hidden_from_review": false,
     "variants": []
@@ -268,89 +282,8 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "rotation_depth_span",
-    "label": "Rotation Depth Span",
-    "category": "positioning",
-    "hidden_from_review": true,
-    "variants": [
-      {
-        "key": "rotation_depth_ahead_of_play",
-        "label": "Rotation Depth Ahead Of Play",
-        "category": "positioning"
-      },
-      {
-        "key": "rotation_depth_behind_play",
-        "label": "Rotation Depth Behind Play",
-        "category": "positioning"
-      },
-      {
-        "key": "rotation_depth_level_with_play",
-        "label": "Rotation Depth Level With Play",
-        "category": "positioning"
-      },
-      {
-        "key": "rotation_depth_unknown",
-        "label": "Rotation Depth Unknown",
-        "category": "positioning"
-      }
-    ]
-  },
-  {
-    "key": "rotation_first_man_stint",
-    "label": "First Man Stint",
-    "category": "positioning",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "rotation_player",
-    "label": "Player Rotation",
-    "category": "positioning",
-    "hidden_from_review": true,
-    "variants": [
-      {
-        "key": "rotation_player_state_span",
-        "label": "Player State Span",
-        "category": "positioning"
-      }
-    ]
-  },
-  {
-    "key": "rotation_role_span",
-    "label": "Rotation Role Span",
-    "category": "positioning",
-    "hidden_from_review": true,
-    "variants": [
-      {
-        "key": "rotation_role_ambiguous",
-        "label": "Rotation Role Ambiguous",
-        "category": "positioning"
-      },
-      {
-        "key": "rotation_role_first_man",
-        "label": "Rotation Role First Man",
-        "category": "positioning"
-      },
-      {
-        "key": "rotation_role_second_man",
-        "label": "Rotation Role Second Man",
-        "category": "positioning"
-      },
-      {
-        "key": "rotation_role_third_man",
-        "label": "Rotation Role Third Man",
-        "category": "positioning"
-      },
-      {
-        "key": "rotation_role_unknown",
-        "label": "Rotation Role Unknown",
-        "category": "positioning"
-      }
-    ]
-  },
-  {
-    "key": "rotation_team",
-    "label": "Team Rotation",
+    "key": "rotation_role",
+    "label": "Rotation Role",
     "category": "positioning",
     "hidden_from_review": false,
     "variants": []

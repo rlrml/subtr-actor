@@ -8,6 +8,6 @@
  * totals as it processes frames and the timeline ships them directly. Possession is an input
  * to positioning rather than a positioning facet of its own, so the possession-split distance
  * sums and the possession *times* that denominate them both ride this continuous channel
- * (keyed off the per-frame `possession_state`) rather than being emitted as positioning events.
+ * rather than being emitted as positioning events.
  */
 export type PositioningSignalSnapshot = { sum_distance_to_teammates: number, sum_distance_to_ball: number, sum_distance_to_ball_has_possession: number, time_has_possession: number, sum_distance_to_ball_no_possession: number, time_no_possession: number, };

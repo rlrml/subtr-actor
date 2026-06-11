@@ -57,32 +57,45 @@ fn active_gameplay() -> GameplayState {
     }
 }
 
-#[test]
-fn ball_depth_fractions_treat_near_ball_band_as_level() {
-    let (behind, level, in_front) = ball_depth_fractions(150.0, -100.0, 100.0);
-    assert_eq!(behind, 0.0);
-    assert_eq!(level, 1.0);
-    assert_eq!(in_front, 0.0);
+fn ball_depth_segments(margin: f32, start: f32, end: f32) -> Vec<(BallDepthState, f32)> {
+    scalar_state_segments(
+        start,
+        end,
+        &[-margin, margin],
+        &[
+            BallDepthState::BehindBall,
+            BallDepthState::LevelWithBall,
+            BallDepthState::AheadOfBall,
+        ],
+    )
 }
 
 #[test]
-fn ball_depth_fractions_split_crossing_time_across_all_three_buckets() {
-    let (behind, level, in_front) = ball_depth_fractions(150.0, -300.0, 300.0);
-    assert!((behind - 0.25).abs() < 1e-6);
-    assert!((level - 0.5).abs() < 1e-6);
-    assert!((in_front - 0.25).abs() < 1e-6);
+fn ball_depth_segments_treat_near_ball_band_as_level() {
+    let segments = ball_depth_segments(150.0, -100.0, 100.0);
+    assert_eq!(segments, vec![(BallDepthState::LevelWithBall, 1.0)]);
 }
 
 #[test]
-fn ball_depth_fractions_count_boundary_point_as_in_front_not_level() {
-    let (behind, level, in_front) = ball_depth_fractions(150.0, 150.0, 150.0);
-    assert_eq!(behind, 0.0);
-    assert_eq!(level, 0.0);
-    assert_eq!(in_front, 1.0);
+fn ball_depth_segments_split_crossing_time_across_all_three_buckets() {
+    let segments = ball_depth_segments(150.0, -300.0, 300.0);
+    assert_eq!(segments.len(), 3);
+    assert_eq!(segments[0].0, BallDepthState::BehindBall);
+    assert!((segments[0].1 - 0.25).abs() < 1e-6);
+    assert_eq!(segments[1].0, BallDepthState::LevelWithBall);
+    assert!((segments[1].1 - 0.5).abs() < 1e-6);
+    assert_eq!(segments[2].0, BallDepthState::AheadOfBall);
+    assert!((segments[2].1 - 0.25).abs() < 1e-6);
 }
 
 #[test]
-fn positioning_events_emit_state_change_spans() {
+fn ball_depth_segments_count_boundary_point_as_in_front_not_level() {
+    let segments = ball_depth_segments(150.0, 150.0, 150.0);
+    assert_eq!(segments, vec![(BallDepthState::AheadOfBall, 1.0)]);
+}
+
+#[test]
+fn positioning_facets_emit_coalesced_spans() {
     let mut calculator = PositioningCalculator::new();
     let gameplay = active_gameplay();
     let ball = ball(glam::Vec3::ZERO);
@@ -108,33 +121,26 @@ fn positioning_events_emit_state_change_spans() {
     }
     calculator.flush_pending_events();
 
-    let events = calculator.events();
-    assert_eq!(events.len(), 6);
-    let back_event = events
+    let activity_events = calculator.activity_events();
+    assert_eq!(activity_events.len(), 2);
+    for event in &activity_events {
+        assert_eq!(event.state, ActivityState::Tracked);
+        assert_eq!(event.frame, 0);
+        assert_eq!(event.end_frame, 2);
+        assert!((event.duration - 0.3).abs() < 1e-6);
+    }
+
+    let depth_role_events = calculator.depth_role_events();
+    let back_event = depth_role_events
         .iter()
         .find(|event| event.player == boxcars::RemoteId::Steam(1))
-        .expect("back player event should be emitted");
-    assert_eq!(back_event.frame, 0);
-    assert_eq!(back_event.end_frame, 0);
-    assert!((back_event.duration - 0.1).abs() < 1e-6);
-    assert!(back_event.active);
-    assert_eq!(
-        back_event.teammate_role,
-        PositioningTeammateRoleState::MostBack
-    );
-
-    let forward_event = events
+        .expect("back player depth role span should be emitted");
+    assert_eq!(back_event.state, DepthRoleState::MostBack);
+    let forward_event = depth_role_events
         .iter()
         .find(|event| event.player == boxcars::RemoteId::Steam(2))
-        .expect("forward player event should be emitted");
-    assert_eq!(forward_event.frame, 0);
-    assert_eq!(forward_event.end_frame, 0);
-    assert!((forward_event.duration - 0.1).abs() < 1e-6);
-    assert!(forward_event.active);
-    assert_eq!(
-        forward_event.teammate_role,
-        PositioningTeammateRoleState::MostForward
-    );
+        .expect("forward player depth role span should be emitted");
+    assert_eq!(forward_event.state, DepthRoleState::MostForward);
 }
 
 #[test]
@@ -175,17 +181,16 @@ fn closest_to_ball_requires_stable_challenger_before_switching() {
             )
             .expect("positioning update should succeed");
 
-        let closest = calculator
-            .new_events()
+        let events = calculator.ball_proximity_events();
+        let closest = events
             .iter()
-            .find(|event| event.closest_to_ball_team)
-            .expect("team closest event should be emitted");
+            .find(|event| event.end_frame == frame_number && event.state.closest_to_ball_team)
+            .expect("team closest span should cover the current frame");
         assert_eq!(closest.player, boxcars::RemoteId::Steam(*expected_closest));
-        let absolute_closest = calculator
-            .new_events()
+        let absolute_closest = events
             .iter()
-            .find(|event| event.closest_to_ball_absolute)
-            .expect("absolute closest event should be emitted");
+            .find(|event| event.end_frame == frame_number && event.state.closest_to_ball_absolute)
+            .expect("absolute closest span should cover the current frame");
         assert_eq!(
             absolute_closest.player,
             boxcars::RemoteId::Steam(*expected_closest)

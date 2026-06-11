@@ -304,6 +304,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .and_then(|config| config.get("first_man_debounce_seconds"))
                 .and_then(json_f32)
                 .unwrap_or(rotation_defaults.first_man_debounce_seconds),
+            rotation_first_man_stint_end_grace_seconds: rotation_config
+                .and_then(|config| config.get("first_man_stint_end_grace_seconds"))
+                .and_then(json_f32)
+                .unwrap_or(rotation_defaults.first_man_stint_end_grace_seconds),
             rush_max_start_y: rush_config
                 .and_then(|config| config.get("rush_max_start_y"))
                 .and_then(json_f32)
@@ -568,6 +572,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             (
                 "rotation_first_man_debounce_seconds",
                 rotation_defaults.first_man_debounce_seconds,
+            ),
+            (
+                "rotation_first_man_stint_end_grace_seconds",
+                rotation_defaults.first_man_stint_end_grace_seconds,
             ),
         ] {
             let source_key = key.strip_prefix("rotation_").unwrap_or(key);

@@ -252,8 +252,8 @@ build_analysis_player_event_indicator!(
     AnalysisPlayerRotationEvents,
     rotation_dependency,
     RotationCalculator,
-    new_player_events,
-    |event: &RotationPlayerEvent, player_id: &PlayerId| &event.player == player_id,
+    new_role_events,
+    |event: &RotationRoleEvent, player_id: &PlayerId| &event.player == player_id,
     "analysis rotation event",
 );
 
@@ -270,8 +270,8 @@ build_analysis_player_event_indicator!(
     AnalysisPlayerPositioningEvents,
     positioning_dependency,
     PositioningCalculator,
-    new_events,
-    |event: &PositioningEvent, player_id: &PlayerId| &event.player == player_id,
+    new_event_players,
+    |event: &PlayerId, player_id: &PlayerId| event == player_id,
     "analysis positioning event",
 );
 

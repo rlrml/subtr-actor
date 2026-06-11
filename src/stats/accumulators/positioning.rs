@@ -25,7 +25,6 @@ pub struct PositioningStats {
     pub time_offensive_zone: f32,
     pub time_defensive_half: f32,
     pub time_offensive_half: f32,
-    pub time_closest_to_ball: f32,
     pub time_closest_to_ball_team: f32,
     pub time_closest_to_ball_absolute: f32,
     pub time_farthest_from_ball: f32,
@@ -38,7 +37,6 @@ pub struct PositioningStats {
 #[ts(export)]
 pub struct PositioningTeamStats {
     pub tracked_time: f32,
-    pub time_closest_to_ball: f32,
     pub time_closest_to_ball_team: f32,
     pub time_closest_to_ball_absolute: f32,
 }
@@ -50,10 +48,6 @@ impl PositioningTeamStats {
         } else {
             value * 100.0 / self.tracked_time
         }
-    }
-
-    pub fn closest_to_ball_pct(&self) -> f32 {
-        self.pct(self.time_closest_to_ball)
     }
 
     pub fn closest_to_ball_team_pct(&self) -> f32 {
@@ -134,28 +128,12 @@ impl PositioningStats {
         self.pct(self.time_offensive_zone)
     }
 
-    pub fn defensive_zone_pct(&self) -> f32 {
-        self.defensive_third_pct()
-    }
-
-    pub fn neutral_zone_pct(&self) -> f32 {
-        self.neutral_third_pct()
-    }
-
-    pub fn offensive_zone_pct(&self) -> f32 {
-        self.offensive_third_pct()
-    }
-
     pub fn defensive_half_pct(&self) -> f32 {
         self.pct(self.time_defensive_half)
     }
 
     pub fn offensive_half_pct(&self) -> f32 {
         self.pct(self.time_offensive_half)
-    }
-
-    pub fn closest_to_ball_pct(&self) -> f32 {
-        self.pct(self.time_closest_to_ball)
     }
 
     pub fn closest_to_ball_team_pct(&self) -> f32 {
@@ -183,6 +161,10 @@ impl PositioningStats {
     }
 }
 
+/// Rebuilds [`PositioningStats`] from the per-facet event streams plus the
+/// continuous distance signal. This is the only accumulation path — the native
+/// projection and event-based playback reconstruction both run it, so they
+/// agree by construction.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PositioningStatsAccumulator {
     player_stats: HashMap<PlayerId, PositioningStats>,
@@ -207,111 +189,72 @@ impl PositioningStatsAccumulator {
         &self.team_one_stats
     }
 
-    pub fn apply_event(&mut self, event: &PositioningEvent) {
+    pub fn apply_activity_event(&mut self, event: &PlayerActivityEvent) {
         let stats = self.player_stats.entry(event.player.clone()).or_default();
-        if event.active {
-            stats.active_game_time += event.duration;
-        }
-        if event.tracked {
-            let team_stats = if event.is_team_0 {
-                &mut self.team_zero_stats
-            } else {
-                &mut self.team_one_stats
-            };
-            if event.closest_to_ball_team || event.closest_to_ball {
-                team_stats.tracked_time += event.duration;
-                team_stats.time_closest_to_ball += event.duration;
-                team_stats.time_closest_to_ball_team += event.duration;
-            }
-            if event.closest_to_ball_absolute {
-                team_stats.time_closest_to_ball_absolute += event.duration;
-            }
-
-            stats.tracked_time += event.duration;
-            if let Some(distance) = event.distance_to_teammates {
-                stats.sum_distance_to_teammates += distance * event.duration;
-            }
-            if let Some(distance) = event.distance_to_ball {
-                stats.sum_distance_to_ball += distance * event.duration;
-                match event.possession_state {
-                    PositioningPossessionState::HasPossession => {
-                        stats.sum_distance_to_ball_has_possession += distance * event.duration;
-                    }
-                    PositioningPossessionState::NoPossession => {
-                        stats.sum_distance_to_ball_no_possession += distance * event.duration;
-                    }
-                    PositioningPossessionState::Neutral => {}
-                }
-            }
-            match event.possession_state {
-                PositioningPossessionState::HasPossession => {
-                    stats.time_has_possession += event.duration;
-                }
-                PositioningPossessionState::NoPossession => {
-                    stats.time_no_possession += event.duration;
-                }
-                PositioningPossessionState::Neutral => {}
-            }
-            match event.teammate_role {
-                PositioningTeammateRoleState::NoTeammates => {
-                    stats.time_no_teammates += event.duration;
-                }
-                PositioningTeammateRoleState::MostBack => {
-                    stats.time_most_back += event.duration;
-                }
-                PositioningTeammateRoleState::MostForward => {
-                    stats.time_most_forward += event.duration;
-                }
-                PositioningTeammateRoleState::Mid => {
-                    stats.time_mid_role += event.duration;
-                }
-                PositioningTeammateRoleState::Other => {
-                    stats.time_other_role += event.duration;
-                }
-                PositioningTeammateRoleState::Unknown => {}
-            }
-            stats.time_defensive_zone += event.duration * event.defensive_zone_fraction;
-            stats.time_neutral_zone += event.duration * event.neutral_zone_fraction;
-            stats.time_offensive_zone += event.duration * event.offensive_zone_fraction;
-            stats.time_defensive_half += event.duration * event.defensive_half_fraction;
-            stats.time_offensive_half += event.duration * event.offensive_half_fraction;
-            if event.closest_to_ball {
-                stats.time_closest_to_ball += event.duration;
-            }
-            if event.closest_to_ball_team {
-                stats.time_closest_to_ball_team += event.duration;
-            }
-            if event.closest_to_ball_absolute {
-                stats.time_closest_to_ball_absolute += event.duration;
-            }
-            if event.farthest_from_ball {
-                stats.time_farthest_from_ball += event.duration;
-            }
-            stats.time_behind_ball += event.duration * event.behind_ball_fraction;
-            stats.time_level_with_ball += event.duration * event.level_with_ball_fraction;
-            stats.time_in_front_of_ball += event.duration * event.in_front_of_ball_fraction;
-        }
-        if event.demolished {
-            stats.time_demolished += event.duration;
+        stats.active_game_time += event.duration;
+        match event.state {
+            ActivityState::Tracked => stats.tracked_time += event.duration,
+            ActivityState::Demolished => stats.time_demolished += event.duration,
         }
     }
 
-    pub fn apply_events<'a>(&mut self, events: impl IntoIterator<Item = &'a PositioningEvent>) {
-        for event in events {
-            self.apply_event(event);
+    pub fn apply_field_third_event(&mut self, event: &FieldThirdEvent) {
+        let stats = self.player_stats.entry(event.player.clone()).or_default();
+        match event.state {
+            FieldThirdState::Defensive => stats.time_defensive_zone += event.duration,
+            FieldThirdState::Neutral => stats.time_neutral_zone += event.duration,
+            FieldThirdState::Offensive => stats.time_offensive_zone += event.duration,
         }
     }
 
-    pub fn apply_activity_event(&mut self, event: &PositioningActivityEvent) {
+    pub fn apply_field_half_event(&mut self, event: &FieldHalfEvent) {
         let stats = self.player_stats.entry(event.player.clone()).or_default();
-        if event.active {
-            stats.active_game_time += event.duration;
+        match event.state {
+            FieldHalfState::Defensive => stats.time_defensive_half += event.duration,
+            FieldHalfState::Offensive => stats.time_offensive_half += event.duration,
         }
-        if event.tracked {
-            stats.tracked_time += event.duration;
+    }
+
+    pub fn apply_ball_depth_event(&mut self, event: &BallDepthEvent) {
+        let stats = self.player_stats.entry(event.player.clone()).or_default();
+        match event.state {
+            BallDepthState::BehindBall => stats.time_behind_ball += event.duration,
+            BallDepthState::LevelWithBall => stats.time_level_with_ball += event.duration,
+            BallDepthState::AheadOfBall => stats.time_in_front_of_ball += event.duration,
         }
-        if event.demolished {
-            stats.time_demolished += event.duration;
+    }
+
+    pub fn apply_depth_role_event(&mut self, event: &DepthRoleEvent) {
+        let stats = self.player_stats.entry(event.player.clone()).or_default();
+        match event.state {
+            DepthRoleState::NoTeammates => stats.time_no_teammates += event.duration,
+            DepthRoleState::MostBack => stats.time_most_back += event.duration,
+            DepthRoleState::MostForward => stats.time_most_forward += event.duration,
+            DepthRoleState::Mid => stats.time_mid_role += event.duration,
+            DepthRoleState::Other => stats.time_other_role += event.duration,
+        }
+    }
+
+    pub fn apply_ball_proximity_event(&mut self, event: &BallProximityEvent) {
+        let team_stats = if event.is_team_0 {
+            &mut self.team_zero_stats
+        } else {
+            &mut self.team_one_stats
+        };
+        let stats = self.player_stats.entry(event.player.clone()).or_default();
+        if event.state.closest_to_ball_team {
+            // Exactly one player per team is closest at any tracked moment, so
+            // summing closest spans doubles as the team's tracked time.
+            team_stats.tracked_time += event.duration;
+            team_stats.time_closest_to_ball_team += event.duration;
+            stats.time_closest_to_ball_team += event.duration;
+        }
+        if event.state.closest_to_ball_absolute {
+            team_stats.time_closest_to_ball_absolute += event.duration;
+            stats.time_closest_to_ball_absolute += event.duration;
+        }
+        if event.state.farthest_from_ball {
+            stats.time_farthest_from_ball += event.duration;
         }
     }
 
@@ -326,67 +269,6 @@ impl PositioningStatsAccumulator {
         stats.time_has_possession = signal.time_has_possession;
         stats.sum_distance_to_ball_no_possession = signal.sum_distance_to_ball_no_possession;
         stats.time_no_possession = signal.time_no_possession;
-    }
-
-    pub fn apply_field_zone_event(&mut self, event: &PositioningFieldZoneEvent) {
-        let stats = self.player_stats.entry(event.player.clone()).or_default();
-        stats.time_defensive_zone += event.duration * event.defensive_zone_fraction;
-        stats.time_neutral_zone += event.duration * event.neutral_zone_fraction;
-        stats.time_offensive_zone += event.duration * event.offensive_zone_fraction;
-        stats.time_defensive_half += event.duration * event.defensive_half_fraction;
-        stats.time_offensive_half += event.duration * event.offensive_half_fraction;
-    }
-
-    pub fn apply_ball_relative_depth_event(&mut self, event: &PositioningBallRelativeDepthEvent) {
-        let stats = self.player_stats.entry(event.player.clone()).or_default();
-        stats.time_behind_ball += event.duration * event.behind_ball_fraction;
-        stats.time_level_with_ball += event.duration * event.level_with_ball_fraction;
-        stats.time_in_front_of_ball += event.duration * event.in_front_of_ball_fraction;
-    }
-
-    pub fn apply_teammate_role_event(&mut self, event: &PositioningTeammateRoleEvent) {
-        let stats = self.player_stats.entry(event.player.clone()).or_default();
-        match event.teammate_role {
-            PositioningTeammateRoleState::NoTeammates => {
-                stats.time_no_teammates += event.duration;
-            }
-            PositioningTeammateRoleState::MostBack => {
-                stats.time_most_back += event.duration;
-            }
-            PositioningTeammateRoleState::MostForward => {
-                stats.time_most_forward += event.duration;
-            }
-            PositioningTeammateRoleState::Mid => {
-                stats.time_mid_role += event.duration;
-            }
-            PositioningTeammateRoleState::Other => {
-                stats.time_other_role += event.duration;
-            }
-            PositioningTeammateRoleState::Unknown => {}
-        }
-    }
-
-    pub fn apply_ball_proximity_event(&mut self, event: &PositioningBallProximityEvent) {
-        let team_stats = if event.is_team_0 {
-            &mut self.team_zero_stats
-        } else {
-            &mut self.team_one_stats
-        };
-        let stats = self.player_stats.entry(event.player.clone()).or_default();
-        if event.closest_to_ball_team {
-            team_stats.tracked_time += event.duration;
-            team_stats.time_closest_to_ball += event.duration;
-            team_stats.time_closest_to_ball_team += event.duration;
-            stats.time_closest_to_ball += event.duration;
-            stats.time_closest_to_ball_team += event.duration;
-        }
-        if event.closest_to_ball_absolute {
-            team_stats.time_closest_to_ball_absolute += event.duration;
-            stats.time_closest_to_ball_absolute += event.duration;
-        }
-        if event.farthest_from_ball {
-            stats.time_farthest_from_ball += event.duration;
-        }
     }
 }
 

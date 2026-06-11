@@ -7,16 +7,14 @@ use ts_rs::TS;
 use linkme::distributed_slice;
 
 use super::{
-    BackboardBounceEvent, BallCarryEvent, BallHalfEvent, BoostPickupEvent, BumpEvent,
-    CeilingShotEvent, CenterEvent, ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeEvent,
-    DodgeResetEvent, DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipResetEvent, HalfFlipEvent,
-    HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent, PassEvent,
-    PositioningActivityEvent, PositioningBallProximityEvent, PositioningBallRelativeDepthEvent,
-    PositioningFieldZoneEvent, PositioningTeammateRoleEvent, PossessionEvent, PowerslideEvent,
-    RespawnEvent, RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent,
-    RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
-    TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
-    WhiffEvent,
+    BackboardBounceEvent, BallCarryEvent, BallDepthEvent, BallHalfEvent, BallProximityEvent,
+    BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent, ControlledPlayEvent,
+    CorePlayerScoreboardEvent, DepthRoleEvent, DodgeEvent, DodgeResetEvent, DoubleTapEvent,
+    FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent, FirstManChangeEvent, FlickEvent,
+    FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent,
+    PassEvent, PlayerActivityEvent, PossessionEvent, PowerslideEvent, RespawnEvent,
+    RotationRoleEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent,
+    TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::Event;
 
@@ -470,63 +468,6 @@ const BOOST_PICKUP_VARIANTS: &[EventVariant] = &[EventVariant::new(
     EventCategory::Boost,
 )];
 
-const ROTATION_PLAYER_VARIANTS: &[EventVariant] = &[EventVariant::new(
-    "rotation_player_state_span",
-    "Player State Span",
-    EventCategory::Positioning,
-)];
-
-const ROTATION_ROLE_VARIANTS: &[EventVariant] = &[
-    EventVariant::new(
-        "rotation_role_ambiguous",
-        "Rotation Role Ambiguous",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_role_first_man",
-        "Rotation Role First Man",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_role_second_man",
-        "Rotation Role Second Man",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_role_third_man",
-        "Rotation Role Third Man",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_role_unknown",
-        "Rotation Role Unknown",
-        EventCategory::Positioning,
-    ),
-];
-
-const ROTATION_DEPTH_VARIANTS: &[EventVariant] = &[
-    EventVariant::new(
-        "rotation_depth_ahead_of_play",
-        "Rotation Depth Ahead Of Play",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_depth_behind_play",
-        "Rotation Depth Behind Play",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_depth_level_with_play",
-        "Rotation Depth Level With Play",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_depth_unknown",
-        "Rotation Depth Unknown",
-        EventCategory::Positioning,
-    ),
-];
-
 // Payload-less event definitions: native Rocket League scoreboard stats, goal
 // context labels, and the air-dribble mechanic kind. These have no `StatsEvent`
 // payload type but still belong in the catalog so they surface in the review
@@ -946,79 +887,59 @@ define_stats_event!(
     EventCategory::Other
 );
 define_stats_event!(
-    PositioningActivityEvent,
-    POSITIONING_ACTIVITY_EVENT_DEFINITION,
-    "positioning_activity",
-    "Positioning Activity",
+    PlayerActivityEvent,
+    PLAYER_ACTIVITY_EVENT_DEFINITION,
+    "player_activity",
+    "Player Activity",
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningFieldZoneEvent,
-    POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
-    "positioning_field_zone",
-    "Positioning Field Zone",
+    FieldThirdEvent,
+    FIELD_THIRD_EVENT_DEFINITION,
+    "field_third",
+    "Field Third",
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningBallRelativeDepthEvent,
-    POSITIONING_BALL_RELATIVE_DEPTH_EVENT_DEFINITION,
-    "positioning_ball_relative_depth",
-    "Positioning Ball-Relative Depth",
+    FieldHalfEvent,
+    FIELD_HALF_EVENT_DEFINITION,
+    "field_half",
+    "Field Half",
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningTeammateRoleEvent,
-    POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
-    "positioning_teammate_role",
-    "Positioning Teammate Role",
+    BallDepthEvent,
+    BALL_DEPTH_EVENT_DEFINITION,
+    "ball_depth",
+    "Ball Depth",
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningBallProximityEvent,
-    POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
-    "positioning_ball_proximity",
-    "Positioning Ball Proximity",
+    DepthRoleEvent,
+    DEPTH_ROLE_EVENT_DEFINITION,
+    "depth_role",
+    "Depth Role",
     EventCategory::Positioning
 );
 define_stats_event!(
-    RotationPlayerEvent,
-    ROTATION_PLAYER_EVENT_DEFINITION,
-    "rotation_player",
-    "Player Rotation",
-    EventCategory::Positioning,
-    hidden = true,
-    variants = ROTATION_PLAYER_VARIANTS
-);
-define_stats_event!(
-    RotationRoleSpanEvent,
-    ROTATION_ROLE_SPAN_EVENT_DEFINITION,
-    "rotation_role_span",
-    "Rotation Role Span",
-    EventCategory::Positioning,
-    hidden = true,
-    variants = ROTATION_ROLE_VARIANTS
-);
-define_stats_event!(
-    RotationDepthSpanEvent,
-    ROTATION_DEPTH_SPAN_EVENT_DEFINITION,
-    "rotation_depth_span",
-    "Rotation Depth Span",
-    EventCategory::Positioning,
-    hidden = true,
-    variants = ROTATION_DEPTH_VARIANTS
-);
-define_stats_event!(
-    RotationFirstManStintEvent,
-    ROTATION_FIRST_MAN_STINT_EVENT_DEFINITION,
-    "rotation_first_man_stint",
-    "First Man Stint",
+    BallProximityEvent,
+    BALL_PROXIMITY_EVENT_DEFINITION,
+    "ball_proximity",
+    "Ball Proximity",
     EventCategory::Positioning
 );
 define_stats_event!(
-    RotationTeamEvent,
-    ROTATION_TEAM_EVENT_DEFINITION,
-    "rotation_team",
-    "Team Rotation",
+    RotationRoleEvent,
+    ROTATION_ROLE_EVENT_DEFINITION,
+    "rotation_role",
+    "Rotation Role",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    FirstManChangeEvent,
+    FIRST_MAN_CHANGE_EVENT_DEFINITION,
+    "first_man_change",
+    "First-Man Change",
     EventCategory::Positioning
 );
 define_stats_event!(
@@ -1288,31 +1209,37 @@ const MOVEMENT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 
 const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
-        &POSITIONING_ACTIVITY_EVENT_DEFINITION,
+        &PLAYER_ACTIVITY_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
+        &FIELD_THIRD_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_BALL_RELATIVE_DEPTH_EVENT_DEFINITION,
+        &FIELD_HALF_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
+        &BALL_DEPTH_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
+        &DEPTH_ROLE_EVENT_DEFINITION,
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+    produced_event(
+        &BALL_PROXIMITY_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
@@ -1321,31 +1248,13 @@ const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
 
 const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
-        &ROTATION_PLAYER_EVENT_DEFINITION,
+        &ROTATION_ROLE_EVENT_DEFINITION,
         "rotation",
         "RotationNode",
         "RotationCalculator",
     ),
     produced_event(
-        &ROTATION_TEAM_EVENT_DEFINITION,
-        "rotation",
-        "RotationNode",
-        "RotationCalculator",
-    ),
-    produced_event(
-        &ROTATION_ROLE_SPAN_EVENT_DEFINITION,
-        "rotation",
-        "RotationNode",
-        "RotationCalculator",
-    ),
-    produced_event(
-        &ROTATION_DEPTH_SPAN_EVENT_DEFINITION,
-        "rotation",
-        "RotationNode",
-        "RotationCalculator",
-    ),
-    produced_event(
-        &ROTATION_FIRST_MAN_STINT_EVENT_DEFINITION,
+        &FIRST_MAN_CHANGE_EVENT_DEFINITION,
         "rotation",
         "RotationNode",
         "RotationCalculator",
