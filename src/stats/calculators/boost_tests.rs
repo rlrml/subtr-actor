@@ -662,7 +662,7 @@ fn skips_inactive_pickup_without_observed_boost_gain() {
 }
 
 #[test]
-fn stale_unreported_boost_increase_is_counted_as_ghost_pickup() {
+fn stale_unreported_boost_increase_is_counted_as_inferred_only_pickup() {
     let mut calculator = BoostCalculator::new();
     let player_id = PlayerId::Steam(1);
     let (pad_position, _) = standard_soccar_boost_pad_layout()
@@ -729,7 +729,7 @@ fn stale_unreported_boost_increase_is_counted_as_ghost_pickup() {
 }
 
 #[test]
-fn non_live_boost_increase_is_not_counted_as_ghost_pickup() {
+fn non_live_boost_increase_is_not_counted_as_inferred_only_pickup() {
     let mut calculator = BoostCalculator::new();
     let player_id = PlayerId::Steam(1);
     let (pad_position, _) = standard_soccar_boost_pad_layout()
