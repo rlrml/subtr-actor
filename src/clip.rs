@@ -136,11 +136,33 @@ impl ReplayClip {
     }
 }
 
+/// Whether an attribute records a transient *event* rather than persistent
+/// world state. The processor's event detectors fire on `UpdatedAttribute`s
+/// carrying these (boost pad pickups, demolishes, goal explosions), so
+/// re-emitting a stale one from the synthetic keyframe would manufacture a
+/// phantom event that never happened inside the clip window. They carry no
+/// state any detector reads back, so the keyframe simply omits them.
+fn attribute_is_transient_event(attribute: &boxcars::Attribute) -> bool {
+    matches!(
+        attribute,
+        boxcars::Attribute::Pickup(_)
+            | boxcars::Attribute::PickupNew(_)
+            | boxcars::Attribute::Demolish(_)
+            | boxcars::Attribute::DemolishFx(_)
+            | boxcars::Attribute::DemolishExtended(_)
+            | boxcars::Attribute::Explosion(_)
+            | boxcars::Attribute::ExtendedExplosion(_)
+            | boxcars::Attribute::StatEvent(_)
+    )
+}
+
 /// Build the synthetic keyframe that recreates the world modeled by `modeler`.
 ///
 /// Emits one `NewActor` per live actor plus one `UpdatedAttribute` per current
-/// attribute. Output is sorted (actors by id, attributes by object id) so the
-/// resulting clip is deterministic and its JSON fixture is stable/diffable.
+/// attribute (transient event-like attributes excepted; see
+/// [`attribute_is_transient_event`]). Output is sorted (actors by id,
+/// attributes by object id) so the resulting clip is deterministic and its JSON
+/// fixture is stable/diffable.
 fn synthesize_keyframe(modeler: &ActorStateModeler, time: f32) -> boxcars::Frame {
     let mut new_actors: Vec<boxcars::NewActor> = Vec::with_capacity(modeler.actor_states.len());
     let mut updated_actors: Vec<boxcars::UpdatedAttribute> = Vec::new();
@@ -166,6 +188,9 @@ fn synthesize_keyframe(modeler: &ActorStateModeler, time: f32) -> boxcars::Frame
         object_ids.sort_by_key(|id| id.0);
         for object_id in object_ids {
             let (attribute, _source_frame) = &state.attributes[object_id];
+            if attribute_is_transient_event(attribute) {
+                continue;
+            }
             updated_actors.push(boxcars::UpdatedAttribute {
                 actor_id: *actor_id,
                 // `stream_id` is unused post-decode; mirror the object id.
@@ -268,6 +293,36 @@ pub fn clip_replay_around(
         .min(frame_count.saturating_sub(1));
     let actual_lead_in = region_start - real_start;
     clip_replay_range(replay, real_start, real_end, actual_lead_in)
+}
+
+/// Index of the first frame whose `time` is at or after `time` (the last frame
+/// if every frame is earlier).
+pub fn frame_index_at_time(replay: &boxcars::Replay, time: f32) -> SubtrActorResult<usize> {
+    let frames = &replay
+        .network_frames
+        .as_ref()
+        .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoNetworkFrames))?
+        .frames;
+    Ok(frames
+        .iter()
+        .position(|frame| frame.time >= time)
+        .unwrap_or(frames.len().saturating_sub(1)))
+}
+
+/// [`clip_replay_around`], but with the region of interest given in replay
+/// seconds instead of frame indices. Most event assertions are written against
+/// event times (which clips preserve from the source replay), so this is the
+/// usual entry point when migrating a full-replay test onto a clip.
+pub fn clip_replay_around_times(
+    replay: &boxcars::Replay,
+    region_start_time: f32,
+    region_end_time: f32,
+    lead_in: usize,
+    tail: usize,
+) -> SubtrActorResult<ReplayClip> {
+    let region_start = frame_index_at_time(replay, region_start_time)?;
+    let region_end = frame_index_at_time(replay, region_end_time)?;
+    clip_replay_around(replay, region_start, region_end, lead_in, tail)
 }
 
 #[cfg(test)]
