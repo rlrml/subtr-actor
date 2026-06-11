@@ -91,6 +91,43 @@ fn date_header(value: &str) -> Vec<(String, boxcars::HeaderProp)> {
 }
 
 #[test]
+fn parse_header_datetime_utc_converts_plain_format_as_eastern() {
+    // "14:30:00" Eastern Standard (UTC-5) → 19:30 UTC, same day.
+    assert_eq!(
+        parse_header_datetime_utc("2026-04-28 14-30-00"),
+        Some((2026, 4, 28, 19, 30))
+    );
+    // Hour that crosses midnight: 20:00 EST → 01:00 UTC next day.
+    assert_eq!(
+        parse_header_datetime_utc("2026-04-28 20-00-00"),
+        Some((2026, 4, 29, 1, 0))
+    );
+}
+
+#[test]
+fn parse_header_datetime_utc_uses_rfc3339_offset() {
+    // "15:01:25-07:00" → 15:01 + 7h = 22:01 UTC.
+    assert_eq!(
+        parse_header_datetime_utc("2026-04-17T15:01:25-07:00"),
+        Some((2026, 4, 17, 22, 1))
+    );
+}
+
+#[test]
+fn season_for_datetime_resolves_boundary_day_by_time() {
+    // Season 23 started 2026-06-10 16:00 UTC. A replay at 15:59 UTC is still S22.
+    assert_eq!(
+        season_for_datetime((2026, 6, 10, 15, 59)),
+        Some(ReplaySeason::new(SeasonEra::FreeToPlay, 22))
+    );
+    // Exactly on the boundary resolves to the new season.
+    assert_eq!(
+        season_for_datetime((2026, 6, 10, 16, 0)),
+        Some(ReplaySeason::new(SeasonEra::FreeToPlay, 23))
+    );
+}
+
+#[test]
 fn parse_header_date_handles_replay_and_rfc3339_formats() {
     assert_eq!(
         parse_header_date("2026-04-28 14-30-00"),
@@ -108,9 +145,18 @@ fn parse_header_date_handles_replay_and_rfc3339_formats() {
 fn season_for_date_returns_most_recent_started_season() {
     let f21 = ReplaySeason::new(SeasonEra::FreeToPlay, 21);
     // Exactly on a boundary resolves to that season.
-    assert_eq!(season_for_date((2026, 1, 14)), Some(f21));
+    assert_eq!(season_for_date((2025, 12, 10)), Some(f21));
     // Between boundaries resolves to the earlier one.
-    assert_eq!(season_for_date((2026, 4, 17)), Some(f21));
+    assert_eq!(season_for_date((2026, 1, 14)), Some(f21));
+    // A date past a later boundary resolves to the newer season.
+    assert_eq!(
+        season_for_date((2026, 4, 17)),
+        Some(ReplaySeason::new(SeasonEra::FreeToPlay, 22))
+    );
+    assert_eq!(
+        season_for_date((2026, 6, 10)),
+        Some(ReplaySeason::new(SeasonEra::FreeToPlay, 23))
+    );
     assert_eq!(
         season_for_date((2024, 12, 4)),
         Some(ReplaySeason::new(SeasonEra::FreeToPlay, 17))
@@ -125,6 +171,18 @@ fn season_for_date_returns_most_recent_started_season() {
 }
 
 #[test]
+fn season_start_returns_utc_go_live_instant() {
+    let s23 = ReplaySeason::new(SeasonEra::FreeToPlay, 23)
+        .start()
+        .expect("season 23 has a boundary entry");
+    assert_eq!(s23, SeasonStart::new(2026, 6, 10, 16, 0));
+    assert_eq!(s23.date(), (2026, 6, 10));
+
+    // A season with no boundary entry has no start.
+    assert_eq!(ReplaySeason::new(SeasonEra::FreeToPlay, 99).start(), None);
+}
+
+#[test]
 fn season_code_round_trips_era_and_number() {
     assert_eq!(ReplaySeason::new(SeasonEra::FreeToPlay, 21).code(), "f21");
     assert_eq!(ReplaySeason::new(SeasonEra::Legacy, 14).code(), "s14");
@@ -134,7 +192,7 @@ fn season_code_round_trips_era_and_number() {
 fn season_from_headers_resolves_from_date() {
     assert_eq!(
         season_from_headers(&date_header("2026-04-17T15:01:25-07:00")),
-        Some(ReplaySeason::new(SeasonEra::FreeToPlay, 21))
+        Some(ReplaySeason::new(SeasonEra::FreeToPlay, 22))
     );
     assert_eq!(season_from_headers(&[]), None);
 }
