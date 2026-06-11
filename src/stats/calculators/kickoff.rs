@@ -865,8 +865,7 @@ impl KickoffCalculator {
         let Some(ball) = ball.sample() else {
             return (KickoffOutcome::Unknown, None, None);
         };
-        let projected_y = (ball.position().y
-            + ball.velocity().y * KICKOFF_WIN_PROJECTION_SECONDS)
+        let projected_y = (ball.position().y + ball.velocity().y * KICKOFF_WIN_PROJECTION_SECONDS)
             .clamp(-KICKOFF_FIELD_HALF_LENGTH, KICKOFF_FIELD_HALF_LENGTH);
         if projected_y.abs() < KICKOFF_WIN_MIN_PROJECTED_BALL_Y {
             return (KickoffOutcome::Neutral, None, None);
