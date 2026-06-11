@@ -141,7 +141,7 @@ impl KickoffStats {
                 &KICKOFF_WIN_STRENGTH_LABELS,
                 &KICKOFF_POSSESSION_OUTCOME_LABELS,
                 &KICKOFF_GOAL_LABELS,
-                &KICKOFF_SETTLEMENT_LABELS,
+                &KICKOFF_ADVANTAGE_LABELS,
             ],
             &self.labeled_event_counts,
         )
