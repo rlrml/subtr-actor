@@ -408,28 +408,21 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    /// Scans the actor graph for the first actor that matches a known ball
-    /// type, falling back to any archetype under `Archetypes.Ball.` so balls
-    /// introduced by new game modes are still recognized.
+    /// Scans the actor graph for the first actor whose archetype lives under
+    /// `Archetypes.Ball.`. Matching the prefix rather than an explicit whitelist
+    /// means ball archetypes introduced by new or limited-time game modes are
+    /// recognized automatically.
     pub(crate) fn find_ball_actor(&self) -> Option<boxcars::ActorId> {
-        BALL_TYPES
+        self.actor_state
+            .actor_ids_by_type
             .iter()
-            .filter_map(|ball_type| self.iter_actors_by_type(ball_type))
-            .flatten()
-            .map(|(actor_id, _)| *actor_id)
-            .next()
-            .or_else(|| {
-                self.actor_state
-                    .actor_ids_by_type
-                    .iter()
-                    .filter(|(object_id, _)| {
-                        self.object_id_to_name
-                            .get(object_id)
-                            .is_some_and(|name| name.starts_with(BALL_TYPE_PREFIX))
-                    })
-                    .flat_map(|(_, actor_ids)| actor_ids.iter().copied())
-                    .next()
+            .filter(|(object_id, _)| {
+                self.object_id_to_name
+                    .get(object_id)
+                    .is_some_and(|name| name.starts_with(BALL_TYPE_PREFIX))
             })
+            .flat_map(|(_, actor_ids)| actor_ids.iter().copied())
+            .next()
     }
 
     /// Returns the tracked actor id for the replay ball.

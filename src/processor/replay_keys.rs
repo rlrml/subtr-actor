@@ -1,15 +1,8 @@
-pub(crate) static BALL_TYPES: [&str; 6] = [
-    "Archetypes.Ball.Ball_Default",
-    "Archetypes.Ball.Ball_Basketball",
-    "Archetypes.Ball.Ball_Puck",
-    "Archetypes.Ball.CubeBall",
-    "Archetypes.Ball.Ball_Breakout",
-    "Archetypes.Ball.Ball_WorldCup",
-];
-
-/// Limited-time modes ship new ball archetypes (e.g. `Ball_WorldCup`) that
-/// predate any explicit `BALL_TYPES` entry; anything under this prefix is a
-/// ball.
+/// Every ball archetype the game has shipped lives under this prefix
+/// (`Ball_Default`, `Ball_Basketball`, `Ball_Puck`, `CubeBall`, `Ball_Breakout`,
+/// `Ball_WorldCup`, ...). Matching the prefix rather than an explicit whitelist
+/// means limited-time modes that introduce new ball archetypes are recognized
+/// automatically instead of silently disabling touch detection match-wide.
 pub(crate) static BALL_TYPE_PREFIX: &str = "Archetypes.Ball.";
 
 pub(crate) static BOOST_TYPE: &str = "Archetypes.CarComponents.CarComponent_Boost";
