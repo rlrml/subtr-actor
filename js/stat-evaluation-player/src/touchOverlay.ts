@@ -16,6 +16,26 @@ const ADVANCEMENT_ARROW_MIN_LENGTH = 48;
 
 export type TouchOverlayMode = "markers" | "advancement";
 
+export type TouchOverlayColorMode = "team" | "intention" | "kind";
+
+const INTENTION_COLORS: Record<string, number> = {
+  shot: 0xff5d6c,
+  save: 0x4ade80,
+  clear: 0xfacc15,
+  pass: 0x22d3ee,
+  challenge: 0xc084fc,
+  control: 0xf1f5f9,
+  neutral: 0x9aa5b1,
+};
+
+const KIND_COLORS: Record<string, number> = {
+  control: 0x4ade80,
+  medium_hit: 0xfacc15,
+  hard_hit: 0xff5d6c,
+};
+
+const UNKNOWN_CLASSIFICATION_COLOR = 0x9aa5b1;
+
 export interface TouchMarker {
   id: string;
   time: number;
@@ -23,6 +43,8 @@ export interface TouchMarker {
   isTeamZero: boolean;
   playerId: string | null;
   playerName: string;
+  kind: string | null;
+  intention: string | null;
   position: {
     x: number;
     y: number;
@@ -60,20 +82,49 @@ function positiveDelta(current: number, previous: number): number {
   return Math.max(0, current - previous);
 }
 
-function touchCreditLabel(marker: TouchMarker, mode: TouchOverlayMode): string {
+function touchCreditLabel(
+  marker: TouchMarker,
+  mode: TouchOverlayMode,
+  colorMode: TouchOverlayColorMode,
+): string {
+  const classification = touchMarkerClassification(marker, colorMode);
+  const suffix = classification ? ` · ${classification.replaceAll("_", " ")}` : "";
   if (mode === "markers") {
-    return marker.playerName;
+    return `${marker.playerName}${suffix}`;
   }
 
   const advance = Math.round(marker.totalBallAdvanceDistance);
   const retreat = Math.round(marker.totalBallRetreatDistance);
   if (advance > 0 && retreat > 0) {
-    return `${marker.playerName} +${advance} / -${retreat} uu`;
+    return `${marker.playerName} +${advance} / -${retreat} uu${suffix}`;
   }
   if (retreat > 0) {
-    return `${marker.playerName} -${retreat} uu`;
+    return `${marker.playerName} -${retreat} uu${suffix}`;
   }
-  return `${marker.playerName} +${advance} uu`;
+  return `${marker.playerName} +${advance} uu${suffix}`;
+}
+
+function touchMarkerClassification(
+  marker: TouchMarker,
+  colorMode: TouchOverlayColorMode,
+): string | null {
+  if (colorMode === "intention") {
+    return marker.intention;
+  }
+  if (colorMode === "kind") {
+    return marker.kind;
+  }
+  return null;
+}
+
+export function touchMarkerColor(marker: TouchMarker, colorMode: TouchOverlayColorMode): number {
+  if (colorMode === "intention") {
+    return INTENTION_COLORS[marker.intention ?? ""] ?? UNKNOWN_CLASSIFICATION_COLOR;
+  }
+  if (colorMode === "kind") {
+    return KIND_COLORS[marker.kind ?? ""] ?? UNKNOWN_CLASSIFICATION_COLOR;
+  }
+  return marker.isTeamZero ? BLUE_TOUCH_COLOR : ORANGE_TOUCH_COLOR;
 }
 
 export function buildTouchMarkers(
@@ -108,6 +159,8 @@ export function buildTouchMarkers(
       isTeamZero: event.is_team_0,
       playerId,
       playerName: replay.players.find((player) => player.id === playerId)?.name ?? playerId,
+      kind: typeof event.kind === "string" ? event.kind : null,
+      intention: typeof event.intention === "string" ? event.intention : null,
       position: {
         x: ballPosition.x,
         y: ballPosition.y,
@@ -257,6 +310,7 @@ export class TouchEventOverlay {
   private originalContainerPosition = "";
   private decaySeconds = DEFAULT_DECAY_SECONDS;
   private mode: TouchOverlayMode = "markers";
+  private colorMode: TouchOverlayColorMode = "team";
 
   constructor(
     scene: ReplayScene,
@@ -266,6 +320,7 @@ export class TouchEventOverlay {
     options?: {
       decaySeconds?: number;
       mode?: TouchOverlayMode;
+      colorMode?: TouchOverlayColorMode;
     },
   ) {
     ensureStyles();
@@ -273,6 +328,7 @@ export class TouchEventOverlay {
     this.container = container;
     this.decaySeconds = Math.max(0.1, options?.decaySeconds ?? DEFAULT_DECAY_SECONDS);
     this.mode = options?.mode ?? "markers";
+    this.colorMode = options?.colorMode ?? "team";
     this.labelOffset.set(0, 0, TOUCH_LABEL_HEIGHT);
     this.markers = buildTouchMarkers(statsTimeline, replay);
 
@@ -306,6 +362,14 @@ export class TouchEventOverlay {
     this.mode = mode;
   }
 
+  getColorMode(): TouchOverlayColorMode {
+    return this.colorMode;
+  }
+
+  setColorMode(colorMode: TouchOverlayColorMode): void {
+    this.colorMode = colorMode;
+  }
+
   update(currentTime: number): void {
     const visibleMarkers = getVisibleTouchMarkers(this.markers, currentTime, this.decaySeconds);
     const visibleIds = new Set(visibleMarkers.map((marker) => marker.id));
@@ -329,18 +393,30 @@ export class TouchEventOverlay {
       const baseOpacity = 0.1 + 0.6 * life;
       const scale = 0.95 + (1 - life) * 0.28;
 
+      const color = touchMarkerColor(marker, this.colorMode);
       view.material.opacity = baseOpacity;
+      view.material.color.setHex(color);
+      view.arrow.setColor(color);
       view.ring.position.set(
         marker.position.x,
         marker.position.y,
         marker.position.z + TOUCH_RING_HEIGHT,
       );
       view.ring.scale.setScalar(scale);
-      view.label.textContent = touchCreditLabel(marker, this.mode);
+      view.label.textContent = touchCreditLabel(marker, this.mode, this.colorMode);
       view.label.classList.toggle(
         "sap-touch-overlay-label-advancement",
         this.mode === "advancement",
       );
+      const teamTinted = this.colorMode === "team";
+      view.label.classList.toggle("sap-touch-overlay-label-blue", teamTinted && marker.isTeamZero);
+      view.label.classList.toggle(
+        "sap-touch-overlay-label-orange",
+        teamTinted && !marker.isTeamZero,
+      );
+      view.label.style.borderColor = teamTinted
+        ? ""
+        : `#${color.toString(16).padStart(6, "0")}cc`;
 
       this.updateArrow(view, marker, baseOpacity);
 
