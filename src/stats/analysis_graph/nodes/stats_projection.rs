@@ -123,8 +123,6 @@ struct StatsProjectionCursors {
     kickoff: usize,
     possession: usize,
     ball_half: usize,
-    rotation_player: usize,
-    rotation_team: usize,
     rush: usize,
     touch: usize,
     whiff: usize,
@@ -139,7 +137,6 @@ struct StatsProjectionCursors {
     bump: usize,
     half_volley: usize,
     movement: usize,
-    positioning: usize,
     powerslide: usize,
     demo_timeline: usize,
     center: usize,
@@ -358,18 +355,15 @@ impl StatsProjectionNode {
             self.state.territorial_pressure.apply_event(event);
         }
         let rotation = ctx.get::<RotationCalculator>()?;
-        let projected_rotation_player_events = rotation.projected_player_events();
         self.state.rotation = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
-            rotation.config().first_man_debounce_seconds,
+            rotation.config().first_man_stint_end_grace_seconds,
         );
-        for event in projected_rotation_player_events.iter() {
-            self.state.rotation.apply_player_event(event);
+        for event in rotation.role_events().iter() {
+            self.state.rotation.apply_role_event(event);
         }
-        for event in rotation.team_events() {
-            self.state.rotation.apply_team_event(event);
+        for event in rotation.first_man_change_events() {
+            self.state.rotation.apply_first_man_change_event(event);
         }
-        self.cursors.rotation_player = rotation.player_events().len();
-        self.cursors.rotation_team = rotation.team_events().len();
         let rush = ctx.get::<RushCalculator>()?;
         for event in Self::events_since(&mut self.cursors.rush, rush.events()) {
             self.state.rush.apply_event(event);
@@ -458,12 +452,28 @@ impl StatsProjectionNode {
         }
         self.cursors.movement = movement.events().len();
         let positioning = ctx.get::<PositioningCalculator>()?;
-        let projected_positioning_events = positioning.projected_events();
         self.state.positioning = PositioningStatsAccumulator::default();
-        self.state
-            .positioning
-            .apply_events(projected_positioning_events.iter());
-        self.cursors.positioning = positioning.events().len();
+        for event in positioning.activity_events().iter() {
+            self.state.positioning.apply_activity_event(event);
+        }
+        for event in positioning.field_third_events().iter() {
+            self.state.positioning.apply_field_third_event(event);
+        }
+        for event in positioning.field_half_events().iter() {
+            self.state.positioning.apply_field_half_event(event);
+        }
+        for event in positioning.ball_depth_events().iter() {
+            self.state.positioning.apply_ball_depth_event(event);
+        }
+        for event in positioning.depth_role_events().iter() {
+            self.state.positioning.apply_depth_role_event(event);
+        }
+        for event in positioning.ball_proximity_events().iter() {
+            self.state.positioning.apply_ball_proximity_event(event);
+        }
+        for (player, signal) in positioning.signals() {
+            self.state.positioning.apply_signal(player, signal);
+        }
         let powerslide = ctx.get::<PowerslideCalculator>()?;
         let powerslide_events =
             Self::events_since(&mut self.cursors.powerslide, powerslide.events());

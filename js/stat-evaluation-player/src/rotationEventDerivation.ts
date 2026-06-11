@@ -1,15 +1,12 @@
-import type { RotationPlayerEvent } from "./generated/RotationPlayerEvent.ts";
+import type { FirstManChangeEvent } from "./generated/FirstManChangeEvent.ts";
 import type { RotationPlayerStats } from "./generated/RotationPlayerStats.ts";
-import type { RotationTeamEvent } from "./generated/RotationTeamEvent.ts";
 import type { RotationTeamStats } from "./generated/RotationTeamStats.ts";
-import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import type { RotationRoleEvent, StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 import { statsEventPayloads } from "./statsTimeline.ts";
 
 interface RotationPlayerState {
-  active: boolean;
-  firstManStintActive: boolean;
   currentFirstManStintTime: number;
-  nonFirstManSeconds: number;
+  lastFirstManEndTime: number | null;
   stats: RotationPlayerStats;
 }
 
@@ -31,20 +28,15 @@ function remoteIdKey(playerId: unknown): string {
 function defaultRotationPlayerStats(): RotationPlayerStats {
   return {
     active_game_time: 0,
-    tracked_time: 0,
     time_first_man: 0,
     time_second_man: 0,
     time_third_man: 0,
     time_ambiguous_role: 0,
-    time_behind_play: 0,
-    time_level_with_play: 0,
-    time_ahead_of_play: 0,
     longest_first_man_stint_time: 0,
     first_man_stint_count: 0,
     became_first_man_count: 0,
     lost_first_man_count: 0,
     current_role_state: "unknown",
-    current_depth_state: "unknown",
   };
 }
 
@@ -70,91 +62,65 @@ function sortRotationEvents<T extends { time: number; frame: number }>(events: r
     .map(({ event }) => event);
 }
 
-function applyRotationPlayerEvent(state: RotationPlayerState, event: RotationPlayerEvent): void {
-  state.active = event.active;
-  if (!event.active) {
-    state.firstManStintActive = false;
-    state.currentFirstManStintTime = 0;
-    state.nonFirstManSeconds = 0;
-  }
-  const stats = state.stats;
-  stats.current_role_state = event.current_role_state;
-  stats.current_depth_state = event.current_depth_state;
-}
-
-function accumulateActiveRotationFrame(
+/**
+ * Credit a portion of a role span to the player's stats. Mirrors the Rust
+ * `RotationStatsAccumulator`: first-man stints continue while the gap between
+ * consecutive first-man spans stays within the configured grace, and partial
+ * credits of one open span extend the same stint.
+ */
+function creditRoleSpan(
   state: RotationPlayerState,
-  frame: StatsFrame,
+  event: RotationRoleEvent,
+  delta: number,
+  creditedThroughTime: number,
   firstManStintEndGraceSeconds: number,
 ): void {
-  if (!state.active) {
-    return;
-  }
-
   const stats = state.stats;
-  stats.active_game_time = addF32(stats.active_game_time, frame.dt);
-  stats.tracked_time = addF32(stats.tracked_time, frame.dt);
-
-  switch (stats.current_role_state) {
-    case "first_man":
-      if (!state.firstManStintActive) {
-        state.firstManStintActive = true;
-        state.currentFirstManStintTime = 0;
+  stats.active_game_time = addF32(stats.active_game_time, delta);
+  stats.current_role_state = event.state;
+  switch (event.state) {
+    case "first_man": {
+      const continuesStint =
+        state.lastFirstManEndTime !== null &&
+        event.time - state.lastFirstManEndTime <= firstManStintEndGraceSeconds;
+      if (continuesStint) {
+        state.currentFirstManStintTime = addF32(state.currentFirstManStintTime, delta);
+      } else {
+        state.currentFirstManStintTime = delta;
         stats.first_man_stint_count += 1;
       }
-      state.currentFirstManStintTime = addF32(state.currentFirstManStintTime, frame.dt);
+      state.lastFirstManEndTime = creditedThroughTime;
       stats.longest_first_man_stint_time = Math.max(
         stats.longest_first_man_stint_time,
         state.currentFirstManStintTime,
       );
-      state.nonFirstManSeconds = 0;
-      stats.time_first_man = addF32(stats.time_first_man, frame.dt);
+      stats.time_first_man = addF32(stats.time_first_man, delta);
       break;
+    }
     case "second_man":
-      updateNonFirstManStintState(state, frame, firstManStintEndGraceSeconds);
-      stats.time_second_man = addF32(stats.time_second_man, frame.dt);
+      stats.time_second_man = addF32(stats.time_second_man, delta);
       break;
     case "third_man":
-      updateNonFirstManStintState(state, frame, firstManStintEndGraceSeconds);
-      stats.time_third_man = addF32(stats.time_third_man, frame.dt);
+      stats.time_third_man = addF32(stats.time_third_man, delta);
       break;
     case "ambiguous":
-      updateNonFirstManStintState(state, frame, firstManStintEndGraceSeconds);
-      stats.time_ambiguous_role = addF32(stats.time_ambiguous_role, frame.dt);
+      stats.time_ambiguous_role = addF32(stats.time_ambiguous_role, delta);
       break;
-    default:
-      updateNonFirstManStintState(state, frame, firstManStintEndGraceSeconds);
-      break;
-  }
-
-  switch (stats.current_depth_state) {
-    case "behind_play":
-      stats.time_behind_play = addF32(stats.time_behind_play, frame.dt);
-      break;
-    case "level_with_play":
-      stats.time_level_with_play = addF32(stats.time_level_with_play, frame.dt);
-      break;
-    case "ahead_of_play":
-      stats.time_ahead_of_play = addF32(stats.time_ahead_of_play, frame.dt);
+    case "unknown":
       break;
   }
 }
 
-function updateNonFirstManStintState(
-  state: RotationPlayerState,
-  frame: StatsFrame,
-  firstManStintEndGraceSeconds: number,
-): void {
-  if (!state.firstManStintActive) {
-    return;
+function creditedDurationThroughFrame(event: RotationRoleEvent, frame: StatsFrame): number {
+  if (frame.frame_number >= event.end_frame) {
+    return event.duration;
   }
-
-  state.nonFirstManSeconds = addF32(state.nonFirstManSeconds, frame.dt);
-  if (state.nonFirstManSeconds > firstManStintEndGraceSeconds) {
-    state.firstManStintActive = false;
-    state.currentFirstManStintTime = 0;
-    state.nonFirstManSeconds = 0;
+  const totalTime = event.end_time - event.time;
+  if (totalTime <= 0) {
+    return 0;
   }
+  const elapsedTime = Math.max(0, frame.time - event.time);
+  return event.duration * Math.min(1, elapsedTime / totalTime);
 }
 
 function getRotationPlayerState(
@@ -163,20 +129,18 @@ function getRotationPlayerState(
 ): RotationPlayerState {
   const playerKey = remoteIdKey(playerId);
   const playerState = players.get(playerKey) ?? {
-    active: false,
-    firstManStintActive: false,
     currentFirstManStintTime: 0,
-    nonFirstManSeconds: 0,
+    lastFirstManEndTime: null,
     stats: defaultRotationPlayerStats(),
   };
   players.set(playerKey, playerState);
   return playerState;
 }
 
-function applyRotationTeamEvent(
+function applyFirstManChangeEvent(
   stats: RotationTeamStats,
   players: Map<string, RotationPlayerState>,
-  event: RotationTeamEvent,
+  event: FirstManChangeEvent,
 ): void {
   stats.first_man_changes_for_team += 1;
   stats.rotation_count += 1;
@@ -210,44 +174,54 @@ export function applyRotationEventDerivedStats(
 export function createRotationEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const playerEvents = sortRotationEvents(statsEventPayloads(timeline, "rotation_player"));
-  const teamEvents = sortRotationEvents(statsEventPayloads(timeline, "rotation_team"));
-  const firstManStintEndGraceSeconds = timeline.config.rotation_first_man_debounce_seconds;
+  const roleEvents = sortRotationEvents(statsEventPayloads(timeline, "rotation_role"));
+  const changeEvents = sortRotationEvents(statsEventPayloads(timeline, "first_man_change"));
+  const firstManStintEndGraceSeconds = timeline.config.rotation_first_man_stint_end_grace_seconds;
 
-  let playerEventIndex = 0;
-  let teamEventIndex = 0;
+  const creditedDurations = new Array(roleEvents.length).fill(0) as number[];
+  let changeEventIndex = 0;
   const players = new Map<string, RotationPlayerState>();
   const teamZero = defaultRotationTeamStats();
   const teamOne = defaultRotationTeamStats();
 
   return {
     applyFrame(frame: StatsFrame): void {
-      while (
-        playerEventIndex < playerEvents.length &&
-        playerEvents[playerEventIndex]!.frame <= frame.frame_number
-      ) {
-        const event = playerEvents[playerEventIndex] as RotationPlayerEvent;
-        const playerState = getRotationPlayerState(players, event.player);
-        applyRotationPlayerEvent(playerState, event);
-        playerEventIndex += 1;
+      for (let index = 0; index < roleEvents.length; index += 1) {
+        const event = roleEvents[index]!;
+        if (event.frame > frame.frame_number) {
+          break;
+        }
+        const targetDuration = creditedDurationThroughFrame(event, frame);
+        const delta = targetDuration - creditedDurations[index]!;
+        if (delta > 0) {
+          creditedDurations[index] = targetDuration;
+          const creditedThroughTime =
+            frame.frame_number >= event.end_frame
+              ? event.end_time
+              : Math.min(frame.time, event.end_time);
+          creditRoleSpan(
+            getRotationPlayerState(players, event.player),
+            event,
+            delta,
+            creditedThroughTime,
+            firstManStintEndGraceSeconds,
+          );
+        }
       }
 
       while (
-        teamEventIndex < teamEvents.length &&
-        teamEvents[teamEventIndex]!.frame <= frame.frame_number
+        changeEventIndex < changeEvents.length &&
+        changeEvents[changeEventIndex]!.frame <= frame.frame_number
       ) {
-        const event = teamEvents[teamEventIndex] as RotationTeamEvent;
-        applyRotationTeamEvent(event.is_team_0 ? teamZero : teamOne, players, event);
-        teamEventIndex += 1;
+        const event = changeEvents[changeEventIndex]!;
+        applyFirstManChangeEvent(event.is_team_0 ? teamZero : teamOne, players, event);
+        changeEventIndex += 1;
       }
 
       assignRotationTeamStats(frame.team_zero.rotation, teamZero);
       assignRotationTeamStats(frame.team_one.rotation, teamOne);
       for (const player of frame.players) {
         const playerState = players.get(remoteIdKey(player.player_id));
-        if (playerState) {
-          accumulateActiveRotationFrame(playerState, frame, firstManStintEndGraceSeconds);
-        }
         assignRotationPlayerStats(player.rotation, playerState?.stats);
       }
     },

@@ -34,13 +34,14 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<BallHalfEvent>();
     assert_stats_event::<TerritorialPressureEvent>();
     assert_stats_event::<MovementEvent>();
-    assert_stats_event::<PositioningActivityEvent>();
-    assert_stats_event::<PositioningFieldZoneEvent>();
-    assert_stats_event::<PositioningBallRelativeDepthEvent>();
-    assert_stats_event::<PositioningTeammateRoleEvent>();
-    assert_stats_event::<PositioningBallProximityEvent>();
-    assert_stats_event::<RotationPlayerEvent>();
-    assert_stats_event::<RotationTeamEvent>();
+    assert_stats_event::<PlayerActivityEvent>();
+    assert_stats_event::<FieldThirdEvent>();
+    assert_stats_event::<FieldHalfEvent>();
+    assert_stats_event::<BallDepthEvent>();
+    assert_stats_event::<DepthRoleEvent>();
+    assert_stats_event::<BallProximityEvent>();
+    assert_stats_event::<RotationRoleEvent>();
+    assert_stats_event::<FirstManChangeEvent>();
     assert_stats_event::<FlipResetEvent>();
     assert_stats_event::<Event>();
 }

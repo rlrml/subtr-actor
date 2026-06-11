@@ -1,19 +1,24 @@
-import type { PositioningActivityEvent } from "./generated/PositioningActivityEvent.ts";
-import type { PositioningBallRelativeDepthEvent } from "./generated/PositioningBallRelativeDepthEvent.ts";
-import type { PositioningBallProximityEvent } from "./generated/PositioningBallProximityEvent.ts";
-import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
 import type { PositioningStats } from "./generated/PositioningStats.ts";
 import type { PositioningTeamStats } from "./generated/PositioningTeamStats.ts";
-import type { PositioningTeammateRoleEvent } from "./generated/PositioningTeammateRoleEvent.ts";
-import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
+import type {
+  BallDepthEvent,
+  BallProximityEvent,
+  DepthRoleEvent,
+  FieldHalfEvent,
+  FieldThirdEvent,
+  PlayerActivityEvent,
+  StatsFrame,
+  MaterializedStatsTimeline,
+} from "./statsTimeline.ts";
 import { statsEventPayloads } from "./statsTimeline.ts";
 
-type PositioningTimedEvent =
-  | PositioningActivityEvent
-  | PositioningFieldZoneEvent
-  | PositioningBallRelativeDepthEvent
-  | PositioningTeammateRoleEvent
-  | PositioningBallProximityEvent;
+type PositioningSpanEvent =
+  | PlayerActivityEvent
+  | FieldThirdEvent
+  | FieldHalfEvent
+  | BallDepthEvent
+  | DepthRoleEvent
+  | BallProximityEvent;
 
 interface EventStreamCursor {
   applyThroughFrame(frame: StatsFrame): void;
@@ -55,7 +60,6 @@ function defaultPositioningStats(): PositioningStats {
     time_offensive_third: 0,
     time_defensive_half: 0,
     time_offensive_half: 0,
-    time_closest_to_ball: 0,
     time_closest_to_ball_team: 0,
     time_closest_to_ball_absolute: 0,
     time_farthest_from_ball: 0,
@@ -68,13 +72,12 @@ function defaultPositioningStats(): PositioningStats {
 function defaultPositioningTeamStats(): PositioningTeamStats {
   return {
     tracked_time: 0,
-    time_closest_to_ball: 0,
     time_closest_to_ball_team: 0,
     time_closest_to_ball_absolute: 0,
   };
 }
 
-function sortPositioningEvents<TEvent extends PositioningTimedEvent>(
+function sortPositioningEvents<TEvent extends PositioningSpanEvent>(
   events: readonly TEvent[],
 ): TEvent[] {
   return events
@@ -93,7 +96,7 @@ function sortPositioningEvents<TEvent extends PositioningTimedEvent>(
 
 function playerStatsFor(
   players: Map<string, PositioningStats>,
-  event: PositioningTimedEvent,
+  event: PositioningSpanEvent,
 ): PositioningStats {
   const playerKey = remoteIdKey(event.player);
   const stats = players.get(playerKey) ?? defaultPositioningStats();
@@ -101,64 +104,59 @@ function playerStatsFor(
   return stats;
 }
 
-function applyActivityEvent(stats: PositioningStats, event: PositioningActivityEvent): void {
-  if (event.active) {
-    stats.active_game_time = addF32(stats.active_game_time, event.duration);
-  }
-  if (event.tracked) {
-    stats.tracked_time = addF32(stats.tracked_time, event.duration);
-  }
-  if (event.demolished) {
-    stats.time_demolished = addF32(stats.time_demolished, event.duration);
+function applyActivityEvent(stats: PositioningStats, event: PlayerActivityEvent): void {
+  stats.active_game_time = addF32(stats.active_game_time, event.duration);
+  switch (event.state) {
+    case "tracked":
+      stats.tracked_time = addF32(stats.tracked_time, event.duration);
+      break;
+    case "demolished":
+      stats.time_demolished = addF32(stats.time_demolished, event.duration);
+      break;
   }
 }
 
-function applyFieldZoneEvent(stats: PositioningStats, event: PositioningFieldZoneEvent): void {
-  stats.time_defensive_third = addF32(
-    stats.time_defensive_third,
-    event.duration * event.defensive_zone_fraction,
-  );
-  stats.time_neutral_third = addF32(
-    stats.time_neutral_third,
-    event.duration * event.neutral_zone_fraction,
-  );
-  stats.time_offensive_third = addF32(
-    stats.time_offensive_third,
-    event.duration * event.offensive_zone_fraction,
-  );
-  stats.time_defensive_half = addF32(
-    stats.time_defensive_half,
-    event.duration * event.defensive_half_fraction,
-  );
-  stats.time_offensive_half = addF32(
-    stats.time_offensive_half,
-    event.duration * event.offensive_half_fraction,
-  );
+function applyFieldThirdEvent(stats: PositioningStats, event: FieldThirdEvent): void {
+  switch (event.state) {
+    case "defensive":
+      stats.time_defensive_third = addF32(stats.time_defensive_third, event.duration);
+      break;
+    case "neutral":
+      stats.time_neutral_third = addF32(stats.time_neutral_third, event.duration);
+      break;
+    case "offensive":
+      stats.time_offensive_third = addF32(stats.time_offensive_third, event.duration);
+      break;
+  }
 }
 
-function applyBallRelativeDepthEvent(
-  stats: PositioningStats,
-  event: PositioningBallRelativeDepthEvent,
-): void {
-  stats.time_behind_ball = addF32(
-    stats.time_behind_ball,
-    event.duration * event.behind_ball_fraction,
-  );
-  stats.time_level_with_ball = addF32(
-    stats.time_level_with_ball,
-    event.duration * event.level_with_ball_fraction,
-  );
-  stats.time_in_front_of_ball = addF32(
-    stats.time_in_front_of_ball,
-    event.duration * event.in_front_of_ball_fraction,
-  );
+function applyFieldHalfEvent(stats: PositioningStats, event: FieldHalfEvent): void {
+  switch (event.state) {
+    case "defensive":
+      stats.time_defensive_half = addF32(stats.time_defensive_half, event.duration);
+      break;
+    case "offensive":
+      stats.time_offensive_half = addF32(stats.time_offensive_half, event.duration);
+      break;
+  }
 }
 
-function applyTeammateRoleEvent(
-  stats: PositioningStats,
-  event: PositioningTeammateRoleEvent,
-): void {
-  switch (event.teammate_role) {
+function applyBallDepthEvent(stats: PositioningStats, event: BallDepthEvent): void {
+  switch (event.state) {
+    case "behind_ball":
+      stats.time_behind_ball = addF32(stats.time_behind_ball, event.duration);
+      break;
+    case "level_with_ball":
+      stats.time_level_with_ball = addF32(stats.time_level_with_ball, event.duration);
+      break;
+    case "ahead_of_ball":
+      stats.time_in_front_of_ball = addF32(stats.time_in_front_of_ball, event.duration);
+      break;
+  }
+}
+
+function applyDepthRoleEvent(stats: PositioningStats, event: DepthRoleEvent): void {
+  switch (event.state) {
     case "no_teammates":
       stats.time_no_teammates = addF32(stats.time_no_teammates, event.duration);
       break;
@@ -180,19 +178,17 @@ function applyTeammateRoleEvent(
 function applyBallProximityEvent(
   stats: PositioningStats,
   teamStats: PositioningTeamStats,
-  event: PositioningBallProximityEvent,
+  event: BallProximityEvent,
 ): void {
-  if (event.closest_to_ball_team) {
+  if (event.state.closest_to_ball_team) {
     teamStats.tracked_time = addF32(teamStats.tracked_time, event.duration);
-    teamStats.time_closest_to_ball = addF32(teamStats.time_closest_to_ball, event.duration);
     teamStats.time_closest_to_ball_team = addF32(
       teamStats.time_closest_to_ball_team,
       event.duration,
     );
-    stats.time_closest_to_ball = addF32(stats.time_closest_to_ball, event.duration);
     stats.time_closest_to_ball_team = addF32(stats.time_closest_to_ball_team, event.duration);
   }
-  if (event.closest_to_ball_absolute) {
+  if (event.state.closest_to_ball_absolute) {
     teamStats.time_closest_to_ball_absolute = addF32(
       teamStats.time_closest_to_ball_absolute,
       event.duration,
@@ -202,7 +198,7 @@ function applyBallProximityEvent(
       event.duration,
     );
   }
-  if (event.farthest_from_ball) {
+  if (event.state.farthest_from_ball) {
     stats.time_farthest_from_ball = addF32(stats.time_farthest_from_ball, event.duration);
   }
 }
@@ -221,13 +217,12 @@ function assignPositioningTeamStats(
   Object.assign(target, source ?? defaultPositioningTeamStats());
 }
 
-function createEventStreamCursor<TEvent extends PositioningTimedEvent>(
+function createEventStreamCursor<TEvent extends PositioningSpanEvent>(
   events: readonly TEvent[],
   apply: (event: TEvent) => void,
 ): EventStreamCursor {
   const sortedEvents = sortPositioningEvents(events);
   const creditedDurations = new Array(sortedEvents.length).fill(0) as number[];
-  const appliedMomentEvents = new Set<number>();
   return {
     applyThroughFrame(frame: StatsFrame): void {
       for (let index = 0; index < sortedEvents.length; index += 1) {
@@ -235,14 +230,6 @@ function createEventStreamCursor<TEvent extends PositioningTimedEvent>(
         if (event.frame > frame.frame_number) {
           break;
         }
-        if (!isSpanPositioningEvent(event)) {
-          if (!appliedMomentEvents.has(index)) {
-            apply(event);
-            appliedMomentEvents.add(index);
-          }
-          continue;
-        }
-
         const targetDuration = creditedDurationThroughFrame(event, frame);
         const delta = targetDuration - creditedDurations[index]!;
         if (delta > 0) {
@@ -254,22 +241,7 @@ function createEventStreamCursor<TEvent extends PositioningTimedEvent>(
   };
 }
 
-function isSpanPositioningEvent(event: PositioningTimedEvent): event is PositioningTimedEvent & {
-  duration: number;
-  end_frame: number;
-  end_time: number;
-} {
-  return (
-    typeof (event as { duration?: unknown }).duration === "number" &&
-    typeof (event as { end_frame?: unknown }).end_frame === "number" &&
-    typeof (event as { end_time?: unknown }).end_time === "number"
-  );
-}
-
-function creditedDurationThroughFrame(
-  event: PositioningTimedEvent & { duration: number; end_frame: number; end_time: number },
-  frame: StatsFrame,
-): number {
+function creditedDurationThroughFrame(event: PositioningSpanEvent, frame: StatsFrame): number {
   if (frame.frame_number >= event.end_frame) {
     return event.duration;
   }
@@ -303,20 +275,22 @@ export function createPositioningEventDerivedStatsAccumulator(
   const teamOne = defaultPositioningTeamStats();
 
   const streams: EventStreamCursor[] = [
-    createEventStreamCursor(statsEventPayloads(timeline, "positioning_activity"), (event) =>
+    createEventStreamCursor(statsEventPayloads(timeline, "player_activity"), (event) =>
       applyActivityEvent(playerStatsFor(players, event), event),
     ),
-    createEventStreamCursor(statsEventPayloads(timeline, "positioning_field_zone"), (event) =>
-      applyFieldZoneEvent(playerStatsFor(players, event), event),
+    createEventStreamCursor(statsEventPayloads(timeline, "field_third"), (event) =>
+      applyFieldThirdEvent(playerStatsFor(players, event), event),
     ),
-    createEventStreamCursor(
-      statsEventPayloads(timeline, "positioning_ball_relative_depth"),
-      (event) => applyBallRelativeDepthEvent(playerStatsFor(players, event), event),
+    createEventStreamCursor(statsEventPayloads(timeline, "field_half"), (event) =>
+      applyFieldHalfEvent(playerStatsFor(players, event), event),
     ),
-    createEventStreamCursor(statsEventPayloads(timeline, "positioning_teammate_role"), (event) =>
-      applyTeammateRoleEvent(playerStatsFor(players, event), event),
+    createEventStreamCursor(statsEventPayloads(timeline, "ball_depth"), (event) =>
+      applyBallDepthEvent(playerStatsFor(players, event), event),
     ),
-    createEventStreamCursor(statsEventPayloads(timeline, "positioning_ball_proximity"), (event) =>
+    createEventStreamCursor(statsEventPayloads(timeline, "depth_role"), (event) =>
+      applyDepthRoleEvent(playerStatsFor(players, event), event),
+    ),
+    createEventStreamCursor(statsEventPayloads(timeline, "ball_proximity"), (event) =>
       applyBallProximityEvent(
         playerStatsFor(players, event),
         event.is_team_0 ? teamZero : teamOne,

@@ -36,24 +36,6 @@ impl StatFieldProvider for RotationPlayerStats {
         ));
         visitor(ExportedStat::float(
             "rotation",
-            "time_behind_play",
-            StatUnit::Seconds,
-            self.time_behind_play,
-        ));
-        visitor(ExportedStat::float(
-            "rotation",
-            "time_level_with_play",
-            StatUnit::Seconds,
-            self.time_level_with_play,
-        ));
-        visitor(ExportedStat::float(
-            "rotation",
-            "time_ahead_of_play",
-            StatUnit::Seconds,
-            self.time_ahead_of_play,
-        ));
-        visitor(ExportedStat::float(
-            "rotation",
             "percent_first_man",
             StatUnit::Percent,
             self.first_man_pct(),
@@ -75,24 +57,6 @@ impl StatFieldProvider for RotationPlayerStats {
             "percent_ambiguous_role",
             StatUnit::Percent,
             self.ambiguous_role_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "rotation",
-            "percent_behind_play",
-            StatUnit::Percent,
-            self.behind_play_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "rotation",
-            "percent_level_with_play",
-            StatUnit::Percent,
-            self.level_with_play_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "rotation",
-            "percent_ahead_of_play",
-            StatUnit::Percent,
-            self.ahead_of_play_pct(),
         ));
         visitor(ExportedStat::unsigned(
             "rotation",

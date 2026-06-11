@@ -14,30 +14,32 @@ function assertClose(actual: number | undefined, expected: number): void {
 test("rotation event derivation populates compacted player and team stats", () => {
   const timeline = createStatsTimeline({
     events: {
-      rotation_player: [
+      rotation_role: [
         {
           time: 1,
           frame: 10,
+          end_time: 1.1,
+          end_frame: 11,
+          duration: 0.1,
           player: playerId,
           is_team_0: true,
-          active: true,
-          current_role_state: "first_man",
-          current_depth_state: "ahead_of_play",
+          state: "first_man",
         },
         {
           time: 1.1,
           frame: 11,
+          end_time: 1.3,
+          end_frame: 13,
+          duration: 0.2,
           player: playerId,
           is_team_0: true,
-          active: true,
-          current_role_state: "second_man",
-          current_depth_state: "behind_play",
+          state: "second_man",
         },
       ],
-      rotation_team: [
+      first_man_change: [
         {
-          time: 1,
-          frame: 10,
+          time: 1.1,
+          frame: 11,
           is_team_0: true,
           previous_first_man: playerId,
           next_first_man: nextPlayerId,
@@ -51,14 +53,14 @@ test("rotation event derivation populates compacted player and team stats", () =
         players: [{ player_id: playerId, is_team_0: true, name: "Blue" }],
       }),
       createStatsFrame({
-        frame_number: 10,
-        time: 1,
+        frame_number: 11,
+        time: 1.1,
         dt: 0.1,
         players: [{ player_id: playerId, is_team_0: true, name: "Blue" }],
       }),
       createStatsFrame({
-        frame_number: 11,
-        time: 1.1,
+        frame_number: 13,
+        time: 1.3,
         dt: 0.2,
         players: [{ player_id: playerId, is_team_0: true, name: "Blue" }],
       }),
@@ -82,18 +84,18 @@ test("rotation event derivation populates compacted player and team stats", () =
   assert.equal(derived.frames[0]!.team_zero.rotation.rotation_count, 0);
   assert.equal(derived.frames[1]!.team_zero.rotation.rotation_count, 1);
   assert.equal(derived.frames[2]!.team_zero.rotation.first_man_changes_for_team, 1);
-  assertClose(derived.frames[1]!.players[0]!.rotation.tracked_time, 0.1);
+  assertClose(derived.frames[1]!.players[0]!.rotation.active_game_time, 0.1);
   assertClose(derived.frames[1]!.players[0]!.rotation.time_first_man, 0.1);
   assert.equal(derived.frames[1]!.players[0]!.rotation.first_man_stint_count, 1);
   assert.equal(derived.frames[1]!.players[0]!.rotation.current_role_state, "first_man");
-  assertClose(derived.frames[2]!.players[0]!.rotation.tracked_time, 0.3);
+  assertClose(derived.frames[2]!.players[0]!.rotation.active_game_time, 0.3);
   assertClose(derived.frames[2]!.players[0]!.rotation.time_second_man, 0.2);
   assert.equal(derived.frames[2]!.players[0]!.rotation.lost_first_man_count, 1);
-  assert.equal(derived.frames[2]!.players[0]!.rotation.current_depth_state, "behind_play");
+  assert.equal(derived.frames[2]!.players[0]!.rotation.current_role_state, "second_man");
 });
 
 test("rotation event derivation keeps first man stint through brief interruptions", () => {
-  const frames = [10, 11, 12, 13, 14, 15, 16].map((frameNumber) =>
+  const frames = [10, 11, 12, 13, 14, 15, 16, 17].map((frameNumber) =>
     createStatsFrame({
       frame_number: frameNumber,
       time: frameNumber / 10,
@@ -101,57 +103,33 @@ test("rotation event derivation keeps first man stint through brief interruption
       players: [{ player_id: playerId, is_team_0: true, name: "Blue" }],
     }),
   );
+  const roleSpan = (
+    startFrame: number,
+    endFrame: number,
+    state: "first_man" | "ambiguous",
+  ): Record<string, unknown> => ({
+    time: startFrame / 10,
+    frame: startFrame,
+    end_time: endFrame / 10,
+    end_frame: endFrame,
+    duration: (endFrame - startFrame) / 10,
+    player: playerId,
+    is_team_0: true,
+    state,
+  });
   const timeline = createStatsTimeline({
     config: {
-      rotation_first_man_debounce_seconds: 0.25,
+      rotation_first_man_stint_end_grace_seconds: 0.25,
     },
     events: {
-      rotation_player: [
-        {
-          time: 1,
-          frame: 10,
-          player: playerId,
-          is_team_0: true,
-          active: true,
-          current_role_state: "first_man",
-          current_depth_state: "level_with_play",
-        },
-        {
-          time: 1.1,
-          frame: 11,
-          player: playerId,
-          is_team_0: true,
-          active: true,
-          current_role_state: "ambiguous",
-          current_depth_state: "level_with_play",
-        },
-        {
-          time: 1.2,
-          frame: 12,
-          player: playerId,
-          is_team_0: true,
-          active: true,
-          current_role_state: "first_man",
-          current_depth_state: "level_with_play",
-        },
-        {
-          time: 1.3,
-          frame: 13,
-          player: playerId,
-          is_team_0: true,
-          active: true,
-          current_role_state: "ambiguous",
-          current_depth_state: "level_with_play",
-        },
-        {
-          time: 1.6,
-          frame: 16,
-          player: playerId,
-          is_team_0: true,
-          active: true,
-          current_role_state: "first_man",
-          current_depth_state: "level_with_play",
-        },
+      rotation_role: [
+        // A short ambiguous gap (0.1s <= 0.25s grace) keeps the stint alive; the
+        // longer 0.3s gap before the final span starts a new stint.
+        roleSpan(10, 11, "first_man"),
+        roleSpan(11, 12, "ambiguous"),
+        roleSpan(12, 13, "first_man"),
+        roleSpan(13, 16, "ambiguous"),
+        roleSpan(16, 17, "first_man"),
       ],
     },
     frames,
@@ -159,10 +137,10 @@ test("rotation event derivation keeps first man stint through brief interruption
 
   const derived = applyRotationEventDerivedStats(timeline);
 
-  assert.equal(derived.frames[0]!.players[0]!.rotation.first_man_stint_count, 1);
-  assert.equal(derived.frames[2]!.players[0]!.rotation.first_man_stint_count, 1);
-  assertClose(derived.frames[2]!.players[0]!.rotation.longest_first_man_stint_time, 0.2);
-  assert.equal(derived.frames[6]!.players[0]!.rotation.first_man_stint_count, 2);
-  assertClose(derived.frames[6]!.players[0]!.rotation.time_first_man, 0.3);
-  assertClose(derived.frames[6]!.players[0]!.rotation.longest_first_man_stint_time, 0.2);
+  assert.equal(derived.frames[1]!.players[0]!.rotation.first_man_stint_count, 1);
+  assert.equal(derived.frames[3]!.players[0]!.rotation.first_man_stint_count, 1);
+  assertClose(derived.frames[3]!.players[0]!.rotation.longest_first_man_stint_time, 0.2);
+  assert.equal(derived.frames[7]!.players[0]!.rotation.first_man_stint_count, 2);
+  assertClose(derived.frames[7]!.players[0]!.rotation.time_first_man, 0.3);
+  assertClose(derived.frames[7]!.players[0]!.rotation.longest_first_man_stint_time, 0.2);
 });

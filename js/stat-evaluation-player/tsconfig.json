@@ -8,7 +8,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
     "paths": {
       "@rlrml/subtr-actor": ["../pkg/rl_replay_subtr_actor.js"],
       "@rlrml/player": ["../player/src/lib.ts"],

@@ -100,6 +100,7 @@ impl StatsTimelineEventsNode {
             own_half_goal_dependency(),
             empty_net_goal_dependency(),
             counter_attack_goal_dependency(),
+            sustained_pressure_goal_dependency(),
             flick_goal_dependency(),
             ceiling_shot_goal_dependency(),
             double_tap_goal_dependency(),
@@ -145,6 +146,7 @@ impl StatsTimelineEventsNode {
         let own_half_goal = ctx.get::<OwnHalfGoalCalculator>()?;
         let empty_net_goal = ctx.get::<EmptyNetGoalCalculator>()?;
         let counter_attack_goal = ctx.get::<CounterAttackGoalCalculator>()?;
+        let sustained_pressure_goal = ctx.get::<SustainedPressureGoalCalculator>()?;
         let flick_goal = ctx.get::<FlickGoalCalculator>()?;
         let ceiling_shot_goal = ctx.get::<CeilingShotGoalCalculator>()?;
         let double_tap_goal = ctx.get::<DoubleTapGoalCalculator>()?;
@@ -179,6 +181,7 @@ impl StatsTimelineEventsNode {
             own_half_goal.events(),
             empty_net_goal.events(),
             counter_attack_goal.events(),
+            sustained_pressure_goal.events(),
             flick_goal.events(),
             ceiling_shot_goal.events(),
             double_tap_goal.events(),
@@ -464,10 +467,10 @@ fn build_replay_events(
 
     for (index, event) in positioning.activity_events().iter().enumerate() {
         events.push(make_event(
-            "positioning_activity",
+            "player_activity",
             index,
             span(event.frame, event.end_frame, event.time, event.end_time),
-            EventPayload::PositioningActivity(event.clone()),
+            EventPayload::PlayerActivity(event.clone()),
             Some(event.player.clone()),
             None,
             Some(event.is_team_0),
@@ -477,12 +480,12 @@ fn build_replay_events(
         ));
     }
 
-    for (index, event) in positioning.field_zone_events().iter().enumerate() {
+    for (index, event) in positioning.field_third_events().iter().enumerate() {
         events.push(make_event(
-            "positioning_field_zone",
+            "field_third",
             index,
             span(event.frame, event.end_frame, event.time, event.end_time),
-            EventPayload::PositioningFieldZone(event.clone()),
+            EventPayload::FieldThird(event.clone()),
             Some(event.player.clone()),
             None,
             Some(event.is_team_0),
@@ -492,12 +495,12 @@ fn build_replay_events(
         ));
     }
 
-    for (index, event) in positioning.ball_relative_depth_events().iter().enumerate() {
+    for (index, event) in positioning.field_half_events().iter().enumerate() {
         events.push(make_event(
-            "positioning_ball_relative_depth",
+            "field_half",
             index,
-            moment(event.frame, event.time),
-            EventPayload::PositioningBallRelativeDepth(event.clone()),
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::FieldHalf(event.clone()),
             Some(event.player.clone()),
             None,
             Some(event.is_team_0),
@@ -507,12 +510,27 @@ fn build_replay_events(
         ));
     }
 
-    for (index, event) in positioning.teammate_role_events().iter().enumerate() {
+    for (index, event) in positioning.ball_depth_events().iter().enumerate() {
         events.push(make_event(
-            "positioning_teammate_role",
+            "ball_depth",
             index,
-            moment(event.frame, event.time),
-            EventPayload::PositioningTeammateRole(event.clone()),
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::BallDepth(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in positioning.depth_role_events().iter().enumerate() {
+        events.push(make_event(
+            "depth_role",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::DepthRole(event.clone()),
             Some(event.player.clone()),
             None,
             Some(event.is_team_0),
@@ -524,85 +542,40 @@ fn build_replay_events(
 
     for (index, event) in positioning.ball_proximity_events().iter().enumerate() {
         events.push(make_event(
-            "positioning_ball_proximity",
+            "ball_proximity",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::BallProximity(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in rotation.role_events().iter().enumerate() {
+        events.push(make_event(
+            "rotation_role",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::RotationRole(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in rotation.first_man_change_events().iter().enumerate() {
+        events.push(make_event(
+            "first_man_change",
             index,
             moment(event.frame, event.time),
-            EventPayload::PositioningBallProximity(event.clone()),
-            Some(event.player.clone()),
-            None,
-            Some(event.is_team_0),
-            event.player_position,
-            None,
-            None,
-        ));
-    }
-
-    for (index, event) in rotation.player_events().iter().enumerate() {
-        events.push(make_event(
-            "rotation_player",
-            index,
-            span(event.frame, event.end_frame, event.time, event.end_time),
-            EventPayload::RotationPlayer(event.clone()),
-            Some(event.player.clone()),
-            None,
-            Some(event.is_team_0),
-            event.player_position,
-            None,
-            None,
-        ));
-    }
-
-    for (index, event) in rotation.role_span_events().iter().enumerate() {
-        events.push(make_event(
-            "rotation_role_span",
-            index,
-            span(event.frame, event.end_frame, event.time, event.end_time),
-            EventPayload::RotationRoleSpan(event.clone()),
-            Some(event.player.clone()),
-            None,
-            Some(event.is_team_0),
-            event.player_position,
-            None,
-            None,
-        ));
-    }
-
-    for (index, event) in rotation.depth_span_events().iter().enumerate() {
-        events.push(make_event(
-            "rotation_depth_span",
-            index,
-            span(event.frame, event.end_frame, event.time, event.end_time),
-            EventPayload::RotationDepthSpan(event.clone()),
-            Some(event.player.clone()),
-            None,
-            Some(event.is_team_0),
-            event.player_position,
-            None,
-            None,
-        ));
-    }
-
-    for (index, event) in rotation.first_man_stint_events().iter().enumerate() {
-        events.push(make_event(
-            "rotation_first_man_stint",
-            index,
-            span(event.frame, event.end_frame, event.time, event.end_time),
-            EventPayload::RotationFirstManStint(event.clone()),
-            Some(event.player.clone()),
-            None,
-            Some(event.is_team_0),
-            event.player_position,
-            None,
-            None,
-        ));
-    }
-
-    for (index, event) in rotation.team_events().iter().enumerate() {
-        events.push(make_event(
-            "rotation_team",
-            index,
-            moment(event.frame, event.time),
-            EventPayload::RotationTeam(event.clone()),
+            EventPayload::FirstManChange(event.clone()),
             Some(event.next_first_man.clone()),
             Some(event.previous_first_man.clone()),
             Some(event.is_team_0),

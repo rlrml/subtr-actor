@@ -209,22 +209,26 @@ fn records_role_and_depth_time() {
         .get(&PlayerId::Steam(1))
         .expect("first man stats");
     assert_eq!(first_man.current_role_state, RoleState::FirstMan);
-    assert_eq!(first_man.current_depth_state, PlayDepthState::BehindPlay);
     assert_eq!(first_man.time_first_man, 0.1);
-    assert_eq!(first_man.time_behind_play, 0.1);
+    assert_eq!(
+        calculator.current_role_and_depth(&PlayerId::Steam(1)),
+        (RoleState::FirstMan, PlayDepthState::BehindPlay)
+    );
 
     let second_man = calculator
         .player_stats()
         .get(&PlayerId::Steam(2))
         .expect("second man stats");
     assert_eq!(second_man.current_role_state, RoleState::SecondMan);
-    assert_eq!(second_man.current_depth_state, PlayDepthState::AheadOfPlay);
     assert_eq!(second_man.time_second_man, 0.1);
-    assert_eq!(second_man.time_ahead_of_play, 0.1);
+    assert_eq!(
+        calculator.current_role_and_depth(&PlayerId::Steam(2)),
+        (RoleState::SecondMan, PlayDepthState::AheadOfPlay)
+    );
 }
 
 #[test]
-fn rotation_player_events_emit_state_change_spans() {
+fn rotation_role_events_emit_state_change_spans() {
     let mut calculator = RotationCalculator::with_config(RotationCalculatorConfig {
         first_man_ambiguity_margin: 50.0,
         ..RotationCalculatorConfig::default()
@@ -239,33 +243,31 @@ fn rotation_player_events_emit_state_change_spans() {
             glam::Vec3::new(1000.0, 500.0, 0.0),
         );
     }
-    calculator.flush_pending_player_events();
+    calculator.flush_pending_events();
 
-    let player_events = calculator.player_events();
-    assert_eq!(player_events.len(), 4);
-    let first_man = player_events
+    let role_events = calculator.role_events();
+    assert_eq!(role_events.len(), 4);
+    let first_man = role_events
         .iter()
-        .find(|event| event.player == PlayerId::Steam(1) && event.active)
+        .find(|event| event.player == PlayerId::Steam(1))
         .expect("first man span should be emitted");
     assert_eq!(first_man.frame, 1);
     assert_eq!(first_man.end_frame, 3);
     assert!((first_man.duration - 0.3).abs() < 1e-6);
-    assert_eq!(first_man.current_role_state, RoleState::FirstMan);
-    assert_eq!(first_man.current_depth_state, PlayDepthState::BehindPlay);
+    assert_eq!(first_man.state, RoleState::FirstMan);
 
-    let second_man = player_events
+    let second_man = role_events
         .iter()
-        .find(|event| event.player == PlayerId::Steam(2) && event.active)
+        .find(|event| event.player == PlayerId::Steam(2))
         .expect("second man span should be emitted");
     assert_eq!(second_man.frame, 1);
     assert_eq!(second_man.end_frame, 3);
     assert!((second_man.duration - 0.3).abs() < 1e-6);
-    assert_eq!(second_man.current_role_state, RoleState::SecondMan);
-    assert_eq!(second_man.current_depth_state, PlayDepthState::AheadOfPlay);
+    assert_eq!(second_man.state, RoleState::SecondMan);
 }
 
 #[test]
-fn derived_rotation_events_split_role_depth_and_stints() {
+fn role_spans_coalesce_across_depth_changes() {
     let mut calculator = RotationCalculator::with_config(RotationCalculatorConfig {
         first_man_debounce_seconds: 0.25,
         first_man_ambiguity_margin: 50.0,
@@ -293,55 +295,35 @@ fn derived_rotation_events_split_role_depth_and_stints() {
         glam::Vec3::new(0.0, 300.0, 0.0),
         glam::Vec3::new(1000.0, 0.0, 0.0),
     );
-    calculator.flush_pending_player_events();
+    calculator.flush_pending_events();
 
-    let player_one_raw = calculator
-        .player_events()
-        .iter()
-        .filter(|event| event.player == PlayerId::Steam(1) && event.active)
-        .collect::<Vec<_>>();
+    // The player crosses from behind to ahead of the play, but their role never
+    // changes, so the role stream stays one coalesced span. Depth spans are
+    // covered by the positioning ball_depth facet, not the rotation calculator.
     let player_one_role_spans = calculator
-        .role_span_events()
+        .role_events()
         .into_iter()
         .filter(|event| event.player == PlayerId::Steam(1))
         .collect::<Vec<_>>();
-    let player_one_depth_spans = calculator
-        .depth_span_events()
-        .into_iter()
-        .filter(|event| event.player == PlayerId::Steam(1))
-        .collect::<Vec<_>>();
-    let player_one_stints = calculator
-        .first_man_stint_events()
-        .into_iter()
-        .filter(|event| event.player == PlayerId::Steam(1))
-        .collect::<Vec<_>>();
-
-    assert_eq!(player_one_raw.len(), 2);
     assert_eq!(player_one_role_spans.len(), 1);
-    assert_eq!(
-        player_one_role_spans[0].current_role_state,
-        RoleState::FirstMan
-    );
+    assert_eq!(player_one_role_spans[0].state, RoleState::FirstMan);
+    assert_eq!(player_one_role_spans[0].frame, 1);
+    assert_eq!(player_one_role_spans[0].end_frame, 3);
     assert!((player_one_role_spans[0].duration - 0.3).abs() < 1e-6);
-    assert_eq!(player_one_depth_spans.len(), 2);
-    assert_eq!(
-        player_one_depth_spans[0].current_depth_state,
-        PlayDepthState::BehindPlay
-    );
-    assert_eq!(
-        player_one_depth_spans[1].current_depth_state,
-        PlayDepthState::AheadOfPlay
-    );
-    assert_eq!(player_one_stints.len(), 1);
-    assert_eq!(player_one_stints[0].frame, 1);
-    assert_eq!(player_one_stints[0].end_frame, 3);
-    assert!((player_one_stints[0].duration - 0.3).abs() < 1e-6);
+
+    let stats = calculator
+        .player_stats()
+        .get(&PlayerId::Steam(1))
+        .expect("player one stats");
+    assert_eq!(stats.first_man_stint_count, 1);
+    assert!((stats.longest_first_man_stint_time - 0.3).abs() < 1e-6);
 }
 
 #[test]
 fn first_man_stints_survive_brief_interruptions() {
     let mut calculator = RotationCalculator::with_config(RotationCalculatorConfig {
         first_man_debounce_seconds: 0.25,
+        first_man_stint_end_grace_seconds: 0.25,
         first_man_ambiguity_margin: 50.0,
         ..RotationCalculatorConfig::default()
     });

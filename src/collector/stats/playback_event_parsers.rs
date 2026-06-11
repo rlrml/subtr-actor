@@ -178,13 +178,18 @@ pub(in crate::collector::stats::playback) fn parse_movement_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_positioning_activity_event(
+/// Shared parser for every player-facet span stream: the envelope is common
+/// and only the typed `state` payload differs per facet.
+pub(in crate::collector::stats::playback) fn parse_player_state_span_event<S>(
     value: &Value,
-) -> SubtrActorResult<PositioningActivityEvent> {
-    let object = json_object(value, "positioning activity event")?;
+) -> SubtrActorResult<PlayerStateSpan<S>>
+where
+    S: serde::de::DeserializeOwned,
+{
+    let object = json_object(value, "player state span event")?;
     let time = json_required_f32(object, "time")?;
     let frame = json_required_usize(object, "frame")?;
-    Ok(PositioningActivityEvent {
+    Ok(PlayerStateSpan {
         time,
         frame,
         end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
@@ -193,189 +198,15 @@ pub(in crate::collector::stats::playback) fn parse_positioning_activity_event(
         player: json_required_remote_id(object, "player")?,
         player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        active: json_required_bool(object, "active")?,
-        tracked: json_required_bool(object, "tracked")?,
-        demolished: json_required_bool(object, "demolished")?,
+        state: decode_json_value(json_required_value(object, "state")?.clone())?,
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_positioning_field_zone_event(
+pub(in crate::collector::stats::playback) fn parse_first_man_change_event(
     value: &Value,
-) -> SubtrActorResult<PositioningFieldZoneEvent> {
-    let object = json_object(value, "positioning field zone event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(PositioningFieldZoneEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        defensive_zone_fraction: json_required_f32(object, "defensive_zone_fraction")?,
-        neutral_zone_fraction: json_required_f32(object, "neutral_zone_fraction")?,
-        offensive_zone_fraction: json_required_f32(object, "offensive_zone_fraction")?,
-        defensive_half_fraction: json_required_f32(object, "defensive_half_fraction")?,
-        offensive_half_fraction: json_required_f32(object, "offensive_half_fraction")?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_positioning_ball_relative_depth_event(
-    value: &Value,
-) -> SubtrActorResult<PositioningBallRelativeDepthEvent> {
-    let object = json_object(value, "positioning ball-relative depth event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(PositioningBallRelativeDepthEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        behind_ball_fraction: json_required_f32(object, "behind_ball_fraction")?,
-        level_with_ball_fraction: json_required_f32(object, "level_with_ball_fraction")?,
-        in_front_of_ball_fraction: json_required_f32(object, "in_front_of_ball_fraction")?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_positioning_teammate_role_event(
-    value: &Value,
-) -> SubtrActorResult<PositioningTeammateRoleEvent> {
-    let object = json_object(value, "positioning teammate role event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(PositioningTeammateRoleEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        teammate_role: decode_json_value(json_required_value(object, "teammate_role")?.clone())?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_positioning_ball_proximity_event(
-    value: &Value,
-) -> SubtrActorResult<PositioningBallProximityEvent> {
-    let object = json_object(value, "positioning ball proximity event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    let closest_to_ball = json_optional_bool(object.get("closest_to_ball")).unwrap_or(false);
-    Ok(PositioningBallProximityEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        closest_to_ball_team: json_optional_bool(object.get("closest_to_ball_team"))
-            .unwrap_or(closest_to_ball),
-        closest_to_ball_absolute: json_optional_bool(object.get("closest_to_ball_absolute"))
-            .unwrap_or(false),
-        farthest_from_ball: json_required_bool(object, "farthest_from_ball")?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_rotation_player_event(
-    value: &Value,
-) -> SubtrActorResult<RotationPlayerEvent> {
-    let object = json_object(value, "rotation player event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(RotationPlayerEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        active: json_required_bool(object, "active")?,
-        current_role_state: decode_json_value(
-            json_required_value(object, "current_role_state")?.clone(),
-        )?,
-        current_depth_state: decode_json_value(
-            json_required_value(object, "current_depth_state")?.clone(),
-        )?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_rotation_role_span_event(
-    value: &Value,
-) -> SubtrActorResult<RotationRoleSpanEvent> {
-    let object = json_object(value, "rotation role span event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(RotationRoleSpanEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        current_role_state: decode_json_value(
-            json_required_value(object, "current_role_state")?.clone(),
-        )?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_rotation_depth_span_event(
-    value: &Value,
-) -> SubtrActorResult<RotationDepthSpanEvent> {
-    let object = json_object(value, "rotation depth span event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(RotationDepthSpanEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        current_depth_state: decode_json_value(
-            json_required_value(object, "current_depth_state")?.clone(),
-        )?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_rotation_first_man_stint_event(
-    value: &Value,
-) -> SubtrActorResult<RotationFirstManStintEvent> {
-    let object = json_object(value, "rotation first man stint event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(RotationFirstManStintEvent {
-        time,
-        frame,
-        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
-        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
-        duration: json_optional_f32(object.get("duration"))?.unwrap_or(0.0),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-    })
-}
-
-pub(in crate::collector::stats::playback) fn parse_rotation_team_event(
-    value: &Value,
-) -> SubtrActorResult<RotationTeamEvent> {
-    let object = json_object(value, "rotation team event")?;
-    Ok(RotationTeamEvent {
+) -> SubtrActorResult<FirstManChangeEvent> {
+    let object = json_object(value, "first man change event")?;
+    Ok(FirstManChangeEvent {
         time: json_required_f32(object, "time")?,
         frame: json_required_usize(object, "frame")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
@@ -920,30 +751,9 @@ pub(in crate::collector::stats::playback) fn parse_goal_tag_event(
     value: &Value,
 ) -> SubtrActorResult<GoalTagAssignment> {
     let object = json_object(value, "goal tag event")?;
-    let kind = decode_json_value(json_required_value(object, "kind")?.clone())?;
-    let metadata = GoalTagMetadata {
-        confidence: json_required_f32(object, "confidence")?,
-        performer: object
-            .get("performer")
-            .cloned()
-            .map(decode_json_value)
-            .transpose()?,
-        modifiers: json_optional_array(object.get("modifiers"))?
-            .iter()
-            .map(|modifier| decode_json_value(modifier.clone()))
-            .collect::<SubtrActorResult<Vec<_>>>()?,
-        related_events: json_optional_array(object.get("related_events"))?
-            .iter()
-            .map(|event_ref| decode_json_value(event_ref.clone()))
-            .collect::<SubtrActorResult<Vec<_>>>()?,
-        evidence: json_required_array(object, "evidence")?
-            .iter()
-            .map(parse_goal_tag_evidence)
-            .collect::<SubtrActorResult<Vec<_>>>()?,
-    };
     Ok(GoalTagAssignment {
         goal_index: json_required_usize(object, "goal_index")?,
-        tag: GoalTag::from_parts(kind, metadata),
+        tag: parse_goal_tag(json_required_value(object, "tag")?)?,
     })
 }
 

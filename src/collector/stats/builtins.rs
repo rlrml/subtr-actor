@@ -715,8 +715,8 @@ pub(crate) fn builtin_module_json(
                 "team_zero": projection.rotation.team_zero_stats(),
                 "team_one": projection.rotation.team_one_stats(),
                 "player_stats": player_stats_entries(projection.rotation.player_stats()),
-                "player_events": calculator.player_events(),
-                "team_events": calculator.team_events(),
+                "role_events": calculator.role_events(),
+                "first_man_change_events": calculator.first_man_change_events(),
             }))
         }
         "rush" => {
@@ -874,9 +874,10 @@ pub(crate) fn builtin_module_json(
                 "team_one": projection.positioning.team_one_stats(),
                 "player_stats": player_stats_entries(projection.positioning.player_stats()),
                 "activity_events": calculator.activity_events(),
-                "field_zone_events": calculator.field_zone_events(),
-                "ball_relative_depth_events": calculator.ball_relative_depth_events(),
-                "teammate_role_events": calculator.teammate_role_events(),
+                "field_third_events": calculator.field_third_events(),
+                "field_half_events": calculator.field_half_events(),
+                "ball_depth_events": calculator.ball_depth_events(),
+                "depth_role_events": calculator.depth_role_events(),
                 "ball_proximity_events": calculator.ball_proximity_events(),
             }))
         }

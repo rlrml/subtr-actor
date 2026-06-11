@@ -191,6 +191,106 @@ function findFirstMismatch(left: unknown, right: unknown, pathLabel = "$"): stri
   return `${pathLabel}: expected ${previewValue(left)}, got ${previewValue(right)}`;
 }
 
+function omitEventCounts<T extends object>(value: T): T {
+  const { event_counts: _ignored, ...rest } = value as T & { event_counts?: unknown };
+  return rest as T;
+}
+
+// Labeled stat breakdowns that the legacy serializer exports but the
+// event-derived hydration does not reconstruct.
+const UNRECONSTRUCTED_LABELED_FIELDS: Record<string, readonly string[]> = {
+  boost: ["labeled_amounts", "labeled_counts"],
+  touch: ["labeled_intention_counts"],
+};
+
+function omitLabeledBoostStats<T extends object>(value: T): T {
+  const record = value as Record<string, unknown>;
+  let result: Record<string, unknown> | null = null;
+  for (const [module, fields] of Object.entries(UNRECONSTRUCTED_LABELED_FIELDS)) {
+    const moduleStats = record[module];
+    if (!moduleStats || typeof moduleStats !== "object") {
+      continue;
+    }
+    const cleaned = { ...(moduleStats as Record<string, unknown>) };
+    for (const field of fields) {
+      delete cleaned[field];
+    }
+    result = result ?? { ...record };
+    result[module] = cleaned;
+  }
+  return (result ?? record) as T;
+}
+
+// Continuous positioning magnitudes (distance and possession-time sums) ship once
+// as a whole-match summary rather than as events, so the hydrated playhead view
+// reports the constant whole-match totals while legacy frames carry running
+// partial sums. They only converge at the final frame, where a dedicated check
+// below compares them.
+const POSITIONING_SUMMARY_FIELDS = [
+  "sum_distance_to_teammates",
+  "sum_distance_to_ball",
+  "sum_distance_to_ball_has_possession",
+  "time_has_possession",
+  "sum_distance_to_ball_no_possession",
+  "time_no_possession",
+] as const;
+
+function omitPositioningSummaryFields<T extends { positioning?: object }>(value: T): T {
+  if (!value.positioning) {
+    return value;
+  }
+  const positioning = { ...value.positioning } as Record<string, unknown>;
+  for (const field of POSITIONING_SUMMARY_FIELDS) {
+    delete positioning[field];
+  }
+  return { ...value, positioning };
+}
+
+// event_counts is derived client-side during hydration and is never part of the
+// legacy serialized payload; conversely the labeled boost sums are a legacy-only
+// export detail that the event-derived boost reconstruction does not rebuild.
+// Both are excluded so the comparison covers the shared stats surface.
+function comparablePlayer<T extends { positioning?: object; boost?: object }>(player: T): T {
+  return omitPositioningSummaryFields(omitLabeledBoostStats(omitEventCounts(player)));
+}
+
+function comparableFrames(
+  frames: MaterializedStatsTimeline["frames"],
+): MaterializedStatsTimeline["frames"] {
+  return frames.map((frame) => ({
+    ...frame,
+    team_zero: omitLabeledBoostStats(omitEventCounts(frame.team_zero)),
+    team_one: omitLabeledBoostStats(omitEventCounts(frame.team_one)),
+    players: frame.players.map((player) => comparablePlayer(player)),
+  }));
+}
+
+function assertFinalFramePositioningSummariesMatch(
+  legacyFrames: MaterializedStatsTimeline["frames"],
+  frames: MaterializedStatsTimeline["frames"],
+): void {
+  const legacyFinal = legacyFrames.at(-1);
+  const hydratedFinal = frames.at(-1);
+  if (!legacyFinal || !hydratedFinal) {
+    return;
+  }
+  for (const [index, legacyPlayer] of legacyFinal.players.entries()) {
+    const hydratedPlayer = hydratedFinal.players[index];
+    if (!hydratedPlayer) {
+      throw new Error(`missing hydrated final-frame player ${index}`);
+    }
+    for (const field of POSITIONING_SUMMARY_FIELDS) {
+      const expected = (legacyPlayer.positioning as Record<string, number>)[field] ?? 0;
+      const actual = (hydratedPlayer.positioning as Record<string, number>)[field] ?? 0;
+      if (!numbersMatchLegacyStats(expected, actual)) {
+        throw new Error(
+          `final-frame positioning summary mismatch: players[${index}].${field}: expected ${expected}, got ${actual}`,
+        );
+      }
+    }
+  }
+}
+
 function assertHydratedStatsTimelineMatchesLegacy(
   decoder: TextDecoder,
   bytes: Uint8Array,
@@ -200,7 +300,12 @@ function assertHydratedStatsTimelineMatchesLegacy(
     decoder,
     get_legacy_stats_timeline_json(bytes),
   );
-  const mismatch = findFirstMismatch(legacyTimeline.frames, frames, "$.frames");
+  assertFinalFramePositioningSummariesMatch(legacyTimeline.frames, frames);
+  const mismatch = findFirstMismatch(
+    comparableFrames(legacyTimeline.frames),
+    comparableFrames(frames),
+    "$.frames",
+  );
   if (mismatch) {
     throw new Error(
       `event-derived stats timeline did not match legacy serialized frames: ${mismatch}`,

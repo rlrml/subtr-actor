@@ -229,6 +229,7 @@ fn empty_stats_timeline_config() -> StatsTimelineConfig {
         rotation_role_depth_margin: 0.0,
         rotation_first_man_ambiguity_margin: 0.0,
         rotation_first_man_debounce_seconds: 0.0,
+        rotation_first_man_stint_end_grace_seconds: 0.0,
         rush_max_start_y: 0.0,
         rush_attack_support_distance_y: 0.0,
         rush_defender_distance_y: 0.0,

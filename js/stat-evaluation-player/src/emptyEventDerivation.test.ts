@@ -116,7 +116,7 @@ test("empty event derivations restore default fields for compacted zero-event ti
   assert.equal(derivedPlayer.bump.bumps_inflicted, 0);
   assert.equal(derivedPlayer.movement.tracked_time, 0);
   assert.equal(derivedPlayer.positioning.tracked_time, 0);
-  assert.equal(derivedPlayer.rotation.tracked_time, 0);
+  assert.equal(derivedPlayer.rotation.active_game_time, 0);
   assert.equal(derivedPlayer.powerslide.total_duration, 0);
   assert.equal(derivedPlayer.demo.demos_inflicted, 0);
 });
