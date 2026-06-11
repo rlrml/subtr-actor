@@ -1,13 +1,11 @@
-//! Clip-based variant of `worldcup_ball_kickoff_test.rs`.
+//! Clip-based replacement for `worldcup_ball_kickoff_test.rs`.
 //!
-//! Covers two of the replay's five kickoffs (verified against a full-replay
-//! run): the opening kickoff, clipped from frame 0 (no synthetic keyframe), and
-//! a mid-game kickoff seeded through the synthetic keyframe — both on the
-//! newer net11 World Cup replay format. The full-replay original is
-//! `#[ignore]`d as slow; the clips run by default.
-//!
-//! See the original test for the regression background (`Ball_WorldCup` missing
-//! from `BALL_TYPES` left every kickoff without a first touch).
+//! The original asserted that all five kickoffs of a World Cup-build replay
+//! resolve a first touch and outcome (the regression: `Ball_WorldCup` was
+//! missing from `BALL_TYPES`, so no touch candidates were generated). This
+//! reproduces the assertion for every kickoff on its own clip. The opening
+//! kickoff is clipped from frame 0 (no synthetic keyframe); the rest are seeded
+//! through the keyframe.
 
 mod common;
 
@@ -18,9 +16,8 @@ use subtr_actor::{
 
 const WORLDCUP_REPLAY: &str = "assets/replay-format-2026-06-02-v868-32-net11-worldcup-ball.replay";
 
-/// Kickoff start times measured from a full-replay run.
-const OPENING_KICKOFF_START_TIME: f32 = 13.94;
-const MID_GAME_KICKOFF_START_TIME: f32 = 62.30;
+/// Kickoff start times measured from a full-replay run, in replay seconds.
+const KICKOFF_START_TIMES: [f32; 5] = [13.94, 37.01, 62.30, 95.98, 141.84];
 
 fn assert_clip_kickoff_resolves(clip: &ReplayClip, expected_start_time: f32) {
     let timeline = StatsTimelineCollector::new()
@@ -71,30 +68,33 @@ fn assert_clip_kickoff_resolves(clip: &ReplayClip, expected_start_time: f32) {
 }
 
 #[test]
-fn clip_worldcup_opening_kickoff_resolves_first_touch() {
+fn clip_worldcup_all_kickoffs_resolve_first_touches() {
     let replay = common::parse_replay(WORLDCUP_REPLAY);
-    // Clip from the very start of the replay: real_start == 0, so the clip has
-    // no synthetic keyframe and the opening countdown plays out unmodified.
-    let clip = clip_replay_around_times(&replay, 0.0, OPENING_KICKOFF_START_TIME + 8.0, 0, 90)
-        .expect("clip should build");
-    assert_eq!(
-        clip.provenance.synthetic_frame_count, 0,
-        "a clip starting at frame 0 needs no synthetic keyframe"
-    );
-    assert_clip_kickoff_resolves(&clip, OPENING_KICKOFF_START_TIME);
-}
 
-#[test]
-fn clip_worldcup_mid_game_kickoff_resolves_first_touch() {
-    let replay = common::parse_replay(WORLDCUP_REPLAY);
-    let clip = clip_replay_around_times(
-        &replay,
-        MID_GAME_KICKOFF_START_TIME - 5.0,
-        MID_GAME_KICKOFF_START_TIME + 8.0,
-        90,
-        90,
-    )
-    .expect("clip should build");
-    assert_eq!(clip.provenance.synthetic_frame_count, 1);
-    assert_clip_kickoff_resolves(&clip, MID_GAME_KICKOFF_START_TIME);
+    for (index, &start_time) in KICKOFF_START_TIMES.iter().enumerate() {
+        // The opening kickoff is clipped from the very start of the replay
+        // (real_start == 0, no synthetic keyframe); the rest are seeded by the
+        // keyframe with warm-up before the countdown.
+        let lead_in = if index == 0 { 0 } else { 90 };
+        let clip = clip_replay_around_times(
+            &replay,
+            (start_time - 5.0).max(0.0),
+            start_time + 8.0,
+            lead_in,
+            90,
+        )
+        .expect("clip should build");
+        if index == 0 {
+            assert_eq!(
+                clip.provenance.synthetic_frame_count, 0,
+                "the opening kickoff clip should need no synthetic keyframe"
+            );
+        } else {
+            assert_eq!(
+                clip.provenance.synthetic_frame_count, 1,
+                "mid-game kickoff clips should be seeded by a synthetic keyframe"
+            );
+        }
+        assert_clip_kickoff_resolves(&clip, start_time);
+    }
 }
