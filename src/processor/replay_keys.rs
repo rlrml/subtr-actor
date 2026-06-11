@@ -1,10 +1,16 @@
-pub(crate) static BALL_TYPES: [&str; 5] = [
+pub(crate) static BALL_TYPES: [&str; 6] = [
     "Archetypes.Ball.Ball_Default",
     "Archetypes.Ball.Ball_Basketball",
     "Archetypes.Ball.Ball_Puck",
     "Archetypes.Ball.CubeBall",
     "Archetypes.Ball.Ball_Breakout",
+    "Archetypes.Ball.Ball_WorldCup",
 ];
+
+/// Limited-time modes ship new ball archetypes (e.g. `Ball_WorldCup`) that
+/// predate any explicit `BALL_TYPES` entry; anything under this prefix is a
+/// ball.
+pub(crate) static BALL_TYPE_PREFIX: &str = "Archetypes.Ball.";
 
 pub(crate) static BOOST_TYPE: &str = "Archetypes.CarComponents.CarComponent_Boost";
 pub(crate) static CAR_TYPE: &str = "Archetypes.Car.Car_Default";
