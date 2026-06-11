@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 
 import { getReplayHitboxOverlayTransform, getReplayHitboxSpec } from "../src/hitboxes";
-import { interpolateQuaternion, updateAttachedCamera } from "../src/player-internals/spatial";
+import {
+  interpolatePositionHermite,
+  interpolateQuaternion,
+  updateAttachedCamera,
+} from "../src/player-internals/spatial";
 import type { ReplayModel } from "../src/types";
 import { getHitboxOverlayColor, setHitboxOverlayOnlyMode, type ReplayScene } from "../src/scene";
 
@@ -86,6 +90,9 @@ test("ball cam stays behind the attached player when the ball is ahead", () => {
     cameraDistanceScale: 2.25,
     customCameraSettings: null,
     frameIndex: 0,
+    nextFrameIndex: 0,
+    alpha: 0,
+    dt: 0,
     ballPosition: new THREE.Vector3(3000, 0, 93),
     desiredCameraPosition,
     desiredLookTarget,
@@ -112,6 +119,70 @@ test("interpolateQuaternion blends rotation samples instead of holding the previ
   const rotated = new THREE.Vector3(1, 0, 0).applyQuaternion(halfway);
   assert.ok(Math.abs(rotated.x) < 1e-10);
   assert.ok(rotated.y > 0.999);
+});
+
+test("interpolatePositionHermite matches a lerp when motion is straight and constant", () => {
+  // Velocity exactly equals the secant (position moves +10/s over a 1s gap), so
+  // the Hermite curve has no curvature and should coincide with linear interp.
+  const result = interpolatePositionHermite(
+    { x: 0, y: 0, z: 0 },
+    { x: 10, y: 0, z: 0 },
+    { x: 10, y: 0, z: 0 },
+    { x: 10, y: 0, z: 0 },
+    1,
+    0.5,
+  );
+  assert.ok(result);
+  assert.ok(Math.abs(result.x - 5) < 1e-9);
+  assert.ok(Math.abs(result.y) < 1e-9);
+});
+
+test("interpolatePositionHermite curves toward the sample velocities", () => {
+  // Endpoints sit on the x-axis, but the samples carry +y velocity at the start
+  // and -y velocity at the end (a projectile-style arc). Linear interp would
+  // hold y at 0; Hermite should bow the midpoint above the straight line.
+  const result = interpolatePositionHermite(
+    { x: 0, y: 0, z: 0 },
+    { x: 10, y: 0, z: 0 },
+    { x: 10, y: 10, z: 0 },
+    { x: 10, y: -10, z: 0 },
+    1,
+    0.5,
+  );
+  assert.ok(result);
+  assert.ok(result.y > 0.5, "expected the curve to bow toward the velocity tangents");
+});
+
+test("interpolatePositionHermite falls back to linear when velocity is missing", () => {
+  const result = interpolatePositionHermite(
+    { x: 0, y: 0, z: 0 },
+    { x: 10, y: 4, z: 0 },
+    null,
+    null,
+    1,
+    0.25,
+  );
+  assert.ok(result);
+  assert.ok(Math.abs(result.x - 2.5) < 1e-9);
+  assert.ok(Math.abs(result.y - 1) < 1e-9);
+});
+
+test("interpolatePositionHermite rejects implausible tangents and falls back to linear", () => {
+  // A 100x-too-large velocity (e.g. a units mismatch) would swing the curve far
+  // past the segment; the deviation guard should discard it and use the lerp.
+  const result = interpolatePositionHermite(
+    { x: 0, y: 0, z: 0 },
+    { x: 10, y: 0, z: 0 },
+    { x: 1000, y: 0, z: 0 },
+    { x: 1000, y: 0, z: 0 },
+    1,
+    0.5,
+  );
+  assert.ok(result);
+  assert.ok(
+    Math.abs(result.x - 5) < 1e-9,
+    "expected the pathological tangent to fall back to lerp",
+  );
 });
 
 test("hitbox overlay transform uses Rocket League local axes", () => {
