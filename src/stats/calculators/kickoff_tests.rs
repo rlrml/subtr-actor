@@ -2282,6 +2282,12 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
         kickoff_goal: true,
         scoring_team_is_team_0: Some(true),
         time_to_goal: Some(4.0),
+        settlement: KickoffSettlement::Unsettled,
+        settlement_team_is_team_0: None,
+        settlement_time: None,
+        settlement_frame: None,
+        settlement_seconds_after_first_touch: None,
+        settlement_player: None,
         team_zero_taker: Some(KickoffTakerEvent {
             player: player_id.clone(),
             is_team_0: true,
@@ -3037,4 +3043,249 @@ fn next_kickoff_phase_flushes_kickoff_awaiting_attribution() {
     let event = calculator.events().last().unwrap();
     assert!(!event.kickoff_goal);
     assert_eq!(event.end_time, 2.6);
+}
+
+fn live_gameplay() -> GameplayState {
+    GameplayState {
+        ball_has_been_hit: Some(true),
+        ..GameplayState::default()
+    }
+}
+
+/// Arm a 1v2 kickoff (blue taker vs orange taker + orange back man) and apply
+/// the blue taker's first touch at t=1.0 with the ball still at center field.
+fn settlement_kickoff(
+    blue_taker: &PlayerId,
+    orange_taker: &PlayerId,
+    orange_back: &PlayerId,
+) -> KickoffCalculator {
+    let mut calculator = KickoffCalculator::new();
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_back.clone(),
+                        false,
+                        glam::Vec3::new(0.0, 4608.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(10, 1.0),
+            &live_gameplay(),
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker.clone(), true, 10, 1.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+    calculator
+}
+
+fn drive_frame(
+    calculator: &mut KickoffCalculator,
+    frame_number: usize,
+    time: f32,
+    ball_state: &BallFrameState,
+    touches: Vec<TouchEvent>,
+) {
+    calculator
+        .update(
+            &frame(frame_number, time),
+            &live_gameplay(),
+            ball_state,
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: touches,
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+}
+
+#[test]
+fn lost_kickoff_settles_for_collecting_team() {
+    let blue_taker = PlayerId::Steam(90);
+    let orange_taker = PlayerId::Steam(91);
+    let orange_back = PlayerId::Steam(92);
+    let mut calculator = settlement_kickoff(&blue_taker, &orange_taker, &orange_back);
+
+    // Blue wins the opening touch and pokes the ball deep into orange's half,
+    // but never touches it there: no anchor, so no pressure clock runs while
+    // orange's back man calmly retrieves it.
+    let mut frame_number = 11;
+    let mut time = 1.1;
+    while time < 3.0 - 1e-4 {
+        drive_frame(&mut calculator, frame_number, time, &ball(4000.0), vec![]);
+        frame_number += 1;
+        time += 0.1;
+    }
+    // Orange's back man collects and strings touches together: a possession
+    // run with no blue touch in between, spanning the minimum run length.
+    for (frame_number, time) in [(30usize, 3.0f32), (34, 3.4), (38, 3.8), (43, 4.3)] {
+        drive_frame(
+            &mut calculator,
+            frame_number,
+            time,
+            &ball(4000.0),
+            vec![touch(orange_back.clone(), false, frame_number, time)],
+        );
+    }
+    calculator.finish();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.settlement, KickoffSettlement::TeamOnePossession);
+    assert_eq!(event.settlement_team_is_team_0, Some(false));
+    assert_eq!(event.settlement_player, Some(orange_back));
+    assert_eq!(event.settlement_time, Some(4.3));
+    assert_eq!(event.settlement_frame, Some(43));
+    let seconds_after = event.settlement_seconds_after_first_touch.unwrap();
+    assert!((seconds_after - 3.3).abs() < 1e-4);
+    // The immediate exchange still reads as a blue win.
+    assert_eq!(event.outcome, KickoffOutcome::TeamZeroWin);
+}
+
+#[test]
+fn engaged_pressure_settles_for_attacking_team() {
+    let blue_taker = PlayerId::Steam(93);
+    let orange_taker = PlayerId::Steam(94);
+    let orange_back = PlayerId::Steam(95);
+    let mut calculator = settlement_kickoff(&blue_taker, &orange_taker, &orange_back);
+
+    // Ball lands in orange's third; blue follows up with a touch there (the
+    // anchor), and an orange panic touch neither resets the pressure clocks
+    // nor builds a possession run.
+    drive_frame(&mut calculator, 15, 1.5, &ball(3000.0), vec![]);
+    drive_frame(
+        &mut calculator,
+        20,
+        2.0,
+        &ball(3000.0),
+        vec![touch(blue_taker.clone(), true, 20, 2.0)],
+    );
+    drive_frame(
+        &mut calculator,
+        24,
+        2.4,
+        &ball(3000.0),
+        vec![touch(orange_back.clone(), false, 24, 2.4)],
+    );
+    let mut frame_number = 25;
+    let mut time = 2.5;
+    while time < 3.5 - 1e-4 {
+        drive_frame(&mut calculator, frame_number, time, &ball(3000.0), vec![]);
+        frame_number += 1;
+        time += 0.1;
+    }
+    calculator.finish();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.settlement, KickoffSettlement::TeamZeroPressure);
+    assert_eq!(event.settlement_team_is_team_0, Some(true));
+    assert_eq!(event.settlement_player, None);
+    let settlement_time = event.settlement_time.unwrap();
+    assert!(
+        (2.0..=3.0).contains(&settlement_time),
+        "expected pressure to establish ~0.75s after the in-zone anchor, got {settlement_time}",
+    );
+}
+
+#[test]
+fn contested_kickoff_stays_unsettled() {
+    let blue_taker = PlayerId::Steam(96);
+    let orange_taker = PlayerId::Steam(97);
+    let orange_back = PlayerId::Steam(98);
+    let mut calculator = settlement_kickoff(&blue_taker, &orange_taker, &orange_back);
+
+    // Alternating touches around midfield: no run ever spans the minimum and
+    // the ball never sits in either offensive zone.
+    let mut team_zero_turn = false;
+    let mut frame_number = 15;
+    let mut time = 1.5;
+    while time < 5.0 - 1e-4 {
+        let toucher = if team_zero_turn {
+            blue_taker.clone()
+        } else {
+            orange_taker.clone()
+        };
+        drive_frame(
+            &mut calculator,
+            frame_number,
+            time,
+            &ball(0.0),
+            vec![touch(toucher, team_zero_turn, frame_number, time)],
+        );
+        team_zero_turn = !team_zero_turn;
+        frame_number += 5;
+        time += 0.5;
+    }
+    calculator.finish();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.settlement, KickoffSettlement::Unsettled);
+    assert_eq!(event.settlement_team_is_team_0, None);
+    assert_eq!(event.settlement_time, None);
+    assert_eq!(event.settlement_player, None);
+}
+
+#[test]
+fn qualifying_kickoff_goal_settles_for_scoring_team() {
+    let blue_taker = PlayerId::Steam(99);
+    let orange_taker = PlayerId::Steam(100);
+    let orange_back = PlayerId::Steam(101);
+    let mut calculator = settlement_kickoff(&blue_taker, &orange_taker, &orange_back);
+
+    calculator
+        .update(
+            &frame(12, 1.2),
+            &live_gameplay(),
+            &ball(360.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState {
+                goal_events: vec![goal(false, 12, 1.2)],
+                ..FrameEventsState::default()
+            },
+        )
+        .unwrap();
+    calculator.finish();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert!(event.kickoff_goal);
+    assert_eq!(event.settlement, KickoffSettlement::TeamOneGoal);
+    assert_eq!(event.settlement_team_is_team_0, Some(false));
+    assert_eq!(event.settlement_time, Some(1.2));
 }

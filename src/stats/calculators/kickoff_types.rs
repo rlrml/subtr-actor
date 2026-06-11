@@ -216,6 +216,50 @@ impl KickoffPossessionOutcome {
     }
 }
 
+/// How (and for whom) the kickoff exchange ultimately settled, independent of
+/// who won the immediate touch battle. A kickoff is settled by the first of:
+/// a team stringing uncontested touches together long enough to count as real
+/// possession (even deep in its own half — losing the opening touch but
+/// collecting the ball cleanly is a settlement for the collector), a team
+/// pinning the ball in the opponent's half with touch engagement and no clean
+/// opposing possession, or a qualifying kickoff goal. A kickoff that never
+/// reaches any of those within the settlement window stays `Unsettled`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffSettlement {
+    TeamZeroPossession,
+    TeamOnePossession,
+    TeamZeroPressure,
+    TeamOnePressure,
+    TeamZeroGoal,
+    TeamOneGoal,
+    #[default]
+    Unsettled,
+}
+
+impl KickoffSettlement {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::TeamZeroPossession => "team_zero_possession",
+            Self::TeamOnePossession => "team_one_possession",
+            Self::TeamZeroPressure => "team_zero_pressure",
+            Self::TeamOnePressure => "team_one_pressure",
+            Self::TeamZeroGoal => "team_zero_goal",
+            Self::TeamOneGoal => "team_one_goal",
+            Self::Unsettled => "unsettled",
+        }
+    }
+
+    pub fn team_is_team_0(self) -> Option<bool> {
+        match self {
+            Self::TeamZeroPossession | Self::TeamZeroPressure | Self::TeamZeroGoal => Some(true),
+            Self::TeamOnePossession | Self::TeamOnePressure | Self::TeamOneGoal => Some(false),
+            Self::Unsettled => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -381,6 +425,19 @@ pub struct KickoffEvent {
     pub kickoff_goal: bool,
     pub scoring_team_is_team_0: Option<bool>,
     pub time_to_goal: Option<f32>,
+    /// See [`KickoffSettlement`]. Unlike `outcome` and
+    /// `kickoff_possession_outcome`, which read the immediate exchange, this
+    /// answers "who did the kickoff actually end up being good for" once play
+    /// settled.
+    pub settlement: KickoffSettlement,
+    pub settlement_team_is_team_0: Option<bool>,
+    pub settlement_time: Option<f32>,
+    pub settlement_frame: Option<usize>,
+    pub settlement_seconds_after_first_touch: Option<f32>,
+    /// For possession settlements, the player whose touch completed the
+    /// possession run. Pressure and goal settlements are team-level.
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
+    pub settlement_player: Option<PlayerId>,
     pub team_zero_taker: Option<KickoffTakerEvent>,
     pub team_one_taker: Option<KickoffTakerEvent>,
     pub team_zero_non_takers: Vec<KickoffSupportEvent>,
