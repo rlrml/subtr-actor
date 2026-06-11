@@ -21,6 +21,7 @@ descriptive fixture names in tests and docs.
 | `replay-format-2025-06-10-v868-32-net10-replicated-boost.replay` | former `new_boost_format.replay` |
 | `replay-format-2026-01-14-v868-32-net10-demolish-extended.replay` | former `new_demolition_format.replay` |
 | `replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay` | former `dodges_refreshed_counter.replay` |
+| `replay-format-2026-06-02-v868-32-net11-worldcup-ball.replay` | ranked doubles played 2026-06-10 on the World Cup update (`Ball_WorldCup` archetype) |
 
 These fixtures were downloaded from the Ballchasing API on 2026-03-10.
 
