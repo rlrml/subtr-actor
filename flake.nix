@@ -122,9 +122,10 @@
             let
               vendorDir = rustPlatform.importCargoLock {
                 lockFile = ./Cargo.lock;
-                outputHashes = {
-                  "boxcars-0.11.1" = "sha256-G6uUsXLqlZr2g3x8sIbrTx2Z3TX7shXxBqIPfQe/9Xo=";
-                };
+                # Fetch git dependencies (e.g. patched boxcars) via
+                # builtins.fetchGit so Cargo.lock stays the single source of
+                # truth — no outputHashes entry to keep in sync by hand.
+                allowBuiltinFetchGit = true;
                 extraRegistries = {
                   "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
                 };
@@ -198,7 +199,12 @@
           pname = "subtr-actor-bakkesmod-plugin";
           version = projectVersion;
           src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            # Same as js-web-wasm: hash-free git-dependency fetching keeps
+            # Cargo.lock the single source of truth for crate revisions.
+            allowBuiltinFetchGit = true;
+          };
           nativeBuildInputs = [
             pkgs.cmake
             pkgs.llvmPackages_21.clang-unwrapped
