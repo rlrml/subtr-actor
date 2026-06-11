@@ -36,6 +36,7 @@
     "check": "sh -lc 'test -f ../pkg/rl_replay_subtr_actor.js || ../scripts/with-clean-npm-env.sh node --run=build:bindings; ../scripts/with-clean-npm-env.sh node --run=verify:raw-types && tsc --noEmit'",
     "test": "tsx --tsconfig tsconfig.test.json --test test/*.test.ts",
     "build:types": "tsc --project tsconfig.build.json",
+    "build:dist": "vite build && tsc --project tsconfig.build.json",
     "build": "../scripts/with-clean-npm-env.sh node --run=build:bindings && ../scripts/with-clean-npm-env.sh node --run=check && vite build && ../scripts/with-clean-npm-env.sh node --run=build:types",
     "prepare:package": "node ./scripts/prepare-package.mjs",
     "smoke:install": "node ./scripts/smoke-install.mjs"
