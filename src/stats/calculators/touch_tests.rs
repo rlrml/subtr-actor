@@ -303,6 +303,124 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
 }
 
 #[test]
+fn dodge_byte_lagging_one_frame_upgrades_touch_to_dodge() {
+    // Regression: the CarComponent_Dodge ReplicatedActive byte routinely
+    // replicates a frame after the ball-hit it produced, so a flip-into-ball
+    // contact is sampled on the one frame where the flag is not yet active. The
+    // touch must still be recognized as a dodge contact once the byte flips on
+    // within the lag-tolerance window.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+
+    calculator
+        .update(
+            &frame(0),
+            &ball(0.0, 0.0),
+            &PlayerFrameState::default(),
+            &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
+            &TouchState::default(),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    // The hit lands while the dodge byte still reads inactive.
+    calculator
+        .update(
+            &frame(1),
+            &ball_with_velocity(0.0, 0.0, glam::Vec3::new(0.0, 1500.0, 0.0)),
+            &player_frame_state_with_dodge_active(&player_id, glam::Vec3::ZERO, false),
+            &vertical_state(&player_id, 0.0),
+            &RotationCalculator::default(),
+            &touch_state(1, &player_id),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    assert_eq!(calculator.events()[0].dodge_state, "no_dodge");
+    // One frame later the dodge byte flips on (no new touch this frame).
+    calculator
+        .update(
+            &frame(2),
+            &ball_with_velocity(0.0, 0.0, glam::Vec3::new(0.0, 1500.0, 0.0)),
+            &player_frame_state_with_dodge_active(&player_id, glam::Vec3::ZERO, true),
+            &vertical_state(&player_id, 0.0),
+            &RotationCalculator::default(),
+            &TouchState::default(),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events()[0].dodge_state, "dodge");
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.dodge_touch_count(), 1);
+}
+
+#[test]
+fn dodge_byte_outside_tolerance_window_does_not_upgrade_touch() {
+    // A dodge that activates well after the touch (beyond the lag tolerance) is
+    // a separate maneuver and must not retroactively mark the touch a dodge.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+
+    calculator
+        .update(
+            &frame(0),
+            &ball(0.0, 0.0),
+            &PlayerFrameState::default(),
+            &PlayerVerticalState::default(),
+            &RotationCalculator::default(),
+            &TouchState::default(),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(1),
+            &ball_with_velocity(0.0, 0.0, glam::Vec3::new(0.0, 1500.0, 0.0)),
+            &player_frame_state_with_dodge_active(&player_id, glam::Vec3::ZERO, false),
+            &vertical_state(&player_id, 0.0),
+            &RotationCalculator::default(),
+            &touch_state(1, &player_id),
+            &PossessionState::default(),
+            &FiftyFiftyState::default(),
+            &FrameEventsState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    // Dodge stays inactive through frame 2, then activates at frame 3 — by which
+    // point the touch (t=0.1) is 0.2s old, past the tolerance window.
+    for (frame_number, dodge_active) in [(2usize, false), (3usize, true)] {
+        calculator
+            .update(
+                &frame(frame_number),
+                &ball_with_velocity(0.0, 0.0, glam::Vec3::new(0.0, 1500.0, 0.0)),
+                &player_frame_state_with_dodge_active(&player_id, glam::Vec3::ZERO, dodge_active),
+                &vertical_state(&player_id, 0.0),
+                &RotationCalculator::default(),
+                &TouchState::default(),
+                &PossessionState::default(),
+                &FiftyFiftyState::default(),
+                &FrameEventsState::default(),
+                &LivePlayState::active_play(),
+            )
+            .unwrap();
+    }
+
+    assert_eq!(calculator.events()[0].dodge_state, "no_dodge");
+}
+
+#[test]
 fn controlled_ground_carry_touch_counts_as_control_despite_medium_impulse() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = TouchCalculator::new();
