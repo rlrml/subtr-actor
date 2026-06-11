@@ -3,4 +3,4 @@
 /**
  * Coarse product/domain grouping for an event definition.
  */
-export type EventCategory = "core" | "mechanic" | "possession" | "positioning" | "boost" | "movement" | "annotation" | "other" | "context";
+export type EventCategory = "core" | "mechanic" | "positioning" | "movement" | "annotation" | "other" | "context";
