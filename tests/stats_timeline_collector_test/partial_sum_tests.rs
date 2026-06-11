@@ -443,8 +443,8 @@ fn test_core_events_reconstruct_serialized_partial_sums() {
         "expected core fixture to contain player scoreboard events"
     );
     assert!(
-        timeline_has_stream(&timeline, "core_player_goal_context"),
-        "expected core fixture to contain player goal-context events"
+        timeline_has_stream(&timeline, "goal_context"),
+        "expected core fixture to contain consolidated goal-context events"
     );
     assert_core_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
 }
