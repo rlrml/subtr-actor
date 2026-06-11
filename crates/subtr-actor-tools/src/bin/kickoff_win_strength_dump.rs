@@ -3,9 +3,7 @@ use clap::Parser;
 use subtr_actor::{EventPayload, StatsTimelineCollector};
 
 #[derive(Debug, Parser)]
-#[command(
-    about = "Dump per-kickoff win strength and band to evaluate the band calibration."
-)]
+#[command(about = "Dump per-kickoff win strength and band to evaluate the band calibration.")]
 struct Args {
     /// Replay paths to dump.
     #[arg(value_name = "replay", num_args = 1..)]
@@ -21,12 +19,8 @@ fn main() -> anyhow::Result<()> {
     // TSV header
     println!("replay\tstart_time\toutcome\twin_strength\tband\texit_speed\texit_y_velocity");
     for path in &paths {
-        if let Err(error) = dump_replay(
-            path,
-            &mut strengths,
-            &mut band_counts,
-            &mut outcome_counts,
-        ) {
+        if let Err(error) = dump_replay(path, &mut strengths, &mut band_counts, &mut outcome_counts)
+        {
             eprintln!("skip {path}: {error:?}");
         }
     }
