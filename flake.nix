@@ -122,6 +122,9 @@
             let
               vendorDir = rustPlatform.importCargoLock {
                 lockFile = ./Cargo.lock;
+                outputHashes = {
+                  "boxcars-0.11.1" = "sha256-G6uUsXLqlZr2g3x8sIbrTx2Z3TX7shXxBqIPfQe/9Xo=";
+                };
                 extraRegistries = {
                   "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
                 };
