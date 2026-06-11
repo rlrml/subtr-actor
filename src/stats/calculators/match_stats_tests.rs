@@ -517,6 +517,51 @@ fn counter_attack_buildup_accepts_defensive_half_pressure_without_defensive_thir
 }
 
 #[test]
+fn counter_attack_buildup_ignores_defensive_pressure_before_the_kickoff() {
+    // Regression: a clean kickoff goal must not be classified as a
+    // counter-attack just because the lookback window reaches back across the
+    // kickoff into the previous possession. The defensive-half presence here all
+    // predates the kickoff first touch, so it must not count toward this goal.
+    let mut calculator = MatchStatsCalculator::new();
+    calculator.goal_buildup_samples = vec![
+        buildup_sample(2.0, -500.0),
+        buildup_sample(3.0, -500.0),
+        buildup_sample(4.0, -500.0),
+        buildup_sample(5.0, -500.0),
+        buildup_sample(6.0, 600.0),
+        buildup_sample(7.0, 600.0),
+        buildup_sample(8.0, 600.0),
+        buildup_sample(9.0, 600.0),
+    ];
+    // Kickoff first touch lands after the (prior-possession) defensive pressure.
+    calculator.active_kickoff_touch_time = Some(5.5);
+
+    assert_eq!(
+        calculator.classify_goal_buildup(10.0, true),
+        GoalBuildupKind::Other
+    );
+}
+
+#[test]
+fn counter_attack_buildup_ignores_opponent_shot_before_the_kickoff() {
+    let mut calculator = MatchStatsCalculator::new();
+    calculator.goal_buildup_samples = vec![
+        buildup_sample(6.0, 600.0),
+        buildup_sample(7.0, 600.0),
+        buildup_sample(8.0, 600.0),
+        buildup_sample(9.0, 600.0),
+    ];
+    // Opponent shot belongs to the possession before this kickoff.
+    calculator.goal_buildup_pressure_events = vec![shot_pressure(5.0, false)];
+    calculator.active_kickoff_touch_time = Some(5.5);
+
+    assert_eq!(
+        calculator.classify_goal_buildup(10.0, true),
+        GoalBuildupKind::Other
+    );
+}
+
+#[test]
 fn counter_attack_buildup_accepts_opponent_shot_as_pressure_signal() {
     let mut calculator = MatchStatsCalculator::new();
     calculator.goal_buildup_samples = vec![

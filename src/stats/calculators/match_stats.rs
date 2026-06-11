@@ -1001,11 +1001,24 @@ impl MatchStatsCalculator {
         goal_time: f32,
         scoring_team_is_team_0: bool,
     ) -> GoalBuildupKind {
+        // A goal's buildup must not reach back across the kickoff that
+        // immediately preceded it. Play before that kickoff belongs to a prior,
+        // already-concluded possession (a kickoff only follows a goal/reset), so
+        // counting its ball positions as "defensive pressure" for this goal is
+        // spurious — it is exactly what makes a clean kickoff goal masquerade as
+        // a counter-attack. Clamp the lookback window to the current kickoff's
+        // first touch when one is established.
+        let window_start = self
+            .active_kickoff_touch_time
+            .map(|kickoff_touch_time| {
+                kickoff_touch_time.max(goal_time - GOAL_BUILDUP_LOOKBACK_SECONDS)
+            })
+            .unwrap_or(goal_time - GOAL_BUILDUP_LOOKBACK_SECONDS);
         let relevant_samples: Vec<_> = self
             .goal_buildup_samples
             .iter()
             .filter(|entry| entry.time <= goal_time)
-            .filter(|entry| goal_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS)
+            .filter(|entry| entry.time >= window_start)
             .collect();
         if relevant_samples.is_empty() {
             return GoalBuildupKind::Other;
@@ -1051,7 +1064,7 @@ impl MatchStatsCalculator {
 
         let opponent_shot_in_lookback = self.goal_buildup_pressure_events.iter().any(|entry| {
             entry.time <= goal_time
-                && goal_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS
+                && entry.time >= window_start
                 && entry.is_team_0 != scoring_team_is_team_0
         });
         let has_defensive_pressure_signal = defensive_half_time
