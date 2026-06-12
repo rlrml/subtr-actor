@@ -257,6 +257,9 @@ export class ViewerPlayer extends EventTarget {
     // Default camera: simple orbit. The full follow/ballcam path is a later
     // bring-up; plugins can also drive `camera` directly.
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    // Default zoomSpeed (1) feels glacial at field scale — viewing distances are
+    // thousands of UU, so each wheel notch barely moves the camera.
+    this.controls.zoomSpeed = 2.5;
     this.camera.position.set(0, 4000, 6000);
     this.controls.target.set(0, 200, 0);
     this.controls.update();

@@ -17,6 +17,9 @@ export class CameraManager {
     // Configure controls
     this.controls.dollyToCursor = false;
     this.controls.infinityDolly = false;
+    // Default dollySpeed (1) is sluggish at field scale (camera distances run
+    // into thousands of UU) — boost wheel zoom responsiveness in free mode.
+    this.controls.dollySpeed = 2.5;
 
     // Smooth damping for transitions - keep it snappy
     this.controls.smoothTime = 0.05; // Very fast transitions
@@ -124,12 +127,13 @@ export class CameraManager {
           // Disable scroll zoom when following another viewer
           if (this.mode === 'ballOrbit' && !this.isFollowingViewer) {
             e.preventDefault();
-            // Dolly in/out based on scroll direction (in UU)
-            const zoomSpeed = 50;
+            // Dolly in/out proportionally to current distance — a fixed UU step
+            // is imperceptible at field scale (orbit distances run 1000s of UU).
+            const zoomStep = Math.max(this.controls.distance * 0.2, 100);
             if (e.deltaY > 0) {
-              this.controls.dolly(-zoomSpeed, true);
+              this.controls.dolly(-zoomStep, true);
             } else {
-              this.controls.dolly(zoomSpeed, true);
+              this.controls.dolly(zoomStep, true);
             }
           }
         };
