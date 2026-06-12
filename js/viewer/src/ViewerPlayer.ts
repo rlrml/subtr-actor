@@ -17,7 +17,25 @@ import { ArenaManager } from "./managers/ArenaManager.js";
 import { ActorManager } from "./managers/ActorManager.js";
 import { EffectsManager } from "./managers/EffectsManager.js";
 import type { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
-import type { ReplayModel } from "@rlrml/player";
+// Timeline projection / skip-window semantics are @rlrml/player's own
+// ReplayModel utilities, so both players agree on what gets skipped and how
+// replay time maps onto the (skip-aware) timeline.
+import {
+  computeTimelineSegments,
+  getKickoffCountdownMetadata,
+  getKickoffSkipTargetTime,
+  getPostGoalTransitionSkipTargetTime,
+  getReplayPlaybackEndTime,
+  inferKickoffGameState,
+  inferLiveGameState,
+  projectReplayTimeToTimeline,
+  projectTimelineTimeToReplay,
+} from "@rlrml/player";
+import type {
+  ReplayModel,
+  ReplayPlayerTimelineProjection,
+  ReplayPlayerTimelineSegment,
+} from "@rlrml/player";
 import type { CameraPlugin } from "./plugins/camera.js";
 import type {
   BallRenderState,
@@ -127,6 +145,12 @@ export class ViewerPlayer extends EventTarget {
   /** True once view-mode/attachment was set through the parity surface. */
   private attachmentTouched = false;
 
+  // ── Timeline projection / skip windows (require a ReplayModel) ──────────────
+  private readonly liveGameState: number | null = null;
+  private readonly kickoffGameState: number | null = null;
+  private timelineSegmentsCacheKey: string | null = null;
+  private timelineSegmentsCache: ReplayPlayerTimelineSegment[] = [];
+
   constructor(
     container: HTMLElement,
     adapter: SubtrActorPlayer,
@@ -138,6 +162,10 @@ export class ViewerPlayer extends EventTarget {
     this.adapter = adapter;
     this.replay = replay;
     this.options = options;
+    if (replay) {
+      this.liveGameState = inferLiveGameState(replay);
+      this.kickoffGameState = inferKickoffGameState(replay, this.liveGameState);
+    }
     this.speed = Math.max(0.1, options.initialPlaybackRate ?? options.speed ?? 1);
     this.loop = options.loop ?? false;
     this.cameraDistanceScaleValue = Math.max(0.25, options.initialCameraDistanceScale ?? 1);
@@ -190,6 +218,10 @@ export class ViewerPlayer extends EventTarget {
       this.installPlugin(definition, false);
     }
     this.applyInitialCameraOptions();
+    // @rlrml/player semantics: don't start inside a skipped window (t=0 is a
+    // kickoff, so skip-kickoffs jumps straight to live play).
+    this.skipPostGoalTransitionIfNeeded();
+    this.skipPastKickoffIfNeeded();
     this.scheduleAnimationFrame();
     this.emitChange();
 
@@ -230,6 +262,11 @@ export class ViewerPlayer extends EventTarget {
 
   seek(time: number): void {
     this.seekInternal(time);
+    if (this.playing) {
+      // Never land playback inside a skipped window (@rlrml/player semantics).
+      this.skipPostGoalTransitionIfNeeded();
+      this.skipPastKickoffIfNeeded();
+    }
     this.emitChange();
   }
 
@@ -334,13 +371,21 @@ export class ViewerPlayer extends EventTarget {
     this.emitChange();
   }
 
+  // ── Skip windows (@rlrml/player parity; live when a ReplayModel is present) ──
   setSkipPostGoalTransitionsEnabled(enabled: boolean): void {
     this.skipPostGoalTransitionsEnabledValue = enabled;
+    if (enabled && this.playing) {
+      this.skipPostGoalTransitionIfNeeded();
+    }
     this.emitChange();
   }
 
   setSkipKickoffsEnabled(enabled: boolean): void {
     this.skipKickoffsEnabledValue = enabled;
+    if (enabled && this.playing) {
+      this.skipPostGoalTransitionIfNeeded();
+      this.skipPastKickoffIfNeeded();
+    }
     this.emitChange();
   }
 
@@ -398,10 +443,15 @@ export class ViewerPlayer extends EventTarget {
     if (patch.playing !== undefined && patch.playing !== this.playing) {
       this.setPlayingInternal(patch.playing);
     }
+    if (this.playing && (patch.currentTime !== undefined || patch.playing !== undefined)) {
+      this.skipPostGoalTransitionIfNeeded();
+      this.skipPastKickoffIfNeeded();
+    }
     this.emitChange();
   }
 
   getState(): ViewerState {
+    const frameIndex = this.adapter.frameIndexAt(this.currentTime);
     const camera = this.getCameraPlugin();
     let cameraViewMode = this.cameraViewModeValue;
     let attachedPlayerId = this.attachedPlayerIdValue;
@@ -423,8 +473,13 @@ export class ViewerPlayer extends EventTarget {
     return {
       currentTime: this.currentTime,
       duration: this.duration,
-      frameIndex: this.adapter.frameIndexAt(this.currentTime),
-      activeMetadata: null,
+      frameIndex,
+      // Kickoff countdowns, like @rlrml/player. The adapter's frame timeline is
+      // the ReplayModel's (same metadata frames, same time axis), so its index
+      // is valid against the model.
+      activeMetadata: this.replay
+        ? getKickoffCountdownMetadata(this.replay, frameIndex, this.currentTime)
+        : null,
       playing: this.playing,
       speed: this.speed,
       cameraDistanceScale: this.cameraDistanceScaleValue,
@@ -443,6 +498,51 @@ export class ViewerPlayer extends EventTarget {
 
   getSnapshot(): ViewerSnapshot {
     return this.getState();
+  }
+
+  // ── Timeline projection (@rlrml/player parity) ──────────────────────────────
+  // Maps replay time onto the skip-aware timeline (and back). Without a
+  // ReplayModel there are no segments, so every projection is the identity.
+  getTimelineDuration(): number {
+    return this.replay?.duration ?? this.duration;
+  }
+
+  getTimelineCurrentTime(): number {
+    return this.projectReplayTimeToTimeline(this.currentTime).timelineTime;
+  }
+
+  getTimelineSegments(): ReplayPlayerTimelineSegment[] {
+    if (!this.replay) return [];
+    const cacheKey = `${this.skipPostGoalTransitionsEnabledValue}:${this.skipKickoffsEnabledValue}`;
+    if (this.timelineSegmentsCacheKey === cacheKey) {
+      return this.timelineSegmentsCache;
+    }
+    this.timelineSegmentsCacheKey = cacheKey;
+    this.timelineSegmentsCache = computeTimelineSegments(
+      this.replay,
+      this.skipPostGoalTransitionsEnabledValue,
+      this.skipKickoffsEnabledValue,
+      this.liveGameState,
+      this.kickoffGameState,
+    );
+    return this.timelineSegmentsCache;
+  }
+
+  projectReplayTimeToTimeline(replayTime: number): ReplayPlayerTimelineProjection {
+    return projectReplayTimeToTimeline(
+      this.replay?.duration ?? this.duration,
+      this.getTimelineSegments(),
+      replayTime,
+    );
+  }
+
+  projectTimelineTimeToReplay(timelineTime: number): number {
+    return projectTimelineTimeToReplay(
+      this.replay?.duration ?? this.duration,
+      this.getTimelineDuration(),
+      this.getTimelineSegments(),
+      timelineTime,
+    );
   }
 
   subscribe(listener: ViewerListener): () => void {
@@ -531,6 +631,46 @@ export class ViewerPlayer extends EventTarget {
     this.actorManager.seekAnimations(this.currentTime);
     this.effectsManager.resetBallTrail();
     this.actorManager.resetWheelTracking();
+  }
+
+  /** Where playback stops: the last segment's start if skips run to the end. */
+  private getPlaybackEndTime(): number {
+    return this.replay
+      ? getReplayPlaybackEndTime(this.replay.duration, this.getTimelineSegments())
+      : this.duration;
+  }
+
+  /**
+   * Jump past a kickoff countdown when skip-kickoffs is on (@rlrml/player
+   * semantics). A skip is a jump, so it routes through seekInternal — that
+   * resets the delta-based trackers (ball trail, wheel spin) which must not
+   * see it. Returns true when a skip happened.
+   */
+  private skipPastKickoffIfNeeded(): boolean {
+    if (!this.replay || !this.skipKickoffsEnabledValue) return false;
+    const targetTime = getKickoffSkipTargetTime(
+      this.replay,
+      this.currentTime,
+      this.liveGameState,
+      this.kickoffGameState,
+    );
+    if (targetTime === null) return false;
+    this.seekInternal(targetTime);
+    return true;
+  }
+
+  /** Same as skipPastKickoffIfNeeded, for post-goal replay/celebration windows. */
+  private skipPostGoalTransitionIfNeeded(): boolean {
+    if (!this.replay || !this.skipPostGoalTransitionsEnabledValue) return false;
+    const targetTime = getPostGoalTransitionSkipTargetTime(
+      this.replay,
+      this.currentTime,
+      this.liveGameState,
+      this.kickoffGameState,
+    );
+    if (targetTime === null) return false;
+    this.seekInternal(targetTime);
+    return true;
   }
 
   /** The installed camera plugin, when one is present (duck-typed by id). */
@@ -639,7 +779,10 @@ export class ViewerPlayer extends EventTarget {
       dt = this.lastTickAt === null ? 0 : Math.min(0.1, (now - this.lastTickAt) / 1000);
       this.lastTickAt = now;
       let next = this.currentTime + dt * this.speed;
-      if (next >= this.duration) {
+      // Skip-aware end: when trailing windows are skipped, playback ends at
+      // the final segment boundary instead of the raw duration (@rlrml/player).
+      const end = this.getPlaybackEndTime();
+      if (next >= end) {
         if (this.loop) {
           next = 0;
           // Wrapping is a seek: clear delta-based trackers (see seek()).
@@ -647,12 +790,16 @@ export class ViewerPlayer extends EventTarget {
           this.effectsManager.resetBallTrail();
           this.actorManager.resetWheelTracking();
         } else {
-          next = this.duration;
+          next = end;
           this.playing = false;
         }
       }
       timeChanged = next !== this.currentTime || !this.playing;
       this.currentTime = next;
+      if (this.playing) {
+        timeChanged = this.skipPostGoalTransitionIfNeeded() || timeChanged;
+        timeChanged = this.skipPastKickoffIfNeeded() || timeChanged;
+      }
     }
 
     this.render(dt);
@@ -738,6 +885,8 @@ export class ViewerPlayer extends EventTarget {
   private createPluginContext(): ViewerPluginContext {
     return {
       player: this,
+      replay: this.replay,
+      options: this.options,
       scene: this.scene,
       camera: this.camera,
       renderer: this.renderer,
@@ -783,6 +932,8 @@ export class ViewerPlayer extends EventTarget {
     });
     return {
       ...this.createPluginContext(),
+      ...this.computeFrameRenderInfo(),
+      state: this.getState(),
       time: this.currentTime,
       ball: ballState,
       cars,

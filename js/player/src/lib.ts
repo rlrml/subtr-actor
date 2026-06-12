@@ -64,6 +64,24 @@ export type {
   ReplayPlaylistPlayerSingleReplayOptions,
 } from "./playlist";
 export { findFrameIndexAtTime, normalizeReplayData, normalizeReplayDataAsync } from "./replay-data";
+export { playerIdToString } from "./replay-data-helpers";
+// Pure ReplayModel timeline utilities, exported so other players (e.g.
+// @rlrml/viewer) can offer the same timeline-projection / skip-window
+// semantics over a shared ReplayModel.
+export {
+  computeTimelineSegments,
+  getFrameWindow,
+  getKickoffCountdownMetadata,
+  getReplayPlaybackEndTime,
+  inferKickoffGameState,
+  inferLiveGameState,
+  projectReplayTimeToTimeline,
+  projectTimelineTimeToReplay,
+} from "./player-internals/timeline";
+export {
+  getKickoffSkipTargetTime,
+  getPostGoalTransitionSkipTargetTime,
+} from "./player-helpers";
 export type {
   NormalizeReplayDataAsyncOptions,
   NormalizeReplayDataOptions,

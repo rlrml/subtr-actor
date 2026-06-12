@@ -12,6 +12,7 @@
  * `ViewerPlayer` unchanged — see docs/PLAYER_PARITY.md for the matrix.
  */
 import type * as THREE from "three";
+import type { ReplayModel, ReplayPlayerActiveMetadata } from "@rlrml/player";
 import type { Vec3, Quat } from "./adapter/coords.js";
 import type { ViewerPlayer } from "./ViewerPlayer.js";
 
@@ -55,16 +56,17 @@ export type ViewerFreeCameraPreset = "overhead" | "side";
  * Snapshot of playback state, emitted on every "change" event. Shape-compatible
  * with `@rlrml/player`'s `ReplayPlayerState`.
  *
- * The display toggles (boost meter, hitboxes, skip windows) are tracked-but-
- * inert for now: setters update state and notify subscribers, but no rendering
- * is wired to them yet (docs/PLAYER_PARITY.md).
+ * The display toggles (boost meter, hitboxes) are tracked-but-inert for now:
+ * setters update state and notify subscribers, but no rendering is wired to
+ * them yet (docs/PLAYER_PARITY.md). The skip toggles are live when the viewer
+ * has a `ReplayModel` (always, via `createViewer`).
  */
 export interface ViewerState {
   currentTime: number;
   duration: number;
   frameIndex: number;
-  /** Always null for now (@rlrml/player surfaces kickoff countdowns here). */
-  activeMetadata: null;
+  /** Kickoff countdown metadata (@rlrml/player semantics); null outside kickoffs. */
+  activeMetadata: ReplayPlayerActiveMetadata | null;
   playing: boolean;
   speed: number;
   cameraDistanceScale: number;
@@ -146,6 +148,14 @@ export interface CarRenderState {
 export interface ViewerPluginContext {
   /** The core; exposes playback control, state, and the subtr-actor adapter. */
   player: ViewerPlayer;
+  /**
+   * @rlrml/player's normalized ReplayModel (`viewer.replay`) — the shared data
+   * layer plugins written against `ReplayPlayerPluginContext` read. Null only
+   * when the ViewerPlayer was constructed directly without one.
+   */
+  replay: ReplayModel | null;
+  /** The constructor options the viewer was created with. */
+  options: ViewerOptions;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
@@ -157,8 +167,8 @@ export interface ViewerPluginStateContext extends ViewerPluginContext {
   state: ViewerState;
 }
 
-export interface ViewerRenderContext extends ViewerPluginContext {
-  /** Current playback time (s). */
+export interface ViewerRenderContext extends ViewerPluginStateContext, FrameRenderInfo {
+  /** Current playback time (s) — same value as `currentTime` (viewer-native name). */
   time: number;
   ball: BallRenderState;
   cars: CarRenderState[];
@@ -205,8 +215,8 @@ export interface ViewerOptions {
   initialHitboxWireframesEnabled?: boolean;
   /** Tracked-but-inert (no hitbox-only mode yet). */
   initialHitboxOnlyModeEnabled?: boolean;
-  /** Tracked-but-inert (no post-goal skip logic yet). */
+  /** Live when a ReplayModel is present (@rlrml/player default: true). */
   initialSkipPostGoalTransitionsEnabled?: boolean;
-  /** Tracked-but-inert (no kickoff skip logic yet). */
+  /** Live when a ReplayModel is present (@rlrml/player default: false). */
   initialSkipKickoffsEnabled?: boolean;
 }

@@ -9,6 +9,8 @@ import {
   createNameTagPlugin,
   createBoostPadsPlugin,
   createCameraPlugin,
+  createTimelineOverlayPlugin,
+  fromReplayPlayerPlugin,
 } from "../lib.js";
 
 const hud = document.getElementById("hud") as HTMLDivElement;
@@ -27,7 +29,14 @@ async function main() {
   const viewer = await createViewer(container, bytes, {
     autoplay: true,
     loop: true,
-    plugins: [createNameTagPlugin(), createBoostPadsPlugin(), camPlugin],
+    plugins: [
+      createNameTagPlugin(),
+      createBoostPadsPlugin(),
+      camPlugin,
+      // @rlrml/player's own timeline overlay (goals/saves markers, skip
+      // toggles, scrubber), mounted through the Phase 3 bridge.
+      fromReplayPlayerPlugin(createTimelineOverlayPlugin()),
+    ],
   });
 
   const roster = viewer.adapter.playerList
@@ -170,6 +179,44 @@ async function main() {
       !!model &&
         model.players.some((p) => p.id === first.id) &&
         Math.abs(model.duration - viewer.getState().duration) < 0.001,
+    );
+    // Phase 3: timeline projection / skip windows / bridged @rlrml/player plugin.
+    ok(
+      "timeline duration matches model",
+      !!model && Math.abs(viewer.getTimelineDuration() - model.duration) < 0.001,
+    );
+    ok(
+      "timeline current time = projection of currentTime",
+      Math.abs(
+        viewer.getTimelineCurrentTime() -
+          viewer.projectReplayTimeToTimeline(viewer.getState().currentTime).timelineTime,
+      ) < 0.001,
+    );
+    viewer.setSkipKickoffsEnabled(true);
+    const proj0 = viewer.projectReplayTimeToTimeline(0);
+    ok(
+      "t=0 hidden by kickoff skip, seekTime jumps past it",
+      proj0.hiddenBySkip && proj0.seekTime > 0,
+    );
+    ok("skip segments computed", viewer.getTimelineSegments().length > 0);
+    viewer.setSkipKickoffsEnabled(false);
+    const kickoffFrame = model?.frames.find((f) => f.kickoffCountdown > 0);
+    if (kickoffFrame) {
+      viewer.setState({ playing: false, currentTime: kickoffFrame.time });
+      ok(
+        "activeMetadata during kickoff countdown",
+        viewer.getState().activeMetadata?.kind === "kickoff-countdown",
+      );
+      viewer.setState({ currentTime: 45 });
+      ok("activeMetadata null outside kickoff", viewer.getState().activeMetadata === null);
+    } else {
+      ok("activeMetadata during kickoff countdown (no countdown frames in model)", false);
+    }
+    ok(
+      "bridged timeline overlay mounted",
+      !!document.querySelector(".sap-tl-root") &&
+        document.querySelector<HTMLInputElement>(".sap-tl-root input[type=range]")?.max ===
+          `${model?.duration}`,
     );
     viewer.play();
   }

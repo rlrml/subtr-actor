@@ -114,6 +114,17 @@ Key modules:
   `src/dev/validate.mts` assert id-set and time-axis equality. This requires
   the **workspace** `@rlrml/player` (`file:../player`, see
   [`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md) for the build steps).
+- **Plugin-context parity + plugin bridge (Parity Phase 3).** Plugin contexts
+  carry `replay`/`options`/`state` (+ `FrameRenderInfo` in the render
+  context), the timeline-projection / skip-window APIs are live —
+  @rlrml/player's own pure `ReplayModel` utilities, so `skipKickoffs` /
+  `skipPostGoalTransitions`, `activeMetadata` kickoff countdowns, and the
+  skip-aware playback end all behave identically — and
+  `fromReplayPlayerPlugin()` mounts @rlrml/player's DOM plugins unmodified.
+  The dev harness runs its real timeline overlay (markers, skip toggles,
+  scrubber) through the bridge. Renderer-coupled plugins (`beforeRender`)
+  are rejected loudly and need native ports — see
+  [`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md).
 - **Recorded camera settings.** subtr-actor now extracts each player's
   replicated RL camera preset (`TAGame.CameraSettingsActor_TA:ProfileSettings`
   → `PlayerInfo.camera_settings`: fov/height/angle/distance/stiffness/swivel/
@@ -132,10 +143,10 @@ Key modules:
    position-smoothing and frame-filtering passes that exist to clean raw replay
    jitter that subtr-actor already handles upstream; those should be removed,
    not preserved.
-3. **Parity Phase 3** ([`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md)):
-   close the plugin-context gap (`replay`/`options`/`state` in plugin
-   contexts) and port the timeline-overlay / recorder plugins so
-   `js/stat-evaluation-player` can run on this viewer.
+3. **Native ports of @rlrml/player's renderer-coupled plugins**
+   (boost-pickup animation, canvas recorder): they use `beforeRender`, whose
+   render context is renderer-internal, so the Phase 3 bridge deliberately
+   rejects them ([`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md)).
 
 ## Focused layout (cleanup complete)
 

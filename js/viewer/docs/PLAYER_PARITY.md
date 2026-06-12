@@ -13,10 +13,14 @@ Three phases:
 2. **Shared data layer** *(done — see below)*: `viewer.replay: ReplayModel` from
    `@rlrml/player`'s `normalizeReplayData` over the same raw WASM output the
    adapter consumes, with the adapter's ids and time axis aligned to it.
-3. **Plugin-context parity** *(next)*: add `replay`/`options`/`state` to plugin
-   contexts, `FrameRenderInfo` in the render context, and port/reuse the
-   timeline overlay, boost-pickup animation, ballchasing overlay, and canvas
-   recorder plugins.
+3. **Plugin-context parity** *(done — see below)*: `replay`/`options`/`state`
+   in plugin contexts, `FrameRenderInfo` in the render context, the timeline
+   projection / skip-window APIs (live, off the shared `ReplayModel`), and a
+   bridge (`fromReplayPlayerPlugin`) that runs @rlrml/player's DOM plugins
+   unmodified — the timeline overlay is mounted through it in the dev harness.
+   Still open within Phase 3: ports of the renderer-coupled plugins
+   (boost-pickup animation, canvas recorder; they use `beforeRender`, which the
+   bridge deliberately rejects).
 
 ## State (`getState()` / `subscribe` payload)
 
@@ -26,7 +30,7 @@ Three phases:
 | --- | --- | --- |
 | `currentTime`, `duration`, `playing`, `speed` | ✅ live | |
 | `frameIndex` | ✅ live | binary search over the adapter's `frameTimes` (the replay's metadata-frame timeline) |
-| `activeMetadata` | ⚪ always `null` | @rlrml/player surfaces kickoff countdowns here; no equivalent yet |
+| `activeMetadata` | ✅ live | kickoff countdowns via @rlrml/player's own `getKickoffCountdownMetadata` over the shared `ReplayModel` (null when constructed without one) |
 | `cameraDistanceScale` | ✅ live | scales the **follow-camera** distance via the camera plugin; no effect on the orbit camera (user scroll-zoom owns that) |
 | `customCameraSettings` | ✅ live | delegated to the camera plugin as explicit overrides (they win over the recorded preset). `pitch` is accepted as an alias of the viewer-native `angle` |
 | `cameraViewMode` | ✅ live | `"follow"` ⇄ camera-plugin follow mode; `"free"` covers all unattached modes (orbit / fly / ballOrbit). Derived from the plugin when installed, so dev-UI-driven changes stay truthful |
@@ -36,8 +40,8 @@ Three phases:
 | `boostPickupAnimationEnabled` | 🟡 tracked-but-inert | pads animate unconditionally via `createBoostPadsPlugin()` |
 | `hitboxWireframesEnabled` | 🟡 tracked-but-inert | `HitboxManager` exists but isn't wired |
 | `hitboxOnlyModeEnabled` | 🟡 tracked-but-inert | |
-| `skipPostGoalTransitionsEnabled` | 🟡 tracked-but-inert | no goal events from the adapter yet |
-| `skipKickoffsEnabled` | 🟡 tracked-but-inert | |
+| `skipPostGoalTransitionsEnabled` | ✅ live | @rlrml/player's exact skip-window semantics over the shared `ReplayModel` (`computeTimelineSegments` + skip-target helpers); applied on play/seek/tick, never while paused |
+| `skipKickoffsEnabled` | ✅ live | same machinery; t=0 starts past the opening kickoff when enabled |
 
 “Tracked-but-inert”: the setter updates state and notifies subscribers (so UI
 toggles round-trip correctly), but no rendering behavior is attached yet.
@@ -57,9 +61,10 @@ toggles round-trip correctly), but no rendering behavior is attached yet.
 | `setFreeCameraPreset("overhead" \| "side")` | ✅ | @rlrml/player's exact poses, converted to this package's Y-up space; positions the core orbit camera |
 | `setBallCamEnabled(bool)` | ✅ | forces ball/car cam (overrides the recorded state) |
 | toggle setters (`setBoostMeterEnabled`, …) | 🟡 | accepted; tracked-but-inert (see table above) |
-| `addPlugin` / `removePlugin` / `getPlugins` / `destroy` / `dispose` | ✅ same | plugin *contract* differs until Phase 3 (`ViewerPlugin` vs `ReplayPlayerPlugin`) |
+| `addPlugin` / `removePlugin` / `getPlugins` / `destroy` / `dispose` | ✅ same | contexts now carry `replay`/`options`/`state` + `FrameRenderInfo`; @rlrml/player DOM plugins mount via `fromReplayPlayerPlugin` (see “Plugin bridge”) |
 | `.replay: ReplayModel` | ✅ same | see “Shared data layer” below |
-| playlist & timeline-projection APIs | ❌ Phase 3+ | skip-window projection needs goal/kickoff events first |
+| `getTimelineDuration` / `getTimelineCurrentTime` / `getTimelineSegments` / `projectReplayTimeToTimeline` / `projectTimelineTimeToReplay` | ✅ same | @rlrml/player's own pure timeline utilities (exported from its lib) over the shared `ReplayModel`; identity projection when constructed without one |
+| playlist APIs | ❌ | `ReplayPlaylistPlayer` wraps a player; out of scope for the core |
 
 Camera delegation requires an installed camera plugin
 (`createCameraPlugin()`, plugin id `"camera"`). Parity camera state is tracked
@@ -93,6 +98,32 @@ workspace build: `"@rlrml/player": "file:../player"` (build it with
 `npx vite build && npx tsc --project tsconfig.build.json` in `js/player`) and
 `"@rlrml/subtr-actor": "file:../pkg"` (built by `js/scripts/build-wasm.sh`,
 which also writes the `package.json` that makes `js/pkg` installable).
+
+## Plugin bridge (Phase 3)
+
+`ViewerPluginContext` now carries everything `ReplayPlayerPluginContext` does —
+`player` (the parity control + timeline surface), `replay` (the shared
+`ReplayModel`), `options`, `container`, and `state` / `FrameRenderInfo` on the
+state/render contexts. That makes @rlrml/player's **DOM-only** plugins run
+unmodified through `fromReplayPlayerPlugin`
+(`src/plugins/replay-player-bridge.ts`):
+
+```ts
+import { createTimelineOverlayPlugin, fromReplayPlayerPlugin } from "@rlrml/viewer";
+viewer.addPlugin(fromReplayPlayerPlugin(createTimelineOverlayPlugin()));
+```
+
+The dev harness mounts the timeline overlay this way — markers, skip toggles,
+and the scrubber all drive the viewer through the parity methods
+(`projectTimelineTimeToReplay`, `getTimelineCurrentTime`, `seek`, …).
+
+Two surfaces deliberately do **not** bridge, and fail loudly:
+
+- `context.scene` is @rlrml/player's `ReplayScene` (its schematic renderer's
+  internals); accessing it through the bridge throws.
+- `beforeRender` plugins (boost-pickup animation, canvas recorder) receive
+  renderer-internal frame state; the bridge rejects them at install time. They
+  need native `ViewerPlugin` ports.
 
 ## Constructor options
 
