@@ -74,3 +74,26 @@ ok(
   "recorded camera settings present for every player",
   player.playerList.every((p) => p.cameraSettings && p.cameraSettings.stiffness >= 0 && p.cameraSettings.stiffness <= 1),
 );
+
+// @rlrml/player parity surface (docs/PLAYER_PARITY.md): stable ids + frame timeline.
+ok(
+  "player ids present and unique",
+  player.playerList.every((p) => p.id.length > 0) &&
+    new Set(player.playerList.map((p) => p.id)).size === player.playerList.length,
+);
+ok("frameTimes non-empty", player.frameTimes.length > 100);
+ok(
+  "frameTimes monotonic non-decreasing",
+  player.frameTimes.every((t, i) => i === 0 || t >= player.frameTimes[i - 1]),
+);
+const midTime = player.duration / 2;
+const midIdx = player.frameIndexAt(midTime);
+ok(
+  "frameIndexAt finds the last frame at-or-before t",
+  player.frameTimes[midIdx] <= midTime &&
+    (midIdx === player.frameTimes.length - 1 || player.frameTimes[midIdx + 1] > midTime),
+);
+ok(
+  "frameIndexAt clamps to ends",
+  player.frameIndexAt(-5) === 0 && player.frameIndexAt(player.duration + 5) === player.frameTimes.length - 1,
+);

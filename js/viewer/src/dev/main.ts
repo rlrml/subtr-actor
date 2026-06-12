@@ -119,6 +119,51 @@ async function main() {
   }
   const tParam = params.get("t");
   if (tParam) viewer.seek(Number(tParam));
+  // ?paritycheck: exercise the @rlrml/player-parity surface (docs/PLAYER_PARITY.md)
+  // and log PASS/FAIL lines for headless verification.
+  if (params.get("paritycheck")) {
+    const ok = (label: string, cond: boolean) =>
+      console.log(`[paritycheck] ${cond ? "PASS" : "FAIL"} ${label}`);
+    const first = viewer.adapter.playerList[0];
+    let renders = 0;
+    const offBeforeRender = viewer.onBeforeRender((info) => {
+      renders += 1;
+      if (renders === 1) {
+        ok("FrameRenderInfo sane", info.frameIndex >= 0 && info.alpha >= 0 && info.alpha <= 1);
+        offBeforeRender();
+      }
+    });
+    viewer.setState({ playing: false, currentTime: 45, speed: 2 });
+    let s = viewer.getState();
+    ok("setState applied", !s.playing && Math.abs(s.currentTime - 45) < 0.001 && s.speed === 2);
+    ok("frameIndex matches adapter", s.frameIndex === viewer.adapter.frameIndexAt(45));
+    const beforeIdx = s.frameIndex;
+    viewer.stepFrames(3);
+    ok("stepFrames(3) advances", viewer.getState().frameIndex === beforeIdx + 3);
+    viewer.stepBackwardFrame();
+    ok("stepBackwardFrame", viewer.getState().frameIndex === beforeIdx + 2);
+    viewer.setAttachedPlayer(first.id);
+    s = viewer.getState();
+    ok(
+      "setAttachedPlayer by id → follow",
+      s.cameraViewMode === "follow" && s.attachedPlayerId === first.id,
+    );
+    ok("camera plugin followed", camPlugin.getMode() === "follow" && camPlugin.getTarget() === first.name);
+    viewer.setCustomCameraSettings({ pitch: -7, distance: 300 });
+    ok("pitch alias → angle", camPlugin.getCameraSettings().angle === -7);
+    viewer.setCameraDistanceScale(2);
+    ok("distance scale applied", camPlugin.getCameraSettings().distance === 600);
+    viewer.setCustomCameraSettings(null);
+    viewer.setCameraDistanceScale(1);
+    ok("settings cleared", viewer.getState().customCameraSettings === null);
+    viewer.setBallCamEnabled(false);
+    ok("ball cam forced off", viewer.getState().ballCamEnabled === false);
+    viewer.setCameraViewMode("free");
+    s = viewer.getState();
+    ok("view mode free releases", s.cameraViewMode === "free" && camPlugin.getMode() === "orbit");
+    ok("snapshot equals state", JSON.stringify(viewer.getSnapshot()) === JSON.stringify(viewer.getState()));
+    viewer.play();
+  }
   if (params.get("paused")) viewer.pause();
   // ?pauseat=<seconds>: pause once playback reaches this time (deterministic
   // screenshots — both A/B runs freeze on the identical frame).

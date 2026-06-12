@@ -92,6 +92,19 @@ Key modules:
   ultra-wide floor. The dev harness mounts a mode/player dropdown + ball-cam
   toggle (`B` key) + stiffness slider, and accepts
   `?follow=<player>&t=<seconds>` URL params.
+- **@rlrml/player control-surface parity (Phase 1).** `ViewerPlayer` now
+  exposes `@rlrml/player`'s `ReplayPlayer` API: the full
+  `ReplayPlayerState`-shaped state (frameIndex, camera fields, display
+  toggles), `setState(patch)` / `getSnapshot()`, frame stepping
+  (`setFrameIndex` / `stepFrames` / `stepForwardFrame` / `stepBackwardFrame`),
+  `onBeforeRender(cb)` with `FrameRenderInfo`, camera delegation
+  (`setAttachedPlayer` / `setCameraViewMode` / `setBallCamEnabled` /
+  `setCustomCameraSettings` / `setCameraDistanceScale` /
+  `setFreeCameraPreset`) routed to the installed camera plugin, all `initial*`
+  constructor options, and stable per-player ids on the adapter roster. The
+  compatibility matrix, the id/name and `pitch`/`angle` mappings, and the
+  3-phase roadmap toward porting `js/stat-evaluation-player` live in
+  [`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md).
 - **Recorded camera settings.** subtr-actor now extracts each player's
   replicated RL camera preset (`TAGame.CameraSettingsActor_TA:ProfileSettings`
   → `PlayerInfo.camera_settings`: fov/height/angle/distance/stiffness/swivel/
@@ -110,6 +123,11 @@ Key modules:
    position-smoothing and frame-filtering passes that exist to clean raw replay
    jitter that subtr-actor already handles upstream; those should be removed,
    not preserved.
+3. **Parity Phases 2–3** ([`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md)):
+   expose `viewer.replay: ReplayModel` via `@rlrml/player`'s
+   `normalizeReplayData`, then close the plugin-context gap and port the
+   timeline-overlay / recorder plugins so `js/stat-evaluation-player` can run
+   on this viewer.
 
 ## Focused layout (cleanup complete)
 

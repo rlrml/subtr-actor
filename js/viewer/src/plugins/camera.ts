@@ -27,28 +27,27 @@
  */
 import * as THREE from "three";
 import { CameraManager } from "../managers/CameraManager.js";
-import type { ViewerPlugin, ViewerPluginContext, ViewerRenderContext } from "../types.js";
+import type {
+  CameraSettings,
+  ViewerPlugin,
+  ViewerPluginContext,
+  ViewerRenderContext,
+} from "../types.js";
 
 export type CameraPluginMode = "orbit" | "free" | "ballOrbit" | "follow";
 
-/** RL-style camera settings (original GameEngine defaults). */
-export interface CameraSettings {
-  /** Distance behind car in UU (RL range 100-400). */
-  distance?: number;
-  /** Height above car in UU (RL range 40-200). */
-  height?: number;
-  /** Pitch angle in degrees, negative = look down (RL range -15 to 0). */
-  angle?: number;
-  /** Camera stiffness (RL range 0.0-1.0; higher = more responsive). */
-  stiffness?: number;
-  /** Swivel speed around the car (RL range 1.0-10.0). */
-  swivelSpeed?: number;
-  /** Ball cam transition speed (RL range 1.0-2.0). */
-  transitionSpeed?: number;
-  /** HORIZONTAL field of view in degrees (RL range 60-110). */
-  fov?: number;
-  /** Free-cam fly speed in UU/s. */
-  freeCamSpeed?: number;
+// CameraSettings lives in types.ts (shared with ViewerPlayer's parity surface);
+// re-exported here so existing `from "./plugins/camera.js"` imports keep working.
+export type { CameraSettings };
+
+/**
+ * Accept `@rlrml/player`'s `pitch` as an alias for our native `angle`:
+ * normalize on entry so the rest of the plugin only ever sees `angle`.
+ */
+function normalizePitchAlias(settings: CameraSettings): CameraSettings {
+  if (settings.pitch === undefined || settings.angle !== undefined) return settings;
+  const { pitch, ...rest } = settings;
+  return { ...rest, angle: pitch };
 }
 
 export interface CameraPluginOptions {
@@ -87,8 +86,15 @@ export interface CameraPlugin extends ViewerPlugin {
   setBallCam(enabled: boolean | null): void;
   /** The ball-cam state currently applied to the camera. */
   getBallCam(): boolean;
-  /** Merge explicit settings (they win over the recorded preset + defaults). */
-  setCameraSettings(settings: CameraSettings): void;
+  /**
+   * Merge explicit settings (they win over the recorded preset + defaults).
+   * Pass `null` to clear all explicit overrides (recorded preset + defaults
+   * apply again) — matching @rlrml/player's `setCustomCameraSettings(null)`.
+   */
+  setCameraSettings(settings: CameraSettings | null): void;
+  /** Scale the effective follow distance (parity with cameraDistanceScale). */
+  setDistanceScale(scale: number): void;
+  getDistanceScale(): number;
   /** The effective settings currently applied (defaults ⊕ recorded ⊕ explicit). */
   getCameraSettings(): CameraSettings;
   /** The follow target's recorded camera preset, when the replay carries one. */
@@ -96,7 +102,8 @@ export interface CameraPlugin extends ViewerPlugin {
 }
 
 // Original GameEngine.cameraSettings defaults (RL camera options).
-const DEFAULT_SETTINGS: Required<Omit<CameraSettings, "freeCamSpeed">> = {
+// (`pitch` is an input alias normalized onto `angle`, never stored.)
+const DEFAULT_SETTINGS: Required<Omit<CameraSettings, "freeCamSpeed" | "pitch">> = {
   distance: 260,
   height: 90,
   angle: -4,
@@ -115,7 +122,8 @@ export function createCameraPlugin(options: CameraPluginOptions = {}): CameraPlu
   let effectiveBallCam = ballCamOverride ?? true;
   // Explicit settings only — the effective set is recomputed on read so the
   // recorded preset switches with the follow target (see settings()).
-  let overrides: CameraSettings = { ...options.settings };
+  let overrides: CameraSettings = normalizePitchAlias({ ...options.settings });
+  let distanceScale = 1;
   const useRecorded = options.useRecordedSettings !== false;
   let lastNow: number | null = null;
   const lastCarPos = new THREE.Vector3();
@@ -149,7 +157,11 @@ export function createCameraPlugin(options: CameraPluginOptions = {}): CameraPlu
 
   /** Effective settings: defaults ⊕ recorded preset ⊕ explicit overrides. */
   function settings(): CameraSettings {
-    return { ...DEFAULT_SETTINGS, ...recordedSettings(), ...overrides };
+    const merged = { ...DEFAULT_SETTINGS, ...recordedSettings(), ...overrides };
+    if (distanceScale !== 1 && merged.distance !== undefined) {
+      merged.distance *= distanceScale;
+    }
+    return merged;
   }
 
   function getBallMesh(): THREE.Object3D | null {
@@ -279,14 +291,25 @@ export function createCameraPlugin(options: CameraPluginOptions = {}): CameraPlu
 
     setBallCam(enabled: boolean | null) {
       ballCamOverride = enabled;
+      // Reflect a forced value immediately (the per-frame follow update only
+      // recomputes the effective state while a follow target renders).
+      if (enabled !== null) effectiveBallCam = enabled;
     },
 
     getBallCam(): boolean {
       return effectiveBallCam;
     },
 
-    setCameraSettings(next: CameraSettings) {
-      overrides = { ...overrides, ...next };
+    setCameraSettings(next: CameraSettings | null) {
+      overrides = next === null ? {} : { ...overrides, ...normalizePitchAlias(next) };
+    },
+
+    setDistanceScale(scale: number) {
+      distanceScale = Math.max(0.25, scale);
+    },
+
+    getDistanceScale(): number {
+      return distanceScale;
     },
 
     getCameraSettings(): CameraSettings {

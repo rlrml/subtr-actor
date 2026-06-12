@@ -106,6 +106,8 @@ interface FlagsKeyframe {
 }
 
 export interface ViewerPlayerInfo {
+  /** Stable player id derived from the replay's remote id (Steam/Epic/…). */
+  id: string;
   name: string;
   team: number;
   carName: string;
@@ -204,6 +206,8 @@ class PlayerEntity extends EventEmitter {
   isVisible = true;
   isBallCam = true;
   constructor(
+    /** Stable player id derived from the replay's remote id. */
+    public id: string,
     public name: string,
     public team: number,
     public carName: string,
@@ -218,6 +222,8 @@ class PlayerEntity extends EventEmitter {
 export class SubtrActorPlayer extends EventEmitter {
   duration = 0;
   playerList: ViewerPlayerInfo[] = [];
+  /** Monotonic per-frame timestamps (s) — the replay's frame timeline. */
+  frameTimes: number[] = [];
   ball = new BallEntity();
   players = new Map<string, PlayerEntity>();
   boostPads = new Map<number, BoostPadEntity>();
@@ -240,6 +246,7 @@ export class SubtrActorPlayer extends EventEmitter {
     const meta = this.raw.meta;
     const metaFrames = fd.metadata_frames;
     this.duration = metaFrames.length ? metaFrames[metaFrames.length - 1].time : 0;
+    this.frameTimes = metaFrames.map((f) => f.time);
 
     // remote_id -> { name, team, car } lookup from meta roster
     const infoByKey = new Map<string, { info: RawPlayerInfo; team: number }>();
@@ -298,8 +305,8 @@ export class SubtrActorPlayer extends EventEmitter {
       this._playerTimelines[name] = motion;
       this._playerFlags[name] = flags;
       this._teams[name] = team;
-      this.playerList.push({ name, team, carName, hitboxType, cameraSettings });
-      this.players.set(name, new PlayerEntity(name, team, carName, hitboxType, cameraSettings));
+      this.playerList.push({ id: key, name, team, carName, hitboxType, cameraSettings });
+      this.players.set(name, new PlayerEntity(key, name, team, carName, hitboxType, cameraSettings));
     });
 
     this._compileBoostPads();
@@ -408,11 +415,33 @@ export class SubtrActorPlayer extends EventEmitter {
     }
   }
 
+  /** Index of the last frame at or before `time` (binary search over frameTimes). */
+  frameIndexAt(time: number): number {
+    const times = this.frameTimes;
+    if (times.length === 0) return 0;
+    if (time <= times[0]) return 0;
+    let lo = 0;
+    let hi = times.length - 1;
+    if (time >= times[hi]) return hi;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (times[mid] <= time) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  }
+
   getBall(): BallEntity {
     return this.ball;
   }
   getPlayer(name: string): PlayerEntity | undefined {
     return this.players.get(name);
+  }
+  getPlayerById(id: string): PlayerEntity | undefined {
+    for (const entity of this.players.values()) {
+      if (entity.id === id) return entity;
+    }
+    return undefined;
   }
   getAllPlayers(): PlayerEntity[] {
     return Array.from(this.players.values());
