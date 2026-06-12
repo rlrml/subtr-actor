@@ -76,6 +76,20 @@ export class ArenaManager {
             child.frustumCulled = false;
           }
 
+          // Force-field cage hexagons (FFCage_Full / Field_Center accents): the
+          // hex outlines are baked opaque geometry (not a texture), which reads
+          // far louder than the game's barely-there forcefield. Line width is
+          // modeled into the mesh so it can't be thinned directly — translucency
+          // (+ no depth write, so it never occludes gameplay) gets the subtle
+          // in-game look and makes the lines read thinner.
+          if (child.material && /^Hexagone_T[01]$/.test(child.material.name ?? '')) {
+            child.material = child.material.clone();
+            child.material.transparent = true;
+            child.material.opacity = 0.18;
+            child.material.depthWrite = false;
+            child.renderOrder = 1;
+          }
+
           // Fix visibility issues (disappearing at certain angles)
           if (child.material && child.material.name && visibilityFixMaterials.includes(child.material.name)) {
             console.log(`[ArenaManager] Fixing visibility for: ${child.name} (material: ${child.material.name})`);
