@@ -67,6 +67,8 @@ export { loadReplay, parseReplay } from "./adapter/wasm.js";
 export type { ReplayLoadResult, ReplayModel, ReplayScene } from "@rlrml/player";
 export { createNameTagPlugin } from "./plugins/name-tags.js";
 export { createBoostPadsPlugin } from "./plugins/boost-pads.js";
+export { createFpsOverlayPlugin } from "./plugins/fps-overlay.js";
+export type { FpsOverlayOptions, FpsSample } from "./plugins/fps-overlay.js";
 // Phase 3 parity: run @rlrml/player plugins on the viewer, e.g.
 //   viewer.addPlugin(fromReplayPlayerPlugin(createTimelineOverlayPlugin()))
 export { fromReplayPlayerPlugin } from "./plugins/replay-player-bridge.js";

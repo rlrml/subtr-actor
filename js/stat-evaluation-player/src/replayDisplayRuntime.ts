@@ -9,7 +9,11 @@ import {
   type ReplayPlayerState,
   type TimelineOverlayPlugin,
 } from "@rlrml/player";
-import { createViewerFromParsed, fromReplayPlayerPlugin } from "@rlrml/viewer";
+import {
+  createFpsOverlayPlugin,
+  createViewerFromParsed,
+  fromReplayPlayerPlugin,
+} from "@rlrml/viewer";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { CameraControlsController } from "./cameraControls.ts";
 import type { StatsPlayerConfig } from "./playerConfig.ts";
@@ -155,6 +159,16 @@ export async function loadReplayBundleForDisplay(
       initialSkipPostGoalTransitionsEnabled: elements.skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: elements.skipKickoffs.checked,
       plugins: [
+        // Render + live replay FPS, reported into the Playback window's detail
+        // grid (headless: we own the markup so it matches the other fields).
+        createFpsOverlayPlugin({
+          onSample: ({ renderFps, replayFps }) => {
+            const render = document.getElementById("render-fps-readout");
+            const replay = document.getElementById("replay-fps-readout");
+            if (render) render.textContent = `${renderFps.toFixed(0)} fps`;
+            if (replay) replay.textContent = `${replayFps.toFixed(0)} fps`;
+          },
+        }),
         fromReplayPlayerPlugin(createBallchasingOverlayPlugin()),
         fromReplayPlayerPlugin(
           createBoostPickupAnimationPlugin({
@@ -165,6 +179,11 @@ export async function loadReplayBundleForDisplay(
         fromReplayPlayerPlugin(timelineOverlay),
       ],
     }) as StatsReplayPlayer;
+    if (import.meta.env.DEV) {
+      // Console/debug handle (dev server only): inspect playback, A/B camera or
+      // motion-interpolation settings live, sample mesh positions, etc.
+      (window as { __statsReplayPlayer?: StatsReplayPlayer }).__statsReplayPlayer = replayPlayer;
+    }
     options.setTimelineOverlay(timelineOverlay);
     options.setReplayPlayer(replayPlayer);
     options.syncBoostPadOverlayPlugin();

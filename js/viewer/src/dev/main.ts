@@ -9,6 +9,7 @@ import {
   createViewer,
   createNameTagPlugin,
   createBoostPadsPlugin,
+  createFpsOverlayPlugin,
   createBoostPickupAnimationPlugin,
   createCameraPlugin,
   createCanvasRecorderPlugin,
@@ -36,6 +37,7 @@ async function main() {
     autoplay: true,
     loop: true,
     plugins: [
+      createFpsOverlayPlugin(),
       createNameTagPlugin(),
       createBoostPadsPlugin(),
       camPlugin,

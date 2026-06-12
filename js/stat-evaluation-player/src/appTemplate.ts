@@ -292,6 +292,14 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
                 <dt>Status</dt>
                 <dd id="playback-status-readout">Stopped</dd>
               </div>
+              <div>
+                <dt>Render FPS</dt>
+                <dd id="render-fps-readout">–</dd>
+              </div>
+              <div>
+                <dt>Replay FPS</dt>
+                <dd id="replay-fps-readout">–</dd>
+              </div>
             </div>
           </section>
 
