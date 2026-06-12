@@ -25,7 +25,13 @@ const raw = await parseReplay(bytes);
 const player = new SubtrActorPlayer(raw as never);
 
 console.log("\n== roster ==");
-for (const p of player.playerList) console.log(`  ${p.name}  team${p.team}  ${p.carName}/${p.hitboxType}`);
+for (const p of player.playerList) {
+  const cam = p.cameraSettings;
+  const camStr = cam
+    ? `cam{d=${cam.distance} h=${cam.height} a=${cam.angle} stiff=${cam.stiffness} swivel=${cam.swivelSpeed} fov=${cam.fov}}`
+    : "cam{none}";
+  console.log(`  ${p.name}  team${p.team}  ${p.carName}/${p.hitboxType}  ${camStr}`);
+}
 console.log(`duration: ${player.duration.toFixed(2)}s`);
 
 const { ballTimeline, playerTimelines } = player.getTimelines();
@@ -64,3 +70,7 @@ ok(`ball height y <= ${FIELD.yCeil * margin} (y is up-axis, not length)`, bb.max
 ok(`ball |x| <= ${FIELD.x * margin}`, Math.abs(bb.minx) <= FIELD.x * margin && Math.abs(bb.maxx) <= FIELD.x * margin);
 ok(`ball |z| <= ${FIELD.z * margin}`, Math.abs(bb.minz) <= FIELD.z * margin && Math.abs(bb.maxz) <= FIELD.z * margin);
 ok("duration sane (60-600s)", player.duration > 60 && player.duration < 600);
+ok(
+  "recorded camera settings present for every player",
+  player.playerList.every((p) => p.cameraSettings && p.cameraSettings.stiffness >= 0 && p.cameraSettings.stiffness <= 1),
+);

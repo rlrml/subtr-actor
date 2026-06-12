@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import bodyToHitboxData from '../body_to_hitbox.json';
+import { getCarHitboxInfo } from '../data/hitboxes.js';
 import { CarModelLoader } from './CarModelLoader.js';
 
 export class ActorManager {
@@ -21,10 +21,9 @@ export class ActorManager {
         this.actorLoadouts = {}; // actorId -> TeamLoadout
 
 
-        // Hitbox mapping bodyId -> { name, hitbox_type, dimensions }
-        this.bodyToHitbox = bodyToHitboxData;
+        // Car/hitbox family comes from subtr-actor per player (PlayerInfo.car_hitbox_family);
+        // getCarHitboxInfo(bodyId) is only a fallback for the legacy body-id path.
         this.carBodyIds = {}; // actorId -> bodyId
-        console.log(`✓ Loaded hitbox mapping for ${Object.keys(this.bodyToHitbox).length} cars`);
 
         // Car model loader for FBX models
         this.carModelLoader = new CarModelLoader();
@@ -211,7 +210,13 @@ export class ActorManager {
         // Create car meshes for each player
         const playerList = player.playerList;
         playerList.forEach((playerInfo, index) => {
-            this._createCarMesh(playerInfo.name, playerInfo.team, index, playerInfo.loadout);
+            this._createCarMesh(
+                playerInfo.name,
+                playerInfo.team,
+                index,
+                playerInfo.carName,
+                playerInfo.hitboxType,
+            );
             //scale car
             const carActorId = this.playerNameToCarActorId[playerInfo.name];
             const carActor = this.actors[carActorId];
@@ -2697,10 +2702,10 @@ export class ActorManager {
      * @param {number} index - Player index (used as actor ID)
      * @param {Object} loadout - Player's TeamLoadout (optional)
      */
-    _createCarMesh(playerName, team, index, loadout) {
+    _createCarMesh(playerName, team, index, carName, hitboxType) {
         const actorId = `car_${index}`;  // Use string ID
 
-        // Default Octane dimensions
+        // Placeholder box (swapped for the GLB model below)
         const geometry = new THREE.BoxGeometry(118, 36, 84);
         const color = team === 0 ? 0x3399ff : 0xff6600;
         const material = new THREE.MeshStandardMaterial({ color });
@@ -2708,8 +2713,10 @@ export class ActorManager {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
 
-        // Get body ID from loadout based on team
-        const bodyId = loadout ? (team === 1 ? loadout.orange?.body : loadout.blue?.body) : null;
+        // Car/hitbox family resolved by subtr-actor (PlayerInfo.car_body_name /
+        // car_hitbox_family). Default to Octane when the replay omits them.
+        const carNameResolved = carName || 'Octane';
+        const hitboxResolved = hitboxType || 'Octane';
 
         mesh.userData = {
             location: new THREE.Vector3(),
@@ -2722,8 +2729,8 @@ export class ActorManager {
             team: team,
             sleeping: false,
             steer: 0,
-            bodyId: bodyId,
-            teamLoadout: loadout,
+            carName: carNameResolved,
+            hitboxType: hitboxResolved,
         };
 
         this.scene.add(mesh);
@@ -2739,12 +2746,10 @@ export class ActorManager {
             this.onPlayerFound(playerName);
         }
 
-        // If we have a body ID, load the appropriate car model
-        if (bodyId) {
-            this.updateCarHitbox(mesh, bodyId, actorId);
-        }
+        // Swap the placeholder box for the car's GLB model.
+        this.replaceCarWithModel(actorId, mesh, carNameResolved, hitboxResolved);
 
-        console.log(`[ActorManager] Created car for ${playerName} (team ${team === 0 ? 'blue' : 'orange'}, body ${bodyId || 'default'})`);
+        console.log(`[ActorManager] Created car for ${playerName} (team ${team === 0 ? 'blue' : 'orange'}, ${carNameResolved} / ${hitboxResolved} hitbox)`);
     }
 
     /**
@@ -3229,9 +3234,9 @@ export class ActorManager {
     }
 
     updateCarHitbox(mesh, bodyId, actorId) {
-        const hitboxInfo = this.bodyToHitbox[bodyId.toString()];
+        const hitboxInfo = getCarHitboxInfo(bodyId);
         const carName = hitboxInfo?.name || "Octane";
-        const hitboxType = hitboxInfo?.hitbox_type || "Octane";
+        const hitboxType = hitboxInfo?.hitboxType || "Octane";
 
         // Try to replace with FBX model
         this.replaceCarWithModel(actorId, mesh, carName, hitboxType);
@@ -3650,7 +3655,14 @@ export class ActorManager {
 
             // Calculate wheel rotation based on distance traveled
             // rotation = distance / wheel_circumference * 2π = distance / radius
-            const rotationIncrement = (distanceTraveled * direction) / WHEEL_RADIUS;
+            // Cap the per-frame step: at game speeds the true rate (1-2.3 rad/frame
+            // at 60fps) is past the Nyquist limit of a spoked rim, so unclamped
+            // rotation strobes (wagon-wheel effect) and reads as "wheels don't
+            // spin". 0.5 rad/frame stays below one spoke period per frame, so the
+            // spin is fast but visually coherent.
+            const MAX_WHEEL_STEP = 0.5;
+            const rotationIncrement =
+                Math.min(distanceTraveled / WHEEL_RADIUS, MAX_WHEEL_STEP) * direction;
 
             // Use ReplicatedSteer value from replay if available
             let steerAngle = 0;

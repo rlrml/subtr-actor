@@ -50,36 +50,88 @@ Key modules:
 - A bring-up harness (`src/dev/main.ts`) drives the real renderer (scene + arena
   + actors) from the adapter to render a match.
 
+- **Car models are wired.** `ActorManager` selects each car's GLB from
+  subtr-actor's per-player `car_body_name` / `car_hitbox_family`
+  (`SubtrActorPlayer` → `CarModelLoader`), replacing the legacy body-id lookup.
+  This requires the **local** WASM build (`js/pkg`, built from this repo's Rust via
+  `js/scripts/build-wasm.sh`): the *published* `@rlrml/player` WASM predates the
+  `car_hitbox_family` field, so the dev server's `vite` alias points
+  `@rlrml/subtr-actor` at `../pkg`.
+
+- **`ViewerPlayer` core + plugin host.** `src/ViewerPlayer.ts` is the bare
+  playback core: it owns scene/arena/actors, the playback clock
+  (play/pause/seek/speed/loop, `subscribe`), and the `ViewerPlugin` host from
+  [`docs/EXTENSIBILITY.md`](./docs/EXTENSIBILITY.md). The public entry is
+  `createViewer(container, bytes, options)` (`src/lib.ts`). The first plugin,
+  `createNameTagPlugin()`, drives name tags entirely through hooks. The dev
+  harness (`src/dev/main.ts`) now uses this public API.
+- **Trail effects + the original per-frame path.** The real `EffectsManager` is
+  wired into the core (opt out with `effects: false`): boost trails, supersonic
+  trails, and the ball trail run off the adapter's per-frame state. The core's
+  render loop preserves the original GameEngine frame order and behaviors:
+  animation-mixer advance before actor updates, per-player boost particle state
+  (with kickoff-reset suppression), supersonic state, wheel spin/steering from
+  position deltas, and seek-time resets (animations, ball trail, wheel
+  tracking — also applied on loop wrap). Explosions stay dormant until the
+  adapter exposes goal/demo events (and `setRenderContext` warmup is deferred
+  with them — it blocks the main thread for seconds).
+- **Boost pads** (`createBoostPadsPlugin()`). The original ballcam GameEngine
+  pad rendering (glowing spheres + point lights for big pads, flat cylinders
+  for small), fed by subtr-actor's resolved pad layout and exact
+  pickup/availability events — pads fade out when collected and relight on
+  respawn, in sync with playback time.
+- **Camera plugin** (`createCameraPlugin()`). The full original ballcam camera
+  system wrapped as a plugin, with four modes: `orbit` (the core's
+  OrbitControls, default), `free` (FPS fly cam: WASD/arrows + Space/Shift,
+  right-click-drag look with pointer lock), `ballOrbit` (orbit the ball while
+  tracking it), and `follow` (RL-style state-blended car cam ⇄ ball cam;
+  `follow(name)` / `release()` / `setBallCam(bool|null)` — `null` follows the
+  replay's recorded ball-cam state). Also ports the original RL camera
+  settings (`setCameraSettings`: distance/height/angle/stiffness/swivel/
+  transition speed) and the horizontal→vertical FOV conversion with its 16:9
+  ultra-wide floor. The dev harness mounts a mode/player dropdown + ball-cam
+  toggle (`B` key) + stiffness slider, and accepts
+  `?follow=<player>&t=<seconds>` URL params.
+- **Recorded camera settings.** subtr-actor now extracts each player's
+  replicated RL camera preset (`TAGame.CameraSettingsActor_TA:ProfileSettings`
+  → `PlayerInfo.camera_settings`: fov/height/angle/distance/stiffness/swivel/
+  transition). The adapter surfaces it as `playerList[].cameraSettings`, and
+  follow mode defaults to the followed player's recorded preset — so the
+  camera feels like the player's own — with `setCameraSettings` overrides
+  winning per field (`useRecordedSettings: false` opts out). Requires the
+  local WASM build (`js/scripts/build-wasm.sh`).
+
 **Not yet done:**
 
-1. **Car models.** Every car currently renders as the default body. subtr-actor
-   already provides each player's car/hitbox family; that needs to be fed into
-   the car-model loader, replacing the renderer's legacy body-id lookup.
-2. **Visual confirmation.** The data is verified; the rendered output still needs
-   to be eyeballed in a browser.
-3. **Full playback engine.** The harness wires managers directly. The complete
-   camera/effects/UI path needs bringing up, and the adapter's interpolation can
-   then be simplified — the renderer carries position-smoothing and frame-
-   filtering passes that exist to clean raw replay jitter that subtr-actor
-   already handles upstream; those should be removed, not preserved.
+1. **Goal/demo events → explosions.** Fill the adapter's stubbed event getters
+   from subtr-actor, then trigger `EffectsManager` explosions (and call
+   `setRenderContext` to warm the pools).
+2. **Drop redundant smoothing.** The renderer (`ActorManager`) carries
+   position-smoothing and frame-filtering passes that exist to clean raw replay
+   jitter that subtr-actor already handles upstream; those should be removed,
+   not preserved.
 
-## Cleanup required to make this focused
+## Focused layout (cleanup complete)
 
-The package currently contains a large amount of code that does **not** belong in
-a focused player and must be removed:
+The web-app code (a full routing/auth/uploads/comments/admin/collab application)
+and the second replay-parsing stack (`framework/`) have been removed. `src/` now
+mirrors `@rlrml/player`'s lean shape:
 
-- `src/pages/`, `src/components/`, `src/hooks/`, `src/api/`, `src/services/`,
-  `src/collab/` — a full web application (routing, auth, uploads, comments,
-  admin, collaboration, API clients). None of this is part of rendering a replay.
-- `framework/` — a second, self-contained replay-parsing/compiler stack. The
-  adapter replaces it. Only a couple of static data constants it holds (hitbox
-  dimensions, car-family mapping) are still referenced by the renderer; those
-  should be lifted into this package and the rest deleted.
-- `sourcemaps/` — not part of the package.
+- `src/ViewerPlayer.ts`, `src/lib.ts`, `src/types.ts` — the playback core,
+  public embed API, and plugin contract.
+- `src/plugins/` — built-in plugins (`createNameTagPlugin`).
+- `src/adapter/` — subtr-actor → renderer data (the only data source).
+- `src/managers/`, `src/lib/` — the three.js renderer (scene, arena, actors, car
+  models, cameras, effects, trails).
+- `src/data/hitboxes.js` — the static hitbox constants lifted out of `framework/`.
+- `src/dev/` — the bring-up harness + headless validator.
+- `public/` — the 3D assets (GLB models, draco decoder).
 
-The end state mirrors `@rlrml/player`: `src/` contains only the renderer
-(`managers`, `lib`), the adapter, and a small `lib.ts` entry point exposing a
-mount/embed API; `public/` holds the 3D assets (GLB models, draco decoder).
+Everything above raw playback (scoreboard/HUD, overlays, clips, collab, dev tools)
+was intentionally dropped and is meant to return as **plugins** — the contract and
+a ledger of what was removed live in
+[`docs/EXTENSIBILITY.md`](./docs/EXTENSIBILITY.md). The host for those plugins is
+`ViewerPlayer` (`src/ViewerPlayer.ts`) behind `createViewer()` (`src/lib.ts`).
 
 ## Development
 

@@ -13,5 +13,12 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["src/adapter", "src/dev"]
+  "include": [
+    "src/adapter",
+    "src/dev",
+    "src/plugins",
+    "src/lib.ts",
+    "src/types.ts",
+    "src/ViewerPlayer.ts"
+  ]
 }

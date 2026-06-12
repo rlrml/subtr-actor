@@ -8,7 +8,7 @@
  */
 
 import * as THREE from 'three';
-import { HITBOX_DIMENSIONS } from '@rlview/framework';
+import { HITBOX_DIMENSIONS } from '../data/hitboxes.js';
 
 // Color coding by hitbox type
 const HITBOX_COLORS = {

@@ -1,19 +1,15 @@
 /**
- * Bring-up harness: .replay -> subtr-actor WASM -> SubtrActorPlayer -> the real
- * ballcam renderer (SceneManager + ArenaManager + ActorManager).
- *
- * This drives ballcam's actual mesh/interpolation code from subtr-actor data, to
- * validate the pipeline + coordinate transform end-to-end. It deliberately does
- * NOT boot the full GameEngine (cameras/effects/UI/backend) yet — that comes
- * after the vertical slice renders. See INTEGRATION.md.
+ * Dev harness: exercises the real public API (`createViewer` from lib.ts) with
+ * the sample replay — the same path an embedding consumer uses. The HUD readout
+ * and name tags are driven entirely through the public seams (subscribe + the
+ * name-tag plugin), keeping the core bare.
  */
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { SceneManager } from "../managers/SceneManager.js";
-import { ArenaManager } from "../managers/ArenaManager.js";
-import { ActorManager } from "../managers/ActorManager.js";
-import { SubtrActorPlayer } from "../adapter/SubtrActorPlayer.js";
-import { parseReplay } from "../adapter/wasm.js";
+import {
+  createViewer,
+  createNameTagPlugin,
+  createBoostPadsPlugin,
+  createCameraPlugin,
+} from "../lib.js";
 
 const hud = document.getElementById("hud") as HTMLDivElement;
 const log = (msg: string) => {
@@ -21,68 +17,150 @@ const log = (msg: string) => {
   console.log("[viewer]", msg);
 };
 
-// Any effects call from ActorManager is a no-op during bring-up.
-const effectsStub = new Proxy({}, { get: () => () => {} });
-
 async function main() {
   const container = document.getElementById("app") as HTMLDivElement;
 
   log("parsing replay via subtr-actor WASM…");
   const bytes = new Uint8Array(await (await fetch("/sample.replay")).arrayBuffer());
-  const raw = await parseReplay(bytes);
 
-  log("compiling timelines…");
-  const player = new SubtrActorPlayer(raw as never);
-  log(
-    `players: ${player.playerList.map((p) => `${p.name}(${p.team})`).join(", ")}\n` +
-      `duration: ${player.duration.toFixed(1)}s`,
-  );
-
-  // Scene + arena + actors (ballcam's real renderer code)
-  const sceneManager = new SceneManager(container);
-  const scene = sceneManager.scene as THREE.Scene;
-  const camera = sceneManager.camera as THREE.PerspectiveCamera;
-  const renderer = sceneManager.renderer as THREE.WebGLRenderer;
-
-  const arena = new ArenaManager(scene);
-  await arena.loadArenaMeshes().catch((e: unknown) => console.warn("arena load failed", e));
-
-  const actors = new ActorManager(scene, effectsStub);
-  actors.initFromFramework(player);
-  actors.initInterpolants(player.getTimelines());
-
-  // Simple orbit camera for the demo.
-  const controls = new OrbitControls(camera, renderer.domElement);
-  camera.position.set(0, 4000, 6000);
-  controls.target.set(0, 200, 0);
-  controls.update();
-
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+  const camPlugin = createCameraPlugin();
+  const viewer = await createViewer(container, bytes, {
+    autoplay: true,
+    loop: true,
+    plugins: [createNameTagPlugin(), createBoostPadsPlugin(), camPlugin],
   });
 
-  // Playback loop
-  let t = 0;
-  let last = performance.now();
-  const speed = 1.0;
-  function frame(now: number) {
-    const dt = Math.min(0.1, (now - last) / 1000) * speed;
-    last = now;
-    t += dt;
-    if (t > player.duration) t = 0;
+  const roster = viewer.adapter.playerList
+    .map((p) => `${p.name}(${p.team}:${p.carName})`)
+    .join(", ");
+  console.log("[viewer] roster:", roster);
 
-    player.seek(t);
-    actors.updateFromFramework(player, t);
-    controls.update();
-    renderer.render(scene, camera);
-
-    const b = player.ball.position;
-    log(`t=${t.toFixed(1)}/${player.duration.toFixed(1)}s  ball=(${b.x.toFixed(0)},${b.y.toFixed(0)},${b.z.toFixed(0)})`);
-    requestAnimationFrame(frame);
+  // ── Camera bar: follow-player selector + ball cam toggle (dev-only UI). ─────
+  const camBar = document.createElement("div");
+  camBar.style.cssText =
+    "position:fixed;top:8px;right:8px;z-index:10;display:flex;gap:8px;" +
+    "align-items:center;font:12px monospace;color:#fff;background:rgba(0,0,0,.55);" +
+    "padding:6px 8px;border-radius:6px;";
+  const select = document.createElement("select");
+  select.append(new Option("orbit camera", ""));
+  select.append(new Option("free camera (WASD + right-drag)", "__free"));
+  select.append(new Option("ball orbit", "__ballOrbit"));
+  for (const p of viewer.adapter.playerList) {
+    select.append(new Option(`follow ${p.name} (team ${p.team})`, p.name));
   }
-  requestAnimationFrame(frame);
+  select.onchange = () => {
+    if (select.value === "") camPlugin.release();
+    else if (select.value === "__free") camPlugin.setMode("free");
+    else if (select.value === "__ballOrbit") camPlugin.setMode("ballOrbit");
+    else {
+      camPlugin.follow(select.value);
+      console.log(
+        `[viewer] following ${select.value}; recorded camera settings:`,
+        camPlugin.getRecordedSettings(),
+      );
+    }
+    syncStiffness();
+    select.blur(); // keep arrow keys on the scrubber, not the dropdown
+  };
+  const ballCamLabel = document.createElement("label");
+  const ballCamBox = document.createElement("input");
+  ballCamBox.type = "checkbox";
+  ballCamBox.checked = camPlugin.getBallCam();
+  ballCamBox.onchange = () => camPlugin.setBallCam(ballCamBox.checked);
+  ballCamLabel.append(ballCamBox, " ball cam");
+  // Stiffness slider: shows the effective value (recorded preset when
+  // following); dragging it sets an explicit override that wins over recorded.
+  const stiffnessLabel = document.createElement("label");
+  const stiffness = document.createElement("input");
+  stiffness.type = "range";
+  stiffness.min = "0";
+  stiffness.max = "1";
+  stiffness.step = "0.05";
+  stiffness.style.width = "70px";
+  const stiffnessValue = document.createElement("span");
+  const syncStiffness = () => {
+    const s = camPlugin.getCameraSettings().stiffness ?? 0.45;
+    stiffness.value = String(s);
+    stiffnessValue.textContent = s.toFixed(2);
+  };
+  stiffness.oninput = () => {
+    camPlugin.setCameraSettings({ stiffness: Number(stiffness.value) });
+    stiffnessValue.textContent = Number(stiffness.value).toFixed(2);
+  };
+  stiffnessLabel.append("stiff ", stiffness, stiffnessValue);
+  syncStiffness();
+  camBar.append(select, ballCamLabel, stiffnessLabel);
+  document.body.append(camBar);
+
+  // URL params for headless/dev bring-up:
+  //   ?follow=<player name>  ?cam=free|ballOrbit  ?t=<seconds>
+  const params = new URLSearchParams(location.search);
+  const camParam = params.get("cam");
+  if (camParam === "free" || camParam === "ballOrbit") {
+    camPlugin.setMode(camParam);
+    select.value = `__${camParam}`;
+  }
+  const followParam = params.get("follow");
+  if (followParam) {
+    const match = viewer.adapter.playerList.find(
+      (p) => p.name.toLowerCase() === followParam.toLowerCase(),
+    );
+    if (match) {
+      camPlugin.follow(match.name);
+      select.value = match.name;
+      console.log(
+        `[viewer] following ${match.name}; recorded camera settings:`,
+        camPlugin.getRecordedSettings(),
+      );
+      syncStiffness();
+    } else {
+      console.warn(`[viewer] ?follow=${followParam}: no such player`);
+    }
+  }
+  const tParam = params.get("t");
+  if (tParam) viewer.seek(Number(tParam));
+  if (params.get("paused")) viewer.pause();
+  // ?pauseat=<seconds>: pause once playback reaches this time (deterministic
+  // screenshots — both A/B runs freeze on the identical frame).
+  const pauseAt = params.get("pauseat");
+  if (pauseAt) {
+    const at = Number(pauseAt);
+    const unsub = viewer.subscribe((state) => {
+      if (state.currentTime >= at) {
+        viewer.pause();
+        unsub();
+      }
+    });
+  }
+
+  viewer.subscribe((state) => {
+    const b = viewer.adapter.ball.position;
+    log(
+      `t=${state.currentTime.toFixed(1)}/${state.duration.toFixed(1)}s` +
+        `  ball=(${b.x.toFixed(0)},${b.y.toFixed(0)},${b.z.toFixed(0)})` +
+        (state.playing ? "" : "  [paused]"),
+    );
+  });
+
+  // Space toggles playback; ←/→ scrub 5s; B toggles ball cam.
+  // In free-cam mode the CameraManager owns Space/arrows (fly controls).
+  window.addEventListener("keydown", (e) => {
+    const freeCam = camPlugin.getMode() === "free";
+    if (e.code === "Space" && !freeCam) {
+      e.preventDefault();
+      viewer.togglePlayback();
+    } else if (e.code === "ArrowRight" && !freeCam) {
+      viewer.seek(viewer.getState().currentTime + 5);
+    } else if (e.code === "ArrowLeft" && !freeCam) {
+      viewer.seek(viewer.getState().currentTime - 5);
+    } else if (e.code === "KeyB") {
+      ballCamBox.checked = !ballCamBox.checked;
+      camPlugin.setBallCam(ballCamBox.checked);
+    }
+  });
+
+  await viewer.ready;
+  console.log("[viewer] assets ready (arena + ball model)");
 }
 
 main().catch((e) => {

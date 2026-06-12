@@ -4,6 +4,8 @@ import CameraControls from 'camera-controls';
 // Install CameraControls with THREE
 CameraControls.install({ THREE });
 
+const _AXIS_X = new THREE.Vector3(1, 0, 0);
+
 export class CameraManager {
   constructor(camera, domElement) {
     this.camera = camera;
@@ -544,8 +546,8 @@ export class CameraManager {
     this.lastIsBallCam = isBallCam;
 
     // Calculate BOTH camera states every frame
-    const carCamState = this.calculateCarCamPosition(carPos, carQuaternion);
-    const ballCamState = this.calculateBallCamPosition(carPos, carQuaternion);
+    const carCamState = this.calculateCarCamPosition(carPos, carQuaternion, delta);
+    const ballCamState = this.calculateBallCamPosition(carPos, carQuaternion, delta);
 
     // Update target blend based on ball cam toggle
     // This doesn't reset - it just changes direction (handles rapid toggling)
@@ -604,24 +606,44 @@ export class CameraManager {
       alpha
     );
 
+    // Apply camera angle (pitch adjustment) to the target orientation
+    // followAngle is negative (e.g., -4 degrees) = look down
+    if (this.followAngle !== 0) {
+      const angleRad = (this.followAngle * Math.PI) / 180;
+      finalQuat.multiply(this._tempQuatCarCam.setFromAxisAngle(_AXIS_X, -angleRad));
+    }
+
+    // === STIFFNESS (Rocket League camera setting) ===
+    // stiffness 1.0 = camera rigidly locked to the computed pose (the previous
+    // behavior); lower values exponentially smooth the final pose toward the
+    // target, absorbing car/ball interpolation jitter. Framerate-independent.
+    const stiffness = Math.min(1, Math.max(0, this.stiffness));
+    const smoothTime = (1 - stiffness) * 0.15; // seconds of lag at stiffness 0
+    const SNAP_DISTANCE_SQ = 1500 * 1500; // teleports (seek/demo/respawn): snap
+    if (
+      !this._smoothedCamPos ||
+      smoothTime < 1e-3 ||
+      this._smoothedCamPos.distanceToSquared(finalPos) > SNAP_DISTANCE_SQ
+    ) {
+      this._smoothedCamPos = (this._smoothedCamPos || new THREE.Vector3()).copy(finalPos);
+      this._smoothedCamQuat = (this._smoothedCamQuat || new THREE.Quaternion()).copy(finalQuat);
+    } else {
+      const k = 1 - Math.exp(-delta / smoothTime);
+      this._smoothedCamPos.lerp(finalPos, k);
+      this._smoothedCamQuat.slerp(finalQuat, k);
+    }
+
     // Apply position and rotation to camera
-    this.camera.position.copy(finalPos);
-    this.camera.quaternion.copy(finalQuat);
+    this.camera.position.copy(this._smoothedCamPos);
+    this.camera.quaternion.copy(this._smoothedCamQuat);
 
     // Store current state for reference
     if (!this.currentCamPos) this.currentCamPos = new THREE.Vector3();
     if (!this.currentLookTarget) this.currentLookTarget = new THREE.Vector3();
-    this.currentCamPos.copy(finalPos);
+    this.currentCamPos.copy(this._smoothedCamPos);
     // Calculate look target from quaternion for compatibility
-    const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(finalQuat);
-    this.currentLookTarget.copy(finalPos).add(lookDir.multiplyScalar(100));
-
-    // Apply camera angle (pitch adjustment) after rotation
-    // followAngle is negative (e.g., -4 degrees) = look down
-    if (this.followAngle !== 0) {
-      const angleRad = (this.followAngle * Math.PI) / 180;
-      this.camera.rotateX(-angleRad);
-    }
+    const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this._smoothedCamQuat);
+    this.currentLookTarget.copy(this._smoothedCamPos).add(lookDir.multiplyScalar(100));
 
     this.enforceMinHeight();
   }
@@ -631,9 +653,9 @@ export class CameraManager {
    * Camera positioned so that both car and ball are visible
    * When ball is higher than car, camera goes lower to keep both in frame
    */
-  calculateBallCamPosition(carPos, carQuaternion) {
+  calculateBallCamPosition(carPos, carQuaternion, delta = 1 / 60) {
     if (!this.targetBall) {
-      return this.calculateCarCamPosition(carPos, carQuaternion);
+      return this.calculateCarCamPosition(carPos, carQuaternion, delta);
     }
 
     const ballPos = this.targetBall.position.clone();
@@ -677,7 +699,7 @@ export class CameraManager {
    * Calculate car cam position and look target
    * Uses velocity-based direction when car is airborne/flipping
    */
-  calculateCarCamPosition(carPos, carQuaternion) {
+  calculateCarCamPosition(carPos, carQuaternion, delta = 1 / 60) {
     // Track car position to calculate velocity direction
     if (!this.lastCarPos) {
       this.lastCarPos = carPos.clone();
@@ -744,8 +766,9 @@ export class CameraManager {
 
     // Use swivelSpeed for rotation speed (RL range: 1.0-10.0)
     // Higher swivelSpeed = faster camera rotation around car
+    // (framerate-independent: scale by the real frame delta, not assumed 60fps)
     const yawLerpSpeed = isFlipping ? (this.swivelSpeed * 0.4) : this.swivelSpeed;
-    this.smoothedCarYaw += yawDiff * Math.min(1, yawLerpSpeed * (1 / 60));
+    this.smoothedCarYaw += yawDiff * Math.min(1, yawLerpSpeed * delta);
 
     // Calculate camera position using smoothed yaw
     const backwardX = -Math.sin(this.smoothedCarYaw);

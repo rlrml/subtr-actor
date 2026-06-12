@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export class SceneManager {
     constructor(container) {
@@ -36,6 +37,26 @@ export class SceneManager {
 
         // Resize handler
         window.addEventListener('resize', () => this.onWindowResize());
+    }
+
+    /**
+     * Asset-free default lighting. The original ballcam app lit everything via
+     * an HDR skybox (scene.environment -> IBL on the PBR materials); those HDRs
+     * were never vendored into this package, so without this the scene renders
+     * nearly black. RoomEnvironment + PMREM gives equivalent neutral IBL from
+     * code, and a directional key light adds definition.
+     */
+    initDefaultEnvironment() {
+        const pmrem = new THREE.PMREMGenerator(this.renderer);
+        this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        pmrem.dispose();
+
+        const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+        sun.position.set(3000, 8000, 4000);
+        this.scene.add(sun);
+
+        const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+        this.scene.add(ambient);
     }
 
     loadSkybox(skyboxId = 'HighFantasy4k') {

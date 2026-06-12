@@ -18,6 +18,7 @@
  */
 import EventEmitter from "eventemitter3";
 import { vec3RlToThree, quatRlToThree, boostToPercent, type Vec3, type Quat } from "./coords.js";
+import { getCarHitboxInfo } from "../data/hitboxes.js";
 
 // ── Minimal view of subtr-actor's raw ReplayData (ts-rs). Loosely typed on
 //    purpose: the ts-rs union types (BallFrame = "Empty" | {Data:{...}}) are
@@ -42,6 +43,19 @@ type RawPlayerFrame =
         is_team_0: boolean | null;
       };
     };
+type RawBoostPadEventKind = "Available" | { PickedUp: { sequence: number } };
+interface RawBoostPadEvent {
+  time: number;
+  frame: number;
+  pad_id: string;
+  kind: RawBoostPadEventKind;
+}
+interface RawResolvedBoostPad {
+  index: number;
+  pad_id: string | null;
+  size: "Big" | "Small";
+  position: { x: number; y: number; z: number };
+}
 interface RawReplayData {
   frame_data: {
     ball_data: { frames: RawBallFrame[] };
@@ -52,12 +66,26 @@ interface RawReplayData {
     team_zero: RawPlayerInfo[];
     team_one: RawPlayerInfo[];
   };
+  boost_pads?: RawResolvedBoostPad[];
+  boost_pad_events?: RawBoostPadEvent[];
 }
 interface RawPlayerInfo {
   remote_id: unknown;
   name: string;
+  car_body_id?: number | null;
   car_body_name?: string | null;
   car_hitbox_family?: string | null;
+  camera_settings?: RawCameraSettings | null;
+}
+/** subtr-actor's PlayerCameraSettings (snake_case, RL menu units). */
+interface RawCameraSettings {
+  fov: number;
+  height: number;
+  angle: number;
+  distance: number;
+  stiffness: number;
+  swivel_speed: number;
+  transition_speed?: number | null;
 }
 
 // ── Timeline keyframe shapes the renderer expects (ballcam THREE space).
@@ -83,7 +111,43 @@ export interface ViewerPlayerInfo {
   carName: string;
   hitboxType: string;
   loadout?: undefined;
+  /** The player's recorded RL camera preset, when the replay carries one. */
+  cameraSettings: RecordedCameraSettings | null;
 }
+
+/**
+ * A player's recorded Rocket League camera preset (in-game menu units; `fov`
+ * is the HORIZONTAL field of view). Key names match the camera plugin's
+ * `CameraSettings` so a recorded preset can be applied directly.
+ */
+export interface RecordedCameraSettings {
+  fov: number;
+  height: number;
+  angle: number;
+  distance: number;
+  stiffness: number;
+  swivelSpeed: number;
+  transitionSpeed?: number;
+}
+
+function toRecordedCameraSettings(raw: RawCameraSettings | null | undefined): RecordedCameraSettings | null {
+  if (!raw) return null;
+  const settings: RecordedCameraSettings = {
+    fov: raw.fov,
+    height: raw.height,
+    angle: raw.angle,
+    distance: raw.distance,
+    stiffness: raw.stiffness,
+    swivelSpeed: raw.swivel_speed,
+  };
+  // Only set when present so spreading a recorded preset over defaults never
+  // clobbers transitionSpeed with `undefined`.
+  if (raw.transition_speed != null) settings.transitionSpeed = raw.transition_speed;
+  return settings;
+}
+
+/** Supersonic threshold in UU/s (game value ~2200). */
+const SUPERSONIC_SPEED = 2200;
 
 function lastBefore<T extends { time: number }>(arr: T[], time: number): T | null {
   if (arr.length === 0) return null;
@@ -109,6 +173,22 @@ class BallEntity {
   visible = true;
 }
 
+/**
+ * Boost pad in the exact shape the original GameEngine read off framework's
+ * Player.boostPads: position in raw Unreal coords (the renderer does its own
+ * Y/Z swap at the mesh level) + live `isAvailable` updated on seek().
+ */
+export class BoostPadEntity {
+  isAvailable = true;
+  constructor(
+    public isBig: boolean,
+    /** Unreal coords: x, y = along field length, z = height. */
+    public position: Vec3,
+    /** Sorted availability timeline compiled from boost_pad_events. */
+    public events: Array<{ time: number; available: boolean }>,
+  ) {}
+}
+
 class PlayerEntity extends EventEmitter {
   position: Vec3 = { x: 0, y: 0, z: 0 };
   rotation: Quat = { x: 0, y: 0, z: 0, w: 1 };
@@ -118,6 +198,9 @@ class PlayerEntity extends EventEmitter {
   steer = 0;
   boost = 0; // 0-100
   isBoosting = false;
+  isSupersonic = false;
+  /** True while boost is being reset for a kickoff (suppresses boost particles). */
+  isKickoffReset = false;
   isVisible = true;
   isBallCam = true;
   constructor(
@@ -125,6 +208,8 @@ class PlayerEntity extends EventEmitter {
     public team: number,
     public carName: string,
     public hitboxType: string,
+    /** The player's recorded RL camera preset, when the replay carries one. */
+    public cameraSettings: RecordedCameraSettings | null = null,
   ) {
     super();
   }
@@ -135,7 +220,7 @@ export class SubtrActorPlayer extends EventEmitter {
   playerList: ViewerPlayerInfo[] = [];
   ball = new BallEntity();
   players = new Map<string, PlayerEntity>();
-  boostPads = new Map<string, never>(); // stubbed for v0
+  boostPads = new Map<number, BoostPadEntity>();
 
   private _currentTime = 0;
   private _ballTimeline: MotionKeyframe[] = [];
@@ -186,8 +271,12 @@ export class SubtrActorPlayer extends EventEmitter {
       }
       if (!name) name = `Player_${key}`;
 
-      const carName = matched?.info.car_body_name ?? "Octane";
-      const hitboxType = matched?.info.car_hitbox_family ?? "Octane";
+      // Prefer subtr-actor's resolved fields; fall back to the body-id table when
+      // the replay header omits the body name (it often carries only car_body_id).
+      const info = matched?.info;
+      const byId = info?.car_body_id != null ? getCarHitboxInfo(info.car_body_id) : null;
+      const carName = info?.car_body_name ?? byId?.name ?? "Octane";
+      const hitboxType = info?.car_hitbox_family ?? byId?.hitboxType ?? "Octane";
 
       const motion: MotionKeyframe[] = [];
       const flags: FlagsKeyframe[] = [];
@@ -204,14 +293,45 @@ export class SubtrActorPlayer extends EventEmitter {
         });
       });
 
+      const cameraSettings = toRecordedCameraSettings(info?.camera_settings);
+
       this._playerTimelines[name] = motion;
       this._playerFlags[name] = flags;
       this._teams[name] = team;
-      this.playerList.push({ name, team, carName, hitboxType });
-      this.players.set(name, new PlayerEntity(name, team, carName, hitboxType));
+      this.playerList.push({ name, team, carName, hitboxType, cameraSettings });
+      this.players.set(name, new PlayerEntity(name, team, carName, hitboxType, cameraSettings));
     });
 
+    this._compileBoostPads();
+
     this.seek(0);
+  }
+
+  /**
+   * subtr-actor resolves the standard soccar pad layout (with replay pad ids
+   * when known) and emits exact pickup/availability events; fold the events
+   * into per-pad timelines so seek() can resolve `isAvailable` at any time.
+   */
+  private _compileBoostPads(): void {
+    const eventsByPadId = new Map<string, Array<{ time: number; available: boolean }>>();
+    (this.raw.boost_pad_events ?? []).forEach((e) => {
+      const available =
+        e.kind === "Available"
+          ? true
+          : e.kind && typeof e.kind === "object" && "PickedUp" in e.kind
+            ? false
+            : null;
+      if (available === null) return;
+      const bucket = eventsByPadId.get(e.pad_id);
+      if (bucket) bucket.push({ time: e.time, available });
+      else eventsByPadId.set(e.pad_id, [{ time: e.time, available }]);
+    });
+
+    (this.raw.boost_pads ?? []).forEach((pad) => {
+      const events = (pad.pad_id ? eventsByPadId.get(pad.pad_id) : undefined) ?? [];
+      events.sort((a, b) => a.time - b.time);
+      this.boostPads.set(pad.index, new BoostPadEntity(pad.size === "Big", pad.position, events));
+    });
   }
 
   private _rbToKeyframe(rb: RawRigidBody, time: number, frame: number): MotionKeyframe | null {
@@ -267,6 +387,8 @@ export class SubtrActorPlayer extends EventEmitter {
         entity.velocity = m.velocity;
         entity.angularVelocity = m.angularVelocity ?? { x: 0, y: 0, z: 0 };
         entity.sleeping = m.sleeping;
+        const v = m.velocity;
+        entity.isSupersonic = Math.hypot(v.x, v.y, v.z) >= SUPERSONIC_SPEED;
       }
       const fl = lastBefore(this._playerFlags[name] ?? [], time);
       if (fl) {
@@ -277,6 +399,12 @@ export class SubtrActorPlayer extends EventEmitter {
       // car produces Empty frames -> no nearby keyframe -> hidden.
       const tl = this._playerTimelines[name] ?? [];
       entity.isVisible = tl.length > 0 && time >= tl[0].time - 0.001 && time <= tl[tl.length - 1].time + 1.0;
+    }
+    for (const pad of this.boostPads.values()) {
+      if (pad.events.length === 0) continue; // no events recorded -> always available
+      const e = lastBefore(pad.events, time);
+      // Before the first event the pad is in its initial (available) state.
+      pad.isAvailable = e && e.time <= time ? e.available : true;
     }
   }
 
