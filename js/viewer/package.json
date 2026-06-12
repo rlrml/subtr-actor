@@ -1,0 +1,28 @@
+{
+  "name": "@rlrml/viewer",
+  "version": "0.12.0",
+  "private": true,
+  "description": "High-fidelity 3D Rocket League replay viewer powered by subtr-actor (seeded from ballcam.tv with permission)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check:tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rlrml/player": "^0.12.0",
+    "camera-controls": "^2.10.1",
+    "eventemitter3": "^5.0.1"
+  },
+  "peerDependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/three": "^0.180.0",
+    "three": "^0.180.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
+    "vite-plugin-wasm": "^3.5.0"
+  }
+}
