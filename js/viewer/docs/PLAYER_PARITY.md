@@ -16,11 +16,11 @@ Three phases:
 3. **Plugin-context parity** *(done — see below)*: `replay`/`options`/`state`
    in plugin contexts, `FrameRenderInfo` in the render context, the timeline
    projection / skip-window APIs (live, off the shared `ReplayModel`), and a
-   bridge (`fromReplayPlayerPlugin`) that runs @rlrml/player's DOM plugins
-   unmodified — the timeline overlay is mounted through it in the dev harness.
-   Still open within Phase 3: ports of the renderer-coupled plugins
-   (boost-pickup animation, canvas recorder; they use `beforeRender`, which the
-   bridge deliberately rejects).
+   bridge (`fromReplayPlayerPlugin`) that runs @rlrml/player plugins
+   unmodified — DOM hooks pass straight through, and `beforeRender` gets a
+   synthesized `ReplayPlayerRenderContext` built with @rlrml/player's own
+   exported math. The dev harness mounts the timeline overlay, the
+   boost-pickup animation, and the canvas recorder through it.
 
 ## State (`getState()` / `subscribe` payload)
 
@@ -37,7 +37,7 @@ Three phases:
 | `attachedPlayerId` | ✅ live | stable per-player id (from the replay's remote id) — `adapter.playerList[].id` |
 | `ballCamEnabled` | ✅ live | reports the **effective** ball-cam state. Until explicitly set, the viewer follows the replay's recorded per-player ball-cam state (richer than @rlrml/player's static default) |
 | `boostMeterEnabled` | 🟡 tracked-but-inert | no boost-meter rendering yet |
-| `boostPickupAnimationEnabled` | 🟡 tracked-but-inert | pads animate unconditionally via `createBoostPadsPlugin()` |
+| `boostPickupAnimationEnabled` | ✅ live | when @rlrml/player's boost-pickup-animation plugin is bridged (the dev harness mounts it); its `beforeRender` reads this flag off the synthesized render context |
 | `hitboxWireframesEnabled` | 🟡 tracked-but-inert | `HitboxManager` exists but isn't wired |
 | `hitboxOnlyModeEnabled` | 🟡 tracked-but-inert | |
 | `skipPostGoalTransitionsEnabled` | ✅ live | @rlrml/player's exact skip-window semantics over the shared `ReplayModel` (`computeTimelineSegments` + skip-target helpers); applied on play/seek/tick, never while paused |
@@ -105,9 +105,8 @@ which also writes the `package.json` that makes `js/pkg` installable).
 `ViewerPluginContext` now carries everything `ReplayPlayerPluginContext` does —
 `player` (the parity control + timeline surface), `replay` (the shared
 `ReplayModel`), `options`, `container`, and `state` / `FrameRenderInfo` on the
-state/render contexts. That makes @rlrml/player's **DOM-only** plugins run
-unmodified through `fromReplayPlayerPlugin`
-(`src/plugins/replay-player-bridge.ts`):
+state/render contexts. That makes @rlrml/player plugins run unmodified through
+`fromReplayPlayerPlugin` (`src/plugins/replay-player-bridge.ts`):
 
 ```ts
 import { createTimelineOverlayPlugin, fromReplayPlayerPlugin } from "@rlrml/viewer";
@@ -119,10 +118,21 @@ and the scrubber all drive the viewer through the parity methods
 (`projectTimelineTimeToReplay`, `getTimelineCurrentTime`, `seek`, …).
 `context.scene` is the viewer's `sceneState` (below).
 
-One surface deliberately does **not** bridge, and fails loudly:
-`beforeRender` plugins (boost-pickup animation, canvas recorder) receive
-renderer-internal frame state; the bridge rejects them at install time. They
-need native `ViewerPlugin` ports.
+**`beforeRender` plugins** (boost-pickup animation, canvas recorder) get a
+**synthesized `ReplayPlayerRenderContext`**, computed per frame from the
+shared `ReplayModel` with @rlrml/player's own exported math — `getFrameWindow`,
+`interpolatePosition`, `getActiveDemoEvent`, `isPlayerSamplePresent` — so frame
+windows, ball/player samples, interpolated positions, and boost fractions
+match what `ReplayPlayer.render()` would hand the plugin (the early-out
+branches that leave `interpolatedPosition: null` / `boostFraction: 0` are
+mirrored exactly). Per-track `mesh`es are this renderer's live car objects;
+`boostTrail` is always `null`; `ballPosition` is in **this renderer's** world
+space (Y-up via `replayRoot.localToWorld`) — scene-level math doesn't port
+(see “ReplayScene & replayRoot”), but none of @rlrml/player's plugins use it.
+Handles survive the wrap, so e.g. the bridged canvas recorder's
+`start()`/`stop()`/`recordRange()` work against this renderer's real
+`WebGLRenderer` canvas. The dev harness mounts both plugins and
+`?paritycheck=1` asserts the pickup animation actually fires.
 
 ## ReplayScene & replayRoot
 

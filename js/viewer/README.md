@@ -120,10 +120,13 @@ Key modules:
   @rlrml/player's own pure `ReplayModel` utilities, so `skipKickoffs` /
   `skipPostGoalTransitions`, `activeMetadata` kickoff countdowns, and the
   skip-aware playback end all behave identically — and
-  `fromReplayPlayerPlugin()` mounts @rlrml/player's DOM plugins unmodified.
-  The dev harness runs its real timeline overlay (markers, skip toggles,
-  scrubber) through the bridge. Renderer-coupled plugins (`beforeRender`)
-  are rejected loudly and need native ports — see
+  `fromReplayPlayerPlugin()` mounts @rlrml/player plugins unmodified. DOM
+  hooks pass straight through; `beforeRender` plugins get a synthesized
+  `ReplayPlayerRenderContext` built from the shared `ReplayModel` with
+  @rlrml/player's own exported math (frame windows, interpolated positions,
+  boost fractions — identical semantics). The dev harness runs its real
+  timeline overlay (markers, skip toggles, scrubber), boost-pickup
+  animation, and canvas recorder through the bridge — see
   [`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md).
 - **`viewer.sceneState` + `replayRoot`.** A `ReplayScene`-shaped surface for
   @rlrml/player consumers that mount THREE overlays (the stat-evaluation
@@ -149,10 +152,10 @@ Key modules:
    position-smoothing and frame-filtering passes that exist to clean raw replay
    jitter that subtr-actor already handles upstream; those should be removed,
    not preserved.
-3. **Native ports of @rlrml/player's renderer-coupled plugins**
-   (boost-pickup animation, canvas recorder): they use `beforeRender`, whose
-   render context is renderer-internal, so the Phase 3 bridge deliberately
-   rejects them ([`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md)).
+3. **Port `js/stat-evaluation-player` onto the viewer.** Every parity surface
+   it consumes is now in place ([`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md));
+   what remains is the port itself (constructor shape via `createViewer`, and
+   rerouting its few scene-level overlays through `replayRoot`).
 
 ## Focused layout (cleanup complete)
 

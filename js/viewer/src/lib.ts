@@ -41,11 +41,23 @@ export { loadReplay, parseReplay } from "./adapter/wasm.js";
 export type { ReplayLoadResult, ReplayModel, ReplayScene } from "@rlrml/player";
 export { createNameTagPlugin } from "./plugins/name-tags.js";
 export { createBoostPadsPlugin } from "./plugins/boost-pads.js";
-// Phase 3 parity: run @rlrml/player DOM plugins on the viewer, e.g.
+// Phase 3 parity: run @rlrml/player plugins on the viewer, e.g.
 //   viewer.addPlugin(fromReplayPlayerPlugin(createTimelineOverlayPlugin()))
 export { fromReplayPlayerPlugin } from "./plugins/replay-player-bridge.js";
-export { createTimelineOverlayPlugin, timelineEventSeekTime } from "@rlrml/player";
-export type { TimelineOverlayPlugin, TimelineOverlayPluginOptions } from "@rlrml/player";
+export {
+  createBoostPadOverlayPlugin,
+  createBoostPickupAnimationPlugin,
+  createCanvasRecorderPlugin,
+  createTimelineOverlayPlugin,
+  timelineEventSeekTime,
+} from "@rlrml/player";
+export type {
+  BoostPickupAnimationPluginOptions,
+  CanvasRecorderPlugin,
+  CanvasRecorderPluginOptions,
+  TimelineOverlayPlugin,
+  TimelineOverlayPluginOptions,
+} from "@rlrml/player";
 export { createCameraPlugin } from "./plugins/camera.js";
 export type {
   CameraPlugin,

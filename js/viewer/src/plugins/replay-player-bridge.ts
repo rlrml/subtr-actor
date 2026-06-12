@@ -2,10 +2,9 @@
  * Bridge: mount an `@rlrml/player` `ReplayPlayerPlugin` on a `ViewerPlayer`.
  *
  * Phase 3 of docs/PLAYER_PARITY.md. The two plugin contracts are structurally
- * aligned on everything a DOM plugin reads — `player` (control surface +
- * timeline projection), `replay` (the shared `ReplayModel`), `state`,
- * `options`, `container` — so DOM-only plugins (the timeline overlay,
- * ballchasing overlay, …) run unmodified:
+ * aligned on everything a plugin reads — `player` (control surface + timeline
+ * projection), `replay` (the shared `ReplayModel`), `state`, `options`,
+ * `container` — so @rlrml/player plugins run unmodified:
  *
  *   viewer.addPlugin(fromReplayPlayerPlugin(createTimelineOverlayPlugin()));
  *
@@ -16,17 +15,38 @@
  * schematic-player internals (body meshes, hitboxes, boost trails/meters,
  * demo indicators) are empty maps.
  *
- * One part deliberately does NOT bridge, and fails loudly instead of silently:
- * `beforeRender` receives renderer-internal frame state (`ballPosition`,
- * per-track meshes) that can't be faked faithfully. Bridging a plugin that
- * defines it throws at install time.
+ * `beforeRender` receives a synthesized `ReplayPlayerRenderContext`, computed
+ * from the shared `ReplayModel` with @rlrml/player's own exported math
+ * (`getFrameWindow`, `interpolatePosition`, …), so frame windows, ball/player
+ * samples, interpolated positions, and boost fractions match what
+ * `ReplayPlayer.render()` would hand the plugin. Track `mesh`es are this
+ * renderer's live car objects (UE-coordinate `replayRoot` children, like the
+ * schematic player's); `boostTrail` is always null here, and `ballPosition`
+ * is in THIS renderer's world space (Y-up — scene-level math doesn't port,
+ * see docs/PLAYER_PARITY.md).
  */
+import * as THREE from "three";
+import {
+  getActiveDemoEvent,
+  getFrameWindow,
+  interpolatePosition,
+  isPlayerSamplePresent,
+} from "@rlrml/player";
 import type {
+  ReplayModel,
   ReplayPlayerPlugin,
   ReplayPlayerPluginContext,
   ReplayPlayerPluginStateContext,
+  ReplayPlayerRenderContext,
+  ReplayPlayerRenderTrackContext,
+  ReplayScene,
 } from "@rlrml/player";
-import type { ViewerPlugin, ViewerPluginContext, ViewerPluginStateContext } from "../types.js";
+import type {
+  ViewerPlugin,
+  ViewerPluginContext,
+  ViewerPluginStateContext,
+  ViewerRenderContext,
+} from "../types.js";
 
 function toPlayerContext(
   context: ViewerPluginContext,
@@ -57,6 +77,103 @@ function toPlayerStateContext(
 }
 
 /**
+ * Mirror of `ReplayPlayer.render()`'s per-player track construction
+ * (js/player/src/player.ts): `interpolatedPosition`/`boostFraction` stay
+ * null/0 on every early-out branch (no mesh, no interpolable position, active
+ * demo, sample absent) and only populate for a fully rendered player.
+ */
+function toRenderTrack(
+  player: ReplayModel["players"][number],
+  replay: ReplayModel,
+  sceneState: ReplayScene,
+  frameWindow: { frameIndex: number; nextFrameIndex: number; alpha: number },
+  currentTime: number,
+): ReplayPlayerRenderTrackContext {
+  const frame = player.frames[frameWindow.frameIndex] ?? null;
+  const nextFrame = player.frames[frameWindow.nextFrameIndex] ?? frame;
+  const track: ReplayPlayerRenderTrackContext = {
+    track: player,
+    mesh: sceneState.playerMeshes.get(player.id) ?? null,
+    boostTrail: sceneState.playerBoostTrails.get(player.id) ?? null,
+    frame,
+    nextFrame,
+    interpolatedPosition: null,
+    boostFraction: 0,
+  };
+  if (!track.mesh) {
+    return track;
+  }
+  const interpolated = interpolatePosition(
+    frame?.position ?? null,
+    nextFrame?.position ?? null,
+    frameWindow.alpha,
+  );
+  if (
+    !interpolated ||
+    getActiveDemoEvent(replay.timelineEvents, player.id, currentTime) ||
+    !isPlayerSamplePresent(frame)
+  ) {
+    return track;
+  }
+  track.interpolatedPosition = interpolated;
+  const currentBoostFraction = frame?.boostFraction ?? 0;
+  const nextBoostFraction = nextFrame?.boostFraction ?? currentBoostFraction;
+  track.boostFraction = THREE.MathUtils.lerp(
+    currentBoostFraction,
+    nextBoostFraction,
+    frameWindow.alpha,
+  );
+  return track;
+}
+
+function toPlayerRenderContext(
+  context: ViewerRenderContext,
+  pluginId: string,
+): ReplayPlayerRenderContext {
+  const stateContext = toPlayerStateContext(context, pluginId);
+  const replay = stateContext.replay;
+  const sceneState = stateContext.scene;
+  // Recompute the frame window with @rlrml/player's own math over the shared
+  // ReplayModel so the synthesized context is self-consistent and matches
+  // ReplayPlayer.render() exactly (the viewer's FrameRenderInfo is computed
+  // off the adapter's aligned-but-separate time index).
+  const frameWindow = getFrameWindow(replay, context.currentTime);
+  const ballFrame = replay.ballFrames[frameWindow.frameIndex] ?? null;
+  const nextBallFrame = replay.ballFrames[frameWindow.nextFrameIndex] ?? ballFrame;
+  const interpolatedBallPosition = interpolatePosition(
+    ballFrame?.position ?? null,
+    nextBallFrame?.position ?? null,
+    frameWindow.alpha,
+  );
+  // @rlrml/player hands plugins the ball's world-space position; the analog
+  // here is replayRoot's UE→world mapping (Y-up in this renderer).
+  const ballPosition = interpolatedBallPosition
+    ? sceneState.replayRoot.localToWorld(
+        new THREE.Vector3(
+          interpolatedBallPosition.x,
+          interpolatedBallPosition.y,
+          interpolatedBallPosition.z,
+        ),
+      )
+    : null;
+  return {
+    ...stateContext,
+    frameIndex: frameWindow.frameIndex,
+    nextFrameIndex: frameWindow.nextFrameIndex,
+    alpha: frameWindow.alpha,
+    currentTime: context.currentTime,
+    frame: replay.frames[frameWindow.frameIndex] ?? null,
+    nextFrame: replay.frames[frameWindow.nextFrameIndex] ?? null,
+    ballFrame,
+    nextBallFrame,
+    ballPosition,
+    players: replay.players.map((player) =>
+      toRenderTrack(player, replay, sceneState, frameWindow, context.currentTime),
+    ),
+  };
+}
+
+/**
  * Wrap a `ReplayPlayerPlugin` (or one with extra members, e.g.
  * `TimelineOverlayPlugin`) as a `ViewerPlugin`. Extra members survive on the
  * returned object so handles like `overlay.setVisible()` keep working.
@@ -64,12 +181,6 @@ function toPlayerStateContext(
 export function fromReplayPlayerPlugin<P extends ReplayPlayerPlugin>(
   plugin: P,
 ): ViewerPlugin & Omit<P, keyof ReplayPlayerPlugin> {
-  if (plugin.beforeRender) {
-    throw new Error(
-      `[viewer] @rlrml/player plugin "${plugin.id}" defines beforeRender — its render ` +
-        "context is renderer-internal and can't be bridged. Port it as a native ViewerPlugin.",
-    );
-  }
   return {
     ...plugin,
     setup: plugin.setup
@@ -82,7 +193,11 @@ export function fromReplayPlayerPlugin<P extends ReplayPlayerPlugin>(
           plugin.onStateChange?.(toPlayerStateContext(context, plugin.id));
         }
       : undefined,
-    beforeRender: undefined,
+    beforeRender: plugin.beforeRender
+      ? (context: ViewerRenderContext): void => {
+          plugin.beforeRender?.(toPlayerRenderContext(context, plugin.id));
+        }
+      : undefined,
     teardown: plugin.teardown
       ? (context: ViewerPluginContext): void => {
           plugin.teardown?.(toPlayerContext(context, plugin.id));

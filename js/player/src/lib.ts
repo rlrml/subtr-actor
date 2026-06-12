@@ -79,9 +79,14 @@ export {
   projectTimelineTimeToReplay,
 } from "./player-internals/timeline";
 export {
+  getActiveDemoEvent,
   getKickoffSkipTargetTime,
   getPostGoalTransitionSkipTargetTime,
+  isPlayerSamplePresent,
 } from "./player-helpers";
+// Pure render-context math, exported so other players can synthesize a
+// `ReplayPlayerRenderContext` with identical interpolation semantics.
+export { interpolatePosition } from "./player-internals/spatial";
 export type {
   NormalizeReplayDataAsyncOptions,
   NormalizeReplayDataOptions,

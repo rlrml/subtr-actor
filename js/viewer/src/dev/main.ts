@@ -9,7 +9,9 @@ import {
   createViewer,
   createNameTagPlugin,
   createBoostPadsPlugin,
+  createBoostPickupAnimationPlugin,
   createCameraPlugin,
+  createCanvasRecorderPlugin,
   createTimelineOverlayPlugin,
   fromReplayPlayerPlugin,
 } from "../lib.js";
@@ -27,6 +29,9 @@ async function main() {
   const bytes = new Uint8Array(await (await fetch("/sample.replay")).arrayBuffer());
 
   const camPlugin = createCameraPlugin();
+  // @rlrml/player's canvas recorder, bridged: extra members (start/stop/
+  // getStatus/recordRange) survive fromReplayPlayerPlugin.
+  const recorder = fromReplayPlayerPlugin(createCanvasRecorderPlugin());
   const viewer = await createViewer(container, bytes, {
     autoplay: true,
     loop: true,
@@ -37,6 +42,9 @@ async function main() {
       // @rlrml/player's own timeline overlay (goals/saves markers, skip
       // toggles, scrubber), mounted through the Phase 3 bridge.
       fromReplayPlayerPlugin(createTimelineOverlayPlugin()),
+      // beforeRender plugins run on the bridge's synthesized render context.
+      fromReplayPlayerPlugin(createBoostPickupAnimationPlugin()),
+      recorder,
     ],
   });
 
@@ -239,7 +247,40 @@ async function main() {
       );
       ok("sceneState.ballMesh present", viewer.sceneState.ballMesh.isObject3D === true);
     }
-    viewer.play();
+    // Phase 3b: beforeRender plugins on the bridge's synthesized
+    // ReplayPlayerRenderContext (boost-pickup animation + canvas recorder).
+    {
+      // The pickup plugin parents one group per pickup event on replayRoot
+      // (renderOrder 60) during setup…
+      const pickupGroups = () =>
+        viewer.sceneState.replayRoot.children.filter((child) => child.renderOrder === 60);
+      ok("pickup animation groups installed in replayRoot", pickupGroups().length > 0);
+      ok("canvas recorder bridged, idle", recorder.getStatus().state === "idle");
+      const firstPickup = (model?.boostPads ?? [])
+        .flatMap((pad) => pad.events.filter((e) => !e.available && e.playerId))
+        .sort((a, b) => a.time - b.time)[0];
+      if (!firstPickup) {
+        ok("bridged beforeRender animates pickup (no pickup events in model)", false);
+        viewer.play();
+      } else {
+        // …and flips them visible from beforeRender, which only runs inside
+        // the render loop — so finish this check a couple of frames later.
+        viewer.setState({
+          playing: false,
+          currentTime: firstPickup.time + 0.2,
+          boostPickupAnimationEnabled: true,
+        });
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            ok(
+              "bridged beforeRender animates pickup",
+              pickupGroups().some((group) => group.visible),
+            );
+            viewer.setState({ playing: true, currentTime: 45 });
+          }),
+        );
+      }
+    }
   }
   if (params.get("paused")) viewer.pause();
   // ?pauseat=<seconds>: pause once playback reaches this time (deterministic
