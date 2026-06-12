@@ -339,6 +339,11 @@ pub struct KickoffTakerEvent {
     pub start_position: [f32; 3],
     pub spawn_position: KickoffSpawnPosition,
     pub start_boost: Option<f32>,
+    /// Boost remaining at the moment the taker contacts the ball (the
+    /// counterpart to `boost_used`, which is spent reaching that contact).
+    /// For takers that never touch the ball (fake / missed) this falls back to
+    /// the end-of-kickoff sample. Invariant when the taker touches:
+    /// `start_boost + boost_collected == boost_used + boost_after`.
     pub boost_after: Option<f32>,
     pub time_to_ball: Option<f32>,
     pub boost_collected: f32,
