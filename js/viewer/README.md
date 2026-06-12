@@ -125,6 +125,12 @@ Key modules:
   scrubber) through the bridge. Renderer-coupled plugins (`beforeRender`)
   are rejected loudly and need native ports — see
   [`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md).
+- **`viewer.sceneState` + `replayRoot`.** A `ReplayScene`-shaped surface for
+  @rlrml/player consumers that mount THREE overlays (the stat-evaluation
+  player's stat modules). `viewer.replayRoot` is the portable seam: a group
+  whose local space is raw Unreal coordinates in both players, so overlays
+  positioned in UE coords render correctly here with `fieldScale = 1`.
+  `ballMesh`/`playerMeshes` are live views onto this renderer's actors.
 - **Recorded camera settings.** subtr-actor now extracts each player's
   replicated RL camera preset (`TAGame.CameraSettingsActor_TA:ProfileSettings`
   → `PlayerInfo.camera_settings`: fov/height/angle/distance/stiffness/swivel/

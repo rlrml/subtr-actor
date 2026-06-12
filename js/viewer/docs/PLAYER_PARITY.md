@@ -63,6 +63,7 @@ toggles round-trip correctly), but no rendering behavior is attached yet.
 | toggle setters (`setBoostMeterEnabled`, …) | 🟡 | accepted; tracked-but-inert (see table above) |
 | `addPlugin` / `removePlugin` / `getPlugins` / `destroy` / `dispose` | ✅ same | contexts now carry `replay`/`options`/`state` + `FrameRenderInfo`; @rlrml/player DOM plugins mount via `fromReplayPlayerPlugin` (see “Plugin bridge”) |
 | `.replay: ReplayModel` | ✅ same | see “Shared data layer” below |
+| `.sceneState: ReplayScene` | ✅ shape-compatible | `scene`/`camera`/`renderer`/`controls`/`replayRoot`/`resize` real; `ballMesh`/`playerMeshes` are live views onto this renderer's actors (by player id); schematic-player internals (body meshes, hitboxes, boost trails/meters, demo indicators) are empty maps. See “ReplayScene & replayRoot” |
 | `getTimelineDuration` / `getTimelineCurrentTime` / `getTimelineSegments` / `projectReplayTimeToTimeline` / `projectTimelineTimeToReplay` | ✅ same | @rlrml/player's own pure timeline utilities (exported from its lib) over the shared `ReplayModel`; identity projection when constructed without one |
 | playlist APIs | ❌ | `ReplayPlaylistPlayer` wraps a player; out of scope for the core |
 
@@ -116,14 +117,40 @@ viewer.addPlugin(fromReplayPlayerPlugin(createTimelineOverlayPlugin()));
 The dev harness mounts the timeline overlay this way — markers, skip toggles,
 and the scrubber all drive the viewer through the parity methods
 (`projectTimelineTimeToReplay`, `getTimelineCurrentTime`, `seek`, …).
+`context.scene` is the viewer's `sceneState` (below).
 
-Two surfaces deliberately do **not** bridge, and fail loudly:
+One surface deliberately does **not** bridge, and fails loudly:
+`beforeRender` plugins (boost-pickup animation, canvas recorder) receive
+renderer-internal frame state; the bridge rejects them at install time. They
+need native `ViewerPlugin` ports.
 
-- `context.scene` is @rlrml/player's `ReplayScene` (its schematic renderer's
-  internals); accessing it through the bridge throws.
-- `beforeRender` plugins (boost-pickup animation, canvas recorder) receive
-  renderer-internal frame state; the bridge rejects them at install time. They
-  need native `ViewerPlugin` ports.
+## ReplayScene & replayRoot
+
+`viewer.sceneState` matches @rlrml/player's `ReplayScene` shape — the surface
+`js/stat-evaluation-player`'s stat modules use to mount THREE overlays
+(`sceneState.scene` / `sceneState.replayRoot` / `sceneState.camera`).
+
+The portable piece is **`replayRoot`'s coordinate convention**. In both
+players, `replayRoot`-local space is chirality-corrected raw Unreal
+coordinates (RL Z-up, UU): @rlrml/player gets there with a
+`(-fieldScale, fieldScale, fieldScale)` scale in its Z-up world; the viewer
+bakes `adapter/coords.ts`'s axis swap (x→x, z→y, y→z) into the group's matrix
+in its Y-up world. Overlays that `replayRoot.add(mesh)` at UE positions (and
+use `localToWorld` + `camera` for DOM projection) work identically, with
+`fieldScale = 1` (the viewer renders 1:1 UU; `options.fieldScale` is absent,
+so the `?? 1` consumers already apply does the right thing).
+
+**Caveat:** overlays that add geometry to `sceneState.scene` directly assume
+@rlrml/player's Z-up world and will come out sideways here — route them
+through `replayRoot` when porting (that's the shared convention).
+
+What's real vs. empty: `scene`, `camera`, `renderer`, `controls`,
+`replayRoot`, `resize` are the viewer's own; `dispose` maps to
+`viewer.destroy()`; `ballMesh` and `playerMeshes` (keyed by stable player id)
+are live views onto this renderer's actors; `playerBodyMeshes`,
+`playerHitboxes`, `playerBoostTrails`, `playerBoostMeters`,
+`playerDemoIndicators` are empty maps — schematic-renderer internals with no
+counterpart.
 
 ## Constructor options
 

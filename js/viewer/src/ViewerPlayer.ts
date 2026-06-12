@@ -35,6 +35,7 @@ import type {
   ReplayModel,
   ReplayPlayerTimelineProjection,
   ReplayPlayerTimelineSegment,
+  ReplayScene,
 } from "@rlrml/player";
 import type { CameraPlugin } from "./plugins/camera.js";
 import type {
@@ -93,6 +94,32 @@ const FREE_CAMERA_PRESETS: Record<
   side: { position: [-9600, 6400, -12600], target: [0, 900, 0], up: [0, 1, 0] },
 };
 
+/**
+ * Build the viewer's `replayRoot`: a group whose LOCAL space is raw Unreal
+ * coordinates (RL Z-up, UU). Its fixed basis is exactly `vec3RlToThree`
+ * (adapter/coords.ts): x→x, z→y, y→z — so `replayRoot.add(mesh)` with
+ * UE-coordinate positions renders correctly in this Y-up world.
+ *
+ * This matches @rlrml/player's `replayRoot` convention (there it's a
+ * `(-fieldScale, fieldScale, fieldScale)` scale in a Z-up world): in BOTH
+ * players, replayRoot-local space = chirality-corrected UE coordinates, which
+ * is what makes ReplayScene-consuming overlays portable.
+ */
+function createReplayRoot(scene: THREE.Scene): THREE.Group {
+  const replayRoot = new THREE.Group();
+  replayRoot.name = "replayRoot";
+  replayRoot.matrixAutoUpdate = false;
+  // prettier-ignore
+  replayRoot.matrix.set(
+    1, 0, 0, 0,
+    0, 0, 1, 0,
+    0, 1, 0, 0,
+    0, 0, 0, 1,
+  );
+  scene.add(replayRoot);
+  return replayRoot;
+}
+
 export class ViewerPlayer extends EventTarget {
   readonly container: HTMLElement;
   /** The subtr-actor adapter — the sole data source (timelines + live entities). */
@@ -112,6 +139,22 @@ export class ViewerPlayer extends EventTarget {
   readonly actorManager: ActorManager;
   readonly effectsManager: EffectsManager;
   readonly controls: OrbitControls;
+  /**
+   * UE-coordinate mount point: children positioned in raw Unreal coords (RL
+   * Z-up, UU) render correctly here — same convention as @rlrml/player's
+   * `replayRoot`, see createReplayRoot. The portable seam for 3D overlays.
+   */
+  readonly replayRoot: THREE.Group;
+  /**
+   * @rlrml/player's `ReplayScene` surface (docs/PLAYER_PARITY.md Phase 3+):
+   * what `ReplayPlayer.sceneState`-reading consumers (js/stat-evaluation-player
+   * stat modules) use to mount THREE overlays. `scene`/`camera`/`renderer`/
+   * `controls`/`replayRoot`/`resize` are real; `ballMesh`/`playerMeshes` are
+   * live views onto this renderer's actors; the player-renderer internals
+   * (body meshes, hitboxes, boost trails/meters, demo indicators) are empty
+   * maps — they have no counterpart here.
+   */
+  readonly sceneState: ReplayScene;
   private readonly effectsEnabled: boolean;
   /** Resolves when async assets (arena meshes, ball model) are in the scene. */
   readonly ready: Promise<void>;
@@ -205,6 +248,9 @@ export class ViewerPlayer extends EventTarget {
     this.camera.position.set(0, 4000, 6000);
     this.controls.target.set(0, 200, 0);
     this.controls.update();
+
+    this.replayRoot = createReplayRoot(this.scene);
+    this.sceneState = this.createSceneState();
 
     this.ready = Promise.all([
       this.arenaManager.loadArenaMeshes().catch((e: unknown) => {
@@ -879,6 +925,61 @@ export class ViewerPlayer extends EventTarget {
       if (index < 0) return;
       this.plugins.splice(index, 1);
       plugin.teardown?.(this.createPluginContext());
+    };
+  }
+
+  /**
+   * Build the `ReplayScene`-shaped sceneState. `ballMesh`/`playerMeshes` are
+   * getters so they track the live actors (GLB model swaps replace the
+   * Object3Ds; a snapshot would go stale).
+   */
+  private createSceneState(): ReplayScene {
+    // ActorManager is untyped JS; view the lookup tables we read with types.
+    const am = this.actorManager as unknown as {
+      ballActorId: string | number | null;
+      actors: Record<string | number, THREE.Object3D | undefined>;
+      playerNameToCarActorId: Record<string, string | number | undefined>;
+    };
+    const player = this;
+    // Stand-in until the ball actor spawns (ReplayScene.ballMesh is non-null).
+    const fallbackBallMesh = new THREE.Mesh();
+    return {
+      get scene() {
+        return player.scene;
+      },
+      replayRoot: this.replayRoot,
+      get camera() {
+        return player.camera;
+      },
+      get renderer() {
+        return player.renderer;
+      },
+      controls: this.controls,
+      resize: () => this.sceneManager.onWindowResize(),
+      // Parity with ReplayPlayer.destroy() → sceneState.dispose(); consumers
+      // should normally call viewer.destroy() instead.
+      dispose: () => this.destroy(),
+      get ballMesh(): THREE.Mesh {
+        const ball = am.ballActorId != null ? am.actors[am.ballActorId] : null;
+        return (ball as THREE.Mesh) ?? fallbackBallMesh;
+      },
+      // Car Object3Ds keyed by stable player id, rebuilt per access.
+      get playerMeshes(): Map<string, THREE.Object3D> {
+        const map = new Map<string, THREE.Object3D>();
+        for (const info of player.adapter.playerList) {
+          const actorId = am.playerNameToCarActorId[info.name];
+          const mesh = actorId != null ? am.actors[actorId] : undefined;
+          if (mesh) map.set(info.id, mesh);
+        }
+        return map;
+      },
+      // Schematic-player internals with no counterpart in this renderer.
+      playerBodyMeshes: new Map(),
+      playerHitboxes: new Map(),
+      playerBoostTrails: new Map(),
+      playerBoostMeters: new Map(),
+      playerDemoIndicators: new Map(),
+      updateWallVisibility: () => {},
     };
   }
 

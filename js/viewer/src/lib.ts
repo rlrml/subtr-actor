@@ -38,7 +38,7 @@ export { ViewerPlayer } from "./ViewerPlayer.js";
 export { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
 export type { RecordedCameraSettings, ViewerPlayerInfo } from "./adapter/SubtrActorPlayer.js";
 export { loadReplay, parseReplay } from "./adapter/wasm.js";
-export type { ReplayLoadResult, ReplayModel } from "@rlrml/player";
+export type { ReplayLoadResult, ReplayModel, ReplayScene } from "@rlrml/player";
 export { createNameTagPlugin } from "./plugins/name-tags.js";
 export { createBoostPadsPlugin } from "./plugins/boost-pads.js";
 // Phase 3 parity: run @rlrml/player DOM plugins on the viewer, e.g.

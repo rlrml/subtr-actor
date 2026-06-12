@@ -4,6 +4,7 @@
  * and name tags are driven entirely through the public seams (subscribe + the
  * name-tag plugin), keeping the core bare.
  */
+import * as THREE from "three";
 import {
   createViewer,
   createNameTagPlugin,
@@ -218,6 +219,26 @@ async function main() {
         document.querySelector<HTMLInputElement>(".sap-tl-root input[type=range]")?.max ===
           `${model?.duration}`,
     );
+    // sceneState (ReplayScene parity): replayRoot maps UE coords → world
+    // exactly like adapter/coords.ts (x→x, z→y, y→z).
+    {
+      const probe = new THREE.Object3D();
+      probe.position.set(1000, 2000, 300); // UE coords
+      viewer.sceneState.replayRoot.add(probe);
+      viewer.scene.updateMatrixWorld(true);
+      const world = probe.getWorldPosition(new THREE.Vector3());
+      ok(
+        "sceneState.replayRoot is UE-coordinate space",
+        world.x === 1000 && world.y === 300 && world.z === 2000,
+      );
+      viewer.sceneState.replayRoot.remove(probe);
+      const meshes = viewer.sceneState.playerMeshes;
+      ok(
+        "sceneState.playerMeshes keyed by roster ids",
+        viewer.adapter.playerList.every((p) => meshes.get(p.id) !== undefined),
+      );
+      ok("sceneState.ballMesh present", viewer.sceneState.ballMesh.isObject3D === true);
+    }
     viewer.play();
   }
   if (params.get("paused")) viewer.pause();
