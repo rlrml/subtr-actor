@@ -97,10 +97,63 @@ impl PowerslideProjectionState {
     }
 }
 
+/// Incrementally maintained movement-stats projection.
+///
+/// The movement calculator coalesces samples into a small set of in-progress
+/// *pending* events (one per active player) that keep mutating until a player's
+/// classification changes, at which point they finalize into the immutable,
+/// append-only committed stream. The published per-frame snapshot has to
+/// reflect committed + pending, but re-accumulating the entire committed
+/// history every frame is O(n^2) over a replay and stalls on long,
+/// movement-heavy replays.
+///
+/// Instead, each committed event is folded into a persistent `base` exactly
+/// once (tracked by `committed_cursor`), and the bounded pending set is overlaid
+/// on a clone of that base to produce the frame snapshot. `MovementStats`
+/// accumulation is purely additive, so this is identical to a full rebuild while
+/// keeping per-frame work proportional to (newly committed events + players).
+#[derive(Debug, Clone, Default)]
+struct IncrementalMovementProjection {
+    base: MovementStatsAccumulator,
+    committed_cursor: usize,
+    /// Total committed events folded into `base` over this projection's
+    /// lifetime. Tests assert this stays equal to the committed event count
+    /// (each folded exactly once), which is what distinguishes the incremental
+    /// fold from the previous quadratic per-frame rebuild.
+    #[cfg(test)]
+    committed_folds: usize,
+}
+
+impl IncrementalMovementProjection {
+    /// Fold any newly committed events into `base`, then return the published
+    /// snapshot as `base` plus the (bounded) pending overlay.
+    fn project(
+        &mut self,
+        committed: &[MovementEvent],
+        pending: &[MovementEvent],
+    ) -> MovementStatsAccumulator {
+        for event in committed.get(self.committed_cursor..).unwrap_or(&[]) {
+            self.base.apply_event(event);
+            #[cfg(test)]
+            {
+                self.committed_folds += 1;
+            }
+        }
+        self.committed_cursor = committed.len();
+
+        let mut snapshot = self.base.clone();
+        for event in pending {
+            snapshot.apply_event(event);
+        }
+        snapshot
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct StatsProjectionNode {
     state: StatsProjectionState,
     cursors: StatsProjectionCursors,
+    movement_projection: IncrementalMovementProjection,
     powerslide: PowerslideProjectionState,
     boost_current_amount_consistency: BoostCurrentAmountConsistencyTracker,
     last_powerslide_sample_frame: Option<usize>,
@@ -136,7 +189,6 @@ struct StatsProjectionCursors {
     ball_carry: usize,
     bump: usize,
     half_volley: usize,
-    movement: usize,
     powerslide: usize,
     demo_timeline: usize,
     center: usize,
@@ -445,12 +497,9 @@ impl StatsProjectionNode {
             }
         }
         let movement = ctx.get::<MovementCalculator>()?;
-        let projected_movement_events = movement.projected_events();
-        self.state.movement = MovementStatsAccumulator::default();
-        for event in projected_movement_events.iter() {
-            self.state.movement.apply_event(event);
-        }
-        self.cursors.movement = movement.events().len();
+        self.state.movement = self
+            .movement_projection
+            .project(movement.events(), &movement.pending_events());
         let positioning = ctx.get::<PositioningCalculator>()?;
         self.state.positioning = PositioningStatsAccumulator::default();
         for event in positioning.activity_events().iter() {
@@ -573,3 +622,7 @@ impl AnalysisNode for StatsProjectionNode {
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
     Box::new(StatsProjectionNode::new())
 }
+
+#[cfg(test)]
+#[path = "stats_projection_tests.rs"]
+mod tests;
