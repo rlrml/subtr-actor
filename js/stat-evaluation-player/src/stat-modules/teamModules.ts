@@ -166,7 +166,7 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
         });
 
         const thirdOptionText = document.createElement("span");
-        thirdOptionText.textContent = "Third";
+        thirdOptionText.textContent = "Thirds";
         thirdOptionLabel.append(thirdCheckbox, thirdOptionText);
         options.append(thirdOptionLabel);
 
@@ -188,7 +188,7 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
         });
 
         const halfOptionText = document.createElement("span");
-        halfOptionText.textContent = "Half";
+        halfOptionText.textContent = "Halves";
         halfOptionLabel.append(halfCheckbox, halfOptionText);
         options.append(halfOptionLabel);
 
@@ -224,8 +224,8 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
                 className === "possession_state"
                   ? "Control"
                   : className === "field_half"
-                    ? "Half"
-                    : "Third",
+                    ? "Halves"
+                    : "Thirds",
               )
               .join(" x ");
     }
