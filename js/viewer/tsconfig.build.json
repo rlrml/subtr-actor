@@ -6,7 +6,8 @@
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "types": []
   },
   "include": ["src/adapter", "src/plugins", "src/lib.ts", "src/types.ts", "src/ViewerPlayer.ts"]
 }
