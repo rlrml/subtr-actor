@@ -1,7 +1,7 @@
 import { renderTouchStats } from "../touchFormatting.ts";
 import type { TouchBreakdownClass } from "../touchFormatting.ts";
 import { TouchEventOverlay } from "../touchOverlay.ts";
-import type { TouchOverlayMode } from "../touchOverlay.ts";
+import type { TouchOverlayColorMode, TouchOverlayMode } from "../touchOverlay.ts";
 import { buildTouchTimelineEvents } from "../timelineMarkers.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
 import {
@@ -16,9 +16,11 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
   let overlay: TouchEventOverlay | null = null;
   let decaySeconds = 5;
   let overlayMode: TouchOverlayMode = "advancement";
+  let overlayColorMode: TouchOverlayColorMode = "team";
   let settingsEl: HTMLDivElement | null = null;
   let decayReadoutEl: HTMLElement | null = null;
   let overlayModeReadoutEl: HTMLElement | null = null;
+  let overlayColorModeReadoutEl: HTMLElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
   const activeBreakdownClasses = new Set<TouchBreakdownClass>();
   const orderedBreakdownClasses: TouchBreakdownClass[] = [
@@ -40,6 +42,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         ctx.statsTimeline,
         {
           mode: overlayMode,
+          colorMode: overlayColorMode,
         },
       );
       overlay.setDecaySeconds(decaySeconds);
@@ -63,6 +66,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
       return {
         decaySeconds,
         overlayMode,
+        overlayColorMode,
         breakdownClasses: getActiveBreakdownClasses(),
       };
     },
@@ -77,6 +81,14 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         if (record.overlayMode === "markers" || record.overlayMode === "advancement") {
           overlayMode = record.overlayMode;
           overlay?.setMode(overlayMode);
+        }
+        if (
+          record.overlayColorMode === "team" ||
+          record.overlayColorMode === "intention" ||
+          record.overlayColorMode === "kind"
+        ) {
+          overlayColorMode = record.overlayColorMode;
+          overlay?.setColorMode(overlayColorMode);
         }
         activeBreakdownClasses.clear();
         if (Array.isArray(record.breakdownClasses)) {
@@ -209,6 +221,55 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         }
         modeSection.append(modeHeader, modeOptions);
 
+        const colorSection = document.createElement("div");
+        colorSection.className = "module-settings-subgroup";
+
+        const colorHeader = document.createElement("div");
+        colorHeader.className = "module-settings-header";
+
+        const colorText = document.createElement("div");
+        const colorEyebrow = document.createElement("p");
+        colorEyebrow.className = "module-settings-eyebrow";
+        colorEyebrow.textContent = "Overlay";
+        const colorTitle = document.createElement("h3");
+        colorTitle.textContent = "Color by";
+        colorText.append(colorEyebrow, colorTitle);
+
+        overlayColorModeReadoutEl = document.createElement("strong");
+        overlayColorModeReadoutEl.className = "metric-readout";
+        colorHeader.append(colorText, overlayColorModeReadoutEl);
+
+        const colorOptions = document.createElement("div");
+        colorOptions.className = "module-settings-options";
+        for (const option of [
+          { colorMode: "team", label: "Team" },
+          { colorMode: "intention", label: "Intention" },
+          { colorMode: "kind", label: "Hit strength" },
+        ] satisfies Array<{ colorMode: TouchOverlayColorMode; label: string }>) {
+          const optionLabel = document.createElement("label");
+          optionLabel.className = "toggle";
+
+          const radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = "touch-overlay-color-mode";
+          radio.dataset.overlayColorMode = option.colorMode;
+          radio.addEventListener("change", () => {
+            if (!radio.checked) {
+              return;
+            }
+            overlayColorMode = option.colorMode;
+            overlay?.setColorMode(overlayColorMode);
+            syncTouchSettingsUi();
+            runtime.requestConfigSync?.();
+          });
+
+          const optionText = document.createElement("span");
+          optionText.textContent = option.label;
+          optionLabel.append(radio, optionText);
+          colorOptions.append(optionLabel);
+        }
+        colorSection.append(colorHeader, colorOptions);
+
         const breakdownSection = document.createElement("div");
         breakdownSection.className = "module-settings-subgroup";
 
@@ -260,7 +321,7 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
         }
 
         breakdownSection.append(breakdownHeader, breakdownOptions);
-        settingsEl.append(header, label, modeSection, breakdownSection);
+        settingsEl.append(header, label, modeSection, colorSection, breakdownSection);
       }
 
       syncTouchSettingsUi();
@@ -286,6 +347,18 @@ export function createTouchModule(runtime: StatModuleRuntime): StatModule {
     }
     if (overlayModeReadoutEl) {
       overlayModeReadoutEl.textContent = overlayMode === "advancement" ? "Advancement" : "Markers";
+    }
+    for (const radio of settingsEl.querySelectorAll<HTMLInputElement>(
+      "input[data-overlay-color-mode]",
+    )) {
+      radio.checked = radio.dataset.overlayColorMode === overlayColorMode;
+    }
+    if (overlayColorModeReadoutEl) {
+      overlayColorModeReadoutEl.textContent = {
+        team: "Team",
+        intention: "Intention",
+        kind: "Hit strength",
+      }[overlayColorMode];
     }
     for (const checkbox of settingsEl.querySelectorAll<HTMLInputElement>(
       "input[data-breakdown-class]",

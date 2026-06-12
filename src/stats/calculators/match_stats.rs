@@ -48,7 +48,6 @@ pub struct CorePlayerScoreboardEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
 pub struct CorePlayerGoalContextEvent {
     pub time: f32,
     pub frame: usize,
@@ -179,6 +178,8 @@ pub struct GoalContextEvent {
     /// counter-attacks). Filled in at finish once pressure sessions are final.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pressure_duration_before_goal: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_after_kickoff: Option<f32>,
     #[serde(default)]
     pub goal_buildup: GoalBuildupKind,
     pub scorer_last_touch: Option<GoalTouchContext>,
@@ -899,6 +900,9 @@ impl MatchStatsCalculator {
                 .filter(|touch| touch.is_team_0 == goal_event.scoring_team_is_team_0)
                 .cloned();
             let ball_air_time_before_goal = self.ball_air_time_before_goal(goal_event.time);
+            let time_after_kickoff = self
+                .active_kickoff_touch_time
+                .map(|kickoff_touch_time| (goal_event.time - kickoff_touch_time).max(0.0));
             let goal_buildup =
                 self.classify_goal_buildup(goal_event.time, goal_event.scoring_team_is_team_0);
 
@@ -922,6 +926,7 @@ impl MatchStatsCalculator {
                 ball_air_time_before_goal,
                 // Filled in at finish once territorial-pressure sessions are final.
                 pressure_duration_before_goal: None,
+                time_after_kickoff,
                 goal_buildup,
                 scorer_last_touch,
                 players: self.goal_player_contexts(
@@ -996,11 +1001,24 @@ impl MatchStatsCalculator {
         goal_time: f32,
         scoring_team_is_team_0: bool,
     ) -> GoalBuildupKind {
+        // A goal's buildup must not reach back across the kickoff that
+        // immediately preceded it. Play before that kickoff belongs to a prior,
+        // already-concluded possession (a kickoff only follows a goal/reset), so
+        // counting its ball positions as "defensive pressure" for this goal is
+        // spurious — it is exactly what makes a clean kickoff goal masquerade as
+        // a counter-attack. Clamp the lookback window to the current kickoff's
+        // first touch when one is established.
+        let window_start = self
+            .active_kickoff_touch_time
+            .map(|kickoff_touch_time| {
+                kickoff_touch_time.max(goal_time - GOAL_BUILDUP_LOOKBACK_SECONDS)
+            })
+            .unwrap_or(goal_time - GOAL_BUILDUP_LOOKBACK_SECONDS);
         let relevant_samples: Vec<_> = self
             .goal_buildup_samples
             .iter()
             .filter(|entry| entry.time <= goal_time)
-            .filter(|entry| goal_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS)
+            .filter(|entry| entry.time >= window_start)
             .collect();
         if relevant_samples.is_empty() {
             return GoalBuildupKind::Other;
@@ -1046,7 +1064,7 @@ impl MatchStatsCalculator {
 
         let opponent_shot_in_lookback = self.goal_buildup_pressure_events.iter().any(|entry| {
             entry.time <= goal_time
-                && goal_time - entry.time <= GOAL_BUILDUP_LOOKBACK_SECONDS
+                && entry.time >= window_start
                 && entry.is_team_0 != scoring_team_is_team_0
         });
         let has_defensive_pressure_signal = defensive_half_time

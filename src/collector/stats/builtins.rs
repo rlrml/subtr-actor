@@ -123,7 +123,6 @@ struct CoreStatsExport<'a> {
     timeline: &'a [TimelineEvent],
     goal_context: &'a [GoalContextEvent],
     player_events: &'a [CorePlayerScoreboardEvent],
-    player_goal_context_events: &'a [CorePlayerGoalContextEvent],
 }
 
 #[derive(Serialize)]
@@ -408,6 +407,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "half_volley_goal",
         "fifty_fifty",
         "kickoff",
+        "player_possession",
         "possession",
         "ball_half",
         "territorial_pressure",
@@ -467,7 +467,6 @@ pub(crate) fn builtin_module_json(
                 timeline: calculator.timeline(),
                 goal_context: calculator.goal_context_events(),
                 player_events: calculator.core_player_events(),
-                player_goal_context_events: calculator.core_player_goal_context_events(),
             })
         }
         "backboard" => {
@@ -694,6 +693,12 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
+        "player_possession" => {
+            let calculator = graph_state::<PlayerPossessionCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
+                events: calculator.events(),
+            })
+        }
         "ball_half" => {
             let calculator = graph_state::<BallHalfCalculator>(graph, module_name)?;
             let projection = projected_stats(graph, module_name)?;
@@ -717,8 +722,8 @@ pub(crate) fn builtin_module_json(
                 "team_zero": projection.rotation.team_zero_stats(),
                 "team_one": projection.rotation.team_one_stats(),
                 "player_stats": player_stats_entries(projection.rotation.player_stats()),
-                "player_events": calculator.player_events(),
-                "team_events": calculator.team_events(),
+                "role_events": calculator.role_events(),
+                "first_man_change_events": calculator.first_man_change_events(),
             }))
         }
         "rush" => {
@@ -876,9 +881,10 @@ pub(crate) fn builtin_module_json(
                 "team_one": projection.positioning.team_one_stats(),
                 "player_stats": player_stats_entries(projection.positioning.player_stats()),
                 "activity_events": calculator.activity_events(),
-                "field_zone_events": calculator.field_zone_events(),
-                "ball_relative_depth_events": calculator.ball_relative_depth_events(),
-                "teammate_role_events": calculator.teammate_role_events(),
+                "field_third_events": calculator.field_third_events(),
+                "field_half_events": calculator.field_half_events(),
+                "ball_depth_events": calculator.ball_depth_events(),
+                "depth_role_events": calculator.depth_role_events(),
                 "ball_proximity_events": calculator.ball_proximity_events(),
             }))
         }
@@ -1383,7 +1389,9 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: projection.rush.stats(),
             })?
         }
-        "dodge" | "flip_impulse" => serialize_to_json_value(&serde_json::json!({}))?,
+        "dodge" | "flip_impulse" | "player_possession" => {
+            serialize_to_json_value(&serde_json::json!({}))?
+        }
         "touch" => {
             let projection = projected_stats(graph, module_name)?;
             let player_stats = projection
@@ -1695,6 +1703,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "pass"
         | "fifty_fifty"
         | "kickoff"
+        | "player_possession"
         | "possession"
         | "dodge"
         | "flip_impulse"

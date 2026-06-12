@@ -48,6 +48,8 @@ pub fn default_stats_timeline_config() -> StatsTimelineConfig {
         rotation_role_depth_margin: rotation_defaults.role_depth_margin,
         rotation_first_man_ambiguity_margin: rotation_defaults.first_man_ambiguity_margin,
         rotation_first_man_debounce_seconds: rotation_defaults.first_man_debounce_seconds,
+        rotation_first_man_stint_end_grace_seconds: rotation_defaults
+            .first_man_stint_end_grace_seconds,
         rush_max_start_y: RushCalculatorConfig::default().max_start_y,
         rush_attack_support_distance_y: RushCalculatorConfig::default().attack_support_distance_y,
         rush_defender_distance_y: RushCalculatorConfig::default().defender_distance_y,

@@ -308,6 +308,21 @@ fn assert_touch_events_reconstruct_final_serialized_sums(
     }
 }
 
+// Goal-context core contributions (the `scoring_context` sub-stats) are no
+// longer carried on the timeline as a dedicated per-player core stream: that
+// information now lives on the consolidated `goal_context` stream and is
+// reconstructed client-side from it (see the TS `coreEventDerivation.test.ts`).
+//
+// That consolidated stream cannot reproduce the serialized per-frame partial
+// sums exactly: `goals_conceded_while_last_defender` is recorded on the
+// score-change frame keyed to the last defender at that frame, whereas a
+// `goal_context` event is anchored to the goal frame. So this reconstruction
+// asserts only the scoreboard-derived core fields, which the timeline still
+// carries in full via the `core_player` stream.
+fn scoreboard_fields(score: i32, goals: i32, assists: i32, saves: i32, shots: i32) -> (i32, i32, i32, i32, i32) {
+    (score, goals, assists, saves, shots)
+}
+
 fn assert_core_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
@@ -318,15 +333,8 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
             .cmp(&right.frame)
             .then_with(|| left.time.total_cmp(&right.time))
     });
-    let mut goal_context_events = timeline_payloads_by_stream(timeline, "core_player_goal_context", |payload| match payload { EventPayload::CorePlayerGoalContext(event) => Some(event), _ => None });
-    goal_context_events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
-            .then_with(|| left.time.total_cmp(&right.time))
-    });
 
     let mut player_event_index = 0;
-    let mut goal_context_event_index = 0;
     let mut accumulator = CoreStatsAccumulator::new();
 
     for frame in &timeline.frames {
@@ -338,23 +346,29 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
             player_event_index += 1;
         }
 
-        while goal_context_event_index < goal_context_events.len()
-            && goal_context_events[goal_context_event_index].frame <= frame.frame_number
-        {
-            let event = &goal_context_events[goal_context_event_index];
-            accumulator.apply_goal_context_event(event);
-            goal_context_event_index += 1;
-        }
-
+        let team_zero = accumulator.team_zero_stats();
         assert_eq!(
-            frame.team_zero.core,
-            accumulator.team_zero_stats(),
+            scoreboard_fields(
+                frame.team_zero.core.score,
+                frame.team_zero.core.goals,
+                frame.team_zero.core.assists,
+                frame.team_zero.core.saves,
+                frame.team_zero.core.shots,
+            ),
+            scoreboard_fields(team_zero.score, team_zero.goals, team_zero.assists, team_zero.saves, team_zero.shots),
             "{replay_path} team_zero core frame {}",
             frame.frame_number
         );
+        let team_one = accumulator.team_one_stats();
         assert_eq!(
-            frame.team_one.core,
-            accumulator.team_one_stats(),
+            scoreboard_fields(
+                frame.team_one.core.score,
+                frame.team_one.core.goals,
+                frame.team_one.core.assists,
+                frame.team_one.core.saves,
+                frame.team_one.core.shots,
+            ),
+            scoreboard_fields(team_one.score, team_one.goals, team_one.assists, team_one.saves, team_one.shots),
             "{replay_path} team_one core frame {}",
             frame.frame_number
         );
@@ -362,7 +376,14 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
         for player in &frame.players {
             let expected = accumulator.player_stats_for(&player.player_id);
             assert_eq!(
-                player.core, expected,
+                scoreboard_fields(
+                    player.core.score,
+                    player.core.goals,
+                    player.core.assists,
+                    player.core.saves,
+                    player.core.shots,
+                ),
+                scoreboard_fields(expected.score, expected.goals, expected.assists, expected.saves, expected.shots),
                 "{replay_path} player {} core frame {}",
                 player.name, frame.frame_number
             );
@@ -373,11 +394,6 @@ fn assert_core_events_reconstruct_serialized_partial_sums(
         player_event_index,
         player_events.len(),
         "{replay_path} unprocessed core player events"
-    );
-    assert_eq!(
-        goal_context_event_index,
-        goal_context_events.len(),
-        "{replay_path} unprocessed core goal-context events"
     );
 }
 

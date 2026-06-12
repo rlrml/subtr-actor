@@ -96,8 +96,9 @@ checksum = "40ce3582fb888755eb1a77668e69f90c3b317fdcc85bbeacd0d9bdfa89427173"
 
 [[package]]
 name = "boxcars"
-version = "0.11.1"
-source = "git+https://github.com/colonelpanic8/boxcars.git?rev=36598aa6db6ff9248502f9f762139ed3bdd94a34#36598aa6db6ff9248502f9f762139ed3bdd94a34"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dfd59e3b0a3f04719ec67d2c452b128654556eaed03565563100d22bbb79671"
 dependencies = [
  "bitter",
  "encoding_rs",
@@ -1118,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "rl-replay-subtr-actor"
-version = "0.12.0"
+version = "1.0.0"
 dependencies = [
  "boxcars",
  "console_error_panic_hook",
@@ -1310,7 +1311,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "subtr-actor"
-version = "0.12.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "boxcars",
@@ -1330,7 +1331,7 @@ dependencies = [
 
 [[package]]
 name = "subtr-actor-bakkesmod"
-version = "0.12.0"
+version = "1.0.0"
 dependencies = [
  "base64",
  "boxcars",
@@ -1341,7 +1342,7 @@ dependencies = [
 
 [[package]]
 name = "subtr-actor-py"
-version = "0.12.0"
+version = "1.0.0"
 dependencies = [
  "boxcars",
  "numpy",
@@ -1352,7 +1353,7 @@ dependencies = [
 
 [[package]]
 name = "subtr-actor-tools"
-version = "0.12.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "boxcars",

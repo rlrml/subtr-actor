@@ -4,12 +4,133 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
-## Unreleased
+## v1.0.0 - 2026-06-11
 
+This is the first stable release. It restructures the entire stats-timeline
+output schema, so essentially every downstream consumer of timeline events must
+migrate. See the breaking changes below before upgrading.
+
+### Breaking changes
+
+- Restructure stats-timeline output into a unified event-envelope schema. Every
+  timeline stream now emits a common `Event` envelope (`EventMeta`,
+  `EventPayload`, `EventProperty`, `EventTiming`); the old `StatsEvent*` types
+  (`StatsEventProperty`, `StatsEventPropertyValue`, `StatsEventTiming`,
+  `StatsTimelineTagEvent`) are removed. Consumers reading the previous
+  per-stream event shapes must migrate to the envelope.
 - Dissolve the `boost_pickup_both` / `boost_pickup_ghost` / `boost_pickup_missed`
   event-variant split: all boost pickups now surface under a single
   `boost_pickup` review key. Corroboration provenance is still available as the
   pickup payload's `detection` field (`both` | `inferred_only` | `reported_only`).
+- Rename the `pressure` (ball-half) stat to `ball_half` across the Rust
+  pipeline, stat-module/stream/`event_type` keys, the `EventPayload::Pressure`
+  variant, the config key, and the stats-player bindings. `territorial_pressure`
+  and `sustained_pressure_goal` are unaffected.
+- Consolidate flip-reset events onto a single `dodge_reset` event with a `used`
+  field. The `confirmed_flip_reset`, `flip_reset_followup_dodge`, and
+  `post_wall_dodge` event kinds, plus the redundant `dodge_refreshed` /
+  `on_ball_events` stream, are removed from the catalog. A flip reset is now
+  `dodge_reset` with `on_ball`; a converted one is `on_ball && used`.
+- Redesign positioning stats into coalesced event facets plus a whole-match
+  distance summary. Categorical facets (activity, possession, field-zone,
+  ball-depth, teammate-role, ball-proximity) now emit one state-change span per
+  transition instead of one event per frame; possession becomes its own
+  `PositioningPossessionEvent`; the per-frame distance event is removed and
+  replaced by a per-player `ReplayStatsPositioningSummary` shipped once at the
+  timeline top level.
+- Fold touch movement into touch events and split rotation state into derived
+  `PlayerStateSpan` event streams, replacing the previous per-frame
+  movement/rotation event emission.
+- Stop treating goal context as an event category. The per-player goal-context
+  timeline event is removed; goal tags now attach to goal-context events
+  directly, and boost/possession/low-level-interaction/movement events are
+  reclassified under the `Other` category.
+- Redesign kickoff `win_strength` from a `ball_y`-based ratio into a
+  velocity-projected half-field fraction (ball projected 0.5s forward), changing
+  both the outcome sign and the strength banding.
+
+### Stats & event model
+
+- Give confirmed touches a stable `touch_id` identity, and tag touch events with
+  rotation role, play depth, and classified touch intention (with first-touch
+  marking).
+- Add a `KickoffAdvantage` (formerly "settlement") verdict that resolves who a
+  kickoff ended up being good for once play settled, independent of the opening
+  exchange; add kickoff classification metadata, kickoff goal tagging gated on
+  possession chain and field position, live-action-start timing, first-touch
+  ball position, and taker-relative ball direction.
+- Credit the losing challenger on contested 50/50 kickoff touches.
+- Add enriched `player_possession` span events (per-span touch counts with
+  aerial/wall classification, ball advance/retreat, carry/air-dribble time,
+  start/end thirds) and a `controlled_play` stat surfaced as a labeled span
+  stream with `sustained_control` labeling.
+- Add goal tags for flip-into-ball, bump, demo, and sustained-pressure goals;
+  carry mechanic-flavor details and scorer/performer attribution on goal tags;
+  carry ball velocity forward for goal speed at the explosion frame.
+- Detect boost-through and sloppier speed flips; model flip impulses as dodge
+  events; tighten and reject surface-interrupted/grounded double taps; tag
+  reverse-flick rotation handedness; track flip-reset time-to-use with per-reset
+  outcomes.
+- Add `pressure_duration_before_goal` to goal context and team
+  closest-to-ball positioning stats.
+- Introduce a uniform in-flight event lifecycle (`InFlightLedger` /
+  `KeyedInFlightLedger`) backing the projected calculators, an auto-registered
+  event-definition registry mirrored into the TS viewer catalog, and a span
+  policy for timeline streams emitting spans on state changes.
+
+### Rust core / replay processing
+
+- Move boxcars off the patched fork to crates.io `0.11.3`, mapping the June 2026
+  `PickupTimer` (item respawn) and `PRI` name-anonymization attributes so
+  Rumble-family and privacy-flagged replays parse instead of failing the whole
+  network decode.
+- Recognize the World Cup ball archetype and replace the `BALL_TYPES` whitelist
+  with prefix-only matching so ball archetypes from new/limited-time modes are
+  picked up automatically.
+- Derive competitive season from the replay date, modeled as
+  `ReplaySeason { era, number }` with a canonical `code()` (e.g. `f21`/`s14`);
+  adds S22/S23 and corrects several season dates.
+- Expose replay game-type metadata and possession-player metadata; default
+  missing replay metadata during export; clean player names derived from remote
+  ids when no in-game name exists.
+- Add `ReplayClip` for trimming replays to testable windows; keep
+  replay-timeline time canonical; use car hitboxes (canonical body-hitbox
+  mapping) for touch attribution and bump proximity.
+
+### Replay player & stats-player UI
+
+- Smooth attach-camera and car motion with velocity-based interpolation.
+- Centralize boost `0-255 → 0-100` conversion in `@rlrml/player`, exposed as a
+  dependency-free `@rlrml/player/boost-units` subpath used for boost-meter
+  rendering.
+- Count `player_possession` and `controlled_play` spans in the viewer; add
+  enriched playlist/timeline labels (field half/zone/role, span durations,
+  player names) for generic stats streams; color the touch overlay by intention
+  or hit strength.
+- Add a `postMessage` hook to activate a review clip from an embedding page;
+  bound events-review preload/scrolling; fix dense-timeline and general playback
+  performance; add shot save metadata/charting.
+
+### Python / JS bindings & API
+
+- Expose the modern stats APIs in Python.
+- Regenerate ts-rs bindings throughout for the new event envelope, renamed
+  `ball_half`, consolidated rotation/positioning/dodge-reset streams,
+  season/game-type metadata, and the auto-registered event-definition catalog.
+
+### CI / release / tooling
+
+- Add `js-wasm-pkg` / `js-player-pkg` Nix npm package outputs and single-source
+  crate pins via hash-free git dep fetching; pin esbuild/`outputHashes` to fix
+  GitHub Pages and Nix sandbox builds.
+- Speed up the Rust test suite and gate slow replay-backed stats-timeline tests
+  behind `#[ignore]`.
+- Retry/fallback `wasm-pack` installation in CI; add BakkesMod product-dump
+  hitbox data and keep the BakkesMod ABI in sync with the stats-timeline schema
+  changes.
+- Normalize tool player IDs and migrate the ballchasing conversion tool onto the
+  renamed positioning stats.
+- Refresh Rust, Python, and JavaScript release metadata to `1.0.0`.
 
 ## v0.12.0 - 2026-05-28
 

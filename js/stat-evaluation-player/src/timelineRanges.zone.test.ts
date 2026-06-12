@@ -1,28 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
+import type { FieldThirdEvent, StatsTimeline } from "./statsTimeline.ts";
 import { buildTimeInZoneTimelineRanges } from "./timelineRanges.ts";
 import { createStatsTimeline } from "./testStatsTimeline.ts";
 
-function positioningEvent(
-  overrides: Partial<PositioningFieldZoneEvent> &
-    Pick<PositioningFieldZoneEvent, "frame" | "time" | "player" | "is_team_0">,
-): PositioningFieldZoneEvent {
+function fieldThirdEvent(
+  overrides: Partial<FieldThirdEvent> &
+    Pick<FieldThirdEvent, "frame" | "time" | "player" | "is_team_0" | "state">,
+): FieldThirdEvent {
   return {
     frame: overrides.frame,
     time: overrides.time,
-    end_time: overrides.time,
+    end_time: overrides.time + 1,
     end_frame: overrides.frame,
     duration: 1,
     player: overrides.player,
     is_team_0: overrides.is_team_0,
-    defensive_zone_fraction: 0,
-    neutral_zone_fraction: 0,
-    offensive_zone_fraction: 0,
-    defensive_half_fraction: 0,
-    offensive_half_fraction: 0,
+    state: overrides.state,
     ...overrides,
   };
 }
@@ -151,27 +146,30 @@ test("buildTimeInZoneTimelineRanges derives spans from compact positioning event
   const playerId = { Steam: "blue-id" };
   const timeline = createStatsTimeline({
     events: {
-      positioning_field_zone: [
-        positioningEvent({
+      field_third: [
+        fieldThirdEvent({
           frame: 1,
-          time: 1,
+          time: 0,
+          end_time: 1,
           player: playerId,
           is_team_0: true,
-          defensive_zone_fraction: 1,
+          state: "defensive",
         }),
-        positioningEvent({
+        fieldThirdEvent({
           frame: 2,
-          time: 2,
+          time: 1,
+          end_time: 2,
           player: playerId,
           is_team_0: true,
-          neutral_zone_fraction: 1,
+          state: "neutral",
         }),
-        positioningEvent({
+        fieldThirdEvent({
           frame: 3,
-          time: 3,
+          time: 2,
+          end_time: 3,
           player: playerId,
           is_team_0: true,
-          offensive_zone_fraction: 1,
+          state: "offensive",
         }),
       ],
     },

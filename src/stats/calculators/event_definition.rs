@@ -7,14 +7,13 @@ use ts_rs::TS;
 use linkme::distributed_slice;
 
 use super::{
-    BackboardBounceEvent, BallCarryEvent, BallHalfEvent, BoostPickupEvent, BumpEvent,
-    CeilingShotEvent, CenterEvent, ControlledPlayEvent, CorePlayerScoreboardEvent, DodgeEvent,
-    DodgeResetEvent, DoubleTapEvent, FiftyFiftyEvent, FlickEvent, FlipResetEvent, HalfFlipEvent,
-    HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent, PassEvent,
-    PositioningActivityEvent, PositioningBallProximityEvent, PositioningBallRelativeDepthEvent,
-    PositioningFieldZoneEvent, PositioningTeammateRoleEvent, PossessionEvent, PowerslideEvent,
-    RespawnEvent, RotationDepthSpanEvent, RotationFirstManStintEvent, RotationPlayerEvent,
-    RotationRoleSpanEvent, RotationTeamEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
+    BackboardBounceEvent, BallCarryEvent, BallDepthEvent, BallHalfEvent, BallProximityEvent,
+    BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent, ControlledPlayEvent,
+    CorePlayerScoreboardEvent, DepthRoleEvent, DodgeEvent, DodgeResetEvent, DoubleTapEvent,
+    FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent, FirstManChangeEvent, FlickEvent,
+    FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent,
+    PassEvent, PlayerActivityEvent, PlayerPossessionEvent, PossessionEvent, PowerslideEvent,
+    RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
     TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
     WhiffEvent,
 };
@@ -88,9 +87,7 @@ impl EventVariant {
 pub enum EventCategory {
     Core,
     Mechanic,
-    Possession,
     Positioning,
-    Boost,
     Movement,
     Annotation,
     Other,
@@ -467,65 +464,8 @@ macro_rules! register_event_producer {
 const BOOST_PICKUP_VARIANTS: &[EventVariant] = &[EventVariant::new(
     "boost_pickup",
     "Boost Pickup",
-    EventCategory::Boost,
+    EventCategory::Other,
 )];
-
-const ROTATION_PLAYER_VARIANTS: &[EventVariant] = &[EventVariant::new(
-    "rotation_player_state_span",
-    "Player State Span",
-    EventCategory::Positioning,
-)];
-
-const ROTATION_ROLE_VARIANTS: &[EventVariant] = &[
-    EventVariant::new(
-        "rotation_role_ambiguous",
-        "Rotation Role Ambiguous",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_role_first_man",
-        "Rotation Role First Man",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_role_second_man",
-        "Rotation Role Second Man",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_role_third_man",
-        "Rotation Role Third Man",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_role_unknown",
-        "Rotation Role Unknown",
-        EventCategory::Positioning,
-    ),
-];
-
-const ROTATION_DEPTH_VARIANTS: &[EventVariant] = &[
-    EventVariant::new(
-        "rotation_depth_ahead_of_play",
-        "Rotation Depth Ahead Of Play",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_depth_behind_play",
-        "Rotation Depth Behind Play",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_depth_level_with_play",
-        "Rotation Depth Level With Play",
-        EventCategory::Positioning,
-    ),
-    EventVariant::new(
-        "rotation_depth_unknown",
-        "Rotation Depth Unknown",
-        EventCategory::Positioning,
-    ),
-];
 
 // Payload-less event definitions: native Rocket League scoreboard stats, goal
 // context labels, and the air-dribble mechanic kind. These have no `StatsEvent`
@@ -556,20 +496,12 @@ pub const SHOT_EVENT_DEFINITION: EventDefinition =
 register_stats_event_definition!(SHOT_EVENT_DEFINITION);
 
 pub const KICKOFF_EVENT_DEFINITION: EventDefinition =
-    pending_event_definition("kickoff", "Kickoff", EventCategory::Possession);
+    pending_event_definition("kickoff", "Kickoff", EventCategory::Core);
 register_stats_event_definition!(KICKOFF_EVENT_DEFINITION);
 
 pub const GOAL_CONTEXT_EVENT_DEFINITION: EventDefinition =
     pending_event_definition("goal_context", "Goal Context", EventCategory::Context).hidden(true);
 register_stats_event_definition!(GOAL_CONTEXT_EVENT_DEFINITION);
-
-pub const CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION: EventDefinition = pending_event_definition(
-    "core_player_goal_context",
-    "Core Player Goal Context",
-    EventCategory::Context,
-)
-.hidden(true);
-register_stats_event_definition!(CORE_PLAYER_GOAL_CONTEXT_EVENT_DEFINITION);
 
 pub const AIR_DRIBBLE_EVENT_DEFINITION: EventDefinition = event_definition(
     "air_dribble",
@@ -696,7 +628,7 @@ define_stats_event!(
     DODGE_RESET_EVENT_DEFINITION,
     "dodge_reset",
     "Dodge Reset",
-    EventCategory::Other,
+    EventCategory::Mechanic,
     summary = "A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.",
     approach = [
         "Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.",
@@ -736,7 +668,7 @@ define_stats_event!(
     PASS_EVENT_DEFINITION,
     "pass",
     "Pass",
-    EventCategory::Other,
+    EventCategory::Mechanic,
     summary = "A same-team touch sequence where one player sends the ball to a different teammate.",
     approach = [
         "Track the last attributed touch in live play and compare it to each new touch.",
@@ -762,7 +694,7 @@ define_stats_event!(
     CONTROLLED_PLAY_EVENT_DEFINITION,
     "controlled_play",
     "Controlled Play",
-    EventCategory::Possession,
+    EventCategory::Mechanic,
     summary = "A same-player possession episode with multiple touches and sustained close-ball time.",
     approach = [
         "Start a player-owned candidate from an attributed touch during live play.",
@@ -788,7 +720,7 @@ define_stats_event!(
     RUSH_EVENT_DEFINITION,
     "rush",
     "Rush",
-    EventCategory::Possession,
+    EventCategory::Other,
     summary = "A quick possession transition where the attacking team has numbers moving out of its defensive half.",
     approach = [
         "Start from a possession change when the ball is still in the new attacking team's defensive half.",
@@ -801,7 +733,7 @@ define_stats_event!(
     DODGE_EVENT_DEFINITION,
     "dodge",
     "Dodge",
-    EventCategory::Other,
+    EventCategory::Mechanic,
     summary = "A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.",
     approach = [
         "Start on the replay's dodge-active rising edge for each player.",
@@ -879,7 +811,7 @@ define_stats_event!(
     POWERSLIDE_EVENT_DEFINITION,
     "powerslide",
     "Powerslide",
-    EventCategory::Other,
+    EventCategory::Mechanic,
     summary = "A state-change event for effective grounded powerslide use.",
     approach = [
         "Read each player's powerslide-active input/state on every frame.",
@@ -907,7 +839,7 @@ define_stats_event!(
     BOOST_PICKUP_EVENT_DEFINITION,
     "boost_pickups",
     "Boost Pickup",
-    EventCategory::Boost,
+    EventCategory::Other,
     hidden = true,
     variants = BOOST_PICKUP_VARIANTS
 );
@@ -916,7 +848,7 @@ define_stats_event!(
     BOOST_RESPAWN_EVENT_DEFINITION,
     "boost_respawn",
     "Respawn",
-    EventCategory::Boost
+    EventCategory::Other
 );
 define_stats_event!(
     BumpEvent,
@@ -930,103 +862,96 @@ define_stats_event!(
     POSSESSION_EVENT_DEFINITION,
     "possession",
     "Possession",
-    EventCategory::Possession
+    EventCategory::Other
+);
+define_stats_event!(
+    PlayerPossessionEvent,
+    PLAYER_POSSESSION_EVENT_DEFINITION,
+    "player_possession",
+    "Player Possession",
+    EventCategory::Other,
+    summary = "A contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity.",
+    approach = [
+        "Follow the shared possession tracker's controlling player and open a span when a player establishes control.",
+        "Bridge contested or pending-turnover interruptions shorter than the merge gap when the same player re-establishes control, excluding the gap from possessed duration.",
+        "Accumulate distinct touches (with aerial/wall classification), signed ball travel toward the opponent goal, and per-frame carry/air-dribble samples while the span is active.",
+    ]
 );
 define_stats_event!(
     BallHalfEvent,
     PRESSURE_EVENT_DEFINITION,
     "ball_half",
     "Ball Half",
-    EventCategory::Possession
+    EventCategory::Other
 );
 define_stats_event!(
     TerritorialPressureEvent,
     TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     "territorial_pressure",
     "Territorial Pressure",
-    EventCategory::Possession
+    EventCategory::Other
 );
 define_stats_event!(
     MovementEvent,
     MOVEMENT_EVENT_DEFINITION,
     "movement",
     "Movement",
-    EventCategory::Other
+    EventCategory::Movement
 );
 define_stats_event!(
-    PositioningActivityEvent,
-    POSITIONING_ACTIVITY_EVENT_DEFINITION,
-    "positioning_activity",
-    "Positioning Activity",
+    PlayerActivityEvent,
+    PLAYER_ACTIVITY_EVENT_DEFINITION,
+    "player_activity",
+    "Player Activity",
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningFieldZoneEvent,
-    POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
-    "positioning_field_zone",
-    "Positioning Field Zone",
+    FieldThirdEvent,
+    FIELD_THIRD_EVENT_DEFINITION,
+    "field_third",
+    "Field Third",
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningBallRelativeDepthEvent,
-    POSITIONING_BALL_RELATIVE_DEPTH_EVENT_DEFINITION,
-    "positioning_ball_relative_depth",
-    "Positioning Ball-Relative Depth",
+    FieldHalfEvent,
+    FIELD_HALF_EVENT_DEFINITION,
+    "field_half",
+    "Field Half",
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningTeammateRoleEvent,
-    POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
-    "positioning_teammate_role",
-    "Positioning Teammate Role",
+    BallDepthEvent,
+    BALL_DEPTH_EVENT_DEFINITION,
+    "ball_depth",
+    "Ball Depth",
     EventCategory::Positioning
 );
 define_stats_event!(
-    PositioningBallProximityEvent,
-    POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
-    "positioning_ball_proximity",
-    "Positioning Ball Proximity",
+    DepthRoleEvent,
+    DEPTH_ROLE_EVENT_DEFINITION,
+    "depth_role",
+    "Depth Role",
     EventCategory::Positioning
 );
 define_stats_event!(
-    RotationPlayerEvent,
-    ROTATION_PLAYER_EVENT_DEFINITION,
-    "rotation_player",
-    "Player Rotation",
-    EventCategory::Positioning,
-    hidden = true,
-    variants = ROTATION_PLAYER_VARIANTS
-);
-define_stats_event!(
-    RotationRoleSpanEvent,
-    ROTATION_ROLE_SPAN_EVENT_DEFINITION,
-    "rotation_role_span",
-    "Rotation Role Span",
-    EventCategory::Positioning,
-    hidden = true,
-    variants = ROTATION_ROLE_VARIANTS
-);
-define_stats_event!(
-    RotationDepthSpanEvent,
-    ROTATION_DEPTH_SPAN_EVENT_DEFINITION,
-    "rotation_depth_span",
-    "Rotation Depth Span",
-    EventCategory::Positioning,
-    hidden = true,
-    variants = ROTATION_DEPTH_VARIANTS
-);
-define_stats_event!(
-    RotationFirstManStintEvent,
-    ROTATION_FIRST_MAN_STINT_EVENT_DEFINITION,
-    "rotation_first_man_stint",
-    "First Man Stint",
+    BallProximityEvent,
+    BALL_PROXIMITY_EVENT_DEFINITION,
+    "ball_proximity",
+    "Ball Proximity",
     EventCategory::Positioning
 );
 define_stats_event!(
-    RotationTeamEvent,
-    ROTATION_TEAM_EVENT_DEFINITION,
-    "rotation_team",
-    "Team Rotation",
+    RotationRoleEvent,
+    ROTATION_ROLE_EVENT_DEFINITION,
+    "rotation_role",
+    "Rotation Role",
+    EventCategory::Positioning
+);
+define_stats_event!(
+    FirstManChangeEvent,
+    FIRST_MAN_CHANGE_EVENT_DEFINITION,
+    "first_man_change",
+    "First-Man Change",
     EventCategory::Positioning
 );
 define_stats_event!(
@@ -1273,6 +1198,13 @@ const POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "PossessionCalculator",
 )];
 
+const PLAYER_POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &PLAYER_POSSESSION_EVENT_DEFINITION,
+    "player_possession",
+    "PlayerPossessionNode",
+    "PlayerPossessionCalculator",
+)];
+
 const BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &PRESSURE_EVENT_DEFINITION,
     "ball_half",
@@ -1296,31 +1228,37 @@ const MOVEMENT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 
 const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
-        &POSITIONING_ACTIVITY_EVENT_DEFINITION,
+        &PLAYER_ACTIVITY_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_FIELD_ZONE_EVENT_DEFINITION,
+        &FIELD_THIRD_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_BALL_RELATIVE_DEPTH_EVENT_DEFINITION,
+        &FIELD_HALF_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_TEAMMATE_ROLE_EVENT_DEFINITION,
+        &BALL_DEPTH_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
-        &POSITIONING_BALL_PROXIMITY_EVENT_DEFINITION,
+        &DEPTH_ROLE_EVENT_DEFINITION,
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+    produced_event(
+        &BALL_PROXIMITY_EVENT_DEFINITION,
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
@@ -1329,31 +1267,13 @@ const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
 
 const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
-        &ROTATION_PLAYER_EVENT_DEFINITION,
+        &ROTATION_ROLE_EVENT_DEFINITION,
         "rotation",
         "RotationNode",
         "RotationCalculator",
     ),
     produced_event(
-        &ROTATION_TEAM_EVENT_DEFINITION,
-        "rotation",
-        "RotationNode",
-        "RotationCalculator",
-    ),
-    produced_event(
-        &ROTATION_ROLE_SPAN_EVENT_DEFINITION,
-        "rotation",
-        "RotationNode",
-        "RotationCalculator",
-    ),
-    produced_event(
-        &ROTATION_DEPTH_SPAN_EVENT_DEFINITION,
-        "rotation",
-        "RotationNode",
-        "RotationCalculator",
-    ),
-    produced_event(
-        &ROTATION_FIRST_MAN_STINT_EVENT_DEFINITION,
+        &FIRST_MAN_CHANGE_EVENT_DEFINITION,
         "rotation",
         "RotationNode",
         "RotationCalculator",
@@ -1462,6 +1382,11 @@ register_event_producer!(
     POSSESSION_EVENT_PRODUCER,
     "possession",
     POSSESSION_EMITTED_EVENTS
+);
+register_event_producer!(
+    PLAYER_POSSESSION_EVENT_PRODUCER,
+    "player_possession",
+    PLAYER_POSSESSION_EMITTED_EVENTS
 );
 register_event_producer!(
     BALL_HALF_EVENT_PRODUCER,

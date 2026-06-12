@@ -48,10 +48,13 @@ const SPAN_BASED_STATS_EVENT_STREAM_IDS = new Set<string>([
   "ball_half",
   "territorial_pressure",
   "controlled_play",
-  "positioning_field_zone",
-  "rotation_role_span",
-  "rotation_depth_span",
-  "rotation_first_man_stint",
+  "player_activity",
+  "field_third",
+  "field_half",
+  "ball_depth",
+  "depth_role",
+  "ball_proximity",
+  "rotation_role",
   "rush",
 ]);
 const EVENT_PLAYLIST_PLAYER_COLORS = [
@@ -259,48 +262,40 @@ function formatGenericStatsEventLabel({
     return joinEventDetails([prefix, duration]);
   }
 
-  if (event.payload.kind === "positioning_activity") {
-    const state =
-      payload.demolished === true
-        ? "demolished"
-        : payload.active === false
-          ? "inactive"
-          : payload.tracked === false
-            ? "untracked"
-            : "active";
+  if (event.payload.kind === "player_activity") {
+    const state = titleCaseValue(payload.state);
     const prefix = playerName ? `${playerName} positioning` : streamLabel;
-    return joinEventDetails([`${prefix} ${state}`, duration]);
+    return joinEventDetails([state ? `${prefix} ${state.toLowerCase()}` : prefix, duration]);
   }
 
-  if (event.payload.kind === "positioning_field_zone") {
-    const defensive = Number(payload.defensive_zone_fraction ?? 0);
-    const neutral = Number(payload.neutral_zone_fraction ?? 0);
-    const offensive = Number(payload.offensive_zone_fraction ?? 0);
-    const zone =
-      defensive >= neutral && defensive >= offensive
-        ? "defensive zone"
-        : offensive >= neutral
-          ? "offensive zone"
-          : "neutral zone";
+  if (event.payload.kind === "field_third") {
+    const zone = titleCaseValue(payload.state);
     const prefix = playerName ? `${playerName} positioning` : streamLabel;
-    return joinEventDetails([`${prefix} in ${zone}`, duration]);
+    return joinEventDetails([zone ? `${prefix} in ${zone.toLowerCase()} third` : prefix, duration]);
   }
 
-  if (event.payload.kind === "rotation_role_span") {
-    const role = titleCaseValue(payload.current_role_state);
-    const prefix = playerName ? `${playerName} rotation` : streamLabel;
-    return joinEventDetails([role ? `${prefix}: ${role.toLowerCase()}` : prefix, duration]);
+  if (event.payload.kind === "field_half") {
+    const half = titleCaseValue(payload.state);
+    const prefix = playerName ? `${playerName} positioning` : streamLabel;
+    return joinEventDetails([half ? `${prefix} in ${half.toLowerCase()} half` : prefix, duration]);
   }
 
-  if (event.payload.kind === "rotation_depth_span") {
-    const depth = titleCaseValue(payload.current_depth_state);
-    const prefix = playerName ? `${playerName} rotation depth` : streamLabel;
+  if (event.payload.kind === "ball_depth") {
+    const depth = titleCaseValue(payload.state);
+    const prefix = playerName ? `${playerName} ball depth` : streamLabel;
     return joinEventDetails([depth ? `${prefix}: ${depth.toLowerCase()}` : prefix, duration]);
   }
 
-  if (event.payload.kind === "rotation_first_man_stint") {
-    const prefix = playerName ? `${playerName} first-man stint` : streamLabel;
-    return joinEventDetails([prefix, duration]);
+  if (event.payload.kind === "depth_role") {
+    const role = titleCaseValue(payload.state);
+    const prefix = playerName ? `${playerName} depth role` : streamLabel;
+    return joinEventDetails([role ? `${prefix}: ${role.toLowerCase()}` : prefix, duration]);
+  }
+
+  if (event.payload.kind === "rotation_role") {
+    const role = titleCaseValue(payload.state);
+    const prefix = playerName ? `${playerName} rotation` : streamLabel;
+    return joinEventDetails([role ? `${prefix}: ${role.toLowerCase()}` : prefix, duration]);
   }
 
   return playerName ? `${playerName} ${streamLabel.toLowerCase()}` : streamLabel;

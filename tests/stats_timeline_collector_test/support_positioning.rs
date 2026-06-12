@@ -186,14 +186,19 @@ fn assert_movement_stats_close(
         actual.tracked_time,
         expected.tracked_time
     );
+    // Distance and speed sums grow into the millions, where one f32 ULP exceeds
+    // an absolute 0.001 tolerance, so summation-order differences between the
+    // projection and the event replay need a relative bound instead.
     assert!(
-        (actual.total_distance - expected.total_distance).abs() < 0.001,
+        (actual.total_distance - expected.total_distance).abs()
+            < 0.001f32.max(expected.total_distance.abs() * 1e-4),
         "{replay_path} {label}.total_distance frame {frame_number} actual {:.3} expected {:.3}",
         actual.total_distance,
         expected.total_distance
     );
     assert!(
-        (actual.speed_integral - expected.speed_integral).abs() < 0.001,
+        (actual.speed_integral - expected.speed_integral).abs()
+            < 0.001f32.max(expected.speed_integral.abs() * 1e-4),
         "{replay_path} {label}.speed_integral frame {frame_number} actual {:.3} expected {:.3}",
         actual.speed_integral,
         expected.speed_integral
@@ -399,7 +404,8 @@ fn assert_positioning_stats_close(
     assert_close_field!(time_offensive_zone);
     assert_close_field!(time_defensive_half);
     assert_close_field!(time_offensive_half);
-    assert_close_field!(time_closest_to_ball);
+    assert_close_field!(time_closest_to_ball_team);
+    assert_close_field!(time_closest_to_ball_absolute);
     assert_close_field!(time_farthest_from_ball);
     assert_close_field!(time_behind_ball);
     assert_close_field!(time_level_with_ball);
@@ -411,32 +417,38 @@ fn assert_positioning_events_reconstruct_final_serialized_sums(
     timeline: &ReplayStatsTimeline,
 ) {
     let mut accumulator = PositioningStatsAccumulator::new();
-    for event in timeline_payloads_by_stream(timeline, "positioning_activity", |payload| match payload {
-        EventPayload::PositioningActivity(event) => Some(event),
+    for event in timeline_payloads_by_stream(timeline, "player_activity", |payload| match payload {
+        EventPayload::PlayerActivity(event) => Some(event),
         _ => None,
     }) {
         accumulator.apply_activity_event(&event);
     }
-    for event in timeline_payloads_by_stream(timeline, "positioning_field_zone", |payload| match payload {
-        EventPayload::PositioningFieldZone(event) => Some(event),
+    for event in timeline_payloads_by_stream(timeline, "field_third", |payload| match payload {
+        EventPayload::FieldThird(event) => Some(event),
         _ => None,
     }) {
-        accumulator.apply_field_zone_event(&event);
+        accumulator.apply_field_third_event(&event);
     }
-    for event in timeline_payloads_by_stream(timeline, "positioning_ball_relative_depth", |payload| match payload {
-        EventPayload::PositioningBallRelativeDepth(event) => Some(event),
+    for event in timeline_payloads_by_stream(timeline, "field_half", |payload| match payload {
+        EventPayload::FieldHalf(event) => Some(event),
         _ => None,
     }) {
-        accumulator.apply_ball_relative_depth_event(&event);
+        accumulator.apply_field_half_event(&event);
     }
-    for event in timeline_payloads_by_stream(timeline, "positioning_teammate_role", |payload| match payload {
-        EventPayload::PositioningTeammateRole(event) => Some(event),
+    for event in timeline_payloads_by_stream(timeline, "ball_depth", |payload| match payload {
+        EventPayload::BallDepth(event) => Some(event),
         _ => None,
     }) {
-        accumulator.apply_teammate_role_event(&event);
+        accumulator.apply_ball_depth_event(&event);
     }
-    for event in timeline_payloads_by_stream(timeline, "positioning_ball_proximity", |payload| match payload {
-        EventPayload::PositioningBallProximity(event) => Some(event),
+    for event in timeline_payloads_by_stream(timeline, "depth_role", |payload| match payload {
+        EventPayload::DepthRole(event) => Some(event),
+        _ => None,
+    }) {
+        accumulator.apply_depth_role_event(&event);
+    }
+    for event in timeline_payloads_by_stream(timeline, "ball_proximity", |payload| match payload {
+        EventPayload::BallProximity(event) => Some(event),
         _ => None,
     }) {
         accumulator.apply_ball_proximity_event(&event);
@@ -494,14 +506,10 @@ fn assert_rotation_player_stats_close(
     }
 
     assert_close_field!(active_game_time);
-    assert_close_field!(tracked_time);
     assert_close_field!(time_first_man);
     assert_close_field!(time_second_man);
     assert_close_field!(time_third_man);
     assert_close_field!(time_ambiguous_role);
-    assert_close_field!(time_behind_play);
-    assert_close_field!(time_level_with_play);
-    assert_close_field!(time_ahead_of_play);
     assert_close_field!(longest_first_man_stint_time);
     assert_eq!(
         actual.first_man_stint_count, expected.first_man_stint_count,
@@ -518,10 +526,6 @@ fn assert_rotation_player_stats_close(
     assert_eq!(
         actual.current_role_state, expected.current_role_state,
         "{replay_path} {label}.current_role_state frame {frame_number}"
-    );
-    assert_eq!(
-        actual.current_depth_state, expected.current_depth_state,
-        "{replay_path} {label}.current_depth_state frame {frame_number}"
     );
 }
 
@@ -546,42 +550,46 @@ fn assert_rotation_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut player_events = timeline_payloads_by_stream(timeline, "rotation_player", |payload| match payload { EventPayload::RotationPlayer(event) => Some(event), _ => None });
-    player_events.sort_by(|left, right| {
-        left.frame
-            .cmp(&right.frame)
-            .then_with(|| left.time.total_cmp(&right.time))
+    let mut role_events = timeline_payloads_by_stream(timeline, "rotation_role", |payload| match payload { EventPayload::RotationRole(event) => Some(event), _ => None });
+    role_events.sort_by(|left, right| {
+        left.end_frame
+            .cmp(&right.end_frame)
+            .then_with(|| left.end_time.total_cmp(&right.end_time))
     });
-    let mut team_events = timeline_payloads_by_stream(timeline, "rotation_team", |payload| match payload { EventPayload::RotationTeam(event) => Some(event), _ => None });
-    team_events.sort_by(|left, right| {
+    let mut change_events = timeline_payloads_by_stream(timeline, "first_man_change", |payload| match payload { EventPayload::FirstManChange(event) => Some(event), _ => None });
+    change_events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
             .then_with(|| left.time.total_cmp(&right.time))
     });
 
-    let mut player_event_index = 0;
-    let mut team_event_index = 0;
+    let mut role_event_index = 0;
+    let mut change_event_index = 0;
     let mut accumulator = RotationStatsAccumulator::with_first_man_stint_end_grace_seconds(
-        timeline.config.rotation_first_man_debounce_seconds,
+        timeline.config.rotation_first_man_stint_end_grace_seconds,
     );
 
     for frame in &timeline.frames {
-        while player_event_index < player_events.len()
-            && player_events[player_event_index].end_frame <= frame.frame_number
+        while role_event_index < role_events.len()
+            && role_events[role_event_index].end_frame <= frame.frame_number
         {
-            let event = &player_events[player_event_index];
-            accumulator.apply_player_event(event);
-            player_event_index += 1;
+            let event = &role_events[role_event_index];
+            accumulator.apply_role_event(event);
+            role_event_index += 1;
         }
 
-        while team_event_index < team_events.len()
-            && team_events[team_event_index].frame <= frame.frame_number
+        while change_event_index < change_events.len()
+            && change_events[change_event_index].frame <= frame.frame_number
         {
-            let event = &team_events[team_event_index];
-            accumulator.apply_team_event(event);
-            team_event_index += 1;
+            let event = &change_events[change_event_index];
+            accumulator.apply_first_man_change_event(event);
+            change_event_index += 1;
         }
 
+        // Team rotation stats are pure event counts driven by first-man change
+        // moments, so they reconstruct exactly at every frame. Player stats are
+        // duration sums over role spans that stay open until a state change
+        // closes them, so those are only compared after the final flush below.
         assert_rotation_team_stats_equal(
             replay_path,
             "team_zero.rotation",
@@ -596,33 +604,37 @@ fn assert_rotation_events_reconstruct_serialized_partial_sums(
             &frame.team_one.rotation,
             accumulator.team_one_stats(),
         );
-
-        for player in &frame.players {
-            let expected = accumulator
-                .player_stats()
-                .get(&player.player_id)
-                .cloned()
-                .unwrap_or_default();
-            assert_rotation_player_stats_close(
-                replay_path,
-                &format!("player {} rotation", player.name),
-                frame.frame_number,
-                &player.rotation,
-                &expected,
-            );
-        }
     }
 
     assert_eq!(
-        player_event_index,
-        player_events.len(),
-        "{replay_path} unprocessed rotation player events"
+        role_event_index,
+        role_events.len(),
+        "{replay_path} unprocessed rotation role events"
     );
     assert_eq!(
-        team_event_index,
-        team_events.len(),
-        "{replay_path} unprocessed rotation team events"
+        change_event_index,
+        change_events.len(),
+        "{replay_path} unprocessed first man change events"
     );
+
+    let final_frame = timeline
+        .frames
+        .last()
+        .expect("rotation reconstruction requires at least one frame");
+    for player in &final_frame.players {
+        let expected = accumulator
+            .player_stats()
+            .get(&player.player_id)
+            .cloned()
+            .unwrap_or_default();
+        assert_rotation_player_stats_close(
+            replay_path,
+            &format!("player {} rotation", player.name),
+            final_frame.frame_number,
+            &player.rotation,
+            &expected,
+        );
+    }
 }
 
 fn fifty_fifty_phase_label_for_derivation(is_kickoff: bool) -> StatLabel {

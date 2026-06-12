@@ -26,6 +26,8 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 .first_man_ambiguity_margin,
             rotation_first_man_debounce_seconds: RotationCalculatorConfig::default()
                 .first_man_debounce_seconds,
+            rotation_first_man_stint_end_grace_seconds: RotationCalculatorConfig::default()
+                .first_man_stint_end_grace_seconds,
             rush_max_start_y: RushCalculatorConfig::default().max_start_y,
             rush_attack_support_distance_y: RushCalculatorConfig::default()
                 .attack_support_distance_y,

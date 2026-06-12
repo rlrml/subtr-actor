@@ -1,22 +1,19 @@
-//! Regression test for contested 50/50 kickoff touch attribution.
+//! Clip-based variant of `contested_kickoff_touch_test.rs`.
 //!
-//! On a contested kickoff both cars reach the ball at essentially the same
-//! instant, but the losing challenger's contact lands a frame off the ball's
-//! measurable trajectory deviation (the winning car already redirected it), and
-//! the replay frequently reports only the winning team's `BallHitTeamNum` marker.
-//! Previously the challenger was credited no touch at all: `expected_taker_by_team`
-//! had no first-touch tiebreak, the taker fell back to an unrelated geometric
-//! heuristic, and `kickoff_type`/`kickoff_direction` collapsed to `unknown`.
+//! Each contested 50/50 kickoff is clipped separately, with enough lead-in to
+//! include the countdown state transition that opens the kickoff window and
+//! enough tail for the outcome to resolve. The full-replay original is
+//! `#[ignore]`d as slow; the clips are cheap enough to run by default.
 //!
-//! `assets/post-eac-ranked-doubles-2026-04-28.replay` contains two such kickoffs
-//! (verified frame-by-frame): `Ragnar` reaches the ball a frame before the
-//! deviation while only blue's marker fires, and `2Fum2Tastic` reaches it a frame
-//! after the deviation with no orange marker at all. Both challengers must now be
-//! credited a touch, which resolves the kickoff type for both teams.
+//! See the original test for the regression background (losing challengers were
+//! credited no touch, collapsing `kickoff_type` to `unknown`).
 
 mod common;
 
-use subtr_actor::{EventPayload, KickoffEvent, KickoffType, PlayerId, StatsTimelineCollector};
+use subtr_actor::{
+    clip_replay_around_times, EventPayload, KickoffEvent, KickoffType, PlayerId,
+    StatsTimelineCollector,
+};
 
 const DOUBLES_REPLAY: &str = "assets/post-eac-ranked-doubles-2026-04-28.replay";
 
@@ -40,41 +37,49 @@ const CONTESTED_KICKOFFS: [ContestedKickoffCase; 2] = [
 ];
 
 #[test]
-#[ignore = "replay-backed kickoff touch parity is slow; run explicitly when changing touch attribution"]
-fn contested_kickoff_credits_both_fifty_fifty_challengers() {
+fn clip_contested_kickoff_credits_both_fifty_fifty_challengers() {
     let replay = common::parse_replay(DOUBLES_REPLAY);
-    let timeline = StatsTimelineCollector::new()
-        .get_legacy_replay_stats_timeline(&replay)
-        .expect("expected a stats timeline for the doubles replay");
-
-    let name_of = |player_id: &PlayerId| -> Option<String> {
-        timeline
-            .replay_meta
-            .player_order()
-            .find(|player| &player.remote_id == player_id)
-            .map(|player| player.name.clone())
-    };
-
-    let kickoffs: Vec<&KickoffEvent> = timeline
-        .events
-        .events
-        .iter()
-        .filter_map(|event| match &event.payload {
-            EventPayload::Kickoff(kickoff) => Some(kickoff.as_ref()),
-            _ => None,
-        })
-        .collect();
-    assert!(
-        !kickoffs.is_empty(),
-        "expected kickoff events in the replay"
-    );
 
     for case in &CONTESTED_KICKOFFS {
         let (lo, hi) = case.start_time_range;
+        // Lead-in long enough to include the countdown leading into the
+        // kickoff; tail long enough for the kickoff outcome to resolve.
+        let clip = clip_replay_around_times(&replay, lo - 5.0, hi + 1.0, 90, 300)
+            .expect("clip should build");
+        let timeline = StatsTimelineCollector::new()
+            .get_legacy_replay_stats_timeline(&clip.to_replay())
+            .expect("expected a stats timeline for the kickoff clip");
+
+        let name_of = |player_id: &PlayerId| -> Option<String> {
+            timeline
+                .replay_meta
+                .player_order()
+                .find(|player| &player.remote_id == player_id)
+                .map(|player| player.name.clone())
+        };
+
+        let kickoffs: Vec<&KickoffEvent> = timeline
+            .events
+            .events
+            .iter()
+            .filter_map(|event| match &event.payload {
+                EventPayload::Kickoff(kickoff) => Some(kickoff.as_ref()),
+                _ => None,
+            })
+            .collect();
+
         let kickoff = kickoffs
             .iter()
             .find(|kickoff| kickoff.start_time >= lo && kickoff.start_time <= hi)
-            .unwrap_or_else(|| panic!("expected a kickoff with start_time in [{lo}, {hi}]"));
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected a kickoff with start_time in [{lo}, {hi}] in the clip; got {:?}",
+                    kickoffs
+                        .iter()
+                        .map(|kickoff| kickoff.start_time)
+                        .collect::<Vec<_>>()
+                )
+            });
 
         let team_zero_taker = kickoff
             .team_zero_taker

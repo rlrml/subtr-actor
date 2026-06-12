@@ -34,6 +34,31 @@ fn player(player_id: PlayerId, is_team_0: bool, position: glam::Vec3, boost: f32
     }
 }
 
+fn boost_pickup(
+    player_id: PlayerId,
+    is_team_0: bool,
+    frame: usize,
+    time: f32,
+    collected_amount: f32,
+) -> BoostPickupEvent {
+    BoostPickupEvent {
+        frame,
+        time,
+        player_id,
+        player_position: None,
+        is_team_0,
+        pad_type: BoostPickupPadType::Big,
+        field_half: BoostPickupFieldHalf::Own,
+        activity: BoostPickupActivity::Active,
+        detection: BoostPickupDetection::Both,
+        is_steal: false,
+        collected_amount,
+        overfill_amount: 0.0,
+        boost_before: None,
+        boost_after: None,
+    }
+}
+
 fn frame(frame_number: usize, time: f32) -> FrameInfo {
     FrameInfo {
         frame_number,
@@ -996,26 +1021,32 @@ fn kickoff_taker_tracks_time_to_ball_and_approach_boost_totals() {
         )
         .unwrap();
 
+    // Blue ends the approach at 45 boost after dipping to 30: the gain back up
+    // is a real pad pickup, delivered as a deduplicated BoostPickupEvent rather
+    // than inferred from the gross boost-amount jump. boost_used is then the
+    // balance start(33) + collected(15) - first_touch(45) = 3.
     calculator
-        .update(
-            &frame(35, 3.5),
-            &GameplayState {
+        .update_with_speed_flips(KickoffUpdateContext {
+            frame: &frame(35, 3.5),
+            gameplay: &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
             },
-            &ball(0.0),
-            &PlayerFrameState {
+            ball: &ball(0.0),
+            players: &PlayerFrameState {
                 players: vec![
                     player(blue_taker.clone(), true, glam::Vec3::ZERO, 45.0),
                     player(orange_taker.clone(), false, glam::Vec3::ZERO, 28.0),
                 ],
             },
-            &TouchState {
+            touch_state: &TouchState {
                 touch_events: vec![touch(blue_taker.clone(), true, 35, 3.5)],
                 ..TouchState::default()
             },
-            &FrameEventsState::default(),
-        )
+            events: &FrameEventsState::default(),
+            speed_flip_events: &[],
+            boost_pickups: &[boost_pickup(blue_taker.clone(), true, 35, 3.5, 15.0)],
+        })
         .unwrap();
 
     calculator
@@ -1792,6 +1823,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
+            boost_pickups: &[],
         })
         .unwrap();
 
@@ -1810,6 +1842,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             },
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
+            boost_pickups: &[],
         })
         .unwrap();
 
@@ -1825,6 +1858,7 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
             touch_state: &TouchState::default(),
             events: &FrameEventsState::default(),
             speed_flip_events: std::slice::from_ref(&speed_flip),
+            boost_pickups: &[],
         })
         .unwrap();
 
@@ -1984,6 +2018,53 @@ fn kickoff_classifies_known_taker_approaches() {
             false,
         ),
         KickoffApproach::FakeGoForBoost
+    );
+}
+
+#[test]
+fn kickoff_first_dodge_direction_is_not_overwritten_by_later_dodges() {
+    let player_id = PlayerId::Steam(10);
+    let mut trace = KickoffApproachTrace::default();
+
+    let player_at = |velocity: glam::Vec3, dodge_active: bool| {
+        let mut sample = player(player_id.clone(), true, glam::Vec3::ZERO, 33.0);
+        sample.rigid_body = Some(rigid_body(glam::Vec3::ZERO, velocity));
+        sample.dodge_active = dodge_active;
+        sample
+    };
+
+    // Identity rotation: nose is +X, right is +Y. Establish previous velocity,
+    // then dodge sideways (+Y delta), release, then dodge forward (+X delta)
+    // as happens when the taker flips again into the ball at first touch.
+    KickoffCalculator::observe_player_approach(
+        &mut trace,
+        &frame(1, 0.1),
+        &player_at(glam::Vec3::new(500.0, 0.0, 0.0), false),
+    );
+    KickoffCalculator::observe_player_approach(
+        &mut trace,
+        &frame(2, 0.2),
+        &player_at(glam::Vec3::new(500.0, 600.0, 0.0), true),
+    );
+    KickoffCalculator::observe_player_approach(
+        &mut trace,
+        &frame(3, 0.3),
+        &player_at(glam::Vec3::new(500.0, 600.0, 0.0), false),
+    );
+    KickoffCalculator::observe_player_approach(
+        &mut trace,
+        &frame(4, 0.4),
+        &player_at(glam::Vec3::new(1100.0, 600.0, 0.0), true),
+    );
+
+    assert_eq!(trace.first_dodge_time, Some(0.2));
+    assert_eq!(trace.first_dodge_frame, Some(2));
+    let forward = trace.first_dodge_forward_component.expect("forward set");
+    let side = trace.first_dodge_side_component.expect("side set");
+    assert!(
+        forward.abs() < 0.01 && (side - 1.0).abs() < 0.01,
+        "components should describe the first (sideways) dodge, got \
+         forward={forward} side={side}"
     );
 }
 
@@ -2201,6 +2282,12 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
         kickoff_goal: true,
         scoring_team_is_team_0: Some(true),
         time_to_goal: Some(4.0),
+        advantage: KickoffAdvantage::NoAdvantage,
+        advantage_team_is_team_0: None,
+        advantage_time: None,
+        advantage_frame: None,
+        advantage_seconds_after_first_touch: None,
+        advantage_player: None,
         team_zero_taker: Some(KickoffTakerEvent {
             player: player_id.clone(),
             is_team_0: true,
@@ -2956,4 +3043,249 @@ fn next_kickoff_phase_flushes_kickoff_awaiting_attribution() {
     let event = calculator.events().last().unwrap();
     assert!(!event.kickoff_goal);
     assert_eq!(event.end_time, 2.6);
+}
+
+fn live_gameplay() -> GameplayState {
+    GameplayState {
+        ball_has_been_hit: Some(true),
+        ..GameplayState::default()
+    }
+}
+
+/// Arm a 1v2 kickoff (blue taker vs orange taker + orange back man) and apply
+/// the blue taker's first touch at t=1.0 with the ball still at center field.
+fn advantage_kickoff(
+    blue_taker: &PlayerId,
+    orange_taker: &PlayerId,
+    orange_back: &PlayerId,
+) -> KickoffCalculator {
+    let mut calculator = KickoffCalculator::new();
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_back.clone(),
+                        false,
+                        glam::Vec3::new(0.0, 4608.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(10, 1.0),
+            &live_gameplay(),
+            &ball(0.0),
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: vec![touch(blue_taker.clone(), true, 10, 1.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+    calculator
+}
+
+fn drive_frame(
+    calculator: &mut KickoffCalculator,
+    frame_number: usize,
+    time: f32,
+    ball_state: &BallFrameState,
+    touches: Vec<TouchEvent>,
+) {
+    calculator
+        .update(
+            &frame(frame_number, time),
+            &live_gameplay(),
+            ball_state,
+            &PlayerFrameState::default(),
+            &TouchState {
+                touch_events: touches,
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+}
+
+#[test]
+fn lost_kickoff_settles_for_collecting_team() {
+    let blue_taker = PlayerId::Steam(90);
+    let orange_taker = PlayerId::Steam(91);
+    let orange_back = PlayerId::Steam(92);
+    let mut calculator = advantage_kickoff(&blue_taker, &orange_taker, &orange_back);
+
+    // Blue wins the opening touch and pokes the ball deep into orange's half,
+    // but never touches it there: no anchor, so no pressure clock runs while
+    // orange's back man calmly retrieves it.
+    let mut frame_number = 11;
+    let mut time = 1.1;
+    while time < 3.0 - 1e-4 {
+        drive_frame(&mut calculator, frame_number, time, &ball(4000.0), vec![]);
+        frame_number += 1;
+        time += 0.1;
+    }
+    // Orange's back man collects and strings touches together: a possession
+    // run with no blue touch in between, spanning the minimum run length.
+    for (frame_number, time) in [(30usize, 3.0f32), (34, 3.4), (38, 3.8), (43, 4.3)] {
+        drive_frame(
+            &mut calculator,
+            frame_number,
+            time,
+            &ball(4000.0),
+            vec![touch(orange_back.clone(), false, frame_number, time)],
+        );
+    }
+    calculator.finish();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.advantage, KickoffAdvantage::TeamOnePossession);
+    assert_eq!(event.advantage_team_is_team_0, Some(false));
+    assert_eq!(event.advantage_player, Some(orange_back));
+    assert_eq!(event.advantage_time, Some(4.3));
+    assert_eq!(event.advantage_frame, Some(43));
+    let seconds_after = event.advantage_seconds_after_first_touch.unwrap();
+    assert!((seconds_after - 3.3).abs() < 1e-4);
+    // The immediate exchange still reads as a blue win.
+    assert_eq!(event.outcome, KickoffOutcome::TeamZeroWin);
+}
+
+#[test]
+fn engaged_pressure_settles_for_attacking_team() {
+    let blue_taker = PlayerId::Steam(93);
+    let orange_taker = PlayerId::Steam(94);
+    let orange_back = PlayerId::Steam(95);
+    let mut calculator = advantage_kickoff(&blue_taker, &orange_taker, &orange_back);
+
+    // Ball lands in orange's third; blue follows up with a touch there (the
+    // anchor), and an orange panic touch neither resets the pressure clocks
+    // nor builds a possession run.
+    drive_frame(&mut calculator, 15, 1.5, &ball(3000.0), vec![]);
+    drive_frame(
+        &mut calculator,
+        20,
+        2.0,
+        &ball(3000.0),
+        vec![touch(blue_taker.clone(), true, 20, 2.0)],
+    );
+    drive_frame(
+        &mut calculator,
+        24,
+        2.4,
+        &ball(3000.0),
+        vec![touch(orange_back.clone(), false, 24, 2.4)],
+    );
+    let mut frame_number = 25;
+    let mut time = 2.5;
+    while time < 3.5 - 1e-4 {
+        drive_frame(&mut calculator, frame_number, time, &ball(3000.0), vec![]);
+        frame_number += 1;
+        time += 0.1;
+    }
+    calculator.finish();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.advantage, KickoffAdvantage::TeamZeroPressure);
+    assert_eq!(event.advantage_team_is_team_0, Some(true));
+    assert_eq!(event.advantage_player, None);
+    let advantage_time = event.advantage_time.unwrap();
+    assert!(
+        (2.0..=3.0).contains(&advantage_time),
+        "expected pressure to establish ~0.75s after the in-zone anchor, got {advantage_time}",
+    );
+}
+
+#[test]
+fn contested_kickoff_stays_unsettled() {
+    let blue_taker = PlayerId::Steam(96);
+    let orange_taker = PlayerId::Steam(97);
+    let orange_back = PlayerId::Steam(98);
+    let mut calculator = advantage_kickoff(&blue_taker, &orange_taker, &orange_back);
+
+    // Alternating touches around midfield: no run ever spans the minimum and
+    // the ball never sits in either offensive zone.
+    let mut team_zero_turn = false;
+    let mut frame_number = 15;
+    let mut time = 1.5;
+    while time < 5.0 - 1e-4 {
+        let toucher = if team_zero_turn {
+            blue_taker.clone()
+        } else {
+            orange_taker.clone()
+        };
+        drive_frame(
+            &mut calculator,
+            frame_number,
+            time,
+            &ball(0.0),
+            vec![touch(toucher, team_zero_turn, frame_number, time)],
+        );
+        team_zero_turn = !team_zero_turn;
+        frame_number += 5;
+        time += 0.5;
+    }
+    calculator.finish();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert_eq!(event.advantage, KickoffAdvantage::NoAdvantage);
+    assert_eq!(event.advantage_team_is_team_0, None);
+    assert_eq!(event.advantage_time, None);
+    assert_eq!(event.advantage_player, None);
+}
+
+#[test]
+fn qualifying_kickoff_goal_settles_for_scoring_team() {
+    let blue_taker = PlayerId::Steam(99);
+    let orange_taker = PlayerId::Steam(100);
+    let orange_back = PlayerId::Steam(101);
+    let mut calculator = advantage_kickoff(&blue_taker, &orange_taker, &orange_back);
+
+    calculator
+        .update(
+            &frame(12, 1.2),
+            &live_gameplay(),
+            &ball(360.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState {
+                goal_events: vec![goal(false, 12, 1.2)],
+                ..FrameEventsState::default()
+            },
+        )
+        .unwrap();
+    calculator.finish();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = calculator.events().last().unwrap();
+    assert!(event.kickoff_goal);
+    assert_eq!(event.advantage, KickoffAdvantage::TeamOneGoal);
+    assert_eq!(event.advantage_team_is_team_0, Some(false));
+    assert_eq!(event.advantage_time, Some(1.2));
 }

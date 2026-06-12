@@ -17,7 +17,7 @@ test("positioning event derivation prorates spans across the playhead", () => {
       // Tracked for the first half of the window, demolished for the second half, so the
       // running snapshot should accrue each span in time rather than crediting it whole at
       // its start frame.
-      positioning_activity: [
+      player_activity: [
         {
           time: 1,
           frame: 10,
@@ -26,9 +26,7 @@ test("positioning event derivation prorates spans across the playhead", () => {
           duration: 0.5,
           player: playerId,
           is_team_0: true,
-          active: true,
-          tracked: true,
-          demolished: false,
+          state: "tracked",
         },
         {
           time: 1.5,
@@ -38,12 +36,10 @@ test("positioning event derivation prorates spans across the playhead", () => {
           duration: 0.5,
           player: playerId,
           is_team_0: true,
-          active: true,
-          tracked: false,
-          demolished: true,
+          state: "demolished",
         },
       ],
-      positioning_field_zone: [
+      field_third: [
         {
           time: 1,
           frame: 10,
@@ -52,14 +48,10 @@ test("positioning event derivation prorates spans across the playhead", () => {
           duration: 1,
           player: playerId,
           is_team_0: true,
-          defensive_zone_fraction: 0.5,
-          neutral_zone_fraction: 0.5,
-          offensive_zone_fraction: 0,
-          defensive_half_fraction: 0.8,
-          offensive_half_fraction: 0.2,
+          state: "defensive",
         },
       ],
-      positioning_ball_proximity: [
+      field_half: [
         {
           time: 1,
           frame: 10,
@@ -68,9 +60,23 @@ test("positioning event derivation prorates spans across the playhead", () => {
           duration: 1,
           player: playerId,
           is_team_0: true,
-          closest_to_ball_team: true,
-          closest_to_ball_absolute: true,
-          farthest_from_ball: false,
+          state: "defensive",
+        },
+      ],
+      ball_proximity: [
+        {
+          time: 1,
+          frame: 10,
+          end_time: 2,
+          end_frame: 20,
+          duration: 1,
+          player: playerId,
+          is_team_0: true,
+          state: {
+            closest_to_ball_team: true,
+            closest_to_ball_absolute: true,
+            farthest_from_ball: false,
+          },
         },
       ],
     },
@@ -140,8 +146,9 @@ test("positioning event derivation prorates spans across the playhead", () => {
   assertClose(positioningAt(2).tracked_time, 0.5);
   assertClose(positioningAt(2).active_game_time, 0.5);
   assertClose(positioningAt(2).time_demolished, 0);
-  assertClose(positioningAt(2).time_defensive_third, 0.25);
-  assertClose(positioningAt(2).time_closest_to_ball, 0.5);
+  assertClose(positioningAt(2).time_defensive_third, 0.5);
+  assertClose(positioningAt(2).time_defensive_half, 0.5);
+  assertClose(positioningAt(2).time_closest_to_ball_team, 0.5);
   // Possession time is a whole-match summary total, not a prorated span.
   assertClose(positioningAt(2).time_has_possession, 1);
 
@@ -150,15 +157,16 @@ test("positioning event derivation prorates spans across the playhead", () => {
   assertClose(positioningAt(3).time_demolished, 0.5);
   assertClose(positioningAt(3).active_game_time, 1);
   assertClose(positioningAt(3).time_has_possession, 1);
-  assertClose(positioningAt(3).time_defensive_third, 0.5);
-  assertClose(positioningAt(3).time_closest_to_ball, 1);
+  assertClose(positioningAt(3).time_defensive_third, 1);
+  assertClose(positioningAt(3).time_defensive_half, 1);
+  assertClose(positioningAt(3).time_closest_to_ball_team, 1);
   assertClose(positioningAt(3).time_closest_to_ball_absolute, 1);
 });
 
 test("positioning event derivation prorates team closest-to-ball stats", () => {
   const timeline = createStatsTimeline({
     events: {
-      positioning_ball_proximity: [
+      ball_proximity: [
         {
           time: 1,
           frame: 10,
@@ -167,9 +175,11 @@ test("positioning event derivation prorates team closest-to-ball stats", () => {
           duration: 0.5,
           player: playerId,
           is_team_0: true,
-          closest_to_ball_team: true,
-          closest_to_ball_absolute: true,
-          farthest_from_ball: false,
+          state: {
+            closest_to_ball_team: true,
+            closest_to_ball_absolute: true,
+            farthest_from_ball: false,
+          },
         },
         {
           time: 1.5,
@@ -179,9 +189,11 @@ test("positioning event derivation prorates team closest-to-ball stats", () => {
           duration: 0.5,
           player: opponentId,
           is_team_0: false,
-          closest_to_ball_team: true,
-          closest_to_ball_absolute: true,
-          farthest_from_ball: false,
+          state: {
+            closest_to_ball_team: true,
+            closest_to_ball_absolute: true,
+            farthest_from_ball: false,
+          },
         },
       ],
     },
@@ -201,15 +213,14 @@ test("positioning event derivation prorates team closest-to-ball stats", () => {
 
   // Team zero's span completes by frame 15; team one's has only just started.
   assertClose(derived.frames[2]!.team_zero.positioning.tracked_time, 0.5);
-  assertClose(derived.frames[2]!.team_zero.positioning.time_closest_to_ball, 0.5);
   assertClose(derived.frames[2]!.team_zero.positioning.time_closest_to_ball_team, 0.5);
   assertClose(derived.frames[2]!.team_zero.positioning.time_closest_to_ball_absolute, 0.5);
   assertClose(derived.frames[2]!.team_one.positioning.tracked_time, 0);
 
   // By frame 20 team one's span is complete and team zero's totals are unchanged.
   assertClose(derived.frames[3]!.team_one.positioning.tracked_time, 0.5);
-  assertClose(derived.frames[3]!.team_one.positioning.time_closest_to_ball, 0.5);
+  assertClose(derived.frames[3]!.team_one.positioning.time_closest_to_ball_team, 0.5);
   assertClose(derived.frames[3]!.team_one.positioning.time_closest_to_ball_absolute, 0.5);
   assertClose(derived.frames[3]!.team_zero.positioning.tracked_time, 0.5);
-  assertClose(derived.frames[3]!.team_zero.positioning.time_closest_to_ball, 0.5);
+  assertClose(derived.frames[3]!.team_zero.positioning.time_closest_to_ball_team, 0.5);
 });

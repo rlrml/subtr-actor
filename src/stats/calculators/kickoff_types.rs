@@ -216,6 +216,50 @@ impl KickoffPossessionOutcome {
     }
 }
 
+/// Who the kickoff was ultimately good for once play settled, independent of
+/// who won the immediate touch battle. A team gains the advantage by the
+/// first of: stringing uncontested touches together long enough to count as
+/// real possession (even deep in its own half — losing the opening touch but
+/// collecting the ball cleanly is the collector's advantage), pinning the
+/// ball in the opponent's half with touch engagement and no clean opposing
+/// possession, or a qualifying kickoff goal. A kickoff where neither team
+/// achieves any of those within the window stays `NoAdvantage`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffAdvantage {
+    TeamZeroPossession,
+    TeamOnePossession,
+    TeamZeroPressure,
+    TeamOnePressure,
+    TeamZeroGoal,
+    TeamOneGoal,
+    #[default]
+    NoAdvantage,
+}
+
+impl KickoffAdvantage {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::TeamZeroPossession => "team_zero_possession",
+            Self::TeamOnePossession => "team_one_possession",
+            Self::TeamZeroPressure => "team_zero_pressure",
+            Self::TeamOnePressure => "team_one_pressure",
+            Self::TeamZeroGoal => "team_zero_goal",
+            Self::TeamOneGoal => "team_one_goal",
+            Self::NoAdvantage => "no_advantage",
+        }
+    }
+
+    pub fn team_is_team_0(self) -> Option<bool> {
+        match self {
+            Self::TeamZeroPossession | Self::TeamZeroPressure | Self::TeamZeroGoal => Some(true),
+            Self::TeamOnePossession | Self::TeamOnePressure | Self::TeamOneGoal => Some(false),
+            Self::NoAdvantage => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -381,6 +425,19 @@ pub struct KickoffEvent {
     pub kickoff_goal: bool,
     pub scoring_team_is_team_0: Option<bool>,
     pub time_to_goal: Option<f32>,
+    /// See [`KickoffAdvantage`]. Unlike `outcome` and
+    /// `kickoff_possession_outcome`, which read the immediate exchange, this
+    /// answers "who did the kickoff actually end up being good for" once play
+    /// settled.
+    pub advantage: KickoffAdvantage,
+    pub advantage_team_is_team_0: Option<bool>,
+    pub advantage_time: Option<f32>,
+    pub advantage_frame: Option<usize>,
+    pub advantage_seconds_after_first_touch: Option<f32>,
+    /// For possession advantages, the player whose touch completed the
+    /// possession run. Pressure and goal advantages are team-level.
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
+    pub advantage_player: Option<PlayerId>,
     pub team_zero_taker: Option<KickoffTakerEvent>,
     pub team_one_taker: Option<KickoffTakerEvent>,
     pub team_zero_non_takers: Vec<KickoffSupportEvent>,

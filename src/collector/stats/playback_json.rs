@@ -208,8 +208,9 @@ pub(in crate::collector::stats::playback) fn json_required_value<'a>(
     field: &str,
 ) -> SubtrActorResult<&'a Value> {
     object.get(field).ok_or_else(|| {
+        let available: Vec<&str> = object.keys().map(String::as_str).collect();
         SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(format!(
-            "Missing JSON field '{field}'"
+            "Missing JSON field '{field}' (available: {available:?})"
         )))
     })
 }

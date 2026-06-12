@@ -13,7 +13,7 @@ import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
 import type { BoostPickupPadType } from "./generated/BoostPickupPadType.ts";
 import type { FiftyFiftyEvent } from "./generated/FiftyFiftyEvent.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
-import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
+import type { FieldThirdEvent } from "./statsTimeline.ts";
 import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
 import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
 
@@ -837,99 +837,55 @@ function extractPlayerStatValue(player: PlayerStatsSnapshot, spec: PlayerZoneSpe
   return 0;
 }
 
-function playerNameById(frame: StatsTimeline["frames"][number], playerId: string): string {
-  return (
-    frame.players.find((player) => playerIdToString(player.player_id) === playerId)?.name ??
-    playerId
-  );
-}
-
-function positioningZoneValue(event: PositioningFieldZoneEvent, spec: PlayerZoneSpec): number {
-  switch (spec.fieldName) {
-    case "time_defensive_third":
-      return event.defensive_zone_fraction;
-    case "time_neutral_third":
-      return event.neutral_zone_fraction;
-    case "time_offensive_third":
-      return event.offensive_zone_fraction;
+function fieldThirdZoneSpec(state: FieldThirdEvent["state"]): PlayerZoneSpec {
+  switch (state) {
+    case "defensive":
+      return PLAYER_ZONE_SPECS[0]!;
+    case "neutral":
+      return PLAYER_ZONE_SPECS[1]!;
+    case "offensive":
+      return PLAYER_ZONE_SPECS[2]!;
   }
-
-  return 0;
 }
 
-function buildTimeInZoneTimelineRangesFromEvents(
-  timeline: StatsTimeline,
-  replay?: ReplayModel,
-): ReplayTimelineRange[] {
-  const events = sortTimelineEvents(statsEventPayloads(timeline, "positioning_field_zone"));
+function buildPlayerNameLookup(timeline: StatsTimeline): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const frame of timeline.frames) {
+    for (const player of frame.players) {
+      const playerId = playerIdToString(player.player_id as Record<string, unknown>);
+      if (!names.has(playerId)) {
+        names.set(playerId, player.name);
+      }
+    }
+  }
+  return names;
+}
+
+function buildTimeInZoneTimelineRangesFromEvents(timeline: StatsTimeline): ReplayTimelineRange[] {
+  const events = sortTimelineEvents(statsEventPayloads(timeline, "field_third"));
   const ranges: ReplayTimelineRange[] = [];
   const lastRangeByLane = new Map<string, ReplayTimelineRange>();
-  let eventIndex = 0;
+  const playerNames = buildPlayerNameLookup(timeline);
 
-  let previousFrame: StatsTimeline["frames"][number] | null = null;
-  for (const frame of timeline.frames) {
-    const eventsByPlayer = new Map<
-      string,
-      { event: PositioningFieldZoneEvent; zoneDeltas: Map<string, number> }
-    >();
-    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-      const event = events[eventIndex] as PositioningFieldZoneEvent;
-      const playerId = playerIdToString(event.player as Record<string, unknown>);
-      const entry = eventsByPlayer.get(playerId) ?? {
-        event,
-        zoneDeltas: new Map<string, number>(),
-      };
-      entry.event = event;
-      for (const spec of PLAYER_ZONE_SPECS) {
-        entry.zoneDeltas.set(
-          spec.fieldName,
-          (entry.zoneDeltas.get(spec.fieldName) ?? 0) + positioningZoneValue(event, spec),
-        );
-      }
-      eventsByPlayer.set(playerId, entry);
-      eventIndex += 1;
-    }
-
-    if (!Number.isFinite(frame.time) || !Number.isFinite(frame.dt) || frame.dt <= 0) {
-      previousFrame = frame;
+  for (const event of events) {
+    if (!Number.isFinite(event.time) || !Number.isFinite(event.end_time)) {
       continue;
     }
-
-    const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
-    if (endTime - startTime <= DELTA_EPSILON) {
-      previousFrame = frame;
+    if (event.end_time - event.time <= DELTA_EPSILON) {
       continue;
     }
-
-    for (const [playerId, { event, zoneDeltas }] of eventsByPlayer) {
-      let winningSpec: PlayerZoneSpec | null = null;
-      let winningDelta = 0;
-
-      for (const spec of PLAYER_ZONE_SPECS) {
-        const delta = zoneDeltas.get(spec.fieldName) ?? 0;
-        if (delta > winningDelta + DELTA_EPSILON) {
-          winningDelta = delta;
-          winningSpec = spec;
-        }
-      }
-
-      if (!winningSpec) {
-        continue;
-      }
-
-      mergeRangeForLane(ranges, lastRangeByLane, {
-        id: `time-in-zone:${playerId}:${winningSpec.fieldName}:${startTime.toFixed(3)}`,
-        startTime,
-        endTime,
-        lane: `time-in-zone:${playerId}`,
-        laneLabel: playerNameById(frame, playerId),
-        label: winningSpec.label,
-        color: getPlayerZoneColor(winningSpec, event.is_team_0),
-        isTeamZero: event.is_team_0,
-      });
-    }
-
-    previousFrame = frame;
+    const playerId = playerIdToString(event.player as Record<string, unknown>);
+    const spec = fieldThirdZoneSpec(event.state);
+    mergeRangeForLane(ranges, lastRangeByLane, {
+      id: `time-in-zone:${playerId}:${spec.fieldName}:${event.time.toFixed(3)}`,
+      startTime: event.time,
+      endTime: event.end_time,
+      lane: `time-in-zone:${playerId}`,
+      laneLabel: playerNames.get(playerId) ?? playerId,
+      label: spec.label,
+      color: getPlayerZoneColor(spec, event.is_team_0),
+      isTeamZero: event.is_team_0,
+    });
   }
 
   return ranges;
@@ -939,8 +895,8 @@ export function buildTimeInZoneTimelineRanges(
   timeline: StatsTimeline,
   replay?: ReplayModel,
 ): ReplayTimelineRange[] {
-  if (statsEventPayloads(timeline, "positioning_field_zone").length > 0) {
-    return buildTimeInZoneTimelineRangesFromEvents(timeline, replay);
+  if (statsEventPayloads(timeline, "field_third").length > 0) {
+    return buildTimeInZoneTimelineRangesFromEvents(timeline);
   }
 
   const previousValues = new Map<string, Map<string, number>>();

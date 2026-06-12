@@ -52,6 +52,75 @@ export function interpolatePosition(
   };
 }
 
+// Cubic Hermite interpolation using the replay's per-sample velocities as
+// tangents. Linear interpolation (interpolatePosition) makes the car travel in
+// straight segments and change direction abruptly at every ~30Hz sample, which
+// reads as jitter when rendered at 60Hz+. Hermite is C1-continuous (smooth
+// velocity through the sample points) so the motion looks fluid.
+//
+// `velocity` is in position-units per second and `dt` is the segment duration in
+// seconds, so `velocity * dt` is the tangent in position units. When velocity is
+// unavailable, or the velocity-implied curve deviates implausibly far from the
+// straight-line path (e.g. a units mismatch), we fall back to a plain lerp so we
+// never look worse than the original linear behavior.
+export function interpolatePositionHermite(
+  current: Vec3 | null,
+  next: Vec3 | null,
+  currentVelocity: Vec3 | null,
+  nextVelocity: Vec3 | null,
+  dt: number,
+  alpha: number,
+): Vec3 | null {
+  const linear = interpolatePosition(current, next, alpha);
+  if (
+    !current ||
+    !next ||
+    !currentVelocity ||
+    !nextVelocity ||
+    dt <= 0 ||
+    alpha <= 0 ||
+    alpha >= 1
+  ) {
+    return linear;
+  }
+
+  const s = alpha;
+  const s2 = s * s;
+  const s3 = s2 * s;
+  const h00 = 2 * s3 - 3 * s2 + 1;
+  const h10 = s3 - 2 * s2 + s;
+  const h01 = -2 * s3 + 3 * s2;
+  const h11 = s3 - s2;
+
+  const hermiteAxis = (p0: number, p1: number, v0: number, v1: number): number =>
+    h00 * p0 + h10 * v0 * dt + h01 * p1 + h11 * v1 * dt;
+
+  const result = {
+    x: hermiteAxis(current.x, next.x, currentVelocity.x, nextVelocity.x),
+    y: hermiteAxis(current.y, next.y, currentVelocity.y, nextVelocity.y),
+    z: hermiteAxis(current.z, next.z, currentVelocity.z, nextVelocity.z),
+  };
+
+  // Guard against pathological tangents (e.g. a units mismatch between position
+  // and velocity): if the curve swings far past the straight-line segment, the
+  // tangents are untrustworthy, so prefer the linear result.
+  if (linear) {
+    const dx = result.x - linear.x;
+    const dy = result.y - linear.y;
+    const dz = result.z - linear.z;
+    const deviationSq = dx * dx + dy * dy + dz * dz;
+    const sx = next.x - current.x;
+    const sy = next.y - current.y;
+    const sz = next.z - current.z;
+    const segmentSq = sx * sx + sy * sy + sz * sz;
+    if (deviationSq > segmentSq) {
+      return linear;
+    }
+  }
+
+  return result;
+}
+
 export function interpolateQuaternion(
   current: Quaternion | null,
   next: Quaternion | null,
@@ -149,6 +218,42 @@ export function updateFreeCameraTransition(options: {
   return true;
 }
 
+type PlayerFrame = ReplayModel["players"][number]["frames"][number];
+
+// Build a frame whose geometric fields (position/orientation/velocity) are
+// interpolated between two replay samples, mirroring how the car mesh itself is
+// rendered. Without this the camera chases a discrete, stair-stepped target
+// while the car glides smoothly, which reads as jitter in the viewport.
+function interpolateCameraFrame(
+  frame: PlayerFrame,
+  nextFrame: PlayerFrame | null | undefined,
+  dt: number,
+  alpha: number,
+): PlayerFrame {
+  if (!nextFrame || alpha <= 0 || nextFrame.isPresent === false || !nextFrame.position) {
+    return frame;
+  }
+
+  return {
+    ...frame,
+    position:
+      interpolatePositionHermite(
+        frame.position ?? null,
+        nextFrame.position,
+        frame.linearVelocity ?? null,
+        nextFrame.linearVelocity ?? null,
+        dt,
+        alpha,
+      ) ?? frame.position,
+    forward:
+      interpolatePosition(frame.forward ?? null, nextFrame.forward ?? null, alpha) ?? frame.forward,
+    up: interpolatePosition(frame.up ?? null, nextFrame.up ?? null, alpha) ?? frame.up,
+    linearVelocity:
+      interpolatePosition(frame.linearVelocity ?? null, nextFrame.linearVelocity ?? null, alpha) ??
+      frame.linearVelocity,
+  };
+}
+
 function getOrientationVectors(frame: ReplayModel["players"][number]["frames"][number]): {
   forward: THREE.Vector3;
   up: THREE.Vector3;
@@ -196,6 +301,9 @@ export function updateAttachedCamera(options: {
   cameraDistanceScale: number;
   customCameraSettings: CameraSettings | null;
   frameIndex: number;
+  nextFrameIndex: number;
+  alpha: number;
+  dt: number;
   attachedPlayerUnavailable?: boolean;
   ballPosition: THREE.Vector3 | null;
   desiredCameraPosition: THREE.Vector3;
@@ -213,6 +321,9 @@ export function updateAttachedCamera(options: {
     attachedPlayerUnavailable = false,
     fieldScale,
     frameIndex,
+    nextFrameIndex,
+    alpha,
+    dt,
     replay,
     sceneState,
   } = options;
@@ -255,8 +366,11 @@ export function updateAttachedCamera(options: {
 
   controls.enabled = false;
 
-  const basePosition = worldPosition(frame.position, fieldScale);
-  const orientation = getOrientationVectors(frame);
+  const nextFrame = attachedPlayer.frames[nextFrameIndex] ?? frame;
+  const renderFrame = interpolateCameraFrame(frame, nextFrame, dt, alpha);
+
+  const basePosition = worldPosition(renderFrame.position ?? frame.position, fieldScale);
+  const orientation = getOrientationVectors(renderFrame);
   const forward = orientation?.forward ?? DEFAULT_FORWARD.clone();
   const right = orientation?.right ?? new THREE.Vector3(0, 1, 0);
 

@@ -2,11 +2,15 @@ use super::*;
 
 const DISTINCT_TOUCH_GAP_SECONDS: f32 = 0.12;
 const MAX_TOUCH_CHAIN_GAP_SECONDS: f32 = 2.50;
-const CLOSE_DISTANCE_3D: f32 = 700.0;
-const MIN_CLOSE_DURATION_SECONDS: f32 = 0.75;
-const MIN_EPISODE_DURATION_SECONDS: f32 = 1.00;
-const MIN_FIRST_TO_LAST_TOUCH_DURATION_SECONDS: f32 = 1.00;
-const MIN_TOUCHES: u32 = 2;
+// Shared with the player_possession span stream's `sustained_control` label so
+// the two notions of "deliberate on-ball play" stay in lockstep; the plan is
+// for controlled_play to eventually become a projection of labeled
+// player_possession spans.
+pub(crate) const CLOSE_DISTANCE_3D: f32 = 700.0;
+pub(crate) const MIN_CLOSE_DURATION_SECONDS: f32 = 0.75;
+pub(crate) const MIN_EPISODE_DURATION_SECONDS: f32 = 1.00;
+pub(crate) const MIN_FIRST_TO_LAST_TOUCH_DURATION_SECONDS: f32 = 1.00;
+pub(crate) const MIN_TOUCHES: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]

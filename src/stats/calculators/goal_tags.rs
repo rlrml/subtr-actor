@@ -129,6 +129,16 @@ pub struct GoalTagEventRef {
     pub index: usize,
 }
 
+/// A small categorical descriptor copied from the mechanic event that
+/// produced a goal tag (e.g. a flick goal's flick `kind`), so consumers can
+/// surface mechanic flavor without dereferencing `related_events`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct GoalTagDetail {
+    pub key: String,
+    pub value: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalTagMetadata {
@@ -139,6 +149,8 @@ pub struct GoalTagMetadata {
     pub modifiers: Vec<GoalTagModifier>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub related_events: Vec<GoalTagEventRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub details: Vec<GoalTagDetail>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<GoalTagEvidence>,
 }
@@ -1276,6 +1288,7 @@ impl PassingGoalCalculator {
                     stream: GoalTagEventStream::Pass,
                     index: event_index,
                 }],
+                Vec::new(),
             ));
         }
         tags
@@ -1393,6 +1406,7 @@ impl FlipIntoBallGoalCalculator {
                     stream: GoalTagEventStream::Touch,
                     index: event_index,
                 }],
+                Vec::new(),
             ));
         }
         tags
@@ -1484,6 +1498,7 @@ impl BumpGoalCalculator {
                     stream: GoalTagEventStream::Bump,
                     index: event_index,
                 }],
+                Vec::new(),
             ));
         }
         tags
@@ -1544,6 +1559,7 @@ impl DemoGoalCalculator {
                     stream: GoalTagEventStream::Demo,
                     index: event_index,
                 }],
+                Vec::new(),
             ));
         }
         tags
@@ -1587,6 +1603,7 @@ impl HalfVolleyGoalCalculator {
                     stream: GoalTagEventStream::HalfVolley,
                     index: candidate_index,
                 }],
+                Vec::new(),
             ));
         }
         tags
@@ -1697,6 +1714,12 @@ trait GoalMechanicPointEvent {
             index,
         }
     }
+
+    /// Categorical descriptors copied onto the goal tag so consumers can show
+    /// mechanic flavor (e.g. reverse flick) without resolving `related_events`.
+    fn goal_tag_details(&self) -> Vec<GoalTagDetail> {
+        Vec::new()
+    }
 }
 
 impl GoalMechanicPointEvent for FlickEvent {
@@ -1726,6 +1749,20 @@ impl GoalMechanicPointEvent for FlickEvent {
 
     fn event_stream(&self) -> GoalTagEventStream {
         GoalTagEventStream::Flick
+    }
+
+    fn goal_tag_details(&self) -> Vec<GoalTagDetail> {
+        let mut details = vec![GoalTagDetail {
+            key: "kind".to_owned(),
+            value: self.kind.clone(),
+        }];
+        if self.setup_rotation_direction != FlickSetupRotationDirection::Unknown.as_label_value() {
+            details.push(GoalTagDetail {
+                key: "setup_rotation_direction".to_owned(),
+                value: self.setup_rotation_direction.clone(),
+            });
+        }
+        details
     }
 }
 

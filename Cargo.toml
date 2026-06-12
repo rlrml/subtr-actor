@@ -3,14 +3,14 @@ members = [".", "bakkesmod/rust", "crates/subtr-actor-tools", "js", "python"]
 resolver = "2"
 
 [workspace.package]
-version = "0.12.0"
+version = "1.0.0"
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/rlrml/subtr-actor"
 edition = "2021"
 
 [workspace.dependencies]
-boxcars = ">=0.11.1, <1.0.0"
+boxcars = ">=0.11.3, <1.0.0"
 
 [package]
 name = "subtr-actor"
@@ -55,14 +55,3 @@ repository = "rlrml/subtr-actor"
 
 [badges.maintenance]
 status = "actively-developed"
-
-# A recent Rocket League update (World Cup event ball + player-name
-# anonymization) added network objects that boxcars 0.11.1 cannot decode,
-# which makes `must_parse_network_data()` fail on affected replays. Until the
-# fix lands in an upstream boxcars release, point standalone builds at the
-# patched fork. (Cargo ignores this section when subtr-actor is consumed as a
-# dependency and strips it on publish, so the crates.io version range above is
-# what downstream consumers still resolve.)
-# See https://github.com/colonelpanic8/boxcars/tree/fix/worldcup-ball
-[patch.crates-io]
-boxcars = { git = "https://github.com/colonelpanic8/boxcars.git", rev = "36598aa6db6ff9248502f9f762139ed3bdd94a34" }

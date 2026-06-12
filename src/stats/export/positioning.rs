@@ -120,12 +120,6 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "time_closest_to_ball",
-            StatUnit::Seconds,
-            self.time_closest_to_ball,
-        ));
-        visitor(ExportedStat::float(
-            "positioning",
             "time_closest_to_ball_team",
             StatUnit::Seconds,
             self.time_closest_to_ball_team,
@@ -216,12 +210,6 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "percent_closest_to_ball",
-            StatUnit::Percent,
-            self.closest_to_ball_pct(),
-        ));
-        visitor(ExportedStat::float(
-            "positioning",
             "percent_closest_to_ball_team",
             StatUnit::Percent,
             self.closest_to_ball_team_pct(),
@@ -251,12 +239,6 @@ impl StatFieldProvider for PositioningTeamStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
-            "time_closest_to_ball",
-            StatUnit::Seconds,
-            self.time_closest_to_ball,
-        ));
-        visitor(ExportedStat::float(
-            "positioning",
             "time_closest_to_ball_team",
             StatUnit::Seconds,
             self.time_closest_to_ball_team,
@@ -266,12 +248,6 @@ impl StatFieldProvider for PositioningTeamStats {
             "time_closest_to_ball_absolute",
             StatUnit::Seconds,
             self.time_closest_to_ball_absolute,
-        ));
-        visitor(ExportedStat::float(
-            "positioning",
-            "percent_closest_to_ball",
-            StatUnit::Percent,
-            self.closest_to_ball_pct(),
         ));
         visitor(ExportedStat::float(
             "positioning",

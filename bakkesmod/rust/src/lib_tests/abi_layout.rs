@@ -530,6 +530,7 @@ fn goal_tag(kind: GoalTagKind) -> GoalTag {
             performer: None,
             modifiers: Vec::new(),
             related_events: Vec::new(),
+            details: Vec::new(),
             evidence: Vec::new(),
         },
     )
@@ -563,6 +564,7 @@ fn goal_context_event(frame: usize, time: f32) -> GoalContextEvent {
         ball_air_time_before_goal: Some(1.25),
         ball_speed_at_goal: None,
         pressure_duration_before_goal: None,
+        time_after_kickoff: None,
         goal_buildup: GoalBuildupKind::CounterAttack,
         scorer_last_touch: None,
         players: Vec::new(),

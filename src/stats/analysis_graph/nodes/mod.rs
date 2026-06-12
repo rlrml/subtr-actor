@@ -12,10 +12,10 @@ use crate::stats::calculators::{
     KickoffGoalCalculator, LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator,
     MovementCalculator, MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator,
     OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerFrameState,
-    PlayerVerticalState, PositioningCalculator, PossessionCalculator, PossessionState,
-    PowerslideCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
-    TerritorialPressureCalculator, TouchCalculator, TouchState, WallAerialCalculator,
-    WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
+    PlayerPossessionCalculator, PlayerVerticalState, PositioningCalculator, PossessionCalculator,
+    PossessionState, PowerslideCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
+    SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchCalculator, TouchState,
+    WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -50,6 +50,7 @@ pub(crate) mod musty_flick;
 pub(crate) mod one_timer;
 pub(crate) mod pass;
 pub(crate) mod player_frame_state;
+pub(crate) mod player_possession;
 pub(crate) mod player_vertical_state;
 pub(crate) mod positioning;
 pub(crate) mod possession;
@@ -139,6 +140,8 @@ pub use one_timer::OneTimerNode;
 pub use pass::PassNode;
 #[allow(unused_imports)]
 pub use player_frame_state::PlayerFrameStateNode;
+#[allow(unused_imports)]
+pub use player_possession::PlayerPossessionNode;
 #[allow(unused_imports)]
 pub use player_vertical_state::PlayerVerticalStateNode;
 #[allow(unused_imports)]
@@ -276,6 +279,12 @@ pub(crate) fn counter_attack_goal_dependency() -> AnalysisDependency {
     )
 }
 
+pub(crate) fn sustained_pressure_goal_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<SustainedPressureGoalCalculator>(
+        goal_tags::boxed_sustained_pressure_goal,
+    )
+}
+
 pub(crate) fn flick_goal_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<FlickGoalCalculator>(goal_tags::boxed_flick_goal)
 }
@@ -350,6 +359,10 @@ pub(crate) fn fifty_fifty_dependency() -> AnalysisDependency {
 
 pub(crate) fn possession_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<PossessionCalculator>(possession::boxed_default)
+}
+
+pub(crate) fn player_possession_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<PlayerPossessionCalculator>(player_possession::boxed_default)
 }
 
 pub(crate) fn ball_half_dependency() -> AnalysisDependency {

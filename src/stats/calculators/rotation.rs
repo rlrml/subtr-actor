@@ -38,6 +38,10 @@ impl RoleState {
     }
 }
 
+/// Depth relative to the play, used to tag touches with the toucher's rotation
+/// context. This is no longer emitted as its own event stream — the unified
+/// `ball_depth` positioning facet covers depth spans on the timeline — but the
+/// rotation calculator still computes it per frame for touch classification.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -68,111 +72,15 @@ impl PlayDepthState {
     }
 }
 
+/// A span of game time during which a player held one rotation role. Spans are
+/// only emitted while rotation tracking is active (live play, full 2v2/3v3
+/// rosters), so they never carry [`RoleState::Unknown`].
+pub type RotationRoleEvent = PlayerStateSpan<RoleState>;
+
+/// The debounced first man for a team changed from one player to another.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
-pub struct RotationPlayerEvent {
-    pub time: f32,
-    pub frame: usize,
-    pub end_time: f32,
-    pub end_frame: usize,
-    pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-    pub active: bool,
-    pub current_role_state: RoleState,
-    pub current_depth_state: PlayDepthState,
-}
-
-impl RotationPlayerEvent {
-    fn new(
-        frame: &FrameInfo,
-        player: PlayerId,
-        player_position: Option<[f32; 3]>,
-        is_team_0: bool,
-        active: bool,
-        current_role_state: RoleState,
-        current_depth_state: PlayDepthState,
-    ) -> Self {
-        Self {
-            time: frame.time,
-            frame: frame.frame_number,
-            end_time: frame.time,
-            end_frame: frame.frame_number,
-            duration: 0.0,
-            player,
-            player_position,
-            is_team_0,
-            active,
-            current_role_state,
-            current_depth_state,
-        }
-    }
-
-    fn has_delta(&self) -> bool {
-        self.duration != 0.0
-    }
-
-    fn absorb_delta(&mut self, delta: Self) {
-        self.end_time = delta.time;
-        self.end_frame = delta.frame;
-        self.duration += delta.duration;
-        self.player_position = delta.player_position;
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct RotationRoleSpanEvent {
-    pub time: f32,
-    pub frame: usize,
-    pub end_time: f32,
-    pub end_frame: usize,
-    pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-    pub current_role_state: RoleState,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct RotationDepthSpanEvent {
-    pub time: f32,
-    pub frame: usize,
-    pub end_time: f32,
-    pub end_frame: usize,
-    pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-    pub current_depth_state: PlayDepthState,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct RotationFirstManStintEvent {
-    pub time: f32,
-    pub frame: usize,
-    pub end_time: f32,
-    pub end_frame: usize,
-    pub duration: f32,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
-    pub player: PlayerId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player_position: Option<[f32; 3]>,
-    pub is_team_0: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct RotationTeamEvent {
+pub struct FirstManChangeEvent {
     pub time: f32,
     pub frame: usize,
     pub is_team_0: bool,
@@ -187,6 +95,7 @@ pub struct RotationCalculatorConfig {
     pub role_depth_margin: f32,
     pub first_man_ambiguity_margin: f32,
     pub first_man_debounce_seconds: f32,
+    pub first_man_stint_end_grace_seconds: f32,
 }
 
 impl Default for RotationCalculatorConfig {
@@ -195,6 +104,7 @@ impl Default for RotationCalculatorConfig {
             role_depth_margin: DEFAULT_ROLE_DEPTH_MARGIN,
             first_man_ambiguity_margin: DEFAULT_FIRST_MAN_AMBIGUITY_MARGIN,
             first_man_debounce_seconds: DEFAULT_FIRST_MAN_DEBOUNCE_SECONDS,
+            first_man_stint_end_grace_seconds: DEFAULT_FIRST_MAN_STINT_END_GRACE_SECONDS,
         }
     }
 }
@@ -260,38 +170,14 @@ impl TeamFirstManTracker {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct RotationPlayerEventState {
-    active: bool,
-    current_role_state: RoleState,
-    current_depth_state: PlayDepthState,
-}
-
-impl Default for RotationPlayerEventState {
-    fn default() -> Self {
-        Self {
-            active: false,
-            current_role_state: RoleState::Unknown,
-            current_depth_state: PlayDepthState::Unknown,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct PendingRotationPlayerEvent {
-    state: RotationPlayerEventState,
-    event: RotationPlayerEvent,
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct RotationCalculator {
     config: RotationCalculatorConfig,
     team_zero_tracker: TeamFirstManTracker,
     team_one_tracker: TeamFirstManTracker,
-    player_events: EventStream<RotationPlayerEvent>,
-    team_events: EventStream<RotationTeamEvent>,
-    last_emitted_player_states: HashMap<PlayerId, RotationPlayerEventState>,
-    pending_player_events: HashMap<PlayerId, PendingRotationPlayerEvent>,
+    role_spans: PlayerSpanTracker<RoleState>,
+    first_man_changes: EventStream<FirstManChangeEvent>,
+    current_states: HashMap<PlayerId, (RoleState, PlayDepthState)>,
 }
 
 impl RotationCalculator {
@@ -310,66 +196,32 @@ impl RotationCalculator {
         &self.config
     }
 
-    pub fn player_events(&self) -> &[RotationPlayerEvent] {
-        self.player_events.all()
+    pub fn role_events(&self) -> Vec<RotationRoleEvent> {
+        self.role_spans.projected_events()
     }
 
-    pub fn new_player_events(&self) -> &[RotationPlayerEvent] {
-        self.player_events.new_events()
+    pub fn first_man_change_events(&self) -> &[FirstManChangeEvent] {
+        self.first_man_changes.all()
     }
 
-    pub fn projected_player_events(&self) -> Vec<RotationPlayerEvent> {
-        let mut events = self.player_events.all().to_vec();
-        let mut pending = self
-            .pending_player_events
-            .iter()
-            .map(|(player, pending)| (player.clone(), pending.event.clone()))
-            .collect::<Vec<_>>();
-        pending.sort_by(|(left, _), (right, _)| format!("{left:?}").cmp(&format!("{right:?}")));
-        events.extend(pending.into_iter().map(|(_, event)| event));
-        events
+    /// Role spans closed during the current frame's update.
+    pub fn new_role_events(&self) -> &[RotationRoleEvent] {
+        self.role_spans.new_events()
     }
 
-    pub fn role_span_events(&self) -> Vec<RotationRoleSpanEvent> {
-        rotation_role_span_events(self.player_events())
-    }
-
-    pub fn depth_span_events(&self) -> Vec<RotationDepthSpanEvent> {
-        rotation_depth_span_events(self.player_events())
-    }
-
-    pub fn first_man_stint_events(&self) -> Vec<RotationFirstManStintEvent> {
-        rotation_first_man_stint_events(self.player_events())
-    }
-
-    pub fn flush_pending_player_events(&mut self) {
-        let mut pending = self.pending_player_events.drain().collect::<Vec<_>>();
-        pending.sort_by(|(left, _), (right, _)| format!("{left:?}").cmp(&format!("{right:?}")));
-        self.player_events
-            .extend(pending.into_iter().map(|(_, pending)| pending.event));
-    }
-
-    pub fn team_events(&self) -> &[RotationTeamEvent] {
-        self.team_events.all()
-    }
-
-    pub fn new_team_events(&self) -> &[RotationTeamEvent] {
-        self.team_events.new_events()
-    }
-
-    fn current_player_state(&self, player_id: &PlayerId) -> RotationPlayerEventState {
-        self.last_emitted_player_states
-            .get(player_id)
-            .copied()
-            .unwrap_or_default()
+    /// Close every open role span so the projected event stream is final.
+    pub fn flush_pending_events(&mut self) {
+        self.role_spans.close_all();
     }
 
     /// The rotation role and play-depth the player currently holds, as of the
     /// most recently processed frame. Used by downstream consumers (e.g. touch
     /// classification) to tag events with the toucher's rotation context.
     pub fn current_role_and_depth(&self, player_id: &PlayerId) -> (RoleState, PlayDepthState) {
-        let state = self.current_player_state(player_id);
-        (state.current_role_state, state.current_depth_state)
+        self.current_states
+            .get(player_id)
+            .copied()
+            .unwrap_or_default()
     }
 
     pub fn update(
@@ -381,21 +233,21 @@ impl RotationCalculator {
         events: &FrameEventsState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
-        self.player_events.begin_update();
-        self.team_events.begin_update();
+        self.role_spans.begin_update();
+        self.first_man_changes.begin_update();
         if frame.dt == 0.0 {
             return Ok(());
         }
 
         let Some(ball) = ball.sample() else {
             self.reset_trackers();
-            self.emit_inactive_player_events(frame, players);
+            self.role_spans.close_all();
             return Ok(());
         };
 
         if !live_play_state.is_live_play || !events.goal_events.is_empty() {
             self.reset_trackers();
-            self.emit_inactive_player_events(frame, players);
+            self.role_spans.close_all();
             return Ok(());
         }
 
@@ -426,95 +278,9 @@ impl RotationCalculator {
         Ok(())
     }
 
-    fn emit_inactive_player_events(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
-        for player in &players.players {
-            let current_state = self.current_player_state(&player.player_id);
-            self.emit_player_event_if_changed(
-                frame,
-                &player.player_id,
-                player.position().map(|position| position.to_array()),
-                player.is_team_0,
-                false,
-                current_state.current_role_state,
-                current_state.current_depth_state,
-                0.0,
-            );
-        }
-    }
-
     fn reset_trackers(&mut self) {
         self.team_zero_tracker.reset();
         self.team_one_tracker.reset();
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn emit_player_event_if_changed(
-        &mut self,
-        frame: &FrameInfo,
-        player_id: &PlayerId,
-        player_position: Option<[f32; 3]>,
-        is_team_0: bool,
-        active: bool,
-        current_role_state: RoleState,
-        current_depth_state: PlayDepthState,
-        duration: f32,
-    ) {
-        let state = RotationPlayerEventState {
-            active,
-            current_role_state,
-            current_depth_state,
-        };
-        let state_changed = self.last_emitted_player_states.get(player_id) != Some(&state);
-        let mut event = RotationPlayerEvent::new(
-            frame,
-            player_id.clone(),
-            player_position,
-            is_team_0,
-            active,
-            current_role_state,
-            current_depth_state,
-        );
-        event.duration = duration;
-        if !state_changed && !event.has_delta() {
-            return;
-        }
-        self.record_player_event(state, event);
-        self.last_emitted_player_states
-            .insert(player_id.clone(), state);
-    }
-
-    fn record_player_event(&mut self, state: RotationPlayerEventState, event: RotationPlayerEvent) {
-        let player = event.player.clone();
-        let Some(pending) = self.pending_player_events.get_mut(&player) else {
-            self.pending_player_events.insert(
-                player,
-                PendingRotationPlayerEvent {
-                    state,
-                    event: Self::new_pending_player_event(event),
-                },
-            );
-            return;
-        };
-
-        if pending.state == state {
-            pending.event.absorb_delta(event);
-        } else {
-            let previous = self.pending_player_events.insert(
-                player,
-                PendingRotationPlayerEvent {
-                    state,
-                    event: Self::new_pending_player_event(event),
-                },
-            );
-            let Some(previous) = previous else {
-                return;
-            };
-            self.player_events.push(previous.event);
-        }
-    }
-
-    fn new_pending_player_event(event: RotationPlayerEvent) -> RotationPlayerEvent {
-        event
     }
 
     fn update_team(
@@ -535,13 +301,14 @@ impl RotationCalculator {
             .current_in_game_team_player_count(is_team_0)
             .max(present_team_count);
 
-        let team_players: Vec<_> = players
+        let mut team_players: Vec<_> = players
             .players
             .iter()
             .filter(|player| player.is_team_0 == is_team_0)
             .filter(|player| !demoed_players.contains(&player.player_id))
             .filter_map(|player| player.position().map(|position| (player, position)))
             .collect();
+        team_players.sort_by_key(|(player, _)| format!("{:?}", player.player_id));
 
         if !(2..=3).contains(&team_size) || team_players.len() != team_size {
             self.team_tracker_mut(is_team_0).reset();
@@ -550,19 +317,12 @@ impl RotationCalculator {
                 .iter()
                 .filter(|player| player.is_team_0 == is_team_0)
             {
-                let current_depth_state = self
-                    .current_player_state(&player.player_id)
-                    .current_depth_state;
-                self.emit_player_event_if_changed(
-                    frame,
-                    &player.player_id,
-                    player.position().map(|position| position.to_array()),
-                    player.is_team_0,
-                    false,
-                    RoleState::Unknown,
-                    current_depth_state,
-                    0.0,
-                );
+                self.role_spans.close(&player.player_id);
+                let state = self
+                    .current_states
+                    .entry(player.player_id.clone())
+                    .or_default();
+                state.0 = RoleState::Unknown;
             }
             return;
         }
@@ -586,14 +346,14 @@ impl RotationCalculator {
             self.team_tracker_mut(is_team_0)
                 .update(raw_first_man, frame.dt, debounce_seconds);
         if let Some((previous, next)) = change {
-            let event = RotationTeamEvent {
+            let event = FirstManChangeEvent {
                 time: frame.time,
                 frame: frame.frame_number,
                 is_team_0,
                 previous_first_man: previous,
                 next_first_man: next,
             };
-            self.team_events.push(event);
+            self.first_man_changes.push(event);
         }
 
         let stable_first_man = raw_first_man
@@ -612,16 +372,18 @@ impl RotationCalculator {
                 ball_position,
                 self.config.role_depth_margin,
             );
-            self.emit_player_event_if_changed(
-                frame,
+            self.role_spans.record(
+                frame.frame_number,
+                frame.time - frame.dt,
+                frame.time,
+                frame.dt,
                 &player.player_id,
                 player.position().map(|position| position.to_array()),
                 player.is_team_0,
-                true,
                 role_state,
-                depth_state,
-                frame.dt,
             );
+            self.current_states
+                .insert(player.player_id.clone(), (role_state, depth_state));
         }
     }
 
@@ -705,190 +467,6 @@ fn play_depth_state(
     } else {
         PlayDepthState::LevelWithPlay
     }
-}
-
-fn rotation_events_by_player(events: &[RotationPlayerEvent]) -> Vec<Vec<&RotationPlayerEvent>> {
-    let mut by_player = HashMap::<PlayerId, Vec<&RotationPlayerEvent>>::new();
-    for event in events {
-        by_player
-            .entry(event.player.clone())
-            .or_default()
-            .push(event);
-    }
-    let mut groups = by_player.into_values().collect::<Vec<_>>();
-    for group in &mut groups {
-        group.sort_by(|left, right| {
-            left.time
-                .partial_cmp(&right.time)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| left.frame.cmp(&right.frame))
-        });
-    }
-    groups.sort_by(|left, right| {
-        format!("{:?}", left[0].player).cmp(&format!("{:?}", right[0].player))
-    });
-    groups
-}
-
-fn rotation_role_span_events(events: &[RotationPlayerEvent]) -> Vec<RotationRoleSpanEvent> {
-    let mut derived = Vec::new();
-    for group in rotation_events_by_player(events) {
-        let mut current: Option<RotationRoleSpanEvent> = None;
-        for event in group {
-            if !event.active || event.duration <= 0.0 {
-                if let Some(span) = current.take() {
-                    derived.push(span);
-                }
-                continue;
-            }
-            if let Some(span) = current.as_mut() {
-                if span.current_role_state == event.current_role_state {
-                    span.end_time = event.end_time;
-                    span.end_frame = event.end_frame;
-                    span.duration += event.duration;
-                    span.player_position = event.player_position;
-                    continue;
-                }
-                derived.push(current.take().expect("current role span"));
-            }
-            current = Some(RotationRoleSpanEvent {
-                time: event.time,
-                frame: event.frame,
-                end_time: event.end_time,
-                end_frame: event.end_frame,
-                duration: event.duration,
-                player: event.player.clone(),
-                player_position: event.player_position,
-                is_team_0: event.is_team_0,
-                current_role_state: event.current_role_state,
-            });
-        }
-        if let Some(span) = current {
-            derived.push(span);
-        }
-    }
-    sort_rotation_role_spans(&mut derived);
-    derived
-}
-
-fn rotation_depth_span_events(events: &[RotationPlayerEvent]) -> Vec<RotationDepthSpanEvent> {
-    let mut derived = Vec::new();
-    for group in rotation_events_by_player(events) {
-        let mut current: Option<RotationDepthSpanEvent> = None;
-        for event in group {
-            if !event.active || event.duration <= 0.0 {
-                if let Some(span) = current.take() {
-                    derived.push(span);
-                }
-                continue;
-            }
-            if let Some(span) = current.as_mut() {
-                if span.current_depth_state == event.current_depth_state {
-                    span.end_time = event.end_time;
-                    span.end_frame = event.end_frame;
-                    span.duration += event.duration;
-                    span.player_position = event.player_position;
-                    continue;
-                }
-                derived.push(current.take().expect("current depth span"));
-            }
-            current = Some(RotationDepthSpanEvent {
-                time: event.time,
-                frame: event.frame,
-                end_time: event.end_time,
-                end_frame: event.end_frame,
-                duration: event.duration,
-                player: event.player.clone(),
-                player_position: event.player_position,
-                is_team_0: event.is_team_0,
-                current_depth_state: event.current_depth_state,
-            });
-        }
-        if let Some(span) = current {
-            derived.push(span);
-        }
-    }
-    sort_rotation_depth_spans(&mut derived);
-    derived
-}
-
-fn rotation_first_man_stint_events(
-    events: &[RotationPlayerEvent],
-) -> Vec<RotationFirstManStintEvent> {
-    let mut derived = Vec::new();
-    for group in rotation_events_by_player(events) {
-        let mut current: Option<RotationFirstManStintEvent> = None;
-        let mut non_first_man_seconds = 0.0;
-        for event in group {
-            if event.active
-                && event.current_role_state == RoleState::FirstMan
-                && event.duration > 0.0
-            {
-                if let Some(span) = current.as_mut() {
-                    span.end_time = event.end_time;
-                    span.end_frame = event.end_frame;
-                    span.duration += event.duration;
-                    span.player_position = event.player_position;
-                } else {
-                    current = Some(RotationFirstManStintEvent {
-                        time: event.time,
-                        frame: event.frame,
-                        end_time: event.end_time,
-                        end_frame: event.end_frame,
-                        duration: event.duration,
-                        player: event.player.clone(),
-                        player_position: event.player_position,
-                        is_team_0: event.is_team_0,
-                    });
-                }
-                non_first_man_seconds = 0.0;
-                continue;
-            }
-
-            if current.is_some() {
-                non_first_man_seconds += event.duration.max(0.0);
-                if non_first_man_seconds > DEFAULT_FIRST_MAN_STINT_END_GRACE_SECONDS {
-                    derived.push(current.take().expect("current first-man stint"));
-                    non_first_man_seconds = 0.0;
-                }
-            }
-        }
-        if let Some(span) = current {
-            derived.push(span);
-        }
-    }
-    sort_rotation_first_man_stints(&mut derived);
-    derived
-}
-
-fn sort_rotation_role_spans(events: &mut [RotationRoleSpanEvent]) {
-    events.sort_by(|left, right| {
-        left.time
-            .partial_cmp(&right.time)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| left.frame.cmp(&right.frame))
-            .then_with(|| format!("{:?}", left.player).cmp(&format!("{:?}", right.player)))
-    });
-}
-
-fn sort_rotation_depth_spans(events: &mut [RotationDepthSpanEvent]) {
-    events.sort_by(|left, right| {
-        left.time
-            .partial_cmp(&right.time)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| left.frame.cmp(&right.frame))
-            .then_with(|| format!("{:?}", left.player).cmp(&format!("{:?}", right.player)))
-    });
-}
-
-fn sort_rotation_first_man_stints(events: &mut [RotationFirstManStintEvent]) {
-    events.sort_by(|left, right| {
-        left.time
-            .partial_cmp(&right.time)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| left.frame.cmp(&right.frame))
-            .then_with(|| format!("{:?}", left.player).cmp(&format!("{:?}", right.player)))
-    });
 }
 
 #[cfg(test)]

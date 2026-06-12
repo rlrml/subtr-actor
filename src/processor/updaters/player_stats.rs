@@ -34,11 +34,23 @@ impl<'a> ReplayProcessor<'a> {
             let previous_value = self
                 .player_stat_counters
                 .get(&(player_id.clone(), kind))
-                .copied()
-                .unwrap_or(0);
-            let delta = new_value - previous_value;
+                .copied();
             self.player_stat_counters
                 .insert((player_id.clone(), kind), new_value);
+            // A counter replicated in the same frame its actor spawns carries
+            // the player's *current* total, not an increment: at match start
+            // that total is 0, while a mid-match respawn of the actor (player
+            // rejoin, or the synthetic keyframe of a replay clip) replays a
+            // stale total that must seed the baseline instead of emitting
+            // phantom events.
+            let actor_spawned_this_frame = frame
+                .new_actors
+                .iter()
+                .any(|new_actor| new_actor.actor_id == update.actor_id);
+            if previous_value.is_none() && actor_spawned_this_frame {
+                continue;
+            }
+            let delta = new_value - previous_value.unwrap_or(0);
             let shot = (kind == PlayerStatEventKind::Shot)
                 .then(|| self.shot_event_metadata(frame.time, &player_id, is_team_0))
                 .flatten();

@@ -443,8 +443,8 @@ fn test_core_events_reconstruct_serialized_partial_sums() {
         "expected core fixture to contain player scoreboard events"
     );
     assert!(
-        timeline_has_stream(&timeline, "core_player_goal_context"),
-        "expected core fixture to contain player goal-context events"
+        timeline_has_stream(&timeline, "goal_context"),
+        "expected core fixture to contain consolidated goal-context events"
     );
     assert_core_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
 }
@@ -507,7 +507,7 @@ fn test_positioning_events_reconstruct_final_serialized_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        timeline_has_stream(&timeline, "positioning_activity"),
+        timeline_has_stream(&timeline, "player_activity"),
         "expected positioning fixture to contain positioning events"
     );
     assert_positioning_events_reconstruct_final_serialized_sums(replay_path, &timeline);
@@ -523,7 +523,7 @@ fn test_rotation_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        timeline_has_stream(&timeline, "rotation_player"),
+        timeline_has_stream(&timeline, "rotation_role"),
         "expected rotation fixture to contain rotation player events"
     );
     assert_rotation_events_reconstruct_serialized_partial_sums(replay_path, &timeline);

@@ -284,23 +284,24 @@ export function getKickoffCountdownMetadata(
 export function getFrameWindow(
   replay: ReplayModel,
   time: number,
-): { frameIndex: number; nextFrameIndex: number; alpha: number } {
+): { frameIndex: number; nextFrameIndex: number; alpha: number; dt: number } {
   const frameIndex = findFrameIndexAtTime(replay, time);
   const nextFrameIndex = Math.min(frameIndex + 1, replay.frames.length - 1);
 
   if (nextFrameIndex === frameIndex) {
-    return { frameIndex, nextFrameIndex, alpha: 0 };
+    return { frameIndex, nextFrameIndex, alpha: 0, dt: 0 };
   }
 
   const startTime = replay.frames[frameIndex]?.time ?? 0;
   const endTime = replay.frames[nextFrameIndex]?.time ?? startTime;
   if (endTime <= startTime) {
-    return { frameIndex, nextFrameIndex, alpha: 0 };
+    return { frameIndex, nextFrameIndex, alpha: 0, dt: 0 };
   }
 
   return {
     frameIndex,
     nextFrameIndex,
     alpha: THREE.MathUtils.clamp((time - startTime) / (endTime - startTime), 0, 1),
+    dt: endTime - startTime,
   };
 }

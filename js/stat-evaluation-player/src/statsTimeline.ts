@@ -4,7 +4,6 @@ import type { BoostPickupEvent } from "./generated/BoostPickupEvent.ts";
 import type { RespawnEvent } from "./generated/RespawnEvent.ts";
 import type { BumpEvent } from "./generated/BumpEvent.ts";
 import type { CeilingShotEvent } from "./generated/CeilingShotEvent.ts";
-import type { CorePlayerGoalContextEvent } from "./generated/CorePlayerGoalContextEvent.ts";
 import type { CorePlayerScoreboardEvent } from "./generated/CorePlayerScoreboardEvent.ts";
 import type { DodgeResetEvent } from "./generated/DodgeResetEvent.ts";
 import type { DoubleTapEvent } from "./generated/DoubleTapEvent.ts";
@@ -27,11 +26,15 @@ import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
 import type { PassEvent } from "./generated/PassEvent.ts";
 import type { PlayerStatsSnapshot as GeneratedPlayerStatsSnapshot } from "./generated/PlayerStatsSnapshot.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
-import type { PositioningActivityEvent } from "./generated/PositioningActivityEvent.ts";
-import type { PositioningBallRelativeDepthEvent } from "./generated/PositioningBallRelativeDepthEvent.ts";
-import type { PositioningBallProximityEvent } from "./generated/PositioningBallProximityEvent.ts";
-import type { PositioningFieldZoneEvent } from "./generated/PositioningFieldZoneEvent.ts";
-import type { PositioningTeammateRoleEvent } from "./generated/PositioningTeammateRoleEvent.ts";
+import type { PlayerStateSpan } from "./generated/PlayerStateSpan.ts";
+import type { ActivityState } from "./generated/ActivityState.ts";
+import type { FieldThirdState } from "./generated/FieldThirdState.ts";
+import type { FieldHalfState } from "./generated/FieldHalfState.ts";
+import type { BallDepthState } from "./generated/BallDepthState.ts";
+import type { DepthRoleState } from "./generated/DepthRoleState.ts";
+import type { BallProximityState } from "./generated/BallProximityState.ts";
+import type { RoleState } from "./generated/RoleState.ts";
+import type { FirstManChangeEvent } from "./generated/FirstManChangeEvent.ts";
 import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
 import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
 import type { ReplayMeta } from "./generated/ReplayMeta.ts";
@@ -40,8 +43,6 @@ import type { ReplayStatsFrameScaffold } from "./generated/ReplayStatsFrameScaff
 import type { ReplayStatsTimeline } from "./generated/ReplayStatsTimeline.ts";
 import type { ReplayStatsTimelineScaffold } from "./generated/ReplayStatsTimelineScaffold.ts";
 import type { ReplayStatsTimelineEvents } from "./generated/ReplayStatsTimelineEvents.ts";
-import type { RotationPlayerEvent } from "./generated/RotationPlayerEvent.ts";
-import type { RotationTeamEvent } from "./generated/RotationTeamEvent.ts";
 import type { RushEvent } from "./generated/RushEvent.ts";
 import type { SpeedFlipEvent } from "./generated/SpeedFlipEvent.ts";
 import type { StatLabel } from "./generated/StatLabel.ts";
@@ -75,6 +76,13 @@ export type TeamStatsSnapshot = GeneratedTeamStatsSnapshot & { event_counts?: Ev
 export type PlayerStatsSnapshot = GeneratedPlayerStatsSnapshot & { event_counts?: EventCountStats };
 export type BackboardEvent = BackboardBounceEvent;
 export type RushTimelineEvent = RushEvent;
+export type PlayerActivityEvent = PlayerStateSpan<ActivityState>;
+export type FieldThirdEvent = PlayerStateSpan<FieldThirdState>;
+export type FieldHalfEvent = PlayerStateSpan<FieldHalfState>;
+export type BallDepthEvent = PlayerStateSpan<BallDepthState>;
+export type DepthRoleEvent = PlayerStateSpan<DepthRoleState>;
+export type BallProximityEvent = PlayerStateSpan<BallProximityState>;
+export type RotationRoleEvent = PlayerStateSpan<RoleState>;
 export interface StatsFrameLookup {
   get(frameNumber: number): StatsFrame | undefined;
 }
@@ -100,16 +108,18 @@ export type {
   OneTimerEvent,
   PassEvent,
   PossessionEvent,
-  PositioningActivityEvent,
-  PositioningBallRelativeDepthEvent,
-  PositioningBallProximityEvent,
-  PositioningFieldZoneEvent,
-  PositioningTeammateRoleEvent,
+  PlayerStateSpan,
+  ActivityState,
+  FieldThirdState,
+  FieldHalfState,
+  BallDepthState,
+  DepthRoleState,
+  BallProximityState,
+  RoleState,
+  FirstManChangeEvent,
   BallHalfEvent,
   PowerslideEvent,
   ReplayMeta,
-  RotationPlayerEvent,
-  RotationTeamEvent,
   RushEvent,
   SpeedFlipEvent,
   StatLabel,
@@ -126,7 +136,6 @@ export type {
   BoostPickupEvent,
   RespawnEvent,
   BumpEvent,
-  CorePlayerGoalContextEvent,
   CorePlayerScoreboardEvent,
   DodgeResetEvent,
 };
