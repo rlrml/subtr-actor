@@ -10,7 +10,7 @@ repository = "https://github.com/rlrml/subtr-actor"
 edition = "2021"
 
 [workspace.dependencies]
-boxcars = ">=0.11.1, <1.0.0"
+boxcars = ">=0.11.3, <1.0.0"
 
 [package]
 name = "subtr-actor"
@@ -55,23 +55,3 @@ repository = "rlrml/subtr-actor"
 
 [badges.maintenance]
 status = "actively-developed"
-
-# A recent Rocket League update (World Cup event ball + player-name
-# anonymization) added network objects that boxcars 0.11.1 cannot decode,
-# which makes `must_parse_network_data()` fail on affected replays. Until the
-# fix lands in an upstream boxcars release, point standalone builds at the
-# patched fork. (Cargo ignores this section when subtr-actor is consumed as a
-# dependency and strips it on publish, so the crates.io version range above is
-# what downstream consumers still resolve.)
-# See https://github.com/colonelpanic8/boxcars/tree/frame-deserialize-and-pickup-timer-attrs
-[patch.crates-io]
-# Integration branch combining two not-yet-released boxcars changes:
-#   - frame `Deserialize` support (nickbabcock/boxcars#284, stacked on #283)
-#     that `ReplayClip` fixtures need to read decoded frames back in
-#   - the June 2026 PickupTimer_TA item-timer attributes (Rumble-family
-#     replays) and PRI_TA name-anonymization flags (general privacy feature)
-#     from nickbabcock/boxcars#286
-# boxcars fails the whole network-data decode on any unmapped attribute, so
-# both must be present. Once #284 and #286 land in an upstream release this
-# pin can move off the fork.
-boxcars = { git = "https://github.com/colonelpanic8/boxcars.git", rev = "342509319b5aa725abe0bbcfdb8a1f7a7a70a26d" }
