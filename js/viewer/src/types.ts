@@ -199,6 +199,14 @@ export interface ViewerOptions {
   loop?: boolean;
   /** Boost/supersonic/ball trail effects (default true). */
   effects?: boolean;
+  /**
+   * Position interpolation between ~30Hz replay samples (default "hermite").
+   * "hermite" uses the replay's per-sample linear velocities as cubic tangents
+   * (C1-continuous, smooth through sample points, lerp fallback when velocity
+   * is missing/implausible); "linear" is plain lerp (piecewise-linear motion
+   * with a velocity discontinuity at every sample).
+   */
+  motionInterpolation?: "hermite" | "linear";
 
   // ── @rlrml/player-compatible initial settings (docs/PLAYER_PARITY.md). ──────
   /** Initial playback rate; wins over `speed` when both are set. */

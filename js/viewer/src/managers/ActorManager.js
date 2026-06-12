@@ -70,7 +70,13 @@ export class ActorManager {
 
         // Debug: Interpolation settings
         this.interpolationEnabled = true;
-        this.interpolationMethod = 'lerp';
+        // 'hermite' by default: replay samples are ~30Hz, and plain lerp gives
+        // piecewise-linear motion with a velocity discontinuity at every sample
+        // (reads as jitter at 60Hz+). Cubic Hermite uses the replay's per-sample
+        // linear velocities as tangents (C1-continuous), with a lerp fallback
+        // when velocity is missing or implausible — the same approach as
+        // @rlrml/player's interpolatePositionHermite.
+        this.interpolationMethod = 'hermite';
         this.smoothingWindowSize = 12;
         this.lastFrameInfo = null;
 
@@ -632,41 +638,6 @@ export class ActorManager {
             }
         }
         return Math.max(0, Math.min(low, timeline.length - 2));
-    }
-
-    /**
-     * Hermite interpolation using actual velocity data from replay
-     * This produces smooth motion that respects the physics of the game
-     * @param {Object} p0 - Start position {x, y, z}
-     * @param {Object} v0 - Start velocity {x, y, z}
-     * @param {Object} p1 - End position {x, y, z}
-     * @param {Object} v1 - End velocity {x, y, z}
-     * @param {number} t - Normalized time [0, 1]
-     * @param {number} dt - Time delta between keyframes (seconds)
-     * @returns {Object} Interpolated position {x, y, z}
-     */
-    _hermiteInterpolate(p0, v0, p1, v1, t, dt) {
-        // Scale velocities by dt for proper Hermite tangents
-        const m0x = v0.x * dt;
-        const m0y = v0.y * dt;
-        const m0z = v0.z * dt;
-        const m1x = v1.x * dt;
-        const m1y = v1.y * dt;
-        const m1z = v1.z * dt;
-
-        // Hermite basis functions
-        const t2 = t * t;
-        const t3 = t2 * t;
-        const h00 = 2 * t3 - 3 * t2 + 1;  // p0 coefficient
-        const h10 = t3 - 2 * t2 + t;       // m0 coefficient
-        const h01 = -2 * t3 + 3 * t2;      // p1 coefficient
-        const h11 = t3 - t2;               // m1 coefficient
-
-        return {
-            x: h00 * p0.x + h10 * m0x + h01 * p1.x + h11 * m1x,
-            y: h00 * p0.y + h10 * m0y + h01 * p1.y + h11 * m1y,
-            z: h00 * p0.z + h10 * m0z + h01 * p1.z + h11 * m1z
-        };
     }
 
     /**
@@ -1762,13 +1733,15 @@ export class ActorManager {
         const elapsed = currentTime - k0.time;
         const t = Math.max(0, Math.min(1, elapsed / dt)); // Clamp to [0, 1]
 
+        const linear = {
+            x: k0.position.x + (k1.position.x - k0.position.x) * t,
+            y: k0.position.y + (k1.position.y - k0.position.y) * t,
+            z: k0.position.z + (k1.position.z - k0.position.z) * t
+        };
+
         // If no velocity data, fall back to lerp
         if (!k0.velocity || !k1.velocity) {
-            return {
-                x: k0.position.x + (k1.position.x - k0.position.x) * t,
-                y: k0.position.y + (k1.position.y - k0.position.y) * t,
-                z: k0.position.z + (k1.position.z - k0.position.z) * t
-            };
+            return linear;
         }
 
         // Hermite basis functions
@@ -1793,11 +1766,26 @@ export class ActorManager {
             z: k1.velocity.z * dt
         };
 
-        return {
+        const pos = {
             x: h00 * k0.position.x + h10 * m0.x + h01 * k1.position.x + h11 * m1.x,
             y: h00 * k0.position.y + h10 * m0.y + h01 * k1.position.y + h11 * m1.y,
             z: h00 * k0.position.z + h10 * m0.z + h01 * k1.position.z + h11 * m1.z
         };
+
+        // Plausibility guard (mirrors @rlrml/player's interpolatePositionHermite):
+        // if the velocity-implied curve swings farther from the straight-line path
+        // than the segment is long (stale tangents around bounces/demos, units
+        // mismatch), fall back to lerp so hermite never looks worse than linear.
+        const dx = pos.x - linear.x;
+        const dy = pos.y - linear.y;
+        const dz = pos.z - linear.z;
+        const sx = k1.position.x - k0.position.x;
+        const sy = k1.position.y - k0.position.y;
+        const sz = k1.position.z - k0.position.z;
+        if (dx * dx + dy * dy + dz * dz > sx * sx + sy * sy + sz * sz) {
+            return linear;
+        }
+        return pos;
     }
 
     /**
@@ -2213,40 +2201,6 @@ export class ActorManager {
         }
 
         return pos;
-    }
-
-    /**
-     * Hermite cubic interpolation between two points using velocities as tangents
-     * This creates a smooth curve that passes through both points with the correct velocity
-     * @param {Object} p0 - Start position {x, y, z}
-     * @param {Object} p1 - End position {x, y, z}
-     * @param {Object} v0 - Start velocity {x, y, z}
-     * @param {Object} v1 - End velocity {x, y, z}
-     * @param {number} t - Normalized time [0, 1]
-     * @param {number} dt - Time delta between keyframes (seconds)
-     * @returns {Object} Interpolated position {x, y, z}
-     */
-    _hermiteInterpolate(p0, p1, v0, v1, t, dt) {
-        // Hermite basis functions
-        const t2 = t * t;
-        const t3 = t2 * t;
-
-        // h00(t) = 2t³ - 3t² + 1
-        // h10(t) = t³ - 2t² + t
-        // h01(t) = -2t³ + 3t²
-        // h11(t) = t³ - t²
-        const h00 = 2 * t3 - 3 * t2 + 1;
-        const h10 = t3 - 2 * t2 + t;
-        const h01 = -2 * t3 + 3 * t2;
-        const h11 = t3 - t2;
-
-        // Scale tangents by dt (velocity * time = displacement)
-        // The tangents need to be scaled by dt to convert velocity to position change
-        return {
-            x: h00 * p0.x + h10 * dt * v0.x + h01 * p1.x + h11 * dt * v1.x,
-            y: h00 * p0.y + h10 * dt * v0.y + h01 * p1.y + h11 * dt * v1.y,
-            z: h00 * p0.z + h10 * dt * v0.z + h01 * p1.z + h11 * dt * v1.z
-        };
     }
 
     /**

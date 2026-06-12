@@ -241,6 +241,9 @@ export class ViewerPlayer extends EventTarget {
     this.effectsEnabled = options.effects ?? true;
     this.effectsManager = this.effectsEnabled ? new EffectsManager(this.scene) : effectsStub;
     this.actorManager = new ActorManager(this.scene, this.effectsManager);
+    if (options.motionInterpolation) {
+      this.setMotionInterpolation(options.motionInterpolation);
+    }
     this.actorManager.initFromFramework(adapter);
     this.actorManager.initInterpolants(adapter.getTimelines());
     // Hitbox wireframes (driven by the hitboxWireframesEnabled /
@@ -332,6 +335,15 @@ export class ViewerPlayer extends EventTarget {
 
   setLoop(loop: boolean): void {
     this.loop = loop;
+  }
+
+  /**
+   * Switch position interpolation between replay samples (see
+   * ViewerOptions.motionInterpolation). Takes effect on the next rendered
+   * frame — handy for A/B-ing smoothness live.
+   */
+  setMotionInterpolation(method: "hermite" | "linear"): void {
+    this.actorManager.interpolationMethod = method === "linear" ? "lerp" : "hermite";
   }
 
   // ── Frame stepping (@rlrml/player parity, off the adapter's frame timeline) ──
