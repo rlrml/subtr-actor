@@ -76,18 +76,38 @@ export class ArenaManager {
             child.frustumCulled = false;
           }
 
-          // Force-field cage hexagons (FFCage_Full / Field_Center accents): the
-          // hex outlines are baked opaque geometry (not a texture), which reads
-          // far louder than the game's barely-there forcefield. Line width is
-          // modeled into the mesh so it can't be thinned directly — translucency
-          // (+ no depth write, so it never occludes gameplay) gets the subtle
-          // in-game look and makes the lines read thinner.
+          // Hexagon patterns render far louder here than the game's subtle
+          // originals. They're baked into the model (outline geometry for the
+          // force-field cage, a texture for the floor/out-of-bounds honeycomb),
+          // so line width can't be thinned directly.
+          //
+          // Force-field cage walls + center-circle accents (Hexagone_T0/T1):
+          // translucency (+ no depth write, so the cage never occludes gameplay)
+          // gets the barely-there in-game look and makes the lines read thinner.
           if (child.material && /^Hexagone_T[01]$/.test(child.material.name ?? '')) {
             child.material = child.material.clone();
             child.material.transparent = true;
             child.material.opacity = 0.18;
             child.material.depthWrite = false;
             child.renderOrder = 1;
+          }
+
+          // Field advert strip carries a baked ballcam.tv ad texture
+          // (bannière_pub material on AdvertStrip_Field) — hide the ad face and
+          // keep the AdvertStrip_Frame structure as a neutral board.
+          if (child.material && child.material.name === 'bannière_pub') {
+            child.visible = false;
+          }
+
+          // Floor hex overlay + OOB honeycomb apron (Sol_Hexagone): opacity is
+          // the wrong tool here — the floor stack has solid team-color layers
+          // underneath that show through. Instead dim the texture and drop the
+          // metallic sheen that makes the grid glow at glancing camera angles.
+          if (child.material && child.material.name === 'Sol_Hexagone') {
+            child.material = child.material.clone();
+            child.material.color.setScalar(0.35);
+            child.material.metalness = 0;
+            child.material.roughness = 1;
           }
 
           // Fix visibility issues (disappearing at certain angles)
