@@ -71,6 +71,13 @@ test("possession event derivation populates compacted team stats", () => {
   );
   assertClose(blueDefensive?.value, 0.1);
 
+  const blueDefensiveHalf = derived.frames[3]!.team_zero.possession.labeled_time?.entries.find(
+    (entry) =>
+      entry.labels.some((label) => label.key === "possession_state" && label.value === "own") &&
+      entry.labels.some((label) => label.key === "field_half" && label.value === "defensive_half"),
+  );
+  assertClose(blueDefensiveHalf?.value, 0.1);
+
   const orangeDefensive = derived.frames[3]!.team_one.possession.labeled_time?.entries.find(
     (entry) =>
       entry.labels.some((label) => label.key === "possession_state" && label.value === "own") &&
@@ -79,4 +86,11 @@ test("possession event derivation populates compacted team stats", () => {
       ),
   );
   assertClose(orangeDefensive?.value, 0.3);
+
+  const orangeDefensiveHalf = derived.frames[3]!.team_one.possession.labeled_time?.entries.find(
+    (entry) =>
+      entry.labels.some((label) => label.key === "possession_state" && label.value === "own") &&
+      entry.labels.some((label) => label.key === "field_half" && label.value === "defensive_half"),
+  );
+  assertClose(orangeDefensiveHalf?.value, 0.3);
 });

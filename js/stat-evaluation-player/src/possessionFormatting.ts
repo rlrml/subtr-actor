@@ -1,6 +1,6 @@
 import type { TeamStatsSnapshot } from "./statsTimeline.ts";
 
-export type PossessionBreakdownClass = "possession_state" | "field_third";
+export type PossessionBreakdownClass = "possession_state" | "field_third" | "field_half";
 
 interface PossessionRenderOptions {
   breakdownClasses?: PossessionBreakdownClass[];
@@ -131,6 +131,31 @@ function getOrderedFieldThirds(
   return ["defensive_third", "neutral_third", "offensive_third"];
 }
 
+function formatFieldHalfLabel(
+  value: string,
+  labelPerspective: PossessionRenderOptions["labelPerspective"],
+): string {
+  if (value === "neutral") {
+    return "Neutral";
+  }
+
+  if (labelPerspective.kind === "shared") {
+    return value === "defensive_half" ? "Blue half" : "Orange half";
+  }
+
+  return value === "defensive_half" ? "Own half" : "Opp half";
+}
+
+function getOrderedFieldHalves(
+  labelPerspective: PossessionRenderOptions["labelPerspective"],
+): string[] {
+  if (labelPerspective.kind === "shared") {
+    return ["defensive_half", "neutral", "offensive_half"];
+  }
+
+  return ["defensive_half", "neutral", "offensive_half"];
+}
+
 type PossessionBreakdownValueMap = Record<PossessionBreakdownClass, string>;
 
 function compareBreakdownValues(
@@ -143,7 +168,9 @@ function compareBreakdownValues(
     const valueOrder =
       className === "possession_state"
         ? getOrderedPossessionStates(labelPerspective)
-        : getOrderedFieldThirds(labelPerspective);
+        : className === "field_third"
+          ? getOrderedFieldThirds(labelPerspective)
+          : getOrderedFieldHalves(labelPerspective);
     const leftIndex = valueOrder.indexOf(left[className]);
     const rightIndex = valueOrder.indexOf(right[className]);
     const normalizedLeftIndex = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
@@ -164,7 +191,9 @@ function formatBreakdownLabel(
   const formatValue = (className: PossessionBreakdownClass, value: string): string =>
     className === "possession_state"
       ? formatPossessionStateLabel(value, labelPerspective)
-      : formatFieldThirdLabel(value, labelPerspective);
+      : className === "field_third"
+        ? formatFieldThirdLabel(value, labelPerspective)
+        : formatFieldHalfLabel(value, labelPerspective);
 
   if (classes.length === 1) {
     const className = classes[0]!;

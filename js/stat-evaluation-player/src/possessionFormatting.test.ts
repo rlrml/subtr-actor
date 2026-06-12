@@ -173,6 +173,52 @@ test("renderPossessionStats can render a field-third breakdown on its own", () =
   assert.match(html, /Orange third<\/span><span class="value">5\.0s \(50\.0%\)/);
 });
 
+test("renderPossessionStats can render a field-half breakdown", () => {
+  const html = renderPossessionStats(
+    {
+      tracked_time: 10,
+      possession_time: 4,
+      opponent_possession_time: 4,
+      neutral_time: 2,
+      labeled_time: {
+        entries: [
+          {
+            labels: [
+              { key: "possession_state", value: "own" },
+              { key: "field_half", value: "defensive_half" },
+            ],
+            value: 3,
+          },
+          {
+            labels: [
+              { key: "possession_state", value: "neutral" },
+              { key: "field_half", value: "neutral" },
+            ],
+            value: 2,
+          },
+          {
+            labels: [
+              { key: "possession_state", value: "opponent" },
+              { key: "field_half", value: "offensive_half" },
+            ],
+            value: 5,
+          },
+        ],
+      },
+    },
+    {
+      labelPerspective: {
+        kind: "team",
+      },
+      breakdownClasses: ["field_half"],
+    },
+  );
+
+  assert.match(html, /Own half<\/span><span class="value">3\.0s \(30\.0%\)/);
+  assert.match(html, /Neutral<\/span><span class="value">2\.0s \(20\.0%\)/);
+  assert.match(html, /Opp half<\/span><span class="value">5\.0s \(50\.0%\)/);
+});
+
 test("renderPossessionStats omits breakdown rows when no classes are selected", () => {
   const html = renderPossessionStats(
     {

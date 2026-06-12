@@ -27,7 +27,11 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
   let settingsEl: HTMLDivElement | null = null;
   let breakdownReadoutEl: HTMLElement | null = null;
   const activeBreakdownClasses = new Set<PossessionBreakdownClass>();
-  const orderedBreakdownClasses: PossessionBreakdownClass[] = ["possession_state", "field_third"];
+  const orderedBreakdownClasses: PossessionBreakdownClass[] = [
+    "possession_state",
+    "field_half",
+    "field_third",
+  ];
 
   return {
     id: "possession",
@@ -162,9 +166,31 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
         });
 
         const thirdOptionText = document.createElement("span");
-        thirdOptionText.textContent = "Third";
+        thirdOptionText.textContent = "Thirds";
         thirdOptionLabel.append(thirdCheckbox, thirdOptionText);
         options.append(thirdOptionLabel);
+
+        const halfOptionLabel = document.createElement("label");
+        halfOptionLabel.className = "toggle";
+
+        const halfCheckbox = document.createElement("input");
+        halfCheckbox.type = "checkbox";
+        halfCheckbox.dataset.breakdownClass = "field_half";
+        halfCheckbox.addEventListener("change", () => {
+          if (halfCheckbox.checked) {
+            activeBreakdownClasses.add("field_half");
+          } else {
+            activeBreakdownClasses.delete("field_half");
+          }
+          syncPossessionSettingsUi();
+          runtime.rerenderCurrentState();
+          runtime.requestConfigSync?.();
+        });
+
+        const halfOptionText = document.createElement("span");
+        halfOptionText.textContent = "Halves";
+        halfOptionLabel.append(halfCheckbox, halfOptionText);
+        options.append(halfOptionLabel);
 
         settingsEl.append(header, options);
       }
@@ -194,7 +220,13 @@ export function createPossessionModule(runtime: StatModuleRuntime): StatModule {
         enabled.length === 0
           ? "Total only"
           : enabled
-              .map((className) => (className === "possession_state" ? "Control" : "Third"))
+              .map((className) =>
+                className === "possession_state"
+                  ? "Control"
+                  : className === "field_half"
+                    ? "Halves"
+                    : "Thirds",
+              )
               .join(" x ");
     }
   }
