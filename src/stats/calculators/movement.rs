@@ -89,8 +89,14 @@ impl MovementCalculator {
         self.events.new_events()
     }
 
-    pub fn projected_events(&self) -> Vec<MovementEvent> {
-        let mut events = self.events.all().to_vec();
+    /// The in-progress (not yet committed) coalescing events, one per active
+    /// player, in deterministic order. These keep mutating frame-to-frame until
+    /// the player's classification changes, so consumers that accumulate
+    /// incrementally must overlay these on top of the committed [`events`] each
+    /// frame rather than folding them in permanently.
+    ///
+    /// [`events`]: Self::events
+    pub fn pending_events(&self) -> Vec<MovementEvent> {
         let mut pending: Vec<_> = self
             .pending_events
             .values()
@@ -101,7 +107,12 @@ impl MovementCalculator {
                 .cmp(&right.frame)
                 .then_with(|| format!("{:?}", left.player).cmp(&format!("{:?}", right.player)))
         });
-        events.extend(pending);
+        pending
+    }
+
+    pub fn projected_events(&self) -> Vec<MovementEvent> {
+        let mut events = self.events.all().to_vec();
+        events.extend(self.pending_events());
         events
     }
 
