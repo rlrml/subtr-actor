@@ -281,6 +281,50 @@ async function main() {
         );
       }
     }
+    // Phase 3c: hitbox display toggles drive HitboxManager (created lazily on
+    // the first enabled render — so check a couple of frames after toggling).
+    // Delayed past the pickup block's rAF chain to keep the checks ordered.
+    setTimeout(() => {
+      viewer.setHitboxWireframesEnabled(true);
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const hitboxes = viewer.hitboxManager.hitboxes as Map<
+            unknown,
+            { mesh: THREE.Object3D }
+          >;
+          ok("hitbox wireframes created for cars", hitboxes.size > 0);
+          ok(
+            "hitbox wireframes visible when enabled",
+            [...hitboxes.values()].some((entry) => entry.mesh.visible),
+          );
+          viewer.setHitboxOnlyModeEnabled(true);
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              ok(
+                "hitbox-only mode hides car bodies",
+                viewer.adapter.playerList.every((p) => {
+                  const mesh = viewer.sceneState.playerMeshes.get(p.id);
+                  return !mesh || !mesh.visible;
+                }),
+              );
+              viewer.setHitboxOnlyModeEnabled(false);
+              viewer.setHitboxWireframesEnabled(false);
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => {
+                  ok(
+                    "disabling hitboxes restores car bodies",
+                    viewer.adapter.playerList.some((p) => {
+                      const mesh = viewer.sceneState.playerMeshes.get(p.id);
+                      return mesh ? mesh.visible : false;
+                    }) && [...hitboxes.values()].every((entry) => !entry.mesh.visible),
+                  );
+                }),
+              );
+            }),
+          );
+        }),
+      );
+    }, 400);
   }
   if (params.get("paused")) viewer.pause();
   // ?pauseat=<seconds>: pause once playback reaches this time (deterministic

@@ -1,4 +1,5 @@
-import { timelineEventSeekTime, type ReplayPlayer, type ReplayTimelineEvent } from "@rlrml/player";
+import { timelineEventSeekTime, type ReplayTimelineEvent } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { CameraControlsController } from "./cameraControls.ts";
 import type { MechanicsReviewWindowController } from "./mechanicsReviewWindow.ts";
 import type { StatsPlayerConfig } from "./playerConfig.ts";
@@ -13,7 +14,7 @@ export interface PlaybackActionController {
 
 export interface PlaybackActionControllerOptions {
   readonly goalWatchLeadSeconds: number;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   getCameraControlsController(): CameraControlsController | null;
   getMechanicsReviewController(): MechanicsReviewWindowController | null;
   getSkipPostGoalTransitions(): HTMLInputElement;

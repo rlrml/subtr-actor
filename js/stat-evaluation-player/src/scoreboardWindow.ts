@@ -1,10 +1,10 @@
 import { getTeamClass } from "./statModules.ts";
 import { getStatsFrameForReplayFrame, type StatsFrameLookup } from "./statsTimeline.ts";
-import type { ReplayPlayer } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 
 export interface ScoreboardWindowOptions {
   readonly body: HTMLDivElement;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   getStatsFrameLookup(): StatsFrameLookup | null;
 }
 

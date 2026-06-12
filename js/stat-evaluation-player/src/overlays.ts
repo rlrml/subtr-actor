@@ -332,7 +332,7 @@ export class ThresholdZoneOverlay {
   private orangeForward: ThresholdZone;
   private orangeOther: ThresholdZone;
 
-  constructor(scene: THREE.Scene, replay: ReplayModel, fieldScale: number) {
+  constructor(parent: THREE.Object3D, replay: ReplayModel, fieldScale: number) {
     this.replay = replay;
     this.blueBack = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
     this.blueForward = makeThresholdZone(fieldScale, BLUE_TEAM_ACCENT_COLOR);
@@ -342,7 +342,7 @@ export class ThresholdZoneOverlay {
     this.orangeOther = makeThresholdZone(fieldScale, ORANGE_TEAM_ACCENT_COLOR);
 
     for (const zone of this.getZones()) {
-      scene.add(zone.group);
+      parent.add(zone.group);
     }
   }
 
@@ -437,7 +437,7 @@ export class HalfFieldOverlay {
   private teamZeroSide: HalfFieldSide;
   private teamOneSide: HalfFieldSide;
 
-  constructor(scene: THREE.Scene, fieldScale: number) {
+  constructor(parent: THREE.Object3D, fieldScale: number) {
     this.group = new THREE.Group();
     this.teamZeroSide = this.createHalfFieldSide(BLUE_TEAM_ACCENT_COLOR);
     this.teamOneSide = this.createHalfFieldSide(ORANGE_TEAM_ACCENT_COLOR);
@@ -452,7 +452,7 @@ export class HalfFieldOverlay {
 
     this.group.add(this.teamZeroSide.mesh);
     this.group.add(this.teamOneSide.mesh);
-    scene.add(this.group);
+    parent.add(this.group);
   }
 
   update(ballY: number | null | undefined): void {
@@ -487,7 +487,7 @@ export class HalfFieldOverlay {
   }
 }
 
-export function createZoneBoundaryLines(scene: THREE.Scene, fieldScale: number): THREE.Group {
+export function createZoneBoundaryLines(parent: THREE.Object3D, fieldScale: number): THREE.Group {
   const group = new THREE.Group();
   const fieldWidth = FIELD_HALF_X * 2 * fieldScale;
 
@@ -514,6 +514,6 @@ export function createZoneBoundaryLines(scene: THREE.Scene, fieldScale: number):
 
   group.add(makeStrip(0, ZONE_MIDLINE_THICKNESS, ZONE_MIDLINE_OPACITY));
 
-  scene.add(group);
+  parent.add(group);
   return group;
 }

@@ -16,6 +16,7 @@ import { SceneManager } from "./managers/SceneManager.js";
 import { ArenaManager } from "./managers/ArenaManager.js";
 import { ActorManager } from "./managers/ActorManager.js";
 import { EffectsManager } from "./managers/EffectsManager.js";
+import { HitboxManager } from "./managers/HitboxManager.js";
 import type { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
 // Timeline projection / skip-window semantics are @rlrml/player's own
 // ReplayModel utilities, so both players agree on what gets skipped and how
@@ -138,6 +139,7 @@ export class ViewerPlayer extends EventTarget {
   readonly arenaManager: ArenaManager;
   readonly actorManager: ActorManager;
   readonly effectsManager: EffectsManager;
+  readonly hitboxManager: HitboxManager;
   readonly controls: OrbitControls;
   /**
    * UE-coordinate mount point: children positioned in raw Unreal coords (RL
@@ -183,6 +185,10 @@ export class ViewerPlayer extends EventTarget {
   private boostPickupAnimationEnabledValue: boolean;
   private hitboxWireframesEnabledValue: boolean;
   private hitboxOnlyModeEnabledValue: boolean;
+  /** Lazily built player-name → hitbox-family map (roster is static). */
+  private hitboxTypeByName: Map<string, string> | null = null;
+  /** True while hitbox wireframes are showing (cheap per-frame early-out). */
+  private hitboxesActive = false;
   private skipPostGoalTransitionsEnabledValue: boolean;
   private skipKickoffsEnabledValue: boolean;
   /** True once view-mode/attachment was set through the parity surface. */
@@ -237,6 +243,9 @@ export class ViewerPlayer extends EventTarget {
     this.actorManager = new ActorManager(this.scene, this.effectsManager);
     this.actorManager.initFromFramework(adapter);
     this.actorManager.initInterpolants(adapter.getTimelines());
+    // Hitbox wireframes (driven by the hitboxWireframesEnabled /
+    // hitboxOnlyModeEnabled parity toggles; updated per frame in render()).
+    this.hitboxManager = new HitboxManager(this.scene);
     // NOTE: deliberately NOT calling effectsManager.setRenderContext() yet — it
     // pre-warms the explosion shader pools, which blocks the main thread for
     // seconds, and nothing can trigger explosions until the adapter exposes
@@ -396,7 +405,9 @@ export class ViewerPlayer extends EventTarget {
     this.emitChange();
   }
 
-  // ── Display toggles (@rlrml/player parity; tracked-but-inert for now) ───────
+  // ── Display toggles (@rlrml/player parity). Hitbox toggles drive
+  //    HitboxManager (see updateHitboxVisualization); the pickup-animation
+  //    toggle is read by the bridged plugin; the boost meter is still inert. ──
   setBoostMeterEnabled(enabled: boolean): void {
     this.boostMeterEnabledValue = enabled;
     this.emitChange();
@@ -649,6 +660,7 @@ export class ViewerPlayer extends EventTarget {
     if (this.effectsEnabled) {
       this.effectsManager.reset();
     }
+    this.hitboxManager.dispose();
     this.actorManager.reset();
     this.sceneManager.dispose();
   }
@@ -864,6 +876,7 @@ export class ViewerPlayer extends EventTarget {
     }
     this.actorManager.updateFromFramework(this.adapter, this.currentTime);
     this.updatePlayerStates();
+    this.updateHitboxVisualization();
     this.effectsManager.update(dt, this.playing, this.speed);
     if (this.playing) {
       // Wheel spin works off position deltas (not time), steering off userData.steer.
@@ -895,9 +908,59 @@ export class ViewerPlayer extends EventTarget {
    */
   private updatePlayerStates(): void {
     if (!this.playing) return;
+    // Hitbox-only mode (@rlrml/player parity): bodies are hidden, so suppress
+    // boost / supersonic trail emission too (the player hides its trails).
+    const suppressTrails = this.hitboxOnlyModeEnabledValue;
     for (const entity of this.adapter.getAllPlayers()) {
-      this.actorManager.updateBoostState(entity.name, entity.isBoosting, entity.isKickoffReset);
-      this.actorManager.updateSupersonicState(entity.name, entity.isSupersonic, entity.team);
+      this.actorManager.updateBoostState(
+        entity.name,
+        entity.isBoosting && !suppressTrails,
+        entity.isKickoffReset,
+      );
+      this.actorManager.updateSupersonicState(
+        entity.name,
+        entity.isSupersonic && !suppressTrails,
+        entity.team,
+      );
+    }
+  }
+
+  /**
+   * Drive HitboxManager from the parity display toggles each frame, after
+   * ActorManager has applied entity transforms/visibility:
+   *
+   * - `hitboxWireframesEnabled` — per-car wireframe boxes (color-coded by
+   *   family) tracking the live car meshes.
+   * - `hitboxOnlyModeEnabled` — wireframes shown AND car bodies hidden
+   *   (@rlrml/player semantics). ActorManager re-applies entity visibility on
+   *   every updateFromFramework, so simply not hiding next frame recovers.
+   */
+  private updateHitboxVisualization(): void {
+    const enabled = this.hitboxWireframesEnabledValue || this.hitboxOnlyModeEnabledValue;
+    if (!enabled && !this.hitboxesActive) return;
+    this.hitboxesActive = enabled;
+    this.hitboxManager.setEnabled(enabled);
+    if (!enabled) return;
+
+    const am = this.actorManager as unknown as {
+      actors: Record<string | number, THREE.Object3D | undefined>;
+      playerNameToCarActorId: Record<string, string | number | undefined>;
+    };
+    if (!this.hitboxTypeByName) {
+      this.hitboxTypeByName = new Map(
+        this.adapter.getAllPlayers().map((entity) => [entity.name, entity.hitboxType]),
+      );
+    }
+    this.hitboxManager.updateHitboxes(am.actors, am.playerNameToCarActorId, (name: string) =>
+      this.hitboxTypeByName?.get(name) ?? "Octane",
+    );
+    if (this.hitboxOnlyModeEnabledValue) {
+      for (const carActorId of Object.values(am.playerNameToCarActorId)) {
+        const carMesh = carActorId === undefined ? undefined : am.actors[carActorId];
+        if (carMesh) {
+          carMesh.visible = false;
+        }
+      }
     }
   }
 

@@ -28,7 +28,7 @@ export function createRelativePositioningModule(): StatModule {
     setup(ctx) {
       fieldScale = ctx.fieldScale;
       thresholdZoneOverlay = new ThresholdZoneOverlay(
-        ctx.player.sceneState.scene,
+        ctx.player.sceneState.replayRoot,
         ctx.replay,
         fieldScale,
       );

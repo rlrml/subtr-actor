@@ -17,7 +17,7 @@ import {
   getPlaybackConfigSnapshot,
   getStatsPlayerConfigSnapshot,
 } from "./playerConfigRuntime.ts";
-import type { ReplayPlayer } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 
 export interface PlayerConfigBindings {
   setApplyingConfig(value: boolean): void;
@@ -33,7 +33,7 @@ export interface PlayerConfigBindingsOptions {
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
   readonly hitboxOnlyMode: HTMLInputElement;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   getCameraControlsController(): CameraControlsController | null;
   getRecordingWindowController(): RecordingWindowController | null;
   getFloatingWindowController(): FloatingWindowController | null;

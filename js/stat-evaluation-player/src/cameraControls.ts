@@ -2,10 +2,10 @@ import type {
   CameraSettings,
   ReplayCameraViewMode,
   ReplayFreeCameraPreset,
-  ReplayPlayer,
   ReplayPlayerState,
   ReplayPlayerTrack,
 } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = ["free", "follow"];
 
@@ -44,7 +44,7 @@ export interface CameraControlsElements {
 
 export interface CameraControlsOptions {
   readonly elements: CameraControlsElements;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   requestConfigSync(): void;
 }
 

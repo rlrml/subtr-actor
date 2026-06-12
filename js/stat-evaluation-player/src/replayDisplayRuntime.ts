@@ -3,13 +3,14 @@ import {
   createBoostPickupAnimationPlugin,
   createCanvasRecorderPlugin,
   createTimelineOverlayPlugin,
-  ReplayPlayer,
   type BoostPickupAnimationPickup,
   type CanvasRecorderPlugin,
   type ReplayTimelineEvent,
   type ReplayPlayerState,
   type TimelineOverlayPlugin,
 } from "@rlrml/player";
+import { createViewerFromParsed, fromReplayPlayerPlugin } from "@rlrml/viewer";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { CameraControlsController } from "./cameraControls.ts";
 import type { StatsPlayerConfig } from "./playerConfig.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
@@ -35,8 +36,8 @@ export interface ReplayDisplayRuntimeOptions {
   readonly elements: ReplayDisplayElements;
   readonly defaultCameraDistanceScale: number;
   getReplayLoadModal(): ReplayLoadModalController | null;
-  getReplayPlayer(): ReplayPlayer | null;
-  setReplayPlayer(value: ReplayPlayer | null): void;
+  getReplayPlayer(): StatsReplayPlayer | null;
+  setReplayPlayer(value: StatsReplayPlayer | null): void;
   getUnsubscribe(): (() => void) | null;
   setUnsubscribe(value: (() => void) | null): void;
   setCanvasRecorder(value: CanvasRecorderPlugin | null): void;
@@ -47,7 +48,7 @@ export interface ReplayDisplayRuntimeOptions {
   setStatRegistry(value: StatDefinition[]): void;
   getInitialConfig(): StatsPlayerConfig | null;
   setApplyingConfig(value: boolean): void;
-  getReplayTimelineEvents(replay: ReplayPlayer["replay"]): ReplayTimelineEvent[];
+  getReplayTimelineEvents(replay: StatsReplayPlayer["replay"]): ReplayTimelineEvent[];
   withTimelineEventSeekTimes(events: ReplayTimelineEvent[]): ReplayTimelineEvent[];
   includeBoostPickupAnimationPickup(pickup: BoostPickupAnimationPickup): boolean;
   syncRecordingWindow(): void;
@@ -134,7 +135,11 @@ export async function loadReplayBundleForDisplay(
     options.setCanvasRecorder(recorder);
     const config = options.getInitialConfig();
 
-    const replayPlayer = new ReplayPlayer(elements.viewport, replay, {
+    // The viewer implements @rlrml/player's full ReplayPlayer surface; player
+    // plugins are bridged via fromReplayPlayerPlugin (the original `recorder` /
+    // `timelineOverlay` handles share closure state with the wrapped copies, so
+    // they keep working for setCanvasRecorder/setTimelineOverlay below).
+    const replayPlayer = createViewerFromParsed(elements.viewport, loadedReplay, {
       initialPlaybackRate: config?.playback.rate,
       initialCameraDistanceScale:
         config?.camera.distanceScale ?? options.defaultCameraDistanceScale,
@@ -150,14 +155,16 @@ export async function loadReplayBundleForDisplay(
       initialSkipPostGoalTransitionsEnabled: elements.skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: elements.skipKickoffs.checked,
       plugins: [
-        createBallchasingOverlayPlugin(),
-        createBoostPickupAnimationPlugin({
-          includePickup: options.includeBoostPickupAnimationPickup,
-        }),
-        recorder,
-        timelineOverlay,
+        fromReplayPlayerPlugin(createBallchasingOverlayPlugin()),
+        fromReplayPlayerPlugin(
+          createBoostPickupAnimationPlugin({
+            includePickup: options.includeBoostPickupAnimationPickup,
+          }),
+        ),
+        fromReplayPlayerPlugin(recorder),
+        fromReplayPlayerPlugin(timelineOverlay),
       ],
-    });
+    }) as StatsReplayPlayer;
     options.setTimelineOverlay(timelineOverlay);
     options.setReplayPlayer(replayPlayer);
     options.syncBoostPadOverlayPlugin();

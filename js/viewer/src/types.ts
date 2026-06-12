@@ -56,10 +56,11 @@ export type ViewerFreeCameraPreset = "overhead" | "side";
  * Snapshot of playback state, emitted on every "change" event. Shape-compatible
  * with `@rlrml/player`'s `ReplayPlayerState`.
  *
- * The display toggles (boost meter, hitboxes) are tracked-but-inert for now:
- * setters update state and notify subscribers, but no rendering is wired to
- * them yet (docs/PLAYER_PARITY.md). The skip toggles are live when the viewer
- * has a `ReplayModel` (always, via `createViewer`).
+ * The hitbox toggles drive HitboxManager (wireframes; only-mode also hides
+ * car bodies and trail emission). The boost-meter toggle is tracked-but-inert
+ * for now: the setter updates state and notifies subscribers, but no rendering
+ * is wired to it yet (docs/PLAYER_PARITY.md). The skip toggles are live when
+ * the viewer has a `ReplayModel` (always, via `createViewer`).
  */
 export interface ViewerState {
   currentTime: number;
@@ -209,11 +210,11 @@ export interface ViewerOptions {
   initialBallCamEnabled?: boolean;
   /** Tracked-but-inert (no boost meter rendering yet). */
   initialBoostMeterEnabled?: boolean;
-  /** Tracked-but-inert (no pickup animation toggle wiring yet). */
+  /** Read by the bridged boost-pickup-animation plugin when installed. */
   initialBoostPickupAnimationEnabled?: boolean;
-  /** Tracked-but-inert (no hitbox wireframe rendering yet). */
+  /** Per-car hitbox wireframes (HitboxManager). */
   initialHitboxWireframesEnabled?: boolean;
-  /** Tracked-but-inert (no hitbox-only mode yet). */
+  /** Hitbox-only mode: wireframes shown, car bodies + trails hidden. */
   initialHitboxOnlyModeEnabled?: boolean;
   /** Live when a ReplayModel is present (@rlrml/player default: true). */
   initialSkipPostGoalTransitionsEnabled?: boolean;

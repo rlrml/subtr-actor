@@ -199,6 +199,11 @@ export class HitboxManager {
 
             // Match car rotation
             hitboxMesh.quaternion.copy(carMesh.quaternion);
+
+            // Track the car's live visibility (demolished/sleeping cars hide
+            // their hitbox too). Callers that hide bodies for hitbox-only mode
+            // must do so AFTER this update.
+            hitboxMesh.visible = this.enabled && carMesh.visible;
         }
 
         // Remove hitboxes for cars that no longer exist

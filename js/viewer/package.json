@@ -4,10 +4,13 @@
   "private": true,
   "description": "High-fidelity 3D Rocket League replay viewer powered by subtr-actor (seeded from ballcam.tv with permission)",
   "type": "module",
+  "main": "./src/lib.ts",
+  "types": "./src/lib.ts",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "check:tsc": "tsc --noEmit"
+    "check:tsc": "tsc --noEmit",
+    "build:types": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
     "@rlrml/player": "file:../player",

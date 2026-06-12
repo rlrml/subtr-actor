@@ -55,6 +55,10 @@ export default defineConfig(({ command, mode }) => {
   return {
     base: "./",
     plugins: [wasm(), ensureWasmBindingsPlugin()],
+    // The 3D viewer loads its models/draco assets from absolute web-root paths
+    // (/models/..., /draco/...); serve js/viewer/public at the root in dev and
+    // copy it into site builds. The library build ships no assets.
+    publicDir: useLocalAliases ? path.resolve(import.meta.dirname, "../viewer/public") : false,
     resolve: {
       alias: useLocalAliases
         ? {
@@ -63,6 +67,7 @@ export default defineConfig(({ command, mode }) => {
               "../pkg/rl_replay_subtr_actor.js",
             ),
             "@rlrml/player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+            "@rlrml/viewer": path.resolve(import.meta.dirname, "../viewer/src/lib.ts"),
             three: path.resolve(import.meta.dirname, "node_modules/three"),
           }
         : undefined,
@@ -83,7 +88,7 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     optimizeDeps: {
-      exclude: ["@rlrml/subtr-actor", "@rlrml/player"],
+      exclude: ["@rlrml/subtr-actor", "@rlrml/player", "@rlrml/viewer"],
     },
     build: siteBuild
       ? {
@@ -100,7 +105,7 @@ export default defineConfig(({ command, mode }) => {
             formats: ["es"],
           },
           rollupOptions: {
-            external: ["@rlrml/subtr-actor", "@rlrml/player", "three"],
+            external: ["@rlrml/subtr-actor", "@rlrml/player", "@rlrml/viewer", "three"],
           },
         },
   };
