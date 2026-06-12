@@ -180,6 +180,19 @@ impl<'a> ReplayProcessor<'a> {
         }
     }
 
+    /// Returns the player's replicated Rocket League camera preset, when one
+    /// was captured from a `TAGame.CameraSettingsActor_TA` actor while
+    /// processing frames.
+    pub(crate) fn get_player_camera_settings(
+        &self,
+        player_id: &PlayerId,
+    ) -> Option<PlayerCameraSettings> {
+        let player_actor_id = self.get_player_actor_id(player_id).ok()?;
+        self.player_actor_to_camera_settings
+            .get(&player_actor_id)
+            .copied()
+    }
+
     pub(crate) fn get_player_car_hitbox(&self, player_id: &PlayerId) -> CarHitbox {
         car_hitbox_for_body_id_or_name(
             self.get_player_loadout_body_id(player_id),

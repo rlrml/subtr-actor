@@ -776,6 +776,8 @@ pub(crate) fn live_replay_meta(players: &[SaPlayerFrame]) -> ReplayMeta {
                 .and_then(hitbox_family_for_body_id)
                 .map(|family| format!("{family:?}"))
                 .or_else(|| Some("Octane".to_owned())),
+            // Live frames don't carry replicated camera presets.
+            camera_settings: None,
         };
         if player.is_team_0 != 0 {
             team_zero.push(info);

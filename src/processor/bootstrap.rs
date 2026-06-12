@@ -164,6 +164,7 @@ impl<'a> ReplayProcessor<'a> {
             let car_hitbox_family =
                 hitbox_family_for_body_id_or_name(car_body_id, car_body_name.as_deref())
                     .map(|family| format!("{family:?}"));
+            let camera_settings = self.get_player_camera_settings(player_id);
             Ok(PlayerInfo {
                 name,
                 stats,
@@ -171,6 +172,7 @@ impl<'a> ReplayProcessor<'a> {
                 car_body_id,
                 car_body_name,
                 car_hitbox_family,
+                camera_settings,
             })
         };
         let team_zero: SubtrActorResult<Vec<PlayerInfo>> =

@@ -869,6 +869,48 @@ impl ReplayMeta {
     }
 }
 
+/// The Rocket League camera preset a player used during the match, replicated
+/// through `TAGame.CameraSettingsActor_TA:ProfileSettings`.
+///
+/// Values use the in-game units shown in Rocket League's camera settings menu
+/// (`fov` is the horizontal field of view in degrees, distances/heights are in
+/// unreal units, `angle` in degrees, and `stiffness`/`swivel_speed`/
+/// `transition_speed` are the menu's dimensionless multipliers).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PlayerCameraSettings {
+    /// Horizontal field of view, in degrees.
+    pub fov: f32,
+    /// Camera height above the car, in unreal units.
+    pub height: f32,
+    /// Camera pitch angle, in degrees (negative looks down).
+    pub angle: f32,
+    /// Camera distance behind the car, in unreal units.
+    pub distance: f32,
+    /// Camera stiffness in `[0, 1]`; higher tracks the car more rigidly.
+    pub stiffness: f32,
+    /// Swivel speed multiplier.
+    pub swivel_speed: f32,
+    /// Transition speed multiplier; absent in replays older than its addition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub transition_speed: Option<f32>,
+}
+
+impl From<&boxcars::CamSettings> for PlayerCameraSettings {
+    fn from(settings: &boxcars::CamSettings) -> Self {
+        Self {
+            fov: settings.fov,
+            height: settings.height,
+            angle: settings.angle,
+            distance: settings.distance,
+            stiffness: settings.stiffness,
+            swivel_speed: settings.swivel,
+            transition_speed: settings.transition,
+        }
+    }
+}
+
 /// [`PlayerInfo`] struct provides detailed information about a specific player in the replay.
 ///
 /// This includes player's unique remote ID, player stats if available, and their name.
@@ -896,6 +938,9 @@ pub struct PlayerInfo {
     /// The resolved standardized hitbox family for the player's car body, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub car_hitbox_family: Option<String>,
+    /// The player's replicated Rocket League camera preset, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub camera_settings: Option<PlayerCameraSettings>,
 }
 
 #[cfg(test)]
