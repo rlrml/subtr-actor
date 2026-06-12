@@ -27,7 +27,9 @@ export interface Quat {
 }
 
 /** Raw subtr-actor Vector3fTs -> THREE-space Vec3 (RL Z-up -> THREE Y-up). */
-export function vec3RlToThree(v: { x: number; y: number; z: number } | null | undefined): Vec3 | null {
+export function vec3RlToThree(
+  v: { x: number; y: number; z: number } | null | undefined,
+): Vec3 | null {
   if (!v) return null;
   return { x: v.x, y: v.z, z: v.y };
 }

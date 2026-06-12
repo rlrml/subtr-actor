@@ -16,7 +16,7 @@
  * v0 scope: ball + cars move correctly. Analytics getters are stubbed empty;
  * game-phase / gap-removal / boost-pad polish are deferred (see INTEGRATION.md).
  */
-import EventEmitter from "eventemitter3";
+import EventEmitter from "../util/EventEmitter.js";
 import { vec3RlToThree, quatRlToThree, boostToPercent, type Vec3, type Quat } from "./coords.js";
 import { getCarHitboxInfo } from "../data/hitboxes.js";
 
@@ -132,7 +132,9 @@ export interface RecordedCameraSettings {
   transitionSpeed?: number;
 }
 
-function toRecordedCameraSettings(raw: RawCameraSettings | null | undefined): RecordedCameraSettings | null {
+function toRecordedCameraSettings(
+  raw: RawCameraSettings | null | undefined,
+): RecordedCameraSettings | null {
   if (!raw) return null;
   const settings: RecordedCameraSettings = {
     fov: raw.fov,
@@ -320,7 +322,10 @@ export class SubtrActorPlayer extends EventEmitter {
       this._playerFlags[name] = flags;
       this._teams[name] = team;
       this.playerList.push({ id: key, name, team, carName, hitboxType, cameraSettings });
-      this.players.set(name, new PlayerEntity(key, name, team, carName, hitboxType, cameraSettings));
+      this.players.set(
+        name,
+        new PlayerEntity(key, name, team, carName, hitboxType, cameraSettings),
+      );
     });
 
     this._compileBoostPads();
@@ -386,7 +391,10 @@ export class SubtrActorPlayer extends EventEmitter {
   }
 
   // ── Renderer-facing API ────────────────────────────────────────────────────
-  getTimelines(): { ballTimeline: MotionKeyframe[]; playerTimelines: Record<string, MotionKeyframe[]> } {
+  getTimelines(): {
+    ballTimeline: MotionKeyframe[];
+    playerTimelines: Record<string, MotionKeyframe[]>;
+  } {
     return { ballTimeline: this._ballTimeline, playerTimelines: this._playerTimelines };
   }
 
@@ -429,7 +437,8 @@ export class SubtrActorPlayer extends EventEmitter {
       // Presence: visible while we have motion data near `time`. A demolished
       // car produces Empty frames -> no nearby keyframe -> hidden.
       const tl = this._playerTimelines[name] ?? [];
-      entity.isVisible = tl.length > 0 && time >= tl[0].time - 0.001 && time <= tl[tl.length - 1].time + 1.0;
+      entity.isVisible =
+        tl.length > 0 && time >= tl[0].time - 0.001 && time <= tl[tl.length - 1].time + 1.0;
     }
     for (const pad of this.boostPads.values()) {
       if (pad.events.length === 0) continue; // no events recorded -> always available

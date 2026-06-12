@@ -202,7 +202,9 @@ export function createBoostPadsPlugin(): ViewerPlugin {
         mesh.geometry.dispose();
         mesh.material.dispose();
         for (const key of ["glowMesh", "innerGlowMesh"] as const) {
-          const glow = mesh.userData[key] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | undefined;
+          const glow = mesh.userData[key] as
+            | THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
+            | undefined;
           if (glow) {
             glow.geometry.dispose();
             glow.material.dispose();

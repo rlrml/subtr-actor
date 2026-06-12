@@ -7,10 +7,7 @@ import wasm from "vite-plugin-wasm";
 export default defineConfig(() => ({
   resolve: {
     alias: {
-      "@rlrml/subtr-actor": path.resolve(
-        import.meta.dirname,
-        "../pkg/rl_replay_subtr_actor.js",
-      ),
+      "@rlrml/subtr-actor": path.resolve(import.meta.dirname, "../pkg/rl_replay_subtr_actor.js"),
       // Dedupe three so examples/jsm and addons resolve against one copy.
       three: path.resolve(import.meta.dirname, "node_modules/three"),
     },

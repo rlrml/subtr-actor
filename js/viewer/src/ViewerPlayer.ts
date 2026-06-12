@@ -89,7 +89,11 @@ function normalizeCustomCameraSettings(
  */
 const FREE_CAMERA_PRESETS: Record<
   ViewerFreeCameraPreset,
-  { position: [number, number, number]; target: [number, number, number]; up: [number, number, number] }
+  {
+    position: [number, number, number];
+    target: [number, number, number];
+    up: [number, number, number];
+  }
 > = {
   overhead: { position: [0, 18800, 0], target: [0, 700, 0], up: [-1, 0, 0] },
   side: { position: [-9600, 6400, -12600], target: [0, 900, 0], up: [0, 1, 0] },
@@ -318,7 +322,8 @@ export class ViewerPlayer extends EventTarget {
   }
 
   togglePlayback(): void {
-    this.playing ? this.pause() : this.play();
+    if (this.playing) this.pause();
+    else this.play();
   }
 
   seek(time: number): void {
@@ -966,8 +971,10 @@ export class ViewerPlayer extends EventTarget {
         this.adapter.getAllPlayers().map((entity) => [entity.name, entity.hitboxType]),
       );
     }
-    this.hitboxManager.updateHitboxes(am.actors, am.playerNameToCarActorId, (name: string) =>
-      this.hitboxTypeByName?.get(name) ?? "Octane",
+    this.hitboxManager.updateHitboxes(
+      am.actors,
+      am.playerNameToCarActorId,
+      (name: string) => this.hitboxTypeByName?.get(name) ?? "Octane",
     );
     if (this.hitboxOnlyModeEnabledValue) {
       for (const carActorId of Object.values(am.playerNameToCarActorId)) {
@@ -1018,7 +1025,10 @@ export class ViewerPlayer extends EventTarget {
       actors: Record<string | number, THREE.Object3D | undefined>;
       playerNameToCarActorId: Record<string, string | number | undefined>;
     };
-    const player = this;
+    // Capture the instance: the returned object literal's getters need the
+    // outer `this`, not their own.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const player: ViewerPlayer = this;
     // Stand-in until the ball actor spawns (ReplayScene.ballMesh is non-null).
     const fallbackBallMesh = new THREE.Mesh();
     return {

@@ -168,7 +168,10 @@ async function main() {
       "setAttachedPlayer by id → follow",
       s.cameraViewMode === "follow" && s.attachedPlayerId === first.id,
     );
-    ok("camera plugin followed", camPlugin.getMode() === "follow" && camPlugin.getTarget() === first.name);
+    ok(
+      "camera plugin followed",
+      camPlugin.getMode() === "follow" && camPlugin.getTarget() === first.name,
+    );
     viewer.setCustomCameraSettings({ pitch: -7, distance: 300 });
     ok("pitch alias → angle", camPlugin.getCameraSettings().angle === -7);
     viewer.setCameraDistanceScale(2);
@@ -181,7 +184,10 @@ async function main() {
     viewer.setCameraViewMode("free");
     s = viewer.getState();
     ok("view mode free releases", s.cameraViewMode === "free" && camPlugin.getMode() === "orbit");
-    ok("snapshot equals state", JSON.stringify(viewer.getSnapshot()) === JSON.stringify(viewer.getState()));
+    ok(
+      "snapshot equals state",
+      JSON.stringify(viewer.getSnapshot()) === JSON.stringify(viewer.getState()),
+    );
     // Phase 2: shared data layer (viewer.replay is @rlrml/player's ReplayModel).
     const model = viewer.replay;
     ok("replay model present", !!model && model.frameCount > 0);
@@ -290,10 +296,7 @@ async function main() {
       viewer.setHitboxWireframesEnabled(true);
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
-          const hitboxes = viewer.hitboxManager.hitboxes as Map<
-            unknown,
-            { mesh: THREE.Object3D }
-          >;
+          const hitboxes = viewer.hitboxManager.hitboxes as Map<unknown, { mesh: THREE.Object3D }>;
           ok("hitbox wireframes created for cars", hitboxes.size > 0);
           ok(
             "hitbox wireframes visible when enabled",

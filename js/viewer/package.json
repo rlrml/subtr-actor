@@ -15,8 +15,7 @@
   "dependencies": {
     "@rlrml/player": "file:../player",
     "@rlrml/subtr-actor": "file:../pkg",
-    "camera-controls": "^2.10.1",
-    "eventemitter3": "^5.0.1"
+    "camera-controls": "^2.10.1"
   },
   "peerDependencies": {
     "three": "^0.180.0"

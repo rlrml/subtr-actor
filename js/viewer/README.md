@@ -48,13 +48,13 @@ Key modules:
   field dimensions; the up-axis is height). The coordinate transform — the main
   integration risk — is confirmed.
 - A bring-up harness (`src/dev/main.ts`) drives the real renderer (scene + arena
-  + actors) from the adapter to render a match.
+  - actors) from the adapter to render a match.
 
 - **Car models are wired.** `ActorManager` selects each car's GLB from
   subtr-actor's per-player `car_body_name` / `car_hitbox_family`
   (`SubtrActorPlayer` → `CarModelLoader`), replacing the legacy body-id lookup.
   This requires the **local** WASM build (`js/pkg`, built from this repo's Rust via
-  `js/scripts/build-wasm.sh`): the *published* `@rlrml/player` WASM predates the
+  `js/scripts/build-wasm.sh`): the _published_ `@rlrml/player` WASM predates the
   `car_hitbox_family` field, so the dev server's `vite` alias points
   `@rlrml/subtr-actor` at `../pkg`.
 

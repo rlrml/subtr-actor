@@ -8,11 +8,5 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": [
-    "src/adapter",
-    "src/plugins",
-    "src/lib.ts",
-    "src/types.ts",
-    "src/ViewerPlayer.ts"
-  ]
+  "include": ["src/adapter", "src/plugins", "src/lib.ts", "src/types.ts", "src/ViewerPlayer.ts"]
 }

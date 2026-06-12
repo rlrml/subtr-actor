@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-import CameraControls from 'camera-controls';
+import * as THREE from "three";
+import CameraControls from "camera-controls";
 
 // Install CameraControls with THREE
 CameraControls.install({ THREE });
@@ -37,7 +37,7 @@ export class CameraManager {
     this.minHeight = 50;
 
     // Camera mode: 'free', 'ball', 'ballOrbit', 'car'
-    this.mode = 'free';
+    this.mode = "free";
 
     // Default freecam position: side view of field, elevated, looking at center (in UU)
     this.defaultFreecamPosition = new THREE.Vector3(0, 1000, 5000);
@@ -51,11 +51,11 @@ export class CameraManager {
     this.targetBall = null;
 
     // Camera settings for player follow (in UU) - matching Rocket League settings
-    this.followDistance = 260;    // Distance behind car (RL range: 100-400)
-    this.followHeight = 90;       // Height above car (RL range: 40-200)
-    this.followAngle = -4;        // Pitch angle in degrees (RL range: -15 to 0, negative = look down)
-    this.stiffness = 0.45;        // Camera stiffness (RL range: 0.0-1.0)
-    this.swivelSpeed = 4.30;      // Rotation speed (RL range: 1.0-10.0)
+    this.followDistance = 260; // Distance behind car (RL range: 100-400)
+    this.followHeight = 90; // Height above car (RL range: 40-200)
+    this.followAngle = -4; // Pitch angle in degrees (RL range: -15 to 0, negative = look down)
+    this.stiffness = 0.45; // Camera stiffness (RL range: 0.0-1.0)
+    this.swivelSpeed = 4.3; // Rotation speed (RL range: 1.0-10.0)
 
     // === STATE BLENDING SYSTEM (Rocket League style) ===
     // Instead of interpolating from a fixed start position to a target,
@@ -63,13 +63,13 @@ export class CameraManager {
     // This ensures smooth transitions even when the car is moving.
 
     // Blend factor: 0.0 = Car Cam, 1.0 = Ball Cam
-    this.currentBlend = 0.0;      // Current interpolated blend value
-    this.targetBlend = 0.0;       // Target blend (0 or 1 based on ball cam toggle)
+    this.currentBlend = 0.0; // Current interpolated blend value
+    this.targetBlend = 0.0; // Target blend (0 or 1 based on ball cam toggle)
 
     // Transition Speed in RL (1.0-2.0): multiplier for base duration
     // Base duration ~0.5s at speed 1.0, ~0.25s at speed 2.0
-    this.transitionSpeed = 1.30;  // Ball cam transition speed (RL range: 1.0-2.0)
-    this.baseDuration = 0.5;      // Base transition duration in seconds
+    this.transitionSpeed = 1.3; // Ball cam transition speed (RL range: 1.0-2.0)
+    this.baseDuration = 0.5; // Base transition duration in seconds
 
     // Track previous state for yaw initialization
     this.lastIsBallCam = null;
@@ -87,7 +87,7 @@ export class CameraManager {
     this.controls.enabled = true;
 
     // Disable right-click context menu
-    domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+    domElement.addEventListener("contextmenu", (e) => e.preventDefault());
 
     // Following mode state (for collab - following another viewer's camera)
     this.isFollowingViewer = false;
@@ -114,7 +114,7 @@ export class CameraManager {
   setMode(mode) {
     this.mode = mode;
 
-    if (mode === 'ballOrbit') {
+    if (mode === "ballOrbit") {
       // Ball orbit mode - orbit around the ball with mouse, zoom with scroll
       this.controls.enabled = true;
 
@@ -125,7 +125,7 @@ export class CameraManager {
       if (!this.ballOrbitScrollHandler) {
         this.ballOrbitScrollHandler = (e) => {
           // Disable scroll zoom when following another viewer
-          if (this.mode === 'ballOrbit' && !this.isFollowingViewer) {
+          if (this.mode === "ballOrbit" && !this.isFollowingViewer) {
             e.preventDefault();
             // Dolly in/out proportionally to current distance — a fixed UU step
             // is imperceptible at field scale (orbit distances run 1000s of UU).
@@ -137,7 +137,7 @@ export class CameraManager {
             }
           }
         };
-        this.domElement.addEventListener('wheel', this.ballOrbitScrollHandler, { passive: false });
+        this.domElement.addEventListener("wheel", this.ballOrbitScrollHandler, { passive: false });
       }
 
       // Position camera at a reasonable distance if we have a ball target
@@ -155,14 +155,14 @@ export class CameraManager {
           ballPos.x,
           ballPos.y,
           ballPos.z,
-          false
+          false,
         );
       }
 
       return;
     }
 
-    if (mode === 'free') {
+    if (mode === "free") {
       // Free camera mode - right-click drag rotation (Roblox-style)
       // Disable camera-controls orbit, we'll handle movement manually
       this.controls.enabled = false;
@@ -193,7 +193,7 @@ export class CameraManager {
 
         // Right-click drag handlers (Roblox-style with pointer lock)
         this.onMouseDown = (e) => {
-          if (e.button === 2 && this.mode === 'free' && !this.isFollowingViewer) {
+          if (e.button === 2 && this.mode === "free" && !this.isFollowingViewer) {
             this.isRightMouseDown = true;
             // Request pointer lock for smooth camera rotation
             this.domElement.requestPointerLock?.();
@@ -256,15 +256,15 @@ export class CameraManager {
           }
         };
 
-        document.addEventListener('keydown', this.onKeyDown);
-        document.addEventListener('keyup', this.onKeyUp);
-        document.addEventListener('mousemove', this.onMouseMove);
-        this.domElement.addEventListener('mousedown', this.onMouseDown);
-        document.addEventListener('mouseup', this.onMouseUp);
-        document.addEventListener('pointerlockchange', this.onPointerLockChange);
-        this.domElement.addEventListener('mouseleave', this.onMouseLeave);
-        window.addEventListener('blur', this.onWindowBlur);
-        document.addEventListener('visibilitychange', this.onVisibilityChange);
+        document.addEventListener("keydown", this.onKeyDown);
+        document.addEventListener("keyup", this.onKeyUp);
+        document.addEventListener("mousemove", this.onMouseMove);
+        this.domElement.addEventListener("mousedown", this.onMouseDown);
+        document.addEventListener("mouseup", this.onMouseUp);
+        document.addEventListener("pointerlockchange", this.onPointerLockChange);
+        this.domElement.addEventListener("mouseleave", this.onMouseLeave);
+        window.addEventListener("blur", this.onWindowBlur);
+        document.addEventListener("visibilitychange", this.onVisibilityChange);
       }
 
       // Reset right-click drag state when entering free mode
@@ -302,36 +302,36 @@ export class CameraManager {
    * Handle keydown for free camera
    */
   handleFreeCamKeyDown(e) {
-    if (this.mode !== 'free' || this.isFollowingViewer) return;
+    if (this.mode !== "free" || this.isFollowingViewer) return;
 
     // Ignore keyboard input when user is typing in an input field
     const target = e.target;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
       return;
     }
 
     switch (e.code) {
-      case 'KeyW':
-      case 'ArrowUp':
+      case "KeyW":
+      case "ArrowUp":
         this.freeCamKeys.forward = true;
         break;
-      case 'KeyS':
-      case 'ArrowDown':
+      case "KeyS":
+      case "ArrowDown":
         this.freeCamKeys.backward = true;
         break;
-      case 'KeyA':
-      case 'ArrowLeft':
+      case "KeyA":
+      case "ArrowLeft":
         this.freeCamKeys.left = true;
         break;
-      case 'KeyD':
-      case 'ArrowRight':
+      case "KeyD":
+      case "ArrowRight":
         this.freeCamKeys.right = true;
         break;
-      case 'Space':
+      case "Space":
         this.freeCamKeys.up = true;
         break;
-      case 'ShiftLeft':
-      case 'ShiftRight':
+      case "ShiftLeft":
+      case "ShiftRight":
         this.freeCamKeys.down = true;
         break;
     }
@@ -342,27 +342,27 @@ export class CameraManager {
    */
   handleFreeCamKeyUp(e) {
     switch (e.code) {
-      case 'KeyW':
-      case 'ArrowUp':
+      case "KeyW":
+      case "ArrowUp":
         this.freeCamKeys.forward = false;
         break;
-      case 'KeyS':
-      case 'ArrowDown':
+      case "KeyS":
+      case "ArrowDown":
         this.freeCamKeys.backward = false;
         break;
-      case 'KeyA':
-      case 'ArrowLeft':
+      case "KeyA":
+      case "ArrowLeft":
         this.freeCamKeys.left = false;
         break;
-      case 'KeyD':
-      case 'ArrowRight':
+      case "KeyD":
+      case "ArrowRight":
         this.freeCamKeys.right = false;
         break;
-      case 'Space':
+      case "Space":
         this.freeCamKeys.up = false;
         break;
-      case 'ShiftLeft':
-      case 'ShiftRight':
+      case "ShiftLeft":
+      case "ShiftRight":
         this.freeCamKeys.down = false;
         break;
     }
@@ -372,7 +372,7 @@ export class CameraManager {
    * Handle mouse movement for free camera look (right-click drag style with pointer lock)
    */
   handleFreeCamMouseMove(e) {
-    if (this.mode !== 'free' || !this.isRightMouseDown || this.isFollowingViewer) return;
+    if (this.mode !== "free" || !this.isRightMouseDown || this.isFollowingViewer) return;
 
     // Use movementX/Y when pointer is locked (more reliable, no edge issues)
     const deltaX = e.movementX || 0;
@@ -385,7 +385,7 @@ export class CameraManager {
     // Clamp pitch to prevent flipping
     this.freeCamRotation.pitch = Math.max(
       -Math.PI / 2 + 0.01,
-      Math.min(Math.PI / 2 - 0.01, this.freeCamRotation.pitch)
+      Math.min(Math.PI / 2 - 0.01, this.freeCamRotation.pitch),
     );
   }
 
@@ -399,7 +399,7 @@ export class CameraManager {
     const lookDir = new THREE.Vector3(
       Math.sin(this.freeCamRotation.yaw) * Math.cos(this.freeCamRotation.pitch),
       -Math.sin(this.freeCamRotation.pitch),
-      Math.cos(this.freeCamRotation.yaw) * Math.cos(this.freeCamRotation.pitch)
+      Math.cos(this.freeCamRotation.yaw) * Math.cos(this.freeCamRotation.pitch),
     );
     lookDir.normalize();
 
@@ -408,7 +408,7 @@ export class CameraManager {
     const forward = new THREE.Vector3(
       Math.sin(this.freeCamRotation.yaw) * Math.cos(this.freeCamRotation.pitch),
       -Math.sin(this.freeCamRotation.pitch),
-      Math.cos(this.freeCamRotation.yaw) * Math.cos(this.freeCamRotation.pitch)
+      Math.cos(this.freeCamRotation.yaw) * Math.cos(this.freeCamRotation.pitch),
     );
     forward.normalize();
 
@@ -416,7 +416,7 @@ export class CameraManager {
     const right = new THREE.Vector3(
       Math.sin(this.freeCamRotation.yaw - Math.PI / 2),
       0,
-      Math.cos(this.freeCamRotation.yaw - Math.PI / 2)
+      Math.cos(this.freeCamRotation.yaw - Math.PI / 2),
     );
     // Already normalized (sin² + cos² = 1)
 
@@ -427,14 +427,10 @@ export class CameraManager {
     const velocity = new THREE.Vector3();
     const speed = this.freeCamSpeed * delta;
 
-    if (this.freeCamKeys.forward)
-      velocity.add(forward.clone().multiplyScalar(speed));
-    if (this.freeCamKeys.backward)
-      velocity.add(forward.clone().multiplyScalar(-speed));
-    if (this.freeCamKeys.right)
-      velocity.add(right.clone().multiplyScalar(speed));
-    if (this.freeCamKeys.left)
-      velocity.add(right.clone().multiplyScalar(-speed));
+    if (this.freeCamKeys.forward) velocity.add(forward.clone().multiplyScalar(speed));
+    if (this.freeCamKeys.backward) velocity.add(forward.clone().multiplyScalar(-speed));
+    if (this.freeCamKeys.right) velocity.add(right.clone().multiplyScalar(speed));
+    if (this.freeCamKeys.left) velocity.add(right.clone().multiplyScalar(-speed));
     if (this.freeCamKeys.up) velocity.add(up.clone().multiplyScalar(speed));
     if (this.freeCamKeys.down) velocity.add(up.clone().multiplyScalar(-speed));
 
@@ -458,7 +454,7 @@ export class CameraManager {
       lookTarget.x,
       lookTarget.y,
       lookTarget.z,
-      false
+      false,
     );
   }
 
@@ -475,14 +471,14 @@ export class CameraManager {
       return;
     }
 
-    if (this.mode === 'free') {
+    if (this.mode === "free") {
       // Free camera - FPS-style movement
       this.updateFreeCam(delta);
       this.controls.update(delta);
       return;
     }
 
-    if (this.mode === 'ballOrbit') {
+    if (this.mode === "ballOrbit") {
       // Ball orbit mode - camera orbits around ball and follows it
       if (this.targetBall) {
         const ballPos = this.targetBall.position;
@@ -537,10 +533,7 @@ export class CameraManager {
     // When switching TO car cam, initialize smoothedCarYaw from current camera position
     // to avoid camera jump
     if (this.lastIsBallCam !== null && this.lastIsBallCam !== isBallCam && !isBallCam) {
-      const carToCamera = new THREE.Vector3().subVectors(
-        this.camera.position,
-        carPos
-      );
+      const carToCamera = new THREE.Vector3().subVectors(this.camera.position, carPos);
       carToCamera.y = 0;
       if (carToCamera.length() > 0.01) {
         carToCamera.normalize();
@@ -559,7 +552,10 @@ export class CameraManager {
 
     // Calculate transition step based on transitionSpeed
     // At speed 1.0: duration = 0.5s, at speed 2.0: duration = 0.25s
-    const transitionDuration = Math.max(0.15, Math.min(0.6, this.baseDuration / this.transitionSpeed));
+    const transitionDuration = Math.max(
+      0.15,
+      Math.min(0.6, this.baseDuration / this.transitionSpeed),
+    );
     const step = delta / transitionDuration;
 
     // Move currentBlend towards targetBlend
@@ -579,18 +575,26 @@ export class CameraManager {
     const finalPos = new THREE.Vector3().lerpVectors(
       carCamState.cameraPos,
       ballCamState.cameraPos,
-      alpha
+      alpha,
     );
 
     // === ROTATION: Spherical interpolation (SLERP) using quaternions ===
     // This is critical for smooth rotation without gimbal lock
 
     // Calculate quaternion for car cam orientation
-    this._tempMatrix.lookAt(carCamState.cameraPos, carCamState.lookTarget, new THREE.Vector3(0, 1, 0));
+    this._tempMatrix.lookAt(
+      carCamState.cameraPos,
+      carCamState.lookTarget,
+      new THREE.Vector3(0, 1, 0),
+    );
     this._tempQuatCarCam.setFromRotationMatrix(this._tempMatrix);
 
     // Calculate quaternion for ball cam orientation
-    this._tempMatrix.lookAt(ballCamState.cameraPos, ballCamState.lookTarget, new THREE.Vector3(0, 1, 0));
+    this._tempMatrix.lookAt(
+      ballCamState.cameraPos,
+      ballCamState.lookTarget,
+      new THREE.Vector3(0, 1, 0),
+    );
     this._tempQuatBallCam.setFromRotationMatrix(this._tempMatrix);
 
     // Check dot product - if negative, negate one quaternion to take shortest path
@@ -599,7 +603,7 @@ export class CameraManager {
         -this._tempQuatBallCam.x,
         -this._tempQuatBallCam.y,
         -this._tempQuatBallCam.z,
-        -this._tempQuatBallCam.w
+        -this._tempQuatBallCam.w,
       );
     }
 
@@ -607,7 +611,7 @@ export class CameraManager {
     const finalQuat = new THREE.Quaternion().slerpQuaternions(
       this._tempQuatCarCam,
       this._tempQuatBallCam,
-      alpha
+      alpha,
     );
 
     // Apply camera angle (pitch adjustment) to the target orientation
@@ -670,17 +674,12 @@ export class CameraManager {
     ballToCar.normalize();
 
     // Position camera behind car relative to ball (use followDistance setting)
-    const cameraPos = carPos
-      .clone()
-      .add(ballToCar.multiplyScalar(this.followDistance));
+    const cameraPos = carPos.clone().add(ballToCar.multiplyScalar(this.followDistance));
 
     // Calculate blend factor for aerial adjustments (in UU)
     const ballHeightDiff = ballPos.y - carPos.y;
     const maxHeightDiff = 800; // ~8m in UU
-    const blendFactor = Math.min(
-      1,
-      Math.max(0, ballHeightDiff / maxHeightDiff)
-    );
+    const blendFactor = Math.min(1, Math.max(0, ballHeightDiff / maxHeightDiff));
 
     // Camera height: slightly lower during aerials to see the car better
     cameraPos.y = carPos.y + this.followHeight - blendFactor * 100;
@@ -693,7 +692,7 @@ export class CameraManager {
     const lookTarget = new THREE.Vector3().lerpVectors(
       ballPos,
       new THREE.Vector3(carPos.x, carPos.y + 100, carPos.z),
-      blendFactor * 0.6
+      blendFactor * 0.6,
     );
 
     return { cameraPos, lookTarget };
@@ -738,10 +737,8 @@ export class CameraManager {
 
       // Check if car is going roughly forward or backward relative to its orientation
       let orientationToMovement = movementYaw - orientationYaw;
-      while (orientationToMovement > Math.PI)
-        orientationToMovement -= Math.PI * 2;
-      while (orientationToMovement < -Math.PI)
-        orientationToMovement += Math.PI * 2;
+      while (orientationToMovement > Math.PI) orientationToMovement -= Math.PI * 2;
+      while (orientationToMovement < -Math.PI) orientationToMovement += Math.PI * 2;
 
       // If moving backward, flip the orientation yaw
       if (Math.abs(orientationToMovement) > Math.PI / 2) {
@@ -771,7 +768,7 @@ export class CameraManager {
     // Use swivelSpeed for rotation speed (RL range: 1.0-10.0)
     // Higher swivelSpeed = faster camera rotation around car
     // (framerate-independent: scale by the real frame delta, not assumed 60fps)
-    const yawLerpSpeed = isFlipping ? (this.swivelSpeed * 0.4) : this.swivelSpeed;
+    const yawLerpSpeed = isFlipping ? this.swivelSpeed * 0.4 : this.swivelSpeed;
     this.smoothedCarYaw += yawDiff * Math.min(1, yawLerpSpeed * delta);
 
     // Calculate camera position using smoothed yaw
@@ -781,7 +778,7 @@ export class CameraManager {
     const cameraPos = new THREE.Vector3(
       carPos.x + backwardX * this.followDistance,
       carPos.y + this.followHeight,
-      carPos.z + backwardZ * this.followDistance
+      carPos.z + backwardZ * this.followDistance,
     );
 
     if (cameraPos.y < this.minHeight) {
@@ -794,7 +791,7 @@ export class CameraManager {
     const lookTarget = new THREE.Vector3(
       carPos.x + Math.sin(this.smoothedCarYaw) * lookAheadDistance,
       carPos.y,
-      carPos.z + Math.cos(this.smoothedCarYaw) * lookAheadDistance
+      carPos.z + Math.cos(this.smoothedCarYaw) * lookAheadDistance,
     );
 
     return { cameraPos, lookTarget };
@@ -830,15 +827,7 @@ export class CameraManager {
    * Smoothly move camera to position and target
    */
   moveTo(posX, posY, posZ, targetX, targetY, targetZ, smooth = true) {
-    this.controls.setLookAt(
-      posX,
-      posY,
-      posZ,
-      targetX,
-      targetY,
-      targetZ,
-      smooth
-    );
+    this.controls.setLookAt(posX, posY, posZ, targetX, targetY, targetZ, smooth);
   }
 
   /**
@@ -889,7 +878,7 @@ export class CameraManager {
       // Ball orbit specific state
       lastBallOrbitPos: this.lastBallOrbitPos ? this.lastBallOrbitPos.clone() : null,
     };
-    console.log('[CameraManager] Camera state saved:', this.savedCameraState.mode);
+    console.log("[CameraManager] Camera state saved:", this.savedCameraState.mode);
   }
 
   /**
@@ -898,12 +887,12 @@ export class CameraManager {
    */
   restoreCameraState() {
     if (!this.savedCameraState) {
-      console.warn('[CameraManager] No saved camera state to restore');
+      console.warn("[CameraManager] No saved camera state to restore");
       return null;
     }
 
     const saved = this.savedCameraState;
-    console.log('[CameraManager] Restoring camera state:', saved.mode);
+    console.log("[CameraManager] Restoring camera state:", saved.mode);
 
     // Restore position and rotation
     this.camera.position.copy(saved.position);
@@ -929,9 +918,13 @@ export class CameraManager {
     const lookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(saved.quaternion);
     lookAt.multiplyScalar(100).add(saved.position);
     this.controls.setLookAt(
-      saved.position.x, saved.position.y, saved.position.z,
-      lookAt.x, lookAt.y, lookAt.z,
-      false
+      saved.position.x,
+      saved.position.y,
+      saved.position.z,
+      lookAt.x,
+      lookAt.y,
+      lookAt.z,
+      false,
     );
 
     // Return info for caller to restore mode and target
@@ -991,12 +984,16 @@ export class CameraManager {
 
     // Update controls
     this.controls.setLookAt(
-      podiumPosition.x, podiumPosition.y, podiumPosition.z,
-      podiumLookAt.x, podiumLookAt.y, podiumLookAt.z,
-      false
+      podiumPosition.x,
+      podiumPosition.y,
+      podiumPosition.z,
+      podiumLookAt.x,
+      podiumLookAt.y,
+      podiumLookAt.z,
+      false,
     );
 
-    console.log('[CameraManager] Podium camera setup');
+    console.log("[CameraManager] Podium camera setup");
   }
 
   /**
@@ -1033,9 +1030,13 @@ export class CameraManager {
       this.camera.getWorldDirection(lookAt);
       lookAt.multiplyScalar(100).add(this.camera.position);
       this.controls.setLookAt(
-        position.x, position.y, position.z,
-        lookAt.x, lookAt.y, lookAt.z,
-        false
+        position.x,
+        position.y,
+        position.z,
+        lookAt.x,
+        lookAt.y,
+        lookAt.z,
+        false,
       );
 
       this.hasFollowTarget = true;
@@ -1098,12 +1099,12 @@ export class CameraManager {
       this.followTargetOrbitParams = null;
 
       // Re-enable controls if in ballOrbit mode
-      if (this.mode === 'ballOrbit') {
+      if (this.mode === "ballOrbit") {
         this.controls.enabled = true;
       }
 
       // Exit pointer lock if we were in free mode
-      if (this.mode === 'free' && document.pointerLockElement === this.domElement) {
+      if (this.mode === "free" && document.pointerLockElement === this.domElement) {
         document.exitPointerLock();
       }
     }
@@ -1119,7 +1120,7 @@ export class CameraManager {
     // In ballOrbit mode, use orbit parameters around LOCAL ball
     // This eliminates stuttering because the camera follows the ball at 60fps
     // Only the orbit angles/distance are synchronized at 20Hz
-    if (this.mode === 'ballOrbit') {
+    if (this.mode === "ballOrbit") {
       const localBallPos = this.targetBall?.position;
 
       if (localBallPos && this.followCurrentOrbitParams && this.followTargetOrbitParams) {
@@ -1129,10 +1130,12 @@ export class CameraManager {
 
         // Interpolate distance linearly
         this.followCurrentOrbitParams.distance +=
-          (this.followTargetOrbitParams.distance - this.followCurrentOrbitParams.distance) * lerpFactor;
+          (this.followTargetOrbitParams.distance - this.followCurrentOrbitParams.distance) *
+          lerpFactor;
 
         // Interpolate angles - handle wrap-around for azimuth
-        let azimuthDiff = this.followTargetOrbitParams.azimuth - this.followCurrentOrbitParams.azimuth;
+        let azimuthDiff =
+          this.followTargetOrbitParams.azimuth - this.followCurrentOrbitParams.azimuth;
         while (azimuthDiff > Math.PI) azimuthDiff -= Math.PI * 2;
         while (azimuthDiff < -Math.PI) azimuthDiff += Math.PI * 2;
         this.followCurrentOrbitParams.azimuth += azimuthDiff * lerpFactor;
@@ -1146,7 +1149,11 @@ export class CameraManager {
 
         // Apply interpolated orbit parameters
         this.controls.dollyTo(this.followCurrentOrbitParams.distance, false);
-        this.controls.rotateTo(this.followCurrentOrbitParams.azimuth, this.followCurrentOrbitParams.polar, false);
+        this.controls.rotateTo(
+          this.followCurrentOrbitParams.azimuth,
+          this.followCurrentOrbitParams.polar,
+          false,
+        );
 
         // Update controls to apply changes
         this.controls.update(delta);
@@ -1175,7 +1182,7 @@ export class CameraManager {
         lookAt.x,
         lookAt.y,
         lookAt.z,
-        false
+        false,
       );
     }
   }
@@ -1204,7 +1211,7 @@ export class CameraManager {
       this.defaultFreecamLookAt.x,
       this.defaultFreecamLookAt.y,
       this.defaultFreecamLookAt.z,
-      false
+      false,
     );
   }
 
@@ -1232,35 +1239,35 @@ export class CameraManager {
 
     // Clean up event listeners
     if (this.ballOrbitScrollHandler) {
-      this.domElement.removeEventListener('wheel', this.ballOrbitScrollHandler);
+      this.domElement.removeEventListener("wheel", this.ballOrbitScrollHandler);
     }
     if (this.onKeyDown) {
-      document.removeEventListener('keydown', this.onKeyDown);
+      document.removeEventListener("keydown", this.onKeyDown);
     }
     if (this.onKeyUp) {
-      document.removeEventListener('keyup', this.onKeyUp);
+      document.removeEventListener("keyup", this.onKeyUp);
     }
     if (this.onMouseMove) {
-      document.removeEventListener('mousemove', this.onMouseMove);
+      document.removeEventListener("mousemove", this.onMouseMove);
     }
     // Right-click drag event listeners
     if (this.onMouseDown) {
-      this.domElement.removeEventListener('mousedown', this.onMouseDown);
+      this.domElement.removeEventListener("mousedown", this.onMouseDown);
     }
     if (this.onMouseUp) {
-      document.removeEventListener('mouseup', this.onMouseUp);
+      document.removeEventListener("mouseup", this.onMouseUp);
     }
     if (this.onPointerLockChange) {
-      document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+      document.removeEventListener("pointerlockchange", this.onPointerLockChange);
     }
     if (this.onMouseLeave) {
-      this.domElement.removeEventListener('mouseleave', this.onMouseLeave);
+      this.domElement.removeEventListener("mouseleave", this.onMouseLeave);
     }
     if (this.onWindowBlur) {
-      window.removeEventListener('blur', this.onWindowBlur);
+      window.removeEventListener("blur", this.onWindowBlur);
     }
     if (this.onVisibilityChange) {
-      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+      document.removeEventListener("visibilitychange", this.onVisibilityChange);
     }
   }
 }
