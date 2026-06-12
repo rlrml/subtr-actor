@@ -120,8 +120,13 @@ impl PossessionStatsAccumulator {
             .as_deref()
             .and_then(static_field_third_label_value)
         {
+            let field_half = field_half_for_field_third(field_third);
             self.stats.labeled_time.add(
-                [possession_label, StatLabel::new("field_third", field_third)],
+                [
+                    possession_label,
+                    StatLabel::new("field_third", field_third),
+                    StatLabel::new("field_half", field_half),
+                ],
                 event.duration,
             );
         } else {
@@ -138,6 +143,14 @@ fn static_field_third_label_value(value: &str) -> Option<&'static str> {
         "neutral_third" => Some("neutral_third"),
         "team_one_third" => Some("team_one_third"),
         _ => None,
+    }
+}
+
+fn field_half_for_field_third(value: &str) -> &'static str {
+    match value {
+        "team_zero_third" => "team_zero_side",
+        "team_one_third" => "team_one_side",
+        _ => "neutral",
     }
 }
 
@@ -167,6 +180,73 @@ fn team_relative_possession_label(label: &StatLabel, is_team_zero: bool) -> Stat
                 "defensive_third"
             },
         ),
+        ("field_half", "team_zero_side") => StatLabel::new(
+            "field_half",
+            if is_team_zero {
+                "defensive_half"
+            } else {
+                "offensive_half"
+            },
+        ),
+        ("field_half", "team_one_side") => StatLabel::new(
+            "field_half",
+            if is_team_zero {
+                "offensive_half"
+            } else {
+                "defensive_half"
+            },
+        ),
         _ => label.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn event(possession_state: &str, field_third: &str, duration: f32) -> PossessionEvent {
+        PossessionEvent {
+            time: 0.0,
+            frame: 0,
+            end_time: duration,
+            end_frame: 1,
+            active: true,
+            duration,
+            possession_state: possession_state.to_owned(),
+            player_id: None,
+            field_third: Some(field_third.to_owned()),
+        }
+    }
+
+    #[test]
+    fn possession_labeled_time_includes_field_half() {
+        let mut accumulator = PossessionStatsAccumulator::default();
+        accumulator.apply_event(&event("team_zero", "team_zero_third", 2.0));
+
+        assert_eq!(
+            accumulator.stats().labeled_time.entries[0].labels,
+            vec![
+                StatLabel::new("field_half", "team_zero_side"),
+                StatLabel::new("field_third", "team_zero_third"),
+                StatLabel::new("possession_state", "team_zero"),
+            ]
+        );
+        assert_eq!(accumulator.stats().labeled_time.entries[0].value, 2.0);
+    }
+
+    #[test]
+    fn team_relative_possession_stats_translate_field_half() {
+        let mut accumulator = PossessionStatsAccumulator::default();
+        accumulator.apply_event(&event("team_zero", "team_one_third", 3.0));
+
+        let team_zero = accumulator.stats().for_team(true);
+        assert_eq!(
+            team_zero.labeled_time.entries[0].labels,
+            vec![
+                StatLabel::new("field_half", "offensive_half"),
+                StatLabel::new("field_third", "offensive_third"),
+                StatLabel::new("possession_state", "own"),
+            ]
+        );
     }
 }

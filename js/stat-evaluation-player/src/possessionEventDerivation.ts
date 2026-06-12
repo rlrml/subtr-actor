@@ -103,7 +103,19 @@ function relativePossessionLabel(label: StatLabel, isTeamZero: boolean): StatLab
   if (label.key === "field_third" && label.value === "team_one_third") {
     return { key: "field_third", value: isTeamZero ? "offensive_third" : "defensive_third" };
   }
+  if (label.key === "field_half" && label.value === "team_zero_side") {
+    return { key: "field_half", value: isTeamZero ? "defensive_half" : "offensive_half" };
+  }
+  if (label.key === "field_half" && label.value === "team_one_side") {
+    return { key: "field_half", value: isTeamZero ? "offensive_half" : "defensive_half" };
+  }
   return { ...label };
+}
+
+function fieldHalfForThird(fieldThird: string): string {
+  if (fieldThird === "team_zero_third") return "team_zero_side";
+  if (fieldThird === "team_one_third") return "team_one_side";
+  return "neutral";
 }
 
 function possessionTeamStats(raw: RawPossessionStats, isTeamZero: boolean): PossessionTeamStats {
@@ -152,6 +164,7 @@ function accumulatePossessionFrame(
   const labels: StatLabel[] = [{ key: "possession_state", value: state.possessionState }];
   if (state.fieldThird != null) {
     labels.push({ key: "field_third", value: state.fieldThird });
+    labels.push({ key: "field_half", value: fieldHalfForThird(state.fieldThird) });
   }
   addLabeledTime(raw.labeled_time, labels, dt);
 }
