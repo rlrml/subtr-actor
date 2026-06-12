@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import initSubtr from "@rlrml/subtr-actor";
 import { SubtrActorPlayer } from "../adapter/SubtrActorPlayer.js";
-import { parseReplay } from "../adapter/wasm.js";
+import { loadReplay } from "../adapter/wasm.js";
 
 // Node can't fetch() the web-target wasm over file://; pre-init with bytes so
 // @rlrml/player's later default() init short-circuits to the ready instance.
@@ -21,7 +21,7 @@ const replayUrl = new URL("../../../../assets/recent-ranked-doubles-2026-03-10.r
 const bytes = new Uint8Array(readFileSync(fileURLToPath(replayUrl)));
 
 console.log("parsing via subtr-actor WASM…");
-const raw = await parseReplay(bytes);
+const { replay, raw } = await loadReplay(bytes);
 const player = new SubtrActorPlayer(raw as never);
 
 console.log("\n== roster ==");
@@ -97,3 +97,22 @@ ok(
   "frameIndexAt clamps to ends",
   player.frameIndexAt(-5) === 0 && player.frameIndexAt(player.duration + 5) === player.frameTimes.length - 1,
 );
+
+// Phase 2 (docs/PLAYER_PARITY.md): the adapter and @rlrml/player's ReplayModel
+// are two views over the same raw output — ids and time axis must agree.
+const adapterIds = new Set(player.playerList.map((p) => p.id));
+const modelIds = new Set(replay.players.map((p) => p.id));
+ok(
+  "adapter ids == ReplayModel ids",
+  adapterIds.size === modelIds.size && [...adapterIds].every((id) => modelIds.has(id)),
+);
+ok("time axis starts at 0", player.frameTimes[0] === 0);
+ok(
+  `rawStartTime matches ReplayModel (${player.rawStartTime.toFixed(3)}s)`,
+  player.rawStartTime === replay.rawStartTime,
+);
+ok(
+  "duration matches ReplayModel",
+  Math.abs(player.duration - replay.duration) < 0.001,
+);
+ok("frame count matches ReplayModel", player.frameTimes.length === replay.frameCount);

@@ -105,6 +105,15 @@ Key modules:
   compatibility matrix, the id/name and `pitch`/`angle` mappings, and the
   3-phase roadmap toward porting `js/stat-evaluation-player` live in
   [`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md).
+- **Shared data layer (Parity Phase 2).** `viewer.replay` is `@rlrml/player`'s
+  `ReplayModel`, built from the same single WASM parse that feeds the adapter
+  (`loadReplay` in `src/adapter/wasm.ts`). The adapter's player ids and time
+  axis are aligned with it exactly: ids mirror `playerIdToString`, and all
+  adapter times are shifted by `rawStartTime` so t=0 is the first frame — the
+  same normalization `normalizeReplayData` applies. Headless cross-checks in
+  `src/dev/validate.mts` assert id-set and time-axis equality. This requires
+  the **workspace** `@rlrml/player` (`file:../player`, see
+  [`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md) for the build steps).
 - **Recorded camera settings.** subtr-actor now extracts each player's
   replicated RL camera preset (`TAGame.CameraSettingsActor_TA:ProfileSettings`
   → `PlayerInfo.camera_settings`: fov/height/angle/distance/stiffness/swivel/
@@ -123,11 +132,10 @@ Key modules:
    position-smoothing and frame-filtering passes that exist to clean raw replay
    jitter that subtr-actor already handles upstream; those should be removed,
    not preserved.
-3. **Parity Phases 2–3** ([`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md)):
-   expose `viewer.replay: ReplayModel` via `@rlrml/player`'s
-   `normalizeReplayData`, then close the plugin-context gap and port the
-   timeline-overlay / recorder plugins so `js/stat-evaluation-player` can run
-   on this viewer.
+3. **Parity Phase 3** ([`docs/PLAYER_PARITY.md`](./docs/PLAYER_PARITY.md)):
+   close the plugin-context gap (`replay`/`options`/`state` in plugin
+   contexts) and port the timeline-overlay / recorder plugins so
+   `js/stat-evaluation-player` can run on this viewer.
 
 ## Focused layout (cleanup complete)
 
@@ -156,5 +164,16 @@ a ledger of what was removed live in
 ```
 npm install
 npm run dev          # dev server with a sample replay
-npx tsx src/dev/validate.mts   # headless data-pipeline check
+npx tsx src/dev/validate.mts   # headless data-pipeline + parity cross-checks
 ```
+
+Local-workspace dependencies (both `file:` installs, wired by `npm install`):
+
+- `@rlrml/subtr-actor` → `../pkg`, built by `js/scripts/build-wasm.sh` (the
+  published WASM predates fields the viewer needs).
+- `@rlrml/player` → `../player`, built with
+  `cd ../player && npm ci && npx vite build && npx tsc --project tsconfig.build.json`
+  (the published package predates the `ReplayModel` time-axis fields).
+  The player resolves `@rlrml/subtr-actor` at runtime through
+  `js/player/node_modules/@rlrml/subtr-actor → ../pkg` (a symlink; recreate it
+  after an `npm ci` in `js/player`).

@@ -162,6 +162,15 @@ async function main() {
     s = viewer.getState();
     ok("view mode free releases", s.cameraViewMode === "free" && camPlugin.getMode() === "orbit");
     ok("snapshot equals state", JSON.stringify(viewer.getSnapshot()) === JSON.stringify(viewer.getState()));
+    // Phase 2: shared data layer (viewer.replay is @rlrml/player's ReplayModel).
+    const model = viewer.replay;
+    ok("replay model present", !!model && model.frameCount > 0);
+    ok(
+      "replay model ids/time axis match adapter",
+      !!model &&
+        model.players.some((p) => p.id === first.id) &&
+        Math.abs(model.duration - viewer.getState().duration) < 0.001,
+    );
     viewer.play();
   }
   if (params.get("paused")) viewer.pause();

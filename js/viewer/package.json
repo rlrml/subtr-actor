@@ -10,7 +10,8 @@
     "check:tsc": "tsc --noEmit"
   },
   "dependencies": {
-    "@rlrml/player": "^0.12.0",
+    "@rlrml/player": "file:../player",
+    "@rlrml/subtr-actor": "file:../pkg",
     "camera-controls": "^2.10.1",
     "eventemitter3": "^5.0.1"
   },
@@ -21,6 +22,7 @@
     "@types/node": "^25.5.0",
     "@types/three": "^0.180.0",
     "three": "^0.180.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
     "vite-plugin-wasm": "^3.5.0"

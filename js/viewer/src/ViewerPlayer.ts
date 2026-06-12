@@ -17,6 +17,7 @@ import { ArenaManager } from "./managers/ArenaManager.js";
 import { ActorManager } from "./managers/ActorManager.js";
 import { EffectsManager } from "./managers/EffectsManager.js";
 import type { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
+import type { ReplayModel } from "@rlrml/player";
 import type { CameraPlugin } from "./plugins/camera.js";
 import type {
   BallRenderState,
@@ -78,6 +79,14 @@ export class ViewerPlayer extends EventTarget {
   readonly container: HTMLElement;
   /** The subtr-actor adapter — the sole data source (timelines + live entities). */
   readonly adapter: SubtrActorPlayer;
+  /**
+   * @rlrml/player's normalized `ReplayModel` over the same raw WASM output the
+   * adapter consumes (docs/PLAYER_PARITY.md Phase 2) — the data surface
+   * @rlrml/player consumers read. Shares the adapter's time axis (t=0 at the
+   * first frame) and player-id format. Null when constructed directly with an
+   * adapter only; `createViewer()` always provides it.
+   */
+  readonly replay: ReplayModel | null;
   readonly options: ViewerOptions;
 
   readonly sceneManager: SceneManager;
@@ -118,10 +127,16 @@ export class ViewerPlayer extends EventTarget {
   /** True once view-mode/attachment was set through the parity surface. */
   private attachmentTouched = false;
 
-  constructor(container: HTMLElement, adapter: SubtrActorPlayer, options: ViewerOptions = {}) {
+  constructor(
+    container: HTMLElement,
+    adapter: SubtrActorPlayer,
+    options: ViewerOptions = {},
+    replay: ReplayModel | null = null,
+  ) {
     super();
     this.container = container;
     this.adapter = adapter;
+    this.replay = replay;
     this.options = options;
     this.speed = Math.max(0.1, options.initialPlaybackRate ?? options.speed ?? 1);
     this.loop = options.loop ?? false;

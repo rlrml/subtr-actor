@@ -7,15 +7,16 @@ high-fidelity viewer unchanged.
 
 Three phases:
 
-1. **Control surface** *(done — this document)*: state shape, setters, frame
-   stepping, `setState`/`getSnapshot`/`subscribe`/`onBeforeRender`, camera
-   delegation, `initial*` constructor options, stable player ids.
-2. **Shared data layer** *(next)*: expose `viewer.replay: ReplayModel` by running
-   `@rlrml/player`'s `normalizeReplayData` on the same raw WASM output the
-   adapter already consumes.
-3. **Plugin-context parity**: add `replay`/`options`/`state` to plugin contexts,
-   `FrameRenderInfo` in the render context, and port/reuse the timeline overlay,
-   boost-pickup animation, ballchasing overlay, and canvas recorder plugins.
+1. **Control surface** *(done)*: state shape, setters, frame stepping,
+   `setState`/`getSnapshot`/`subscribe`/`onBeforeRender`, camera delegation,
+   `initial*` constructor options, stable player ids.
+2. **Shared data layer** *(done — see below)*: `viewer.replay: ReplayModel` from
+   `@rlrml/player`'s `normalizeReplayData` over the same raw WASM output the
+   adapter consumes, with the adapter's ids and time axis aligned to it.
+3. **Plugin-context parity** *(next)*: add `replay`/`options`/`state` to plugin
+   contexts, `FrameRenderInfo` in the render context, and port/reuse the
+   timeline overlay, boost-pickup animation, ballchasing overlay, and canvas
+   recorder plugins.
 
 ## State (`getState()` / `subscribe` payload)
 
@@ -57,12 +58,41 @@ toggles round-trip correctly), but no rendering behavior is attached yet.
 | `setBallCamEnabled(bool)` | ✅ | forces ball/car cam (overrides the recorded state) |
 | toggle setters (`setBoostMeterEnabled`, …) | 🟡 | accepted; tracked-but-inert (see table above) |
 | `addPlugin` / `removePlugin` / `getPlugins` / `destroy` / `dispose` | ✅ same | plugin *contract* differs until Phase 3 (`ViewerPlugin` vs `ReplayPlayerPlugin`) |
-| `.replay` / playlist & timeline-projection APIs | ❌ Phase 2+ | `.adapter` is the data surface for now |
+| `.replay: ReplayModel` | ✅ same | see “Shared data layer” below |
+| playlist & timeline-projection APIs | ❌ Phase 3+ | skip-window projection needs goal/kickoff events first |
 
 Camera delegation requires an installed camera plugin
 (`createCameraPlugin()`, plugin id `"camera"`). Parity camera state is tracked
 either way and pushed onto a camera plugin whenever one is installed — but
 without one the calls only update reported state.
+
+## Shared data layer (Phase 2)
+
+`viewer.replay` is `@rlrml/player`'s `ReplayModel` — the exact structure its
+consumers (most importantly `js/stat-evaluation-player`) read. One WASM parse
+feeds both layers: `createViewer` calls `loadReplay` (`adapter/wasm.ts`), which
+returns `loadReplayFromBytes`'s `{ replay, raw }`; `raw` builds the adapter,
+`replay` is stored on the viewer. The model costs nothing extra —
+`loadReplayFromBytes` computes it anyway.
+
+Two cross-layer invariants make the model and the adapter interchangeable
+(`src/dev/validate.mts` asserts both against a real replay):
+
+- **Player ids.** The adapter's `_idKey` mirrors `@rlrml/player`'s
+  `playerIdToString` (`Kind:value` from the remote-id tagged union), so
+  `adapter.playerList[].id` ≡ `replay.players[].id` byte-for-byte.
+- **Time axis.** Raw replay clocks don't start at 0; `normalizeReplayData`
+  shifts every time by the first frame's raw time (`rawStartTime`). The adapter
+  applies the identical shift to its frame timeline, keyframes, and boost-pad
+  events, and exposes `adapter.rawStartTime`. `viewer.currentTime`,
+  `FrameRenderInfo`, and `ReplayModel` times are all directly comparable.
+
+**Build prerequisite.** The published `@rlrml/player` predates `rawStartTime`
+(and the WASM-side fields the viewer needs), so the package depends on the
+workspace build: `"@rlrml/player": "file:../player"` (build it with
+`npx vite build && npx tsc --project tsconfig.build.json` in `js/player`) and
+`"@rlrml/subtr-actor": "file:../pkg"` (built by `js/scripts/build-wasm.sh`,
+which also writes the `package.json` that makes `js/pkg` installable).
 
 ## Constructor options
 

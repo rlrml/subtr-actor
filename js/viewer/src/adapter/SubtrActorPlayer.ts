@@ -224,6 +224,12 @@ export class SubtrActorPlayer extends EventEmitter {
   playerList: ViewerPlayerInfo[] = [];
   /** Monotonic per-frame timestamps (s) — the replay's frame timeline. */
   frameTimes: number[] = [];
+  /**
+   * The raw replay clock value at the first frame. All adapter times (frame
+   * timeline, boost-pad events, duration) are shifted by this so t=0 is the
+   * first frame — matching @rlrml/player's ReplayModel time axis exactly.
+   */
+  rawStartTime = 0;
   ball = new BallEntity();
   players = new Map<string, PlayerEntity>();
   boostPads = new Map<number, BoostPadEntity>();
@@ -245,8 +251,16 @@ export class SubtrActorPlayer extends EventEmitter {
     const fd = this.raw.frame_data;
     const meta = this.raw.meta;
     const metaFrames = fd.metadata_frames;
-    this.duration = metaFrames.length ? metaFrames[metaFrames.length - 1].time : 0;
-    this.frameTimes = metaFrames.map((f) => f.time);
+    // Replay clocks don't start at 0 (the raw first-frame time is several
+    // seconds in). Shift everything so t=0 is the first frame — the exact
+    // normalization @rlrml/player's normalizeReplayData applies
+    // (normalizeReplayTime = max(0, raw - startTime)) — so viewer playback
+    // time is directly comparable to ReplayModel times (PLAYER_PARITY Phase 2).
+    const startTime = metaFrames[0]?.time ?? 0;
+    this.rawStartTime = startTime;
+    const t = (rawTime: number) => Math.max(0, rawTime - startTime);
+    this.duration = metaFrames.length ? t(metaFrames[metaFrames.length - 1].time) : 0;
+    this.frameTimes = metaFrames.map((f) => t(f.time));
 
     // remote_id -> { name, team, car } lookup from meta roster
     const infoByKey = new Map<string, { info: RawPlayerInfo; team: number }>();
@@ -256,7 +270,7 @@ export class SubtrActorPlayer extends EventEmitter {
     // Ball motion timeline
     fd.ball_data.frames.forEach((f, i) => {
       if (f === "Empty" || !("Data" in f)) return;
-      const mk = this._rbToKeyframe(f.Data.rigid_body, metaFrames[i]?.time ?? 0, i);
+      const mk = this._rbToKeyframe(f.Data.rigid_body, t(metaFrames[i]?.time ?? startTime), i);
       if (mk) this._ballTimeline.push(mk);
     });
 
@@ -288,7 +302,7 @@ export class SubtrActorPlayer extends EventEmitter {
       const motion: MotionKeyframe[] = [];
       const flags: FlagsKeyframe[] = [];
       pdata.frames.forEach((f, i) => {
-        const time = metaFrames[i]?.time ?? 0;
+        const time = t(metaFrames[i]?.time ?? startTime);
         if (f === "Empty" || !("Data" in f)) return;
         const mk = this._rbToKeyframe(f.Data.rigid_body, time, i);
         if (mk) motion.push(mk);
@@ -329,9 +343,10 @@ export class SubtrActorPlayer extends EventEmitter {
             ? false
             : null;
       if (available === null) return;
+      const time = Math.max(0, e.time - this.rawStartTime); // same shift as frame times
       const bucket = eventsByPadId.get(e.pad_id);
-      if (bucket) bucket.push({ time: e.time, available });
-      else eventsByPadId.set(e.pad_id, [{ time: e.time, available }]);
+      if (bucket) bucket.push({ time, available });
+      else eventsByPadId.set(e.pad_id, [{ time, available }]);
     });
 
     (this.raw.boost_pads ?? []).forEach((pad) => {
@@ -356,9 +371,18 @@ export class SubtrActorPlayer extends EventEmitter {
   }
 
   private _idKey(remoteId: unknown): string {
-    // RemoteIdTs is a tagged union ({Steam: "..."} etc.) or scalar; JSON is a
-    // stable enough key for matching roster <-> frame players.
-    return typeof remoteId === "string" ? remoteId : JSON.stringify(remoteId);
+    // RemoteIdTs is a tagged union ({Steam: "..."} etc.) or scalar. Mirrors
+    // @rlrml/player's playerIdToString (replay-data-helpers.ts) so adapter ids
+    // are byte-identical to ReplayModel `players[].id` — required for the
+    // shared data layer (docs/PLAYER_PARITY.md Phase 2); validate.mts
+    // cross-checks the two id sets to catch drift.
+    if (typeof remoteId === "string" || typeof remoteId === "number") return String(remoteId);
+    if (remoteId && typeof remoteId === "object") {
+      const [kind, value] = Object.entries(remoteId)[0] ?? ["Unknown", "unknown"];
+      if (typeof value === "string" || typeof value === "number") return `${kind}:${value}`;
+      return `${kind}:${JSON.stringify(value)}`;
+    }
+    return JSON.stringify(remoteId);
   }
 
   // ── Renderer-facing API ────────────────────────────────────────────────────
