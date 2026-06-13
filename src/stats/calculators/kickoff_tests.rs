@@ -71,6 +71,7 @@ fn boost_pickup_at(
         field_half: BoostPickupFieldHalf::Own,
         activity: BoostPickupActivity::Active,
         detection: BoostPickupDetection::Both,
+        pad_zone: Some(BoostPickupPadZone::Defensive),
         is_steal: false,
         collected_amount,
         overfill_amount: 0.0,

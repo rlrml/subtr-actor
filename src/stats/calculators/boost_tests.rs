@@ -36,6 +36,50 @@ fn test_player(
 }
 
 #[test]
+fn pad_zone_classifies_big_pads_by_three_zones_and_small_pads_by_half() {
+    assert_eq!(
+        BoostCalculator::pad_zone_from_position(
+            true,
+            BoostPadSize::Big,
+            Some(glam::Vec3::new(3072.0, 4096.0, 73.0)),
+        ),
+        Some(BoostPickupPadZone::Offensive)
+    );
+    assert_eq!(
+        BoostCalculator::pad_zone_from_position(
+            true,
+            BoostPadSize::Big,
+            Some(glam::Vec3::new(3584.0, 0.0, 73.0)),
+        ),
+        Some(BoostPickupPadZone::Neutral)
+    );
+    assert_eq!(
+        BoostCalculator::pad_zone_from_position(
+            true,
+            BoostPadSize::Big,
+            Some(glam::Vec3::new(3072.0, -4096.0, 73.0)),
+        ),
+        Some(BoostPickupPadZone::Defensive)
+    );
+    assert_eq!(
+        BoostCalculator::pad_zone_from_position(
+            true,
+            BoostPadSize::Small,
+            Some(glam::Vec3::new(2048.0, 1036.0, 70.0)),
+        ),
+        Some(BoostPickupPadZone::Offensive)
+    );
+    assert_eq!(
+        BoostCalculator::pad_zone_from_position(
+            true,
+            BoostPadSize::Small,
+            Some(glam::Vec3::new(2048.0, -1036.0, 70.0)),
+        ),
+        Some(BoostPickupPadZone::Defensive)
+    );
+}
+
+#[test]
 fn records_inactive_pickup_without_active_collection() {
     let mut calculator = BoostCalculator::new();
     let player_id = PlayerId::Steam(1);
