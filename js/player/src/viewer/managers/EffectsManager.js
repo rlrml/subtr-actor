@@ -1962,7 +1962,7 @@ class BoostTrail {
   constructor(carMesh) {
     this.carMesh = carMesh;
     this.active = false;
-    this.particleCount = 200;
+    this.particleCount = 120;
     this.particles = [];
 
     // Create geometry for boost particles
@@ -1991,6 +1991,7 @@ class BoostTrail {
         maxLife: 0.5,
         velocity: new THREE.Vector3(),
         active: false,
+        initialAlpha: 0,
       });
     }
 
@@ -2015,7 +2016,7 @@ class BoostTrail {
                     vColor = color;
                     vAlpha = alpha;
                     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                    gl_PointSize = size * (2500.0 / -mvPosition.z); // Slightly larger for flame effect
+                    gl_PointSize = size * (1500.0 / -mvPosition.z);
                     gl_Position = projectionMatrix * mvPosition;
                 }
             `,
@@ -2027,17 +2028,11 @@ class BoostTrail {
                     float dist = length(gl_PointCoord - vec2(0.5));
                     if (dist > 0.5) discard;
 
-                    // Softer glow with hot center
+                    // Softer glow without a white-hot billboard flare.
                     float glow = 1.0 - (dist * 2.0);
-                    glow = pow(glow, 0.6); // Softer falloff for more glow
+                    glow = pow(glow, 1.05);
 
-                    // Brighter center (white-hot core)
-                    vec3 flameColor = vColor;
-                    if (dist < 0.15) {
-                        flameColor = mix(vec3(1.0, 1.0, 0.9), vColor, dist / 0.15); // White-yellow core
-                    }
-
-                    gl_FragColor = vec4(flameColor * glow * 1.5, vAlpha * glow);
+                    gl_FragColor = vec4(vColor * glow * 0.95, vAlpha * glow);
                 }
             `,
       transparent: true,
@@ -2058,8 +2053,8 @@ class BoostTrail {
     if (!this.active) return;
 
     // Emit particles proportional to playbackSpeed
-    // At 1.0x: 3-5 particles, at 0.5x: 1-2 particles, at 2.0x: 6-10 particles
-    const baseEmit = Math.floor(Math.random() * 3) + 3;
+    // At 1.0x: 2-3 particles, at 0.5x: 1-2 particles, at 2.0x: 4-6 particles
+    const baseEmit = Math.floor(Math.random() * 2) + 2;
     const emitCount = Math.max(1, Math.round(baseEmit * playbackSpeed));
 
     for (let i = 0; i < emitCount; i++) {
@@ -2089,7 +2084,7 @@ class BoostTrail {
       // Velocity: opposite to car direction + inherit some car velocity (in UU)
       const backwardDir = new THREE.Vector3(-1, 0, 0);
       backwardDir.applyQuaternion(rotation);
-      backwardDir.multiplyScalar(150 + Math.random() * 80); // Slightly slower for denser look
+      backwardDir.multiplyScalar(115 + Math.random() * 55);
 
       particle.velocity.copy(backwardDir);
       particle.velocity.add(velocity.clone().multiplyScalar(0.2)); // Inherit 20% of car velocity
@@ -2104,18 +2099,18 @@ class BoostTrail {
       );
 
       particle.life = 0;
-      particle.maxLife = 0.3 + Math.random() * 0.3; // Shorter life (0.3-0.6s) for tighter flame
+      particle.maxLife = 0.22 + Math.random() * 0.22;
       particle.active = true;
 
-      // Start with high alpha and larger size (intense at exhaust)
-      alphas[idx] = 1.0;
-      sizes[idx] = 3.0 + Math.random() * 2.0; // Larger initial size (3-5 UU)
+      particle.initialAlpha = 0.52 + Math.random() * 0.18;
+      alphas[idx] = particle.initialAlpha;
+      sizes[idx] = 1.8 + Math.random() * 1.1;
       particle.initialSize = sizes[idx];
 
-      // Color gradient: white/yellow at start, orange/red at end
+      // Warmer exhaust colors without the bright yellow-white core.
       colors[idx * 3] = 1.0; // R
-      colors[idx * 3 + 1] = 0.8 + Math.random() * 0.2; // G (0.8-1.0 for yellow-white)
-      colors[idx * 3 + 2] = 0.3 + Math.random() * 0.3; // B (0.3-0.6 for warm tint)
+      colors[idx * 3 + 1] = 0.45 + Math.random() * 0.2;
+      colors[idx * 3 + 2] = 0.12 + Math.random() * 0.12;
 
       this.nextParticleIndex = (this.nextParticleIndex + 1) % this.particleCount;
     }
@@ -2153,17 +2148,18 @@ class BoostTrail {
       // Life factor (0 = just born, 1 = about to die)
       const lifeFactor = particle.life / particle.maxLife;
 
-      // Fade out with smooth curve
-      alphas[i] = Math.pow(1.0 - lifeFactor, 0.5);
+      // Fade out with smooth curve while preserving the softer initial opacity.
+      const initialAlpha = particle.initialAlpha || 0.6;
+      alphas[i] = initialAlpha * Math.pow(1.0 - lifeFactor, 0.75);
 
       // Shrink particles as they age (rocket flame tapers off)
       const initialSize = particle.initialSize || 3.0;
       sizes[i] = initialSize * (1.0 - lifeFactor * 0.7); // Shrink to 30% of original
 
-      // Color transition: yellow-white → orange → red as particle ages
+      // Color transition: orange → deep red as particle ages.
       colors[i * 3] = 1.0; // R stays at 1.0
-      colors[i * 3 + 1] = Math.max(0.2, 0.9 - lifeFactor * 0.7); // G: 0.9 → 0.2
-      colors[i * 3 + 2] = Math.max(0.0, 0.4 - lifeFactor * 0.4); // B: 0.4 → 0.0
+      colors[i * 3 + 1] = Math.max(0.16, 0.52 - lifeFactor * 0.34);
+      colors[i * 3 + 2] = Math.max(0.0, 0.16 - lifeFactor * 0.16);
 
       // Very light gravity (flames rise slightly)
       particle.velocity.y += 20 * delta;
