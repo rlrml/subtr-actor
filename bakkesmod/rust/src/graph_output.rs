@@ -64,17 +64,15 @@ pub(crate) unsafe fn serialize_named_analysis_node(
     engine: *const SaEngine,
     node_name: *const c_char,
 ) -> Vec<u8> {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return Vec::new();
-        };
-        let Some(node_name) = c_string_arg(node_name) else {
-            return Vec::new();
-        };
-        match builtin_analysis_node_json(&node_name, &engine.graph) {
-            Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
-            Err(_) => Vec::new(),
-        }
+    let Some(engine) = (unsafe { raw_ref(engine) }) else {
+        return Vec::new();
+    };
+    let Some(node_name) = (unsafe { c_string_arg(node_name) }) else {
+        return Vec::new();
+    };
+    match builtin_analysis_node_json(&node_name, &engine.graph) {
+        Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
+        Err(_) => Vec::new(),
     }
 }
 
@@ -98,37 +96,30 @@ pub(crate) fn callable_analysis_node_names(engine: &SaEngine) -> Vec<String> {
     callable_analysis_node_names_for_graph(&engine.graph)
 }
 
-pub(crate) fn serialize_analysis_node_names(engine: *const SaEngine) -> Vec<u8> {
-    let Some(engine) = (unsafe { engine.as_ref() }) else {
+pub(crate) unsafe fn serialize_analysis_node_names(engine: *const SaEngine) -> Vec<u8> {
+    let Some(engine) = (unsafe { raw_ref(engine) }) else {
         return Vec::new();
     };
     serde_json::to_vec(&callable_analysis_node_names(engine)).unwrap_or_default()
 }
 
 pub(crate) unsafe fn c_string_arg(value: *const c_char) -> Option<String> {
-    unsafe {
-        if value.is_null() {
-            return None;
-        }
-        CStr::from_ptr(value).to_str().ok().map(str::to_owned)
-    }
+    unsafe { raw_c_string(value) }
 }
 
 pub(crate) unsafe fn serialize_named_stats_module(
     engine: *const SaEngine,
     module_name: *const c_char,
 ) -> Vec<u8> {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return Vec::new();
-        };
-        let Some(module_name) = c_string_arg(module_name) else {
-            return Vec::new();
-        };
-        match builtin_stats_module_json(&module_name, &engine.graph) {
-            Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
-            Err(_) => Vec::new(),
-        }
+    let Some(engine) = (unsafe { raw_ref(engine) }) else {
+        return Vec::new();
+    };
+    let Some(module_name) = (unsafe { c_string_arg(module_name) }) else {
+        return Vec::new();
+    };
+    match builtin_stats_module_json(&module_name, &engine.graph) {
+        Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
+        Err(_) => Vec::new(),
     }
 }
 
@@ -136,20 +127,18 @@ pub(crate) unsafe fn serialize_named_stats_module_frame(
     engine: *const SaEngine,
     module_name: *const c_char,
 ) -> Vec<u8> {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return Vec::new();
-        };
-        let Some(module_name) = c_string_arg(module_name) else {
-            return Vec::new();
-        };
-        let Some(replay_meta) = engine.live_replay_meta.as_ref() else {
-            return Vec::new();
-        };
-        match builtin_stats_module_frame_json(&module_name, &engine.graph, replay_meta) {
-            Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
-            Err(_) => Vec::new(),
-        }
+    let Some(engine) = (unsafe { raw_ref(engine) }) else {
+        return Vec::new();
+    };
+    let Some(module_name) = (unsafe { c_string_arg(module_name) }) else {
+        return Vec::new();
+    };
+    let Some(replay_meta) = engine.live_replay_meta.as_ref() else {
+        return Vec::new();
+    };
+    match builtin_stats_module_frame_json(&module_name, &engine.graph, replay_meta) {
+        Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
+        Err(_) => Vec::new(),
     }
 }
 
@@ -157,17 +146,15 @@ pub(crate) unsafe fn serialize_named_stats_module_config(
     engine: *const SaEngine,
     module_name: *const c_char,
 ) -> Vec<u8> {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return Vec::new();
-        };
-        let Some(module_name) = c_string_arg(module_name) else {
-            return Vec::new();
-        };
-        match builtin_stats_module_config_json(&module_name, &engine.graph) {
-            Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
-            Err(_) => Vec::new(),
-        }
+    let Some(engine) = (unsafe { raw_ref(engine) }) else {
+        return Vec::new();
+    };
+    let Some(module_name) = (unsafe { c_string_arg(module_name) }) else {
+        return Vec::new();
+    };
+    match builtin_stats_module_config_json(&module_name, &engine.graph) {
+        Ok(value) => serde_json::to_vec(&value).unwrap_or_default(),
+        Err(_) => Vec::new(),
     }
 }
 
