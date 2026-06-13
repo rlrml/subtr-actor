@@ -1831,13 +1831,13 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;",
+        "const DEFAULT_CAMERA_DISTANCE_SCALE = 1;",
         "stats evaluation player default camera distance scale",
         errors,
     )
     require_contains(
         plugin_header,
-        "float cameraDistanceScale = 2.25f;",
+        "float cameraDistanceScale = 1.0f;",
         "plugin default camera distance scale mirrors stats evaluation player",
         errors,
     )
@@ -1998,14 +1998,14 @@ def main() -> int:
     )
     require_contains(
         web_player_template_source,
-        "<span>Custom camera settings</span>",
-        "stats evaluation player camera custom settings toggle",
+        "<span>Use player camera settings</span>",
+        "stats evaluation player camera player-settings toggle",
         errors,
     )
     require_contains(
         plugin_source,
-        'ImGui::Checkbox("Custom camera settings", &nextCustomSettingsEnabled)',
-        "plugin camera custom settings toggle mirrors web label",
+        'ImGui::Checkbox("Use player camera settings", &nextUsePlayerCameraSettings)',
+        "plugin camera player-settings toggle mirrors web label",
         errors,
     )
     require_contains(

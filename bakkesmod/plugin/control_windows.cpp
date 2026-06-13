@@ -497,13 +497,13 @@ void SubtrActorPlugin::renderCameraWindow() {
     scheduleUiConfigAutosave();
   }
 
-  bool nextCustomSettingsEnabled = cameraCustomSettingsEnabled;
+  bool nextUsePlayerCameraSettings = !cameraCustomSettingsEnabled;
   pushCameraDisabledStyle(!hasAttachedCamera);
   const bool customSettingsChanged =
-      ImGui::Checkbox("Custom camera settings", &nextCustomSettingsEnabled);
+      ImGui::Checkbox("Use player camera settings", &nextUsePlayerCameraSettings);
   popCameraDisabledStyle(!hasAttachedCamera);
   if (hasAttachedCamera && customSettingsChanged) {
-    cameraCustomSettingsEnabled = nextCustomSettingsEnabled;
+    cameraCustomSettingsEnabled = !nextUsePlayerCameraSettings;
     scheduleUiConfigAutosave();
   }
   if (cameraCustomSettingsEnabled) {
