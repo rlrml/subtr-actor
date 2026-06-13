@@ -1,4 +1,4 @@
-export function getAppTemplate(defaultCameraDistanceScale: number): string {
+export function getAppTemplate(): string {
   return `
   <main class="shell">
     <section class="workspace">
@@ -77,21 +77,6 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               </button>
               <button id="camera-view-side" type="button" disabled>Diagonal</button>
             </div>
-            <label>
-              <span class="label">Distance scale</span>
-              <input
-                id="camera-distance"
-                type="range"
-                min="0.75"
-                max="4"
-                step="0.05"
-                value="${defaultCameraDistanceScale}"
-                disabled
-              />
-            </label>
-            <strong id="camera-distance-readout" class="metric-readout">
-              ${defaultCameraDistanceScale.toFixed(2)}x
-            </strong>
             <label class="toggle">
               <input id="use-player-camera-settings" type="checkbox" disabled />
               <span>Use player camera settings</span>

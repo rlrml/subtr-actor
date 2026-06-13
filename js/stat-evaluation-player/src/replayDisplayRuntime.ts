@@ -39,7 +39,6 @@ export interface ReplayDisplayElements {
 
 export interface ReplayDisplayRuntimeOptions {
   readonly elements: ReplayDisplayElements;
-  readonly defaultCameraDistanceScale: number;
   getReplayLoadModal(): ReplayLoadModalController | null;
   getReplayPlayer(): StatsReplayPlayer | null;
   setReplayPlayer(value: StatsReplayPlayer | null): void;
@@ -146,8 +145,6 @@ export async function loadReplayBundleForDisplay(
     // they keep working for setCanvasRecorder/setTimelineOverlay below).
     const replayPlayer = createViewerFromParsed(elements.viewport, loadedReplay, {
       initialPlaybackRate: config?.playback.rate,
-      initialCameraDistanceScale:
-        config?.camera.distanceScale ?? options.defaultCameraDistanceScale,
       initialCustomCameraSettings: getCustomCameraSettingsFromConfig(config?.camera),
       initialAttachedPlayerId: config?.camera.attachedPlayerId ?? null,
       initialCameraViewMode: config?.camera.mode,

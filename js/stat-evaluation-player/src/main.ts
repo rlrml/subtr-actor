@@ -86,7 +86,6 @@ import { createPlayerConfigBindings, type PlayerConfigBindings } from "./playerC
 import { createWindowCommandController } from "./windowCommands.ts";
 import { ShotVisualizationController } from "./shotVisualization.ts";
 
-const DEFAULT_CAMERA_DISTANCE_SCALE = 1;
 const GOAL_WATCH_LEAD_SECONDS = 4;
 const PLAYING_SNAPSHOT_UI_INTERVAL_MS = 100;
 
@@ -514,7 +513,6 @@ async function loadReplayBundleForDisplay(
       hitboxWireframes,
       hitboxOnlyMode,
     },
-    defaultCameraDistanceScale: DEFAULT_CAMERA_DISTANCE_SCALE,
     getReplayLoadModal: () => replayLoadModal,
     getReplayPlayer: () => replayPlayer,
     setReplayPlayer(value) {
@@ -584,7 +582,7 @@ export function mountStatEvaluationPlayer(
 ): StatEvaluationPlayerHandle {
   currentMountCleanup?.();
 
-  root.innerHTML = getAppTemplate(DEFAULT_CAMERA_DISTANCE_SCALE);
+  root.innerHTML = getAppTemplate();
   appRoot = root;
   replayLoadModal = createReplayLoadModal(root);
   floatingWindowController = createFloatingWindowController({
@@ -728,8 +726,6 @@ export function mountStatEvaluationPlayer(
       cameraViewFollowButton: mustElement<HTMLButtonElement>(root, "#camera-view-follow"),
       cameraViewOverheadButton: mustElement<HTMLButtonElement>(root, "#camera-view-overhead"),
       cameraViewSideButton: mustElement<HTMLButtonElement>(root, "#camera-view-side"),
-      cameraDistance: mustElement<HTMLInputElement>(root, "#camera-distance"),
-      cameraDistanceReadout: mustElement<HTMLElement>(root, "#camera-distance-readout"),
       usePlayerCameraSettings: mustElement<HTMLInputElement>(root, "#use-player-camera-settings"),
       cameraSettingsControls: mustElement<HTMLDivElement>(root, "#camera-settings-controls"),
       customCameraFov: mustElement<HTMLInputElement>(root, "#custom-camera-fov"),
