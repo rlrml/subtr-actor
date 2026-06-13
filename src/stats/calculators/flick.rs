@@ -4,6 +4,7 @@ const FLICK_MAX_DODGE_TO_TOUCH_SECONDS: f32 = 0.32;
 const FLICK_MAX_CONTROL_TO_DODGE_SECONDS: f32 = 0.08;
 const FLICK_MAX_SETUP_STALE_SECONDS: f32 = 0.35;
 const FLICK_DODGE_LAG_TOLERANCE_SECONDS: f32 = 0.12;
+const FLICK_MIN_PENDING_DODGE_SETUP_SECONDS: f32 = 0.10;
 const FLICK_MIN_SETUP_SECONDS: f32 = 0.20;
 const FLICK_MIN_BALL_SPEED_CHANGE: f32 = 325.0;
 const FLICK_MIN_CONFIDENCE: f32 = 0.55;
@@ -653,6 +654,9 @@ impl FlickCalculator {
         touch_event: &TouchEvent,
     ) -> Option<RecentDodgeStart> {
         let setup = self.recent_setup_for_player(&player.player_id, touch_event.time)?;
+        if setup.duration < FLICK_MIN_PENDING_DODGE_SETUP_SECONDS {
+            return None;
+        }
         Some(RecentDodgeStart {
             time: touch_event.time,
             frame: touch_event.frame,
