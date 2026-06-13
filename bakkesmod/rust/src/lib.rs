@@ -6,6 +6,7 @@ use std::ffi::{CStr, CString};
 use std::io::{Read, Write};
 use std::os::raw::c_char;
 use std::ptr;
+#[cfg(test)]
 use std::slice;
 
 use base64::Engine as _;
@@ -45,6 +46,7 @@ use subtr_actor::{GoalTag, GoalTagMetadata};
 mod abi;
 mod ffi;
 mod ffi_graph_output;
+mod ffi_raw;
 mod graph_output;
 mod live_events;
 mod live_processor;
@@ -53,6 +55,7 @@ mod timeline_drain;
 pub use abi::*;
 pub use ffi::*;
 pub use ffi_graph_output::*;
+pub(crate) use ffi_raw::*;
 pub(crate) use graph_output::*;
 pub(crate) use live_events::*;
 pub(crate) use live_processor::*;
