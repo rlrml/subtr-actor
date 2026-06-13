@@ -23,6 +23,7 @@ impl_analysis_node! {
         ball_frame_state_dependency() => BallFrameState,
         player_frame_state_dependency() => PlayerFrameState,
         touch_state_dependency() => TouchState,
+        touch_dependency() => TouchCalculator,
         live_play_dependency() => LivePlayState,
     ],
     call = calculator.update,
