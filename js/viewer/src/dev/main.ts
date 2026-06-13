@@ -31,8 +31,7 @@ const log = (msg: string) => {
 async function main() {
   const container = document.getElementById("app") as HTMLDivElement;
   const params = new URLSearchParams(location.search);
-  const motionSmoothingEnabled =
-    params.get("smooth") !== "0" && params.get("smoothing") !== "0";
+  const motionSmoothingEnabled = params.get("smooth") !== "0" && params.get("smoothing") !== "0";
 
   log("parsing replay via subtr-actor WASM…");
   const replayResponse = await fetch(SAMPLE_REPLAY_URL);

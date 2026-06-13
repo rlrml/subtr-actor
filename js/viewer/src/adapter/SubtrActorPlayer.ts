@@ -401,8 +401,7 @@ export class SubtrActorPlayer extends EventEmitter {
   private _timelineProcessingOptions(): TimelineProcessingOptions {
     return {
       motionSmoothing: this.options.motionSmoothing ?? DEFAULT_POSITION_SMOOTHING,
-      smoothingBlendFactor:
-        this.options.smoothingBlendFactor ?? POSITION_SMOOTHING_BLEND_FACTOR,
+      smoothingBlendFactor: this.options.smoothingBlendFactor ?? POSITION_SMOOTHING_BLEND_FACTOR,
       smoothingAnchorInterval:
         this.options.smoothingAnchorInterval ?? POSITION_SMOOTHING_ANCHOR_INTERVAL,
       timelineCompaction: this.options.timelineCompaction ?? DEFAULT_TIMELINE_COMPACTION,
@@ -538,10 +537,7 @@ export class SubtrActorPlayer extends EventEmitter {
     return remapped;
   }
 
-  private _remapPrematch<T extends { time: number }>(
-    timeline: T[],
-    prematchEndTime: number,
-  ): T[] {
+  private _remapPrematch<T extends { time: number }>(timeline: T[], prematchEndTime: number): T[] {
     let lastPrematchFrame: T | null = null;
     for (const frame of timeline) {
       if (frame.time < prematchEndTime) lastPrematchFrame = frame;
@@ -644,12 +640,7 @@ export class SubtrActorPlayer extends EventEmitter {
     for (let index = 1; index < timeline.length; index += 1) {
       const current = timeline[index]!;
       const previous = timeline[lastKeptIndex]!;
-      if (
-        !current.position ||
-        !current.velocity ||
-        !previous.position ||
-        !previous.velocity
-      ) {
+      if (!current.position || !current.velocity || !previous.position || !previous.velocity) {
         filtered.push(current);
         lastKeptIndex = index;
         continue;
