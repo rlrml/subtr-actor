@@ -276,12 +276,19 @@
         # an ES module library and carries its public assets (models/draco) so
         # downstream apps can vendor a single package output from this exact
         # submodule revision.
-        packages.js-viewer-pkg = pkgs.buildNpmPackage {
+        packages.js-viewer-pkg = pkgs.buildNpmPackage rec {
           pname = "rlrml-viewer-npm-pkg";
           version = projectVersion;
-          src = ./.;
+          src = pkgs.runCommand "subtr-actor-js-viewer-pkg-source" { } ''
+            mkdir -p "$out"
+            cp -R ${./.}/. "$out"/
+            chmod -R u+w "$out"
+            rm -rf "$out/js/pkg"
+            mkdir -p "$out/js/pkg"
+            cp -r ${self.packages.${system}.js-web-wasm}/. "$out/js/pkg"/
+          '';
           npmRoot = "js/viewer";
-          npmDeps = pkgs.importNpmLock { npmRoot = ./js/viewer; };
+          npmDeps = pkgs.importNpmLock { npmRoot = "${src}/js/viewer"; };
           npmConfigHook = pkgs.importNpmLock.npmConfigHook;
           npmInstallFlags = [ "--ignore-scripts" ];
           preBuild = ''
