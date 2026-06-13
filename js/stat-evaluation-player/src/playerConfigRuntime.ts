@@ -1,4 +1,4 @@
-import type { ReplayPlayer } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import { getConfigAdapterSnapshot, type StatsPlayerConfigAdapter } from "./configAdapters.ts";
 import type { CameraControlsController } from "./cameraControls.ts";
 import type { RecordingConfig } from "./playerConfig.ts";
@@ -14,14 +14,14 @@ import {
 import type { StatModule } from "./statModules.ts";
 
 export interface PlaybackConfigSnapshotOptions {
-  replayPlayer: ReplayPlayer | null;
+  replayPlayer: StatsReplayPlayer | null;
   playbackRate: HTMLSelectElement;
   skipPostGoalTransitions: HTMLInputElement;
   skipKickoffs: HTMLInputElement;
 }
 
 export interface CameraConfigSnapshotOptions {
-  replayPlayer: ReplayPlayer | null;
+  replayPlayer: StatsReplayPlayer | null;
   cameraControlsController: CameraControlsController | null;
 }
 
@@ -33,7 +33,7 @@ export interface StatsPlayerConfigSnapshotOptions {
   activeMechanicTimelineKinds: ReadonlySet<string>;
   activeRenderEffectModuleIds: ReadonlySet<string>;
   initialConfig: StatsPlayerConfig | null;
-  replayPlayer: ReplayPlayer | null;
+  replayPlayer: StatsReplayPlayer | null;
   boostPadOverlayEnabled: boolean;
   recording: RecordingConfig;
   singletonWindows: SingletonWindowConfig[];
@@ -145,7 +145,7 @@ export function getReplayPlayerStatePatchFromConfig(
   playback: PlayerPlaybackConfig,
   camera: PlayerCameraConfig,
   config: StatsPlayerConfig,
-): Parameters<ReplayPlayer["setState"]>[0] {
+): Parameters<StatsReplayPlayer["setState"]>[0] {
   return {
     currentTime: playback.currentTime,
     playing: playback.playing,

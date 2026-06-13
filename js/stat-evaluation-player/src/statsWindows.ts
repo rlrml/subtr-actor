@@ -1,4 +1,4 @@
-import type { ReplayPlayer } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type {
   StatsWindowConfig,
   StatsWindowKind,
@@ -39,7 +39,7 @@ interface StatsWindowState {
 
 export interface StatsWindowsControllerOptions {
   readonly layer: HTMLElement;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   getStatsTimeline(): StatsTimeline | null;
   getStatsFrameLookup(): StatsFrameLookup | null;
   getStatRegistry(): StatDefinition[];

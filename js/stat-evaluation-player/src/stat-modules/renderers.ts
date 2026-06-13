@@ -49,7 +49,10 @@ function createSharedZoneBoundaryOverlayManager() {
   return {
     acquire(ctx: StatModuleContext): void {
       if (!zoneBoundaryLines) {
-        zoneBoundaryLines = createZoneBoundaryLines(ctx.player.sceneState.scene, ctx.fieldScale);
+        zoneBoundaryLines = createZoneBoundaryLines(
+          ctx.player.sceneState.replayRoot,
+          ctx.fieldScale,
+        );
       }
       refCount += 1;
     },

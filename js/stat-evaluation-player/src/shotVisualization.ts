@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import type { ReplayPlayer, ReplayPlayerState, ReplayTimelineEvent } from "@rlrml/player";
+import type { ReplayPlayerState, ReplayTimelineEvent } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 
 const FIELD_HALF_WIDTH = 4096;
 const FIELD_HALF_LENGTH = 5120;
@@ -20,7 +21,7 @@ interface Vec3Like {
 
 export interface ShotVisualizationControllerOptions {
   readonly body: HTMLElement;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   cueTimelineEvent(event: ReplayTimelineEvent): void;
 }
 
@@ -36,7 +37,7 @@ export class ShotVisualizationController {
   private camera: THREE.PerspectiveCamera | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private selectedShotId: string | null = null;
-  private cachedReplay: ReplayPlayer["replay"] | null = null;
+  private cachedReplay: StatsReplayPlayer["replay"] | null = null;
   private cachedShots: ShotEvent[] = [];
   private lastShotsSignature = "";
   private lastListSelectionKey: string | null = null;

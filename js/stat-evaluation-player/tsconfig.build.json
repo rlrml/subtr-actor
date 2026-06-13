@@ -12,6 +12,7 @@
       "@rlrml/subtr-actor": ["../pkg/rl_replay_subtr_actor.d.ts"],
       "@rlrml/player": ["../player/dist/lib.d.ts"],
       "@rlrml/player/generated/*": ["../player/dist/generated/*"],
+      "@rlrml/viewer": ["../viewer/dist/lib.d.ts"],
       "three": ["./node_modules/@types/three/index.d.ts"],
       "three/examples/jsm/*": ["./node_modules/@types/three/examples/jsm/*"]
     }

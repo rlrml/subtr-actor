@@ -115,6 +115,12 @@ fn print_metadata(path: &str) {
         .process_and_get_replay_meta()
         .unwrap_or_else(|error| panic!("failed to build replay meta for {path}: {error:?}"));
     println!("game_type={:#?}", meta.game_type);
+    for player in meta.player_order() {
+        println!(
+            "player={:?} camera_settings={:?}",
+            player.name, player.camera_settings
+        );
+    }
 }
 
 fn print_plausibility(path: &str) {

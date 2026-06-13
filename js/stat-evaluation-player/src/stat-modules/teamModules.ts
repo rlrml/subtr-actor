@@ -310,7 +310,7 @@ export function createBallHalfModule(): StatModule {
 
     setup(ctx) {
       replay = ctx.replay;
-      halfFieldOverlay = new HalfFieldOverlay(ctx.player.sceneState.scene, ctx.fieldScale);
+      halfFieldOverlay = new HalfFieldOverlay(ctx.player.sceneState.replayRoot, ctx.fieldScale);
     },
 
     teardown() {

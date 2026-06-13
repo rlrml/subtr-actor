@@ -1,4 +1,5 @@
-import type { ReplayPlayer, ReplayPlayerState, ReplayTimelineEvent } from "@rlrml/player";
+import type { ReplayPlayerState, ReplayTimelineEvent } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import {
   buildEventPlaylistItems,
   getEventPlaylistSelectedSourceIds,
@@ -7,7 +8,7 @@ import {
 
 export interface EventPlaylistWindowControllerOptions {
   readonly body: HTMLElement;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   getSources(): EventPlaylistSource[];
   cueTimelineEvent(event: ReplayTimelineEvent): void;
   formatTime(seconds: number): string;
