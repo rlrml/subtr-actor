@@ -15,10 +15,12 @@ const FREE_CAMERA_TRANSITION_SMOOTHING = 0.14;
 const GROUND_HEIGHT_THRESHOLD_UU = 120;
 const MIN_CAMERA_HEIGHT_UU = 90;
 const PLAYER_FOCUS_HEIGHT_UU = 40;
+const BALL_CAM_AERIAL_HEIGHT_ADJUSTMENT_UU = 100;
 const BALL_CAM_HEIGHT_BIAS_UU = 45;
 const BALL_CAM_LOOK_BLEND = 0.58;
 const BALL_CAM_DIRECTION_BLEND = 0.82;
 const BALL_CAM_MAX_FOV = 132;
+const BALL_CAM_TRANSITION_BASE_DURATION_SECONDS = 0.5;
 const DEFAULT_FORWARD = new THREE.Vector3(-1, 0, 0);
 const DEFAULT_UP = new THREE.Vector3(0, 0, 1);
 const OVERHEAD_UP = new THREE.Vector3(-1, 0, 0);
@@ -31,6 +33,12 @@ const CAMERA_POSITION_EPSILON_SQ = 16;
 const CAMERA_TARGET_EPSILON_SQ = 16;
 const CAMERA_UP_EPSILON_RAD = 0.003;
 const CAMERA_FOV_EPSILON = 0.05;
+
+export interface AttachedCameraBlendState {
+  currentBlend: number;
+  targetBlend: number;
+  lastIsBallCam: boolean | null;
+}
 
 export function interpolatePosition(
   current: Vec3 | null,
@@ -304,10 +312,12 @@ export function updateAttachedCamera(options: {
   nextFrameIndex: number;
   alpha: number;
   dt: number;
+  renderDelta: number;
   attachedPlayerUnavailable?: boolean;
   ballPosition: THREE.Vector3 | null;
   desiredCameraPosition: THREE.Vector3;
   desiredLookTarget: THREE.Vector3;
+  blendState?: AttachedCameraBlendState;
 }): void {
   const {
     cameraViewMode,
@@ -324,10 +334,19 @@ export function updateAttachedCamera(options: {
     nextFrameIndex,
     alpha,
     dt,
+    renderDelta,
     replay,
     sceneState,
+    blendState: providedBlendState,
   } = options;
   const controls = sceneState.controls;
+  const blendState =
+    providedBlendState ??
+    ({
+      currentBlend: ballCamEnabled ? 1 : 0,
+      targetBlend: ballCamEnabled ? 1 : 0,
+      lastIsBallCam: ballCamEnabled,
+    } satisfies AttachedCameraBlendState);
 
   if (cameraViewMode === "free") {
     controls.enabled = true;
@@ -391,9 +410,16 @@ export function updateAttachedCamera(options: {
   const playerFocusPoint = basePosition
     .clone()
     .addScaledVector(DEFAULT_UP, PLAYER_FOCUS_HEIGHT_UU * fieldScale);
-  let targetFov = cameraSettings.fov ?? 110;
+  const carTargetFov = cameraSettings.fov ?? 110;
+  let ballTargetFov = carTargetFov;
 
-  if (ballCamEnabled && ballPosition) {
+  const carCameraPosition = playerFocusPoint.clone().add(followOffset);
+  carCameraPosition.z = Math.max(MIN_CAMERA_HEIGHT_UU * fieldScale, carCameraPosition.z);
+  const carLookTarget = playerFocusPoint.clone();
+  let ballCameraPosition = carCameraPosition;
+  let ballLookTarget = carLookTarget;
+
+  if (ballPosition) {
     const ballFocusPoint = ballPosition
       .clone()
       .addScaledVector(DEFAULT_UP, BALL_CAM_HEIGHT_BIAS_UU * fieldScale);
@@ -405,28 +431,62 @@ export function updateAttachedCamera(options: {
       .addScaledVector(lookDirection, 1 - BALL_CAM_DIRECTION_BLEND)
       .normalize();
 
-    desiredLookTarget.copy(playerFocusPoint).lerp(ballFocusPoint, BALL_CAM_LOOK_BLEND);
-    desiredCameraPosition.copy(chaseAnchor).addScaledVector(ballCamDirection, -distance);
-    desiredCameraPosition.z = Math.max(MIN_CAMERA_HEIGHT_UU * fieldScale, desiredCameraPosition.z);
-    const cameraToPlayer = playerFocusPoint.clone().sub(desiredCameraPosition);
-    const cameraToBall = ballFocusPoint.clone().sub(desiredCameraPosition);
+    ballLookTarget = playerFocusPoint.clone().lerp(ballFocusPoint, BALL_CAM_LOOK_BLEND);
+    ballCameraPosition = chaseAnchor.clone().addScaledVector(ballCamDirection, -distance);
+    const heightBlend = Math.min(
+      1,
+      Math.max(0, (ballFocusPoint.z - playerFocusPoint.z) / (800 * fieldScale)),
+    );
+    ballCameraPosition.z -= heightBlend * BALL_CAM_AERIAL_HEIGHT_ADJUSTMENT_UU * fieldScale;
+    ballCameraPosition.z = Math.max(MIN_CAMERA_HEIGHT_UU * fieldScale, ballCameraPosition.z);
+    const cameraToPlayer = playerFocusPoint.clone().sub(ballCameraPosition);
+    const cameraToBall = ballFocusPoint.clone().sub(ballCameraPosition);
     if (cameraToPlayer.lengthSq() > 0.0001 && cameraToBall.lengthSq() > 0.0001) {
       const separationAngle = cameraToPlayer.angleTo(cameraToBall);
-      targetFov = Math.min(
+      ballTargetFov = Math.min(
         BALL_CAM_MAX_FOV,
-        Math.max(targetFov, THREE.MathUtils.radToDeg(separationAngle) * 1.7),
+        Math.max(ballTargetFov, THREE.MathUtils.radToDeg(separationAngle) * 1.7),
       );
     }
-  } else {
-    desiredCameraPosition.copy(playerFocusPoint).add(followOffset);
-    desiredCameraPosition.z = Math.max(MIN_CAMERA_HEIGHT_UU * fieldScale, desiredCameraPosition.z);
-    desiredLookTarget.copy(playerFocusPoint);
   }
 
-  sceneState.camera.position.lerp(desiredCameraPosition, CAMERA_SMOOTHING);
-  sceneState.camera.up.lerp(DEFAULT_UP, CAMERA_SMOOTHING).normalize();
-  controls.target.lerp(desiredLookTarget, CAMERA_SMOOTHING);
-  sceneState.camera.fov = THREE.MathUtils.lerp(sceneState.camera.fov, targetFov, CAMERA_SMOOTHING);
+  if (blendState.lastIsBallCam !== null && blendState.lastIsBallCam !== ballCamEnabled) {
+    blendState.targetBlend = ballCamEnabled ? 1 : 0;
+  } else {
+    blendState.targetBlend = ballCamEnabled ? 1 : 0;
+    if (blendState.lastIsBallCam === null) {
+      blendState.currentBlend = blendState.targetBlend;
+    }
+  }
+  blendState.lastIsBallCam = ballCamEnabled;
+
+  const transitionSpeed = cameraSettings.transitionSpeed ?? 1.3;
+  const transitionDuration = Math.max(
+    0.15,
+    Math.min(0.6, BALL_CAM_TRANSITION_BASE_DURATION_SECONDS / transitionSpeed),
+  );
+  const transitionStep = Math.max(0, renderDelta) / transitionDuration;
+  if (blendState.currentBlend < blendState.targetBlend) {
+    blendState.currentBlend = Math.min(
+      blendState.currentBlend + transitionStep,
+      blendState.targetBlend,
+    );
+  } else if (blendState.currentBlend > blendState.targetBlend) {
+    blendState.currentBlend = Math.max(
+      blendState.currentBlend - transitionStep,
+      blendState.targetBlend,
+    );
+  }
+  const blend =
+    blendState.currentBlend * blendState.currentBlend * (3 - 2 * blendState.currentBlend);
+
+  desiredCameraPosition.lerpVectors(carCameraPosition, ballCameraPosition, blend);
+  desiredLookTarget.lerpVectors(carLookTarget, ballLookTarget, blend);
+
+  sceneState.camera.position.copy(desiredCameraPosition);
+  sceneState.camera.up.copy(DEFAULT_UP);
+  controls.target.copy(desiredLookTarget);
+  sceneState.camera.fov = THREE.MathUtils.lerp(carTargetFov, ballTargetFov, blend);
   sceneState.camera.updateProjectionMatrix();
   sceneState.camera.lookAt(controls.target);
 }

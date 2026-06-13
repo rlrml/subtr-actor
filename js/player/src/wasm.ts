@@ -61,6 +61,9 @@ interface ReplayLoadRequest {
   type: "load-replay";
   bytes: ArrayBuffer;
   reportEveryNFrames: number;
+  motionSmoothing?: boolean;
+  smoothingBlendFactor?: number;
+  smoothingAnchorInterval?: number;
 }
 
 interface ReplayProgressMessage {
@@ -166,6 +169,9 @@ async function loadReplayFromBytesWithWorker(
       type: "load-replay",
       bytes: workerBytes.buffer,
       reportEveryNFrames: options.reportEveryNFrames ?? 1000,
+      motionSmoothing: options.motionSmoothing,
+      smoothingBlendFactor: options.smoothingBlendFactor,
+      smoothingAnchorInterval: options.smoothingAnchorInterval,
     };
     worker.postMessage(request, [workerBytes.buffer]);
   });
@@ -201,6 +207,9 @@ export async function loadReplayFromBytes(
   ) as RawReplayFramesData;
   options.onProgress?.({ stage: "normalizing", progress: 0 });
   const replay = await normalizeReplayDataAsync(raw, {
+    motionSmoothing: options.motionSmoothing,
+    smoothingBlendFactor: options.smoothingBlendFactor,
+    smoothingAnchorInterval: options.smoothingAnchorInterval,
     onProgress(progress) {
       options.onProgress?.({ stage: "normalizing", progress });
     },

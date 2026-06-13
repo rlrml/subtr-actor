@@ -14,6 +14,9 @@ interface ReplayLoadRequest {
   type: "load-replay";
   bytes: ArrayBuffer;
   reportEveryNFrames: number;
+  motionSmoothing?: boolean;
+  smoothingBlendFactor?: number;
+  smoothingAnchorInterval?: number;
 }
 
 interface ReplayProgressMessage {
@@ -109,6 +112,9 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
     });
     const rawReplayData = JSON.parse(new TextDecoder().decode(rawBuffer)) as RawReplayFramesData;
     const replay = normalizeReplayData(rawReplayData, {
+      motionSmoothing: event.data.motionSmoothing,
+      smoothingBlendFactor: event.data.smoothingBlendFactor,
+      smoothingAnchorInterval: event.data.smoothingAnchorInterval,
       progressReportFrameInterval: event.data.reportEveryNFrames,
       onProgress(progress) {
         postMessageToMain({

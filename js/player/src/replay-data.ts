@@ -30,6 +30,16 @@ export interface NormalizeReplayDataOptions {
   onProgress?: (progress: number, details: NormalizeReplayProgress) => void;
   progressReportMinDelta?: number;
   progressReportFrameInterval?: number;
+  /**
+   * Apply Ballcam-style velocity-based correction to normalized ball/player
+   * samples. Defaults to true; set false when inspecting exact raw frame
+   * positions.
+   */
+  motionSmoothing?: boolean;
+  /** Blend toward the measured replay sample during velocity correction. */
+  smoothingBlendFactor?: number;
+  /** Every N corrected samples, use a stronger measured-sample anchor. */
+  smoothingAnchorInterval?: number;
 }
 
 export interface NormalizeReplayDataAsyncOptions extends NormalizeReplayDataOptions {
@@ -65,6 +75,11 @@ const DEFAULT_CAMERA_SETTINGS: CameraSettings = {
 const NORMALIZATION_PROGRESS_REPORT_MIN_DELTA = 0.005;
 const NORMALIZATION_PROGRESS_REPORT_FRAME_INTERVAL = Number.POSITIVE_INFINITY;
 const NORMALIZATION_ASYNC_YIELD_INTERVAL_MS = 16;
+const DEFAULT_MOTION_SMOOTHING = true;
+const MOTION_SMOOTHING_BLEND_FACTOR = 0.15;
+const MOTION_SMOOTHING_ANCHOR_INTERVAL = 10;
+const MAX_POSITION_CORRECTION_DT_SECONDS = 0.1;
+const MAX_POSITION_CORRECTION_DRIFT_UU = 10;
 
 function normalizeVector(value: Vec3): Vec3 | null {
   const magnitude = Math.hypot(value.x, value.y, value.z);
@@ -228,6 +243,113 @@ function fillBoundedPlayerSampleGaps(frames: PlayerSample[]): void {
       gapStart = index;
     }
   }
+}
+
+function distance(left: Vec3, right: Vec3): number {
+  return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
+}
+
+function clonePosition(position: Vec3): Vec3 {
+  return { x: position.x, y: position.y, z: position.z };
+}
+
+function sampleIsAbsent(sample: BallSample | PlayerSample | undefined): boolean {
+  return Boolean(sample && "isPresent" in sample && sample.isPresent === false);
+}
+
+function applyVelocityBasedPositionCorrection(
+  frames: PlaybackFrame[],
+  samples: Array<BallSample | PlayerSample>,
+  options: Required<
+    Pick<
+      NormalizeReplayDataOptions,
+      "motionSmoothing" | "smoothingBlendFactor" | "smoothingAnchorInterval"
+    >
+  >,
+): void {
+  if (!options.motionSmoothing || samples.length < 3 || frames.length < 3) {
+    return;
+  }
+
+  let startIndex = 0;
+  while (
+    startIndex < samples.length &&
+    (!samples[startIndex]?.position ||
+      !samples[startIndex]?.linearVelocity ||
+      sampleIsAbsent(samples[startIndex]))
+  ) {
+    startIndex += 1;
+  }
+  if (startIndex >= samples.length - 1) {
+    return;
+  }
+
+  let smoothed = clonePosition(samples[startIndex]!.position!);
+
+  for (let index = startIndex + 1; index < samples.length; index += 1) {
+    const previous = samples[index - 1]!;
+    const current = samples[index]!;
+    if (!previous.position || !current.position || sampleIsAbsent(current)) {
+      continue;
+    }
+    if (!previous.linearVelocity || !current.linearVelocity) {
+      smoothed = clonePosition(current.position);
+      continue;
+    }
+
+    const currentFrame = frames[index];
+    const previousFrame = frames[index - 1];
+    const dt = currentFrame && previousFrame ? currentFrame.time - previousFrame.time : 0;
+    if (dt <= 0 || dt > MAX_POSITION_CORRECTION_DT_SECONDS) {
+      smoothed = clonePosition(current.position);
+      continue;
+    }
+
+    if (distance(smoothed, current.position) > MAX_POSITION_CORRECTION_DRIFT_UU) {
+      smoothed = clonePosition(current.position);
+      continue;
+    }
+
+    const averageVelocity = {
+      x: (previous.linearVelocity.x + current.linearVelocity.x) / 2,
+      y: (previous.linearVelocity.y + current.linearVelocity.y) / 2,
+      z: (previous.linearVelocity.z + current.linearVelocity.z) / 2,
+    };
+    const predicted = {
+      x: smoothed.x + averageVelocity.x * dt,
+      y: smoothed.y + averageVelocity.y * dt,
+      z: smoothed.z + averageVelocity.z * dt,
+    };
+    const blend =
+      (index - startIndex) % options.smoothingAnchorInterval === 0
+        ? 0.5
+        : options.smoothingBlendFactor;
+
+    smoothed = {
+      x: predicted.x * (1 - blend) + current.position.x * blend,
+      y: predicted.y * (1 - blend) + current.position.y * blend,
+      z: predicted.z * (1 - blend) + current.position.z * blend,
+    };
+    current.position = clonePosition(smoothed);
+  }
+}
+
+function normalizeMotionSmoothingOptions(
+  options: NormalizeReplayDataOptions,
+): Required<
+  Pick<
+    NormalizeReplayDataOptions,
+    "motionSmoothing" | "smoothingBlendFactor" | "smoothingAnchorInterval"
+  >
+> {
+  return {
+    motionSmoothing: options.motionSmoothing ?? DEFAULT_MOTION_SMOOTHING,
+    smoothingBlendFactor: options.smoothingBlendFactor ?? MOTION_SMOOTHING_BLEND_FACTOR,
+    smoothingAnchorInterval: Math.max(
+      1,
+      options.smoothingAnchorInterval ?? MOTION_SMOOTHING_ANCHOR_INTERVAL,
+    ),
+  };
 }
 
 function currentTimeMs(): number {
@@ -869,6 +991,11 @@ export function normalizeReplayData(
   const frames = buildPlaybackFrames(raw, progressTracker);
   const players = buildPlayerTracks(raw, progressTracker);
   const ballFrames = buildBallFrames(raw, progressTracker);
+  const motionSmoothingOptions = normalizeMotionSmoothingOptions(options);
+  applyVelocityBasedPositionCorrection(frames, ballFrames, motionSmoothingOptions);
+  for (const player of players) {
+    applyVelocityBasedPositionCorrection(frames, player.frames, motionSmoothingOptions);
+  }
   const boostPads = buildBoostPads(raw, players, startTime, progressTracker);
   const tickMarks = buildReplayTickMarks(raw, startTime, progressTracker);
   const timelineEvents = buildTimelineEvents(raw, players, tickMarks, startTime, progressTracker);
@@ -898,6 +1025,11 @@ export async function normalizeReplayDataAsync(
   const frames = await buildPlaybackFramesAsync(raw, progressTracker);
   const players = await buildPlayerTracksAsync(raw, progressTracker);
   const ballFrames = await buildBallFramesAsync(raw, progressTracker);
+  const motionSmoothingOptions = normalizeMotionSmoothingOptions(options);
+  applyVelocityBasedPositionCorrection(frames, ballFrames, motionSmoothingOptions);
+  for (const player of players) {
+    applyVelocityBasedPositionCorrection(frames, player.frames, motionSmoothingOptions);
+  }
   const boostPads = await buildBoostPadsAsync(raw, players, startTime, progressTracker);
   const tickMarks = buildReplayTickMarks(raw, startTime, progressTracker);
   const timelineEvents = await buildTimelineEventsAsync(
