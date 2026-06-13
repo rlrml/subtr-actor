@@ -52,7 +52,9 @@ jobs:
 
           for attempt in 1 2 3; do
             echo "nix build attempt ${attempt}/3"
-            if nix build .#js-stats-player-pages --print-build-logs --fallback; then
+            rm -rf result
+            if nix build .#js-stats-player-pages --out-link result --print-build-logs --fallback; then
+              test -d result
               exit 0
             fi
 
