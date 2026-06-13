@@ -51,6 +51,31 @@ The same core pipeline is exposed through Python and JavaScript bindings.
   Codex configuration surface. If a Claude setting contains durable project
   guidance, translate it into this file or `.agents/`.
 
+## Before Committing (avoid CI failures)
+
+CI fails on lint/format/compile issues far more often than on test logic. To
+catch those locally without running the whole suite:
+
+- **Always run `just check` clean before committing.** It is the fast gate that
+  mirrors CI's blocking lint/compile checks: `check_release_versions.py`,
+  `cargo fmt --all -- --check`, `cargo metadata --locked`,
+  `cargo clippy --all-targets --all-features -- -D warnings`, and the JS
+  prettier/eslint style check. If it is not clean, do not commit.
+- Run `just check-rust` or `just check-style` alone when a change is purely
+  Rust or purely JS and you want a faster loop. `just check` runs both.
+- Clippy in CI uses `--all-targets --all-features`, so a warning in a test or
+  feature-gated module fails CI even though a plain `cargo build` passes. The
+  `just clippy` / `just fmt-check` recipes now use the same flags as CI — bare
+  `cargo clippy` / `cargo fmt --check` do not, so prefer the `just` recipes.
+- When you touch JS/TS, or any Rust type that is exported via `ts-rs`, also run
+  `just check-types`. CI regenerates the TS bindings and fails on drift, so
+  stale generated types under `js/*/src/generated/` are a common failure mode;
+  regenerate them with the curated `npm run generate:raw-types` (player) or
+  `npm run generate:stats-types` (stats player) and re-run the check.
+- `just check` deliberately omits the slow CI jobs (`cargo test`, the release
+  build, JS bundling, the binding-regen step). Run those targeted at what you
+  changed — e.g. `cargo test module_name` — rather than the full suite.
+
 ## Common Commands
 
 - Rust formatting generally uses `cargo fmt`.

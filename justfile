@@ -107,13 +107,42 @@ clean:
 fmt:
     {{nix_develop}} cargo fmt
 
-# Check formatting
+# Check formatting (matches CI: --all)
 fmt-check:
-    {{nix_develop}} cargo fmt -- --check
+    {{nix_develop}} cargo fmt --all -- --check
 
-# Run clippy
+# Run clippy (matches CI: --all-targets --all-features -D warnings)
 clippy:
-    {{nix_develop}} cargo clippy -- -D warnings
+    {{nix_develop}} cargo clippy --all-targets --all-features -- -D warnings
+
+# ---------------------------------------------------------------------------
+# CI preflight gates
+#
+# `just check` is the fast quality gate that mirrors the blocking lint/compile
+# checks CI runs on every PR. Agents MUST run it clean before committing. It
+# deliberately omits the slow jobs (cargo test, release build, JS bundling,
+# ts-rs binding regen) -- run those targeted, or via `check-types` / `test`,
+# when the change actually touches them.
+# ---------------------------------------------------------------------------
+
+# Fast quality gate: Rust quality + JS style. Run this clean before every commit.
+check: check-rust check-style
+
+# Rust quality gate (mirrors CI "Rust quality" job, minus tests/release build)
+check-rust:
+    {{nix_develop}} python3 scripts/check_release_versions.py
+    {{nix_develop}} cargo fmt --all -- --check
+    {{nix_develop}} cargo metadata --locked --format-version 1 > /dev/null
+    {{nix_develop}} cargo clippy --all-targets --all-features -- -D warnings
+
+# JS/TS style gate (prettier + eslint; mirrors CI "Check JS/TS style")
+check-style:
+    cd js && npm run check:style
+
+# Heavy JS/TS gate: ts-rs binding drift + typecheck. Run when you change JS/TS or an exported (ts-rs) Rust type. Needs built wasm pkg + JS deps.
+check-types:
+    cd js/player && npm run check
+    cd js/stat-evaluation-player && npm run check
 
 # Version bump (requires version as argument)
 # Updates workspace version and subtr-actor dependency in bindings, tags and pushes
