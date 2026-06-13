@@ -1,5 +1,41 @@
 use super::*;
 
+unsafe fn live_graph_output_len(engine: *const SaEngine, output_name: &str) -> usize {
+    unsafe { raw_ref(engine) }
+        .and_then(|engine| serialize_live_graph_output(engine, output_name))
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+}
+
+unsafe fn write_live_graph_output(
+    engine: *const SaEngine,
+    output_name: &str,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(engine) = (unsafe { raw_ref(engine) }) else {
+        return 0;
+    };
+    let Some(bytes) = serialize_live_graph_output(engine, output_name) else {
+        return 0;
+    };
+    unsafe { copy_to_raw(&bytes, out_bytes, max_bytes) }
+}
+
+unsafe fn write_bytes(bytes: &[u8], out_bytes: *mut u8, max_bytes: usize) -> usize {
+    unsafe { copy_to_raw(bytes, out_bytes, max_bytes) }
+}
+
+unsafe fn drain_pending<T: Copy>(
+    pending: &mut Vec<T>,
+    out_events: *mut T,
+    max_events: usize,
+) -> usize {
+    let count = unsafe { copy_to_raw(pending, out_events, max_events) };
+    pending.drain(..count);
+    count
+}
+
 #[unsafe(no_mangle)]
 /// Returns the UTF-8 byte length of the current serialized graph event bundle.
 ///
@@ -11,13 +47,7 @@ use super::*;
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_events_json_len(engine: *const SaEngine) -> usize {
-    unsafe {
-        engine
-            .as_ref()
-            .and_then(|engine| serialize_live_graph_output(engine, "events"))
-            .map(|bytes| bytes.len())
-            .unwrap_or(0)
-    }
+    unsafe { live_graph_output_len(engine, "events") }
 }
 
 #[unsafe(no_mangle)]
@@ -35,21 +65,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_events_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return 0;
-        };
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-
-        let Some(bytes) = serialize_live_graph_output(engine, "events") else {
-            return 0;
-        };
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    unsafe { write_live_graph_output(engine, "events", out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -63,13 +79,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_events_json(
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_frame_json_len(engine: *const SaEngine) -> usize {
-    unsafe {
-        engine
-            .as_ref()
-            .and_then(|engine| serialize_live_graph_output(engine, "frame"))
-            .map(|bytes| bytes.len())
-            .unwrap_or(0)
-    }
+    unsafe { live_graph_output_len(engine, "frame") }
 }
 
 #[unsafe(no_mangle)]
@@ -87,21 +97,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_frame_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return 0;
-        };
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-
-        let Some(bytes) = serialize_live_graph_output(engine, "frame") else {
-            return 0;
-        };
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    unsafe { write_live_graph_output(engine, "frame", out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -116,13 +112,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_frame_json(
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_timeline_json_len(engine: *const SaEngine) -> usize {
-    unsafe {
-        engine
-            .as_ref()
-            .and_then(|engine| serialize_live_graph_output(engine, "timeline"))
-            .map(|bytes| bytes.len())
-            .unwrap_or(0)
-    }
+    unsafe { live_graph_output_len(engine, "timeline") }
 }
 
 #[unsafe(no_mangle)]
@@ -141,21 +131,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_timeline_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return 0;
-        };
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-
-        let Some(bytes) = serialize_live_graph_output(engine, "timeline") else {
-            return 0;
-        };
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    unsafe { write_live_graph_output(engine, "timeline", out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -171,13 +147,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_timeline_json(
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_stats_json_len(engine: *const SaEngine) -> usize {
-    unsafe {
-        engine
-            .as_ref()
-            .and_then(|engine| serialize_live_graph_output(engine, "stats"))
-            .map(|bytes| bytes.len())
-            .unwrap_or(0)
-    }
+    unsafe { live_graph_output_len(engine, "stats") }
 }
 
 #[unsafe(no_mangle)]
@@ -195,21 +165,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return 0;
-        };
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-
-        let Some(bytes) = serialize_live_graph_output(engine, "stats") else {
-            return 0;
-        };
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    unsafe { write_live_graph_output(engine, "stats", out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -248,15 +204,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-        let bytes = serialize_named_stats_module(engine, module_name);
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    let bytes = unsafe { serialize_named_stats_module(engine, module_name) };
+    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -295,15 +244,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_frame_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-        let bytes = serialize_named_stats_module_frame(engine, module_name);
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    let bytes = unsafe { serialize_named_stats_module_frame(engine, module_name) };
+    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -342,15 +284,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_config_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-        let bytes = serialize_named_stats_module_config(engine, module_name);
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    let bytes = unsafe { serialize_named_stats_module_config(engine, module_name) };
+    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -369,17 +304,15 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_graph_output_json_len(
     engine: *const SaEngine,
     output_name: *const c_char,
 ) -> usize {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return 0;
-        };
-        let Some(output_name) = c_string_arg(output_name) else {
-            return 0;
-        };
-        serialize_live_graph_output(engine, &output_name)
-            .map(|bytes| bytes.len())
-            .unwrap_or(0)
-    }
+    let Some(engine) = (unsafe { raw_ref(engine) }) else {
+        return 0;
+    };
+    let Some(output_name) = (unsafe { c_string_arg(output_name) }) else {
+        return 0;
+    };
+    serialize_live_graph_output(engine, &output_name)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
 }
 
 #[unsafe(no_mangle)]
@@ -400,23 +333,16 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_graph_output_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return 0;
-        };
-        let Some(output_name) = c_string_arg(output_name) else {
-            return 0;
-        };
-        let Some(bytes) = serialize_live_graph_output(engine, &output_name) else {
-            return 0;
-        };
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    let Some(engine) = (unsafe { raw_ref(engine) }) else {
+        return 0;
+    };
+    let Some(output_name) = (unsafe { c_string_arg(output_name) }) else {
+        return 0;
+    };
+    let Some(bytes) = serialize_live_graph_output(engine, &output_name) else {
+        return 0;
+    };
+    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -457,15 +383,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        let bytes = serialize_named_analysis_node(engine, node_name);
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    let bytes = unsafe { serialize_named_analysis_node(engine, node_name) };
+    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -481,7 +400,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_json(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_analysis_node_names_json_len(
     engine: *const SaEngine,
 ) -> usize {
-    serialize_analysis_node_names(engine).len()
+    unsafe { serialize_analysis_node_names(engine).len() }
 }
 
 #[unsafe(no_mangle)]
@@ -500,15 +419,8 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_names_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        let bytes = serialize_analysis_node_names(engine);
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-        let count = max_bytes.min(bytes.len());
-        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-        count
-    }
+    let bytes = unsafe { serialize_analysis_node_names(engine) };
+    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -524,12 +436,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_names_json(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_graph_info_json_len(
     engine: *const SaEngine,
 ) -> usize {
-    unsafe {
-        engine
-            .as_ref()
-            .map(|engine| engine.graph_info_json.len())
-            .unwrap_or(0)
-    }
+    unsafe { raw_ref(engine) }
+        .map(|engine| engine.graph_info_json.len())
+        .unwrap_or(0)
 }
 
 #[unsafe(no_mangle)]
@@ -548,18 +457,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_graph_info_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe {
-        let Some(engine) = engine.as_ref() else {
-            return 0;
-        };
-        if out_bytes.is_null() || max_bytes == 0 {
-            return 0;
-        }
-
-        let count = max_bytes.min(engine.graph_info_json.len());
-        ptr::copy_nonoverlapping(engine.graph_info_json.as_ptr(), out_bytes, count);
-        count
-    }
+    let Some(engine) = (unsafe { raw_ref(engine) }) else {
+        return 0;
+    };
+    unsafe { write_bytes(&engine.graph_info_json, out_bytes, max_bytes) }
 }
 
 #[unsafe(no_mangle)]
@@ -576,19 +477,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_events(
     out_events: *mut SaMechanicEvent,
     max_events: usize,
 ) -> usize {
-    unsafe {
-        let Some(engine) = engine.as_mut() else {
-            return 0;
-        };
-        if out_events.is_null() || max_events == 0 {
-            return 0;
-        }
-
-        let count = max_events.min(engine.pending_events.len());
-        ptr::copy_nonoverlapping(engine.pending_events.as_ptr(), out_events, count);
-        engine.pending_events.drain(..count);
-        count
-    }
+    let Some(engine) = (unsafe { raw_mut(engine) }) else {
+        return 0;
+    };
+    unsafe { drain_pending(&mut engine.pending_events, out_events, max_events) }
 }
 
 #[unsafe(no_mangle)]
@@ -605,19 +497,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_team_events(
     out_events: *mut SaTeamEvent,
     max_events: usize,
 ) -> usize {
-    unsafe {
-        let Some(engine) = engine.as_mut() else {
-            return 0;
-        };
-        if out_events.is_null() || max_events == 0 {
-            return 0;
-        }
-
-        let count = max_events.min(engine.pending_team_events.len());
-        ptr::copy_nonoverlapping(engine.pending_team_events.as_ptr(), out_events, count);
-        engine.pending_team_events.drain(..count);
-        count
-    }
+    let Some(engine) = (unsafe { raw_mut(engine) }) else {
+        return 0;
+    };
+    unsafe { drain_pending(&mut engine.pending_team_events, out_events, max_events) }
 }
 
 #[unsafe(no_mangle)]
@@ -634,21 +517,14 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_goal_context_events(
     out_events: *mut SaGoalContextEvent,
     max_events: usize,
 ) -> usize {
+    let Some(engine) = (unsafe { raw_mut(engine) }) else {
+        return 0;
+    };
     unsafe {
-        let Some(engine) = engine.as_mut() else {
-            return 0;
-        };
-        if out_events.is_null() || max_events == 0 {
-            return 0;
-        }
-
-        let count = max_events.min(engine.pending_goal_context_events.len());
-        ptr::copy_nonoverlapping(
-            engine.pending_goal_context_events.as_ptr(),
+        drain_pending(
+            &mut engine.pending_goal_context_events,
             out_events,
-            count,
-        );
-        engine.pending_goal_context_events.drain(..count);
-        count
+            max_events,
+        )
     }
 }
