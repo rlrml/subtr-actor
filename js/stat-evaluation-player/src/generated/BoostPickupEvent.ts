@@ -10,21 +10,21 @@ import type { RemoteIdTs } from "./RemoteIdTs.ts";
  * A single boost pickup. Replaces the former pickup-comparison + ledger Collected/Stolen/
  * Overfill events: pad classification, theft, and amounts are all facets of one pickup.
  */
-export type BoostPickupEvent = { frame: number, time: number, player_id: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, pad_type: BoostPickupPadType, field_half: BoostPickupFieldHalf, activity: BoostPickupActivity, detection: BoostPickupDetection, 
+export type BoostPickupEvent = { frame: number, time: number, player_id: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, pad_type: BoostPickupPadType, field_half: BoostPickupFieldHalf, activity: BoostPickupActivity, detection: BoostPickupDetection,
 /**
  * Oriented pad location bucket. Big pads use offensive/neutral/defensive; small pads use
  * offensive/defensive half.
  */
-pad_zone?: BoostPickupPadZone | null, 
+pad_zone?: BoostPickupPadZone | null,
 /**
  * A steal is a pickup collected on the opponent's half (mirrors the former `Stolen` ledger
  * transaction condition).
  */
-is_steal: boolean, 
+is_steal: boolean,
 /**
  * Boost actually gained from this pickup.
  */
-collected_amount: number, 
+collected_amount: number,
 /**
  * Boost lost to the cap because the player was already near full when collecting.
  */

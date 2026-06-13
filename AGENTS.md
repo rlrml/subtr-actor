@@ -68,10 +68,17 @@ catch those locally without running the whole suite:
   `just clippy` / `just fmt-check` recipes now use the same flags as CI — bare
   `cargo clippy` / `cargo fmt --check` do not, so prefer the `just` recipes.
 - When you touch JS/TS, or any Rust type that is exported via `ts-rs`, also run
-  `just check-types`. CI regenerates the TS bindings and fails on drift, so
-  stale generated types under `js/*/src/generated/` are a common failure mode;
-  regenerate them with the curated `npm run generate:raw-types` (player) or
-  `npm run generate:stats-types` (stats player) and re-run the check.
+  `just check-types` before committing. CI regenerates the TS bindings and
+  fails on any drift, including formatting-only diffs, so stale or hand-edited
+  generated types under `js/*/src/generated/` are a common failure mode.
+  Regenerate them with the curated `npm run generate:raw-types` (player) or
+  `npm run generate:stats-types` (stats player), then re-run `just check-types`
+  and commit the exact generated output.
+- When you change exported event/state structs or stats timeline data that may
+  flow through the BakkesMod live-plugin ABI, also run
+  `cargo test -p subtr-actor-bakkesmod --no-run` before committing. This catches
+  missed mirror updates in `bakkesmod/rust/src/lib_tests/abi_layout.rs` and other
+  BakkesMod compile-time fixtures without requiring the full Windows DLL build.
 - `just check` deliberately omits the slow CI jobs (`cargo test`, the release
   build, JS bundling, the binding-regen step). Run those targeted at what you
   changed — e.g. `cargo test module_name` — rather than the full suite.
