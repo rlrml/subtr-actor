@@ -109,7 +109,7 @@ state/render contexts. That makes @rlrml/player plugins run unmodified through
 `fromReplayPlayerPlugin` (`src/plugins/replay-player-bridge.ts`):
 
 ```ts
-import { createTimelineOverlayPlugin, fromReplayPlayerPlugin } from "@rlrml/viewer";
+import { createTimelineOverlayPlugin, fromReplayPlayerPlugin } from "@rlrml/player";
 viewer.addPlugin(fromReplayPlayerPlugin(createTimelineOverlayPlugin()));
 ```
 

@@ -9,10 +9,13 @@
       "@rlrml/subtr-actor": ["../pkg/rl_replay_subtr_actor.js"]
     },
     "strict": true,
+    "allowJs": true,
+    "checkJs": false,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "esModuleInterop": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
     "skipLibCheck": true
   },
   "include": ["src"]

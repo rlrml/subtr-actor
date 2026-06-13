@@ -13,7 +13,7 @@ import {
   createFpsOverlayPlugin,
   createViewerFromParsed,
   fromReplayPlayerPlugin,
-} from "@rlrml/viewer";
+} from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { CameraControlsController } from "./cameraControls.ts";
 import type { StatsPlayerConfig } from "./playerConfig.ts";

@@ -20,7 +20,7 @@ interface ReplayDoneMessage {
   type: "done";
   replayBuffer: ArrayBuffer;
   /** Raw subtr-actor ReplayData JSON (UTF-8) — parsed on the main thread for
-   * consumers that need the unnormalized data (the @rlrml/viewer adapter). */
+   * consumers that need the unnormalized data (the @rlrml/player adapter). */
   rawReplayBuffer: ArrayBuffer;
   statsTimelineParts: TransferableStatsTimelineParts;
 }

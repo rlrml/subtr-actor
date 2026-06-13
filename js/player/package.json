@@ -1,14 +1,17 @@
 {
   "name": "@rlrml/player",
   "version": "1.0.2",
-  "description": "Replay player library for subtr-actor Rocket League replay workflows",
+  "description": "High-fidelity replay player library for subtr-actor Rocket League replay workflows",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/lib.d.ts",
   "files": [
     "dist",
+    "public",
+    "docs",
     "README.md",
+    "VIEWER_README.md",
     "LICENSE"
   ],
   "exports": {
@@ -20,6 +23,7 @@
       "types": "./dist/boost-units.d.ts",
       "import": "./dist/boost-units.js"
     },
+    "./public/*": "./public/*",
     "./generated/*": {
       "types": "./dist/generated/*.d.ts"
     },
@@ -62,11 +66,15 @@
   "peerDependencies": {
     "three": "^0.180.0"
   },
+  "dependencies": {
+    "camera-controls": "^2.10.1"
+  },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/three": "^0.180.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "vite-plugin-wasm": "^3.5.0"
   }
 }

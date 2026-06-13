@@ -17,6 +17,7 @@ async function main() {
   const publishPackage = {
     ...sourcePackage,
     dependencies: {
+      ...sourcePackage.dependencies,
       [bindingsPackage.name]: sourcePackage.version,
     },
   };
@@ -26,7 +27,14 @@ async function main() {
   const outputDir = await mkdtemp(path.join(os.tmpdir(), "subtr-actor-player-package-"));
 
   await cp(distDir, path.join(outputDir, "dist"), { recursive: true });
+  await cp(path.resolve(packageDir, "public"), path.join(outputDir, "public"), {
+    recursive: true,
+  });
+  await cp(path.resolve(packageDir, "docs"), path.join(outputDir, "docs"), {
+    recursive: true,
+  });
   await cp(path.resolve(packageDir, "README.md"), path.join(outputDir, "README.md"));
+  await cp(path.resolve(packageDir, "VIEWER_README.md"), path.join(outputDir, "VIEWER_README.md"));
   await cp(path.resolve(packageDir, "LICENSE"), path.join(outputDir, "LICENSE"));
   await writeFile(
     path.join(outputDir, "package.json"),

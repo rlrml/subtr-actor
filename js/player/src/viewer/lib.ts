@@ -1,9 +1,9 @@
 /**
- * @rlrml/viewer public surface.
+ * @rlrml/player public surface.
  *
  * The one-call embed path:
  *
- *   import { createViewer, createNameTagPlugin } from "@rlrml/viewer";
+ *   import { createViewer, createNameTagPlugin } from "@rlrml/player";
  *   const viewer = await createViewer(container, replayBytes, {
  *     autoplay: true,
  *     plugins: [createNameTagPlugin()],
@@ -17,7 +17,7 @@ import { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
 import { ViewerPlayer } from "./ViewerPlayer.js";
 import { createCameraPlugin } from "./plugins/camera.js";
 import type { ViewerOptions } from "./types.js";
-import type { ReplayLoadResult } from "@rlrml/player";
+import type { ReplayLoadResult } from "../types";
 
 /**
  * Parse raw `.replay` bytes and mount a player into `container`.
@@ -74,7 +74,8 @@ export type {
   ViewerPlayerInfo,
 } from "./adapter/SubtrActorPlayer.js";
 export { loadReplay, parseReplay } from "./adapter/wasm.js";
-export type { ReplayLoadResult, ReplayModel, ReplayScene } from "@rlrml/player";
+export type { ReplayLoadResult, ReplayModel } from "../types";
+export type { ReplayScene } from "../scene";
 export { createNameTagPlugin } from "./plugins/name-tags.js";
 export { createBoostPadsPlugin } from "./plugins/boost-pads.js";
 export { createFpsOverlayPlugin } from "./plugins/fps-overlay.js";
@@ -82,23 +83,14 @@ export type { FpsOverlayOptions, FpsSample } from "./plugins/fps-overlay.js";
 // Phase 3 parity: run @rlrml/player plugins on the viewer, e.g.
 //   viewer.addPlugin(fromReplayPlayerPlugin(createTimelineOverlayPlugin()))
 export { fromReplayPlayerPlugin } from "./plugins/replay-player-bridge.js";
-export {
-  BOOST_RAW_MAX,
-  boostAmountToPercent,
-  boostPercentToAmount,
-  createBoostPadOverlayPlugin,
-  createBoostPickupAnimationPlugin,
-  createCanvasRecorderPlugin,
-  createTimelineOverlayPlugin,
-  timelineEventSeekTime,
-} from "@rlrml/player";
-export type {
-  BoostPickupAnimationPluginOptions,
-  CanvasRecorderPlugin,
-  CanvasRecorderPluginOptions,
-  TimelineOverlayPlugin,
-  TimelineOverlayPluginOptions,
-} from "@rlrml/player";
+export { BOOST_RAW_MAX, boostAmountToPercent, boostPercentToAmount } from "../boost-units";
+export { createBoostPadOverlayPlugin } from "../boost-pad-overlay";
+export { createBoostPickupAnimationPlugin } from "../boost-pickup-animation";
+export { createCanvasRecorderPlugin } from "../canvas-recorder";
+export { createTimelineOverlayPlugin, timelineEventSeekTime } from "../timeline-overlay";
+export type { BoostPickupAnimationPluginOptions } from "../boost-pickup-animation";
+export type { CanvasRecorderPlugin, CanvasRecorderPluginOptions } from "../canvas-recorder";
+export type { TimelineOverlayPlugin, TimelineOverlayPluginOptions } from "../timeline-overlay";
 export { createCameraPlugin } from "./plugins/camera.js";
 export type {
   CameraPlugin,

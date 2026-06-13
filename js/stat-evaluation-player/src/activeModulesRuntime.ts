@@ -3,7 +3,7 @@ import {
   type ReplayTimelineEvent,
   type TimelineOverlayPlugin,
 } from "@rlrml/player";
-import { fromReplayPlayerPlugin } from "@rlrml/viewer";
+import { fromReplayPlayerPlugin } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { BoostPickupFilterController } from "./boostPickupFilters.ts";
 import type { EventTimelineSource } from "./eventTimelineSources.ts";

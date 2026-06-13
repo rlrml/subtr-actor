@@ -5,7 +5,19 @@
     "declarationMap": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "types": [],
+    "paths": {
+      "@rlrml/subtr-actor": ["../pkg/rl_replay_subtr_actor.d.ts"]
+    }
   },
-  "include": ["src"]
+  "include": [
+    "src/**/*.ts",
+    "src/viewer/adapter/**/*.ts",
+    "src/viewer/plugins/**/*.ts",
+    "src/viewer/lib.ts",
+    "src/viewer/types.ts",
+    "src/viewer/ViewerPlayer.ts"
+  ],
+  "exclude": ["src/viewer/dev/**", "src/**/*.test.ts"]
 }

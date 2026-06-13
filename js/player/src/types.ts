@@ -1,7 +1,6 @@
 import type { Group, Object3D } from "three";
 import type { RawReplayFramesData, RawShotEventMetadata } from "./raw-types";
 import type { ReplayScene } from "./scene";
-import type { ReplayPlayer } from "./player";
 import type { PlaybackBound } from "./generated/PlaybackBound";
 import type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
 import type { PlaylistEndMode } from "./generated/PlaylistEndMode";
@@ -355,7 +354,7 @@ export type ReplayPreloadContext = PlaylistPreloadContext<ReplaySource, Playlist
 export type ReplayPreloadPolicy = PlaylistPreloadPolicy<ReplaySource, PlaylistItem>;
 
 export interface ReplayPlayerPluginContext {
-  player: ReplayPlayer;
+  player: any;
   replay: ReplayModel;
   scene: ReplayScene;
   container: HTMLElement;

@@ -1,5 +1,7 @@
 import * as THREE from "three";
-import CameraControls from "camera-controls";
+import CameraControlsModule from "camera-controls";
+
+const CameraControls = CameraControlsModule.default ?? CameraControlsModule;
 
 // Install CameraControls with THREE
 CameraControls.install({ THREE });

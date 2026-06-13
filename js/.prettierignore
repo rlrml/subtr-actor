@@ -6,8 +6,8 @@ pkg-*/
 */node_modules/
 */package-lock.json
 example/yarn.lock
+player/public/
 player/src/generated/
 stat-evaluation-player/src/generated/
 
 # Vendored static assets (DRACO decoder, GLB/OBJ models, sample replay).
-viewer/public/

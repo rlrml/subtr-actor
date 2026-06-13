@@ -1,10 +1,10 @@
 import type { ReplayModel } from "@rlrml/player";
-import type { ViewerPlayer } from "@rlrml/viewer";
+import type { ViewerPlayer } from "@rlrml/player";
 
 /**
- * The player this app drives: @rlrml/viewer's `ViewerPlayer`, which implements
+ * The player this app drives: @rlrml/player's `ViewerPlayer`, which implements
  * @rlrml/player's full `ReplayPlayer` control / timeline / scene / plugin
- * surface (js/viewer/docs/PLAYER_PARITY.md).
+ * surface (js/player/docs/PLAYER_PARITY.md).
  *
  * The intersection pins `replay` non-null: we always construct through
  * `createViewerFromParsed` with the worker-parsed `ReplayModel`, so consumers

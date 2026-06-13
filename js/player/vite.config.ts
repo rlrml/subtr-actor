@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import wasm from "vite-plugin-wasm";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const srcDir = path.resolve(rootDir, "src");
@@ -8,6 +9,7 @@ const distDir = path.resolve(rootDir, "dist");
 
 export default defineConfig({
   base: "./",
+  plugins: [wasm()],
   resolve: {
     alias: {
       "@": srcDir,
@@ -37,7 +39,7 @@ export default defineConfig({
       formats: ["es"],
     },
     rollupOptions: {
-      external: ["@rlrml/subtr-actor", "three"],
+      external: ["@rlrml/subtr-actor", "camera-controls", "three", /^three\//],
     },
   },
 });
