@@ -74,8 +74,6 @@ jobs:
           bindings_version="$(python3 -c 'import json; print(json.load(open("js/package.json"))["version"])')"
           player_name="$(python3 -c 'import json; print(json.load(open("js/player/package.json"))["name"])')"
           player_version="$(python3 -c 'import json; print(json.load(open("js/player/package.json"))["version"])')"
-          viewer_name="$(python3 -c 'import json; print(json.load(open("js/viewer/package.json"))["name"])')"
-          viewer_version="$(python3 -c 'import json; print(json.load(open("js/viewer/package.json"))["version"])')"
           stats_player_name="$(python3 -c 'import json; print(json.load(open("js/stat-evaluation-player/package.json"))["name"])')"
           stats_player_version="$(python3 -c 'import json; print(json.load(open("js/stat-evaluation-player/package.json"))["version"])')"
 
@@ -84,8 +82,6 @@ jobs:
             echo "bindings_version=${bindings_version}"
             echo "player_name=${player_name}"
             echo "player_version=${player_version}"
-            echo "viewer_name=${viewer_name}"
-            echo "viewer_version=${viewer_version}"
             echo "stats_player_name=${stats_player_name}"
             echo "stats_player_version=${stats_player_version}"
           } >> "$GITHUB_OUTPUT"
@@ -112,20 +108,19 @@ jobs:
 
           check_already_published "${{ steps.metadata.outputs.bindings_name }}" "${{ steps.metadata.outputs.bindings_version }}" "bindings_already_published"
           check_already_published "${{ steps.metadata.outputs.player_name }}" "${{ steps.metadata.outputs.player_version }}" "player_already_published"
-          check_already_published "${{ steps.metadata.outputs.viewer_name }}" "${{ steps.metadata.outputs.viewer_version }}" "viewer_already_published"
           check_already_published "${{ steps.metadata.outputs.stats_player_name }}" "${{ steps.metadata.outputs.stats_player_version }}" "stats_player_already_published"
 
       - name: Build WASM package
-        if: steps.publish_state.outputs.bindings_already_published != 'true' || steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.viewer_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
+        if: steps.publish_state.outputs.bindings_already_published != 'true' || steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
         run: npm --prefix js run build
 
       - name: Install player dependencies
-        if: steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.viewer_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
+        if: steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
         working-directory: js/player
         run: npm ci
 
       - name: Build player package
-        if: steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.viewer_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
+        if: steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
         working-directory: js/player
         run: npm run build
 
@@ -133,16 +128,6 @@ jobs:
         if: steps.publish_state.outputs.player_already_published != 'true'
         working-directory: js/player
         run: npm run smoke:install
-
-      - name: Install viewer dependencies
-        if: steps.publish_state.outputs.viewer_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
-        working-directory: js/viewer
-        run: npm ci
-
-      - name: Build viewer package
-        if: steps.publish_state.outputs.viewer_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true'
-        working-directory: js/viewer
-        run: npm run build:dist
 
       - name: Install stats player dependencies
         if: steps.publish_state.outputs.stats_player_already_published != 'true'
@@ -170,20 +155,6 @@ jobs:
         if: steps.npm_auth.outputs.available == 'true' && steps.publish_state.outputs.player_already_published != 'true'
         shell: bash
         working-directory: js/player
-        run: |
-          set -euo pipefail
-          package_dir="$(npm run --silent prepare:package)"
-          (
-            cd "$package_dir"
-            npm publish --access public
-          )
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish viewer package to npm
-        if: steps.npm_auth.outputs.available == 'true' && steps.publish_state.outputs.viewer_already_published != 'true'
-        shell: bash
-        working-directory: js/viewer
         run: |
           set -euo pipefail
           package_dir="$(npm run --silent prepare:package)"

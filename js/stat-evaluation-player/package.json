@@ -39,11 +39,10 @@
     "test:legacy-stats-parity": "node ../scripts/ensure-wasm-package.mjs && tsx --tsconfig tsconfig.test.json --test src/statsTimelineLegacyParity.slow-test.ts",
     "bench:load": "node ./scripts/benchmark-replay-load.mjs",
     "build:types": "tsc --project tsconfig.build.json",
-    "build": "../scripts/with-clean-npm-env.sh node --run=build:bindings && ../scripts/with-clean-npm-env.sh node --run=build:player && ../scripts/with-clean-npm-env.sh node --run=build:viewer && ../scripts/with-clean-npm-env.sh node --run=check && vite build && ../scripts/with-clean-npm-env.sh node --run=build:types",
+    "build": "../scripts/with-clean-npm-env.sh node --run=build:bindings && ../scripts/with-clean-npm-env.sh node --run=build:player && ../scripts/with-clean-npm-env.sh node --run=check && vite build && ../scripts/with-clean-npm-env.sh node --run=build:types",
     "build:site": "../scripts/with-clean-npm-env.sh node --run=check:tsc && vite build --mode site",
     "prepare:package": "node ./scripts/prepare-package.mjs",
-    "smoke:install": "node ./scripts/smoke-install.mjs",
-    "build:viewer": "sh -lc 'cd ../viewer && ../scripts/with-clean-npm-env.sh npm ci --ignore-scripts && ../scripts/with-clean-npm-env.sh node --run=build:types'"
+    "smoke:install": "node ./scripts/smoke-install.mjs"
   },
   "repository": {
     "type": "git",
@@ -68,7 +67,6 @@
     "three": "^0.180.0"
   },
   "devDependencies": {
-    "@rlrml/viewer": "file:../viewer",
     "@types/node": "^25.5.0",
     "@types/three": "^0.180.0",
     "camera-controls": "^2.10.1",
@@ -78,7 +76,7 @@
     "vite-plugin-wasm": "^3.6.0"
   },
   "dependencies": {
-    "@rlrml/player": "^0.12.0",
+    "@rlrml/player": "file:../player",
     "fflate": "^0.8.2"
   }
 }

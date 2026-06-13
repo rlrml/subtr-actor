@@ -1,4 +1,4 @@
-# @rlrml/viewer
+# @rlrml/player
 
 A focused three.js Rocket League replay player, backed entirely by subtr-actor.
 

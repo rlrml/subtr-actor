@@ -26,12 +26,9 @@
  * see docs/PLAYER_PARITY.md).
  */
 import * as THREE from "three";
-import {
-  getActiveDemoEvent,
-  getFrameWindow,
-  interpolatePosition,
-  isPlayerSamplePresent,
-} from "@rlrml/player";
+import { getActiveDemoEvent, isPlayerSamplePresent } from "../../player-helpers";
+import { interpolatePosition } from "../../player-internals/spatial";
+import { getFrameWindow } from "../../player-internals/timeline";
 import type {
   ReplayModel,
   ReplayPlayerPlugin,
@@ -39,8 +36,8 @@ import type {
   ReplayPlayerPluginStateContext,
   ReplayPlayerRenderContext,
   ReplayPlayerRenderTrackContext,
-  ReplayScene,
-} from "@rlrml/player";
+} from "../../types";
+import type { ReplayScene } from "../../scene";
 import type {
   ViewerPlugin,
   ViewerPluginContext,

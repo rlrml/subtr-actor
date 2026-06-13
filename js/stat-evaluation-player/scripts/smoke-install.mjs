@@ -32,18 +32,13 @@ async function main() {
   const playerPackage = JSON.parse(
     await readFile(path.resolve(jsDir, "player", "package.json"), "utf8"),
   );
-  const viewerPackage = JSON.parse(
-    await readFile(path.resolve(jsDir, "viewer", "package.json"), "utf8"),
-  );
   const scratchDir = await mkdtemp(path.join(os.tmpdir(), "subtr-actor-stats-player-smoke-"));
   let playerPublishDir = null;
-  let viewerPublishDir = null;
   let statsPublishDir = null;
 
   try {
     run("npm", ["--prefix", jsDir, "run", "build"], packageDir);
     run("npm", ["run", "build"], path.resolve(jsDir, "player"));
-    run("npm", ["run", "build:dist"], path.resolve(jsDir, "viewer"));
     run("npm", ["run", "build"], packageDir);
 
     const packDir = path.join(scratchDir, "pack");
@@ -60,12 +55,6 @@ async function main() {
       encoding: "utf8",
     }).trim();
     const playerTarballPath = await packTarball(playerPublishDir, packDir);
-
-    viewerPublishDir = execFileSync("npm", ["run", "--silent", "prepare:package"], {
-      cwd: path.resolve(jsDir, "viewer"),
-      encoding: "utf8",
-    }).trim();
-    const viewerTarballPath = await packTarball(viewerPublishDir, packDir);
 
     statsPublishDir = execFileSync("npm", ["run", "--silent", "prepare:package"], {
       cwd: packageDir,
@@ -87,7 +76,6 @@ async function main() {
           dependencies: {
             "@rlrml/subtr-actor": `file:${path.relative(consumerDir, bindingsTarballPath)}`,
             [playerPackage.name]: `file:${path.relative(consumerDir, playerTarballPath)}`,
-            [viewerPackage.name]: `file:${path.relative(consumerDir, viewerTarballPath)}`,
             [sourcePackage.name]: `file:${path.relative(consumerDir, statsTarballPath)}`,
             three: "^0.180.0",
           },
@@ -231,9 +219,6 @@ async function main() {
   } finally {
     if (playerPublishDir) {
       await rm(playerPublishDir, { force: true, recursive: true });
-    }
-    if (viewerPublishDir) {
-      await rm(viewerPublishDir, { force: true, recursive: true });
     }
     if (statsPublishDir) {
       await rm(statsPublishDir, { force: true, recursive: true });

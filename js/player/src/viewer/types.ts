@@ -1,5 +1,5 @@
 /**
- * Public types for @rlrml/viewer — most importantly the `ViewerPlugin` contract.
+ * Public types for @rlrml/player — most importantly the `ViewerPlugin` contract.
  *
  * The plugin model mirrors `@rlrml/player` (js/player/src/types.ts): a bare core
  * (`ViewerPlayer`) holds an ordered list of installed plugins and dispatches
@@ -12,7 +12,7 @@
  * `ViewerPlayer` unchanged — see docs/PLAYER_PARITY.md for the matrix.
  */
 import type * as THREE from "three";
-import type { ReplayModel, ReplayPlayerActiveMetadata } from "@rlrml/player";
+import type { ReplayModel, ReplayPlayerActiveMetadata } from "../types";
 import type { Vec3, Quat } from "./adapter/coords.js";
 import type { ViewerPlayer } from "./ViewerPlayer.js";
 

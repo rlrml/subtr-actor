@@ -17,7 +17,7 @@ import type { ReplayLoadProgress } from "./replayLoadProgress.ts";
 
 export interface ReplayLoadBundle {
   replay: ReplayModel;
-  /** Raw (unnormalized) subtr-actor ReplayData — feeds the @rlrml/viewer
+  /** Raw (unnormalized) subtr-actor ReplayData — feeds the @rlrml/player
    * adapter so the bytes aren't parsed twice. */
   raw: RawReplayFramesData;
   statsTimeline: StatsTimeline;

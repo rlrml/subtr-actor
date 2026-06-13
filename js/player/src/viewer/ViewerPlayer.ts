@@ -1,5 +1,5 @@
 /**
- * ViewerPlayer — the bare playback core of @rlrml/viewer.
+ * ViewerPlayer — the bare playback core of @rlrml/player.
  *
  * Deliberately minimal, like `@rlrml/player`'s ReplayPlayer: it owns the
  * renderer (scene / arena / actors), a playback clock, and the plugin host —
@@ -24,20 +24,19 @@ import type { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
 import {
   computeTimelineSegments,
   getKickoffCountdownMetadata,
-  getKickoffSkipTargetTime,
-  getPostGoalTransitionSkipTargetTime,
   getReplayPlaybackEndTime,
   inferKickoffGameState,
   inferLiveGameState,
   projectReplayTimeToTimeline,
   projectTimelineTimeToReplay,
-} from "@rlrml/player";
+} from "../player-internals/timeline";
+import { getKickoffSkipTargetTime, getPostGoalTransitionSkipTargetTime } from "../player-helpers";
 import type {
   ReplayModel,
   ReplayPlayerTimelineProjection,
   ReplayPlayerTimelineSegment,
-  ReplayScene,
-} from "@rlrml/player";
+} from "../types";
+import type { ReplayScene } from "../scene";
 import type { CameraPlugin } from "./plugins/camera.js";
 import type {
   BallRenderState,
@@ -62,7 +61,7 @@ type ViewerListener = (state: ViewerState) => void;
 type InstalledPlugin = { definition: ViewerPluginDefinition; plugin: ViewerPlugin };
 
 // With `effects: false`, every EffectsManager call from ActorManager is a no-op.
-const effectsStub = new Proxy({}, { get: () => () => {} }) as EffectsManager;
+const effectsStub = new Proxy({}, { get: () => () => {} });
 
 /**
  * Drop non-finite fields, matching @rlrml/player's normalizeCustomCameraSettings.
@@ -139,11 +138,11 @@ export class ViewerPlayer extends EventTarget {
   readonly replay: ReplayModel | null;
   readonly options: ViewerOptions;
 
-  readonly sceneManager: SceneManager;
-  readonly arenaManager: ArenaManager;
-  readonly actorManager: ActorManager;
-  readonly effectsManager: EffectsManager;
-  readonly hitboxManager: HitboxManager;
+  readonly sceneManager: any;
+  readonly arenaManager: any;
+  readonly actorManager: any;
+  readonly effectsManager: any;
+  readonly hitboxManager: any;
   readonly controls: OrbitControls;
   /**
    * UE-coordinate mount point: children positioned in raw Unreal coords (RL

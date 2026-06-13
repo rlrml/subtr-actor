@@ -1,6 +1,6 @@
 # Extensibility — the plugin seam
 
-`@rlrml/viewer` is deliberately **bare**, like [`@rlrml/player`](../../player). The core
+`@rlrml/player` is deliberately **bare**, like [`@rlrml/player`](../../player). The core
 is "parse a replay (subtr-actor) and render it (three.js)" — nothing more. Everything
 above raw playback — scoreboard / HUD, name tags, killfeed, overlays, telestrator,
 pings, clip recording, collaboration, dev tooling — is a **plugin**, not core.

@@ -15,8 +15,8 @@
  *
  * useWorker:false keeps it dependency-light for bring-up.
  */
-import { loadReplayFromBytes } from "@rlrml/player";
-import type { ReplayLoadResult } from "@rlrml/player";
+import { loadReplayFromBytes } from "../../wasm";
+import type { ReplayLoadResult } from "../../types";
 
 /** .replay bytes -> { replay: ReplayModel, raw } (plain JS, Maps flattened). */
 export async function loadReplay(bytes: Uint8Array): Promise<ReplayLoadResult> {
