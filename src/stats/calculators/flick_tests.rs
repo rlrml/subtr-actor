@@ -125,6 +125,7 @@ fn counts_controlled_dodge_touch_with_large_ball_impulse() {
                 &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
                 &players(frame_number == 3),
                 &touch_state(Vec::new()),
+                &TouchCalculator::new(),
                 &live_play,
             )
             .unwrap();
@@ -148,6 +149,7 @@ fn counts_controlled_dodge_touch_with_large_ball_impulse() {
                 closest_approach_distance: Some(0.0),
                 dodge_contact: false,
             }]),
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();
@@ -158,6 +160,93 @@ fn counts_controlled_dodge_touch_with_large_ball_impulse() {
     assert!(calculator.events()[0].setup_duration >= FLICK_MIN_SETUP_SECONDS);
     assert!(calculator.events()[0].ball_speed_change >= FLICK_MIN_BALL_SPEED_CHANGE);
     assert_eq!(calculator.events()[0].kind, "other");
+}
+
+#[test]
+fn counts_dodge_contact_touch_when_dodge_transition_is_late() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    for (frame_number, time) in [(1, 0.1), (2, 0.2)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
+                &players(false),
+                &touch_state(Vec::new()),
+                &TouchCalculator::new(),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    calculator
+        .update_with_touch_classification_events(
+            &frame(3, 0.3),
+            &ball(
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                glam::Vec3::new(1350.0, 0.0, 520.0),
+            ),
+            &players(false),
+            &touch_state(vec![TouchEvent {
+                touch_id: None,
+                time: 0.3,
+                frame: 3,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: Some(0.0),
+                dodge_contact: false,
+            }]),
+            &[],
+            &live_play,
+        )
+        .unwrap();
+
+    calculator
+        .update_with_touch_classification_events(
+            &FrameInfo {
+                frame_number: 4,
+                time: 0.35,
+                dt: 0.05,
+                seconds_remaining: None,
+            },
+            &ball(
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                glam::Vec3::new(1350.0, 0.0, 520.0),
+            ),
+            &players(true),
+            &touch_state(Vec::new()),
+            &[TouchClassificationEvent {
+                touch_id: None,
+                time: 0.3,
+                frame: 3,
+                sample_time: 0.3,
+                sample_frame: 3,
+                player: player_id.clone(),
+                player_position: None,
+                is_team_0: true,
+                kind: "hard_hit".to_owned(),
+                height_band: "ground".to_owned(),
+                surface: "ground".to_owned(),
+                dodge_state: "dodge".to_owned(),
+                intention: "shot".to_owned(),
+                first_touch: false,
+                contested: false,
+                role: RoleState::Unknown,
+                play_depth: PlayDepthState::Unknown,
+                ball_speed_change: 1350.0,
+                ball_movement: None,
+            }],
+            &live_play,
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    assert_eq!(calculator.events()[0].player, player_id);
+    assert_eq!(calculator.events()[0].dodge_time, 0.3);
+    assert_eq!(calculator.events()[0].time_since_dodge, 0.0);
 }
 
 #[test]
@@ -178,6 +267,7 @@ fn labels_reverse_flicks_with_backflip_pitch_forward_impulse_and_rotation_under_
                     glam::Vec3::new(0.0, 0.0, 0.0),
                 ),
                 &touch_state(Vec::new()),
+                &TouchCalculator::new(),
                 &live_play,
             )
             .unwrap();
@@ -208,6 +298,7 @@ fn labels_reverse_flicks_with_backflip_pitch_forward_impulse_and_rotation_under_
                 closest_approach_distance: Some(0.0),
                 dodge_contact: false,
             }]),
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();
@@ -253,6 +344,7 @@ fn labels_left_reverse_flicks_from_negative_setup_rotation() {
                     glam::Vec3::new(0.0, 0.0, 0.0),
                 ),
                 &touch_state(Vec::new()),
+                &TouchCalculator::new(),
                 &live_play,
             )
             .unwrap();
@@ -283,6 +375,7 @@ fn labels_left_reverse_flicks_from_negative_setup_rotation() {
                 closest_approach_distance: Some(0.0),
                 dodge_contact: false,
             }]),
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();
@@ -320,6 +413,7 @@ fn frontflip_pitch_forward_impulse_is_not_labeled_reverse() {
                     glam::Vec3::new(0.0, 0.0, 0.0),
                 ),
                 &touch_state(Vec::new()),
+                &TouchCalculator::new(),
                 &live_play,
             )
             .unwrap();
@@ -346,6 +440,7 @@ fn frontflip_pitch_forward_impulse_is_not_labeled_reverse() {
                 closest_approach_distance: Some(0.0),
                 dodge_contact: false,
             }]),
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();
@@ -374,6 +469,7 @@ fn rejects_dodge_touch_without_controlled_setup() {
             &ball(glam::Vec3::new(600.0, 0.0, 112.0), glam::Vec3::ZERO),
             &players(true),
             &TouchState::default(),
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();
@@ -398,6 +494,7 @@ fn rejects_dodge_touch_without_controlled_setup() {
                 }],
                 ..TouchState::default()
             },
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();
@@ -428,6 +525,7 @@ fn setup_with_multiple_control_touches_can_count_after_minimum_duration() {
                     closest_approach_distance: Some(0.0),
                     dodge_contact: false,
                 }]),
+                &TouchCalculator::new(),
                 &live_play,
             )
             .unwrap();
@@ -451,6 +549,7 @@ fn setup_with_multiple_control_touches_can_count_after_minimum_duration() {
                 closest_approach_distance: Some(0.0),
                 dodge_contact: false,
             }]),
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();
@@ -487,6 +586,7 @@ fn rejects_tiny_multi_touch_setup() {
                     closest_approach_distance: Some(0.0),
                     dodge_contact: false,
                 }]),
+                &TouchCalculator::new(),
                 &live_play,
             )
             .unwrap();
@@ -515,6 +615,7 @@ fn rejects_tiny_multi_touch_setup() {
                 closest_approach_distance: Some(0.0),
                 dodge_contact: false,
             }]),
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();
@@ -536,6 +637,7 @@ fn rejects_dodge_after_ball_has_left_car() {
                 &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
                 &players(false),
                 &touch_state(Vec::new()),
+                &TouchCalculator::new(),
                 &live_play,
             )
             .unwrap();
@@ -547,6 +649,7 @@ fn rejects_dodge_after_ball_has_left_car() {
             &ball(glam::Vec3::new(600.0, 0.0, 112.0), glam::Vec3::ZERO),
             &players(true),
             &touch_state(Vec::new()),
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();
@@ -568,6 +671,7 @@ fn rejects_dodge_after_ball_has_left_car() {
                 closest_approach_distance: Some(0.0),
                 dodge_contact: false,
             }]),
+            &TouchCalculator::new(),
             &live_play,
         )
         .unwrap();

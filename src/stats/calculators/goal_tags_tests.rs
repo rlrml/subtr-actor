@@ -674,7 +674,7 @@ fn flick_goal_omits_unknown_setup_rotation_direction_detail() {
 fn flick_goal_rejects_stale_flicks() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
     let events =
-        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(6.5, 65, player_id(1))]);
+        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(4.5, 45, player_id(1))]);
 
     assert!(events.is_empty());
 }
