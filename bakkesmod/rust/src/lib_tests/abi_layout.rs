@@ -486,6 +486,7 @@ fn boost_pickup_event(frame: usize, time: f32) -> BoostPickupEvent {
         field_half: BoostPickupFieldHalf::Opponent,
         activity: BoostPickupActivity::Active,
         detection: BoostPickupDetection::Both,
+        pad_zone: Some(BoostPickupPadZone::Offensive),
         is_steal: true,
         collected_amount: 80.0,
         overfill_amount: 0.0,
