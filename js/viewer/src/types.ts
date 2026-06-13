@@ -200,13 +200,29 @@ export interface ViewerOptions {
   /** Boost/supersonic/ball trail effects (default true). */
   effects?: boolean;
   /**
-   * Position interpolation between ~30Hz replay samples (default "hermite").
-   * "hermite" uses the replay's per-sample linear velocities as cubic tangents
-   * (C1-continuous, smooth through sample points, lerp fallback when velocity
-   * is missing/implausible); "linear" is plain lerp (piecewise-linear motion
-   * with a velocity discontinuity at every sample).
+   * Position interpolation between ~30Hz replay samples (default "linear",
+   * matching Ballcam's production viewer). "linear" is plain lerp;
+   * "hermite" uses per-sample linear velocities as cubic tangents with a lerp
+   * fallback when velocity is missing or implausible.
    */
   motionInterpolation?: "hermite" | "linear";
+  /**
+   * Preprocess ball/car timelines with Ballcam-style velocity correction before
+   * render-time interpolation (default true). Set false to inspect raw samples.
+   */
+  motionSmoothing?: boolean;
+  /** Velocity-correction blend toward measured samples (default 0.15). */
+  smoothingBlendFactor?: number;
+  /** Every N corrected samples, use a stronger measured-sample anchor (default 10). */
+  smoothingAnchorInterval?: number;
+  /**
+   * Remove pre-kickoff idle time and post-goal replay gaps from motion playback,
+   * matching Ballcam's compiled .rlrf time axis (default false; changes
+   * currentTime semantics relative to `viewer.replay`).
+   */
+  timelineCompaction?: boolean;
+  /** Disable velocity/position consistency filtering after smoothing (default false). */
+  disableFrameFiltering?: boolean;
 
   // ── @rlrml/player-compatible initial settings (docs/PLAYER_PARITY.md). ──────
   /** Initial playback rate; wins over `speed` when both are set. */
