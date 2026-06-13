@@ -59,6 +59,12 @@ import type {
 
 type ViewerListener = (state: ViewerState) => void;
 type InstalledPlugin = { definition: ViewerPluginDefinition; plugin: ViewerPlugin };
+type FreeCameraTransition = {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  up: THREE.Vector3;
+  fov: number;
+};
 
 // With `effects: false`, every EffectsManager call from ActorManager is a no-op.
 const effectsStub = new Proxy({}, { get: () => () => {} });
@@ -81,22 +87,80 @@ function normalizeCustomCameraSettings(
   return normalized;
 }
 
-/**
- * Free-camera preset poses — @rlrml/player's exact constants
- * (player-internals/spatial.ts), converted from its Z-up world to this
- * package's THREE Y-up space (x→x, z→y, y→z; see adapter/coords.ts).
- */
-const FREE_CAMERA_PRESETS: Record<
-  ViewerFreeCameraPreset,
-  {
-    position: [number, number, number];
-    target: [number, number, number];
-    up: [number, number, number];
+const FREE_CAMERA_FOV = 48;
+const FREE_CAMERA_TRANSITION_SMOOTHING = 0.14;
+const FREE_CAMERA_POSITION_EPSILON_SQ = 16;
+const FREE_CAMERA_TARGET_EPSILON_SQ = 16;
+const FREE_CAMERA_UP_EPSILON_RAD = 0.003;
+const FREE_CAMERA_FOV_EPSILON = 0.05;
+const FREE_CAMERA_FIT_MARGIN = 1.08;
+const SOCCAR_HALF_X_UU = 4120;
+const SOCCAR_HALF_Y_UU = 5140;
+const SOCCAR_CAMERA_FIT_MIN_Y_UU = 0;
+const SOCCAR_CAMERA_FIT_MAX_Y_UU = 2200;
+const OVERHEAD_TARGET = new THREE.Vector3(0, 700, 0);
+const OVERHEAD_UP = new THREE.Vector3(-1, 0, 0);
+const OVERHEAD_FORWARD = new THREE.Vector3(0, -1, 0);
+const SIDE_TARGET = new THREE.Vector3(0, 900, 0);
+const SIDE_UP = new THREE.Vector3(0, 1, 0);
+const SIDE_FORWARD = new THREE.Vector3(9600, -5500, 12600).normalize();
+
+function getFreeCameraPreset(preset: ViewerFreeCameraPreset, aspect: number): FreeCameraTransition {
+  const fitAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 16 / 9;
+  const target = preset === "overhead" ? OVERHEAD_TARGET.clone() : SIDE_TARGET.clone();
+  const up = preset === "overhead" ? OVERHEAD_UP.clone() : SIDE_UP.clone();
+  const forward = preset === "overhead" ? OVERHEAD_FORWARD.clone() : SIDE_FORWARD.clone();
+  const distance = getFreeCameraFitDistance({
+    aspect: fitAspect,
+    fov: FREE_CAMERA_FOV,
+    forward,
+    margin: FREE_CAMERA_FIT_MARGIN,
+    target,
+    up,
+  });
+
+  return {
+    position: target.clone().addScaledVector(forward, -distance),
+    target,
+    up,
+    fov: FREE_CAMERA_FOV,
+  };
+}
+
+function getFreeCameraFitDistance(options: {
+  aspect: number;
+  fov: number;
+  forward: THREE.Vector3;
+  margin: number;
+  target: THREE.Vector3;
+  up: THREE.Vector3;
+}): number {
+  const { aspect, fov, forward, margin, target, up } = options;
+  const cameraForward = forward.clone().normalize();
+  const right = new THREE.Vector3().crossVectors(cameraForward, up).normalize();
+  const cameraUp = new THREE.Vector3().crossVectors(right, cameraForward).normalize();
+  const tanVertical = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
+  const tanHorizontal = tanVertical * aspect;
+  let requiredDistance = 1;
+
+  for (const x of [-SOCCAR_HALF_X_UU, SOCCAR_HALF_X_UU]) {
+    for (const y of [SOCCAR_CAMERA_FIT_MIN_Y_UU, SOCCAR_CAMERA_FIT_MAX_Y_UU]) {
+      for (const z of [-SOCCAR_HALF_Y_UU, SOCCAR_HALF_Y_UU]) {
+        const relative = new THREE.Vector3(x, y, z).sub(target);
+        const horizontal = Math.abs(relative.dot(right));
+        const vertical = Math.abs(relative.dot(cameraUp));
+        const forwardOffset = relative.dot(cameraForward);
+        requiredDistance = Math.max(
+          requiredDistance,
+          horizontal / tanHorizontal - forwardOffset,
+          vertical / tanVertical - forwardOffset,
+        );
+      }
+    }
   }
-> = {
-  overhead: { position: [0, 18800, 0], target: [0, 700, 0], up: [-1, 0, 0] },
-  side: { position: [-9600, 6400, -12600], target: [0, 900, 0], up: [0, 1, 0] },
-};
+
+  return Math.max(1, requiredDistance * margin);
+}
 
 /**
  * Build the viewer's `replayRoot`: a group whose LOCAL space is raw Unreal
@@ -174,6 +238,7 @@ export class ViewerPlayer extends EventTarget {
   private loop: boolean;
   private currentTime = 0;
   private lastTickAt: number | null = null;
+  private freeCameraTransition: FreeCameraTransition | null = null;
 
   // ── @rlrml/player-parity state (docs/PLAYER_PARITY.md). Camera fields are
   //    delegated to an installed camera plugin (id "camera") when present; the
@@ -395,6 +460,7 @@ export class ViewerPlayer extends EventTarget {
     this.attachedPlayerIdValue = playerId;
     this.cameraViewModeValue = playerId ? "follow" : "free";
     this.attachmentTouched = true;
+    this.freeCameraTransition = null;
     this.syncCameraAttachment();
     this.emitChange();
   }
@@ -402,6 +468,7 @@ export class ViewerPlayer extends EventTarget {
   setCameraViewMode(mode: ViewerCameraViewMode): void {
     this.cameraViewModeValue = mode;
     this.attachmentTouched = true;
+    this.freeCameraTransition = null;
     this.syncCameraAttachment();
     this.emitChange();
   }
@@ -410,11 +477,7 @@ export class ViewerPlayer extends EventTarget {
     this.cameraViewModeValue = "free";
     this.attachmentTouched = true;
     this.syncCameraAttachment(); // leave follow mode if we were in it
-    const pose = FREE_CAMERA_PRESETS[preset];
-    this.camera.up.set(...pose.up);
-    this.camera.position.set(...pose.position);
-    this.controls.target.set(...pose.target);
-    this.controls.update();
+    this.freeCameraTransition = getFreeCameraPreset(preset, this.camera.aspect);
     this.emitChange();
   }
 
@@ -489,6 +552,7 @@ export class ViewerPlayer extends EventTarget {
       }
     }
     if (patch.cameraViewMode !== undefined || patch.attachedPlayerId !== undefined) {
+      this.freeCameraTransition = null;
       this.syncCameraAttachment();
     }
     if (patch.ballCamEnabled !== undefined) {
@@ -915,7 +979,45 @@ export class ViewerPlayer extends EventTarget {
         entry.plugin.beforeRender?.(renderContext);
       }
     }
+    this.updateFreeCameraTransition();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private updateFreeCameraTransition(): void {
+    const transition = this.freeCameraTransition;
+    if (!transition) return;
+
+    this.controls.enabled = false;
+    this.camera.position.lerp(transition.position, FREE_CAMERA_TRANSITION_SMOOTHING);
+    this.controls.target.lerp(transition.target, FREE_CAMERA_TRANSITION_SMOOTHING);
+    this.camera.up.lerp(transition.up, FREE_CAMERA_TRANSITION_SMOOTHING).normalize();
+    this.camera.fov = THREE.MathUtils.lerp(
+      this.camera.fov,
+      transition.fov,
+      FREE_CAMERA_TRANSITION_SMOOTHING,
+    );
+    this.camera.updateProjectionMatrix();
+    this.camera.lookAt(this.controls.target);
+
+    const reachedPosition =
+      this.camera.position.distanceToSquared(transition.position) <=
+      FREE_CAMERA_POSITION_EPSILON_SQ;
+    const reachedTarget =
+      this.controls.target.distanceToSquared(transition.target) <= FREE_CAMERA_TARGET_EPSILON_SQ;
+    const reachedUp = this.camera.up.angleTo(transition.up) <= FREE_CAMERA_UP_EPSILON_RAD;
+    const reachedFov = Math.abs(this.camera.fov - transition.fov) <= FREE_CAMERA_FOV_EPSILON;
+    if (!reachedPosition || !reachedTarget || !reachedUp || !reachedFov) {
+      return;
+    }
+
+    this.camera.position.copy(transition.position);
+    this.controls.target.copy(transition.target);
+    this.camera.up.copy(transition.up).normalize();
+    this.camera.fov = transition.fov;
+    this.camera.updateProjectionMatrix();
+    this.camera.lookAt(transition.target);
+    this.controls.enabled = true;
+    this.freeCameraTransition = null;
   }
 
   /**
