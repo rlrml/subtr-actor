@@ -126,6 +126,15 @@ fn candidate_event_rejects_sideways_dodge_acceleration() {
 }
 
 #[test]
+fn candidate_event_rejects_late_airborne_dodge() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut late_airborne_candidate = strong_candidate(2);
+    late_airborne_candidate.dodge_delay_after_ground_leave_seconds = 0.216;
+
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, late_airborne_candidate).is_none());
+}
+
+#[test]
 fn candidate_event_rejects_frontflip_like_candidate_without_diagonal_rotation() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut frontflip_candidate = strong_candidate(2);
@@ -157,6 +166,18 @@ fn candidate_event_rejects_vertical_dominant_wavedash_like_impulse() {
     wavedash_candidate.best_estimated_dodge_impulse_up_component = -0.86;
 
     assert!(SpeedFlipCalculator::candidate_event(&player_id, wavedash_candidate).is_none());
+}
+
+#[test]
+fn candidate_event_rejects_directional_weak_impulse_without_forward_or_side_component() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut weak_backward_candidate = strong_candidate(2);
+    weak_backward_candidate.best_estimated_dodge_impulse_magnitude = 43.0;
+    weak_backward_candidate.best_estimated_dodge_impulse_forward_component = -0.48;
+    weak_backward_candidate.best_estimated_dodge_impulse_side_component = 0.0;
+    weak_backward_candidate.best_estimated_dodge_impulse_up_component = -0.88;
+
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, weak_backward_candidate).is_none());
 }
 
 #[test]
@@ -266,4 +287,38 @@ fn kickoff_approach_waits_for_player_motion_even_when_not_live_play() {
         calculator.current_kickoff_start_time,
         Some(motion_frame.time)
     );
+}
+
+#[test]
+fn kickoff_candidate_can_start_above_supersonic_threshold() {
+    let mut calculator = SpeedFlipCalculator::default();
+    let frame = FrameInfo {
+        frame_number: 10,
+        time: 1.0,
+        dt: 0.1,
+        seconds_remaining: None,
+    };
+    let gameplay = GameplayState {
+        ball_has_been_hit: Some(false),
+        ..Default::default()
+    };
+    let player = PlayerSample {
+        boost_active: true,
+        ..player(glam::Vec3::new(1900.0, 0.0, 0.0), true)
+    };
+    let player_id = player.player_id.clone();
+
+    calculator
+        .update_parts(
+            &frame,
+            &gameplay,
+            &BallFrameState::default(),
+            &PlayerFrameState {
+                players: vec![player],
+            },
+            &LivePlayState::default(),
+        )
+        .unwrap();
+
+    assert!(calculator.active_candidates.contains(&player_id));
 }

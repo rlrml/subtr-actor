@@ -5,13 +5,15 @@ const SPEED_FLIP_EVALUATION_SECONDS: f32 = 0.32;
 const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.55;
 const SPEED_FLIP_MAX_GROUND_Z: f32 = 80.0;
 const SPEED_FLIP_KICKOFF_MOTION_SPEED: f32 = 100.0;
-const SPEED_FLIP_MAX_START_SPEED: f32 = 1800.0;
 const SPEED_FLIP_MIN_ALIGNMENT: f32 = 0.72;
+const SPEED_FLIP_MAX_DODGE_DELAY_AFTER_GROUND_LEAVE_SECONDS: f32 = 0.20;
 const SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS: f32 = 0.18;
 const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA: f32 = 80.0;
 const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT: f32 = 0.35;
 const SPEED_FLIP_MIN_ESTIMATED_DODGE_IMPULSE_MAGNITUDE: f32 = 90.0;
+const SPEED_FLIP_MIN_DIRECTIONAL_WEAK_IMPULSE_MAGNITUDE: f32 = 20.0;
 const SPEED_FLIP_MIN_ESTIMATED_DODGE_FORWARD_COMPONENT: f32 = 0.35;
+const SPEED_FLIP_MIN_WEAK_IMPULSE_SIDE_COMPONENT: f32 = 0.10;
 const SPEED_FLIP_MIN_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.88;
 const SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.95;
 const SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT: f32 = 0.82;
@@ -305,10 +307,6 @@ impl SpeedFlipCalculator {
         }
 
         let start_speed = player.speed().unwrap_or(0.0);
-        if start_speed > SPEED_FLIP_MAX_START_SPEED {
-            return;
-        }
-
         let Some(best_alignment) = Self::candidate_alignment(ball, player, is_kickoff) else {
             return;
         };
@@ -505,6 +503,11 @@ impl SpeedFlipCalculator {
         if candidate.boost_alignment_sample_count == 0 {
             return None;
         }
+        if candidate.dodge_delay_after_ground_leave_seconds
+            > SPEED_FLIP_MAX_DODGE_DELAY_AFTER_GROUND_LEAVE_SECONDS
+        {
+            return None;
+        }
         if candidate.dodge_acceleration_sample_count == 0
             || candidate.best_dodge_forward_delta < SPEED_FLIP_MIN_FORWARD_DODGE_DELTA
             || candidate.best_dodge_delta_alignment < SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT
@@ -526,6 +529,13 @@ impl SpeedFlipCalculator {
                 || estimated_dodge_side_component > SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT
                 || estimated_dodge_up_component > SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT);
         if has_incompatible_meaningful_impulse {
+            return None;
+        }
+        let weak_impulse_direction_is_usable = candidate.best_estimated_dodge_impulse_magnitude
+            < SPEED_FLIP_MIN_DIRECTIONAL_WEAK_IMPULSE_MAGNITUDE
+            || (candidate.best_estimated_dodge_impulse_forward_component >= 0.0
+                && estimated_dodge_side_component >= SPEED_FLIP_MIN_WEAK_IMPULSE_SIDE_COMPONENT);
+        if !weak_impulse_direction_is_usable {
             return None;
         }
         let has_strong_diagonal_rotation =
