@@ -15,6 +15,7 @@ import type * as THREE from "three";
 import type { ReplayModel, ReplayPlayerActiveMetadata } from "../types";
 import type { Vec3, Quat } from "./adapter/coords.js";
 import type { ViewerPlayer } from "./ViewerPlayer.js";
+import type { ViewerEnvironmentSpec } from "./environments.js";
 
 export type { Vec3, Quat };
 
@@ -199,6 +200,14 @@ export interface ViewerOptions {
   loop?: boolean;
   /** Boost/supersonic/ball trail effects (default true). */
   effects?: boolean;
+  /**
+   * Skybox environment driving the background + image-based lighting
+   * (reflections/ambient on cars, arena, ball). A built-in id (default
+   * `"space"`), a full `ViewerEnvironment` descriptor, or `false` for neutral
+   * default lighting (no skybox). Loaded lazily — playback starts on the neutral
+   * fallback and the HDR swaps in once decoded. See `./environments.ts`.
+   */
+  environment?: ViewerEnvironmentSpec;
   /**
    * Position interpolation between ~30Hz replay samples (default "linear",
    * matching Ballcam's production viewer). "linear" is plain lerp;

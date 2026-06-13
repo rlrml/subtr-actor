@@ -12,9 +12,9 @@ export class SceneManager {
 
     this.scene = new THREE.Scene();
 
-    // Don't load skybox in constructor - it must be awaited before shader precompilation
-    // Call loadSkybox() from GameEngine.init() instead
-    this.scene.background = new THREE.Color(0x87ceeb); // Temporary until skybox loads
+    // No skybox in the constructor: ViewerPlayer calls initDefaultEnvironment()
+    // for instant neutral lighting, then applyEnvironment() loads the HDR lazily.
+    this.scene.background = new THREE.Color(0x87ceeb); // Temporary until environment loads
 
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
@@ -47,27 +47,44 @@ export class SceneManager {
    * code, and a directional key light adds definition.
    */
   initDefaultEnvironment() {
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
+    if (!this._neutralEnvTexture) {
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      this._neutralEnvTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+    }
+    this.scene.environment = this._neutralEnvTexture;
 
-    const sun = new THREE.DirectionalLight(0xffffff, 1.5);
-    sun.position.set(3000, 8000, 4000);
-    this.scene.add(sun);
+    // Add the helper lights once; re-running this method (e.g. reverting from an
+    // HDR environment) must not stack duplicate sun/ambient lights.
+    if (!this._defaultLightsAdded) {
+      const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+      sun.position.set(3000, 8000, 4000);
+      this.scene.add(sun);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-    this.scene.add(ambient);
+      const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+      this.scene.add(ambient);
+      this._defaultLightsAdded = true;
+    }
   }
 
-  loadSkybox(skyboxId = "HighFantasy4k") {
+  /**
+   * Load and apply a {@link ViewerEnvironment}: an HDR skybox that drives both
+   * the visible background and the image-based lighting (reflections/ambient) on
+   * every PBR material. Async and non-blocking — call it without awaiting so the
+   * neutral `initDefaultEnvironment()` lighting renders immediately and the HDR
+   * swaps in once decoded. Resolves `true` on success, `false` on load failure
+   * (the neutral default is left in place).
+   *
+   * @param {import("../environments.js").ViewerEnvironment} env
+   * @returns {Promise<boolean>}
+   */
+  applyEnvironment(env) {
     return new Promise((resolve) => {
       const rgbeLoader = new RGBELoader();
-      const path = `/skyboxes/${skyboxId}.hdr`;
-
       rgbeLoader.load(
-        path,
+        env.skyboxUrl,
         (texture) => {
-          // Dispose of previous skybox texture if exists
+          // Dispose of previous HDR skybox texture if one is mounted.
           if (this.scene.background && this.scene.background.dispose) {
             this.scene.background.dispose();
           }
@@ -75,41 +92,79 @@ export class SceneManager {
           texture.mapping = THREE.EquirectangularReflectionMapping;
           this.scene.background = texture;
           this.scene.environment = texture;
-          this.currentSkyboxId = skyboxId;
-          console.log(`[SceneManager] HDR skybox loaded: ${skyboxId}`);
+          this.currentEnvironmentId = env.id;
+
+          // Static skybox tilt (degrees → radians), applied to both the visible
+          // background and the IBL so reflections stay aligned with the sky.
+          const rot = env.rotation ?? {};
+          this._skyboxBaseRotation = {
+            x: THREE.MathUtils.degToRad(rot.x ?? 0),
+            y: THREE.MathUtils.degToRad(rot.y ?? 0),
+            z: THREE.MathUtils.degToRad(rot.z ?? 0),
+          };
+          this._skyboxAnimatedY = 0;
+          this._skyboxAnimation = env.animation ?? null;
+          this._applySkyboxRotation();
+
+          if (typeof env.exposure === "number") {
+            this.renderer.toneMappingExposure = env.exposure;
+          }
+
+          console.log(`[SceneManager] environment applied: ${env.id}`);
           resolve(true);
         },
         undefined,
         (error) => {
-          console.error(`[SceneManager] Failed to load HDR skybox (${skyboxId}):`, error);
-          // Fallback to solid color
-          this.scene.background = new THREE.Color(0x87ceeb);
+          console.error(`[SceneManager] Failed to load environment "${env.id}":`, error);
+          // Keep the neutral default lighting; never leave the scene black.
           resolve(false);
         },
       );
     });
   }
 
-  setSkybox(skyboxId) {
-    if (this.currentSkyboxId !== skyboxId) {
-      this.loadSkybox(skyboxId);
+  /** Apply base tilt + accumulated animation to background/environment rotation. */
+  _applySkyboxRotation() {
+    const base = this._skyboxBaseRotation;
+    if (!base) return;
+    const y = base.y + (this._skyboxAnimatedY ?? 0);
+    if (this.scene.backgroundRotation) {
+      this.scene.backgroundRotation.set(base.x, y, base.z);
+    }
+    if (this.scene.environmentRotation) {
+      this.scene.environmentRotation.set(base.x, y, base.z);
     }
   }
 
   /**
-   * Set a simple default background (no skybox HDR)
-   * Used when no custom environment is selected
+   * Advance the slow skybox drift, if the active environment enables it. Cheap
+   * no-op otherwise. `dt` is in seconds (already scaled by playback speed).
+   */
+  updateSkyboxAnimation(dt) {
+    const anim = this._skyboxAnimation;
+    if (!anim || !anim.enabled || !dt) return;
+    this._skyboxAnimatedY =
+      (this._skyboxAnimatedY ?? 0) + THREE.MathUtils.degToRad(anim.speed * dt);
+    this._applySkyboxRotation();
+  }
+
+  /**
+   * Revert to the neutral default: a flat background plus the asset-free
+   * RoomEnvironment IBL (so PBR materials stay lit). Used when no environment is
+   * selected (`environment: false`) or when switching away from an HDR skybox.
    */
   setDefaultBackground() {
-    // Dispose of previous skybox texture if exists
+    // Dispose of the HDR skybox texture if one is mounted.
     if (this.scene.background && this.scene.background.dispose) {
       this.scene.background.dispose();
     }
-    // Use a dark grey gradient-like color for a neutral look
     this.scene.background = new THREE.Color(0x1a1a2e);
-    this.scene.environment = null; // No environment lighting from skybox
-    this.currentSkyboxId = null;
-    console.log("[SceneManager] Using default background (no skybox)");
+    this.initDefaultEnvironment(); // restore neutral IBL (idempotent)
+    this.renderer.toneMappingExposure = 1.0;
+    this._skyboxAnimation = null;
+    this._skyboxBaseRotation = null;
+    this.currentEnvironmentId = null;
+    console.log("[SceneManager] Using neutral default environment (no skybox)");
   }
 
   setExposure(value) {
