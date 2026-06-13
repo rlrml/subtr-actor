@@ -1201,6 +1201,13 @@ pub(in crate::collector::stats::playback) fn parse_boost_pickup_event(
         field_half: decode_json_value(json_required_value(object, "field_half")?.clone())?,
         activity: decode_json_value(json_required_value(object, "activity")?.clone())?,
         detection: decode_json_value(json_required_value(object, "detection")?.clone())?,
+        pad_zone: match object
+            .get("pad_zone")
+            .or_else(|| object.get("big_pad_zone"))
+        {
+            Some(value) => Some(decode_json_value(value.clone())?),
+            None => None,
+        },
         is_steal: json_required_bool(object, "is_steal")?,
         collected_amount: json_required_f32(object, "collected_amount")?,
         overfill_amount: json_required_f32(object, "overfill_amount")?,

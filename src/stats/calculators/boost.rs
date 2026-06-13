@@ -70,6 +70,15 @@ pub enum BoostPickupFieldHalf {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
+pub enum BoostPickupPadZone {
+    Offensive,
+    Neutral,
+    Defensive,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum BoostPickupActivity {
     Active,
     Inactive,
@@ -118,6 +127,10 @@ pub struct BoostPickupEvent {
     pub field_half: BoostPickupFieldHalf,
     pub activity: BoostPickupActivity,
     pub detection: BoostPickupDetection,
+    /// Oriented pad location bucket. Big pads use offensive/neutral/defensive; small pads use
+    /// offensive/defensive half.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pad_zone: Option<BoostPickupPadZone>,
     /// A steal is a pickup collected on the opponent's half (mirrors the former `Stolen` ledger
     /// transaction condition).
     pub is_steal: bool,
@@ -757,6 +770,8 @@ impl BoostCalculator {
         } else {
             BoostPickupFieldHalf::Own
         };
+        let pad_zone =
+            Self::pad_zone_from_position(pending_pickup.is_team_0, pad_size, Some(pad_position));
 
         // The obtained balance is applied incrementally (pre-applied + this delta) so usage
         // inference stays correctly timed; the pickup stats below carry the full collected amount
@@ -789,6 +804,7 @@ impl BoostCalculator {
             // Overwritten by `push_reported_pickup` for reported pickups; inferred-only callers
             // set it explicitly.
             detection: BoostPickupDetection::Both,
+            pad_zone,
             is_steal: stolen,
             collected_amount,
             overfill_amount: overfill,
@@ -849,6 +865,11 @@ impl BoostCalculator {
             field_half: BoostPickupFieldHalf::Unknown,
             activity: BoostPickupActivity::Inactive,
             detection: BoostPickupDetection::ReportedOnly,
+            pad_zone: Self::pad_zone_from_position(
+                is_team_0,
+                pad_size,
+                player_position.map(glam::Vec3::from_array),
+            ),
             is_steal: false,
             collected_amount: amount,
             overfill_amount: 0.0,
@@ -965,6 +986,21 @@ impl BoostCalculator {
             Some(position) if is_enemy_side(is_team_0, position) => BoostPickupFieldHalf::Opponent,
             Some(_) => BoostPickupFieldHalf::Own,
             None => BoostPickupFieldHalf::Unknown,
+        }
+    }
+
+    fn pad_zone_from_position(
+        is_team_0: bool,
+        pad_size: BoostPadSize,
+        position: Option<glam::Vec3>,
+    ) -> Option<BoostPickupPadZone> {
+        let normalized_y = normalized_y(is_team_0, position?);
+        if pad_size == BoostPadSize::Big && normalized_y.abs() <= BOOST_PAD_MIDFIELD_TOLERANCE_Y {
+            Some(BoostPickupPadZone::Neutral)
+        } else if normalized_y > 0.0 {
+            Some(BoostPickupPadZone::Offensive)
+        } else {
+            Some(BoostPickupPadZone::Defensive)
         }
     }
 
@@ -1123,6 +1159,19 @@ impl BoostCalculator {
                 field_half: event.field_half,
                 activity: event.activity,
                 detection: BoostPickupDetection::InferredOnly,
+                pad_zone: match event.pad_type {
+                    BoostPickupPadType::Big => Self::pad_zone_from_position(
+                        event.is_team_0,
+                        BoostPadSize::Big,
+                        event.player_position.map(glam::Vec3::from_array),
+                    ),
+                    BoostPickupPadType::Small => Self::pad_zone_from_position(
+                        event.is_team_0,
+                        BoostPadSize::Small,
+                        event.player_position.map(glam::Vec3::from_array),
+                    ),
+                    BoostPickupPadType::Ambiguous => None,
+                },
                 is_steal: matches!(event.field_half, BoostPickupFieldHalf::Opponent),
                 collected_amount: 0.0,
                 overfill_amount: 0.0,
