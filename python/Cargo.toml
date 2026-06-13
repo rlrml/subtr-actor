@@ -3,6 +3,7 @@ name = "subtr-actor-py"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 boxcars.workspace = true
@@ -11,7 +12,7 @@ serde_json = "1.0"
 
 [dependencies.subtr-actor]
 path = ".."
-version = "1.0.0"
+version = "1.0.1"
 
 [dependencies.pyo3]
 version = "0.27.2"

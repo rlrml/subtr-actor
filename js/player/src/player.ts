@@ -30,6 +30,7 @@ import {
   projectTimelineTimeToReplay,
 } from "./player-internals/timeline";
 import {
+  type AttachedCameraBlendState,
   getFreeCameraPreset,
   interpolateQuaternion,
   interpolatePositionHermite,
@@ -86,6 +87,7 @@ export class ReplayPlayer extends EventTarget {
   private readonly desiredCameraPosition = new THREE.Vector3();
   private readonly desiredLookTarget = new THREE.Vector3();
   private readonly boundWindowResize = () => this.sceneState.resize();
+  private readonly attachedCameraBlendState: AttachedCameraBlendState;
   private readonly liveGameState: number | null;
   private readonly kickoffGameState: number | null;
   private timelineSegmentsCacheKey: string | null = null;
@@ -96,6 +98,7 @@ export class ReplayPlayer extends EventTarget {
   private playing = false;
   private speed = 1;
   private currentTime = 0;
+  private lastCameraRenderAt: number | null = null;
   private playbackStartedAt = 0;
   private playbackStartedTime = 0;
   private cameraDistanceScale: number;
@@ -127,6 +130,11 @@ export class ReplayPlayer extends EventTarget {
     this.attachedPlayerId = initialSettings.attachedPlayerId;
     this.cameraViewMode = initialSettings.cameraViewMode;
     this.ballCamEnabled = initialSettings.ballCamEnabled;
+    this.attachedCameraBlendState = {
+      currentBlend: initialSettings.ballCamEnabled ? 1 : 0,
+      targetBlend: initialSettings.ballCamEnabled ? 1 : 0,
+      lastIsBallCam: initialSettings.ballCamEnabled,
+    };
     this.boostMeterEnabled = initialSettings.boostMeterEnabled;
     this.boostPickupAnimationEnabled = initialSettings.boostPickupAnimationEnabled;
     this.hitboxWireframesEnabled = initialSettings.hitboxWireframesEnabled;
@@ -628,6 +636,16 @@ export class ReplayPlayer extends EventTarget {
     this.scheduleAnimationFrame();
   };
 
+  private getCameraRenderDelta(): number {
+    const now = typeof performance === "undefined" ? Date.now() : performance.now();
+    const previous = this.lastCameraRenderAt;
+    this.lastCameraRenderAt = now;
+    if (previous === null) {
+      return 1 / 60;
+    }
+    return Math.max(0, Math.min(0.1, (now - previous) / 1000));
+  }
+
   private render(): void {
     const frameWindow = getFrameWindow(this.replay, this.currentTime);
     const frameIndex = frameWindow.frameIndex;
@@ -840,6 +858,7 @@ export class ReplayPlayer extends EventTarget {
       nextFrameIndex: frameWindow.nextFrameIndex,
       alpha: frameWindow.alpha,
       dt: frameWindow.dt,
+      renderDelta: this.getCameraRenderDelta(),
       attachedPlayerUnavailable:
         this.attachedPlayerId !== null &&
         getActiveDemoEvent(this.replay.timelineEvents, this.attachedPlayerId, this.currentTime) !==
@@ -847,6 +866,7 @@ export class ReplayPlayer extends EventTarget {
       ballPosition,
       desiredCameraPosition: this.desiredCameraPosition,
       desiredLookTarget: this.desiredLookTarget,
+      blendState: this.attachedCameraBlendState,
     });
     if (this.cameraViewMode === "free" && this.freeCameraTransition) {
       const completed = updateFreeCameraTransition({

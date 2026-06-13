@@ -9,8 +9,8 @@
 //! clip so the test only ever processes the frames that matter.
 
 use subtr_actor::{
-    clip_replay_around, EventPayload, PlayerId, ReplayClip, ReplayMeta,
-    ReplayStatsTimelineScaffold, SpeedFlipEvent, StatsTimelineEventCollector,
+    EventPayload, PlayerId, ReplayClip, ReplayMeta, ReplayStatsTimelineScaffold, SpeedFlipEvent,
+    StatsTimelineEventCollector, clip_replay_around,
 };
 
 const COLONELPANIC_NO_SPEED_FLIP_REPLAY: &str =

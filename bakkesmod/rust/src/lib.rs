@@ -6,29 +6,20 @@ use std::ffi::{CStr, CString};
 use std::io::{Read, Write};
 use std::os::raw::c_char;
 use std::ptr;
+#[cfg(test)]
 use std::slice;
 
-use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
 use base64::Engine as _;
+use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
 use boxcars::{ParserBuilder, Quaternion, RemoteId, RigidBody, Vector3f};
 use flate2::{
+    Compression,
     read::{DeflateDecoder, ZlibDecoder},
     write::DeflateEncoder,
-    Compression,
 };
 #[cfg(test)]
 use subtr_actor::ReplayFrameInputBuilder;
 use subtr_actor::{
-    boost_amount_to_percent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
-    builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
-    builtin_stats_module_names, car_hitbox_for_body_id, default_car_hitbox,
-    default_stats_timeline_config,
-    geometry::apply_velocities_to_rigid_body,
-    hitbox_family_for_body_id,
-    stats::analysis_graph::{
-        builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
-        AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
-    },
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
     BoostPickupEvent, BumpEvent, CarHitbox, CorePlayerScoreboardEvent, DemoEventSample,
     DemolishAttribute, DemolishInfo, DodgeRefreshedEvent, Event, EventPayload, EventTiming,
@@ -38,7 +29,16 @@ use subtr_actor::{
     ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent,
     ShotEventMetadata, StatsTimelineCollector, StatsTimelineEventCollector, SubtrActorError,
     SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent,
-    TouchStateCalculator, WhiffEvent,
+    TouchStateCalculator, WhiffEvent, boost_amount_to_percent, builtin_analysis_node_json,
+    builtin_stats_graph_snapshot_json, builtin_stats_module_config_json,
+    builtin_stats_module_frame_json, builtin_stats_module_json, builtin_stats_module_names,
+    car_hitbox_for_body_id, default_car_hitbox, default_stats_timeline_config,
+    geometry::apply_velocities_to_rigid_body,
+    hitbox_family_for_body_id,
+    stats::analysis_graph::{
+        AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
+        builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
+    },
 };
 #[cfg(test)]
 use subtr_actor::{GoalTag, GoalTagMetadata};
@@ -46,6 +46,7 @@ use subtr_actor::{GoalTag, GoalTagMetadata};
 mod abi;
 mod ffi;
 mod ffi_graph_output;
+mod ffi_raw;
 mod graph_output;
 mod live_events;
 mod live_processor;
@@ -54,6 +55,7 @@ mod timeline_drain;
 pub use abi::*;
 pub use ffi::*;
 pub use ffi_graph_output::*;
+pub(crate) use ffi_raw::*;
 pub(crate) use graph_output::*;
 pub(crate) use live_events::*;
 pub(crate) use live_processor::*;

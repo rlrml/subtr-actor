@@ -1,6 +1,5 @@
 use super::*;
 use crate::{
-    builtin_analysis_node_json, builtin_analysis_nodes_json, builtin_stats_module_names,
     AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BallCarryCalculator,
     BumpCalculator, CenterCalculator, CounterAttackGoalCalculator, DoubleTapGoalCalculator,
     EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator, FlipIntoBallGoalCalculator,
@@ -9,7 +8,8 @@ use crate::{
     OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator,
     PlayerVerticalState, PossessionState, RotationCalculator, StatsTimelineCollector,
     SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchState,
-    WallAerialCalculator, WallAerialShotCalculator,
+    WallAerialCalculator, WallAerialShotCalculator, builtin_analysis_node_json,
+    builtin_analysis_nodes_json, builtin_stats_module_names,
 };
 use std::any::TypeId;
 use std::collections::HashSet;
@@ -118,9 +118,11 @@ fn every_builtin_stats_module_is_graph_callable() {
 
 #[test]
 fn core_alias_and_match_stats_share_one_provider() {
-    assert!(builtin_analysis_node_aliases()
-        .iter()
-        .any(|alias| alias.alias == "core" && alias.node_name == "match_stats"));
+    assert!(
+        builtin_analysis_node_aliases()
+            .iter()
+            .any(|alias| alias.alias == "core" && alias.node_name == "match_stats")
+    );
 
     let mut graph = graph_with_builtin_analysis_nodes(["core", "match_stats"])
         .expect("core alias and match_stats should be accepted together");
@@ -139,9 +141,11 @@ fn core_alias_and_match_stats_share_one_provider() {
 #[test]
 fn air_dribble_alias_and_ball_carry_share_one_provider() {
     assert!(builtin_analysis_node_names().contains(&"air_dribble"));
-    assert!(builtin_analysis_node_aliases()
-        .iter()
-        .any(|alias| alias.alias == "air_dribble" && alias.node_name == "ball_carry"));
+    assert!(
+        builtin_analysis_node_aliases()
+            .iter()
+            .any(|alias| alias.alias == "air_dribble" && alias.node_name == "ball_carry")
+    );
 
     let mut graph = graph_with_builtin_analysis_nodes(["air_dribble", "ball_carry"])
         .expect("air_dribble alias and ball_carry should be accepted together");

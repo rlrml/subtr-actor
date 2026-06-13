@@ -4,6 +4,22 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v1.0.1 - 2026-06-13
+
+### Replay player
+
+- Publish a final `@rlrml/player` patch release with Ballcam-style smoothing:
+  velocity-based sample correction during replay normalization and a smoother
+  attached ball-cam path that blends car-cam and ball-cam poses directly.
+- Add normalization and replay-load options to disable or tune motion smoothing
+  for consumers that need exact raw sample inspection.
+
+### Viewer
+
+- Improve high-fidelity viewer parity with Ballcam by matching server-compiled
+  replay motion smoothing, defaulting renderer interpolation to linear, and
+  removing the extra final camera low-pass that made ball cam chase the target.
+
 ## v1.0.0 - 2026-06-11
 
 This is the first stable release. It restructures the entire stats-timeline

@@ -13,6 +13,8 @@ struct MappingUpdateContext {
     client_loadouts_object_id: Option<boxcars::ObjectId>,
     player_replication_object_id: boxcars::ObjectId,
     vehicle_object_id: boxcars::ObjectId,
+    camera_settings_pri_object_id: Option<boxcars::ObjectId>,
+    camera_settings_profile_object_id: Option<boxcars::ObjectId>,
 }
 
 fn synthetic_bot_player_id(actor_id: boxcars::ActorId) -> PlayerId {
@@ -63,6 +65,8 @@ impl<'a> ReplayProcessor<'a> {
             client_loadouts_object_id: cached.client_loadouts,
             player_replication_object_id,
             vehicle_object_id,
+            camera_settings_pri_object_id: cached.camera_settings_pri,
+            camera_settings_profile_object_id: cached.camera_settings_profile,
         })
     }
 
@@ -113,7 +117,7 @@ impl<'a> ReplayProcessor<'a> {
 
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
-                ($map:expr, $actor_ids:expr, $get_key:expr, $get_value:expr, $type:path $(, skip_value $skip:expr)?) => {{
+                ($map:expr_2021, $actor_ids:expr_2021, $get_key:expr_2021, $get_value:expr_2021, $type:path $(, skip_value $skip:expr_2021)?) => {{
                     if $actor_ids.contains(&update.actor_id) {
                         let value = attribute_match!(&update.attribute, $type)?;
                         let _key = $get_key(update.actor_id, value);
@@ -125,7 +129,7 @@ impl<'a> ReplayProcessor<'a> {
                 }};
             }
             macro_rules! maintain_actor_link {
-                ($map:expr, $actor_ids:expr $(, skip_value $skip:expr)?) => {
+                ($map:expr_2021, $actor_ids:expr_2021 $(, skip_value $skip:expr_2021)?) => {
                     maintain_link!(
                         $map,
                         $actor_ids,
@@ -139,7 +143,7 @@ impl<'a> ReplayProcessor<'a> {
                 };
             }
             macro_rules! maintain_vehicle_key_link {
-                ($map:expr, $actor_ids:expr) => {
+                ($map:expr_2021, $actor_ids:expr_2021) => {
                     maintain_actor_link!($map, $actor_ids)
                 };
             }
@@ -199,6 +203,42 @@ impl<'a> ReplayProcessor<'a> {
                         boxcars::Attribute::ActiveActor,
                         skip_value boxcars::ActorId(-1)
                     );
+                }
+                // The two camera-settings attributes only ever appear on
+                // `TAGame.CameraSettingsActor_TA` actors, so matching on the
+                // attribute object id alone is sufficient. The two updates can
+                // arrive in either order (and a player can edit settings
+                // mid-match), so both arms re-resolve the player link.
+                object_id if Some(object_id) == ctx.camera_settings_pri_object_id => {
+                    let active_actor =
+                        attribute_match!(&update.attribute, boxcars::Attribute::ActiveActor)?;
+                    if active_actor.actor != boxcars::ActorId(-1) {
+                        self.camera_settings_actor_to_player_actor
+                            .insert(update.actor_id, active_actor.actor);
+                        if let Some(settings) = self
+                            .camera_settings_actor_to_settings
+                            .get(&update.actor_id)
+                            .copied()
+                        {
+                            self.player_actor_to_camera_settings
+                                .insert(active_actor.actor, settings);
+                        }
+                    }
+                }
+                object_id if Some(object_id) == ctx.camera_settings_profile_object_id => {
+                    let cam_settings =
+                        attribute_match!(&update.attribute, boxcars::Attribute::CamSettings)?;
+                    let settings = PlayerCameraSettings::from(cam_settings.as_ref());
+                    self.camera_settings_actor_to_settings
+                        .insert(update.actor_id, settings);
+                    if let Some(player_actor_id) = self
+                        .camera_settings_actor_to_player_actor
+                        .get(&update.actor_id)
+                        .copied()
+                    {
+                        self.player_actor_to_camera_settings
+                            .insert(player_actor_id, settings);
+                    }
                 }
                 object_id if object_id == ctx.vehicle_object_id => {
                     maintain_vehicle_key_link!(self.car_to_boost, ctx.boost_type_actor_ids);

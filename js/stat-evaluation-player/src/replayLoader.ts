@@ -1,4 +1,4 @@
-import type { ReplayModel } from "@rlrml/player";
+import type { RawReplayFramesData, ReplayModel } from "@rlrml/player";
 import {
   createStatsFrameLookup,
   type CompactStatsTimeline,
@@ -17,6 +17,9 @@ import type { ReplayLoadProgress } from "./replayLoadProgress.ts";
 
 export interface ReplayLoadBundle {
   replay: ReplayModel;
+  /** Raw (unnormalized) subtr-actor ReplayData — feeds the @rlrml/viewer
+   * adapter so the bytes aren't parsed twice. */
+  raw: RawReplayFramesData;
   statsTimeline: StatsTimeline;
   statsFrameLookup: StatsFrameLookup;
 }
@@ -35,6 +38,7 @@ interface ReplayProgressMessage {
 interface ReplayDoneMessage {
   type: "done";
   replayBuffer: ArrayBuffer;
+  rawReplayBuffer: ArrayBuffer;
   statsTimelineParts: TransferableStatsTimelineParts;
 }
 
@@ -179,6 +183,9 @@ export async function loadReplayBundleInWorker(
         options.onProgress?.({ stage: "decoding-replay", progress: 0 });
         await waitForNextPaint();
         const replay = parseJsonBuffer<ReplayModel>(decoder, message.replayBuffer);
+        options.onProgress?.({ stage: "decoding-replay", progress: 0.5 });
+        await waitForNextPaint();
+        const raw = parseJsonBuffer<RawReplayFramesData>(decoder, message.rawReplayBuffer);
         options.onProgress?.({ stage: "decoding-replay", progress: 1 });
         await waitForNextPaint();
         const statsTimeline = await parseStatsTimelineParts(
@@ -189,6 +196,7 @@ export async function loadReplayBundleInWorker(
         const statsFrameLookup = createStatsFrameLookup(statsTimeline);
         resolve({
           replay,
+          raw,
           statsTimeline,
           statsFrameLookup,
         });

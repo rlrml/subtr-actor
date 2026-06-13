@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
-use crate::stats::analysis_graph::{graph_with_builtin_analysis_nodes, AnalysisGraph};
+use crate::stats::analysis_graph::{AnalysisGraph, graph_with_builtin_analysis_nodes};
 use crate::stats::calculators::ReplayFrameInputBuilder;
 use crate::*;
 
@@ -17,7 +17,7 @@ use super::builtins::{
 use super::playback::{
     CapturedStatsData, CapturedStatsFrame, StatsSnapshotData, StatsSnapshotFrame,
 };
-use super::types::{serialize_to_json_value, CollectedStats, CollectedStatsModule};
+use super::types::{CollectedStats, CollectedStatsModule, serialize_to_json_value};
 
 #[derive(Default)]
 enum SampleMode {

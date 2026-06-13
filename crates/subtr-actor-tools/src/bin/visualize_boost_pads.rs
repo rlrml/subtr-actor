@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::Parser;
-use subtr_actor::{standard_soccar_boost_pad_layout, BoostPadSize};
+use subtr_actor::{BoostPadSize, standard_soccar_boost_pad_layout};
 
 const FIELD_HALF_WIDTH: f32 = 4096.0;
 const FIELD_HALF_LENGTH: f32 = 5120.0;

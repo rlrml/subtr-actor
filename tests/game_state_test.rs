@@ -32,12 +32,16 @@ fn test_game_state_column_headers() {
 
     assert_eq!(headers.global_headers.len(), 3);
     assert!(headers.global_headers.contains(&"game state".to_string()));
-    assert!(headers
-        .global_headers
-        .contains(&"kickoff countdown".to_string()));
-    assert!(headers
-        .global_headers
-        .contains(&"ball has been hit".to_string()));
+    assert!(
+        headers
+            .global_headers
+            .contains(&"kickoff countdown".to_string())
+    );
+    assert!(
+        headers
+            .global_headers
+            .contains(&"ball has been hit".to_string())
+    );
 }
 
 #[test]

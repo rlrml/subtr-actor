@@ -2,6 +2,7 @@
 name = "rl-replay-subtr-actor"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 description = "WebAssembly bindings for subtr-actor - Rocket League replay processing and analysis"
@@ -24,7 +25,7 @@ boxcars.workspace = true
 
 [dependencies.subtr-actor]
 path = ".."
-version = "1.0.0"
+version = "1.0.1"
 
 [dependencies.web-sys]
 version = "0.3.85"

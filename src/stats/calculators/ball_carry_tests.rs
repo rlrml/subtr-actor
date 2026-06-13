@@ -32,11 +32,13 @@ fn keeps_ground_carry_stats_separate_from_air_dribbles() {
 
     let stats = harness.calculator.player_stats().get(&player_id).unwrap();
     assert_eq!(stats.carry_count, 1);
-    assert!(harness
-        .calculator
-        .player_air_dribble_stats()
-        .get(&player_id)
-        .is_none());
+    assert!(
+        harness
+            .calculator
+            .player_air_dribble_stats()
+            .get(&player_id)
+            .is_none()
+    );
     assert_eq!(
         harness.calculator.carry_events()[0].kind,
         BallCarryKind::Carry

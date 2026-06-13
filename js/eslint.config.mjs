@@ -11,6 +11,7 @@ export default [
       "pkg-*/**",
       "player/src/generated/**",
       "stat-evaluation-player/src/generated/**",
+      "viewer/public/**",
     ],
   },
   js.configs.recommended,
@@ -61,6 +62,19 @@ export default [
           varsIgnorePattern: "^_",
         },
       ],
+    },
+  },
+  {
+    // Seeded ballcam GameEngine modules, brought in largely verbatim. They carry
+    // not-yet-wired subsystems (e.g. EffectsManager's goal/demo explosions) whose
+    // helpers, classes, and interface-shaped params are intentionally retained
+    // until those features are wired. Relax unused-vars here only; correctness
+    // rules (no-undef, etc.) stay on. New first-party code lives in TS and is
+    // linted strictly.
+    files: ["viewer/src/managers/**/*.js", "viewer/src/lib/**/*.js"],
+    rules: {
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
 ];

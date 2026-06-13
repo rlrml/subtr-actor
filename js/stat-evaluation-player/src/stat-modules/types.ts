@@ -1,4 +1,4 @@
-import { ReplayPlayer } from "@rlrml/player";
+import type { StatsReplayPlayer } from "../statsReplayPlayer.ts";
 import type {
   FrameRenderInfo,
   BoostPickupAnimationPickup,
@@ -11,7 +11,7 @@ import type { PlayerStatsSnapshot, StatsFrameLookup, StatsTimeline } from "../st
 import { playerIdToString } from "../touchOverlay.ts";
 
 export interface StatModuleContext {
-  player: ReplayPlayer;
+  player: StatsReplayPlayer;
   replay: ReplayModel;
   statsTimeline: StatsTimeline;
   statsFrameLookup: StatsFrameLookup;

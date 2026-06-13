@@ -1,7 +1,7 @@
 use glam::{Quat, Vec3};
-use subtr_actor::{quat_to_glam, vec_to_glam, PlayerFrame, ReplayDataCollector};
+use subtr_actor::{PlayerFrame, ReplayDataCollector, quat_to_glam, vec_to_glam};
 use subtr_actor_tools::replay_plausibility::{
-    evaluate_replay_plausibility, ReplayPlausibilityReport,
+    ReplayPlausibilityReport, evaluate_replay_plausibility,
 };
 
 const MIN_ANGULAR_VELOCITY_SPEED: f32 = 30.0;

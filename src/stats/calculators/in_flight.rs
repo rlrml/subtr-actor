@@ -504,7 +504,8 @@ impl<K: Eq + Hash + Clone, C: InFlightItem> KeyedInFlightLedger<K, C> {
             self.active.remove(&key);
         }
         for (key, reason) in remove_finalize {
-            if let Some(item) = self.active.remove(&key) {
+            let removed = self.active.remove(&key);
+            if let Some(item) = removed {
                 self.log.log(&item);
                 finalized.push((key, item, reason));
             }

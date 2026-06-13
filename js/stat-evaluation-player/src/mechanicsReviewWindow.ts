@@ -1,4 +1,5 @@
-import type { ReplayPlayer, ReplayPlayerState } from "@rlrml/player";
+import type { ReplayPlayerState } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import {
   formatMechanicsReviewClipDetails,
   formatMechanicsReviewEventDetails,
@@ -53,7 +54,7 @@ export interface MechanicsReviewWindowElements {
 export interface MechanicsReviewWindowOptions {
   readonly elements: MechanicsReviewWindowElements;
   readonly replayLoads: MechanicsReviewReplayLoadsController;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   clearFreeCameraPreset(): void;
   resetReplayTransitionControls(): void;
   activateTimelineSource(item: MechanicsReviewItem): void;

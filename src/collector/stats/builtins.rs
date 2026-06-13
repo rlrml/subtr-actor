@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use serde::Serialize;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::stats::analysis_graph::{
-    builtin_analysis_node_names, AnalysisGraph, StatsProjectionState, StatsTimelineEventsState,
-    StatsTimelineFrameState,
+    AnalysisGraph, StatsProjectionState, StatsTimelineEventsState, StatsTimelineFrameState,
+    builtin_analysis_node_names,
 };
 use crate::*;
 use boxcars::{Quaternion, RigidBody, Vector3f};
@@ -1533,7 +1533,7 @@ pub(crate) fn builtin_snapshot_frame_json(
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),
-            ))
+            ));
         }
     };
     Ok(Some(value))
@@ -1729,7 +1729,7 @@ pub(crate) fn builtin_snapshot_config_json(
         _ => {
             return SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
                 module_name.to_owned(),
-            ))
+            ));
         }
     };
     Ok(value)

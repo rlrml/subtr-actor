@@ -1,9 +1,9 @@
 import "./styles.css";
 import { timelineEventSeekTime } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type {
   BoostPickupAnimationPickup,
   CanvasRecorderPlugin,
-  ReplayPlayer,
   ReplayTimelineEvent,
   ReplayPlayerState,
   TimelineOverlayPlugin,
@@ -90,7 +90,7 @@ const DEFAULT_CAMERA_DISTANCE_SCALE = 1;
 const GOAL_WATCH_LEAD_SECONDS = 4;
 const PLAYING_SNAPSHOT_UI_INTERVAL_MS = 100;
 
-let replayPlayer: ReplayPlayer | null = null;
+let replayPlayer: StatsReplayPlayer | null = null;
 let timelineOverlay: TimelineOverlayPlugin | null = null;
 let canvasRecorder: CanvasRecorderPlugin | null = null;
 let statsTimeline: StatsTimeline | null = null;
@@ -254,7 +254,8 @@ function getModuleContext(): StatModuleContext | null {
     replay: replayPlayer.replay,
     statsTimeline,
     statsFrameLookup,
-    fieldScale: replayPlayer.options.fieldScale ?? 1,
+    // The viewer renders 1:1 in Unreal Units (no @rlrml/player fieldScale).
+    fieldScale: 1,
   };
 }
 

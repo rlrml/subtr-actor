@@ -2179,10 +2179,12 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
         event.team_zero_taker.as_ref().map(|player| &player.player),
         Some(&right_player)
     );
-    assert!(event
-        .team_zero_non_takers
-        .iter()
-        .any(|player| player.player == left_player));
+    assert!(
+        event
+            .team_zero_non_takers
+            .iter()
+            .any(|player| player.player == left_player)
+    );
 
     let left_goes_index = KickoffCalculator::expected_taker_by_team(
         &[

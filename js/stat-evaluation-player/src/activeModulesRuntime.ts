@@ -1,9 +1,10 @@
 import {
   createBoostPadOverlayPlugin,
-  type ReplayPlayer,
   type ReplayTimelineEvent,
   type TimelineOverlayPlugin,
 } from "@rlrml/player";
+import { fromReplayPlayerPlugin } from "@rlrml/viewer";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { BoostPickupFilterController } from "./boostPickupFilters.ts";
 import type { EventTimelineSource } from "./eventTimelineSources.ts";
 import type { ModuleCapabilityKind } from "./moduleControls.ts";
@@ -14,7 +15,7 @@ export interface ActiveModulesRuntimeOptions {
   readonly modules: readonly StatModule[];
   readonly boostPickupFilters: BoostPickupFilterController;
   getContext(): StatModuleContext | null;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   getTimelineOverlay(): TimelineOverlayPlugin | null;
   getEventTimelineSources(ctx: StatModuleContext | null): EventTimelineSource[];
   withTimelineEventSeekTimes(events: ReplayTimelineEvent[]): ReplayTimelineEvent[];
@@ -233,7 +234,7 @@ export class ActiveModulesRuntime {
 
     this.standalonePluginRemovers.set(
       "boost-pad-overlay",
-      replayPlayer.addPlugin(createBoostPadOverlayPlugin()),
+      replayPlayer.addPlugin(fromReplayPlayerPlugin(createBoostPadOverlayPlugin())),
     );
   }
 

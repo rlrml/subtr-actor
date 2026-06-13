@@ -3,8 +3,9 @@ use super::*;
 const FLICK_MAX_DODGE_TO_TOUCH_SECONDS: f32 = 0.32;
 const FLICK_MAX_CONTROL_TO_DODGE_SECONDS: f32 = 0.08;
 const FLICK_MAX_SETUP_STALE_SECONDS: f32 = 0.35;
-const FLICK_MIN_SETUP_SECONDS: f32 = 0.30;
-const FLICK_MIN_BALL_SPEED_CHANGE: f32 = 450.0;
+const FLICK_DODGE_LAG_TOLERANCE_SECONDS: f32 = 0.12;
+const FLICK_MIN_SETUP_SECONDS: f32 = 0.20;
+const FLICK_MIN_BALL_SPEED_CHANGE: f32 = 325.0;
 const FLICK_MIN_CONFIDENCE: f32 = 0.55;
 const FLICK_MAX_CONTROL_BALL_Z: f32 = 700.0;
 const FLICK_MAX_CONTROL_HORIZONTAL_GAP: f32 = BALL_RADIUS_Z * 1.7;
@@ -162,12 +163,30 @@ struct RecentDodgeStart {
     rotation_at_dodge: Option<glam::Quat>,
 }
 
+#[derive(Debug, Clone)]
+struct PendingFlickTouch {
+    touch_event: TouchEvent,
+    ball: BallFrameState,
+    player: PlayerSample,
+    dodge_start: RecentDodgeStart,
+    ball_impulse: glam::Vec3,
+}
+
+impl PartialEq for PendingFlickTouch {
+    fn eq(&self, other: &Self) -> bool {
+        self.touch_event.touch_id == other.touch_event.touch_id
+            && self.touch_event.player == other.touch_event.player
+            && self.touch_event.frame == other.touch_event.frame
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlickCalculator {
     events: EventStream<FlickEvent>,
     active_setups: HashMap<PlayerId, ActiveFlickSetup>,
     recent_setups: HashMap<PlayerId, FlickSetupSummary>,
     recent_dodge_starts: HashMap<PlayerId, RecentDodgeStart>,
+    pending_dodge_touches: Vec<PendingFlickTouch>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     previous_ball_velocity: Option<glam::Vec3>,
 }
@@ -605,6 +624,101 @@ impl FlickCalculator {
         self.events.push(event);
     }
 
+    fn dodge_start_for_touch(&self, player: &PlayerSample) -> Option<RecentDodgeStart> {
+        if let Some(dodge_start) = self.recent_dodge_starts.get(&player.player_id) {
+            return Some(dodge_start.clone());
+        }
+        None
+    }
+
+    fn classified_as_dodge_touch(
+        touch_event: &TouchEvent,
+        touch_classification_events: &[TouchClassificationEvent],
+    ) -> bool {
+        let Some(touch_player) = touch_event.player.as_ref() else {
+            return false;
+        };
+        touch_classification_events.iter().any(|event| {
+            let same_touch = match (event.touch_id, touch_event.touch_id) {
+                (Some(event_id), Some(touch_id)) => event_id == touch_id,
+                _ => event.player == *touch_player && event.frame == touch_event.frame,
+            };
+            same_touch && event.dodge_state == "dodge"
+        })
+    }
+
+    fn pending_dodge_start_for_touch(
+        &self,
+        player: &PlayerSample,
+        touch_event: &TouchEvent,
+    ) -> Option<RecentDodgeStart> {
+        let setup = self.recent_setup_for_player(&player.player_id, touch_event.time)?;
+        Some(RecentDodgeStart {
+            time: touch_event.time,
+            frame: touch_event.frame,
+            setup,
+            rotation_at_dodge: player
+                .rigid_body
+                .as_ref()
+                .map(|rigid_body| quat_to_glam(&rigid_body.rotation)),
+        })
+    }
+
+    fn store_pending_dodge_touch(
+        &mut self,
+        ball: &BallFrameState,
+        player: &PlayerSample,
+        touch_event: &TouchEvent,
+        ball_impulse: glam::Vec3,
+    ) {
+        if self.pending_dodge_touches.iter().any(|pending| {
+            pending.touch_event.touch_id == touch_event.touch_id
+                && pending.touch_event.player == touch_event.player
+                && pending.touch_event.frame == touch_event.frame
+        }) {
+            return;
+        }
+        let Some(dodge_start) = self.pending_dodge_start_for_touch(player, touch_event) else {
+            return;
+        };
+        self.pending_dodge_touches.push(PendingFlickTouch {
+            touch_event: touch_event.clone(),
+            ball: ball.clone(),
+            player: player.clone(),
+            dodge_start,
+            ball_impulse,
+        });
+    }
+
+    fn resolve_pending_dodge_touches(
+        &mut self,
+        frame: &FrameInfo,
+        touch_classification_events: &[TouchClassificationEvent],
+    ) {
+        let mut resolved = Vec::new();
+        self.pending_dodge_touches.retain(|pending| {
+            if frame.time - pending.touch_event.time > FLICK_DODGE_LAG_TOLERANCE_SECONDS {
+                return false;
+            }
+            if Self::classified_as_dodge_touch(&pending.touch_event, touch_classification_events) {
+                resolved.push(pending.clone());
+                return false;
+            }
+            true
+        });
+        for pending in resolved {
+            if let Some(event) = self.candidate_event(
+                &pending.ball,
+                &pending.player,
+                &pending.touch_event,
+                &pending.dodge_start,
+                pending.ball_impulse,
+            ) {
+                self.apply_event(frame, event);
+            }
+        }
+    }
+
     fn apply_touch_events(
         &mut self,
         frame: &FrameInfo,
@@ -625,11 +739,12 @@ impl FlickCalculator {
             else {
                 continue;
             };
-            let Some(dodge_start) = self.recent_dodge_starts.get(player_id) else {
+            let Some(dodge_start) = self.dodge_start_for_touch(player) else {
+                self.store_pending_dodge_touch(ball, player, touch_event, ball_impulse);
                 continue;
             };
             let Some(event) =
-                self.candidate_event(ball, player, touch_event, dodge_start, ball_impulse)
+                self.candidate_event(ball, player, touch_event, &dodge_start, ball_impulse)
             else {
                 continue;
             };
@@ -642,16 +757,18 @@ impl FlickCalculator {
         self.active_setups.clear();
         self.recent_setups.clear();
         self.recent_dodge_starts.clear();
+        self.pending_dodge_touches.clear();
         self.previous_dodge_active.clear();
         self.previous_ball_velocity = ball.velocity();
     }
 
-    pub fn update(
+    fn update_with_touch_classification_events(
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
         players: &PlayerFrameState,
         touch_state: &TouchState,
+        touch_classification_events: &[TouchClassificationEvent],
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
@@ -660,6 +777,7 @@ impl FlickCalculator {
             return Ok(());
         }
         self.prune_recent_state(frame.time);
+        self.resolve_pending_dodge_touches(frame, touch_classification_events);
         self.update_control_setups(
             frame,
             ball,
@@ -671,6 +789,25 @@ impl FlickCalculator {
         self.apply_touch_events(frame, ball, players, &touch_state.touch_events);
         self.previous_ball_velocity = ball.velocity();
         Ok(())
+    }
+
+    pub fn update(
+        &mut self,
+        frame: &FrameInfo,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        touch_state: &TouchState,
+        touch: &TouchCalculator,
+        live_play_state: &LivePlayState,
+    ) -> SubtrActorResult<()> {
+        self.update_with_touch_classification_events(
+            frame,
+            ball,
+            players,
+            touch_state,
+            touch.events(),
+            live_play_state,
+        )
     }
 }
 

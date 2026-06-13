@@ -1,6 +1,6 @@
 mod common;
 
-use subtr_actor::{builtin_stats_module_names, StatsCollector, StatsFrameResolution};
+use subtr_actor::{StatsCollector, StatsFrameResolution, builtin_stats_module_names};
 
 const SMALL_STATS_FIXTURE: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
 

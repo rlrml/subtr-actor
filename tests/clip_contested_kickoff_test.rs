@@ -11,8 +11,8 @@
 mod common;
 
 use subtr_actor::{
-    clip_replay_around_times, EventPayload, KickoffEvent, KickoffType, PlayerId,
-    StatsTimelineCollector,
+    EventPayload, KickoffEvent, KickoffType, PlayerId, StatsTimelineCollector,
+    clip_replay_around_times,
 };
 
 const DOUBLES_REPLAY: &str = "assets/post-eac-ranked-doubles-2026-04-28.replay";

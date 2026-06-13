@@ -3,13 +3,18 @@ import {
   createBoostPickupAnimationPlugin,
   createCanvasRecorderPlugin,
   createTimelineOverlayPlugin,
-  ReplayPlayer,
   type BoostPickupAnimationPickup,
   type CanvasRecorderPlugin,
   type ReplayTimelineEvent,
   type ReplayPlayerState,
   type TimelineOverlayPlugin,
 } from "@rlrml/player";
+import {
+  createFpsOverlayPlugin,
+  createViewerFromParsed,
+  fromReplayPlayerPlugin,
+} from "@rlrml/viewer";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { CameraControlsController } from "./cameraControls.ts";
 import type { StatsPlayerConfig } from "./playerConfig.ts";
 import { getCustomCameraSettingsFromConfig } from "./playerConfigRuntime.ts";
@@ -36,8 +41,8 @@ export interface ReplayDisplayRuntimeOptions {
   readonly elements: ReplayDisplayElements;
   readonly defaultCameraDistanceScale: number;
   getReplayLoadModal(): ReplayLoadModalController | null;
-  getReplayPlayer(): ReplayPlayer | null;
-  setReplayPlayer(value: ReplayPlayer | null): void;
+  getReplayPlayer(): StatsReplayPlayer | null;
+  setReplayPlayer(value: StatsReplayPlayer | null): void;
   getUnsubscribe(): (() => void) | null;
   setUnsubscribe(value: (() => void) | null): void;
   setCanvasRecorder(value: CanvasRecorderPlugin | null): void;
@@ -48,7 +53,7 @@ export interface ReplayDisplayRuntimeOptions {
   setStatRegistry(value: StatDefinition[]): void;
   getInitialConfig(): StatsPlayerConfig | null;
   setApplyingConfig(value: boolean): void;
-  getReplayTimelineEvents(replay: ReplayPlayer["replay"]): ReplayTimelineEvent[];
+  getReplayTimelineEvents(replay: StatsReplayPlayer["replay"]): ReplayTimelineEvent[];
   withTimelineEventSeekTimes(events: ReplayTimelineEvent[]): ReplayTimelineEvent[];
   includeBoostPickupAnimationPickup(pickup: BoostPickupAnimationPickup): boolean;
   syncRecordingWindow(): void;
@@ -135,7 +140,11 @@ export async function loadReplayBundleForDisplay(
     options.setCanvasRecorder(recorder);
     const config = options.getInitialConfig();
 
-    const replayPlayer = new ReplayPlayer(elements.viewport, replay, {
+    // The viewer implements @rlrml/player's full ReplayPlayer surface; player
+    // plugins are bridged via fromReplayPlayerPlugin (the original `recorder` /
+    // `timelineOverlay` handles share closure state with the wrapped copies, so
+    // they keep working for setCanvasRecorder/setTimelineOverlay below).
+    const replayPlayer = createViewerFromParsed(elements.viewport, loadedReplay, {
       initialPlaybackRate: config?.playback.rate,
       initialCameraDistanceScale:
         config?.camera.distanceScale ?? options.defaultCameraDistanceScale,
@@ -151,14 +160,31 @@ export async function loadReplayBundleForDisplay(
       initialSkipPostGoalTransitionsEnabled: elements.skipPostGoalTransitions.checked,
       initialSkipKickoffsEnabled: elements.skipKickoffs.checked,
       plugins: [
-        createBallchasingOverlayPlugin(),
-        createBoostPickupAnimationPlugin({
-          includePickup: options.includeBoostPickupAnimationPickup,
+        // Render + live replay FPS, reported into the Playback window's detail
+        // grid (headless: we own the markup so it matches the other fields).
+        createFpsOverlayPlugin({
+          onSample: ({ renderFps, replayFps }) => {
+            const render = document.getElementById("render-fps-readout");
+            const replay = document.getElementById("replay-fps-readout");
+            if (render) render.textContent = `${renderFps.toFixed(0)} fps`;
+            if (replay) replay.textContent = `${replayFps.toFixed(0)} fps`;
+          },
         }),
-        recorder,
-        timelineOverlay,
+        fromReplayPlayerPlugin(createBallchasingOverlayPlugin()),
+        fromReplayPlayerPlugin(
+          createBoostPickupAnimationPlugin({
+            includePickup: options.includeBoostPickupAnimationPickup,
+          }),
+        ),
+        fromReplayPlayerPlugin(recorder),
+        fromReplayPlayerPlugin(timelineOverlay),
       ],
-    });
+    }) as StatsReplayPlayer;
+    if (import.meta.env.DEV) {
+      // Console/debug handle (dev server only): inspect playback, A/B camera or
+      // motion-interpolation settings live, sample mesh positions, etc.
+      (window as { __statsReplayPlayer?: StatsReplayPlayer }).__statsReplayPlayer = replayPlayer;
+    }
     options.setTimelineOverlay(timelineOverlay);
     options.setReplayPlayer(replayPlayer);
     options.syncBoostPadOverlayPlugin();

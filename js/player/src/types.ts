@@ -223,6 +223,15 @@ export interface ReplayLoadOptions {
   onProgress?: (progress: ReplayLoadProgress) => void;
   reportEveryNFrames?: number;
   useWorker?: boolean;
+  /**
+   * Apply Ballcam-style velocity-based correction while normalizing replay
+   * samples. Defaults to true; set false to inspect exact raw frame positions.
+   */
+  motionSmoothing?: boolean;
+  /** Blend toward the measured replay sample during velocity correction. */
+  smoothingBlendFactor?: number;
+  /** Every N corrected samples, use a stronger measured-sample anchor. */
+  smoothingAnchorInterval?: number;
 }
 
 export interface ReplayLoadOverlayOptions {

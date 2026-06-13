@@ -19,6 +19,9 @@ interface ReplayProgressMessage {
 interface ReplayDoneMessage {
   type: "done";
   replayBuffer: ArrayBuffer;
+  /** Raw subtr-actor ReplayData JSON (UTF-8) — parsed on the main thread for
+   * consumers that need the unnormalized data (the @rlrml/viewer adapter). */
+  rawReplayBuffer: ArrayBuffer;
   statsTimelineParts: TransferableStatsTimelineParts;
 }
 
@@ -119,6 +122,15 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
     });
     const replayBuffer = new TextEncoder().encode(JSON.stringify(replay));
 
+    // Ship the raw ReplayData bytes too (already decoded above for
+    // normalizeReplayData; TextDecoder doesn't detach the buffer). Re-view as
+    // a standalone buffer if the WASM binding handed us an offset view.
+    const rawView = replayBundle.rawReplayData as Uint8Array;
+    const rawReplayBuffer =
+      rawView.byteOffset === 0 && rawView.byteLength === rawView.buffer.byteLength
+        ? rawView.buffer
+        : rawView.slice().buffer;
+
     const frameChunkBuffers = Array.from(
       replayBundle.statsTimelineParts.frameChunks,
       (chunk) => chunk.buffer,
@@ -128,6 +140,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       {
         type: "done",
         replayBuffer: replayBuffer.buffer,
+        rawReplayBuffer,
         statsTimelineParts: {
           configBuffer: replayBundle.statsTimelineParts.config.buffer,
           replayMetaBuffer: replayBundle.statsTimelineParts.replayMeta.buffer,
@@ -139,6 +152,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       },
       [
         replayBuffer.buffer,
+        rawReplayBuffer,
         replayBundle.statsTimelineParts.config.buffer,
         replayBundle.statsTimelineParts.replayMeta.buffer,
         replayBundle.statsTimelineParts.events.buffer,

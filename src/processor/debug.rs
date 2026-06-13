@@ -38,10 +38,11 @@ impl<'a> ReplayProcessor<'a> {
 
     /// Returns a formatted dump of a single actor's current attribute state.
     pub fn actor_state_string(&self, actor_id: &boxcars::ActorId) -> String {
-        if let Ok(actor_state) = self.get_actor_state(actor_id) {
-            format!("{:?}", self.map_attribute_keys(&actor_state.attributes))
-        } else {
-            String::from("error")
+        match self.get_actor_state(actor_id) {
+            Ok(actor_state) => {
+                format!("{:?}", self.map_attribute_keys(&actor_state.attributes))
+            }
+            _ => String::from("error"),
         }
     }
 

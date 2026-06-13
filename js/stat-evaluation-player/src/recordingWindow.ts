@@ -1,4 +1,5 @@
-import type { CanvasRecorderPlugin, CanvasRecorderStatus, ReplayPlayer } from "@rlrml/player";
+import type { CanvasRecorderPlugin, CanvasRecorderStatus } from "@rlrml/player";
+import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { RecordingConfig } from "./playerConfig.ts";
 
 export interface RecordingWindowElements {
@@ -18,7 +19,7 @@ export interface RecordingWindowElements {
 export interface RecordingWindowOptions {
   readonly elements: RecordingWindowElements;
   getCanvasRecorder(): CanvasRecorderPlugin | null;
-  getReplayPlayer(): ReplayPlayer | null;
+  getReplayPlayer(): StatsReplayPlayer | null;
   getLoadedReplayName(): string | null;
   setStatus(message: string): void;
   requestConfigSync(): void;

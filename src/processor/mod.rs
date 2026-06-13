@@ -73,7 +73,7 @@ pub(crate) fn attribute_type_name(attribute: &boxcars::Attribute) -> &'static st
 /// the actual type.
 #[macro_export]
 macro_rules! attribute_match {
-    ($value:expr, $type:path $(,)?) => {{
+    ($value:expr_2021, $type:path $(,)?) => {{
         let attribute = $value;
         if let $type(value) = attribute {
             Ok(value)
@@ -96,7 +96,7 @@ macro_rules! attribute_match {
 /// * `$type` - The expected enum path.
 #[macro_export]
 macro_rules! get_attribute_errors_expected {
-    ($self:ident, $map:expr, $prop:expr, $type:path) => {
+    ($self:ident, $map:expr_2021, $prop:expr_2021, $type:path) => {
         $self
             .get_attribute($map, $prop)
             .and_then(|found| attribute_match!(found, $type))
@@ -116,7 +116,7 @@ macro_rules! get_attribute_errors_expected {
 /// It returns a [`Result`] with a tuple of the matched attribute and its updated
 /// status, after invoking [`attribute_match!`] on the found attribute.
 macro_rules! get_attribute_and_updated {
-    ($self:ident, $map:expr, $prop:expr, $type:path) => {
+    ($self:ident, $map:expr_2021, $prop:expr_2021, $type:path) => {
         $self
             .get_attribute_and_updated($map, $prop)
             .and_then(|(found, updated)| attribute_match!(found, $type).map(|v| (v, updated)))
@@ -132,7 +132,7 @@ macro_rules! get_attribute_and_updated {
 /// * `$prop` - The attribute key.
 /// * `$type` - The expected enum path.
 macro_rules! get_actor_attribute_matching {
-    ($self:ident, $actor:expr, $prop:expr, $type:path) => {
+    ($self:ident, $actor:expr_2021, $prop:expr_2021, $type:path) => {
         $self
             .get_actor_attribute($actor, $prop)
             .and_then(|found| attribute_match!(found, $type))
@@ -148,7 +148,7 @@ macro_rules! get_actor_attribute_matching {
 /// * `$key` - The attribute key.
 /// * `$type` - The expected enum path.
 macro_rules! get_derived_attribute {
-    ($map:expr, $key:expr, $type:path) => {
+    ($map:expr_2021, $key:expr_2021, $type:path) => {
         $map.get($key)
             .ok_or_else(|| {
                 SubtrActorError::new(SubtrActorErrorVariant::DerivedKeyValueNotFound {
@@ -195,6 +195,8 @@ struct CachedObjectIds {
     replicated_game_playlist: Option<boxcars::ObjectId>,
     ball_hit_team_num: Option<boxcars::ObjectId>,
     dodges_refreshed_counter: Option<boxcars::ObjectId>,
+    camera_settings_pri: Option<boxcars::ObjectId>,
+    camera_settings_profile: Option<boxcars::ObjectId>,
 }
 
 impl CachedObjectIds {
@@ -224,6 +226,8 @@ impl CachedObjectIds {
             replicated_game_playlist: cached(REPLICATED_GAME_PLAYLIST_KEY),
             ball_hit_team_num: cached(BALL_HIT_TEAM_NUM_KEY),
             dodges_refreshed_counter: cached(DODGES_REFRESHED_COUNTER_KEY),
+            camera_settings_pri: cached(CAMERA_SETTINGS_PRI_KEY),
+            camera_settings_profile: cached(CAMERA_SETTINGS_PROFILE_KEY),
         }
     }
 }
@@ -291,6 +295,18 @@ pub struct ReplayProcessor<'a> {
     pub player_to_actor_id: HashMap<PlayerId, boxcars::ActorId>,
     /// Mapping from player-controller actors to their replicated loadouts.
     pub player_actor_to_loadout: HashMap<boxcars::ActorId, boxcars::TeamLoadout>,
+    /// Mapping from player-controller actors to their replicated camera presets.
+    ///
+    /// Like `player_actor_to_loadout`, this is captured while frames are
+    /// processed (camera-settings actors can be deleted mid-replay) and
+    /// persists across [`reset`](Self::reset).
+    pub player_actor_to_camera_settings: HashMap<boxcars::ActorId, PlayerCameraSettings>,
+    /// Mapping from camera-settings actors to the player-controller actor they
+    /// replicate for, used to join the two camera attributes whichever order
+    /// they arrive in.
+    camera_settings_actor_to_player_actor: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    /// Mapping from camera-settings actors to their last replicated preset.
+    camera_settings_actor_to_settings: HashMap<boxcars::ActorId, PlayerCameraSettings>,
     /// Mapping from player-controller actors to car actors.
     pub player_to_car: HashMap<boxcars::ActorId, boxcars::ActorId>,
     /// Mapping from player-controller actors to team actors.
@@ -413,6 +429,9 @@ impl<'a> ReplayProcessor<'a> {
             player_to_team: HashMap::new(),
             player_to_actor_id: HashMap::new(),
             player_actor_to_loadout: HashMap::new(),
+            player_actor_to_camera_settings: HashMap::new(),
+            camera_settings_actor_to_player_actor: HashMap::new(),
+            camera_settings_actor_to_settings: HashMap::new(),
             car_to_player: HashMap::new(),
             car_to_boost: HashMap::new(),
             car_to_jump: HashMap::new(),

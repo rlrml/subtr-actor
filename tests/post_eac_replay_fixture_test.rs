@@ -2,9 +2,9 @@ mod common;
 
 use serde_json::Value;
 use subtr_actor::{
-    builtin_stats_module_names, Collector, EventPayload, FrameRateDecorator, GoalTagKind,
-    NDArrayCollector, PlayerFrame, ReplayDataCollector, ReplayGameType, ReplayProcessor,
-    StatsCollector, StatsFrameResolution, StatsTimelineCollector, StatsTimelineEventCollector,
+    Collector, EventPayload, FrameRateDecorator, GoalTagKind, NDArrayCollector, PlayerFrame,
+    ReplayDataCollector, ReplayGameType, ReplayProcessor, StatsCollector, StatsFrameResolution,
+    StatsTimelineCollector, StatsTimelineEventCollector, builtin_stats_module_names,
 };
 
 struct PostEacFixture {

@@ -5,7 +5,7 @@ use crate::stats::analysis_graph::{
     builtin_analysis_node_names, graph_with_builtin_analysis_nodes, nodes::DoubleTapNode,
 };
 use crate::stats::calculators::{
-    ApproachConfidenceLevel, EventCategory, FrameInput, StatsEvent, DOUBLE_TAP_EVENT_DEFINITION,
+    ApproachConfidenceLevel, DOUBLE_TAP_EVENT_DEFINITION, EventCategory, FrameInput, StatsEvent,
     UNKNOWN_DETECTION_CONFIDENCE,
 };
 

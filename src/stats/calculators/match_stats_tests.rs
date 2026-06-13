@@ -389,10 +389,12 @@ fn finish_flushes_attributed_goal_without_goal_counter_delta() {
         )
         .unwrap();
 
-    assert!(calculator
-        .timeline()
-        .iter()
-        .all(|event| event.kind != TimelineEventKind::Goal));
+    assert!(
+        calculator
+            .timeline()
+            .iter()
+            .all(|event| event.kind != TimelineEventKind::Goal)
+    );
 
     calculator.finish().unwrap();
 

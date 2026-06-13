@@ -1,0 +1,1140 @@
+/**
+ * ViewerPlayer — the bare playback core of @rlrml/viewer.
+ *
+ * Deliberately minimal, like `@rlrml/player`'s ReplayPlayer: it owns the
+ * renderer (scene / arena / actors), a playback clock, and the plugin host —
+ * nothing else. Scoreboard, name tags, overlays, effects polish, custom
+ * cameras: all plugins (docs/EXTENSIBILITY.md).
+ *
+ * Data flows one way each frame:
+ *   adapter.seek(t) → ActorManager interpolates meshes → plugins beforeRender →
+ *   renderer.render.
+ */
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { SceneManager } from "./managers/SceneManager.js";
+import { ArenaManager } from "./managers/ArenaManager.js";
+import { ActorManager } from "./managers/ActorManager.js";
+import { EffectsManager } from "./managers/EffectsManager.js";
+import { HitboxManager } from "./managers/HitboxManager.js";
+import type { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
+// Timeline projection / skip-window semantics are @rlrml/player's own
+// ReplayModel utilities, so both players agree on what gets skipped and how
+// replay time maps onto the (skip-aware) timeline.
+import {
+  computeTimelineSegments,
+  getKickoffCountdownMetadata,
+  getKickoffSkipTargetTime,
+  getPostGoalTransitionSkipTargetTime,
+  getReplayPlaybackEndTime,
+  inferKickoffGameState,
+  inferLiveGameState,
+  projectReplayTimeToTimeline,
+  projectTimelineTimeToReplay,
+} from "@rlrml/player";
+import type {
+  ReplayModel,
+  ReplayPlayerTimelineProjection,
+  ReplayPlayerTimelineSegment,
+  ReplayScene,
+} from "@rlrml/player";
+import type { CameraPlugin } from "./plugins/camera.js";
+import type {
+  BallRenderState,
+  BeforeRenderCallback,
+  CameraSettings,
+  CarRenderState,
+  FrameRenderInfo,
+  ViewerCameraViewMode,
+  ViewerFreeCameraPreset,
+  ViewerOptions,
+  ViewerPlugin,
+  ViewerPluginContext,
+  ViewerPluginDefinition,
+  ViewerPluginStateContext,
+  ViewerRenderContext,
+  ViewerSnapshot,
+  ViewerState,
+  ViewerStatePatch,
+} from "./types.js";
+
+type ViewerListener = (state: ViewerState) => void;
+type InstalledPlugin = { definition: ViewerPluginDefinition; plugin: ViewerPlugin };
+
+// With `effects: false`, every EffectsManager call from ActorManager is a no-op.
+const effectsStub = new Proxy({}, { get: () => () => {} }) as EffectsManager;
+
+/**
+ * Drop non-finite fields, matching @rlrml/player's normalizeCustomCameraSettings.
+ * (`pitch` passes through — the camera plugin maps it onto `angle` on entry.)
+ */
+function normalizeCustomCameraSettings(
+  settings: CameraSettings | null | undefined,
+): CameraSettings | null {
+  if (!settings) return null;
+  const normalized: CameraSettings = {};
+  for (const key of Object.keys(settings) as Array<keyof CameraSettings>) {
+    const value = settings[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      normalized[key] = value;
+    }
+  }
+  return normalized;
+}
+
+/**
+ * Free-camera preset poses — @rlrml/player's exact constants
+ * (player-internals/spatial.ts), converted from its Z-up world to this
+ * package's THREE Y-up space (x→x, z→y, y→z; see adapter/coords.ts).
+ */
+const FREE_CAMERA_PRESETS: Record<
+  ViewerFreeCameraPreset,
+  {
+    position: [number, number, number];
+    target: [number, number, number];
+    up: [number, number, number];
+  }
+> = {
+  overhead: { position: [0, 18800, 0], target: [0, 700, 0], up: [-1, 0, 0] },
+  side: { position: [-9600, 6400, -12600], target: [0, 900, 0], up: [0, 1, 0] },
+};
+
+/**
+ * Build the viewer's `replayRoot`: a group whose LOCAL space is raw Unreal
+ * coordinates (RL Z-up, UU). Its fixed basis is exactly `vec3RlToThree`
+ * (adapter/coords.ts): x→x, z→y, y→z — so `replayRoot.add(mesh)` with
+ * UE-coordinate positions renders correctly in this Y-up world.
+ *
+ * This matches @rlrml/player's `replayRoot` convention (there it's a
+ * `(-fieldScale, fieldScale, fieldScale)` scale in a Z-up world): in BOTH
+ * players, replayRoot-local space = chirality-corrected UE coordinates, which
+ * is what makes ReplayScene-consuming overlays portable.
+ */
+function createReplayRoot(scene: THREE.Scene): THREE.Group {
+  const replayRoot = new THREE.Group();
+  replayRoot.name = "replayRoot";
+  replayRoot.matrixAutoUpdate = false;
+  // prettier-ignore
+  replayRoot.matrix.set(
+    1, 0, 0, 0,
+    0, 0, 1, 0,
+    0, 1, 0, 0,
+    0, 0, 0, 1,
+  );
+  scene.add(replayRoot);
+  return replayRoot;
+}
+
+export class ViewerPlayer extends EventTarget {
+  readonly container: HTMLElement;
+  /** The subtr-actor adapter — the sole data source (timelines + live entities). */
+  readonly adapter: SubtrActorPlayer;
+  /**
+   * @rlrml/player's normalized `ReplayModel` over the same raw WASM output the
+   * adapter consumes (docs/PLAYER_PARITY.md Phase 2) — the data surface
+   * @rlrml/player consumers read. Shares the adapter's time axis (t=0 at the
+   * first frame) and player-id format. Null when constructed directly with an
+   * adapter only; `createViewer()` always provides it.
+   */
+  readonly replay: ReplayModel | null;
+  readonly options: ViewerOptions;
+
+  readonly sceneManager: SceneManager;
+  readonly arenaManager: ArenaManager;
+  readonly actorManager: ActorManager;
+  readonly effectsManager: EffectsManager;
+  readonly hitboxManager: HitboxManager;
+  readonly controls: OrbitControls;
+  /**
+   * UE-coordinate mount point: children positioned in raw Unreal coords (RL
+   * Z-up, UU) render correctly here — same convention as @rlrml/player's
+   * `replayRoot`, see createReplayRoot. The portable seam for 3D overlays.
+   */
+  readonly replayRoot: THREE.Group;
+  /**
+   * @rlrml/player's `ReplayScene` surface (docs/PLAYER_PARITY.md Phase 3+):
+   * what `ReplayPlayer.sceneState`-reading consumers (js/stat-evaluation-player
+   * stat modules) use to mount THREE overlays. `scene`/`camera`/`renderer`/
+   * `controls`/`replayRoot`/`resize` are real; `ballMesh`/`playerMeshes` are
+   * live views onto this renderer's actors; the player-renderer internals
+   * (body meshes, hitboxes, boost trails/meters, demo indicators) are empty
+   * maps — they have no counterpart here.
+   */
+  readonly sceneState: ReplayScene;
+  private readonly effectsEnabled: boolean;
+  /** Resolves when async assets (arena meshes, ball model) are in the scene. */
+  readonly ready: Promise<void>;
+
+  private readonly plugins: InstalledPlugin[] = [];
+  private readonly beforeRenderCallbacks: BeforeRenderCallback[] = [];
+  private resizeObserver: ResizeObserver | null = null;
+  private animationFrameId: number | null = null;
+  private disposed = false;
+  private playing = false;
+  private speed: number;
+  private loop: boolean;
+  private currentTime = 0;
+  private lastTickAt: number | null = null;
+
+  // ── @rlrml/player-parity state (docs/PLAYER_PARITY.md). Camera fields are
+  //    delegated to an installed camera plugin (id "camera") when present; the
+  //    display toggles are tracked-but-inert until their rendering lands.
+  private cameraDistanceScaleValue: number;
+  private customCameraSettingsValue: CameraSettings | null;
+  private cameraViewModeValue: ViewerCameraViewMode;
+  private attachedPlayerIdValue: string | null;
+  /** null = never set: follow the camera plugin's recorded-state behavior. */
+  private ballCamEnabledValue: boolean | null;
+  private boostMeterEnabledValue: boolean;
+  private boostPickupAnimationEnabledValue: boolean;
+  private hitboxWireframesEnabledValue: boolean;
+  private hitboxOnlyModeEnabledValue: boolean;
+  /** Lazily built player-name → hitbox-family map (roster is static). */
+  private hitboxTypeByName: Map<string, string> | null = null;
+  /** True while hitbox wireframes are showing (cheap per-frame early-out). */
+  private hitboxesActive = false;
+  private skipPostGoalTransitionsEnabledValue: boolean;
+  private skipKickoffsEnabledValue: boolean;
+  /** True once view-mode/attachment was set through the parity surface. */
+  private attachmentTouched = false;
+
+  // ── Timeline projection / skip windows (require a ReplayModel) ──────────────
+  private readonly liveGameState: number | null = null;
+  private readonly kickoffGameState: number | null = null;
+  private timelineSegmentsCacheKey: string | null = null;
+  private timelineSegmentsCache: ReplayPlayerTimelineSegment[] = [];
+
+  constructor(
+    container: HTMLElement,
+    adapter: SubtrActorPlayer,
+    options: ViewerOptions = {},
+    replay: ReplayModel | null = null,
+  ) {
+    super();
+    this.container = container;
+    this.adapter = adapter;
+    this.replay = replay;
+    this.options = options;
+    if (replay) {
+      this.liveGameState = inferLiveGameState(replay);
+      this.kickoffGameState = inferKickoffGameState(replay, this.liveGameState);
+    }
+    this.speed = Math.max(0.1, options.initialPlaybackRate ?? options.speed ?? 1);
+    this.loop = options.loop ?? false;
+    this.cameraDistanceScaleValue = Math.max(0.25, options.initialCameraDistanceScale ?? 1);
+    this.customCameraSettingsValue = normalizeCustomCameraSettings(
+      options.initialCustomCameraSettings,
+    );
+    this.attachedPlayerIdValue = options.initialAttachedPlayerId ?? null;
+    this.cameraViewModeValue =
+      options.initialCameraViewMode ?? (this.attachedPlayerIdValue ? "follow" : "free");
+    this.ballCamEnabledValue = options.initialBallCamEnabled ?? null;
+    this.boostMeterEnabledValue = options.initialBoostMeterEnabled ?? false;
+    this.boostPickupAnimationEnabledValue = options.initialBoostPickupAnimationEnabled ?? true;
+    this.hitboxWireframesEnabledValue = options.initialHitboxWireframesEnabled ?? false;
+    this.hitboxOnlyModeEnabledValue = options.initialHitboxOnlyModeEnabled ?? false;
+    this.skipPostGoalTransitionsEnabledValue =
+      options.initialSkipPostGoalTransitionsEnabled ?? true;
+    this.skipKickoffsEnabledValue = options.initialSkipKickoffsEnabled ?? false;
+
+    this.sceneManager = new SceneManager(container);
+    this.sceneManager.initDefaultEnvironment();
+    this.arenaManager = new ArenaManager(this.scene);
+    // Trails (boost / supersonic / ball). Explosions stay dormant until the
+    // adapter exposes goal/demo events (its event getters are still stubs).
+    this.effectsEnabled = options.effects ?? true;
+    this.effectsManager = this.effectsEnabled ? new EffectsManager(this.scene) : effectsStub;
+    this.actorManager = new ActorManager(this.scene, this.effectsManager);
+    if (options.motionInterpolation) {
+      this.setMotionInterpolation(options.motionInterpolation);
+    }
+    this.actorManager.initFromFramework(adapter);
+    this.actorManager.initInterpolants(adapter.getTimelines());
+    // Hitbox wireframes (driven by the hitboxWireframesEnabled /
+    // hitboxOnlyModeEnabled parity toggles; updated per frame in render()).
+    this.hitboxManager = new HitboxManager(this.scene);
+    // NOTE: deliberately NOT calling effectsManager.setRenderContext() yet — it
+    // pre-warms the explosion shader pools, which blocks the main thread for
+    // seconds, and nothing can trigger explosions until the adapter exposes
+    // goal/demo events. Call it when those events land.
+
+    // Default camera: simple orbit. The full follow/ballcam path is a later
+    // bring-up; plugins can also drive `camera` directly.
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    // Default zoomSpeed (1) feels glacial at field scale — viewing distances are
+    // thousands of UU, so each wheel notch barely moves the camera.
+    this.controls.zoomSpeed = 2.5;
+    this.camera.position.set(0, 4000, 6000);
+    this.controls.target.set(0, 200, 0);
+    this.controls.update();
+
+    this.replayRoot = createReplayRoot(this.scene);
+    this.sceneState = this.createSceneState();
+
+    this.ready = Promise.all([
+      this.arenaManager.loadArenaMeshes().catch((e: unknown) => {
+        console.warn("[viewer] arena load failed", e);
+      }),
+      this.actorManager.waitForBallModel().catch(() => false),
+    ]).then(() => undefined);
+
+    this.installResizeHandling();
+    for (const definition of options.plugins ?? []) {
+      this.installPlugin(definition, false);
+    }
+    this.applyInitialCameraOptions();
+    // @rlrml/player semantics: don't start inside a skipped window (t=0 is a
+    // kickoff, so skip-kickoffs jumps straight to live play).
+    this.skipPostGoalTransitionIfNeeded();
+    this.skipPastKickoffIfNeeded();
+    this.scheduleAnimationFrame();
+    this.emitChange();
+
+    if (options.autoplay) {
+      this.play();
+    }
+  }
+
+  get scene(): THREE.Scene {
+    return this.sceneManager.scene as THREE.Scene;
+  }
+  get camera(): THREE.PerspectiveCamera {
+    return this.sceneManager.camera as THREE.PerspectiveCamera;
+  }
+  get renderer(): THREE.WebGLRenderer {
+    return this.sceneManager.renderer as THREE.WebGLRenderer;
+  }
+  get duration(): number {
+    return this.adapter.duration;
+  }
+
+  // ── Playback control ────────────────────────────────────────────────────────
+  play(): void {
+    if (this.playing) return;
+    this.setPlayingInternal(true);
+    this.emitChange();
+  }
+
+  pause(): void {
+    if (!this.playing) return;
+    this.setPlayingInternal(false);
+    this.emitChange();
+  }
+
+  togglePlayback(): void {
+    if (this.playing) this.pause();
+    else this.play();
+  }
+
+  seek(time: number): void {
+    this.seekInternal(time);
+    if (this.playing) {
+      // Never land playback inside a skipped window (@rlrml/player semantics).
+      this.skipPostGoalTransitionIfNeeded();
+      this.skipPastKickoffIfNeeded();
+    }
+    this.emitChange();
+  }
+
+  setPlaybackRate(speed: number): void {
+    this.speed = Math.max(0.1, speed);
+    this.emitChange();
+  }
+
+  setLoop(loop: boolean): void {
+    this.loop = loop;
+  }
+
+  /**
+   * Switch position interpolation between replay samples (see
+   * ViewerOptions.motionInterpolation). Takes effect on the next rendered
+   * frame — handy for A/B-ing smoothness live.
+   */
+  setMotionInterpolation(method: "hermite" | "linear"): void {
+    this.actorManager.interpolationMethod = method === "linear" ? "lerp" : "hermite";
+  }
+
+  // ── Frame stepping (@rlrml/player parity, off the adapter's frame timeline) ──
+  setFrameIndex(frameIndex: number): void {
+    const times = this.adapter.frameTimes;
+    if (times.length === 0 || !Number.isFinite(frameIndex)) return;
+    const clamped = Math.min(Math.max(Math.trunc(frameIndex), 0), times.length - 1);
+    // @rlrml/player semantics: landing on an exact frame implies paused playback.
+    if (this.playing) this.setPlayingInternal(false);
+    this.seekInternal(times[clamped]);
+    this.emitChange();
+  }
+
+  stepFrames(delta: number): void {
+    if (!Number.isFinite(delta)) return;
+    this.setFrameIndex(this.adapter.frameIndexAt(this.currentTime) + Math.trunc(delta));
+  }
+
+  stepForwardFrame(): void {
+    this.stepFrames(1);
+  }
+
+  stepBackwardFrame(): void {
+    this.stepFrames(-1);
+  }
+
+  // ── Camera controls (@rlrml/player parity) ──────────────────────────────────
+  // All delegate to an installed camera plugin (id "camera") when present —
+  // state is tracked either way, so a plugin added later picks it up.
+  setCameraDistanceScale(scale: number): void {
+    this.cameraDistanceScaleValue = Math.max(0.25, scale);
+    this.getCameraPlugin()?.setDistanceScale(this.cameraDistanceScaleValue);
+    this.emitChange();
+  }
+
+  setCustomCameraSettings(settings: CameraSettings | null): void {
+    this.applyCustomCameraSettings(settings);
+    this.emitChange();
+  }
+
+  setAttachedPlayer(playerId: string | null): void {
+    this.attachedPlayerIdValue = playerId;
+    this.cameraViewModeValue = playerId ? "follow" : "free";
+    this.attachmentTouched = true;
+    this.syncCameraAttachment();
+    this.emitChange();
+  }
+
+  setCameraViewMode(mode: ViewerCameraViewMode): void {
+    this.cameraViewModeValue = mode;
+    this.attachmentTouched = true;
+    this.syncCameraAttachment();
+    this.emitChange();
+  }
+
+  setFreeCameraPreset(preset: ViewerFreeCameraPreset): void {
+    this.cameraViewModeValue = "free";
+    this.attachmentTouched = true;
+    this.syncCameraAttachment(); // leave follow mode if we were in it
+    const pose = FREE_CAMERA_PRESETS[preset];
+    this.camera.up.set(...pose.up);
+    this.camera.position.set(...pose.position);
+    this.controls.target.set(...pose.target);
+    this.controls.update();
+    this.emitChange();
+  }
+
+  setBallCamEnabled(enabled: boolean): void {
+    this.ballCamEnabledValue = enabled;
+    this.getCameraPlugin()?.setBallCam(enabled);
+    this.emitChange();
+  }
+
+  // ── Display toggles (@rlrml/player parity). Hitbox toggles drive
+  //    HitboxManager (see updateHitboxVisualization); the pickup-animation
+  //    toggle is read by the bridged plugin; the boost meter is still inert. ──
+  setBoostMeterEnabled(enabled: boolean): void {
+    this.boostMeterEnabledValue = enabled;
+    this.emitChange();
+  }
+
+  setBoostPickupAnimationEnabled(enabled: boolean): void {
+    this.boostPickupAnimationEnabledValue = enabled;
+    this.emitChange();
+  }
+
+  setHitboxWireframesEnabled(enabled: boolean): void {
+    this.hitboxWireframesEnabledValue = enabled;
+    this.emitChange();
+  }
+
+  setHitboxOnlyModeEnabled(enabled: boolean): void {
+    this.hitboxOnlyModeEnabledValue = enabled;
+    this.emitChange();
+  }
+
+  // ── Skip windows (@rlrml/player parity; live when a ReplayModel is present) ──
+  setSkipPostGoalTransitionsEnabled(enabled: boolean): void {
+    this.skipPostGoalTransitionsEnabledValue = enabled;
+    if (enabled && this.playing) {
+      this.skipPostGoalTransitionIfNeeded();
+    }
+    this.emitChange();
+  }
+
+  setSkipKickoffsEnabled(enabled: boolean): void {
+    this.skipKickoffsEnabledValue = enabled;
+    if (enabled && this.playing) {
+      this.skipPostGoalTransitionIfNeeded();
+      this.skipPastKickoffIfNeeded();
+    }
+    this.emitChange();
+  }
+
+  // ── State surface (@rlrml/player parity) ────────────────────────────────────
+  setState(patch: ViewerStatePatch): void {
+    if (patch.speed !== undefined) {
+      this.speed = Math.max(0.1, patch.speed);
+    }
+    if (patch.cameraDistanceScale !== undefined) {
+      this.cameraDistanceScaleValue = Math.max(0.25, patch.cameraDistanceScale);
+      this.getCameraPlugin()?.setDistanceScale(this.cameraDistanceScaleValue);
+    }
+    if (patch.customCameraSettings !== undefined) {
+      this.applyCustomCameraSettings(patch.customCameraSettings);
+    }
+    if (patch.cameraViewMode !== undefined) {
+      this.cameraViewModeValue = patch.cameraViewMode;
+      this.attachmentTouched = true;
+    }
+    if (patch.attachedPlayerId !== undefined) {
+      this.attachedPlayerIdValue = patch.attachedPlayerId;
+      this.attachmentTouched = true;
+      if (patch.cameraViewMode === undefined) {
+        this.cameraViewModeValue = patch.attachedPlayerId ? "follow" : "free";
+      }
+    }
+    if (patch.cameraViewMode !== undefined || patch.attachedPlayerId !== undefined) {
+      this.syncCameraAttachment();
+    }
+    if (patch.ballCamEnabled !== undefined) {
+      this.ballCamEnabledValue = patch.ballCamEnabled;
+      this.getCameraPlugin()?.setBallCam(patch.ballCamEnabled);
+    }
+    if (patch.boostMeterEnabled !== undefined) {
+      this.boostMeterEnabledValue = patch.boostMeterEnabled;
+    }
+    if (patch.boostPickupAnimationEnabled !== undefined) {
+      this.boostPickupAnimationEnabledValue = patch.boostPickupAnimationEnabled;
+    }
+    if (patch.hitboxWireframesEnabled !== undefined) {
+      this.hitboxWireframesEnabledValue = patch.hitboxWireframesEnabled;
+    }
+    if (patch.hitboxOnlyModeEnabled !== undefined) {
+      this.hitboxOnlyModeEnabledValue = patch.hitboxOnlyModeEnabled;
+    }
+    if (patch.skipPostGoalTransitionsEnabled !== undefined) {
+      this.skipPostGoalTransitionsEnabledValue = patch.skipPostGoalTransitionsEnabled;
+    }
+    if (patch.skipKickoffsEnabled !== undefined) {
+      this.skipKickoffsEnabledValue = patch.skipKickoffsEnabled;
+    }
+    if (patch.currentTime !== undefined) {
+      this.seekInternal(patch.currentTime);
+    }
+    if (patch.playing !== undefined && patch.playing !== this.playing) {
+      this.setPlayingInternal(patch.playing);
+    }
+    if (this.playing && (patch.currentTime !== undefined || patch.playing !== undefined)) {
+      this.skipPostGoalTransitionIfNeeded();
+      this.skipPastKickoffIfNeeded();
+    }
+    this.emitChange();
+  }
+
+  getState(): ViewerState {
+    const frameIndex = this.adapter.frameIndexAt(this.currentTime);
+    const camera = this.getCameraPlugin();
+    let cameraViewMode = this.cameraViewModeValue;
+    let attachedPlayerId = this.attachedPlayerIdValue;
+    if (camera) {
+      // Derive the camera fields from the plugin so state stays truthful even
+      // when a consumer drives the plugin handle directly (e.g. the dev UI).
+      if (camera.getMode() === "follow") {
+        cameraViewMode = "follow";
+        const targetName = camera.getTarget();
+        const info = targetName
+          ? this.adapter.playerList.find((p) => p.name === targetName)
+          : undefined;
+        attachedPlayerId = info?.id ?? attachedPlayerId;
+      } else {
+        cameraViewMode = "free";
+        attachedPlayerId = null;
+      }
+    }
+    return {
+      currentTime: this.currentTime,
+      duration: this.duration,
+      frameIndex,
+      // Kickoff countdowns, like @rlrml/player. The adapter's frame timeline is
+      // the ReplayModel's (same metadata frames, same time axis), so its index
+      // is valid against the model.
+      activeMetadata: this.replay
+        ? getKickoffCountdownMetadata(this.replay, frameIndex, this.currentTime)
+        : null,
+      playing: this.playing,
+      speed: this.speed,
+      cameraDistanceScale: this.cameraDistanceScaleValue,
+      customCameraSettings: this.customCameraSettingsValue,
+      cameraViewMode,
+      attachedPlayerId,
+      ballCamEnabled: camera ? camera.getBallCam() : (this.ballCamEnabledValue ?? false),
+      boostMeterEnabled: this.boostMeterEnabledValue,
+      boostPickupAnimationEnabled: this.boostPickupAnimationEnabledValue,
+      hitboxWireframesEnabled: this.hitboxWireframesEnabledValue,
+      hitboxOnlyModeEnabled: this.hitboxOnlyModeEnabledValue,
+      skipPostGoalTransitionsEnabled: this.skipPostGoalTransitionsEnabledValue,
+      skipKickoffsEnabled: this.skipKickoffsEnabledValue,
+    };
+  }
+
+  getSnapshot(): ViewerSnapshot {
+    return this.getState();
+  }
+
+  // ── Timeline projection (@rlrml/player parity) ──────────────────────────────
+  // Maps replay time onto the skip-aware timeline (and back). Without a
+  // ReplayModel there are no segments, so every projection is the identity.
+  getTimelineDuration(): number {
+    return this.replay?.duration ?? this.duration;
+  }
+
+  getTimelineCurrentTime(): number {
+    return this.projectReplayTimeToTimeline(this.currentTime).timelineTime;
+  }
+
+  getTimelineSegments(): ReplayPlayerTimelineSegment[] {
+    if (!this.replay) return [];
+    const cacheKey = `${this.skipPostGoalTransitionsEnabledValue}:${this.skipKickoffsEnabledValue}`;
+    if (this.timelineSegmentsCacheKey === cacheKey) {
+      return this.timelineSegmentsCache;
+    }
+    this.timelineSegmentsCacheKey = cacheKey;
+    this.timelineSegmentsCache = computeTimelineSegments(
+      this.replay,
+      this.skipPostGoalTransitionsEnabledValue,
+      this.skipKickoffsEnabledValue,
+      this.liveGameState,
+      this.kickoffGameState,
+    );
+    return this.timelineSegmentsCache;
+  }
+
+  projectReplayTimeToTimeline(replayTime: number): ReplayPlayerTimelineProjection {
+    return projectReplayTimeToTimeline(
+      this.replay?.duration ?? this.duration,
+      this.getTimelineSegments(),
+      replayTime,
+    );
+  }
+
+  projectTimelineTimeToReplay(timelineTime: number): number {
+    return projectTimelineTimeToReplay(
+      this.replay?.duration ?? this.duration,
+      this.getTimelineDuration(),
+      this.getTimelineSegments(),
+      timelineTime,
+    );
+  }
+
+  subscribe(listener: ViewerListener): () => void {
+    const handleChange = (event: Event): void => {
+      listener((event as CustomEvent<ViewerState>).detail);
+    };
+    this.addEventListener("change", handleChange);
+    listener(this.getState());
+    return () => {
+      this.removeEventListener("change", handleChange);
+    };
+  }
+
+  /** Per-render frame-timing callback (@rlrml/player parity). Returns a remover. */
+  onBeforeRender(callback: BeforeRenderCallback): () => void {
+    this.beforeRenderCallbacks.push(callback);
+    return () => {
+      const index = this.beforeRenderCallbacks.indexOf(callback);
+      if (index >= 0) {
+        this.beforeRenderCallbacks.splice(index, 1);
+      }
+    };
+  }
+
+  // ── Plugin host (mirrors @rlrml/player) ────────────────────────────────────
+  addPlugin(definition: ViewerPluginDefinition): () => void {
+    return this.installPlugin(definition, true);
+  }
+
+  removePlugin(id: string): boolean {
+    const index = this.plugins.findIndex((entry) => entry.plugin.id === id);
+    if (index < 0) return false;
+    const [entry] = this.plugins.splice(index, 1);
+    entry.plugin.teardown?.(this.createPluginContext());
+    return true;
+  }
+
+  getPlugins(): ViewerPlugin[] {
+    return this.plugins.map((entry) => entry.plugin);
+  }
+
+  destroy(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.playing = false;
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    this.beforeRenderCallbacks.length = 0;
+    while (this.plugins.length > 0) {
+      const entry = this.plugins.pop();
+      entry?.plugin.teardown?.(this.createPluginContext());
+    }
+    this.controls.dispose();
+    if (this.effectsEnabled) {
+      this.effectsManager.reset();
+    }
+    this.hitboxManager.dispose();
+    this.actorManager.reset();
+    this.sceneManager.dispose();
+  }
+
+  dispose(): void {
+    this.destroy();
+  }
+
+  // ── Internals ───────────────────────────────────────────────────────────────
+  private setPlayingInternal(playing: boolean): void {
+    this.playing = playing;
+    this.lastTickAt = null;
+    if (playing) {
+      this.actorManager.resumeAnimations();
+    } else {
+      this.actorManager.pauseAnimations();
+    }
+  }
+
+  private seekInternal(time: number): void {
+    this.currentTime = THREE.MathUtils.clamp(time, 0, this.duration);
+    // Sync the THREE animation system (if active) to the new time, and reset
+    // trackers that work off frame-to-frame deltas so they don't see the jump:
+    // the ball trail would draw a segment connecting old/new positions and the
+    // wheels would spin wildly from the position delta.
+    this.actorManager.seekAnimations(this.currentTime);
+    this.effectsManager.resetBallTrail();
+    this.actorManager.resetWheelTracking();
+  }
+
+  /** Where playback stops: the last segment's start if skips run to the end. */
+  private getPlaybackEndTime(): number {
+    return this.replay
+      ? getReplayPlaybackEndTime(this.replay.duration, this.getTimelineSegments())
+      : this.duration;
+  }
+
+  /**
+   * Jump past a kickoff countdown when skip-kickoffs is on (@rlrml/player
+   * semantics). A skip is a jump, so it routes through seekInternal — that
+   * resets the delta-based trackers (ball trail, wheel spin) which must not
+   * see it. Returns true when a skip happened.
+   */
+  private skipPastKickoffIfNeeded(): boolean {
+    if (!this.replay || !this.skipKickoffsEnabledValue) return false;
+    const targetTime = getKickoffSkipTargetTime(
+      this.replay,
+      this.currentTime,
+      this.liveGameState,
+      this.kickoffGameState,
+    );
+    if (targetTime === null) return false;
+    this.seekInternal(targetTime);
+    return true;
+  }
+
+  /** Same as skipPastKickoffIfNeeded, for post-goal replay/celebration windows. */
+  private skipPostGoalTransitionIfNeeded(): boolean {
+    if (!this.replay || !this.skipPostGoalTransitionsEnabledValue) return false;
+    const targetTime = getPostGoalTransitionSkipTargetTime(
+      this.replay,
+      this.currentTime,
+      this.liveGameState,
+      this.kickoffGameState,
+    );
+    if (targetTime === null) return false;
+    this.seekInternal(targetTime);
+    return true;
+  }
+
+  /** The installed camera plugin, when one is present (duck-typed by id). */
+  private getCameraPlugin(): CameraPlugin | null {
+    const plugin = this.plugins.find((entry) => entry.plugin.id === "camera")?.plugin;
+    return plugin && typeof (plugin as CameraPlugin).follow === "function"
+      ? (plugin as CameraPlugin)
+      : null;
+  }
+
+  private playerNameForId(id: string): string | null {
+    return this.adapter.playerList.find((p) => p.id === id)?.name ?? null;
+  }
+
+  /** Push the parity view-mode/attachment onto the camera plugin. */
+  private syncCameraAttachment(): void {
+    const camera = this.getCameraPlugin();
+    if (!camera) return;
+    if (this.cameraViewModeValue === "follow" && this.attachedPlayerIdValue) {
+      const name = this.playerNameForId(this.attachedPlayerIdValue);
+      if (!name) {
+        console.warn(`[viewer] no player with id ${JSON.stringify(this.attachedPlayerIdValue)}`);
+        return;
+      }
+      // Follow mode owns the camera; make sure a preset's custom up is undone.
+      this.camera.up.set(0, 1, 0);
+      camera.follow(name);
+      return;
+    }
+    // "free": only leave follow mode — never stomp the viewer-native free-fly /
+    // ballOrbit modes a consumer may have set on the plugin handle directly.
+    if (camera.getMode() === "follow") {
+      camera.release();
+    }
+  }
+
+  private applyCustomCameraSettings(settings: CameraSettings | null | undefined): void {
+    this.customCameraSettingsValue = normalizeCustomCameraSettings(settings);
+    const camera = this.getCameraPlugin();
+    if (camera) {
+      // Replace, not merge: @rlrml/player treats customCameraSettings as a
+      // whole object, so clear the plugin's overrides before applying.
+      camera.setCameraSettings(null);
+      if (this.customCameraSettingsValue) {
+        camera.setCameraSettings(this.customCameraSettingsValue);
+      }
+    }
+  }
+
+  /** Push explicitly-set parity camera state onto an (newly) installed plugin. */
+  private pushCameraParityState(): void {
+    const camera = this.getCameraPlugin();
+    if (!camera) return;
+    if (this.cameraDistanceScaleValue !== 1) {
+      camera.setDistanceScale(this.cameraDistanceScaleValue);
+    }
+    if (this.customCameraSettingsValue) {
+      camera.setCameraSettings(this.customCameraSettingsValue);
+    }
+    if (this.ballCamEnabledValue !== null) {
+      camera.setBallCam(this.ballCamEnabledValue);
+    }
+    if (this.attachmentTouched) {
+      this.syncCameraAttachment();
+    }
+  }
+
+  private applyInitialCameraOptions(): void {
+    const o = this.options;
+    if (o.initialAttachedPlayerId !== undefined || o.initialCameraViewMode !== undefined) {
+      // Only then may the parity state override the plugin's own follow/mode
+      // options (e.g. createCameraPlugin({ follow })).
+      this.attachmentTouched = true;
+    }
+    this.pushCameraParityState();
+  }
+
+  private computeFrameRenderInfo(): FrameRenderInfo {
+    const times = this.adapter.frameTimes;
+    const frameIndex = this.adapter.frameIndexAt(this.currentTime);
+    const nextFrameIndex = Math.min(frameIndex + 1, Math.max(times.length - 1, 0));
+    const t0 = times[frameIndex] ?? 0;
+    const t1 = times[nextFrameIndex] ?? t0;
+    const alpha = t1 > t0 ? THREE.MathUtils.clamp((this.currentTime - t0) / (t1 - t0), 0, 1) : 0;
+    return { frameIndex, nextFrameIndex, alpha, currentTime: this.currentTime };
+  }
+
+  private installResizeHandling(): void {
+    if (typeof ResizeObserver === "undefined") return; // SceneManager's window listener covers it
+    this.resizeObserver = new ResizeObserver(() => this.sceneManager.onWindowResize());
+    this.resizeObserver.observe(this.container);
+  }
+
+  private scheduleAnimationFrame(): void {
+    if (this.animationFrameId !== null || this.disposed) return;
+    this.animationFrameId = requestAnimationFrame(this.tick);
+  }
+
+  private tick = (now: number): void => {
+    this.animationFrameId = null;
+    if (this.disposed) return;
+
+    let timeChanged = false;
+    let dt = 0;
+    if (this.playing) {
+      dt = this.lastTickAt === null ? 0 : Math.min(0.1, (now - this.lastTickAt) / 1000);
+      this.lastTickAt = now;
+      let next = this.currentTime + dt * this.speed;
+      // Skip-aware end: when trailing windows are skipped, playback ends at
+      // the final segment boundary instead of the raw duration (@rlrml/player).
+      const end = this.getPlaybackEndTime();
+      if (next >= end) {
+        if (this.loop) {
+          next = 0;
+          // Wrapping is a seek: clear delta-based trackers (see seek()).
+          this.actorManager.seekAnimations(0);
+          this.effectsManager.resetBallTrail();
+          this.actorManager.resetWheelTracking();
+        } else {
+          next = end;
+          this.playing = false;
+        }
+      }
+      timeChanged = next !== this.currentTime || !this.playing;
+      this.currentTime = next;
+      if (this.playing) {
+        timeChanged = this.skipPostGoalTransitionIfNeeded() || timeChanged;
+        timeChanged = this.skipPastKickoffIfNeeded() || timeChanged;
+      }
+    }
+
+    this.render(dt);
+    if (timeChanged) {
+      this.emitChange();
+    }
+    this.scheduleAnimationFrame();
+  };
+
+  private render(dt = 0): void {
+    this.adapter.seek(this.currentTime);
+    // Original GameEngine frame order: advance the THREE animation system (when
+    // active it owns positions) BEFORE updateFromFramework applies entity state.
+    if (this.playing) {
+      this.actorManager.updateAnimations(dt * this.speed);
+    }
+    this.actorManager.updateFromFramework(this.adapter, this.currentTime);
+    this.updatePlayerStates();
+    this.updateHitboxVisualization();
+    this.effectsManager.update(dt, this.playing, this.speed);
+    if (this.playing) {
+      // Wheel spin works off position deltas (not time), steering off userData.steer.
+      this.actorManager.updateWheelRotations();
+    }
+    this.controls.update();
+
+    if (this.beforeRenderCallbacks.length > 0) {
+      const info = this.computeFrameRenderInfo();
+      for (const callback of [...this.beforeRenderCallbacks]) {
+        callback(info);
+      }
+    }
+    if (this.plugins.length > 0) {
+      const renderContext = this.createRenderContext();
+      for (const entry of this.plugins) {
+        entry.plugin.beforeRender?.(renderContext);
+      }
+    }
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Per-player boost / supersonic effect state, ported from the original
+   * GameEngine.updateScene(): only update particle emission while playing (so
+   * paused frames don't emit at frozen positions), and pass isKickoffReset so
+   * the kickoff boost-reset doesn't fire particles. ActorManager resolves the
+   * car mesh and forwards to EffectsManager (the stub when `effects: false`).
+   */
+  private updatePlayerStates(): void {
+    if (!this.playing) return;
+    // Hitbox-only mode (@rlrml/player parity): bodies are hidden, so suppress
+    // boost / supersonic trail emission too (the player hides its trails).
+    const suppressTrails = this.hitboxOnlyModeEnabledValue;
+    for (const entity of this.adapter.getAllPlayers()) {
+      this.actorManager.updateBoostState(
+        entity.name,
+        entity.isBoosting && !suppressTrails,
+        entity.isKickoffReset,
+      );
+      this.actorManager.updateSupersonicState(
+        entity.name,
+        entity.isSupersonic && !suppressTrails,
+        entity.team,
+      );
+    }
+  }
+
+  /**
+   * Drive HitboxManager from the parity display toggles each frame, after
+   * ActorManager has applied entity transforms/visibility:
+   *
+   * - `hitboxWireframesEnabled` — per-car wireframe boxes (color-coded by
+   *   family) tracking the live car meshes.
+   * - `hitboxOnlyModeEnabled` — wireframes shown AND car bodies hidden
+   *   (@rlrml/player semantics). ActorManager re-applies entity visibility on
+   *   every updateFromFramework, so simply not hiding next frame recovers.
+   */
+  private updateHitboxVisualization(): void {
+    const enabled = this.hitboxWireframesEnabledValue || this.hitboxOnlyModeEnabledValue;
+    if (!enabled && !this.hitboxesActive) return;
+    this.hitboxesActive = enabled;
+    this.hitboxManager.setEnabled(enabled);
+    if (!enabled) return;
+
+    const am = this.actorManager as unknown as {
+      actors: Record<string | number, THREE.Object3D | undefined>;
+      playerNameToCarActorId: Record<string, string | number | undefined>;
+    };
+    if (!this.hitboxTypeByName) {
+      this.hitboxTypeByName = new Map(
+        this.adapter.getAllPlayers().map((entity) => [entity.name, entity.hitboxType]),
+      );
+    }
+    this.hitboxManager.updateHitboxes(
+      am.actors,
+      am.playerNameToCarActorId,
+      (name: string) => this.hitboxTypeByName?.get(name) ?? "Octane",
+    );
+    if (this.hitboxOnlyModeEnabledValue) {
+      for (const carActorId of Object.values(am.playerNameToCarActorId)) {
+        const carMesh = carActorId === undefined ? undefined : am.actors[carActorId];
+        if (carMesh) {
+          carMesh.visible = false;
+        }
+      }
+    }
+  }
+
+  private installPlugin(definition: ViewerPluginDefinition, renderAfterSetup: boolean): () => void {
+    const plugin = typeof definition === "function" ? definition() : definition;
+    if (this.plugins.some((entry) => entry.plugin.id === plugin.id)) {
+      throw new Error(`Viewer plugin "${plugin.id}" is already installed`);
+    }
+
+    const entry = { definition, plugin };
+    this.plugins.push(entry);
+    plugin.setup?.(this.createPluginContext());
+    if (plugin.id === "camera") {
+      // A camera plugin installed after construction picks up any parity
+      // camera state already set through the ViewerPlayer surface.
+      this.pushCameraParityState();
+    }
+    plugin.onStateChange?.(this.createPluginStateContext(this.getState()));
+    if (renderAfterSetup) {
+      this.render();
+    }
+
+    return () => {
+      const index = this.plugins.indexOf(entry);
+      if (index < 0) return;
+      this.plugins.splice(index, 1);
+      plugin.teardown?.(this.createPluginContext());
+    };
+  }
+
+  /**
+   * Build the `ReplayScene`-shaped sceneState. `ballMesh`/`playerMeshes` are
+   * getters so they track the live actors (GLB model swaps replace the
+   * Object3Ds; a snapshot would go stale).
+   */
+  private createSceneState(): ReplayScene {
+    // ActorManager is untyped JS; view the lookup tables we read with types.
+    const am = this.actorManager as unknown as {
+      ballActorId: string | number | null;
+      actors: Record<string | number, THREE.Object3D | undefined>;
+      playerNameToCarActorId: Record<string, string | number | undefined>;
+    };
+    // Capture the instance: the returned object literal's getters need the
+    // outer `this`, not their own.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const player: ViewerPlayer = this;
+    // Stand-in until the ball actor spawns (ReplayScene.ballMesh is non-null).
+    const fallbackBallMesh = new THREE.Mesh();
+    return {
+      get scene() {
+        return player.scene;
+      },
+      replayRoot: this.replayRoot,
+      get camera() {
+        return player.camera;
+      },
+      get renderer() {
+        return player.renderer;
+      },
+      controls: this.controls,
+      resize: () => this.sceneManager.onWindowResize(),
+      // Parity with ReplayPlayer.destroy() → sceneState.dispose(); consumers
+      // should normally call viewer.destroy() instead.
+      dispose: () => this.destroy(),
+      get ballMesh(): THREE.Mesh {
+        const ball = am.ballActorId != null ? am.actors[am.ballActorId] : null;
+        return (ball as THREE.Mesh) ?? fallbackBallMesh;
+      },
+      // Car Object3Ds keyed by stable player id, rebuilt per access.
+      get playerMeshes(): Map<string, THREE.Object3D> {
+        const map = new Map<string, THREE.Object3D>();
+        for (const info of player.adapter.playerList) {
+          const actorId = am.playerNameToCarActorId[info.name];
+          const mesh = actorId != null ? am.actors[actorId] : undefined;
+          if (mesh) map.set(info.id, mesh);
+        }
+        return map;
+      },
+      // Schematic-player internals with no counterpart in this renderer.
+      playerBodyMeshes: new Map(),
+      playerHitboxes: new Map(),
+      playerBoostTrails: new Map(),
+      playerBoostMeters: new Map(),
+      playerDemoIndicators: new Map(),
+      updateWallVisibility: () => {},
+    };
+  }
+
+  private createPluginContext(): ViewerPluginContext {
+    return {
+      player: this,
+      replay: this.replay,
+      options: this.options,
+      scene: this.scene,
+      camera: this.camera,
+      renderer: this.renderer,
+      container: this.container,
+    };
+  }
+
+  private createPluginStateContext(state: ViewerState): ViewerPluginStateContext {
+    return { ...this.createPluginContext(), state };
+  }
+
+  private createRenderContext(): ViewerRenderContext {
+    // ActorManager is untyped JS; view the two lookup tables we read with types.
+    const am = this.actorManager as unknown as {
+      ballActorId: string | number | null;
+      actors: Record<string | number, THREE.Object3D | undefined>;
+      playerNameToCarActorId: Record<string, string | number | undefined>;
+    };
+    const ball = this.adapter.ball;
+    const ballState: BallRenderState = {
+      position: ball.position,
+      rotation: ball.rotation,
+      velocity: ball.velocity,
+      visible: ball.visible,
+      object3d: am.ballActorId != null ? (am.actors[am.ballActorId] ?? null) : null,
+    };
+    const cars: CarRenderState[] = this.adapter.getAllPlayers().map((entity) => {
+      const carActorId = am.playerNameToCarActorId[entity.name];
+      return {
+        id: entity.id,
+        name: entity.name,
+        team: entity.team,
+        carName: entity.carName,
+        hitboxType: entity.hitboxType,
+        position: entity.position,
+        rotation: entity.rotation,
+        velocity: entity.velocity,
+        boost: entity.boost,
+        isBoosting: entity.isBoosting,
+        visible: entity.isVisible,
+        object3d: carActorId != null ? (am.actors[carActorId] ?? null) : null,
+      };
+    });
+    return {
+      ...this.createPluginContext(),
+      ...this.computeFrameRenderInfo(),
+      state: this.getState(),
+      time: this.currentTime,
+      ball: ballState,
+      cars,
+    };
+  }
+
+  private emitChange(): void {
+    const state = this.getState();
+    const pluginStateContext = this.createPluginStateContext(state);
+    for (const entry of this.plugins) {
+      entry.plugin.onStateChange?.(pluginStateContext);
+    }
+    this.dispatchEvent(new CustomEvent<ViewerState>("change", { detail: state }));
+  }
+}

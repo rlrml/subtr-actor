@@ -460,11 +460,7 @@ pub(crate) fn fifty_fifty_involves_player(
 }
 
 fn own_goal_line_y(is_team_0: bool) -> f32 {
-    if is_team_0 {
-        -GOAL_LINE_Y
-    } else {
-        GOAL_LINE_Y
-    }
+    if is_team_0 { -GOAL_LINE_Y } else { GOAL_LINE_Y }
 }
 
 fn opponent_goal_line_y(is_team_0: bool) -> f32 {
