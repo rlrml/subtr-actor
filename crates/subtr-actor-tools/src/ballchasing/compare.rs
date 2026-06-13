@@ -5,8 +5,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 use super::comparison::{
-    build_actual_comparable_stats, build_expected_comparable_stats, compute_comparable_stats,
-    MatchConfig, StatMatcher,
+    MatchConfig, StatMatcher, build_actual_comparable_stats, build_expected_comparable_stats,
+    compute_comparable_stats,
 };
 use super::report::BallchasingComparisonReport;
 use subtr_actor::*;

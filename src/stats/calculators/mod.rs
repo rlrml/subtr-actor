@@ -324,11 +324,7 @@ pub fn standard_soccar_boost_pad_layout() -> &'static [(glam::Vec3, BoostPadSize
 }
 
 fn normalized_y(is_team_0: bool, position: glam::Vec3) -> f32 {
-    if is_team_0 {
-        position.y
-    } else {
-        -position.y
-    }
+    if is_team_0 { position.y } else { -position.y }
 }
 
 fn is_enemy_side(is_team_0: bool, position: glam::Vec3) -> bool {

@@ -66,25 +66,32 @@ impl<'a> SaLiveProcessorView<'a> {
 }
 
 pub(crate) unsafe fn checked_slice<'a, T>(items: *const T, count: usize) -> Result<&'a [T], ()> {
-    if items.is_null() && count != 0 {
-        return Err(());
-    }
-    if count == 0 {
-        Ok(&[])
-    } else {
-        Ok(slice::from_raw_parts(items, count))
+    unsafe {
+        if items.is_null() && count != 0 {
+            return Err(());
+        }
+        if count == 0 {
+            Ok(&[])
+        } else {
+            Ok(slice::from_raw_parts(items, count))
+        }
     }
 }
 
 pub(crate) unsafe fn frame_event_slices(frame: &SaLiveFrame) -> Result<SaFrameEventSlices<'_>, ()> {
-    Ok(SaFrameEventSlices {
-        touches: checked_slice(frame.touches, frame.touch_count)?,
-        dodge_refreshes: checked_slice(frame.dodge_refreshes, frame.dodge_refresh_count)?,
-        boost_pad_events: checked_slice(frame.boost_pad_events, frame.boost_pad_event_count)?,
-        goals: checked_slice(frame.goals, frame.goal_count)?,
-        player_stat_events: checked_slice(frame.player_stat_events, frame.player_stat_event_count)?,
-        demolishes: checked_slice(frame.demolishes, frame.demolish_count)?,
-    })
+    unsafe {
+        Ok(SaFrameEventSlices {
+            touches: checked_slice(frame.touches, frame.touch_count)?,
+            dodge_refreshes: checked_slice(frame.dodge_refreshes, frame.dodge_refresh_count)?,
+            boost_pad_events: checked_slice(frame.boost_pad_events, frame.boost_pad_event_count)?,
+            goals: checked_slice(frame.goals, frame.goal_count)?,
+            player_stat_events: checked_slice(
+                frame.player_stat_events,
+                frame.player_stat_event_count,
+            )?,
+            demolishes: checked_slice(frame.demolishes, frame.demolish_count)?,
+        })
+    }
 }
 
 impl ProcessorView for SaLiveProcessorView<'_> {

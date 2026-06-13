@@ -20,7 +20,8 @@ fn main() -> anyhow::Result<()> {
     // TSV header
     println!("replay\ttaker\ttaker_id\tspawn\tapproach\ttime_to_ball\toutcome");
     for path in paths {
-        if let Err(error) = dump_replay(&path) {
+        let dumped = dump_replay(&path);
+        if let Err(error) = dumped {
             eprintln!("skip {path}: {error:?}");
         }
     }

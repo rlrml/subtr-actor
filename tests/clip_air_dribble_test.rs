@@ -9,7 +9,7 @@
 mod common;
 
 use subtr_actor::{
-    clip_replay_around_times, EventPayload, GoalTagKind, StatsTimelineEventCollector,
+    EventPayload, GoalTagKind, StatsTimelineEventCollector, clip_replay_around_times,
 };
 
 const AIR_DRIBBLE_GOAL_MOUTH_REPLAY: &str = "assets/air-dribble-goal-mouth-2026-05-24.replay";

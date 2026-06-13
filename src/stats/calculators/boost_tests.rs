@@ -959,11 +959,15 @@ fn matches_two_small_pickups_from_one_observed_boost_increase() {
 
     let events = calculator.pickup_events();
     assert_eq!(events.len(), 2);
-    assert!(events
-        .iter()
-        .all(|event| event.pad_type == BoostPickupPadType::Small));
+    assert!(
+        events
+            .iter()
+            .all(|event| event.pad_type == BoostPickupPadType::Small)
+    );
     // At least one of the two reported pickups is corroborated by the observed boost jump.
-    assert!(events
-        .iter()
-        .any(|event| event.detection == BoostPickupDetection::Both));
+    assert!(
+        events
+            .iter()
+            .any(|event| event.detection == BoostPickupDetection::Both)
+    );
 }

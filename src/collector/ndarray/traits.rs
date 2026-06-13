@@ -658,7 +658,7 @@ where
 /// Declares a new global feature-adder type and wires it into the ndarray traits.
 #[macro_export]
 macro_rules! build_global_feature_adder {
-    ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $prop_getter:expr_2021, $( $column_names:expr_2021 ),* $(,)?) => {
 
         #[derive(derive_new::new)]
         pub struct $struct_name<F> {
@@ -684,7 +684,7 @@ macro_rules! build_global_feature_adder {
 /// Implements the ndarray feature-adder traits for an existing global feature type.
 #[macro_export]
 macro_rules! global_feature_adder {
-    ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $prop_getter:expr_2021, $( $column_names:expr_2021 ),* $(,)?) => {
         macro_rules! _global_feature_adder {
             ($count:ident) => {
                 impl<F: TryFrom<f32>> LengthCheckedFeatureAdder<F, $count> for $struct_name<F>
@@ -719,7 +719,7 @@ macro_rules! global_feature_adder {
 /// Declares a new analysis-backed global feature-adder type.
 #[macro_export]
 macro_rules! build_analysis_global_feature_adder {
-    ($struct_name:ident, $dependency_getter:expr, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $dependency_getter:expr_2021, $prop_getter:expr_2021, $( $column_names:expr_2021 ),* $(,)?) => {
 
         #[derive(derive_new::new)]
         pub struct $struct_name<F> {
@@ -746,7 +746,7 @@ macro_rules! build_analysis_global_feature_adder {
 /// Implements the ndarray traits for an existing analysis-backed global feature type.
 #[macro_export]
 macro_rules! analysis_global_feature_adder {
-    ($struct_name:ident, $dependency_getter:expr, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $dependency_getter:expr_2021, $prop_getter:expr_2021, $( $column_names:expr_2021 ),* $(,)?) => {
         macro_rules! _analysis_global_feature_adder {
             ($count:ident) => {
                 impl<F: TryFrom<f32>> LengthCheckedAnalysisFeatureAdder<F, $count> for $struct_name<F>
@@ -786,7 +786,7 @@ macro_rules! analysis_global_feature_adder {
 /// Declares a new per-player feature-adder type and wires it into the ndarray traits.
 #[macro_export]
 macro_rules! build_player_feature_adder {
-    ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $prop_getter:expr_2021, $( $column_names:expr_2021 ),* $(,)?) => {
         #[derive(derive_new::new)]
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
@@ -811,7 +811,7 @@ macro_rules! build_player_feature_adder {
 /// Implements the ndarray feature-adder traits for an existing per-player feature type.
 #[macro_export]
 macro_rules! player_feature_adder {
-    ($struct_name:ident, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $prop_getter:expr_2021, $( $column_names:expr_2021 ),* $(,)?) => {
         macro_rules! _player_feature_adder {
             ($count:ident) => {
                 impl<F: TryFrom<f32>> LengthCheckedPlayerFeatureAdder<F, $count> for $struct_name<F>
@@ -847,7 +847,7 @@ macro_rules! player_feature_adder {
 /// Declares a new analysis-backed per-player feature-adder type.
 #[macro_export]
 macro_rules! build_analysis_player_feature_adder {
-    ($struct_name:ident, $dependency_getter:expr, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $dependency_getter:expr_2021, $prop_getter:expr_2021, $( $column_names:expr_2021 ),* $(,)?) => {
         #[derive(derive_new::new)]
         pub struct $struct_name<F> {
             _zero: std::marker::PhantomData<F>,
@@ -873,7 +873,7 @@ macro_rules! build_analysis_player_feature_adder {
 /// Implements the ndarray traits for an existing analysis-backed per-player feature type.
 #[macro_export]
 macro_rules! analysis_player_feature_adder {
-    ($struct_name:ident, $dependency_getter:expr, $prop_getter:expr, $( $column_names:expr ),* $(,)?) => {
+    ($struct_name:ident, $dependency_getter:expr_2021, $prop_getter:expr_2021, $( $column_names:expr_2021 ),* $(,)?) => {
         macro_rules! _analysis_player_feature_adder {
             ($count:ident) => {
                 impl<F: TryFrom<f32>> LengthCheckedAnalysisPlayerFeatureAdder<F, $count> for $struct_name<F>
@@ -919,7 +919,7 @@ pub fn convert_float_conversion_error<T>(_: T) -> SubtrActorError {
 /// Converts a fixed list of values with a caller-supplied error mapper.
 #[macro_export]
 macro_rules! convert_all {
-    ($err:expr, $( $item:expr ),* $(,)?) => {{
+    ($err:expr_2021, $( $item:expr_2021 ),* $(,)?) => {{
 		Ok([
 			$( $item.try_into().map_err($err)? ),*
 		])
@@ -929,7 +929,7 @@ macro_rules! convert_all {
 /// Converts a fixed list of float-like values using [`convert_float_conversion_error`].
 #[macro_export]
 macro_rules! convert_all_floats {
-    ($( $item:expr ),* $(,)?) => {{
+    ($( $item:expr_2021 ),* $(,)?) => {{
         convert_all!(convert_float_conversion_error, $( $item ),*)
     }};
 }

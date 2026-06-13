@@ -113,7 +113,7 @@ impl<'a> ReplayProcessor<'a> {
 
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
-                ($map:expr, $actor_ids:expr, $get_key:expr, $get_value:expr, $type:path $(, skip_value $skip:expr)?) => {{
+                ($map:expr_2021, $actor_ids:expr_2021, $get_key:expr_2021, $get_value:expr_2021, $type:path $(, skip_value $skip:expr_2021)?) => {{
                     if $actor_ids.contains(&update.actor_id) {
                         let value = attribute_match!(&update.attribute, $type)?;
                         let _key = $get_key(update.actor_id, value);
@@ -125,7 +125,7 @@ impl<'a> ReplayProcessor<'a> {
                 }};
             }
             macro_rules! maintain_actor_link {
-                ($map:expr, $actor_ids:expr $(, skip_value $skip:expr)?) => {
+                ($map:expr_2021, $actor_ids:expr_2021 $(, skip_value $skip:expr_2021)?) => {
                     maintain_link!(
                         $map,
                         $actor_ids,
@@ -139,7 +139,7 @@ impl<'a> ReplayProcessor<'a> {
                 };
             }
             macro_rules! maintain_vehicle_key_link {
-                ($map:expr, $actor_ids:expr) => {
+                ($map:expr_2021, $actor_ids:expr_2021) => {
                     maintain_actor_link!($map, $actor_ids)
                 };
             }

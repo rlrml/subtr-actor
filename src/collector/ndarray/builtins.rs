@@ -155,14 +155,18 @@ fn default_rb_state_quaternion<F: TryFrom<f32>>() -> RigidBodyQuaternionArrayRes
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    convert_all_floats!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,)
+    convert_all_floats!(
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    )
 }
 
 fn default_rb_state_basis<F: TryFrom<f32>>() -> RigidBodyBasisArrayResult<F>
 where
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    convert_all_floats!(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,)
+    convert_all_floats!(
+        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    )
 }
 
 fn default_rb_state_no_velocities<F: TryFrom<f32>>() -> SubtrActorResult<[F; 7]>
@@ -197,9 +201,11 @@ build_global_feature_adder!(
 build_global_feature_adder!(
     ReplicatedGameStateTimeRemaining,
     |_, processor: &dyn ProcessorView, _frame, _index, _current_time| {
-        convert_all_floats!(processor
-            .get_replicated_game_state_time_remaining()
-            .unwrap_or(0) as f32)
+        convert_all_floats!(
+            processor
+                .get_replicated_game_state_time_remaining()
+                .unwrap_or(0) as f32
+        )
     },
     "kickoff countdown"
 );
@@ -318,7 +324,8 @@ global_feature_adder!(
 build_player_feature_adder!(
     PlayerRigidBody,
     |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
-        if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
+        let rigid_body = processor.get_normalized_player_rigid_body(player_id);
+        if let Ok(rb) = rigid_body {
             get_rigid_body_properties(&rb)
         } else {
             default_rb_state()
@@ -341,7 +348,8 @@ build_player_feature_adder!(
 build_player_feature_adder!(
     PlayerRigidBodyNoVelocities,
     |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
-        if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
+        let rigid_body = processor.get_normalized_player_rigid_body(player_id);
+        if let Ok(rb) = rigid_body {
             get_rigid_body_properties_no_velocities(&rb)
         } else {
             default_rb_state_no_velocities()
@@ -359,7 +367,8 @@ build_player_feature_adder!(
 build_player_feature_adder!(
     VelocityAddedPlayerRigidBodyNoVelocities,
     |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, current_time: f32| {
-        if let Ok(rb) = processor.get_velocity_applied_player_rigid_body(player_id, current_time) {
+        let rigid_body = processor.get_velocity_applied_player_rigid_body(player_id, current_time);
+        if let Ok(rb) = rigid_body {
             get_rigid_body_properties_no_velocities(&rb)
         } else {
             default_rb_state_no_velocities()
@@ -664,7 +673,8 @@ build_player_feature_adder!(
 build_player_feature_adder!(
     PlayerRigidBodyQuaternions,
     |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
-        if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
+        let rigid_body = processor.get_normalized_player_rigid_body(player_id);
+        if let Ok(rb) = rigid_body {
             let rotation = rb.rotation;
             let location = rb.location;
             convert_all_floats!(
@@ -686,7 +696,8 @@ build_player_feature_adder!(
 build_player_feature_adder!(
     PlayerRigidBodyQuaternionVelocities,
     |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
-        if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
+        let rigid_body = processor.get_normalized_player_rigid_body(player_id);
+        if let Ok(rb) = rigid_body {
             get_rigid_body_properties_quaternion(&rb)
         } else {
             default_rb_state_quaternion()
@@ -710,7 +721,8 @@ build_player_feature_adder!(
 build_player_feature_adder!(
     PlayerRigidBodyBasis,
     |_, player_id: &PlayerId, processor: &dyn ProcessorView, _frame, _index, _current_time: f32| {
-        if let Ok(rb) = processor.get_normalized_player_rigid_body(player_id) {
+        let rigid_body = processor.get_normalized_player_rigid_body(player_id);
+        if let Ok(rb) = rigid_body {
             get_rigid_body_properties_basis(&rb)
         } else {
             default_rb_state_basis()

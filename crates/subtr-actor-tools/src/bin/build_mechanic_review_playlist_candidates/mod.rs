@@ -1,12 +1,12 @@
 use anyhow::anyhow;
 use subtr_actor::{
-    stats::analysis_graph::AnalysisGraph, BallCarryCalculator, BallCarryKind,
-    CeilingShotCalculator, Collector, DodgeResetCalculator, DoubleTapCalculator, FlickCalculator,
-    FlipResetTracker, HalfFlipCalculator, MustyFlickCalculator, OneTimerCalculator,
-    SpeedFlipCalculator, WavedashCalculator,
+    BallCarryCalculator, BallCarryKind, CeilingShotCalculator, Collector, DodgeResetCalculator,
+    DoubleTapCalculator, FlickCalculator, FlipResetTracker, HalfFlipCalculator,
+    MustyFlickCalculator, OneTimerCalculator, SpeedFlipCalculator, WavedashCalculator,
+    stats::analysis_graph::AnalysisGraph,
 };
 
-use super::{event_json, player_id_string, Config, MechanicCandidate};
+use super::{Config, MechanicCandidate, event_json, player_id_string};
 
 fn confidence_pct(confidence: f32) -> u32 {
     (confidence * 100.0).round().clamp(0.0, 100.0) as u32

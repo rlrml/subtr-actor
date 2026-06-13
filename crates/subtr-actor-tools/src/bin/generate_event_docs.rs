@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use clap::Parser;
 use subtr_actor::{
-    event_producers, DetectionConfidence, EmittedEvent, EventDefinition, EventProducerDefinition,
-    GoalTagDefinition, KnownIssueRef, ProducerDefinition, ALL_GOAL_TAG_DEFINITIONS,
+    ALL_GOAL_TAG_DEFINITIONS, DetectionConfidence, EmittedEvent, EventDefinition,
+    EventProducerDefinition, GoalTagDefinition, KnownIssueRef, ProducerDefinition, event_producers,
 };
 
 #[derive(Debug, Parser)]

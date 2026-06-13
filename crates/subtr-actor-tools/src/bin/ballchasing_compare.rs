@@ -1,4 +1,4 @@
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use clap::Parser;
 use reqwest::blocking::Client;
 use serde_json::Value;

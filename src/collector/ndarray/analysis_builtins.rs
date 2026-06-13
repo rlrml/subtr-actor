@@ -9,8 +9,8 @@ macro_rules! build_analysis_player_event_indicator {
         $dependency:ident,
         $calculator:ty,
         $events:ident,
-        $player_matches:expr,
-        $column_name:expr $(,)?
+        $player_matches:expr_2021,
+        $column_name:expr_2021 $(,)?
     ) => {
         build_analysis_player_feature_adder!(
             $struct_name,

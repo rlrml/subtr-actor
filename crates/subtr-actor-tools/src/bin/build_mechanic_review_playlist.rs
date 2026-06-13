@@ -2,23 +2,23 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use clap::Parser;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 mod build_mechanic_review_playlist_candidates;
 use build_mechanic_review_playlist_candidates::extract_candidates;
 use subtr_actor::{
+    Collector, GoalEvent, PlayerId, PlayerInfo, ProcessorView, ReplayMeta, ReplayProcessor,
+    SubtrActorResult, TimeAdvance,
     interop::player::{
         PlaybackBound, PlaybackBoundKind, PlaylistAdvanceMode, PlaylistEndMode, PlaylistManifest,
         PlaylistManifestItem, PlaylistManifestReplay, PlaylistManifestReplayLocator,
         PlaylistPlaybackOptions,
     },
     stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
-    Collector, GoalEvent, PlayerId, PlayerInfo, ProcessorView, ReplayMeta, ReplayProcessor,
-    SubtrActorResult, TimeAdvance,
 };
 
 const BALLCHASING_API_BASE_URL: &str = "https://ballchasing.com/api";
@@ -597,11 +597,13 @@ fn resolve_mechanics(config: &Config) -> anyhow::Result<Vec<&'static str>> {
         let names: Vec<&str> = match normalized.as_str() {
             "default" => DEFAULT_MECHANICS.to_vec(),
             "all" => ALL_MECHANICS.to_vec(),
-            name if ALL_MECHANICS.contains(&name) => vec![ALL_MECHANICS
-                .iter()
-                .copied()
-                .find(|candidate| *candidate == name)
-                .expect("mechanic is known")],
+            name if ALL_MECHANICS.contains(&name) => vec![
+                ALL_MECHANICS
+                    .iter()
+                    .copied()
+                    .find(|candidate| *candidate == name)
+                    .expect("mechanic is known"),
+            ],
             other => bail!(
                 "unknown mechanic {other}; supported mechanics are: {}, default, all",
                 ALL_MECHANICS.join(", ")
@@ -646,11 +648,7 @@ fn confidence_pct(confidence: f32) -> u32 {
 }
 
 fn player_team_label(is_team_0: bool) -> &'static str {
-    if is_team_0 {
-        "blue"
-    } else {
-        "orange"
-    }
+    if is_team_0 { "blue" } else { "orange" }
 }
 
 fn followup_goal_for_candidate<'a>(

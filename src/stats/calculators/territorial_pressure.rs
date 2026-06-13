@@ -157,11 +157,7 @@ impl TerritorialPressureCalculator {
     }
 
     fn normalized_ball_y(team_is_team_0: bool, ball_y: f32) -> f32 {
-        if team_is_team_0 {
-            ball_y
-        } else {
-            -ball_y
-        }
+        if team_is_team_0 { ball_y } else { -ball_y }
     }
 
     fn candidate_sample(

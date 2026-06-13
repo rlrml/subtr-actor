@@ -1,7 +1,7 @@
-use std::any::{type_name, Any, TypeId};
+use std::any::{Any, TypeId, type_name};
 use std::collections::{HashMap, HashSet};
 
-use crate::stats::calculators::{event_producers, EmittedEvent};
+use crate::stats::calculators::{EmittedEvent, event_producers};
 use crate::*;
 
 #[derive(Clone, Copy)]
@@ -498,35 +498,35 @@ impl AnalysisGraph {
                 .declared_root_states
                 .contains_key(&node.provides_state_type_id())
             {
-                return SubtrActorError::new_result(
-                    SubtrActorErrorVariant::CallbackError(format!(
+                return SubtrActorError::new_result(SubtrActorErrorVariant::CallbackError(
+                    format!(
                         "analysis node graph error: Duplicate providers for root state {}: root and '{}'",
                         node.provides_state_type_name(),
                         node.name(),
-                    )),
-                );
+                    ),
+                ));
             }
             if self
                 .declared_input_states
                 .contains_key(&node.provides_state_type_id())
             {
-                return SubtrActorError::new_result(
-                    SubtrActorErrorVariant::CallbackError(format!(
+                return SubtrActorError::new_result(SubtrActorErrorVariant::CallbackError(
+                    format!(
                         "analysis node graph error: Duplicate providers for input state {}: input and '{}'",
                         node.provides_state_type_name(),
                         node.name(),
-                    )),
-                );
+                    ),
+                ));
             }
             if let Some(existing) = providers.insert(node.provides_state_type_id(), index) {
-                return SubtrActorError::new_result(
-                    SubtrActorErrorVariant::CallbackError(format!(
+                return SubtrActorError::new_result(SubtrActorErrorVariant::CallbackError(
+                    format!(
                         "analysis node graph error: Duplicate providers for state {}: '{}' and '{}'",
                         node.provides_state_type_name(),
                         self.nodes[existing].name(),
                         node.name(),
-                    )),
-                );
+                    ),
+                ));
             }
         }
         Ok(providers)

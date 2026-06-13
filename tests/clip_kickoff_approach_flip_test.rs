@@ -15,7 +15,7 @@
 mod common;
 
 use subtr_actor::{
-    clip_replay_around_times, EventPayload, KickoffApproach, PlayerId, StatsTimelineCollector,
+    EventPayload, KickoffApproach, PlayerId, StatsTimelineCollector, clip_replay_around_times,
 };
 
 const REPLAY: &str = "assets/boost-into-ball-misclassification-2026-06-11.replay";

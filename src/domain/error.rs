@@ -15,7 +15,9 @@ pub enum SubtrActorErrorVariant {
     #[error("Frame index out of bounds")]
     FrameIndexOutOfBounds,
 
-    #[error("Players found in frames that were not part of original set. Found: {found:?}, Original: {original:?}")]
+    #[error(
+        "Players found in frames that were not part of original set. Found: {found:?}, Original: {original:?}"
+    )]
     InconsistentPlayerSet {
         found: std::collections::HashSet<PlayerId>,
         original: std::collections::HashSet<PlayerId>,
@@ -33,7 +35,9 @@ pub enum SubtrActorErrorVariant {
     #[error("No boost amount value.")]
     NoBoostAmountValue,
 
-    #[error("The attribute value that was found was not of the expected type {expected_type} {actual_type:?}")]
+    #[error(
+        "The attribute value that was found was not of the expected type {expected_type} {actual_type:?}"
+    )]
     UnexpectedAttributeType {
         expected_type: &'static str,
         actual_type: &'static str,

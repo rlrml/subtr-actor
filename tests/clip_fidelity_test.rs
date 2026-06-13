@@ -9,8 +9,8 @@
 
 use std::collections::BTreeMap;
 use subtr_actor::{
-    clip_replay_around, Collector, PlayerId, ProcessorView, ReplayProcessor, SubtrActorResult,
-    TimeAdvance,
+    Collector, PlayerId, ProcessorView, ReplayProcessor, SubtrActorResult, TimeAdvance,
+    clip_replay_around,
 };
 
 const REPLAY: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";

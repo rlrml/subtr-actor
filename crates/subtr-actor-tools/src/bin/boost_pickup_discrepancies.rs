@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use clap::Parser;
 use serde::Serialize;
 use subtr_actor::{
-    stats::analysis_graph::collect_builtin_analysis_graph_for_replay, BoostCalculator,
-    BoostPickupActivity, BoostPickupDetection, BoostPickupEvent, BoostPickupFieldHalf,
-    BoostPickupPadType, PlayerId, ReplayProcessor,
+    BoostCalculator, BoostPickupActivity, BoostPickupDetection, BoostPickupEvent,
+    BoostPickupFieldHalf, BoostPickupPadType, PlayerId, ReplayProcessor,
+    stats::analysis_graph::collect_builtin_analysis_graph_for_replay,
 };
 
 #[derive(Default, Serialize)]

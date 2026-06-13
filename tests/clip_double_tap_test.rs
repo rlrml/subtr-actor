@@ -10,8 +10,8 @@
 mod common;
 
 use subtr_actor::{
-    clip_replay_around_times, EventPayload, EventTiming, GoalTagKind, ReplayStatsTimelineScaffold,
-    StatsTimelineEventCollector,
+    EventPayload, EventTiming, GoalTagKind, ReplayStatsTimelineScaffold,
+    StatsTimelineEventCollector, clip_replay_around_times,
 };
 
 const THIRD_GOAL_DOUBLE_TAP_REPLAY: &str =

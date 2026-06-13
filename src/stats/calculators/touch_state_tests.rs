@@ -702,14 +702,18 @@ fn aggregate_explicit_touch_cooldown_processes_events_chronologically() {
     );
 
     assert_eq!(touch_state.touch_events.len(), 2);
-    assert!(touch_state
-        .touch_events
-        .iter()
-        .any(|touch| touch.frame == 1));
-    assert!(touch_state
-        .touch_events
-        .iter()
-        .any(|touch| touch.frame == 4));
+    assert!(
+        touch_state
+            .touch_events
+            .iter()
+            .any(|touch| touch.frame == 1)
+    );
+    assert!(
+        touch_state
+            .touch_events
+            .iter()
+            .any(|touch| touch.frame == 4)
+    );
     assert_eq!(touch_state.last_touch_player, Some(player_id));
     assert_eq!(
         touch_state.last_touch.as_ref().map(|touch| touch.frame),
@@ -1028,14 +1032,18 @@ fn player_explicit_touch_events_are_kept_alongside_physics_candidates() {
     );
 
     assert_eq!(touch_state.touch_events.len(), 2);
-    assert!(touch_state
-        .touch_events
-        .iter()
-        .any(|touch| touch.player.as_ref() == Some(&physics_player_id)));
-    assert!(touch_state
-        .touch_events
-        .iter()
-        .any(|touch| touch.player.as_ref() == Some(&explicit_player_id)));
+    assert!(
+        touch_state
+            .touch_events
+            .iter()
+            .any(|touch| touch.player.as_ref() == Some(&physics_player_id))
+    );
+    assert!(
+        touch_state
+            .touch_events
+            .iter()
+            .any(|touch| touch.player.as_ref() == Some(&explicit_player_id))
+    );
 }
 
 #[test]
@@ -1248,22 +1256,30 @@ fn simultaneous_close_candidates_are_all_emitted() {
     );
 
     assert_eq!(touch_state.touch_events.len(), 2);
-    assert!(touch_state
-        .touch_events
-        .iter()
-        .any(|touch| touch.player.as_ref() == Some(&team_zero_player_id)));
-    assert!(touch_state
-        .touch_events
-        .iter()
-        .any(|touch| touch.player.as_ref() == Some(&team_one_player_id)));
-    assert!(touch_state
-        .touch_events
-        .iter()
-        .any(|touch| touch.team_is_team_0));
-    assert!(touch_state
-        .touch_events
-        .iter()
-        .any(|touch| !touch.team_is_team_0));
+    assert!(
+        touch_state
+            .touch_events
+            .iter()
+            .any(|touch| touch.player.as_ref() == Some(&team_zero_player_id))
+    );
+    assert!(
+        touch_state
+            .touch_events
+            .iter()
+            .any(|touch| touch.player.as_ref() == Some(&team_one_player_id))
+    );
+    assert!(
+        touch_state
+            .touch_events
+            .iter()
+            .any(|touch| touch.team_is_team_0)
+    );
+    assert!(
+        touch_state
+            .touch_events
+            .iter()
+            .any(|touch| !touch.team_is_team_0)
+    );
 }
 
 #[test]

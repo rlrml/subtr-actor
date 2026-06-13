@@ -2,9 +2,8 @@ mod common;
 
 use subtr_actor::stats::analysis_graph::graph_with_builtin_analysis_nodes;
 use subtr_actor::{
-    car_hitbox_for_body_id, car_hitbox_for_body_name, Collector, FrameInput,
-    ReplayFrameInputBuilder, ReplayProcessor, SubtrActorResult, TimeAdvance, TouchCandidateScoring,
-    TouchState,
+    Collector, FrameInput, ReplayFrameInputBuilder, ReplayProcessor, SubtrActorResult, TimeAdvance,
+    TouchCandidateScoring, TouchState, car_hitbox_for_body_id, car_hitbox_for_body_name,
 };
 
 const TOUCH_STATE_FIXTURES: &[&str] = &[

@@ -142,9 +142,11 @@ fn finalize_all_drains_and_logs_every_item() {
 
     let finalized = ledger.finalize_all(FinalizeReason::Superseded);
     assert_eq!(finalized.len(), 2);
-    assert!(finalized
-        .iter()
-        .all(|(_, reason)| *reason == FinalizeReason::Superseded));
+    assert!(
+        finalized
+            .iter()
+            .all(|(_, reason)| *reason == FinalizeReason::Superseded)
+    );
     assert!(ledger.is_empty());
     // Both are now queryable as having happened (committed, by recognition time).
     assert!(ledger.happened_within(1.0, 1.0, true));

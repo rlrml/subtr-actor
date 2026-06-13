@@ -85,11 +85,11 @@ impl BallFrame {
     fn new_from_processor(processor: &dyn ProcessorView, current_time: f32) -> Self {
         if processor.get_ignore_ball_syncing().unwrap_or(false) {
             Self::Empty
-        } else if let Ok(rigid_body) = processor.get_interpolated_ball_rigid_body(current_time, 0.0)
-        {
-            Self::new_from_rigid_body(rigid_body)
         } else {
-            Self::Empty
+            match processor.get_interpolated_ball_rigid_body(current_time, 0.0) {
+                Ok(rigid_body) => Self::new_from_rigid_body(rigid_body),
+                _ => Self::Empty,
+            }
         }
     }
 

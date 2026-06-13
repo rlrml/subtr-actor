@@ -10,8 +10,8 @@
 mod common;
 
 use subtr_actor::{
-    clip_replay_around_times, EventPayload, KickoffEvent, KickoffOutcome, ReplayClip,
-    StatsTimelineCollector,
+    EventPayload, KickoffEvent, KickoffOutcome, ReplayClip, StatsTimelineCollector,
+    clip_replay_around_times,
 };
 
 const WORLDCUP_REPLAY: &str = "assets/replay-format-2026-06-02-v868-32-net11-worldcup-ball.replay";

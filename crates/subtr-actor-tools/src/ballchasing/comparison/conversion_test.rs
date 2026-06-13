@@ -1,6 +1,6 @@
 use super::{
-    build_actual_comparable_stats, collect_final_replay_meta, compute_comparable_stats,
-    raw_boost_amount_as_comparable_units, ComputedComparableStats,
+    ComputedComparableStats, build_actual_comparable_stats, collect_final_replay_meta,
+    compute_comparable_stats, raw_boost_amount_as_comparable_units,
 };
 use subtr_actor::*;
 

@@ -73,7 +73,7 @@ pub(crate) fn attribute_type_name(attribute: &boxcars::Attribute) -> &'static st
 /// the actual type.
 #[macro_export]
 macro_rules! attribute_match {
-    ($value:expr, $type:path $(,)?) => {{
+    ($value:expr_2021, $type:path $(,)?) => {{
         let attribute = $value;
         if let $type(value) = attribute {
             Ok(value)
@@ -96,7 +96,7 @@ macro_rules! attribute_match {
 /// * `$type` - The expected enum path.
 #[macro_export]
 macro_rules! get_attribute_errors_expected {
-    ($self:ident, $map:expr, $prop:expr, $type:path) => {
+    ($self:ident, $map:expr_2021, $prop:expr_2021, $type:path) => {
         $self
             .get_attribute($map, $prop)
             .and_then(|found| attribute_match!(found, $type))
@@ -116,7 +116,7 @@ macro_rules! get_attribute_errors_expected {
 /// It returns a [`Result`] with a tuple of the matched attribute and its updated
 /// status, after invoking [`attribute_match!`] on the found attribute.
 macro_rules! get_attribute_and_updated {
-    ($self:ident, $map:expr, $prop:expr, $type:path) => {
+    ($self:ident, $map:expr_2021, $prop:expr_2021, $type:path) => {
         $self
             .get_attribute_and_updated($map, $prop)
             .and_then(|(found, updated)| attribute_match!(found, $type).map(|v| (v, updated)))
@@ -132,7 +132,7 @@ macro_rules! get_attribute_and_updated {
 /// * `$prop` - The attribute key.
 /// * `$type` - The expected enum path.
 macro_rules! get_actor_attribute_matching {
-    ($self:ident, $actor:expr, $prop:expr, $type:path) => {
+    ($self:ident, $actor:expr_2021, $prop:expr_2021, $type:path) => {
         $self
             .get_actor_attribute($actor, $prop)
             .and_then(|found| attribute_match!(found, $type))
@@ -148,7 +148,7 @@ macro_rules! get_actor_attribute_matching {
 /// * `$key` - The attribute key.
 /// * `$type` - The expected enum path.
 macro_rules! get_derived_attribute {
-    ($map:expr, $key:expr, $type:path) => {
+    ($map:expr_2021, $key:expr_2021, $type:path) => {
         $map.get($key)
             .ok_or_else(|| {
                 SubtrActorError::new(SubtrActorErrorVariant::DerivedKeyValueNotFound {
