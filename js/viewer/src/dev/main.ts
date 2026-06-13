@@ -17,6 +17,11 @@ import {
   fromReplayPlayerPlugin,
 } from "../lib.js";
 
+const SAMPLE_REPLAY_URL = new URL(
+  "../../../../assets/recent-ranked-doubles-2026-03-10.replay",
+  import.meta.url,
+).href;
+
 const hud = document.getElementById("hud") as HTMLDivElement;
 const log = (msg: string) => {
   hud.textContent = msg;
@@ -25,9 +30,15 @@ const log = (msg: string) => {
 
 async function main() {
   const container = document.getElementById("app") as HTMLDivElement;
+  const params = new URLSearchParams(location.search);
+  const motionSmoothingEnabled = params.get("smooth") !== "0" && params.get("smoothing") !== "0";
 
   log("parsing replay via subtr-actor WASM…");
-  const bytes = new Uint8Array(await (await fetch("/sample.replay")).arrayBuffer());
+  const replayResponse = await fetch(SAMPLE_REPLAY_URL);
+  if (!replayResponse.ok) {
+    throw new Error(`Failed to fetch sample replay: ${replayResponse.status}`);
+  }
+  const bytes = new Uint8Array(await replayResponse.arrayBuffer());
 
   const camPlugin = createCameraPlugin();
   // @rlrml/player's canvas recorder, bridged: extra members (start/stop/
@@ -36,6 +47,11 @@ async function main() {
   const viewer = await createViewer(container, bytes, {
     autoplay: true,
     loop: true,
+    // The dev harness loops the full raw replay so playback visibly advances
+    // even when the sample's skip-window inference marks trailing time hidden.
+    initialSkipPostGoalTransitionsEnabled: false,
+    timelineCompaction: params.get("compact") === "1" || params.get("compact") === "true",
+    motionSmoothing: motionSmoothingEnabled,
     plugins: [
       createFpsOverlayPlugin(),
       createNameTagPlugin(),
@@ -88,6 +104,16 @@ async function main() {
   ballCamBox.checked = camPlugin.getBallCam();
   ballCamBox.onchange = () => camPlugin.setBallCam(ballCamBox.checked);
   ballCamLabel.append(ballCamBox, " ball cam");
+  const smoothLabel = document.createElement("label");
+  const smoothBox = document.createElement("input");
+  smoothBox.type = "checkbox";
+  smoothBox.checked = motionSmoothingEnabled;
+  smoothBox.onchange = () => {
+    const next = new URL(location.href);
+    next.searchParams.set("smooth", smoothBox.checked ? "1" : "0");
+    location.href = next.toString();
+  };
+  smoothLabel.append(smoothBox, " smooth");
   // Stiffness slider: shows the effective value (recorded preset when
   // following); dragging it sets an explicit override that wins over recorded.
   const stiffnessLabel = document.createElement("label");
@@ -109,12 +135,11 @@ async function main() {
   };
   stiffnessLabel.append("stiff ", stiffness, stiffnessValue);
   syncStiffness();
-  camBar.append(select, ballCamLabel, stiffnessLabel);
+  camBar.append(select, ballCamLabel, smoothLabel, stiffnessLabel);
   document.body.append(camBar);
 
   // URL params for headless/dev bring-up:
-  //   ?follow=<player name>  ?cam=free|ballOrbit  ?t=<seconds>
-  const params = new URLSearchParams(location.search);
+  //   ?follow=<player name>  ?cam=free|ballOrbit  ?t=<seconds>  ?compact=1  ?smooth=0
   const camParam = params.get("cam");
   if (camParam === "free" || camParam === "ballOrbit") {
     camPlugin.setMode(camParam);

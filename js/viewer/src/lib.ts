@@ -46,7 +46,13 @@ export function createViewerFromParsed(
   parsed: ReplayLoadResult,
   options: ViewerOptions = {},
 ): ViewerPlayer {
-  const adapter = new SubtrActorPlayer(parsed.raw as never);
+  const adapter = new SubtrActorPlayer(parsed.raw as never, {
+    motionSmoothing: options.motionSmoothing,
+    smoothingBlendFactor: options.smoothingBlendFactor,
+    smoothingAnchorInterval: options.smoothingAnchorInterval,
+    timelineCompaction: options.timelineCompaction,
+    disableFrameFiltering: options.disableFrameFiltering,
+  });
   const viewer = new ViewerPlayer(container, adapter, options, parsed.replay);
   // @rlrml/player parity: ReplayPlayer's camera surface (follow / ballcam /
   // distance scale / custom settings) works out of the box, so the factory
@@ -62,7 +68,11 @@ export function createViewerFromParsed(
 
 export { ViewerPlayer } from "./ViewerPlayer.js";
 export { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
-export type { RecordedCameraSettings, ViewerPlayerInfo } from "./adapter/SubtrActorPlayer.js";
+export type {
+  RecordedCameraSettings,
+  SubtrActorPlayerOptions,
+  ViewerPlayerInfo,
+} from "./adapter/SubtrActorPlayer.js";
 export { loadReplay, parseReplay } from "./adapter/wasm.js";
 export type { ReplayLoadResult, ReplayModel, ReplayScene } from "@rlrml/player";
 export { createNameTagPlugin } from "./plugins/name-tags.js";

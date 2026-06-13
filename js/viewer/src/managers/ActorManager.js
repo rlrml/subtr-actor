@@ -69,13 +69,10 @@ export class ActorManager {
 
     // Debug: Interpolation settings
     this.interpolationEnabled = true;
-    // 'hermite' by default: replay samples are ~30Hz, and plain lerp gives
-    // piecewise-linear motion with a velocity discontinuity at every sample
-    // (reads as jitter at 60Hz+). Cubic Hermite uses the replay's per-sample
-    // linear velocities as tangents (C1-continuous), with a lerp fallback
-    // when velocity is missing or implausible — the same approach as
-    // @rlrml/player's interpolatePositionHermite.
-    this.interpolationMethod = "hermite";
+    // Match Ballcam's production viewer default. Alternative methods remain
+    // useful for debugging/A-B testing, but the public viewer ships with plain
+    // lerp between replay samples.
+    this.interpolationMethod = "lerp";
     this.smoothingWindowSize = 12;
     this.lastFrameInfo = null;
 

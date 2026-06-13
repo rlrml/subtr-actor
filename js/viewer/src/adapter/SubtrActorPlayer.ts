@@ -60,7 +60,12 @@ interface RawReplayData {
   frame_data: {
     ball_data: { frames: RawBallFrame[] };
     players: Array<[unknown, { frames: RawPlayerFrame[] }]>;
-    metadata_frames: Array<{ time: number; seconds_remaining: number }>;
+    metadata_frames: Array<{
+      time: number;
+      seconds_remaining: number;
+      replicated_game_state_name?: number;
+      replicated_game_state_time_remaining?: number;
+    }>;
   };
   meta: {
     team_zero: RawPlayerInfo[];
@@ -68,6 +73,7 @@ interface RawReplayData {
   };
   boost_pads?: RawResolvedBoostPad[];
   boost_pad_events?: RawBoostPadEvent[];
+  goal_events?: Array<{ time: number; frame: number }>;
 }
 interface RawPlayerInfo {
   remote_id: unknown;
@@ -152,6 +158,60 @@ function toRecordedCameraSettings(
 
 /** Supersonic threshold in UU/s (game value ~2200). */
 const SUPERSONIC_SPEED = 2200;
+const DEFAULT_POSITION_SMOOTHING = true;
+const DEFAULT_TIMELINE_COMPACTION = false;
+const POSITION_SMOOTHING_BLEND_FACTOR = 0.15;
+const POSITION_SMOOTHING_ANCHOR_INTERVAL = 10;
+const MAX_POSITION_CORRECTION_DT_SECONDS = 0.1;
+const MAX_POSITION_CORRECTION_DRIFT_UU = 10;
+const FILTER_VELOCITY_THRESHOLD = 0.1;
+const FILTER_POSITION_THRESHOLD = 0.15;
+const MIN_FILTER_SPEED_UU_PER_SECOND = 10;
+
+export interface SubtrActorPlayerOptions {
+  /**
+   * Preprocess compiled ball/player timelines with the same style of
+   * velocity-based correction Ballcam applies before serializing its replay
+   * artifact. Defaults to true; set false for raw sample inspection.
+   */
+  motionSmoothing?: boolean;
+  /** Blend toward the measured replay sample during velocity correction. */
+  smoothingBlendFactor?: number;
+  /** Every N corrected samples, use a stronger measured-sample anchor. */
+  smoothingAnchorInterval?: number;
+  /**
+   * Remove pre-kickoff idle time and post-goal replay gaps from the adapter's
+   * motion timelines, matching Ballcam's compiled .rlrf time axis. Defaults to
+   * false because it intentionally diverges from @rlrml/player's raw normalized
+   * ReplayModel time axis.
+   */
+  timelineCompaction?: boolean;
+  /** Skip Ballcam-style velocity/position consistency filtering. */
+  disableFrameFiltering?: boolean;
+}
+
+interface TimelineProcessingOptions {
+  motionSmoothing: boolean;
+  smoothingBlendFactor: number;
+  smoothingAnchorInterval: number;
+  timelineCompaction: boolean;
+  disableFrameFiltering: boolean;
+}
+
+interface ReplayGap {
+  beforeFrame: number;
+  afterFrame: number;
+  beforeTime: number;
+  afterTime: number;
+  duration: number;
+}
+
+interface TimelineCompaction {
+  gaps: ReplayGap[];
+  prematchEndTime: number | null;
+  removedDuration: number;
+  compactedDuration: number;
+}
 
 function lastBefore<T extends { time: number }>(arr: T[], time: number): T | null {
   if (arr.length === 0) return null;
@@ -242,8 +302,12 @@ export class SubtrActorPlayer extends EventEmitter {
   private _ballFlags: FlagsKeyframe[] = []; // ball has none, kept for symmetry
   private _playerFlags: Record<string, FlagsKeyframe[]> = {};
   private _teams: Record<string, number> = {};
+  private _timelineCompaction: TimelineCompaction | null = null;
 
-  constructor(private raw: RawReplayData) {
+  constructor(
+    private raw: RawReplayData,
+    private options: SubtrActorPlayerOptions = {},
+  ) {
     super();
     this._compile();
   }
@@ -328,9 +392,285 @@ export class SubtrActorPlayer extends EventEmitter {
       );
     });
 
+    this._preprocessMotionTimelines();
     this._compileBoostPads();
 
     this.seek(0);
+  }
+
+  private _timelineProcessingOptions(): TimelineProcessingOptions {
+    return {
+      motionSmoothing: this.options.motionSmoothing ?? DEFAULT_POSITION_SMOOTHING,
+      smoothingBlendFactor: this.options.smoothingBlendFactor ?? POSITION_SMOOTHING_BLEND_FACTOR,
+      smoothingAnchorInterval:
+        this.options.smoothingAnchorInterval ?? POSITION_SMOOTHING_ANCHOR_INTERVAL,
+      timelineCompaction: this.options.timelineCompaction ?? DEFAULT_TIMELINE_COMPACTION,
+      disableFrameFiltering: this.options.disableFrameFiltering ?? false,
+    };
+  }
+
+  private _preprocessMotionTimelines(): void {
+    const options = this._timelineProcessingOptions();
+    if (options.motionSmoothing) {
+      this._applyVelocityBasedPositionCorrection(options);
+    }
+    if (options.timelineCompaction) {
+      this._applyTimelineCompaction();
+    }
+    if (!options.disableFrameFiltering) {
+      this._filterInconsistentFrames();
+    }
+  }
+
+  private _applyTimelineCompaction(): void {
+    const compaction = this._buildTimelineCompaction();
+    if (!compaction || (compaction.gaps.length === 0 && compaction.prematchEndTime === null)) {
+      return;
+    }
+
+    this._timelineCompaction = compaction;
+    this._ballTimeline = this._compactTimeline(this._ballTimeline, compaction);
+    Object.entries(this._playerTimelines).forEach(([name, timeline]) => {
+      this._playerTimelines[name] = this._compactTimeline(timeline, compaction);
+    });
+    Object.entries(this._playerFlags).forEach(([name, timeline]) => {
+      this._playerFlags[name] = this._compactTimeline(timeline, compaction);
+    });
+
+    this.frameTimes = this.frameTimes.map((time) => this._compactTime(time, compaction));
+    this.duration = compaction.compactedDuration;
+  }
+
+  private _buildTimelineCompaction(): TimelineCompaction | null {
+    if (this.frameTimes.length === 0) return null;
+
+    const gaps = this._detectPostGoalTimeGaps();
+    const prematchRawEndTime = this._detectFirstKickoffGoTime();
+    const prematchEndTime =
+      prematchRawEndTime == null ? null : remapGapTime(prematchRawEndTime, gaps);
+    const gapRemovedDuration = gaps.reduce((total, gap) => total + gap.duration, 0);
+    const removedDuration = gapRemovedDuration + (prematchEndTime ?? 0);
+    if (removedDuration <= 0) return null;
+
+    return {
+      gaps,
+      prematchEndTime,
+      removedDuration,
+      compactedDuration: Math.max(0, this.duration - removedDuration),
+    };
+  }
+
+  private _detectPostGoalTimeGaps(): ReplayGap[] {
+    const gaps: ReplayGap[] = [];
+    for (const goal of this.raw.goal_events ?? []) {
+      const goalFrame = goal.frame;
+      if (!Number.isInteger(goalFrame) || goalFrame < 0 || goalFrame >= this.frameTimes.length) {
+        continue;
+      }
+      const goalTime = this.frameTimes[goalFrame]!;
+      for (let frame = goalFrame + 1; frame < this.frameTimes.length; frame += 1) {
+        const beforeTime = this.frameTimes[frame - 1]!;
+        const afterTime = this.frameTimes[frame]!;
+        if (beforeTime - goalTime > 10) break;
+        const duration = afterTime - beforeTime;
+        if (duration > 0.3) {
+          gaps.push({
+            beforeFrame: frame - 1,
+            afterFrame: frame,
+            beforeTime,
+            afterTime,
+            duration,
+          });
+          break;
+        }
+      }
+    }
+    return gaps;
+  }
+
+  private _detectFirstKickoffGoTime(): number | null {
+    const frames = this.raw.frame_data.metadata_frames;
+    let sawCountdown = false;
+    for (let index = 0; index < frames.length; index += 1) {
+      const remaining = frames[index]?.replicated_game_state_time_remaining;
+      if (remaining != null && remaining > 0) sawCountdown = true;
+      if (sawCountdown && remaining === 0) return this.frameTimes[index] ?? null;
+    }
+
+    const firstActiveFrame = frames.findIndex((frame) => frame.replicated_game_state_name === 54);
+    return firstActiveFrame === -1 ? null : (this.frameTimes[firstActiveFrame] ?? null);
+  }
+
+  private _compactTimeline<T extends { time: number }>(
+    timeline: T[],
+    compaction: TimelineCompaction,
+  ): T[] {
+    const afterGaps = this._remapReplayGaps(timeline, compaction.gaps);
+    if (compaction.prematchEndTime === null) return afterGaps;
+    return this._remapPrematch(afterGaps, compaction.prematchEndTime);
+  }
+
+  private _remapReplayGaps<T extends { time: number }>(timeline: T[], gaps: ReplayGap[]): T[] {
+    if (gaps.length === 0) return timeline;
+
+    const inserted: T[] = [];
+    gaps.forEach((gap, gapIndex) => {
+      const entry = timeline.find((frame) => frame.time >= gap.afterTime);
+      if (!entry) return;
+      inserted.push({
+        ...entry,
+        time: remapGapTime(gap.afterTime, gaps.slice(0, gapIndex + 1)),
+      });
+    });
+
+    const remapped = timeline
+      .filter((frame) => !isInReplayGap(frame.time, gaps))
+      .map((frame) => ({ ...frame, time: remapGapTime(frame.time, gaps) }));
+
+    for (const entry of inserted) {
+      if (remapped.some((frame) => Math.abs(frame.time - entry.time) < 1e-3)) continue;
+      let insertAt = remapped.findIndex((frame) => frame.time > entry.time);
+      if (insertAt === -1) insertAt = remapped.length;
+      remapped.splice(insertAt, 0, entry);
+    }
+
+    return remapped;
+  }
+
+  private _remapPrematch<T extends { time: number }>(timeline: T[], prematchEndTime: number): T[] {
+    let lastPrematchFrame: T | null = null;
+    for (const frame of timeline) {
+      if (frame.time < prematchEndTime) lastPrematchFrame = frame;
+      else break;
+    }
+
+    const remapped = timeline
+      .filter((frame) => frame.time >= prematchEndTime)
+      .map((frame) => ({ ...frame, time: frame.time - prematchEndTime }));
+
+    if (lastPrematchFrame && (remapped.length === 0 || remapped[0]!.time > 1e-3)) {
+      remapped.unshift({ ...lastPrematchFrame, time: 0 });
+    }
+
+    return remapped;
+  }
+
+  private _compactTime(time: number, compaction: TimelineCompaction): number {
+    const afterGaps = remapGapTime(time, compaction.gaps);
+    if (compaction.prematchEndTime === null) return afterGaps;
+    return Math.max(0, afterGaps - compaction.prematchEndTime);
+  }
+
+  private _applyVelocityBasedPositionCorrection(options: TimelineProcessingOptions): void {
+    const correctTimeline = (timeline: MotionKeyframe[]): void => {
+      if (timeline.length < 3) return;
+
+      let startIndex = 0;
+      while (
+        startIndex < timeline.length &&
+        (!timeline[startIndex].position || !timeline[startIndex].velocity)
+      ) {
+        startIndex += 1;
+      }
+      if (startIndex >= timeline.length - 1) return;
+
+      let smoothed = { ...timeline[startIndex].position };
+
+      for (let index = startIndex + 1; index < timeline.length; index += 1) {
+        const previous = timeline[index - 1]!;
+        const current = timeline[index]!;
+        if (!previous.position || !current.position) continue;
+        if (!previous.velocity || !current.velocity) {
+          smoothed = { ...current.position };
+          continue;
+        }
+
+        const dt = current.time - previous.time;
+        if (dt <= 0 || dt > MAX_POSITION_CORRECTION_DT_SECONDS) {
+          smoothed = { ...current.position };
+          continue;
+        }
+
+        if (distance(smoothed, current.position) > MAX_POSITION_CORRECTION_DRIFT_UU) {
+          smoothed = { ...current.position };
+          continue;
+        }
+
+        const averageVelocity = {
+          x: (previous.velocity.x + current.velocity.x) / 2,
+          y: (previous.velocity.y + current.velocity.y) / 2,
+          z: (previous.velocity.z + current.velocity.z) / 2,
+        };
+        const predicted = {
+          x: smoothed.x + averageVelocity.x * dt,
+          y: smoothed.y + averageVelocity.y * dt,
+          z: smoothed.z + averageVelocity.z * dt,
+        };
+        const blend =
+          (index - startIndex) % options.smoothingAnchorInterval === 0
+            ? 0.5
+            : options.smoothingBlendFactor;
+
+        smoothed = {
+          x: predicted.x * (1 - blend) + current.position.x * blend,
+          y: predicted.y * (1 - blend) + current.position.y * blend,
+          z: predicted.z * (1 - blend) + current.position.z * blend,
+        };
+        current.position = { ...smoothed };
+      }
+    };
+
+    correctTimeline(this._ballTimeline);
+    Object.values(this._playerTimelines).forEach(correctTimeline);
+  }
+
+  private _filterInconsistentFrames(): void {
+    this._ballTimeline = this._filterInconsistentTimeline(this._ballTimeline);
+    Object.entries(this._playerTimelines).forEach(([name, timeline]) => {
+      this._playerTimelines[name] = this._filterInconsistentTimeline(timeline);
+    });
+  }
+
+  private _filterInconsistentTimeline(timeline: MotionKeyframe[]): MotionKeyframe[] {
+    if (timeline.length < 2) return timeline;
+
+    const filtered = [timeline[0]!];
+    let lastKeptIndex = 0;
+
+    for (let index = 1; index < timeline.length; index += 1) {
+      const current = timeline[index]!;
+      const previous = timeline[lastKeptIndex]!;
+      if (!current.position || !current.velocity || !previous.position || !previous.velocity) {
+        filtered.push(current);
+        lastKeptIndex = index;
+        continue;
+      }
+
+      const previousSpeed = magnitude(previous.velocity);
+      const currentSpeed = magnitude(current.velocity);
+      if (previousSpeed < MIN_FILTER_SPEED_UU_PER_SECOND) {
+        filtered.push(current);
+        lastKeptIndex = index;
+        continue;
+      }
+
+      if (Math.abs(currentSpeed - previousSpeed) / previousSpeed < FILTER_VELOCITY_THRESHOLD) {
+        const dt = current.time - previous.time;
+        if (dt > 0.001) {
+          const expectedDistance = previousSpeed * dt;
+          const actualDistance = distance(previous.position, current.position);
+          const positionError = Math.abs(actualDistance - expectedDistance) / expectedDistance;
+          if (Number.isFinite(positionError) && positionError > FILTER_POSITION_THRESHOLD) {
+            continue;
+          }
+        }
+      }
+
+      filtered.push(current);
+      lastKeptIndex = index;
+    }
+
+    return filtered;
   }
 
   /**
@@ -349,9 +689,13 @@ export class SubtrActorPlayer extends EventEmitter {
             : null;
       if (available === null) return;
       const time = Math.max(0, e.time - this.rawStartTime); // same shift as frame times
+      if (this._timelineCompaction && this._isRemovedByTimelineCompaction(time)) return;
+      const compactedTime = this._timelineCompaction
+        ? this._compactTime(time, this._timelineCompaction)
+        : time;
       const bucket = eventsByPadId.get(e.pad_id);
-      if (bucket) bucket.push({ time, available });
-      else eventsByPadId.set(e.pad_id, [{ time, available }]);
+      if (bucket) bucket.push({ time: compactedTime, available });
+      else eventsByPadId.set(e.pad_id, [{ time: compactedTime, available }]);
     });
 
     (this.raw.boost_pads ?? []).forEach((pad) => {
@@ -373,6 +717,14 @@ export class SubtrActorPlayer extends EventEmitter {
       angularVelocity: vec3RlToThree(rb.angular_velocity),
       sleeping: !!rb.sleeping,
     };
+  }
+
+  private _isRemovedByTimelineCompaction(time: number): boolean {
+    const compaction = this._timelineCompaction;
+    if (!compaction) return false;
+    if (isInReplayGap(time, compaction.gaps)) return true;
+    const afterGaps = remapGapTime(time, compaction.gaps);
+    return compaction.prematchEndTime !== null && afterGaps < compaction.prematchEndTime;
   }
 
   private _idKey(remoteId: unknown): string {
@@ -511,4 +863,32 @@ export class SubtrActorPlayer extends EventEmitter {
   getGamePhaseAt(): null {
     return null;
   }
+}
+
+function magnitude(vector: Vec3): number {
+  return Math.sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+function distance(left: Vec3, right: Vec3): number {
+  const dx = right.x - left.x;
+  const dy = right.y - left.y;
+  const dz = right.z - left.z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function remapGapTime(time: number, gaps: ReplayGap[]): number {
+  let cumulativeRemoved = 0;
+  for (const gap of gaps) {
+    if (time < gap.beforeTime) break;
+    if (time >= gap.afterTime) {
+      cumulativeRemoved += gap.duration;
+      continue;
+    }
+    return gap.beforeTime - cumulativeRemoved;
+  }
+  return time - cumulativeRemoved;
+}
+
+function isInReplayGap(time: number, gaps: ReplayGap[]): boolean {
+  return gaps.some((gap) => time > gap.beforeTime && time < gap.afterTime);
 }
