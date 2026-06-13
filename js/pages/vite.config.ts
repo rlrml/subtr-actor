@@ -54,6 +54,7 @@ export default defineConfig({
     alias: {
       "@rlrml/subtr-actor": path.resolve(import.meta.dirname, "../pkg/rl_replay_subtr_actor.js"),
       "@rlrml/player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+      "@rlrml/viewer": path.resolve(import.meta.dirname, "../viewer/src/lib.ts"),
       three: path.resolve(import.meta.dirname, "../stat-evaluation-player/node_modules/three"),
     },
   },
@@ -68,7 +69,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ["@rlrml/subtr-actor", "@rlrml/player"],
+    exclude: ["@rlrml/subtr-actor", "@rlrml/player", "@rlrml/viewer"],
   },
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"),

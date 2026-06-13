@@ -71,6 +71,7 @@
     "@rlrml/viewer": "file:../viewer",
     "@types/node": "^25.5.0",
     "@types/three": "^0.180.0",
+    "camera-controls": "^2.10.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
