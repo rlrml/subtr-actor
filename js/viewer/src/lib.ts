@@ -73,6 +73,9 @@ export type { FpsOverlayOptions, FpsSample } from "./plugins/fps-overlay.js";
 //   viewer.addPlugin(fromReplayPlayerPlugin(createTimelineOverlayPlugin()))
 export { fromReplayPlayerPlugin } from "./plugins/replay-player-bridge.js";
 export {
+  BOOST_RAW_MAX,
+  boostAmountToPercent,
+  boostPercentToAmount,
   createBoostPadOverlayPlugin,
   createBoostPickupAnimationPlugin,
   createCanvasRecorderPlugin,

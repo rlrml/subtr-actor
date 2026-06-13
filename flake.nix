@@ -161,16 +161,39 @@
         packages.js-stats-player-pages = pkgs.buildNpmPackage rec {
           pname = "subtr-actor-js-pages";
           version = projectVersion;
-          src = ./.;
+          src = pkgs.runCommand "subtr-actor-js-pages-source" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
+            mkdir -p "$out"
+            cp -R ${./.}/. "$out"/
+            chmod -R u+w "$out"
+            cd "$out"
+            node <<'EOF'
+            const fs = require("node:fs");
+
+            const packagePath = "js/stat-evaluation-player/package.json";
+            const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+            delete packageJson.devDependencies["@rlrml/viewer"];
+            fs.writeFileSync(packagePath, `''${JSON.stringify(packageJson, null, 2)}\n`);
+
+            const lockPath = "js/stat-evaluation-player/package-lock.json";
+            const lockJson = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+            delete lockJson.packages[""].devDependencies["@rlrml/viewer"];
+            delete lockJson.packages["../viewer"];
+            delete lockJson.packages["node_modules/@rlrml/viewer"];
+            fs.writeFileSync(lockPath, `''${JSON.stringify(lockJson, null, 2)}\n`);
+            EOF
+          '';
           npmRoot = "js/stat-evaluation-player";
-          npmDeps = pkgs.importNpmLock { npmRoot = ./js/stat-evaluation-player; };
+          npmDeps = pkgs.importNpmLock { npmRoot = "${src}/js/stat-evaluation-player"; };
           npmConfigHook = pkgs.importNpmLock.npmConfigHook;
           preBuild = ''
             rm -rf js/pkg
             mkdir -p js/pkg
             cp -r ${self.packages.${system}.js-web-wasm}/. js/pkg/
             ln -sfn ../stat-evaluation-player/node_modules js/player/node_modules
+            ln -sfn ../stat-evaluation-player/node_modules js/viewer/node_modules
             ln -sfn ../stat-evaluation-player/node_modules js/pages/node_modules
+            mkdir -p js/stat-evaluation-player/node_modules/@rlrml
+            ln -sfn ../../../viewer js/stat-evaluation-player/node_modules/@rlrml/viewer
           '';
           buildPhase = ''
             runHook preBuild
@@ -187,6 +210,7 @@
             runHook preInstall
             mkdir -p $out
             cp -r js/stat-evaluation-player/dist/. $out/
+            cp -r js/viewer/public/. $out/
             mkdir -p $out/stats
             cp -r js/pages/dist/. $out/stats/
             mkdir -p $out/review
@@ -241,6 +265,41 @@
           installPhase = ''
             runHook preInstall
             pushd js/player
+            staged="$(node ./scripts/prepare-package.mjs)"
+            popd
+            mkdir -p $out
+            cp -R "$staged"/. $out/
+            runHook postInstall
+          '';
+        };
+        # The publishable npm package layout for @rlrml/viewer. It is built as
+        # an ES module library and carries its public assets (models/draco) so
+        # downstream apps can vendor a single package output from this exact
+        # submodule revision.
+        packages.js-viewer-pkg = pkgs.buildNpmPackage {
+          pname = "rlrml-viewer-npm-pkg";
+          version = projectVersion;
+          src = ./.;
+          npmRoot = "js/viewer";
+          npmDeps = pkgs.importNpmLock { npmRoot = ./js/viewer; };
+          npmConfigHook = pkgs.importNpmLock.npmConfigHook;
+          npmInstallFlags = [ "--ignore-scripts" ];
+          preBuild = ''
+            rm -rf js/pkg
+            mkdir -p js/pkg
+            cp -r ${self.packages.${system}.js-web-wasm}/. js/pkg/
+            ln -sfn ../viewer/node_modules js/player/node_modules
+          '';
+          buildPhase = ''
+            runHook preBuild
+            pushd js/viewer
+            npm run build:dist
+            popd
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            pushd js/viewer
             staged="$(node ./scripts/prepare-package.mjs)"
             popd
             mkdir -p $out
