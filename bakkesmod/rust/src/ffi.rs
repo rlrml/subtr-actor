@@ -26,7 +26,7 @@ pub(crate) fn refresh_timeline_graph_state(engine: &mut SaEngine) {
 ///
 /// The caller owns the returned pointer and must free it with
 /// `subtr_actor_bakkesmod_engine_destroy`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn subtr_actor_bakkesmod_engine_create() -> *mut SaEngine {
     Box::into_raw(Box::new(SaEngine::default()))
 }
@@ -72,7 +72,7 @@ pub(crate) fn build_replay_annotations(path: &CStr) -> SubtrActorResult<SaReplay
 ///
 /// Returns null on failure. The returned handle must be destroyed with
 /// `subtr_actor_bakkesmod_replay_annotations_destroy`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_create(
     replay_path: *const c_char,
 ) -> *mut SaReplayAnnotations {
@@ -88,7 +88,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_create(
 
 /// Destroys a replay annotation handle allocated by
 /// `subtr_actor_bakkesmod_replay_annotations_create`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_destroy(
     annotations: *mut SaReplayAnnotations,
 ) {
@@ -98,7 +98,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_destroy(
 }
 
 /// Returns the number of precomputed replay annotation events.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_count(
     annotations: *const SaReplayAnnotations,
 ) -> usize {
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_count(
 }
 
 /// Returns the number of replay players available for annotation labels.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_player_count(
     annotations: *const SaReplayAnnotations,
 ) -> usize {
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_player_count(
 }
 
 /// Copies replay player metadata into `out_players`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_players(
     annotations: *const SaReplayAnnotations,
     out_players: *mut SaReplayPlayerInfo,
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_players(
 }
 
 /// Copies replay players and current-frame core stats for replay playback.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_frame_players(
     annotations: *const SaReplayAnnotations,
     replay_time: f32,
@@ -192,16 +192,18 @@ pub(crate) fn serialize_replay_annotation_frame(
 /// The JSON payload is a `ReplayStatsFrame` from the preprocessed replay
 /// timeline. It is the replay-mode counterpart of
 /// `subtr_actor_bakkesmod_frame_json_len`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_frame_json_len(
     annotations: *const SaReplayAnnotations,
     replay_time: f32,
 ) -> usize {
-    annotations
-        .as_ref()
-        .and_then(|annotations| serialize_replay_annotation_frame(annotations, replay_time))
-        .map(|bytes| bytes.len())
-        .unwrap_or(0)
+    unsafe {
+        annotations
+            .as_ref()
+            .and_then(|annotations| serialize_replay_annotation_frame(annotations, replay_time))
+            .map(|bytes| bytes.len())
+            .unwrap_or(0)
+    }
 }
 
 /// Writes the replay stats frame at `replay_time` into caller-owned storage.
@@ -209,31 +211,33 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_frame_json_len(
 /// Returns the number of bytes written. Call
 /// `subtr_actor_bakkesmod_replay_annotation_frame_json_len` first to size the
 /// destination buffer.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_frame_json(
     annotations: *const SaReplayAnnotations,
     replay_time: f32,
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(annotations) = annotations.as_ref() else {
-        return 0;
-    };
-    if out_bytes.is_null() || max_bytes == 0 {
-        return 0;
-    }
+    unsafe {
+        let Some(annotations) = annotations.as_ref() else {
+            return 0;
+        };
+        if out_bytes.is_null() || max_bytes == 0 {
+            return 0;
+        }
 
-    let Some(bytes) = serialize_replay_annotation_frame(annotations, replay_time) else {
-        return 0;
-    };
-    let count = max_bytes.min(bytes.len());
-    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-    count
+        let Some(bytes) = serialize_replay_annotation_frame(annotations, replay_time) else {
+            return 0;
+        };
+        let count = max_bytes.min(bytes.len());
+        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+        count
+    }
 }
 
 /// Returns the scoreboard value for the latest processed replay frame at or before
 /// `replay_time`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_score_at_time(
     annotations: *const SaReplayAnnotations,
     replay_time: f32,
@@ -265,7 +269,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_score_at_time(
 ///
 /// The cursor resets automatically after seeking backwards. Events are copied
 /// into `out_events` and the return value is the number of copied events.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn subtr_actor_bakkesmod_poll_replay_annotations(
     annotations: *mut SaReplayAnnotations,
     replay_time: f32,
@@ -310,7 +314,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_poll_replay_annotations(
     copied
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Destroys an engine allocated by `subtr_actor_bakkesmod_engine_create`.
 ///
 /// # Safety
@@ -318,12 +322,14 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_poll_replay_annotations(
 /// `engine` must either be null or a pointer returned by
 /// `subtr_actor_bakkesmod_engine_create` that has not already been destroyed.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_engine_destroy(engine: *mut SaEngine) {
-    if !engine.is_null() {
-        drop(Box::from_raw(engine));
+    unsafe {
+        if !engine.is_null() {
+            drop(Box::from_raw(engine));
+        }
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Resets an existing engine to its initial state.
 ///
 /// # Safety
@@ -331,12 +337,14 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_engine_destroy(engine: *mut SaEng
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_engine_reset(engine: *mut SaEngine) {
-    if let Some(engine) = engine.as_mut() {
-        *engine = SaEngine::default();
+    unsafe {
+        if let Some(engine) = engine.as_mut() {
+            *engine = SaEngine::default();
+        }
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Finishes live graph evaluation and refreshes exported graph views.
 ///
 /// This mirrors replay collectors' end-of-replay `AnalysisGraph::finish` call,
@@ -350,24 +358,26 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_engine_reset(engine: *mut SaEngin
 ///
 /// `engine` must be a valid engine pointer.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_finish(engine: *mut SaEngine) -> i32 {
-    let Some(engine) = engine.as_mut() else {
-        return -1;
-    };
-    if !engine.live_replay_meta_initialized {
-        return 0;
+    unsafe {
+        let Some(engine) = engine.as_mut() else {
+            return -1;
+        };
+        if !engine.live_replay_meta_initialized {
+            return 0;
+        }
+        if engine.live_graph_finished {
+            return 0;
+        }
+        if engine.graph.finish().is_err() {
+            return -2;
+        }
+        refresh_timeline_graph_state(engine);
+        engine.live_graph_finished = true;
+        0
     }
-    if engine.live_graph_finished {
-        return 0;
-    }
-    if engine.graph.finish().is_err() {
-        return -2;
-    }
-    refresh_timeline_graph_state(engine);
-    engine.live_graph_finished = true;
-    0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Feeds one sampled Rocket League frame into the live mechanics engine.
 ///
 /// Returns `0` on success, `-1` for invalid pointers, and `-2` if detector
@@ -382,52 +392,54 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
     engine: *mut SaEngine,
     frame: *const SaLiveFrame,
 ) -> i32 {
-    let Some(engine) = engine.as_mut() else {
-        return -1;
-    };
-    let Some(frame) = frame.as_ref() else {
-        return -1;
-    };
-    if frame.players.is_null() && frame.player_count != 0 {
-        return -1;
-    }
+    unsafe {
+        let Some(engine) = engine.as_mut() else {
+            return -1;
+        };
+        let Some(frame) = frame.as_ref() else {
+            return -1;
+        };
+        if frame.players.is_null() && frame.player_count != 0 {
+            return -1;
+        }
 
-    let players = if frame.player_count == 0 {
-        &[]
-    } else {
-        slice::from_raw_parts(frame.players, frame.player_count)
-    };
-    if has_duplicate_player_indices(players) {
-        return -1;
-    }
-    let Ok(explicit_events) = frame_event_slices(frame) else {
-        return -1;
-    };
-    if sync_live_replay_meta(engine, players).is_err() {
-        return -2;
-    }
-    let mut live_events = engine.live_events.clone();
-    let mut live_event_history = engine.live_event_history.clone();
-    let frame_input = frame_input_from_live_state(
-        &mut live_events,
-        &mut live_event_history,
-        engine.live_replay_meta.as_ref(),
-        frame,
-        players,
-        &explicit_events,
-    );
-    if engine.graph.evaluate_with_state(&frame_input).is_err() {
-        return -2;
-    }
+        let players = if frame.player_count == 0 {
+            &[]
+        } else {
+            slice::from_raw_parts(frame.players, frame.player_count)
+        };
+        if has_duplicate_player_indices(players) {
+            return -1;
+        }
+        let Ok(explicit_events) = frame_event_slices(frame) else {
+            return -1;
+        };
+        if sync_live_replay_meta(engine, players).is_err() {
+            return -2;
+        }
+        let mut live_events = engine.live_events.clone();
+        let mut live_event_history = engine.live_event_history.clone();
+        let frame_input = frame_input_from_live_state(
+            &mut live_events,
+            &mut live_event_history,
+            engine.live_replay_meta.as_ref(),
+            frame,
+            players,
+            &explicit_events,
+        );
+        if engine.graph.evaluate_with_state(&frame_input).is_err() {
+            return -2;
+        }
 
-    engine.live_events = live_events;
-    engine.live_event_history = live_event_history;
-    engine.live_graph_finished = false;
-    refresh_timeline_graph_state(engine);
-    0
+        engine.live_events = live_events;
+        engine.live_event_history = live_event_history;
+        engine.live_graph_finished = false;
+        refresh_timeline_graph_state(engine);
+        0
+    }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Returns the number of pending events currently buffered by the engine.
 ///
 /// # Safety
@@ -437,13 +449,15 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_event_count(
     engine: *const SaEngine,
 ) -> usize {
-    engine
-        .as_ref()
-        .map(|engine| engine.pending_events.len())
-        .unwrap_or(0)
+    unsafe {
+        engine
+            .as_ref()
+            .map(|engine| engine.pending_events.len())
+            .unwrap_or(0)
+    }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Returns the number of pending team-owned events currently buffered by the engine.
 ///
 /// # Safety
@@ -453,13 +467,15 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_event_count(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_team_event_count(
     engine: *const SaEngine,
 ) -> usize {
-    engine
-        .as_ref()
-        .map(|engine| engine.pending_team_events.len())
-        .unwrap_or(0)
+    unsafe {
+        engine
+            .as_ref()
+            .map(|engine| engine.pending_team_events.len())
+            .unwrap_or(0)
+    }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Returns the number of pending goal-context events currently buffered by the engine.
 ///
 /// # Safety
@@ -469,13 +485,15 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_team_event_count(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_goal_context_event_count(
     engine: *const SaEngine,
 ) -> usize {
-    engine
-        .as_ref()
-        .map(|engine| engine.pending_goal_context_events.len())
-        .unwrap_or(0)
+    unsafe {
+        engine
+            .as_ref()
+            .map(|engine| engine.pending_goal_context_events.len())
+            .unwrap_or(0)
+    }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Returns the UTF-8 byte length of a decoded stats-player config JSON payload.
 ///
 /// Accepts the compressed base64url `cfg` value emitted by the web stats
@@ -497,7 +515,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_decoded_stats_player_config_json_
         .unwrap_or(0)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Writes a decoded stats-player config JSON payload into caller-owned storage.
 ///
 /// Returns the number of bytes written. Call
@@ -513,19 +531,21 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_decoded_stats_player_config
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    if encoded_config.is_null() || out_bytes.is_null() || max_bytes == 0 {
-        return 0;
+    unsafe {
+        if encoded_config.is_null() || out_bytes.is_null() || max_bytes == 0 {
+            return 0;
+        }
+        let encoded_config = CStr::from_ptr(encoded_config);
+        let Some(bytes) = decode_stats_player_config_json(encoded_config) else {
+            return 0;
+        };
+        let count = max_bytes.min(bytes.len());
+        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+        count
     }
-    let encoded_config = unsafe { CStr::from_ptr(encoded_config) };
-    let Some(bytes) = decode_stats_player_config_json(encoded_config) else {
-        return 0;
-    };
-    let count = max_bytes.min(bytes.len());
-    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-    count
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Returns the byte length of the compressed base64url stats-player cfg value.
 ///
 /// The output format matches the web stats evaluation player's `cfg` payload:
@@ -547,7 +567,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_encoded_stats_player_config_len(
         .unwrap_or(0)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Writes the compressed base64url stats-player cfg value into caller storage.
 ///
 /// Returns the number of bytes written. Call
@@ -563,14 +583,16 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_encoded_stats_player_config
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    if json_config.is_null() || out_bytes.is_null() || max_bytes == 0 {
-        return 0;
+    unsafe {
+        if json_config.is_null() || out_bytes.is_null() || max_bytes == 0 {
+            return 0;
+        }
+        let json_config = CStr::from_ptr(json_config);
+        let Some(bytes) = encode_stats_player_config_json(json_config) else {
+            return 0;
+        };
+        let count = max_bytes.min(bytes.len());
+        ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
+        count
     }
-    let json_config = unsafe { CStr::from_ptr(json_config) };
-    let Some(bytes) = encode_stats_player_config_json(json_config) else {
-        return 0;
-    };
-    let count = max_bytes.min(bytes.len());
-    ptr::copy_nonoverlapping(bytes.as_ptr(), out_bytes, count);
-    count
 }

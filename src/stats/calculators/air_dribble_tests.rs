@@ -198,11 +198,13 @@ fn rejects_air_dribble_when_player_lands_between_touches() {
 
     harness.finish();
 
-    assert!(harness
-        .calculator
-        .player_air_dribble_stats()
-        .get(&player_id)
-        .is_none());
+    assert!(
+        harness
+            .calculator
+            .player_air_dribble_stats()
+            .get(&player_id)
+            .is_none()
+    );
     assert!(harness.calculator.carry_events().is_empty());
 }
 
@@ -240,11 +242,13 @@ fn rejects_air_dribble_with_fewer_than_three_successive_touches() {
 
     harness.finish();
 
-    assert!(harness
-        .calculator
-        .player_air_dribble_stats()
-        .get(&player_id)
-        .is_none());
+    assert!(
+        harness
+            .calculator
+            .player_air_dribble_stats()
+            .get(&player_id)
+            .is_none()
+    );
     assert!(harness.calculator.carry_events().is_empty());
 }
 
@@ -369,10 +373,12 @@ fn rejects_wall_control_as_air_dribble() {
     harness.finish();
 
     assert!(harness.calculator.player_stats().get(&player_id).is_none());
-    assert!(harness
-        .calculator
-        .player_air_dribble_stats()
-        .get(&player_id)
-        .is_none());
+    assert!(
+        harness
+            .calculator
+            .player_air_dribble_stats()
+            .get(&player_id)
+            .is_none()
+    );
     assert!(harness.calculator.carry_events().is_empty());
 }

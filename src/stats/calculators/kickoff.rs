@@ -722,6 +722,9 @@ impl KickoffCalculator {
         }
         if let Some(boost_amount) = Self::boost_amount(player) {
             if let Some(previous_boost) = trace.previous_boost {
+                // Collection is tracked from pad-pickup events, not deltas; only
+                // the spent side is sampled here, as a fallback for boost_used
+                // when start/contact boost is unavailable.
                 let delta = boost_amount - previous_boost;
                 if delta < 0.0 {
                     // Only the depletion side is sampled here, as a fallback for
@@ -992,6 +995,22 @@ impl KickoffCalculator {
 
     fn taker_boost_collected(player: &KickoffPlayerSnapshot) -> f32 {
         player.approach_trace.pickup_boost_collected
+    }
+
+    /// Boost the taker has left *at the moment of contact* with the ball.
+    ///
+    /// This is the counterpart to [`taker_boost_used`], which measures boost
+    /// spent over the `start -> first touch` window. The plain finish-frame
+    /// sample (`boost_after`) is taken ~1.25s after the touch, by which point
+    /// the taker has driven on and possibly re-collected boost, so pairing it
+    /// with `boost_used` produces nonsensical combinations (e.g. used 94 /
+    /// after 80). Using `first_touch_boost` keeps the two consistent:
+    /// `start_boost + boost_collected == boost_used + boost_after`.
+    ///
+    /// Falls back to the finish-frame sample for takers who never touched the
+    /// ball (fake / missed outcomes), where there is no contact moment.
+    fn taker_boost_after(player: &KickoffPlayerSnapshot, boost_after: Option<f32>) -> Option<f32> {
+        player.first_touch_boost.or(boost_after)
     }
 
     fn taker_boost_used(player: &KickoffPlayerSnapshot) -> f32 {
@@ -1568,13 +1587,14 @@ impl KickoffCalculator {
                         team_one_touched
                     },
                 );
+                let taker_boost_after = Self::taker_boost_after(player, boost_after);
                 let player_event = KickoffTakerEvent {
                     player: player.player.clone(),
                     is_team_0: player.is_team_0,
                     start_position: player.start_position,
                     spawn_position: player.spawn_position,
                     start_boost: player.start_boost,
-                    boost_after,
+                    boost_after: taker_boost_after,
                     time_to_ball: Self::taker_time_to_ball(player, movement_start_time),
                     boost_collected: Self::taker_boost_collected(player),
                     boost_used: Self::taker_boost_used(player),
@@ -1585,7 +1605,7 @@ impl KickoffCalculator {
                     approach: Self::classify_approach(
                         player,
                         outcome,
-                        boost_after,
+                        taker_boost_after,
                         active.speed_flip_players.contains(&player.player),
                     ),
                 };

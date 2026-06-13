@@ -1,5 +1,5 @@
 use subtr_actor::stats::export::{
-    ExportedStat, LabeledFloatSums, StatFieldProvider, StatUnit, StatValue, LEGACY_STAT_VARIANT,
+    ExportedStat, LEGACY_STAT_VARIANT, LabeledFloatSums, StatFieldProvider, StatUnit, StatValue,
 };
 use subtr_actor::{
     BackboardPlayerStats, BallHalfStats, BoostStats, CorePlayerStats, DodgeResetStats,

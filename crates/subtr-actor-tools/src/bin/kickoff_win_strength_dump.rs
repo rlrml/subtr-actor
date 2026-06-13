@@ -19,8 +19,8 @@ fn main() -> anyhow::Result<()> {
     // TSV header
     println!("replay\tstart_time\toutcome\twin_strength\tband\texit_speed\texit_y_velocity");
     for path in &paths {
-        if let Err(error) = dump_replay(path, &mut strengths, &mut band_counts, &mut outcome_counts)
-        {
+        let dumped = dump_replay(path, &mut strengths, &mut band_counts, &mut outcome_counts);
+        if let Err(error) = dumped {
             eprintln!("skip {path}: {error:?}");
         }
     }

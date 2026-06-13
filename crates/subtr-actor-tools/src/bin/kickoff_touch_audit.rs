@@ -9,9 +9,9 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::path::{Path, PathBuf};
 use subtr_actor::{
+    Collector, EventPayload, PlayerId, ProcessorView, StatsTimelineCollector, TimeAdvance,
     ball_trajectory_deviation_with_gravity, touch_candidate_contact_gap_rank_with_hitbox,
-    vec_to_glam, Collector, EventPayload, PlayerId, ProcessorView, StatsTimelineCollector,
-    TimeAdvance,
+    vec_to_glam,
 };
 
 #[derive(Debug, Parser)]
@@ -320,7 +320,8 @@ fn main() -> Result<()> {
             .to_owned();
         match parse_replay(path) {
             Ok(replay) => {
-                if let Err(e) = audit(&label, &args, &replay) {
+                let audited = audit(&label, &args, &replay);
+                if let Err(e) = audited {
                     eprintln!("error {label}: {e:?}");
                 }
             }

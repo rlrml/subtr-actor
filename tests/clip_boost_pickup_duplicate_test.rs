@@ -11,7 +11,7 @@ mod common;
 use std::collections::HashMap;
 
 use subtr_actor::stats::analysis_graph::{
-    graph_with_builtin_analysis_nodes, AnalysisNodeCollector,
+    AnalysisNodeCollector, graph_with_builtin_analysis_nodes,
 };
 use subtr_actor::*;
 
@@ -173,9 +173,11 @@ fn clip_suppresses_iced_space_duplicate_reported_small_boost_pickup() {
             && pickup.pad_id == "VehiclePickup_Boost_TA_23"
             && pickup.sequence == 5
     }));
-    assert!(!duplicate_frame_pickups
-        .iter()
-        .any(|pickup| pickup.pad_id == duplicate_pad_id && pickup.sequence == 5));
+    assert!(
+        !duplicate_frame_pickups
+            .iter()
+            .any(|pickup| pickup.pad_id == duplicate_pad_id && pickup.sequence == 5)
+    );
 
     let graph_events_at_duplicate_frame = graph_events_for_iced_space
         .iter()

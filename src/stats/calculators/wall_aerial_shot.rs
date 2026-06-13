@@ -1,6 +1,6 @@
 use super::wall_aerial::{
-    wall_aerial_normalize_score, wall_aerial_wall_for_position, WALL_AERIAL_MIN_TOUCH_BALL_Z,
-    WALL_AERIAL_MIN_TOUCH_PLAYER_Z,
+    WALL_AERIAL_MIN_TOUCH_BALL_Z, WALL_AERIAL_MIN_TOUCH_PLAYER_Z, wall_aerial_normalize_score,
+    wall_aerial_wall_for_position,
 };
 use super::*;
 

@@ -5,4 +5,12 @@ import type { KickoffSpawnPosition } from "./KickoffSpawnPosition.ts";
 import type { KickoffTakerOutcome } from "./KickoffTakerOutcome.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type KickoffTakerEvent = { player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number], spawn_position: KickoffSpawnPosition, start_boost: number | null, boost_after: number | null, time_to_ball: number | null, boost_collected: number, boost_used: number, ball_direction: KickoffBallDirection, first_touch_time: number | null, first_touch_frame: number | null, outcome: KickoffTakerOutcome, approach: KickoffApproach, };
+export type KickoffTakerEvent = { player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number], spawn_position: KickoffSpawnPosition, start_boost: number | null,
+/**
+ * Boost remaining at the moment the taker contacts the ball (the
+ * counterpart to `boost_used`, which is spent reaching that contact).
+ * For takers that never touch the ball (fake / missed) this falls back to
+ * the end-of-kickoff sample. Invariant when the taker touches:
+ * `start_boost + boost_collected == boost_used + boost_after`.
+ */
+boost_after: number | null, time_to_ball: number | null, boost_collected: number, boost_used: number, ball_direction: KickoffBallDirection, first_touch_time: number | null, first_touch_frame: number | null, outcome: KickoffTakerOutcome, approach: KickoffApproach, };

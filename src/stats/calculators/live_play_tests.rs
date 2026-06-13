@@ -1,5 +1,5 @@
 use super::*;
-use crate::{GoalEvent, GAME_STATE_KICKOFF_COUNTDOWN};
+use crate::{GAME_STATE_KICKOFF_COUNTDOWN, GoalEvent};
 
 #[test]
 fn kickoff_waiting_for_first_touch_is_not_live_play() {

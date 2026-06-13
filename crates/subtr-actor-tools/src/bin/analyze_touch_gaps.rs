@@ -3,8 +3,9 @@ use clap::Parser;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use subtr_actor::{
+    Collector, PlayerId, ProcessorView, TimeAdvance, TouchCandidateScoring,
     ball_trajectory_deviation_with_gravity, touch_candidate_contact_gap_rank_with_hitbox,
-    vec_to_glam, Collector, PlayerId, ProcessorView, TimeAdvance, TouchCandidateScoring,
+    vec_to_glam,
 };
 
 const FIELD_HALF_WIDTH: f32 = 4096.0;
@@ -672,14 +673,20 @@ fn print_high_confidence_impulse_summary(
         println!(
             "{:>7.2}uu vel_dev={:>7.2} impulse_frame={:<6} best_frame={:<6} time={:>8.3} ball=({:>7.1},{:>7.1},{:>6.1}) player={} replay={}",
             sample.window_best_gap.unwrap_or_default(),
-            sample.sample.trajectory_velocity_deviation.unwrap_or_default(),
+            sample
+                .sample
+                .trajectory_velocity_deviation
+                .unwrap_or_default(),
             sample.sample.frame,
             sample.window_best_frame,
             sample.sample.time,
             sample.sample.ball_position.x,
             sample.sample.ball_position.y,
             sample.sample.ball_position.z,
-            sample.window_best_player_name.as_deref().unwrap_or("<unknown>"),
+            sample
+                .window_best_player_name
+                .as_deref()
+                .unwrap_or("<unknown>"),
             sample.window_best_replay,
         );
     }

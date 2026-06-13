@@ -164,7 +164,7 @@ pub use speed_flip::SpeedFlipNode;
 pub use stats_projection::{StatsProjectionNode, StatsProjectionState};
 #[allow(unused_imports)]
 pub use stats_timeline_events::{
-    StatsTimelineEventsNode, StatsTimelineEventsState, STATS_TIMELINE_MECHANIC_KINDS,
+    STATS_TIMELINE_MECHANIC_KINDS, StatsTimelineEventsNode, StatsTimelineEventsState,
 };
 #[allow(unused_imports)]
 pub use stats_timeline_frame::{StatsTimelineFrameNode, StatsTimelineFrameState};

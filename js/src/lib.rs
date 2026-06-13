@@ -2,10 +2,10 @@
 
 use js_sys::{Array, Function, Object, Reflect, Uint8Array};
 use subtr_actor::{
-    collector::replay_data::{ReplayData, ReplayDataCollector},
-    collector::CallbackCollector,
     Collector, FrameRateDecorator, NDArrayCollector, ReplayProcessor, StatsCollector,
     StatsTimelineEventCollector, SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
+    collector::CallbackCollector,
+    collector::replay_data::{ReplayData, ReplayDataCollector},
 };
 use wasm_bindgen::prelude::*;
 

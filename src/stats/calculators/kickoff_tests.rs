@@ -1070,8 +1070,18 @@ fn kickoff_taker_tracks_time_to_ball_and_approach_boost_totals() {
     let blue_taker_event = event.team_zero_taker.as_ref().unwrap();
     assert_eq!(blue_taker_event.player, blue_taker);
     assert_eq!(blue_taker_event.time_to_ball, Some(0.5));
+    // Collection comes from the deduplicated BoostPickupEvent during the
+    // approach, not from summing per-frame boost deltas.
     assert_eq!(blue_taker_event.boost_collected, 15.0);
-    assert_eq!(blue_taker_event.boost_used, 3.0);
+    // boost_used = start + collected - boost-at-contact.
+    assert_eq!(
+        blue_taker_event.boost_used,
+        (33.0_f32 + 15.0 - 45.0).max(0.0)
+    );
+    // `boost_after` is sampled at contact (45.0 at frame 35), not at the
+    // end-of-kickoff resolution frame (10.0 at frame 50). This keeps the
+    // accounting consistent: start (33) + collected == used + after (45).
+    assert_eq!(blue_taker_event.boost_after, Some(45.0));
 }
 
 #[test]
@@ -2147,10 +2157,12 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
         event.team_zero_taker.as_ref().map(|player| &player.player),
         Some(&right_player)
     );
-    assert!(event
-        .team_zero_non_takers
-        .iter()
-        .any(|player| player.player == left_player));
+    assert!(
+        event
+            .team_zero_non_takers
+            .iter()
+            .any(|player| player.player == left_player)
+    );
 
     let left_goes_index = KickoffCalculator::expected_taker_by_team(
         &[

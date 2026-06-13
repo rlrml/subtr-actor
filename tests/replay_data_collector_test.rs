@@ -1,6 +1,6 @@
 use std::path::Path;
 use subtr_actor::collector::replay_data::{BallFrame, PlayerFrame, ReplayDataCollector};
-use subtr_actor::{ReplayProcessor, BOOST_KICKOFF_START_AMOUNT};
+use subtr_actor::{BOOST_KICKOFF_START_AMOUNT, ReplayProcessor};
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);

@@ -49,14 +49,17 @@ impl<'a> ReplayProcessor<'a> {
             return;
         }
         self.known_demolishes.push((demolish.clone(), frame_index));
-        if let Ok(info) = self.build_demolish_info(demolish, frame, frame_index) {
-            self.demolishes.push(info);
-        } else {
-            log::warn!(
-                "Error building demolish info: attacker_car={:?}, victim_car={:?}",
-                demolish.attacker_actor_id(),
-                demolish.victim_actor_id(),
-            );
+        match self.build_demolish_info(demolish, frame, frame_index) {
+            Ok(info) => {
+                self.demolishes.push(info);
+            }
+            _ => {
+                log::warn!(
+                    "Error building demolish info: attacker_car={:?}, victim_car={:?}",
+                    demolish.attacker_actor_id(),
+                    demolish.victim_actor_id(),
+                );
+            }
         }
     }
 

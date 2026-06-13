@@ -11,9 +11,11 @@ fn reports_used_split_mismatch() {
 
     let violations = boost_invariant_violations(&stats);
 
-    assert!(violations
-        .iter()
-        .any(|violation| violation.kind == BoostInvariantKind::UsedSplitAmounts));
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.kind == BoostInvariantKind::UsedSplitAmounts)
+    );
 }
 
 #[test]
@@ -27,9 +29,11 @@ fn accepts_matching_used_split() {
 
     let violations = boost_invariant_violations(&stats);
 
-    assert!(!violations
-        .iter()
-        .any(|violation| violation.kind == BoostInvariantKind::UsedSplitAmounts));
+    assert!(
+        !violations
+            .iter()
+            .any(|violation| violation.kind == BoostInvariantKind::UsedSplitAmounts)
+    );
 }
 
 #[test]

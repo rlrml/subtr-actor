@@ -3,7 +3,7 @@ macro_rules! impl_analysis_node {
         node = $node:ident,
         state = $state:ty,
         name = $name:literal,
-        dependencies = [$($dependency:expr => $dependency_ty:ty),* $(,)?],
+        dependencies = [$($dependency:expr_2021 => $dependency_ty:ty),* $(,)?],
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
         call = $field:ident.$method:ident
         $(, finish = $finish_field:ident.$finish_method:ident)?
@@ -61,7 +61,7 @@ macro_rules! impl_analysis_node {
         node = $node:ident,
         state = $state:ty,
         name = $name:literal,
-        dependencies = [$($dependency:expr => $dependency_ty:ty),* $(,)?],
+        dependencies = [$($dependency:expr_2021 => $dependency_ty:ty),* $(,)?],
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
         update_state = $field:ident.$method:ident
         $(, finish = $finish_field:ident.$finish_method:ident)?
@@ -120,12 +120,12 @@ macro_rules! impl_analysis_node {
         node = $node:ident,
         state = $state:ty,
         name = $name:literal,
-        dependencies = [$($dependency:expr),* $(,)?],
+        dependencies = [$($dependency:expr_2021),* $(,)?],
         inputs = {$($binding:ident : $binding_ty:ty),* $(,)?},
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
         evaluate = |$eval_self:ident| $evaluate:block,
         $(finish = |$finish_self:ident| $finish:block,)?
-        state_ref = |$state_self:ident| $state_ref:expr $(,)?
+        state_ref = |$state_self:ident| $state_ref:expr_2021 $(,)?
     ) => {
         impl Default for $node {
             fn default() -> Self {

@@ -864,7 +864,7 @@ fn checked_in_header_matches_event_abi_struct_field_types() {
 }
 
 macro_rules! assert_layout {
-    ($ty:ty, size = $size:expr, align = $align:expr) => {
+    ($ty:ty, size = $size:expr_2021, align = $align:expr_2021) => {
         assert_eq!(
             std::mem::size_of::<$ty>(),
             $size,
@@ -881,7 +881,7 @@ macro_rules! assert_layout {
 }
 
 macro_rules! assert_offset {
-    ($ty:ty, $field:tt, $offset:expr) => {
+    ($ty:ty, $field:tt, $offset:expr_2021) => {
         assert_eq!(
             std::mem::offset_of!($ty, $field),
             $offset,

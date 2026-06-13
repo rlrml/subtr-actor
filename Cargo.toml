@@ -1,13 +1,14 @@
 [workspace]
 members = [".", "bakkesmod/rust", "crates/subtr-actor-tools", "js", "python"]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 version = "1.0.0"
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/rlrml/subtr-actor"
-edition = "2021"
+edition = "2024"
+rust-version = "1.87"
 
 [workspace.dependencies]
 boxcars = ">=0.11.3, <1.0.0"
@@ -19,6 +20,7 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 keywords = ["rocket-league"]
 categories = ["parsing"]
 description = "Rocket League replay transformer"

@@ -408,10 +408,10 @@ macro_rules! define_stats_event {
         $definition:ident,
         $id:literal,
         $label:literal,
-        $category:expr,
+        $category:expr_2021,
         summary = $summary:literal,
         approach = [$($approach:literal),* $(,)?]
-        $(, $modifier:ident = $modval:expr)* $(,)?
+        $(, $modifier:ident = $modval:expr_2021)* $(,)?
     ) => {
         pub const $definition: EventDefinition =
             event_definition($id, $label, $category, $summary, &[$($approach),*])
@@ -429,8 +429,8 @@ macro_rules! define_stats_event {
         $definition:ident,
         $id:literal,
         $label:literal,
-        $category:expr
-        $(, $modifier:ident = $modval:expr)* $(,)?
+        $category:expr_2021
+        $(, $modifier:ident = $modval:expr_2021)* $(,)?
     ) => {
         pub const $definition: EventDefinition =
             pending_event_definition($id, $label, $category)
@@ -445,7 +445,7 @@ macro_rules! define_stats_event {
 }
 
 macro_rules! register_event_producer {
-    ($static_name:ident, $node_name:literal, $emitted_events:expr) => {
+    ($static_name:ident, $node_name:literal, $emitted_events:expr_2021) => {
         #[cfg(not(target_arch = "wasm32"))]
         #[distributed_slice(EVENT_PRODUCERS)]
         static $static_name: EventProducerDefinition = EventProducerDefinition {
@@ -656,7 +656,8 @@ define_stats_event!(
     "one_timer",
     "One Timer",
     EventCategory::Mechanic,
-    summary = "A fast receiver touch from a completed pass that is immediately directed toward goal.",
+    summary =
+        "A fast receiver touch from a completed pass that is immediately directed toward goal.",
     approach = [
         "Consume newly completed pass events on the frame they are recorded.",
         "Require the current ball speed after the receiver's touch to exceed the one-timer speed threshold.",
@@ -682,7 +683,8 @@ define_stats_event!(
     "ball_carry",
     "Ball Carry",
     EventCategory::Mechanic,
-    summary = "A sustained player-ball control sequence, covering grounded carries and air dribbles.",
+    summary =
+        "A sustained player-ball control sequence, covering grounded carries and air dribbles.",
     approach = [
         "Use continuous ball-control tracking to build player-owned sequences while live play is active.",
         "Sample grounded carries from close horizontal/vertical ball gaps over the car, excluding wall contact.",
@@ -695,7 +697,8 @@ define_stats_event!(
     "controlled_play",
     "Controlled Play",
     EventCategory::Mechanic,
-    summary = "A same-player possession episode with multiple touches and sustained close-ball time.",
+    summary =
+        "A same-player possession episode with multiple touches and sustained close-ball time.",
     approach = [
         "Start a player-owned candidate from an attributed touch during live play.",
         "Require at least two distinct touches by the same player with at least one second between the first and last touch.",

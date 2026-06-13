@@ -266,21 +266,22 @@ impl FrameInput {
         let active_demo_events = processor.current_frame_active_demo_events();
         if !active_demo_events.is_empty() {
             active_demo_events.to_vec()
-        } else if let Ok(demos) = processor.get_active_demos() {
-            demos
-                .into_iter()
-                .filter_map(|demo| {
-                    let attacker = processor
-                        .get_player_id_from_car_id(&demo.attacker_actor_id())
-                        .ok()?;
-                    let victim = processor
-                        .get_player_id_from_car_id(&demo.victim_actor_id())
-                        .ok()?;
-                    Some(DemoEventSample { attacker, victim })
-                })
-                .collect()
         } else {
-            Vec::new()
+            match processor.get_active_demos() {
+                Ok(demos) => demos
+                    .into_iter()
+                    .filter_map(|demo| {
+                        let attacker = processor
+                            .get_player_id_from_car_id(&demo.attacker_actor_id())
+                            .ok()?;
+                        let victim = processor
+                            .get_player_id_from_car_id(&demo.victim_actor_id())
+                            .ok()?;
+                        Some(DemoEventSample { attacker, victim })
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            }
         }
     }
 
