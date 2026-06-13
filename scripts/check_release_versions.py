@@ -13,6 +13,7 @@ CHANGELOG = ROOT / "CHANGELOG.md"
 JS_PACKAGE_PATHS = [
     "js/package.json",
     "js/player/package.json",
+    "js/viewer/package.json",
     "js/stat-evaluation-player/package.json",
     "js/pages/package.json",
 ]
@@ -20,6 +21,7 @@ JS_PACKAGE_PATHS = [
 JS_PACKAGE_LOCK_PATHS = [
     "js/package-lock.json",
     "js/player/package-lock.json",
+    "js/viewer/package-lock.json",
     "js/stat-evaluation-player/package-lock.json",
 ]
 

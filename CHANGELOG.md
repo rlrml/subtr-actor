@@ -4,6 +4,16 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v1.0.2 - 2026-06-13
+
+### JavaScript packages
+
+- Publish `@rlrml/viewer` alongside `@rlrml/player`, `@rlrml/subtr-actor`, and
+  `@rlrml/stats-player` so stats-player installs include every externalized
+  package used by its bundled viewer runtime.
+- Supersede the incomplete `v1.0.1` JavaScript release attempt, which failed
+  before any npm packages were published.
+
 ## v1.0.1 - 2026-06-13
 
 ### Replay player

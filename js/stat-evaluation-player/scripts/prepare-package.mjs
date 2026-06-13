@@ -17,11 +17,16 @@ async function main() {
   const playerPackage = JSON.parse(
     await readFile(path.resolve(packageDir, "..", "player", "package.json"), "utf8"),
   );
+  const viewerPackage = JSON.parse(
+    await readFile(path.resolve(packageDir, "..", "viewer", "package.json"), "utf8"),
+  );
   const publishPackage = {
     ...sourcePackage,
     dependencies: {
+      ...sourcePackage.dependencies,
       [bindingsPackage.name]: sourcePackage.version,
       [playerPackage.name]: sourcePackage.version,
+      [viewerPackage.name]: sourcePackage.version,
     },
   };
   delete publishPackage.scripts;

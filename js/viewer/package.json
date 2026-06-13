@@ -1,6 +1,6 @@
 {
   "name": "@rlrml/viewer",
-  "version": "0.12.0",
+  "version": "1.0.2",
   "description": "High-fidelity 3D Rocket League replay viewer powered by subtr-actor (seeded from ballcam.tv with permission)",
   "type": "module",
   "main": "./dist/index.js",
