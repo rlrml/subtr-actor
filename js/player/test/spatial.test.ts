@@ -4,6 +4,7 @@ import * as THREE from "three";
 
 import { getReplayHitboxOverlayTransform, getReplayHitboxSpec } from "../src/hitboxes";
 import {
+  getFreeCameraPreset,
   interpolatePositionHermite,
   interpolateQuaternion,
   updateAttachedCamera,
@@ -103,6 +104,22 @@ test("ball cam stays behind the attached player when the ball is ahead", () => {
     "expected ball cam to keep the camera behind the player, not between the car and ball",
   );
   assert.ok(desiredLookTarget.x > 0, "expected ball cam to keep looking toward the ball");
+});
+
+test("free camera presets frame the arena closer than the old fixed defaults", () => {
+  const overhead = getFreeCameraPreset("overhead", 1, 16 / 9);
+  assert.equal(overhead.position.x, 0);
+  assert.equal(overhead.position.y, 0);
+  assert.ok(
+    overhead.position.z < 14000,
+    `expected overhead preset to sit closer than the old 18800uu default, got ${overhead.position.z}`,
+  );
+
+  const diagonal = getFreeCameraPreset("side", 1, 16 / 9);
+  assert.ok(
+    diagonal.position.distanceTo(diagonal.target) < 15000,
+    "expected diagonal preset to sit closer than the old fixed diagonal camera",
+  );
 });
 
 test("interpolateQuaternion blends rotation samples instead of holding the previous frame", () => {

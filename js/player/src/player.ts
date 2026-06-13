@@ -217,7 +217,11 @@ export class ReplayPlayer extends EventTarget {
   }
 
   setFreeCameraPreset(preset: ReplayFreeCameraPreset): void {
-    const { fov, position, target, up } = getFreeCameraPreset(preset, this.fieldScale);
+    const { fov, position, target, up } = getFreeCameraPreset(
+      preset,
+      this.fieldScale,
+      this.sceneState.camera.aspect,
+    );
     this.cameraViewMode = DEFAULT_CAMERA_VIEW_MODE;
     this.freeCameraTransition = {
       position,

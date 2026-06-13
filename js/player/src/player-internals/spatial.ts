@@ -22,11 +22,15 @@ const BALL_CAM_MAX_FOV = 132;
 const DEFAULT_FORWARD = new THREE.Vector3(-1, 0, 0);
 const DEFAULT_UP = new THREE.Vector3(0, 0, 1);
 const OVERHEAD_UP = new THREE.Vector3(-1, 0, 0);
-const OVERHEAD_CAMERA_POSITION_UU = new THREE.Vector3(0, 0, 18800);
 const OVERHEAD_LOOK_TARGET_UU = new THREE.Vector3(0, 0, 700);
-const SIDE_CAMERA_POSITION_UU = new THREE.Vector3(-9600, -12600, 6400);
 const SIDE_LOOK_TARGET_UU = new THREE.Vector3(0, 0, 900);
+const SIDE_CAMERA_FORWARD = new THREE.Vector3(9600, 12600, -5500).normalize();
 const FREE_CAMERA_FOV = 48;
+const SOCCAR_HALF_X_UU = 4120;
+const SOCCAR_HALF_Y_UU = 5140;
+const SOCCAR_CAMERA_FIT_MIN_Z_UU = 0;
+const SOCCAR_CAMERA_FIT_MAX_Z_UU = 2200;
+const FREE_CAMERA_FIT_MARGIN = 1.08;
 const CAMERA_POSITION_EPSILON_SQ = 16;
 const CAMERA_TARGET_EPSILON_SQ = 16;
 const CAMERA_UP_EPSILON_RAD = 0.003;
@@ -158,28 +162,91 @@ function worldDirection(direction: Vec3): THREE.Vector3 {
 export function getFreeCameraPreset(
   preset: ReplayFreeCameraPreset,
   fieldScale: number,
+  aspect = 16 / 9,
 ): {
   position: THREE.Vector3;
   target: THREE.Vector3;
   up: THREE.Vector3;
   fov: number;
 } {
+  const fov = FREE_CAMERA_FOV;
+  const fitAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 16 / 9;
   switch (preset) {
-    case "overhead":
+    case "overhead": {
+      const target = OVERHEAD_LOOK_TARGET_UU.clone().multiplyScalar(fieldScale);
+      const forward = new THREE.Vector3(0, 0, -1);
+      const distance = getFreeCameraFitDistance({
+        aspect: fitAspect,
+        fieldScale,
+        fov,
+        forward,
+        margin: FREE_CAMERA_FIT_MARGIN,
+        target,
+        up: OVERHEAD_UP,
+      });
       return {
-        position: OVERHEAD_CAMERA_POSITION_UU.clone().multiplyScalar(fieldScale),
-        target: OVERHEAD_LOOK_TARGET_UU.clone().multiplyScalar(fieldScale),
+        position: target.clone().addScaledVector(forward, -distance),
+        target,
         up: OVERHEAD_UP.clone(),
-        fov: FREE_CAMERA_FOV,
+        fov,
       };
-    case "side":
+    }
+    case "side": {
+      const target = SIDE_LOOK_TARGET_UU.clone().multiplyScalar(fieldScale);
+      const distance = getFreeCameraFitDistance({
+        aspect: fitAspect,
+        fieldScale,
+        fov,
+        forward: SIDE_CAMERA_FORWARD,
+        margin: FREE_CAMERA_FIT_MARGIN,
+        target,
+        up: DEFAULT_UP,
+      });
       return {
-        position: SIDE_CAMERA_POSITION_UU.clone().multiplyScalar(fieldScale),
-        target: SIDE_LOOK_TARGET_UU.clone().multiplyScalar(fieldScale),
+        position: target.clone().addScaledVector(SIDE_CAMERA_FORWARD, -distance),
+        target,
         up: DEFAULT_UP.clone(),
-        fov: FREE_CAMERA_FOV,
+        fov,
       };
+    }
   }
+}
+
+function getFreeCameraFitDistance(options: {
+  aspect: number;
+  fieldScale: number;
+  fov: number;
+  forward: THREE.Vector3;
+  margin: number;
+  target: THREE.Vector3;
+  up: THREE.Vector3;
+}): number {
+  const { aspect, fieldScale, fov, forward, margin, target, up } = options;
+  const cameraForward = forward.clone().normalize();
+  const right = new THREE.Vector3().crossVectors(cameraForward, up).normalize();
+  const cameraUp = new THREE.Vector3().crossVectors(right, cameraForward).normalize();
+  const tanVertical = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
+  const tanHorizontal = tanVertical * aspect;
+  let requiredDistance = 1;
+
+  for (const x of [-SOCCAR_HALF_X_UU, SOCCAR_HALF_X_UU]) {
+    for (const y of [-SOCCAR_HALF_Y_UU, SOCCAR_HALF_Y_UU]) {
+      for (const z of [SOCCAR_CAMERA_FIT_MIN_Z_UU, SOCCAR_CAMERA_FIT_MAX_Z_UU]) {
+        const corner = new THREE.Vector3(x, y, z).multiplyScalar(fieldScale);
+        const relative = corner.sub(target);
+        const horizontal = Math.abs(relative.dot(right));
+        const vertical = Math.abs(relative.dot(cameraUp));
+        const forwardOffset = relative.dot(cameraForward);
+        requiredDistance = Math.max(
+          requiredDistance,
+          horizontal / tanHorizontal - forwardOffset,
+          vertical / tanVertical - forwardOffset,
+        );
+      }
+    }
+  }
+
+  return Math.max(1, requiredDistance * margin);
 }
 
 export function updateFreeCameraTransition(options: {
