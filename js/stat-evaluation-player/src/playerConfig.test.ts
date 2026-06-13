@@ -23,7 +23,6 @@ const CONFIG: StatsPlayerConfig = {
   camera: {
     mode: "follow",
     attachedPlayerId: "player-one",
-    distanceScale: 2.4,
     ballCam: true,
     usePlayerCameraSettings: false,
     customSettings: {

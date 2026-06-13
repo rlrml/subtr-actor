@@ -25,8 +25,6 @@ export interface CameraControlsElements {
   readonly cameraViewFollowButton: HTMLButtonElement;
   readonly cameraViewOverheadButton: HTMLButtonElement;
   readonly cameraViewSideButton: HTMLButtonElement;
-  readonly cameraDistance: HTMLInputElement;
-  readonly cameraDistanceReadout: HTMLElement;
   readonly usePlayerCameraSettings: HTMLInputElement;
   readonly cameraSettingsControls: HTMLDivElement;
   readonly customCameraFov: HTMLInputElement;
@@ -77,17 +75,6 @@ export class CameraControlsController {
 
   installEventListeners(signal: AbortSignal): void {
     const { elements } = this.options;
-    elements.cameraDistance.addEventListener(
-      "input",
-      () => {
-        this.options
-          .getReplayPlayer()
-          ?.setCameraDistanceScale(Number(elements.cameraDistance.value));
-        this.options.requestConfigSync();
-      },
-      { signal },
-    );
-
     elements.usePlayerCameraSettings.addEventListener(
       "change",
       () => {
@@ -191,8 +178,6 @@ export class CameraControlsController {
 
   syncState(state: ReplayPlayerState): void {
     const { elements } = this.options;
-    elements.cameraDistance.value = `${state.cameraDistanceScale}`;
-    elements.cameraDistanceReadout.textContent = `${state.cameraDistanceScale.toFixed(2)}x`;
     elements.usePlayerCameraSettings.checked = state.customCameraSettings === null;
     elements.cameraSettingsControls.hidden = elements.usePlayerCameraSettings.checked;
     this.syncCustomCameraSettingControls(
@@ -211,7 +196,6 @@ export class CameraControlsController {
       replayPlayer !== null &&
       state?.cameraViewMode === "follow" &&
       (state.attachedPlayerId ?? null) !== null;
-    this.options.elements.cameraDistance.disabled = !hasAttachedCamera;
     this.options.elements.usePlayerCameraSettings.disabled = !hasAttachedCamera;
     this.setCameraSettingControlsEnabled(hasAttachedCamera && state?.customCameraSettings !== null);
     this.options.elements.ballCam.disabled = !hasAttachedCamera;
