@@ -12,7 +12,7 @@ const KICKOFF_GOAL_MAX_SECONDS: f32 = 10.0;
 const KICKOFF_GOAL_MAX_DEFENSIVE_BALL_Y: f32 = 1280.0;
 const KICKOFF_WIN_PROJECTION_SECONDS: f32 = 0.5;
 const KICKOFF_FIELD_HALF_LENGTH: f32 = 5120.0;
-const KICKOFF_WIN_MIN_PROJECTED_BALL_Y: f32 = 300.0;
+const KICKOFF_WIN_MIN_PROJECTED_BALL_Y: f32 = 256.0;
 const KICKOFF_BALL_DIRECTION_MIN_ABS_X: f32 = 180.0;
 const KICKOFF_BALL_DIRECTION_MIN_ABS_SPEED_X: f32 = 220.0;
 const KICKOFF_CLEAR_WIN_STRENGTH: f32 = 0.25;
@@ -22,6 +22,7 @@ const KICKOFF_POSSESSION_IMMEDIATE_CONTEST_SECONDS: f32 = 0.35;
 const KICKOFF_TOUCH_CLUSTER_MAX_GAP_SECONDS: f32 = 0.35;
 const KICKOFF_APPROACH_MIN_BOOST_USED: f32 = 3.0;
 const KICKOFF_APPROACH_MIN_FAKE_MOVE_DISTANCE: f32 = 350.0;
+const KICKOFF_APPROACH_FLIP_MIN_SECONDS_BEFORE_TOUCH: f32 = 0.5;
 const KICKOFF_APPROACH_FRONT_FLIP_FORWARD_COMPONENT: f32 = 0.45;
 const KICKOFF_APPROACH_DIAGONAL_FLIP_SIDE_COMPONENT: f32 = 0.35;
 const KICKOFF_SUPPORT_CHEAT_MIN_CENTER_PROGRESS: f32 = 400.0;
@@ -1030,6 +1031,15 @@ impl KickoffCalculator {
             .distance(glam::Vec3::from_array(player.start_position))
     }
 
+    fn approach_dodge_happened_before_contact(player: &KickoffPlayerSnapshot) -> bool {
+        let Some(first_dodge_time) = player.approach_trace.first_dodge_time else {
+            return false;
+        };
+        player.first_touch_time.is_none_or(|first_touch_time| {
+            first_touch_time - first_dodge_time >= KICKOFF_APPROACH_FLIP_MIN_SECONDS_BEFORE_TOUCH
+        })
+    }
+
     fn classify_approach(
         player: &KickoffPlayerSnapshot,
         outcome: KickoffTakerOutcome,
@@ -1051,7 +1061,7 @@ impl KickoffCalculator {
             .approach_trace
             .first_dodge_side_component
             .unwrap_or(0.0);
-        if player.approach_trace.first_dodge_time.is_some() {
+        if Self::approach_dodge_happened_before_contact(player) {
             if side_component >= KICKOFF_APPROACH_DIAGONAL_FLIP_SIDE_COMPONENT {
                 return KickoffApproach::DiagonalFlip;
             }

@@ -1942,6 +1942,28 @@ fn kickoff_classifies_known_taker_approaches() {
         KickoffApproach::FrontFlip
     );
 
+    let contact_flip = KickoffPlayerSnapshot {
+        approach_trace: KickoffApproachTrace {
+            boost_active_sample_count: 4,
+            first_dodge_time: Some(0.85),
+            first_dodge_frame: Some(8),
+            first_dodge_forward_component: Some(0.55),
+            first_dodge_side_component: Some(0.75),
+            min_boost: Some(18.0),
+            ..KickoffApproachTrace::default()
+        },
+        ..speed_flip.clone()
+    };
+    assert_eq!(
+        KickoffCalculator::classify_approach(
+            &contact_flip,
+            KickoffTakerOutcome::Touched,
+            Some(18.0),
+            false,
+        ),
+        KickoffApproach::BoostIntoBall
+    );
+
     let boost_into_ball = KickoffPlayerSnapshot {
         first_touch_time: Some(0.95),
         first_touch_frame: Some(9),
