@@ -41,13 +41,33 @@ fn boost_pickup(
     time: f32,
     collected_amount: f32,
 ) -> BoostPickupEvent {
+    boost_pickup_at(
+        player_id,
+        is_team_0,
+        frame,
+        time,
+        collected_amount,
+        BoostPickupPadType::Big,
+        None,
+    )
+}
+
+fn boost_pickup_at(
+    player_id: PlayerId,
+    is_team_0: bool,
+    frame: usize,
+    time: f32,
+    collected_amount: f32,
+    pad_type: BoostPickupPadType,
+    player_position: Option<[f32; 3]>,
+) -> BoostPickupEvent {
     BoostPickupEvent {
         frame,
         time,
         player_id,
-        player_position: None,
+        player_position,
         is_team_0,
-        pad_type: BoostPickupPadType::Big,
+        pad_type,
         field_half: BoostPickupFieldHalf::Own,
         activity: BoostPickupActivity::Active,
         detection: BoostPickupDetection::Both,
@@ -677,14 +697,14 @@ fn kickoff_classifies_support_players_as_cheating_or_going_for_boost() {
         .unwrap();
 
     calculator
-        .update(
-            &frame(5, 0.5),
-            &GameplayState {
+        .update_with_speed_flips(KickoffUpdateContext {
+            frame: &frame(5, 0.5),
+            gameplay: &GameplayState {
                 ball_has_been_hit: Some(false),
                 ..GameplayState::default()
             },
-            &ball(0.0),
-            &PlayerFrameState {
+            ball: &ball(0.0),
+            players: &PlayerFrameState {
                 players: vec![
                     player(
                         blue_cheat.clone(),
@@ -695,14 +715,24 @@ fn kickoff_classifies_support_players_as_cheating_or_going_for_boost() {
                     player(
                         orange_boost.clone(),
                         false,
-                        glam::Vec3::new(900.0, 4300.0, 17.0),
+                        glam::Vec3::new(3072.0, 4096.0, 17.0),
                         100.0,
                     ),
                 ],
             },
-            &TouchState::default(),
-            &FrameEventsState::default(),
-        )
+            touch_state: &TouchState::default(),
+            events: &FrameEventsState::default(),
+            speed_flip_events: &[],
+            boost_pickups: &[boost_pickup_at(
+                orange_boost.clone(),
+                false,
+                5,
+                0.5,
+                67.0,
+                BoostPickupPadType::Big,
+                Some([3072.0, 4096.0, 73.0]),
+            )],
+        })
         .unwrap();
 
     calculator
@@ -743,7 +773,7 @@ fn kickoff_classifies_support_players_as_cheating_or_going_for_boost() {
                     player(
                         orange_boost.clone(),
                         false,
-                        glam::Vec3::new(1200.0, 4300.0, 17.0),
+                        glam::Vec3::new(3072.0, 4096.0, 17.0),
                         100.0,
                     ),
                 ],
@@ -796,6 +826,108 @@ fn kickoff_classifies_support_players_as_cheating_or_going_for_boost() {
             .support_go_for_boosts,
         1
     );
+}
+
+#[test]
+fn kickoff_support_boost_gain_without_boost_route_is_other() {
+    let support = KickoffPlayerSnapshot {
+        player: PlayerId::Epic("calemacar".to_owned()),
+        is_team_0: false,
+        start_position: [2048.0, 2560.0, 17.0],
+        spawn_position: KickoffSpawnPosition::DiagonalLeft,
+        start_boost: Some(85.0),
+        first_touch_boost: None,
+        first_touch_time: None,
+        first_touch_frame: None,
+        approach_trace: KickoffApproachTrace {
+            min_boost: Some(85.0),
+            last_position: Some([2100.0, 2200.0, 17.0]),
+            previous_boost: Some(145.0),
+            ..KickoffApproachTrace::default()
+        },
+    };
+
+    assert_eq!(
+        KickoffCalculator::classify_support_behavior(&support, false),
+        Some(KickoffSupportBehavior::Other)
+    );
+}
+
+#[test]
+fn kickoff_support_go_for_boost_requires_immediate_own_back_big() {
+    let support_id = PlayerId::Epic("support".to_owned());
+    let support = KickoffPlayerSnapshot {
+        player: support_id.clone(),
+        is_team_0: false,
+        start_position: [2048.0, 2560.0, 17.0],
+        spawn_position: KickoffSpawnPosition::DiagonalLeft,
+        start_boost: Some(85.0),
+        first_touch_boost: None,
+        first_touch_time: None,
+        first_touch_frame: None,
+        approach_trace: KickoffApproachTrace::default(),
+    };
+    let movement_start_time = 10.0;
+
+    let own_back_big = boost_pickup_at(
+        support_id.clone(),
+        false,
+        20,
+        12.0,
+        170.0,
+        BoostPickupPadType::Big,
+        Some([3072.0, 4096.0, 73.0]),
+    );
+    assert!(KickoffCalculator::is_immediate_own_back_big_pickup(
+        &support,
+        &own_back_big,
+        movement_start_time,
+    ));
+
+    let small_pad = boost_pickup_at(
+        support_id.clone(),
+        false,
+        20,
+        12.0,
+        30.6,
+        BoostPickupPadType::Small,
+        Some([3072.0, 4096.0, 73.0]),
+    );
+    assert!(!KickoffCalculator::is_immediate_own_back_big_pickup(
+        &support,
+        &small_pad,
+        movement_start_time,
+    ));
+
+    let midfield_big = boost_pickup_at(
+        support_id.clone(),
+        false,
+        20,
+        12.0,
+        170.0,
+        BoostPickupPadType::Big,
+        Some([3584.0, 0.0, 73.0]),
+    );
+    assert!(!KickoffCalculator::is_immediate_own_back_big_pickup(
+        &support,
+        &midfield_big,
+        movement_start_time,
+    ));
+
+    let late_back_big = boost_pickup_at(
+        support_id,
+        false,
+        20,
+        movement_start_time + KICKOFF_SUPPORT_BACK_BIG_MAX_SECONDS_AFTER_GO + 0.1,
+        170.0,
+        BoostPickupPadType::Big,
+        Some([3072.0, 4096.0, 73.0]),
+    );
+    assert!(!KickoffCalculator::is_immediate_own_back_big_pickup(
+        &support,
+        &late_back_big,
+        movement_start_time,
+    ));
 }
 
 #[test]
