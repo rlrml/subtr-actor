@@ -32,6 +32,7 @@ const KICKOFF_PRESSURE_MIN_ESTABLISH_SECONDS: f32 = 2.0;
 const KICKOFF_PRESSURE_MIN_ESTABLISH_THIRD_SECONDS: f32 = 0.75;
 const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_LATERAL_MOVE: f32 = 600.0;
 const KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_BOOST_GAIN: f32 = 10.0;
+const KICKOFF_SUPPORT_BACK_BIG_MAX_SECONDS_AFTER_GO: f32 = 3.0;
 
 #[derive(Debug, Clone, PartialEq)]
 struct KickoffPlayerSnapshot {
@@ -65,6 +66,7 @@ struct KickoffApproachTrace {
     /// reported boost balances reconcile, so summing positive deltas
     /// double-counts and can push `boost_used` past a full tank.
     pickup_boost_collected: f32,
+    picked_up_immediate_own_back_big_boost: bool,
     last_position: Option<[f32; 3]>,
     previous_velocity: Option<glam::Vec3>,
     previous_dodge_active: bool,
@@ -859,7 +861,43 @@ impl KickoffCalculator {
                 continue;
             }
             snapshot.approach_trace.pickup_boost_collected += pickup.collected_amount;
+            if Self::is_immediate_own_back_big_pickup(snapshot, pickup, lower_bound) {
+                snapshot
+                    .approach_trace
+                    .picked_up_immediate_own_back_big_boost = true;
+            }
         }
+    }
+
+    fn is_immediate_own_back_big_pickup(
+        player: &KickoffPlayerSnapshot,
+        pickup: &BoostPickupEvent,
+        movement_start_time: f32,
+    ) -> bool {
+        if pickup.pad_type != BoostPickupPadType::Big {
+            return false;
+        }
+        if pickup.time < movement_start_time {
+            return false;
+        }
+        if pickup.time - movement_start_time > KICKOFF_SUPPORT_BACK_BIG_MAX_SECONDS_AFTER_GO {
+            return false;
+        }
+        let Some(position) = pickup.player_position else {
+            return false;
+        };
+        let pickup_position = glam::Vec2::new(position[0], position[1]);
+        let own_back_y = if player.is_team_0 {
+            -BOOST_PAD_BACK_CORNER_Y
+        } else {
+            BOOST_PAD_BACK_CORNER_Y
+        };
+        [-BOOST_PAD_BACK_CORNER_X, BOOST_PAD_BACK_CORNER_X]
+            .iter()
+            .any(|x| {
+                pickup_position.distance(glam::Vec2::new(*x, own_back_y))
+                    <= STANDARD_PAD_MATCH_RADIUS_BIG
+            })
     }
 
     fn apply_speed_flip_events(
@@ -1128,7 +1166,6 @@ impl KickoffCalculator {
     fn classify_support_behavior(
         player: &KickoffPlayerSnapshot,
         is_taker: bool,
-        boost_after: Option<f32>,
     ) -> Option<KickoffSupportBehavior> {
         if is_taker {
             return None;
@@ -1138,9 +1175,7 @@ impl KickoffCalculator {
         {
             return Some(KickoffSupportBehavior::Cheat);
         }
-        if Self::boost_gain(player, boost_after) >= KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_BOOST_GAIN
-            || Self::lateral_movement(player) >= KICKOFF_SUPPORT_GO_FOR_BOOST_MIN_LATERAL_MOVE
-        {
+        if player.approach_trace.picked_up_immediate_own_back_big_boost {
             return Some(KickoffSupportBehavior::GoForBoost);
         }
         Some(KickoffSupportBehavior::Other)
@@ -1634,7 +1669,7 @@ impl KickoffCalculator {
                     boost_after,
                     first_touch_time: player.first_touch_time,
                     first_touch_frame: player.first_touch_frame,
-                    support_behavior: Self::classify_support_behavior(player, false, boost_after)
+                    support_behavior: Self::classify_support_behavior(player, false)
                         .unwrap_or_default(),
                 };
                 if player_event.is_team_0 {
