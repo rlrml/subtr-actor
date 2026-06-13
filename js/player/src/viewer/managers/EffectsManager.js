@@ -2028,11 +2028,18 @@ class BoostTrail {
                     float dist = length(gl_PointCoord - vec2(0.5));
                     if (dist > 0.5) discard;
 
-                    // Softer glow without a white-hot billboard flare.
+                    // Soft halo so neighbouring sprites merge into a cohesive
+                    // flame instead of reading as separate dots.
                     float glow = 1.0 - (dist * 2.0);
-                    glow = pow(glow, 1.05);
+                    glow = pow(glow, 1.35);
 
-                    gl_FragColor = vec4(vColor * glow * 0.95, vAlpha * glow);
+                    // Hot specular core: a small white-gold center that gives the
+                    // exhaust the glossy, almost-reflective sheen of the in-game
+                    // boost flame. Concentrated near the sprite center (high power).
+                    float core = pow(clamp(1.0 - dist * 2.0, 0.0, 1.0), 6.0);
+                    vec3 col = vColor * glow + vec3(1.0, 0.92, 0.7) * core * 0.75;
+
+                    gl_FragColor = vec4(col, vAlpha * glow);
                 }
             `,
       transparent: true,
@@ -2054,7 +2061,7 @@ class BoostTrail {
 
     // Emit particles proportional to playbackSpeed
     // At 1.0x: 2-3 particles, at 0.5x: 1-2 particles, at 2.0x: 4-6 particles
-    const baseEmit = Math.floor(Math.random() * 2) + 2;
+    const baseEmit = Math.floor(Math.random() * 2) + 3;
     const emitCount = Math.max(1, Math.round(baseEmit * playbackSpeed));
 
     for (let i = 0; i < emitCount; i++) {
@@ -2071,9 +2078,9 @@ class BoostTrail {
 
       // Tighter spread for more focused flame (in UU)
       const spread = new THREE.Vector3(
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 15,
-        (Math.random() - 0.5) * 15,
+        (Math.random() - 0.5) * 7,
+        (Math.random() - 0.5) * 9,
+        (Math.random() - 0.5) * 9,
       );
 
       const startPos = position.clone().add(rearOffset).add(spread);
@@ -2084,7 +2091,7 @@ class BoostTrail {
       // Velocity: opposite to car direction + inherit some car velocity (in UU)
       const backwardDir = new THREE.Vector3(-1, 0, 0);
       backwardDir.applyQuaternion(rotation);
-      backwardDir.multiplyScalar(115 + Math.random() * 55);
+      backwardDir.multiplyScalar(95 + Math.random() * 45);
 
       particle.velocity.copy(backwardDir);
       particle.velocity.add(velocity.clone().multiplyScalar(0.2)); // Inherit 20% of car velocity
@@ -2099,12 +2106,12 @@ class BoostTrail {
       );
 
       particle.life = 0;
-      particle.maxLife = 0.22 + Math.random() * 0.22;
+      particle.maxLife = 0.2 + Math.random() * 0.18;
       particle.active = true;
 
       particle.initialAlpha = 0.52 + Math.random() * 0.18;
       alphas[idx] = particle.initialAlpha;
-      sizes[idx] = 1.8 + Math.random() * 1.1;
+      sizes[idx] = 1.5 + Math.random() * 0.9;
       particle.initialSize = sizes[idx];
 
       // Warmer exhaust colors without the bright yellow-white core.

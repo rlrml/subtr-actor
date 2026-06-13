@@ -31,6 +31,11 @@ import {
   projectTimelineTimeToReplay,
 } from "../player-internals/timeline";
 import { getKickoffSkipTargetTime, getPostGoalTransitionSkipTargetTime } from "../player-helpers";
+import {
+  DEFAULT_ENVIRONMENT_ID,
+  resolveEnvironment,
+  type ViewerEnvironmentSpec,
+} from "./environments.js";
 import type {
   ReplayModel,
   ReplayPlayerTimelineProjection,
@@ -302,7 +307,10 @@ export class ViewerPlayer extends EventTarget {
     this.skipKickoffsEnabledValue = options.initialSkipKickoffsEnabled ?? false;
 
     this.sceneManager = new SceneManager(container);
+    // Neutral IBL renders instantly so playback starts immediately; the HDR
+    // environment (default "space") loads lazily and swaps in once decoded.
     this.sceneManager.initDefaultEnvironment();
+    this.applyEnvironmentSpec(options.environment ?? DEFAULT_ENVIRONMENT_ID);
     this.arenaManager = new ArenaManager(this.scene);
     // Trails (boost / supersonic / ball). Explosions stay dormant until the
     // adapter exposes goal/demo events (its event getters are still stubs).
@@ -370,6 +378,29 @@ export class ViewerPlayer extends EventTarget {
   }
   get duration(): number {
     return this.adapter.duration;
+  }
+
+  // ── Environment (skybox + IBL) ──────────────────────────────────────────────
+  /**
+   * Switch the skybox environment at runtime. Accepts a built-in id (e.g.
+   * `"space"`), a full `ViewerEnvironment` descriptor, or `false` for the
+   * neutral default (no skybox). Non-blocking: the HDR swaps in when decoded.
+   */
+  setEnvironment(spec: ViewerEnvironmentSpec): void {
+    this.applyEnvironmentSpec(spec);
+  }
+
+  private applyEnvironmentSpec(spec: ViewerEnvironmentSpec): void {
+    const env = resolveEnvironment(spec);
+    if (!env) {
+      this.sceneManager.setDefaultBackground();
+      return;
+    }
+    // Fire-and-forget: do NOT await or fold into `this.ready`, so playback never
+    // waits on the HDR download.
+    void this.sceneManager.applyEnvironment(env).catch((e: unknown) => {
+      console.warn(`[viewer] environment "${env.id}" failed to load`, e);
+    });
   }
 
   // ── Playback control ────────────────────────────────────────────────────────
@@ -965,6 +996,8 @@ export class ViewerPlayer extends EventTarget {
       // Wheel spin works off position deltas (not time), steering off userData.steer.
       this.actorManager.updateWheelRotations();
     }
+    // Slow skybox drift (no-op unless the active environment enables animation).
+    this.sceneManager.updateSkyboxAnimation(this.playing ? dt * this.speed : 0);
     this.controls.update();
 
     if (this.beforeRenderCallbacks.length > 0) {

@@ -75,6 +75,15 @@ Key modules:
   tracking — also applied on loop wrap). Explosions stay dormant until the
   adapter exposes goal/demo events (and `setRenderContext` warmup is deferred
   with them — it blocks the main thread for seconds).
+- **Skybox environments** (`src/environments.ts`). An HDR skybox drives both the
+  visible background and the image-based lighting (reflections/ambient on cars,
+  arena, ball) — the polish layer the original ballcam viewer got from its HDRs.
+  The built-in `"space"` (ballcam's PlanetaryEarth4k, shipped in
+  `public/skyboxes/`) is the default; select it via the `environment` option (a
+  built-in id, a full `ViewerEnvironment` descriptor, or `false` for neutral
+  default lighting), switch at runtime with `viewer.setEnvironment(...)`, and add
+  your own with `registerEnvironment(...)`. Loading is lazy: playback starts on
+  the asset-free `RoomEnvironment` fallback and the HDR swaps in once decoded.
 - **Boost pads** (`createBoostPadsPlugin()`). The original ballcam GameEngine
   pad rendering (glowing spheres + point lights for big pads, flat cylinders
   for small), fed by subtr-actor's resolved pad layout and exact

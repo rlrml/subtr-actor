@@ -74,6 +74,15 @@ export type {
   ViewerPlayerInfo,
 } from "./adapter/SubtrActorPlayer.js";
 export { loadReplay, parseReplay } from "./adapter/wasm.js";
+// Skybox environments (background + image-based lighting). The built-in "space"
+// is the default; register more or pass a descriptor inline. See environments.ts.
+export {
+  DEFAULT_ENVIRONMENT_ID,
+  listEnvironments,
+  registerEnvironment,
+  resolveEnvironment,
+} from "./environments.js";
+export type { ViewerEnvironment, ViewerEnvironmentSpec } from "./environments.js";
 export type { ReplayLoadResult, ReplayModel } from "../types";
 export type { ReplayScene } from "../scene";
 export { createNameTagPlugin } from "./plugins/name-tags.js";
