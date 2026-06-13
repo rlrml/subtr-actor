@@ -92,7 +92,7 @@ fn counts_near_miss_after_player_exits_ball_area() {
             &frame(2, 0.2),
             &ball,
             &PlayerFrameState {
-                players: vec![player(1, 460.0, false)],
+                players: vec![player(1, 560.0, false)],
             },
             &touch_state,
             &LivePlayState::active_play(),
@@ -103,6 +103,55 @@ fn counts_near_miss_after_player_exits_ball_area() {
     assert_eq!(stats.whiff_count, 1);
     assert_eq!(stats.grounded_whiff_count, 1);
     assert_eq!(calculator.events().len(), 1);
+}
+
+#[test]
+fn loosened_detector_counts_moderate_speed_approach_as_candidate() {
+    // A ~500 uu/s committed approach that gets close to the ball and then leaves
+    // without a touch sits below the old 700 uu/s arming gate, but now registers
+    // as a whiff candidate for review.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = WhiffCalculator::new();
+    let ball = ball();
+    let touch_state = TouchState::default();
+
+    calculator
+        .update(
+            &frame(1, 0.1),
+            &ball,
+            &PlayerFrameState {
+                players: vec![player_at(
+                    1,
+                    glam::Vec3::new(-200.0, 0.0, 17.0),
+                    glam::Vec3::new(500.0, 0.0, 0.0),
+                    false,
+                )],
+            },
+            &touch_state,
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(2, 0.2),
+            &ball,
+            &PlayerFrameState {
+                players: vec![player_at(
+                    1,
+                    glam::Vec3::new(560.0, 0.0, 17.0),
+                    glam::Vec3::new(500.0, 0.0, 0.0),
+                    false,
+                )],
+            },
+            &touch_state,
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.whiff_count, 1);
+    assert_eq!(calculator.events().len(), 1);
+    assert_eq!(calculator.events()[0].kind, WhiffEventKind::Whiff);
 }
 
 #[test]

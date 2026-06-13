@@ -1,16 +1,26 @@
 use super::*;
 
-const WHIFF_ENTER_DISTANCE: f32 = 150.0;
-const WHIFF_EXIT_DISTANCE: f32 = 285.0;
-const WHIFF_MAX_CANDIDATE_SECONDS: f32 = 0.65;
-const WHIFF_MIN_APPROACH_SPEED: f32 = 700.0;
-const WHIFF_MIN_CLOSING_SPEED: f32 = 450.0;
-const WHIFF_MIN_FORWARD_ALIGNMENT: f32 = 0.55;
-const WHIFF_MIN_VELOCITY_ALIGNMENT: f32 = 0.7;
+// These thresholds are intentionally permissive. The whiff detector feeds a
+// human confirm/reject review loop (rocket-sense `event_reviews`) whose purpose
+// is to build a labeled dataset, so it is tuned for recall rather than
+// precision: it flags essentially any committed move at a nearby ball that did
+// not produce a touch as a *candidate*, and leaves reviewers to prune the false
+// positives. Precision is recovered downstream from the labels, not here.
+//
+// The non-dodge approach path and the shared distance/time gates carry the
+// loosening; the dodge-specific gates below are left at their stricter values so
+// a clear side-dodge past the ball is still not treated as an attempt.
+const WHIFF_ENTER_DISTANCE: f32 = 220.0;
+const WHIFF_EXIT_DISTANCE: f32 = 360.0;
+const WHIFF_MAX_CANDIDATE_SECONDS: f32 = 1.0;
+const WHIFF_MIN_APPROACH_SPEED: f32 = 350.0;
+const WHIFF_MIN_CLOSING_SPEED: f32 = 250.0;
+const WHIFF_MIN_FORWARD_ALIGNMENT: f32 = 0.3;
+const WHIFF_MIN_VELOCITY_ALIGNMENT: f32 = 0.45;
 const WHIFF_MIN_DODGE_APPROACH_SPEED: f32 = 450.0;
 const WHIFF_MIN_DODGE_CLOSING_SPEED: f32 = 300.0;
 const WHIFF_MIN_DODGE_FORWARD_ALIGNMENT: f32 = 0.25;
-const WHIFF_MAX_LATERAL_OFFSET: f32 = 120.0;
+const WHIFF_MAX_LATERAL_OFFSET: f32 = 200.0;
 const WHIFF_MAX_DODGE_LATERAL_OFFSET: f32 = 150.0;
 const WHIFF_MIN_LOCAL_FORWARD_OFFSET: f32 = 0.0;
 const WHIFF_MIN_DODGE_LOCAL_FORWARD_OFFSET: f32 = -20.0;
