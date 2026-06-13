@@ -1,6 +1,6 @@
-import type { ReplayPlayer } from "@rlrml/player";
+import type { CameraSettings, ReplayPlayer } from "@rlrml/player";
 import { getConfigAdapterSnapshot, type StatsPlayerConfigAdapter } from "./configAdapters.ts";
-import type { CameraControlsController } from "./cameraControls.ts";
+import { DEFAULT_CUSTOM_CAMERA_SETTINGS, type CameraControlsController } from "./cameraControls.ts";
 import type { RecordingConfig } from "./playerConfig.ts";
 import {
   STATS_PLAYER_CONFIG_VERSION,
@@ -39,6 +39,28 @@ export interface StatsPlayerConfigSnapshotOptions {
   singletonWindows: SingletonWindowConfig[];
   statsWindows: StatsWindowConfig[];
   moduleConfigs: Record<string, unknown>;
+}
+
+export function getDefaultCustomCameraSettings(): CameraSettings {
+  return { ...DEFAULT_CUSTOM_CAMERA_SETTINGS };
+}
+
+export function getUsePlayerCameraSettingsFromConfig(camera?: PlayerCameraConfig | null): boolean {
+  if (!camera) {
+    return false;
+  }
+  if (camera.usePlayerCameraSettings !== undefined) {
+    return camera.usePlayerCameraSettings;
+  }
+  return camera.customSettings === null;
+}
+
+export function getCustomCameraSettingsFromConfig(
+  camera?: PlayerCameraConfig | null,
+): CameraSettings | null {
+  return getUsePlayerCameraSettingsFromConfig(camera)
+    ? null
+    : (camera?.customSettings ?? getDefaultCustomCameraSettings());
 }
 
 export function getConfigAdapters(modules: readonly StatModule[]): StatsPlayerConfigAdapter[] {
@@ -94,6 +116,7 @@ export function getCameraConfigSnapshot({
     attachedPlayerId: state?.attachedPlayerId,
     distanceScale: state?.cameraDistanceScale,
     ballCam: state?.ballCamEnabled ?? cameraControlsController?.ballCamChecked,
+    usePlayerCameraSettings: state?.customCameraSettings === null,
     customSettings: state?.customCameraSettings,
   };
 }
@@ -151,7 +174,7 @@ export function getReplayPlayerStatePatchFromConfig(
     playing: playback.playing,
     speed: playback.rate,
     cameraDistanceScale: camera.distanceScale,
-    customCameraSettings: camera.customSettings,
+    customCameraSettings: getCustomCameraSettingsFromConfig(camera),
     cameraViewMode: camera.mode,
     attachedPlayerId: camera.attachedPlayerId,
     ballCamEnabled: camera.ballCam,

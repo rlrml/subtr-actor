@@ -93,8 +93,8 @@ export function getAppTemplate(defaultCameraDistanceScale: number): string {
               ${defaultCameraDistanceScale.toFixed(2)}x
             </strong>
             <label class="toggle">
-              <input id="custom-camera-settings" type="checkbox" disabled />
-              <span>Custom camera settings</span>
+              <input id="use-player-camera-settings" type="checkbox" disabled />
+              <span>Use player camera settings</span>
             </label>
             <div id="camera-settings-controls" class="camera-settings-controls" hidden>
               <label>

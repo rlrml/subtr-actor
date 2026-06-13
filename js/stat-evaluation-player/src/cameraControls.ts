@@ -9,6 +9,16 @@ import type {
 
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = ["free", "follow"];
 
+export const DEFAULT_CUSTOM_CAMERA_SETTINGS: Required<CameraSettings> = {
+  fov: 110,
+  height: 100,
+  pitch: -4,
+  distance: 270,
+  stiffness: 0,
+  swivelSpeed: 1,
+  transitionSpeed: 1,
+};
+
 export interface CameraControlsElements {
   readonly attachedPlayer: HTMLSelectElement;
   readonly cameraViewFreeButton: HTMLButtonElement;
@@ -17,7 +27,7 @@ export interface CameraControlsElements {
   readonly cameraViewSideButton: HTMLButtonElement;
   readonly cameraDistance: HTMLInputElement;
   readonly cameraDistanceReadout: HTMLElement;
-  readonly customCameraSettings: HTMLInputElement;
+  readonly usePlayerCameraSettings: HTMLInputElement;
   readonly cameraSettingsControls: HTMLDivElement;
   readonly customCameraFov: HTMLInputElement;
   readonly customCameraHeight: HTMLInputElement;
@@ -78,14 +88,15 @@ export class CameraControlsController {
       { signal },
     );
 
-    elements.customCameraSettings.addEventListener(
+    elements.usePlayerCameraSettings.addEventListener(
       "change",
       () => {
-        elements.cameraSettingsControls.hidden = !elements.customCameraSettings.checked;
+        const usePlayerCameraSettings = elements.usePlayerCameraSettings.checked;
+        elements.cameraSettingsControls.hidden = usePlayerCameraSettings;
         this.options
           .getReplayPlayer()
           ?.setCustomCameraSettings(
-            elements.customCameraSettings.checked ? this.readCustomCameraSettings() : null,
+            usePlayerCameraSettings ? null : this.readCustomCameraSettings(),
           );
         this.options.requestConfigSync();
       },
@@ -182,9 +193,11 @@ export class CameraControlsController {
     const { elements } = this.options;
     elements.cameraDistance.value = `${state.cameraDistanceScale}`;
     elements.cameraDistanceReadout.textContent = `${state.cameraDistanceScale.toFixed(2)}x`;
-    elements.customCameraSettings.checked = state.customCameraSettings !== null;
-    elements.cameraSettingsControls.hidden = !elements.customCameraSettings.checked;
-    this.syncCustomCameraSettingControls(this.getEffectiveCameraSettings(state));
+    elements.usePlayerCameraSettings.checked = state.customCameraSettings === null;
+    elements.cameraSettingsControls.hidden = elements.usePlayerCameraSettings.checked;
+    this.syncCustomCameraSettingControls(
+      state.customCameraSettings ?? this.getFallbackCameraSettings(),
+    );
     elements.ballCam.checked = state.ballCamEnabled;
     elements.attachedPlayer.value = state.attachedPlayerId ?? "";
     this.syncAvailability(state);
@@ -199,7 +212,7 @@ export class CameraControlsController {
       state?.cameraViewMode === "follow" &&
       (state.attachedPlayerId ?? null) !== null;
     this.options.elements.cameraDistance.disabled = !hasAttachedCamera;
-    this.options.elements.customCameraSettings.disabled = !hasAttachedCamera;
+    this.options.elements.usePlayerCameraSettings.disabled = !hasAttachedCamera;
     this.setCameraSettingControlsEnabled(hasAttachedCamera && state?.customCameraSettings !== null);
     this.options.elements.ballCam.disabled = !hasAttachedCamera;
   }
@@ -266,15 +279,7 @@ export class CameraControlsController {
   }
 
   private getFallbackCameraSettings(): Required<CameraSettings> {
-    return {
-      fov: 110,
-      height: 100,
-      pitch: -4,
-      distance: 270,
-      stiffness: 0,
-      swivelSpeed: 1,
-      transitionSpeed: 1,
-    };
+    return DEFAULT_CUSTOM_CAMERA_SETTINGS;
   }
 
   private getAttachedPlayerCameraSettings(attachedPlayerId: string | null): CameraSettings | null {
@@ -312,7 +317,7 @@ export class CameraControlsController {
 
   private setCameraSettingControlsEnabled(enabled: boolean): void {
     const elements = this.options.elements;
-    elements.cameraSettingsControls.hidden = !elements.customCameraSettings.checked;
+    elements.cameraSettingsControls.hidden = elements.usePlayerCameraSettings.checked;
     elements.customCameraFov.disabled = !enabled;
     elements.customCameraHeight.disabled = !enabled;
     elements.customCameraPitch.disabled = !enabled;

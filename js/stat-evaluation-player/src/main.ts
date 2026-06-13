@@ -86,7 +86,7 @@ import { createPlayerConfigBindings, type PlayerConfigBindings } from "./playerC
 import { createWindowCommandController } from "./windowCommands.ts";
 import { ShotVisualizationController } from "./shotVisualization.ts";
 
-const DEFAULT_CAMERA_DISTANCE_SCALE = 2.25;
+const DEFAULT_CAMERA_DISTANCE_SCALE = 1;
 const GOAL_WATCH_LEAD_SECONDS = 4;
 const PLAYING_SNAPSHOT_UI_INTERVAL_MS = 100;
 
@@ -729,7 +729,7 @@ export function mountStatEvaluationPlayer(
       cameraViewSideButton: mustElement<HTMLButtonElement>(root, "#camera-view-side"),
       cameraDistance: mustElement<HTMLInputElement>(root, "#camera-distance"),
       cameraDistanceReadout: mustElement<HTMLElement>(root, "#camera-distance-readout"),
-      customCameraSettings: mustElement<HTMLInputElement>(root, "#custom-camera-settings"),
+      usePlayerCameraSettings: mustElement<HTMLInputElement>(root, "#use-player-camera-settings"),
       cameraSettingsControls: mustElement<HTMLDivElement>(root, "#camera-settings-controls"),
       customCameraFov: mustElement<HTMLInputElement>(root, "#custom-camera-fov"),
       customCameraHeight: mustElement<HTMLInputElement>(root, "#custom-camera-height"),

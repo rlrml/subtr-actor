@@ -25,6 +25,7 @@ const CONFIG: StatsPlayerConfig = {
     attachedPlayerId: "player-one",
     distanceScale: 2.4,
     ballCam: true,
+    usePlayerCameraSettings: false,
     customSettings: {
       fov: 108,
       height: 120,
@@ -134,6 +135,22 @@ test("stats player config round-trips through compressed url-safe encoding", () 
 
 test("stats player config also accepts uncompressed JSON cfg payloads", () => {
   assert.deepEqual(decodeStatsPlayerConfig(JSON.stringify(CONFIG)), CONFIG);
+});
+
+test("stats player config preserves use-player-camera setting", () => {
+  const config = decodeStatsPlayerConfig(
+    JSON.stringify({
+      ...CONFIG,
+      camera: {
+        ...CONFIG.camera,
+        usePlayerCameraSettings: true,
+        customSettings: null,
+      },
+    }),
+  );
+
+  assert.equal(config.camera.usePlayerCameraSettings, true);
+  assert.equal(config.camera.customSettings, null);
 });
 
 test("stats player config preserves plugin-only overlay extension fields", () => {

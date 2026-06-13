@@ -12,6 +12,7 @@ import {
 } from "@rlrml/player";
 import type { CameraControlsController } from "./cameraControls.ts";
 import type { StatsPlayerConfig } from "./playerConfig.ts";
+import { getCustomCameraSettingsFromConfig } from "./playerConfigRuntime.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import type { ReplayLoadBundle } from "./replayLoader.ts";
 import type { ReplayInputSource } from "./replaySources.ts";
@@ -138,7 +139,7 @@ export async function loadReplayBundleForDisplay(
       initialPlaybackRate: config?.playback.rate,
       initialCameraDistanceScale:
         config?.camera.distanceScale ?? options.defaultCameraDistanceScale,
-      initialCustomCameraSettings: config?.camera.customSettings ?? null,
+      initialCustomCameraSettings: getCustomCameraSettingsFromConfig(config?.camera),
       initialAttachedPlayerId: config?.camera.attachedPlayerId ?? null,
       initialCameraViewMode: config?.camera.mode,
       initialBallCamEnabled: config?.camera.ballCam ?? false,

@@ -73,6 +73,7 @@ export interface PlayerCameraConfig {
   readonly attachedPlayerId?: string | null;
   readonly distanceScale?: number;
   readonly ballCam?: boolean;
+  readonly usePlayerCameraSettings?: boolean;
   readonly customSettings?: CameraSettings | null;
 }
 
@@ -300,12 +301,16 @@ function normalizeCameraConfig(value: unknown): PlayerCameraConfig {
   const attachedPlayerId = stringOrNull(value.attachedPlayerId);
   const distanceScale = finiteNumber(value.distanceScale);
   const ballCam = booleanValue(value.ballCam);
+  const usePlayerCameraSettings = booleanValue(value.usePlayerCameraSettings);
   const customSettings = normalizeCameraSettings(value.customSettings);
   if (mode !== undefined) config.mode = mode;
   if (freePreset !== undefined) config.freePreset = freePreset;
   if (attachedPlayerId !== undefined) config.attachedPlayerId = attachedPlayerId;
   if (distanceScale !== undefined) config.distanceScale = distanceScale;
   if (ballCam !== undefined) config.ballCam = ballCam;
+  if (usePlayerCameraSettings !== undefined) {
+    config.usePlayerCameraSettings = usePlayerCameraSettings;
+  }
   if (customSettings !== undefined) config.customSettings = customSettings;
   return config;
 }
