@@ -165,22 +165,6 @@
             mkdir -p "$out"
             cp -R ${./.}/. "$out"/
             chmod -R u+w "$out"
-            cd "$out"
-            node <<'EOF'
-            const fs = require("node:fs");
-
-            const packagePath = "js/stat-evaluation-player/package.json";
-            const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
-            delete packageJson.devDependencies["@rlrml/viewer"];
-            fs.writeFileSync(packagePath, `''${JSON.stringify(packageJson, null, 2)}\n`);
-
-            const lockPath = "js/stat-evaluation-player/package-lock.json";
-            const lockJson = JSON.parse(fs.readFileSync(lockPath, "utf8"));
-            delete lockJson.packages[""].devDependencies["@rlrml/viewer"];
-            delete lockJson.packages["../viewer"];
-            delete lockJson.packages["node_modules/@rlrml/viewer"];
-            fs.writeFileSync(lockPath, `''${JSON.stringify(lockJson, null, 2)}\n`);
-            EOF
           '';
           npmRoot = "js/stat-evaluation-player";
           npmDeps = pkgs.importNpmLock { npmRoot = "${src}/js/stat-evaluation-player"; };
@@ -190,10 +174,10 @@
             mkdir -p js/pkg
             cp -r ${self.packages.${system}.js-web-wasm}/. js/pkg/
             ln -sfn ../stat-evaluation-player/node_modules js/player/node_modules
-            ln -sfn ../stat-evaluation-player/node_modules js/viewer/node_modules
             ln -sfn ../stat-evaluation-player/node_modules js/pages/node_modules
             mkdir -p js/stat-evaluation-player/node_modules/@rlrml
-            ln -sfn ../../../viewer js/stat-evaluation-player/node_modules/@rlrml/viewer
+            rm -rf js/stat-evaluation-player/node_modules/@rlrml/player
+            ln -sfn ../../../player js/stat-evaluation-player/node_modules/@rlrml/player
           '';
           buildPhase = ''
             runHook preBuild
@@ -210,7 +194,7 @@
             runHook preInstall
             mkdir -p $out
             cp -r js/stat-evaluation-player/dist/. $out/
-            cp -r js/viewer/public/. $out/
+            cp -r js/player/public/. $out/
             mkdir -p $out/stats
             cp -r js/pages/dist/. $out/stats/
             mkdir -p $out/review
@@ -272,48 +256,9 @@
             runHook postInstall
           '';
         };
-        # The publishable npm package layout for @rlrml/viewer. It is built as
-        # an ES module library and carries its public assets (models/draco) so
-        # downstream apps can vendor a single package output from this exact
-        # submodule revision.
-        packages.js-viewer-pkg = pkgs.buildNpmPackage rec {
-          pname = "rlrml-viewer-npm-pkg";
-          version = projectVersion;
-          src = pkgs.runCommand "subtr-actor-js-viewer-pkg-source" { } ''
-            mkdir -p "$out"
-            cp -R ${./.}/. "$out"/
-            chmod -R u+w "$out"
-            rm -rf "$out/js/pkg"
-            mkdir -p "$out/js/pkg"
-            cp -r ${self.packages.${system}.js-web-wasm}/. "$out/js/pkg"/
-          '';
-          npmRoot = "js/viewer";
-          npmDeps = pkgs.importNpmLock { npmRoot = "${src}/js/viewer"; };
-          npmConfigHook = pkgs.importNpmLock.npmConfigHook;
-          npmInstallFlags = [ "--ignore-scripts" ];
-          preBuild = ''
-            rm -rf js/pkg
-            mkdir -p js/pkg
-            cp -r ${self.packages.${system}.js-web-wasm}/. js/pkg/
-            ln -sfn ../viewer/node_modules js/player/node_modules
-          '';
-          buildPhase = ''
-            runHook preBuild
-            pushd js/viewer
-            npm run build:dist
-            popd
-            runHook postBuild
-          '';
-          installPhase = ''
-            runHook preInstall
-            pushd js/viewer
-            staged="$(node ./scripts/prepare-package.mjs)"
-            popd
-            mkdir -p $out
-            cp -R "$staged"/. $out/
-            runHook postInstall
-          '';
-        };
+        # Backward-compatible flake output for callers that have not yet moved
+        # from the old viewer package output name to @rlrml/player.
+        packages.js-viewer-pkg = self.packages.${system}.js-player-pkg;
         packages.xwin-msvc-sysroot = xwinMsvcSysroot;
         packages.bakkesmod-plugin = rustPlatform.buildRustPackage {
           pname = "subtr-actor-bakkesmod-plugin";
