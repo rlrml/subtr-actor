@@ -250,6 +250,98 @@ fn counts_dodge_contact_touch_when_dodge_transition_is_late() {
 }
 
 #[test]
+fn rejects_late_dodge_touch_with_only_single_frame_setup() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    calculator
+        .update(
+            &FrameInfo {
+                frame_number: 1,
+                time: 0.046,
+                dt: 0.046,
+                seconds_remaining: None,
+            },
+            &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
+            &players(false),
+            &touch_state(Vec::new()),
+            &TouchCalculator::new(),
+            &live_play,
+        )
+        .unwrap();
+
+    calculator
+        .update_with_touch_classification_events(
+            &FrameInfo {
+                frame_number: 2,
+                time: 0.092,
+                dt: 0.046,
+                seconds_remaining: None,
+            },
+            &ball(
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                glam::Vec3::new(1800.0, 0.0, 750.0),
+            ),
+            &players(false),
+            &touch_state(vec![TouchEvent {
+                touch_id: None,
+                time: 0.092,
+                frame: 2,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: Some(0.0),
+                dodge_contact: false,
+            }]),
+            &[],
+            &live_play,
+        )
+        .unwrap();
+
+    calculator
+        .update_with_touch_classification_events(
+            &FrameInfo {
+                frame_number: 3,
+                time: 0.138,
+                dt: 0.046,
+                seconds_remaining: None,
+            },
+            &ball(
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                glam::Vec3::new(1800.0, 0.0, 750.0),
+            ),
+            &players(true),
+            &touch_state(Vec::new()),
+            &[TouchClassificationEvent {
+                touch_id: None,
+                time: 0.092,
+                frame: 2,
+                sample_time: 0.092,
+                sample_frame: 2,
+                player: player_id,
+                player_position: None,
+                is_team_0: true,
+                kind: "hard_hit".to_owned(),
+                height_band: "ground".to_owned(),
+                surface: "ground".to_owned(),
+                dodge_state: "dodge".to_owned(),
+                intention: "shot".to_owned(),
+                first_touch: false,
+                contested: false,
+                role: RoleState::Unknown,
+                play_depth: PlayDepthState::Unknown,
+                ball_speed_change: 1800.0,
+                ball_movement: None,
+            }],
+            &live_play,
+        )
+        .unwrap();
+
+    assert!(calculator.events().is_empty());
+}
+
+#[test]
 fn labels_reverse_flicks_with_backflip_pitch_forward_impulse_and_rotation_under_ball() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = FlickCalculator::new();
