@@ -259,6 +259,43 @@ function ensureStyles(): void {
         font-size: 0.64rem;
         padding-inline: 0.58rem;
       }
+
+      /*
+       * Team HUDs (a row of per-player boost bars on each side of center) are
+       * too wide for a phone: with fixed-width bars a 3v3 roster runs off both
+       * edges. Cap each HUD to its half of the viewport, anchor it tight to
+       * center, and let the bars flex-shrink to share the space.
+       */
+      .sap-bc-team-hud {
+        max-width: calc(50vw - 0.6rem);
+        gap: 0.2rem;
+        padding: 0.28rem 0.3rem;
+      }
+
+      .sap-bc-team-hud-blue {
+        right: calc(50% + 0.3rem);
+      }
+
+      .sap-bc-team-hud-orange {
+        left: calc(50% + 0.3rem);
+      }
+
+      .sap-bc-team-hud .sap-bc-hud-player {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+
+      .sap-bc-hud-boost-bar {
+        min-width: 0;
+        max-width: none;
+        width: 100%;
+      }
+
+      .sap-bc-hud-boost-text {
+        gap: 0.2rem;
+        padding-inline: 0.32rem;
+        font-size: 0.58rem;
+      }
     }
   `;
   document.head.append(style);
