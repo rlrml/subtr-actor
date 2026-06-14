@@ -283,8 +283,11 @@ export class CarModelLoader {
     let wheelModel = null;
 
     if (config.format === "glb") {
-      // Load GLB file (textures are embedded)
-      const glbPath = `${basePath}/${config.file}`;
+      // Load GLB file (textures are embedded). Resolve against the viewer asset
+      // base so the body model honors subpath/embedded deployments the same way
+      // the wheel + draco loads do (otherwise a relative URL resolves against
+      // the host page's route and 404s).
+      const glbPath = resolveViewerAssetUrl(`${basePath}/${config.file}`, this.assetBase);
 
       // If model uses wheel sockets, load wheel model in parallel
       if (config.wheelSockets && config.wheelModel) {
@@ -298,10 +301,14 @@ export class CarModelLoader {
         console.log(`✓ Loaded GLB model: ${glbPath}`);
       }
     } else {
-      // Load FBX file with external texture
-      const fbxPath = `${basePath}/${config.file}.fbx`;
+      // Load FBX file with external texture (same asset-base resolution as the
+      // GLB path above, so subpath/embedded deployments resolve correctly).
+      const fbxPath = resolveViewerAssetUrl(`${basePath}/${config.file}.fbx`, this.assetBase);
       const modelName = config.file;
-      const texturePath = `${basePath}/${modelName}_engine.png`;
+      const texturePath = resolveViewerAssetUrl(
+        `${basePath}/${modelName}_engine.png`,
+        this.assetBase,
+      );
 
       // Load FBX and texture in parallel
       [model, chassisTexture] = await Promise.all([
