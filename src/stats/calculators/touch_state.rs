@@ -1,5 +1,6 @@
 use super::*;
 
+/// Shared per-frame raw-touch state.
 #[derive(Debug, Clone, Default)]
 pub struct TouchState {
     pub touch_events: Vec<TouchEvent>,
@@ -121,6 +122,7 @@ struct RecentTeamTouch {
     team_is_team_0: bool,
 }
 
+/// Detects raw ball touches per frame from ball/player state and frame events.
 #[derive(Debug, Clone, Default)]
 pub struct TouchStateCalculator {
     previous_ball_rigid_body: Option<(boxcars::RigidBody, f32)>,

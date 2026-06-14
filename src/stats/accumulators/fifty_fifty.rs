@@ -1,5 +1,6 @@
 use super::*;
 
+/// Match-wide accumulated 50/50 win/loss/neutral tallies.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FiftyFiftyStats {
@@ -21,6 +22,7 @@ pub struct FiftyFiftyStats {
     pub labeled_event_counts: LabeledCounts,
 }
 
+/// Per-player accumulated 50/50 stats and post-contest possession.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FiftyFiftyPlayerStats {
@@ -202,6 +204,7 @@ impl FiftyFiftyPlayerStats {
     }
 }
 
+/// Per-team accumulated 50/50 stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FiftyFiftyTeamStats {
@@ -275,6 +278,7 @@ impl FiftyFiftyStats {
     }
 }
 
+/// Accumulates 50/50 stats over the replay from 50/50 events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FiftyFiftyStatsAccumulator {
     stats: FiftyFiftyStats,

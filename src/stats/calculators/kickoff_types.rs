@@ -1,5 +1,6 @@
 use super::*;
 
+/// Spawn position a player took for a kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -26,6 +27,7 @@ impl KickoffSpawnPosition {
     }
 }
 
+/// The kickoff formation/type.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -76,6 +78,7 @@ impl KickoffType {
     }
 }
 
+/// Direction a player approached the kickoff from.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -126,6 +129,7 @@ impl KickoffDirection {
     }
 }
 
+/// Outcome for the player who took the kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -148,6 +152,7 @@ impl KickoffTakerOutcome {
     }
 }
 
+/// Overall outcome of a kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -170,6 +175,7 @@ impl KickoffOutcome {
     }
 }
 
+/// Banded strength of a kickoff win.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -192,6 +198,7 @@ impl KickoffWinStrengthBand {
     }
 }
 
+/// Possession outcome following a kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -260,6 +267,7 @@ impl KickoffAdvantage {
     }
 }
 
+/// How a player approached the kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -286,6 +294,7 @@ impl KickoffApproach {
     }
 }
 
+/// Behavior of a supporting (non-taking) player on a kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -308,6 +317,7 @@ impl KickoffSupportBehavior {
     }
 }
 
+/// Direction the ball traveled off the kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -330,6 +340,7 @@ impl KickoffBallDirection {
     }
 }
 
+/// Kickoff event for the player who challenged the ball.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffTakerEvent {
@@ -355,6 +366,7 @@ pub struct KickoffTakerEvent {
     pub approach: KickoffApproach,
 }
 
+/// Kickoff event for a supporting player.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffSupportEvent {
@@ -370,6 +382,7 @@ pub struct KickoffSupportEvent {
     pub support_behavior: KickoffSupportBehavior,
 }
 
+/// A kickoff with its type, outcome, and participant context.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffEvent {

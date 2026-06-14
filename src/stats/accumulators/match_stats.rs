@@ -4,6 +4,7 @@ const GOAL_AFTER_KICKOFF_BUCKET_KICKOFF_MAX_SECONDS: f32 = 10.0;
 const GOAL_AFTER_KICKOFF_BUCKET_SHORT_MAX_SECONDS: f32 = 20.0;
 const GOAL_AFTER_KICKOFF_BUCKET_MEDIUM_MAX_SECONDS: f32 = 40.0;
 
+/// Stats on goals scored shortly after a kickoff.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalAfterKickoffStats {
@@ -68,6 +69,7 @@ impl GoalAfterKickoffStats {
     }
 }
 
+/// Stats on ball air-time leading into goals.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalBallAirTimeStats {
@@ -129,6 +131,7 @@ impl GoalBallAirTimeStats {
     }
 }
 
+/// Stats classifying how goals were built up.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalBuildupStats {
@@ -153,6 +156,7 @@ impl GoalBuildupStats {
     }
 }
 
+/// Per-player scoring-context stats around goals.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PlayerScoringContextStats {
@@ -309,6 +313,7 @@ impl PlayerScoringContextStats {
     }
 }
 
+/// Per-player core scoreboard stats (goals, assists, saves, shots, etc.).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct CorePlayerStats {
@@ -395,6 +400,7 @@ impl CorePlayerStats {
     }
 }
 
+/// Per-team scoring-context stats around goals.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TeamScoringContextStats {
@@ -406,6 +412,7 @@ pub struct TeamScoringContextStats {
     pub goal_ball_air_time: GoalBallAirTimeStats,
 }
 
+/// Per-team core scoreboard stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct CoreTeamStats {
@@ -467,6 +474,7 @@ pub(crate) fn player_id_sort_key(player_id: &PlayerId) -> String {
     }
 }
 
+/// Accumulates core scoreboard and goal-context stats over the replay.
 #[derive(Debug, Clone, Default)]
 pub struct CoreStatsAccumulator {
     player_stats: HashMap<PlayerId, CorePlayerStats>,

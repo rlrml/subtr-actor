@@ -1,5 +1,6 @@
 use super::*;
 
+/// A completed ball carry or air dribble with path, duration, and touch metrics.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BallCarryEvent {
@@ -25,6 +26,7 @@ pub struct BallCarryEvent {
     pub air_dribble_origin: Option<AirDribbleOrigin>,
 }
 
+/// Whether a ball-control sequence was a ground carry or an air dribble.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
@@ -33,6 +35,7 @@ pub enum BallCarryKind {
     AirDribble,
 }
 
+/// Detects ball carries and air dribbles from continuous ball-control sequences.
 #[derive(Debug, Clone, Default)]
 pub struct BallCarryCalculator {
     carry_events: EventStream<BallCarryEvent>,

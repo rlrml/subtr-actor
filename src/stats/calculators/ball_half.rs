@@ -20,6 +20,7 @@ impl BallHalfLabel {
     }
 }
 
+/// A change in which half of the field the ball occupies.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BallHalfEvent {
@@ -40,6 +41,7 @@ impl BallHalfEvent {
     }
 }
 
+/// Configuration thresholds for ball-half classification.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BallHalfCalculatorConfig {
     pub neutral_zone_half_width_y: f32,
@@ -53,6 +55,7 @@ impl Default for BallHalfCalculatorConfig {
     }
 }
 
+/// Tracks which half of the field the ball is in over time.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BallHalfCalculator {
     config: BallHalfCalculatorConfig,

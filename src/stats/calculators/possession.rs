@@ -50,6 +50,7 @@ impl FieldThirdLabel {
     }
 }
 
+/// A team-possession span.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PossessionEvent {
@@ -239,6 +240,7 @@ impl PossessionTracker {
 #[path = "possession_tests.rs"]
 mod tests;
 
+/// Derives team possession from ball and touch state.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PossessionCalculator {
     tracker: PossessionTracker,

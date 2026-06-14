@@ -9,6 +9,9 @@ import type { KickoffType } from "./KickoffType.ts";
 import type { KickoffWinStrengthBand } from "./KickoffWinStrengthBand.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * A kickoff with its type, outcome, and participant context.
+ */
 export type KickoffEvent = { start_time: number, start_frame: number, end_time: number, end_frame: number, live_action_start_time: number | null, live_action_start_frame: number | null, movement_start_time: number, movement_start_frame: number, kickoff_type: KickoffType, kickoff_direction: KickoffDirection, first_touch_time: number | null, first_touch_frame: number | null, first_touch_team_is_team_0: boolean | null, first_touch_player: RemoteIdTs | null,
 /**
  * Identity of the first kickoff [`TouchEvent`](crate::TouchEvent). Join on

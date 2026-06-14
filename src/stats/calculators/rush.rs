@@ -11,6 +11,7 @@ const DEFAULT_RUSH_ATTACK_SUPPORT_DISTANCE_Y: f32 = 900.0;
 const DEFAULT_RUSH_DEFENDER_DISTANCE_Y: f32 = 150.0;
 const DEFAULT_RUSH_MIN_POSSESSION_RETAINED_SECONDS: f32 = 0.75;
 
+/// A quick possession transition where the attacking team has numbers moving out of its defensive half.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct RushEvent {
@@ -82,6 +83,7 @@ pub(crate) fn rush_defenders_label(defenders: usize) -> StatLabel {
     )
 }
 
+/// Configuration thresholds for rush detection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RushCalculatorConfig {
     pub max_start_y: f32,
@@ -101,6 +103,7 @@ impl Default for RushCalculatorConfig {
     }
 }
 
+/// Detects rushes/over-commits during live play.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RushCalculator {
     config: RushCalculatorConfig,

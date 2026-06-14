@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks per-player boost usage and pickups, accumulating boost stats from frame/event state.
 pub struct BoostNode {
     calculator: BoostCalculator,
 }

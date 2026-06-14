@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects half-volleys from ball/player state and touches during live play.
 pub struct HalfVolleyNode {
     calculator: HalfVolleyCalculator,
 }

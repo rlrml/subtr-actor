@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects demolitions from player frame state and frame events.
 pub struct DemoNode {
     calculator: DemoCalculator,
 }

@@ -1,5 +1,6 @@
 use super::*;
 
+/// A state-change event for effective grounded powerslide use.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PowerslideEvent {
@@ -13,6 +14,7 @@ pub struct PowerslideEvent {
     pub active: bool,
 }
 
+/// Detects powerslide usage from player frame state.
 #[derive(Debug, Clone, Default)]
 pub struct PowerslideCalculator {
     last_active: HashMap<PlayerId, bool>,

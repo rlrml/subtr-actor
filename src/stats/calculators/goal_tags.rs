@@ -32,6 +32,7 @@ const DEFAULT_HALF_VOLLEY_GOAL_MIN_GOAL_ALIGNMENT: f32 = 0.55;
 // back to a goal context's timestamp.
 const KICKOFF_GOAL_TAG_MATCH_EPSILON_SECONDS: f32 = 0.05;
 
+/// Identifier for a kind of goal tag.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -57,6 +58,7 @@ pub enum GoalTagKind {
     KickoffGoal,
 }
 
+/// Which event stream a goal tag's evidence is drawn from.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -74,6 +76,7 @@ pub enum GoalTagEventStream {
     HalfVolley,
 }
 
+/// The kind of evidence supporting a goal tag.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -95,6 +98,7 @@ pub enum GoalTagEvidenceKind {
     HalfVolley,
 }
 
+/// An optional modifier qualifying a goal tag.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -102,6 +106,7 @@ pub enum GoalTagModifier {
     ByScorer,
 }
 
+/// Who performed the tagged action relative to the goal.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -110,6 +115,7 @@ pub enum GoalTagPerformer {
     Teammate,
 }
 
+/// Evidence linking an event to a tagged goal.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalTagEvidence {
@@ -122,6 +128,7 @@ pub struct GoalTagEvidence {
     pub player_position: Option<GoalContextPosition>,
 }
 
+/// Reference to the event backing a goal tag.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalTagEventRef {
@@ -139,6 +146,7 @@ pub struct GoalTagDetail {
     pub value: String,
 }
 
+/// Metadata describing a goal-tag definition.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalTagMetadata {
@@ -155,6 +163,7 @@ pub struct GoalTagMetadata {
     pub evidence: Vec<GoalTagEvidence>,
 }
 
+/// An assignable tag describing how a goal was scored.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[serde(tag = "kind", content = "metadata", rename_all = "snake_case")]
 #[ts(export)]
@@ -180,6 +189,7 @@ pub enum GoalTag {
     KickoffGoal(GoalTagMetadata),
 }
 
+/// Definition of a goal tag and how it is matched against a goal.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct GoalTagDefinition {
     pub kind: GoalTagKind,
@@ -492,12 +502,14 @@ impl GoalTag {
     }
 }
 
+/// A goal tag assigned to a specific goal.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct GoalTagAssignment {
     pub goal_index: usize,
     pub tag: GoalTag,
 }
 
+/// Configuration thresholds for the aerial goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct AerialGoalCalculatorConfig {
@@ -512,6 +524,7 @@ impl Default for AerialGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the high-aerial goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct HighAerialGoalCalculatorConfig {
@@ -526,6 +539,7 @@ impl Default for HighAerialGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the long-distance goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct LongDistanceGoalCalculatorConfig {
@@ -540,6 +554,7 @@ impl Default for LongDistanceGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the own-half goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct OwnHalfGoalCalculatorConfig {
@@ -554,6 +569,7 @@ impl Default for OwnHalfGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the empty-net goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct EmptyNetGoalCalculatorConfig {
@@ -572,6 +588,7 @@ impl Default for EmptyNetGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the flick goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlickGoalCalculatorConfig {
@@ -586,6 +603,7 @@ impl Default for FlickGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the ceiling-shot goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct CeilingShotGoalCalculatorConfig {
@@ -600,6 +618,7 @@ impl Default for CeilingShotGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the double-tap goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DoubleTapGoalCalculatorConfig {
@@ -614,6 +633,7 @@ impl Default for DoubleTapGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the one-timer goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct OneTimerGoalCalculatorConfig {
@@ -628,6 +648,7 @@ impl Default for OneTimerGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the passing goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PassingGoalCalculatorConfig {
@@ -642,6 +663,7 @@ impl Default for PassingGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the air-dribble goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct AirDribbleGoalCalculatorConfig {
@@ -656,6 +678,7 @@ impl Default for AirDribbleGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the flip-reset goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlipResetGoalCalculatorConfig {
@@ -670,6 +693,7 @@ impl Default for FlipResetGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the flip-into-ball goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlipIntoBallGoalCalculatorConfig {
@@ -684,6 +708,7 @@ impl Default for FlipIntoBallGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the bump goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BumpGoalCalculatorConfig {
@@ -698,6 +723,7 @@ impl Default for BumpGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the demo goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DemoGoalCalculatorConfig {
@@ -712,6 +738,7 @@ impl Default for DemoGoalCalculatorConfig {
     }
 }
 
+/// Configuration thresholds for the half-volley goal-tag calculator.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct HalfVolleyGoalCalculatorConfig {
@@ -733,112 +760,131 @@ struct GoalTaggingContext {
     goal_index: usize,
 }
 
+/// Tags goals scored from an aerial.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AerialGoalCalculator {
     config: AerialGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored from a high aerial.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HighAerialGoalCalculator {
     config: HighAerialGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored from long distance.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LongDistanceGoalCalculator {
     config: LongDistanceGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored from the shooter's own half.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OwnHalfGoalCalculator {
     config: OwnHalfGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored into an empty net.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EmptyNetGoalCalculator {
     config: EmptyNetGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored on a counter-attack.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CounterAttackGoalCalculator {
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored after sustained offensive pressure.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SustainedPressureGoalCalculator {
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored from a flick.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlickGoalCalculator {
     config: FlickGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored from a ceiling shot.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CeilingShotGoalCalculator {
     config: CeilingShotGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored from a double tap.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoubleTapGoalCalculator {
     config: DoubleTapGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored from a one-timer.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OneTimerGoalCalculator {
     config: OneTimerGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored off a pass.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PassingGoalCalculator {
     config: PassingGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored from an air dribble.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AirDribbleGoalCalculator {
     config: AirDribbleGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored after a flip reset.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlipResetGoalCalculator {
     config: FlipResetGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored by flipping into the ball.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlipIntoBallGoalCalculator {
     config: FlipIntoBallGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals involving a bump.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BumpGoalCalculator {
     config: BumpGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals involving a demolition.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DemoGoalCalculator {
     config: DemoGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored from a half-volley.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HalfVolleyGoalCalculator {
     config: HalfVolleyGoalCalculatorConfig,
     events: EventStream<GoalTagAssignment>,
 }
 
+/// Tags goals scored directly off a kickoff.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KickoffGoalCalculator {
     events: EventStream<GoalTagAssignment>,

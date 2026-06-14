@@ -2,6 +2,7 @@ use super::*;
 
 const DEMO_REPEAT_FRAME_WINDOW: usize = 8;
 
+/// Detects demolitions from player frame state and frame events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DemoCalculator {
     player_teams: HashMap<PlayerId, bool>,

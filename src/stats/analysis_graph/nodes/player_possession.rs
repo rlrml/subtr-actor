@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks per-player possession from ball/player/possession/touch state.
 pub struct PlayerPossessionNode {
     calculator: PlayerPossessionCalculator,
 }

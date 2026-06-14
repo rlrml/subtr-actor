@@ -1,5 +1,6 @@
 use super::*;
 
+/// Shared current ball-possession state.
 #[derive(Debug, Clone, Default)]
 pub struct PossessionState {
     pub active_team_before_sample: Option<bool>,
@@ -8,6 +9,7 @@ pub struct PossessionState {
     pub current_player: Option<PlayerId>,
 }
 
+/// Maintains shared ball-possession state from touches and live play.
 #[derive(Default)]
 pub struct PossessionStateCalculator {
     tracker: PossessionTracker,

@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use serde::{Serialize, Serializer};
 
+/// Append-only buffer of emitted events exposing all events and newly added ones.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EventStream<E> {
     events: Vec<E>,

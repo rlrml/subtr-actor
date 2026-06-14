@@ -1,5 +1,6 @@
 use super::*;
 
+/// Accumulated time the ball spends in each field half.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct BallHalfStats {
     pub tracked_time: f32,
@@ -67,6 +68,7 @@ impl BallHalfStats {
     }
 }
 
+/// Per-team accumulated ball-half time stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BallHalfTeamStats {
@@ -78,6 +80,7 @@ pub struct BallHalfTeamStats {
     pub labeled_time: LabeledFloatSums,
 }
 
+/// Accumulates ball-half time stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BallHalfStatsAccumulator {
     stats: BallHalfStats,

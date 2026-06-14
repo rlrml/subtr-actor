@@ -1,5 +1,6 @@
 use super::*;
 
+/// A follow-up touch after an attributed backboard bounce forming a shot-like trajectory.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DoubleTapEvent {

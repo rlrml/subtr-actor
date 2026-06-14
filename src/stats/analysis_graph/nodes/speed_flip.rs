@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects speed-flips from gameplay/ball/player state during live play.
 pub struct SpeedFlipNode {
     calculator: SpeedFlipCalculator,
 }

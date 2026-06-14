@@ -2,6 +2,7 @@ use super::*;
 
 const HALF_FLIP_HIGH_CONFIDENCE: f32 = 0.78;
 
+/// Per-player accumulated half-flip stats with confidence.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct HalfFlipStats {
@@ -57,6 +58,7 @@ impl HalfFlipStats {
     }
 }
 
+/// Accumulates half-flip stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct HalfFlipStatsAccumulator {
     player_stats: HashMap<PlayerId, HalfFlipStats>,

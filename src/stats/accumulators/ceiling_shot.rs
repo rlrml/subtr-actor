@@ -2,6 +2,7 @@ use super::*;
 
 const CEILING_SHOT_HIGH_CONFIDENCE: f32 = 0.78;
 
+/// Per-player accumulated ceiling-shot stats with confidence.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct CeilingShotStats {
@@ -57,6 +58,7 @@ impl CeilingShotStats {
     }
 }
 
+/// Accumulates ceiling-shot stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CeilingShotStatsAccumulator {
     player_stats: HashMap<PlayerId, CeilingShotStats>,

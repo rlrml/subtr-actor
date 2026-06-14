@@ -125,9 +125,23 @@ impl<'a> AnalysisStateContext<'a> {
     }
 }
 
+/// A node in the [`AnalysisGraph`]: consumes upstream state, runs once per
+/// frame, and exposes its own typed state for downstream nodes.
+///
+/// Implementors are the catalog of analysis nodes (see the
+/// [`nodes`](crate::stats::analysis_graph) module and the *Implementors* list
+/// below). A node declares what it reads via
+/// [`dependencies`](AnalysisNode::dependencies), reads it from the
+/// [`AnalysisStateContext`] in [`evaluate`](AnalysisNode::evaluate), and
+/// publishes [`State`](AnalysisNode::State) via [`state`](AnalysisNode::state).
+/// The blanket [`AnalysisNodeDyn`] impl makes every `AnalysisNode` usable as a
+/// boxed graph node.
 pub trait AnalysisNode: 'static {
+    /// The typed state this node publishes to downstream nodes.
     type State: 'static;
 
+    /// Stable identifier for this node, used for dependency wiring and the
+    /// built-in node registry.
     fn name(&self) -> &'static str;
 
     fn on_replay_meta(&mut self, _meta: &ReplayMeta) -> SubtrActorResult<()> {
@@ -202,6 +216,14 @@ where
     }
 }
 
+/// A resolved, ordered collection of [`AnalysisNode`]s evaluated together over a
+/// replay.
+///
+/// Add nodes with [`with_node`](AnalysisGraph::with_node) /
+/// [`push_node`](AnalysisGraph::push_node) (or by name via the module-level
+/// `graph_with_*` helpers); the graph topologically orders them by their
+/// dependencies. Drive it frame by frame, then read any node's published state
+/// with [`state`](AnalysisGraph::state).
 #[derive(Default)]
 pub struct AnalysisGraph {
     nodes: Vec<Box<dyn AnalysisNodeDyn>>,

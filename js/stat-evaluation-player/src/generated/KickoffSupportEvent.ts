@@ -3,4 +3,7 @@ import type { KickoffSpawnPosition } from "./KickoffSpawnPosition.ts";
 import type { KickoffSupportBehavior } from "./KickoffSupportBehavior.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * Kickoff event for a supporting player.
+ */
 export type KickoffSupportEvent = { player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number], spawn_position: KickoffSpawnPosition, start_boost: number | null, boost_after: number | null, first_touch_time: number | null, first_touch_frame: number | null, support_behavior: KickoffSupportBehavior, };
