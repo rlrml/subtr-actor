@@ -539,7 +539,11 @@ export class ViewerPlayer extends EventTarget {
     this.emitChange();
   }
 
-  setBallCamEnabled(enabled: boolean): void {
+  /**
+   * Force ball cam (`true`) or car cam (`false`), or pass `null` to follow the
+   * attached player's recorded ball-cam toggle ("player" view — the default).
+   */
+  setBallCamEnabled(enabled: boolean | null): void {
     this.ballCamEnabledValue = enabled;
     this.getCameraPlugin()?.setBallCam(enabled);
     this.emitChange();
@@ -613,7 +617,12 @@ export class ViewerPlayer extends EventTarget {
       this.freeCameraTransition = null;
       this.syncCameraAttachment();
     }
-    if (patch.ballCamEnabled !== undefined) {
+    // "player" view wins when requested (mirrors @rlrml/player: useReplayBallCam
+    // overrides the manual ballCamEnabled flag). null = follow recorded state.
+    if (patch.useReplayBallCam === true) {
+      this.ballCamEnabledValue = null;
+      this.getCameraPlugin()?.setBallCam(null);
+    } else if (patch.ballCamEnabled !== undefined) {
       this.ballCamEnabledValue = patch.ballCamEnabled;
       this.getCameraPlugin()?.setBallCam(patch.ballCamEnabled);
     }
@@ -685,6 +694,9 @@ export class ViewerPlayer extends EventTarget {
       cameraViewMode,
       attachedPlayerId,
       ballCamEnabled: camera ? camera.getBallCam() : (this.ballCamEnabledValue ?? false),
+      // null override = follow the player's recorded ball-cam toggle.
+      useReplayBallCam: this.ballCamEnabledValue === null,
+      effectiveBallCamEnabled: camera ? camera.getBallCam() : (this.ballCamEnabledValue ?? false),
       boostMeterEnabled: this.boostMeterEnabledValue,
       boostPickupAnimationEnabled: this.boostPickupAnimationEnabledValue,
       hitboxWireframesEnabled: this.hitboxWireframesEnabledValue,
