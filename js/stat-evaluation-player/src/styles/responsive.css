@@ -42,3 +42,36 @@
     width: auto;
   }
 }
+
+/*
+ * Small screens: an open floating window splits the screen with the viewport
+ * (docked bottom sheet) instead of floating PiP over it. The 3D viewport shrinks
+ * to the top (its canvas auto-resizes via ResizeObserver) and the open window(s)
+ * dock to the bottom as a scrollable sheet. Scoped to `.floating-window`, so the
+ * top scoreboard pill and the launcher menu are unaffected.
+ */
+@media (max-width: 720px) {
+  /* Reserve the bottom for the sheet only while a floating window is open. */
+  .viewport-panel:has(.floating-window:not([hidden])) .viewport {
+    inset: 0 0 52dvh 0;
+  }
+
+  .floating-window {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    max-width: none;
+    height: 52dvh;
+    max-height: 52dvh;
+    overflow: auto;
+    border-width: 1px 0 0 0;
+    border-radius: 1rem 1rem 0 0;
+    transform: none;
+    z-index: 30;
+  }
+
+  /* Dragging is meaningless once the sheet is docked. */
+  .floating-window .floating-window-header {
+    cursor: default;
+  }
+}
