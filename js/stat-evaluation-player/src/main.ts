@@ -290,10 +290,6 @@ function syncBoostPadOverlayPlugin(): void {
   activeModulesRuntime.syncBoostPadOverlayPlugin();
 }
 
-function toggleBoostPadOverlay(): void {
-  activeModulesRuntime.toggleBoostPadOverlay();
-}
-
 function syncTimelineEvents(): void {
   activeModulesRuntime.syncTimelineEvents();
 }
@@ -785,7 +781,6 @@ export function mountStatEvaluationPlayer(
     getActiveCapabilityIds,
     getBoostPickupAnimationEnabled: () =>
       replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
-    getBoostPadOverlayEnabled: () => activeModulesRuntime.getBoostPadOverlayEnabled(),
     toggleCapability,
     toggleBoostPickupAnimation() {
       const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
@@ -795,7 +790,6 @@ export function mountStatEvaluationPlayer(
       renderModuleSettings();
       scheduleConfigUrlUpdate();
     },
-    toggleBoostPadOverlay,
     syncTimelineEvents,
     syncTimelineRanges,
     renderTimelineEventCount,

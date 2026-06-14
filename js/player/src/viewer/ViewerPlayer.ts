@@ -18,6 +18,7 @@ import { ActorManager } from "./managers/ActorManager.js";
 import { EffectsManager } from "./managers/EffectsManager.js";
 import { HitboxManager } from "./managers/HitboxManager.js";
 import type { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
+import { createBoostPadsPlugin } from "./plugins/boost-pads.js";
 // Timeline projection / skip-window semantics are @rlrml/player's own
 // ReplayModel utilities, so both players agree on what gets skipped and how
 // replay time maps onto the (skip-aware) timeline.
@@ -380,6 +381,9 @@ export class ViewerPlayer extends EventTarget {
     this.installResizeHandling();
     for (const definition of options.plugins ?? []) {
       this.installPlugin(definition, false);
+    }
+    if (!this.plugins.some((entry) => entry.plugin.id === "boost-pads")) {
+      this.installPlugin(createBoostPadsPlugin(), false);
     }
     this.applyInitialCameraOptions();
     // @rlrml/player semantics: don't start inside a skipped window (t=0 is a

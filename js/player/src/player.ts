@@ -7,6 +7,7 @@ import {
   updateBoostMeter,
   type ReplayScene,
 } from "./scene";
+import { createBoostPadOverlayPlugin } from "./boost-pad-overlay";
 import { findFrameIndexAtTime } from "./replay-data";
 import {
   DEFAULT_CAMERA_VIEW_MODE,
@@ -197,6 +198,9 @@ export class ReplayPlayer extends EventTarget {
     this.installResizeHandling();
     for (const plugin of options.plugins ?? []) {
       this.installPlugin(plugin, false);
+    }
+    if (!this.plugins.some((entry) => entry.plugin.id === "boost-pad-overlay")) {
+      this.installPlugin(createBoostPadOverlayPlugin(), false);
     }
     this.render();
     this.scheduleAnimationFrame();
