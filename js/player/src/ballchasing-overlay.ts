@@ -106,12 +106,12 @@ function ensureStyles(): void {
       justify-content: center;
       min-width: 8rem;
       max-width: 14rem;
-      min-height: 1.45rem;
+      min-height: 1.7rem;
       border-radius: 999px;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      background: rgba(6, 11, 17, 0.42);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.42);
+      background: rgba(6, 11, 17, 0.52);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
       backdrop-filter: blur(6px);
       transition:
         border-color 0.12s ease-out,
@@ -160,11 +160,11 @@ function ensureStyles(): void {
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
-      padding: 0.22rem 0.72rem;
+      padding: 0.24rem 0.78rem;
       color: #ffffff;
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
