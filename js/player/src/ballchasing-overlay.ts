@@ -24,6 +24,7 @@ interface PlayerOverlayElements {
 const STYLE_ID = "subtr-actor-ballchasing-overlay-styles";
 const TEAM_BLUE = "#3b82f6";
 const TEAM_ORANGE = "#f59e0b";
+const FLOATING_LABEL_OFFSET_UU = 140;
 
 function ensureStyles(): void {
   if (document.getElementById(STYLE_ID)) {
@@ -501,7 +502,7 @@ export function createBallchasingOverlayPlugin(
       });
     }
 
-    floatingOffset.set(0, 0, 255 * (context.options.fieldScale ?? 1));
+    floatingOffset.set(0, 0, FLOATING_LABEL_OFFSET_UU * (context.options.fieldScale ?? 1));
     container.append(root);
     syncAttachedPlayer(context.player.getState().attachedPlayerId);
   }
@@ -554,7 +555,11 @@ export function createBallchasingOverlayPlugin(
           continue;
         }
 
+        const isAttachedPlayer =
+          context.state.cameraViewMode === "follow" &&
+          context.state.attachedPlayerId === player.track.id;
         if (
+          isAttachedPlayer ||
           !active ||
           !projectToContainer(
             mesh,

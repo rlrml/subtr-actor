@@ -34,7 +34,15 @@ export function createNameTagPlugin(): ViewerPlugin {
         boosts[car.name] = car.boost;
         nameToActorId[car.name] = car.name;
       }
-      manager.update(actors, boosts, nameToActorId, null);
+      const followedPlayer =
+        ctx.state.cameraViewMode === "follow" && ctx.state.attachedPlayerId
+          ? (ctx.player.adapter.playerList.find(
+              (player) =>
+                player.id === ctx.state.attachedPlayerId ||
+                player.name === ctx.state.attachedPlayerId,
+            )?.name ?? null)
+          : null;
+      manager.update(actors, boosts, nameToActorId, followedPlayer ?? null);
     },
     teardown() {
       manager?.dispose();
