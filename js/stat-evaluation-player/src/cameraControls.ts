@@ -114,7 +114,13 @@ export class CameraControlsController {
     elements.attachedPlayer.addEventListener(
       "change",
       () => {
-        this.options.getReplayPlayer()?.setAttachedPlayer(elements.attachedPlayer.value || null);
+        const replayPlayer = this.options.getReplayPlayer();
+        const attachedPlayerId = elements.attachedPlayer.value || null;
+        replayPlayer?.setAttachedPlayer(attachedPlayerId);
+        if (attachedPlayerId) {
+          replayPlayer?.setCustomCameraSettings(null);
+          replayPlayer?.setBallCamEnabled(true);
+        }
         this.lastFreeCameraPreset = null;
         this.options.requestConfigSync();
       },
@@ -134,7 +140,12 @@ export class CameraControlsController {
     elements.cameraViewFollowButton.addEventListener(
       "click",
       () => {
-        this.options.getReplayPlayer()?.setCameraViewMode("follow");
+        const replayPlayer = this.options.getReplayPlayer();
+        replayPlayer?.setCameraViewMode("follow");
+        if (replayPlayer?.getState().attachedPlayerId) {
+          replayPlayer.setCustomCameraSettings(null);
+          replayPlayer.setBallCamEnabled(true);
+        }
         this.lastFreeCameraPreset = null;
         this.options.requestConfigSync();
       },
