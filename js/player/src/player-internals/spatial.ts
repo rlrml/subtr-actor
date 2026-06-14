@@ -9,6 +9,12 @@ import type {
   Vec3,
 } from "../types";
 
+// Player cars cannot plausibly travel faster than supersonic (~2300 uu/s) under
+// their own power; we double it for headroom against sparse keyframes and bump
+// knockback. A jump larger than this between two samples is a teleport
+// (demolition respawn or kickoff repositioning), not motion.
+const MAX_INTERPOLATION_SPEED_UU_PER_S = 2300 * 2;
+
 const CHASE_CAMERA_HEIGHT_MULTIPLIER = 1.4;
 const CAMERA_SMOOTHING = 0.18;
 const FREE_CAMERA_TRANSITION_SMOOTHING = 0.14;
@@ -42,6 +48,28 @@ export interface AttachedCameraBlendState {
   currentBlend: number;
   targetBlend: number;
   lastIsBallCam: boolean | null;
+}
+
+// Detect a teleport-scale jump between two consecutive samples. Demolition
+// respawns and kickoff repositioning relocate a car instantly; interpolating
+// across that gap slides the car (and any attached camera) across the field,
+// which reads as a glitch. Callers should hold the current sample so the jump
+// lands cleanly on the frame boundary instead of being smeared through space.
+export function isPositionDiscontinuity(
+  current: Vec3 | null,
+  next: Vec3 | null,
+  dt: number,
+): boolean {
+  if (!current || !next || dt <= 0) {
+    return false;
+  }
+
+  const dx = next.x - current.x;
+  const dy = next.y - current.y;
+  const dz = next.z - current.z;
+  const distanceSq = dx * dx + dy * dy + dz * dz;
+  const maxDistance = MAX_INTERPOLATION_SPEED_UU_PER_S * dt;
+  return distanceSq > maxDistance * maxDistance;
 }
 
 export function interpolatePosition(
@@ -84,6 +112,13 @@ export function interpolatePositionHermite(
   alpha: number,
 ): Vec3 | null {
   const linear = interpolatePosition(current, next, alpha);
+
+  // Hold the current sample across teleport-scale gaps (demolition respawns,
+  // kickoff repositioning) rather than sliding toward the relocated sample.
+  if (isPositionDiscontinuity(current, next, dt)) {
+    return current;
+  }
+
   if (
     !current ||
     !next ||
@@ -305,7 +340,15 @@ function interpolateCameraFrame(
   dt: number,
   alpha: number,
 ): PlayerFrame {
-  if (!nextFrame || alpha <= 0 || nextFrame.isPresent === false || !nextFrame.position) {
+  if (
+    !nextFrame ||
+    alpha <= 0 ||
+    nextFrame.isPresent === false ||
+    !nextFrame.position ||
+    // Don't let the camera chase a relocated target across a teleport (demo
+    // respawn / kickoff reposition); hold the current frame so it snaps cleanly.
+    isPositionDiscontinuity(frame.position ?? null, nextFrame.position, dt)
+  ) {
     return frame;
   }
 

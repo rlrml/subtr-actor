@@ -7,6 +7,7 @@ import {
   getFreeCameraPreset,
   interpolatePositionHermite,
   interpolateQuaternion,
+  isPositionDiscontinuity,
   updateAttachedCamera,
 } from "../src/player-internals/spatial";
 import type { ReplayModel } from "../src/types";
@@ -200,6 +201,40 @@ test("interpolatePositionHermite rejects implausible tangents and falls back to 
     Math.abs(result.x - 5) < 1e-9,
     "expected the pathological tangent to fall back to lerp",
   );
+});
+
+test("isPositionDiscontinuity flags teleport-scale jumps but not fast motion", () => {
+  // Supersonic travel over a ~30Hz frame (~77uu) is real motion, not a teleport.
+  assert.equal(
+    isPositionDiscontinuity({ x: 0, y: 0, z: 17 }, { x: -77, y: 0, z: 17 }, 1 / 30),
+    false,
+  );
+  // A kickoff reposition / demo respawn jumps thousands of units in one frame.
+  assert.equal(
+    isPositionDiscontinuity({ x: 0, y: 0, z: 17 }, { x: -2048, y: -2560, z: 17 }, 1 / 30),
+    true,
+  );
+  // Without a valid gap there is nothing to interpolate across.
+  assert.equal(isPositionDiscontinuity({ x: 0, y: 0, z: 0 }, { x: 5000, y: 0, z: 0 }, 0), false);
+  assert.equal(isPositionDiscontinuity(null, { x: 5000, y: 0, z: 0 }, 1 / 30), false);
+});
+
+test("interpolatePositionHermite holds the current sample across a teleport", () => {
+  // A kickoff reposition: the car is relocated thousands of units in one frame.
+  // Interpolating would slide it across the field, so we hold the current sample
+  // until the frame boundary instead.
+  const result = interpolatePositionHermite(
+    { x: 0, y: 0, z: 17 },
+    { x: -2048, y: -2560, z: 17 },
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: 0 },
+    1 / 30,
+    0.5,
+  );
+  assert.ok(result);
+  assert.equal(result.x, 0);
+  assert.equal(result.y, 0);
+  assert.equal(result.z, 17);
 });
 
 test("hitbox overlay transform uses Rocket League local axes", () => {
