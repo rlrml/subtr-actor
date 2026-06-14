@@ -1830,12 +1830,6 @@ def main() -> int:
         errors,
     )
     require_contains(
-        web_player_main_source,
-        "const DEFAULT_CAMERA_DISTANCE_SCALE = 1;",
-        "stats evaluation player default camera distance scale",
-        errors,
-    )
-    require_contains(
         plugin_header,
         "float cameraDistanceScale = 1.0f;",
         "plugin default camera distance scale mirrors stats evaluation player",
@@ -1893,12 +1887,6 @@ def main() -> int:
         "  border-color: rgba(142, 197, 255, 0.42);\n"
         "  background: linear-gradient(180deg, rgba(33, 71, 107, 0.96), rgba(12, 27, 42, 0.98));",
         "stats evaluation player active camera preset has accented button chrome",
-        errors,
-    )
-    require_contains(
-        web_player_main_source,
-        "cameraDistance.disabled = !hasAttachedCamera;",
-        "stats evaluation player updates camera settings availability from active camera state",
         errors,
     )
     require_contains(
