@@ -263,6 +263,7 @@ pub(in crate::collector::stats::playback) fn parse_touch_stats_event(
         sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
         player_position: json_optional_vec3(object.get("player_position"))?,
+        ball_position: json_optional_vec3(object.get("ball_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         kind: json_required_str(object, "kind")?.to_owned(),
         height_band: json_required_str(object, "height_band")?.to_owned(),
