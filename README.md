@@ -4,18 +4,25 @@
 
 [![Rust version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square&label=rust)](https://crates.io/crates/subtr-actor) [![Python version](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square&label=python)](https://pypi.org/project/subtr-actor-py/) [![JS bindings version](https://img.shields.io/npm/v/%40rlrml%2Fsubtr-actor?style=flat-square&label=js%20bindings)](https://www.npmjs.com/package/@rlrml/subtr-actor) [![JS player version](https://img.shields.io/npm/v/%40rlrml%2Fplayer?style=flat-square&label=js%20player)](https://www.npmjs.com/package/@rlrml/player) [![JS stats player version](https://img.shields.io/npm/v/%40rlrml%2Fstats-player?style=flat-square&label=js%20stats%20player)](https://www.npmjs.com/package/@rlrml/stats-player)
 
+> ▶ **[Try the live stats player](https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/problematic-private-duel-2026-03-20.replay)** — watch a real replay play back and stats accumulate frame-by-frame, right in your browser.
+
 <!-- The section below is generated from the crate-level docs in `src/lib.rs`
      by `cargo rdme`. Do not edit it by hand: run `just readme` to regenerate,
      and `just check` verifies it stays in sync. -->
 <!-- cargo-rdme start -->
 
-`subtr-actor` turns raw [`boxcars`](https://docs.rs/boxcars) replay data into higher-level game
-state, derived replay events, structured frame payloads, and dense numeric
-features for analytics and ML workflows.
+`subtr-actor` turns raw [`boxcars`](https://docs.rs/boxcars) replay data into
+higher-level game state, derived replay events, structured frame payloads, and
+dense numeric features for analytics and ML workflows.
 
-The Rust crate is the source of truth for the replay-processing pipeline.
-The Python and JavaScript bindings build on the same collector APIs and
-string-addressable feature registry exposed here.
+- **Higher-level game state** modeled from the raw actor graph
+- **Frame-by-frame structured data** ready for JSON export and playback UIs
+- **Dense numeric feature matrices** for ML, built from a string-addressable
+  feature registry
+- **Derived events and cumulative stats** — touches, boost pickups, dodge
+  refreshes, goals, demolishes, and more
+- **One pipeline, three languages** — the same Rust core drives the Python and
+  JavaScript/WASM bindings
 
 ## Processing model
 
@@ -139,7 +146,7 @@ println!("rush events: {rush_events}");
 - Python: [`subtr-actor-py`](https://pypi.org/project/subtr-actor-py/)
 - JavaScript / WASM bindings: [`@rlrml/subtr-actor`](https://www.npmjs.com/package/@rlrml/subtr-actor)
 - JavaScript replay player: [`@rlrml/player`](https://www.npmjs.com/package/@rlrml/player)
-- JavaScript stats player: [`@rlrml/stats-player`](https://www.npmjs.com/package/@rlrml/stats-player) ([see it in action](https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/problematic-private-duel-2026-03-20.replay))
+- JavaScript stats player: [`@rlrml/stats-player`](https://www.npmjs.com/package/@rlrml/stats-player) (see the [live demo](https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/problematic-private-duel-2026-03-20.replay) above)
 
 ## Installation
 
@@ -249,6 +256,7 @@ just build
 just test
 just fmt
 just clippy
+just check   # fast lint/format/compile gate — run clean before committing
 ```
 
 These `just` recipes enter the flake dev shell, so they use the Rust toolchain

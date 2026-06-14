@@ -1,12 +1,17 @@
 #![allow(clippy::result_large_err)]
 
-//! `subtr-actor` turns raw [`boxcars`](https://docs.rs/boxcars) replay data into higher-level game
-//! state, derived replay events, structured frame payloads, and dense numeric
-//! features for analytics and ML workflows.
+//! `subtr-actor` turns raw [`boxcars`](https://docs.rs/boxcars) replay data into
+//! higher-level game state, derived replay events, structured frame payloads, and
+//! dense numeric features for analytics and ML workflows.
 //!
-//! The Rust crate is the source of truth for the replay-processing pipeline.
-//! The Python and JavaScript bindings build on the same collector APIs and
-//! string-addressable feature registry exposed here.
+//! - **Higher-level game state** modeled from the raw actor graph
+//! - **Frame-by-frame structured data** ready for JSON export and playback UIs
+//! - **Dense numeric feature matrices** for ML, built from a string-addressable
+//!   feature registry
+//! - **Derived events and cumulative stats** — touches, boost pickups, dodge
+//!   refreshes, goals, demolishes, and more
+//! - **One pipeline, three languages** — the same Rust core drives the Python and
+//!   JavaScript/WASM bindings
 //!
 //! ## Processing model
 //!
