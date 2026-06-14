@@ -3,13 +3,16 @@ import type {
   ReplayPlayerPlugin,
   ReplayPlayerPluginContext,
   ReplayPlayerRenderContext,
+  ReplayPlayerPluginStateContext,
 } from "./types";
 import { boostAmountToPercent } from "./boost-units";
+import { findFrameIndexAtTime } from "./replay-data";
 
 export interface BallchasingOverlayPluginOptions {
   showFloatingNames?: boolean;
   showFloatingBoostBars?: boolean;
   showTeamBoostHud?: boolean;
+  showFollowedPlayerHud?: boolean;
 }
 
 interface PlayerOverlayElements {
@@ -21,10 +24,16 @@ interface PlayerOverlayElements {
   teamHudText: HTMLSpanElement | null;
 }
 
+interface FollowedPlayerHudElements {
+  root: HTMLDivElement;
+  ring: HTMLDivElement;
+  value: HTMLSpanElement;
+  name: HTMLSpanElement;
+}
+
 const STYLE_ID = "subtr-actor-ballchasing-overlay-styles";
 const TEAM_BLUE = "#3b82f6";
 const TEAM_ORANGE = "#f59e0b";
-const FLOATING_LABEL_OFFSET_UU = 140;
 
 function ensureStyles(): void {
   if (document.getElementById(STYLE_ID)) {
@@ -69,6 +78,10 @@ function ensureStyles(): void {
     }
 
     .sap-bc-floating-track[hidden] {
+      display: none;
+    }
+
+    .sap-bc-floating-track.sap-bc-player-following {
       display: none;
     }
 
@@ -243,6 +256,98 @@ function ensureStyles(): void {
         0 12px 28px rgba(0, 0, 0, 0.28);
     }
 
+    .sap-bc-followed-hud {
+      position: absolute;
+      right: 1rem;
+      bottom: 5.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.72rem;
+      min-width: 8.8rem;
+      padding: 0.58rem 0.7rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 0.55rem;
+      background: rgba(6, 11, 17, 0.58);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(8px);
+    }
+
+    .sap-bc-followed-hud[hidden] {
+      display: none;
+    }
+
+    .sap-bc-followed-hud-blue {
+      border-color: rgba(109, 169, 255, 0.52);
+    }
+
+    .sap-bc-followed-hud-orange {
+      border-color: rgba(255, 189, 110, 0.52);
+    }
+
+    .sap-bc-followed-boost-ring {
+      --sap-bc-followed-boost: 0%;
+      --sap-bc-followed-color: ${TEAM_BLUE};
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 4.1rem;
+      height: 4.1rem;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, rgba(6, 11, 17, 0.95) 0 57%, transparent 58%),
+        conic-gradient(
+          var(--sap-bc-followed-color) var(--sap-bc-followed-boost),
+          rgba(255, 255, 255, 0.16) 0
+        );
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+        0 10px 22px rgba(0, 0, 0, 0.22);
+    }
+
+    .sap-bc-followed-hud-blue .sap-bc-followed-boost-ring {
+      --sap-bc-followed-color: ${TEAM_BLUE};
+    }
+
+    .sap-bc-followed-hud-orange .sap-bc-followed-boost-ring {
+      --sap-bc-followed-color: ${TEAM_ORANGE};
+    }
+
+    .sap-bc-followed-boost-value {
+      color: #ffffff;
+      font-size: 1.45rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.72);
+    }
+
+    .sap-bc-followed-meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      line-height: 1.15;
+      text-transform: uppercase;
+    }
+
+    .sap-bc-followed-name {
+      display: block;
+      max-width: 8rem;
+      margin-top: 0.18rem;
+      overflow: hidden;
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-overflow: ellipsis;
+      text-transform: none;
+      white-space: nowrap;
+    }
+
     @media (max-width: 900px) {
       .sap-bc-team-hud {
         top: 3.25rem;
@@ -297,6 +402,28 @@ function ensureStyles(): void {
         padding-inline: 0.32rem;
         font-size: 0.58rem;
       }
+
+      .sap-bc-followed-hud {
+        right: 0.65rem;
+        bottom: 4.85rem;
+        min-width: 7.5rem;
+        gap: 0.55rem;
+        padding: 0.5rem 0.58rem;
+      }
+
+      .sap-bc-followed-boost-ring {
+        width: 3.45rem;
+        height: 3.45rem;
+      }
+
+      .sap-bc-followed-boost-value {
+        font-size: 1.2rem;
+      }
+
+      .sap-bc-followed-name {
+        max-width: 6.2rem;
+        font-size: 0.68rem;
+      }
     }
   `;
   document.head.append(style);
@@ -307,6 +434,30 @@ function lerpBoostAmount(context: ReplayPlayerRenderContext, playerIndex: number
   const currentAmount = player.frame?.boostAmount ?? 0;
   const nextAmount = player.nextFrame?.boostAmount ?? currentAmount;
   return THREE.MathUtils.lerp(currentAmount, nextAmount, context.alpha);
+}
+
+function replayBoostAmountAtTime(
+  context: ReplayPlayerPluginStateContext,
+  playerId: string,
+): number | null {
+  const track = context.replay.players.find((player) => player.id === playerId);
+  if (!track) {
+    return null;
+  }
+
+  const frameIndex = findFrameIndexAtTime(context.replay, context.state.currentTime);
+  const nextFrameIndex = Math.min(frameIndex + 1, context.replay.frames.length - 1);
+  const currentFrame = context.replay.frames[frameIndex];
+  const nextFrame = context.replay.frames[nextFrameIndex] ?? currentFrame;
+  const startTime = currentFrame?.time ?? context.state.currentTime;
+  const endTime = nextFrame?.time ?? startTime;
+  const alpha =
+    endTime > startTime
+      ? THREE.MathUtils.clamp((context.state.currentTime - startTime) / (endTime - startTime), 0, 1)
+      : 0;
+  const currentAmount = track.frames[frameIndex]?.boostAmount ?? 0;
+  const nextAmount = track.frames[nextFrameIndex]?.boostAmount ?? currentAmount;
+  return THREE.MathUtils.lerp(currentAmount, nextAmount, alpha);
 }
 
 function setBoostBar(
@@ -322,6 +473,26 @@ function setBoostBar(
   const percent = Math.max(0, Math.min(100, Math.round(boostAmountToPercent(amount))));
   fill.style.width = `${percent}%`;
   text.textContent = `${percent} ${playerName}`;
+}
+
+function setFollowedHud(
+  elements: FollowedPlayerHudElements | null,
+  amount: number,
+  playerName: string,
+  isTeamZero: boolean,
+): void {
+  if (!elements) {
+    return;
+  }
+
+  const percent = Math.max(0, Math.min(100, Math.round(boostAmountToPercent(amount))));
+  elements.root.hidden = false;
+  elements.root.classList.toggle("sap-bc-followed-hud-blue", isTeamZero);
+  elements.root.classList.toggle("sap-bc-followed-hud-orange", !isTeamZero);
+  elements.root.setAttribute("aria-label", `${playerName} boost ${percent}`);
+  elements.ring.style.setProperty("--sap-bc-followed-boost", `${percent}%`);
+  elements.value.textContent = `${percent}`;
+  elements.name.textContent = playerName;
 }
 
 function makePlayerSelectable(
@@ -387,11 +558,13 @@ export function createBallchasingOverlayPlugin(
   const showFloatingNames = options.showFloatingNames ?? true;
   const showFloatingBoostBars = options.showFloatingBoostBars ?? true;
   const showTeamBoostHud = options.showTeamBoostHud ?? true;
+  const showFollowedPlayerHud = options.showFollowedPlayerHud ?? true;
 
   let root: HTMLDivElement | null = null;
   let floatingLayer: HTMLDivElement | null = null;
   let blueHud: HTMLDivElement | null = null;
   let orangeHud: HTMLDivElement | null = null;
+  let followedHud: FollowedPlayerHudElements | null = null;
   let changedContainerPosition = false;
   let originalContainerPosition = "";
   const playerElements = new Map<string, PlayerOverlayElements>();
@@ -406,6 +579,31 @@ export function createBallchasingOverlayPlugin(
       elements.floatingRoot?.setAttribute("aria-pressed", isAttached ? "true" : "false");
       elements.teamHudEntry?.setAttribute("aria-pressed", isAttached ? "true" : "false");
     }
+  }
+
+  function syncFollowedHud(context: ReplayPlayerPluginStateContext): void {
+    if (!followedHud || !context.state.attachedPlayerId) {
+      if (followedHud) {
+        followedHud.root.hidden = true;
+      }
+      return;
+    }
+
+    const track = context.replay.players.find(
+      (player) => player.id === context.state.attachedPlayerId,
+    );
+    if (!track) {
+      followedHud.root.hidden = true;
+      return;
+    }
+
+    const boostAmount = replayBoostAmountAtTime(context, track.id);
+    if (boostAmount === null) {
+      followedHud.root.hidden = true;
+      return;
+    }
+
+    setFollowedHud(followedHud, boostAmount, track.name, track.isTeamZero);
   }
 
   function buildHud(context: ReplayPlayerPluginContext, container: HTMLElement): void {
@@ -436,6 +634,36 @@ export function createBallchasingOverlayPlugin(
     } else {
       blueHud = null;
       orangeHud = null;
+    }
+
+    if (showFollowedPlayerHud) {
+      const followedHudRoot = document.createElement("div");
+      followedHudRoot.className = "sap-bc-followed-hud";
+      followedHudRoot.hidden = true;
+
+      const followedHudRing = document.createElement("div");
+      followedHudRing.className = "sap-bc-followed-boost-ring";
+      const followedHudValue = document.createElement("span");
+      followedHudValue.className = "sap-bc-followed-boost-value";
+      followedHudRing.append(followedHudValue);
+
+      const followedHudMeta = document.createElement("div");
+      followedHudMeta.className = "sap-bc-followed-meta";
+      followedHudMeta.textContent = "Boost";
+      const followedHudName = document.createElement("span");
+      followedHudName.className = "sap-bc-followed-name";
+      followedHudMeta.append(followedHudName);
+
+      followedHudRoot.append(followedHudRing, followedHudMeta);
+      root.append(followedHudRoot);
+      followedHud = {
+        root: followedHudRoot,
+        ring: followedHudRing,
+        value: followedHudValue,
+        name: followedHudName,
+      };
+    } else {
+      followedHud = null;
     }
 
     for (const track of context.replay.players) {
@@ -502,9 +730,10 @@ export function createBallchasingOverlayPlugin(
       });
     }
 
-    floatingOffset.set(0, 0, FLOATING_LABEL_OFFSET_UU * (context.options.fieldScale ?? 1));
+    floatingOffset.set(0, 0, 255 * (context.options.fieldScale ?? 1));
     container.append(root);
     syncAttachedPlayer(context.player.getState().attachedPlayerId);
+    syncFollowedHud({ ...context, state: context.player.getState() });
   }
 
   return {
@@ -514,6 +743,7 @@ export function createBallchasingOverlayPlugin(
     },
     onStateChange(context): void {
       syncAttachedPlayer(context.state.attachedPlayerId);
+      syncFollowedHud(context);
     },
     teardown(context): void {
       root?.remove();
@@ -521,6 +751,7 @@ export function createBallchasingOverlayPlugin(
       floatingLayer = null;
       blueHud = null;
       orangeHud = null;
+      followedHud = null;
       playerElements.clear();
       if (changedContainerPosition) {
         context.container.style.position = originalContainerPosition;
@@ -532,6 +763,7 @@ export function createBallchasingOverlayPlugin(
         return;
       }
 
+      let followedHudUpdated = false;
       for (const [playerIndex, player] of context.players.entries()) {
         const elements = playerElements.get(player.track.id);
         if (!elements) {
@@ -539,6 +771,12 @@ export function createBallchasingOverlayPlugin(
         }
 
         const boostAmount = lerpBoostAmount(context, playerIndex);
+        const isAttachedPlayer =
+          elements.floatingRoot?.classList.contains("sap-bc-player-following") ?? false;
+        if (isAttachedPlayer) {
+          setFollowedHud(followedHud, boostAmount, player.track.name, player.track.isTeamZero);
+          followedHudUpdated = true;
+        }
         setBoostBar(
           elements.floatingBoostFill,
           elements.floatingBoostText,
@@ -555,9 +793,6 @@ export function createBallchasingOverlayPlugin(
           continue;
         }
 
-        const isAttachedPlayer =
-          context.state.cameraViewMode === "follow" &&
-          context.state.attachedPlayerId === player.track.id;
         if (
           isAttachedPlayer ||
           !active ||
@@ -577,6 +812,10 @@ export function createBallchasingOverlayPlugin(
         elements.floatingRoot.style.transform =
           `translate(${projected.x.toFixed(1)}px, ${projected.y.toFixed(1)}px) ` +
           "translate(-50%, -100%)";
+      }
+
+      if (!followedHudUpdated && followedHud) {
+        followedHud.root.hidden = true;
       }
     },
   };
