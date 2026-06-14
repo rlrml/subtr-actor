@@ -4,6 +4,11 @@ import { getCarHitboxInfo } from "../data/hitboxes.js";
 import { resolveViewerAssetUrl } from "../asset-url.js";
 import { CarModelLoader } from "./CarModelLoader.js";
 
+// Seconds to hide the ball after a goal so it vanishes inside the explosion
+// (covers the goal explosion's ~1.8s lifetime). Recomputed every frame, so a
+// skipped/scrubbed-past celebration never leaves the ball stuck hidden.
+const GOAL_BALL_HIDE_DURATION = 2.0;
+
 export class ActorManager {
   constructor(scene, effectsManager, options = {}) {
     this.scene = scene;
@@ -29,6 +34,12 @@ export class ActorManager {
     // Car model loader for FBX models
     this.carModelLoader = new CarModelLoader({ assetBase: this.assetBase });
     this.pendingCarReplacements = new Map(); // actorId -> hitboxType (cars waiting for model)
+
+    // Goal-explosion bookkeeping. We fire each goal's explosion the first time
+    // forward playback crosses its time, then suppress re-fires until a backward
+    // seek/loop. Keyed by goal time so it survives across replays.
+    this._lastGoalScanTime = null;
+    this._firedGoalTimes = new Set();
 
     // Reusable vectors for interpolation
     this._p0 = new THREE.Vector3();
@@ -198,6 +209,8 @@ export class ActorManager {
     this.playerNameToCarActorId = {};
     this.playerNameToPriActorId = {};
     this.actorLoadouts = {};
+    this._lastGoalScanTime = null;
+    this._firedGoalTimes.clear();
     // playerTeams are static per replay, usually
   }
 
@@ -2923,6 +2936,61 @@ export class ActorManager {
       const hasValidPosition = mesh.position.length() > 0.1;
       mesh.visible = playerEntity.isVisible && hasValidPosition && !mesh.userData.sleeping;
     });
+
+    // Fire goal explosions as playback reaches them (and hide the ball inside
+    // the blast during the celebration window).
+    this._updateGoalExplosions(currentTime);
+  }
+
+  /**
+   * Trigger the team-colored goal explosion the first time forward playback
+   * crosses each goal, and hide the ball for the celebration window so it
+   * vanishes inside the blast (matching the original Ballcam viewer). Robust to
+   * scrubbing and post-goal skips: keyed on goal time, self-correcting on
+   * backward seeks, and the ball-hidden state is recomputed every frame.
+   */
+  _updateGoalExplosions(currentTime) {
+    const effects = this.effectsManager;
+    const goalEvents = effects && effects.explosions ? effects.explosions.goalEvents : null;
+    if (!(goalEvents instanceof Map) || goalEvents.size === 0) return;
+
+    const prev = this._lastGoalScanTime;
+    // Backward seek / loop: clear fire suppression so goals replay next pass.
+    if (prev !== null && currentTime < prev - 0.001) {
+      this._firedGoalTimes.clear();
+    }
+
+    const ball = this.actors[this.ballActorId];
+    let ballHidden = false;
+
+    for (const goal of goalEvents.values()) {
+      const goalTime = goal.time;
+      if (!Number.isFinite(goalTime)) continue;
+
+      // Hide the ball from the goal moment through the explosion lifetime.
+      if (currentTime >= goalTime && currentTime <= goalTime + GOAL_BALL_HIDE_DURATION) {
+        ballHidden = true;
+      }
+
+      // Fire once, the first time we cross the goal moving forward. A baseline
+      // scan (prev === null) only seeds state so a load mid-replay never fires
+      // a stale burst.
+      const crossedForward = prev !== null && prev < goalTime && currentTime >= goalTime;
+      if (crossedForward && !this._firedGoalTimes.has(goalTime)) {
+        this._firedGoalTimes.add(goalTime);
+        const pos = this.getBallPositionAt(goalTime) || (ball && ball.position) || null;
+        if (pos) {
+          this.effectsManager.triggerGoalExplosion(pos, goal.team);
+        }
+      }
+    }
+
+    if (ball) {
+      ball.userData.isHiddenByGoal = ballHidden;
+      if (ballHidden) ball.visible = false;
+    }
+
+    this._lastGoalScanTime = currentTime;
   }
 
   /**

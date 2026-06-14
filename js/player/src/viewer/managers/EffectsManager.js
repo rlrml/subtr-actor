@@ -3473,6 +3473,12 @@ export class EffectsManager {
     this.camera = null;
     this.explosions = {
       active: [],
+      // frameIndex -> { time, team, playerName }: the replay's goal events, so
+      // ActorManager can fire a team-colored explosion when playback reaches a
+      // goal. Populated via setGoalEvents(); demoEvents is reserved for the
+      // (currently inert) demolition path.
+      goalEvents: new Map(),
+      demoEvents: new Map(),
     };
     this.boostTrails = new Map(); // carActorId -> BoostTrail
     this.supersonicTrails = new Map(); // carActorId -> SupersonicTrail
@@ -3522,6 +3528,23 @@ export class EffectsManager {
   clearEvents() {
     this.explosions.goalEvents.clear();
     this.explosions.demoEvents.clear();
+  }
+
+  /**
+   * Register the replay's goal events so the goal explosion fires when playback
+   * reaches each one. Each event is `{ frame, time, team, playerName }` (team:
+   * 0 = blue, 1 = orange). Static per replay — call once after load.
+   */
+  setGoalEvents(events) {
+    this.explosions.goalEvents.clear();
+    for (const event of events ?? []) {
+      if (!Number.isFinite(event.frame)) continue;
+      this.explosions.goalEvents.set(event.frame, {
+        time: event.time,
+        team: event.team ?? 0,
+        playerName: event.playerName ?? "",
+      });
+    }
   }
 
   /**

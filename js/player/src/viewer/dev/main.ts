@@ -14,6 +14,7 @@ import {
   createCameraPlugin,
   createCanvasRecorderPlugin,
   createTimelineOverlayPlugin,
+  createScoredTextPlugin,
   fromReplayPlayerPlugin,
 } from "../lib.js";
 
@@ -56,6 +57,8 @@ async function main() {
       createFpsOverlayPlugin(),
       createNameTagPlugin(),
       createBoostPadsPlugin(),
+      // "<PLAYER> SCORED !!" banner on each goal (toggleable plugin).
+      createScoredTextPlugin(),
       camPlugin,
       // @rlrml/player's own timeline overlay (goals/saves markers, skip
       // toggles, scrubber), mounted through the Phase 3 bridge.
