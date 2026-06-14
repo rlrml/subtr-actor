@@ -215,6 +215,8 @@ impl<'a> ReplayProcessor<'a> {
                     if active_actor.actor != boxcars::ActorId(-1) {
                         self.camera_settings_actor_to_player_actor
                             .insert(update.actor_id, active_actor.actor);
+                        self.player_actor_to_camera_settings_actor
+                            .insert(active_actor.actor, update.actor_id);
                         if let Some(settings) = self
                             .camera_settings_actor_to_settings
                             .get(&update.actor_id)

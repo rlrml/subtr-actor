@@ -41,6 +41,16 @@ type RawPlayerFrame =
         player_name: string | null;
         team: number | null;
         is_team_0: boolean | null;
+        camera?: {
+          pitch: number | null;
+          yaw: number | null;
+        };
+        input?: {
+          throttle: number | null;
+          steer: number | null;
+          dodge_impulse: [number, number, number] | null;
+          dodge_torque: [number, number, number] | null;
+        };
       };
     };
 type RawBoostPadEventKind = "Available" | { PickedUp: { sequence: number } };
@@ -74,6 +84,17 @@ interface RawReplayData {
   boost_pads?: RawResolvedBoostPad[];
   boost_pad_events?: RawBoostPadEvent[];
   goal_events?: Array<{ time: number; frame: number }>;
+  player_camera_events?: Array<
+    [
+      unknown,
+      Array<{
+        frame: number;
+        ball_cam_active: boolean | null;
+        behind_view_active: boolean | null;
+        driving: boolean | null;
+      }>,
+    ]
+  >;
 }
 interface RawPlayerInfo {
   remote_id: unknown;
@@ -109,6 +130,14 @@ interface FlagsKeyframe {
   boost: number; // 0-100
   isBoosting: boolean;
   present: boolean;
+  /** Normalized steer input (-1 left .. 1 right); 0 when not replicated. */
+  steer: number;
+}
+
+/** A coalesced ball-cam change for a player, resolved via last-before on seek. */
+interface CameraEventKeyframe {
+  time: number;
+  ballCam: boolean | null;
 }
 
 export interface ViewerPlayerInfo {
@@ -301,6 +330,8 @@ export class SubtrActorPlayer extends EventEmitter {
   private _playerTimelines: Record<string, MotionKeyframe[]> = {};
   private _ballFlags: FlagsKeyframe[] = []; // ball has none, kept for symmetry
   private _playerFlags: Record<string, FlagsKeyframe[]> = {};
+  /** Coalesced ball-cam change timeline per player name (last-before on seek). */
+  private _playerCameraEvents: Record<string, CameraEventKeyframe[]> = {};
   private _teams: Record<string, number> = {};
   private _timelineCompaction: TimelineCompaction | null = null;
 
@@ -372,11 +403,15 @@ export class SubtrActorPlayer extends EventEmitter {
         if (f === "Empty" || !("Data" in f)) return;
         const mk = this._rbToKeyframe(f.Data.rigid_body, time, i);
         if (mk) motion.push(mk);
+        const rawSteer = f.Data.input?.steer;
         flags.push({
           time,
           boost: boostToPercent(f.Data.boost_amount ?? 0),
           isBoosting: !!f.Data.boost_active,
           present: true,
+          // ReplicatedSteer is a byte (~128 neutral); normalize to -1..1 for
+          // the renderer's wheel steering (ActorManager scales by max angle).
+          steer: rawSteer == null ? 0 : Math.max(-1, Math.min(1, (rawSteer - 128) / 128)),
         });
       });
 
@@ -391,6 +426,20 @@ export class SubtrActorPlayer extends EventEmitter {
         new PlayerEntity(key, name, team, carName, hitboxType, cameraSettings),
       );
     });
+
+    // Coalesced ball-cam changes arrive grouped by remote id; map them onto the
+    // display names the rest of the adapter uses, deriving each change's time
+    // from its frame, so seek() can resolve ball-cam state via last-before.
+    const nameByKey = new Map<string, string>();
+    this.playerList.forEach((player) => nameByKey.set(player.id, player.name));
+    for (const [player, changes] of this.raw.player_camera_events ?? []) {
+      const name = nameByKey.get(this._idKey(player));
+      if (!name) continue;
+      this._playerCameraEvents[name] = changes.map((change) => ({
+        time: t(metaFrames[change.frame]?.time ?? startTime),
+        ballCam: change.ball_cam_active,
+      }));
+    }
 
     this._preprocessMotionTimelines();
     this._compileBoostPads();
@@ -785,6 +834,14 @@ export class SubtrActorPlayer extends EventEmitter {
       if (fl) {
         entity.boost = fl.boost;
         entity.isBoosting = fl.isBoosting;
+        // Replay-driven wheel steering (ActorManager reads entity.steer).
+        entity.steer = fl.steer;
+      }
+      // Replay-driven ball cam from the coalesced event stream; keep the
+      // previous value when the replay never replicated it for this player.
+      const cameraEvent = lastBefore(this._playerCameraEvents[name] ?? [], time);
+      if (cameraEvent && cameraEvent.ballCam != null) {
+        entity.isBallCam = cameraEvent.ballCam;
       }
       // Presence: visible while we have motion data near `time`. A demolished
       // car produces Empty frames -> no nearby keyframe -> hidden.
