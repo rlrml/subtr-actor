@@ -758,6 +758,8 @@ export function mountStatEvaluationPlayer(
         "#custom-camera-transition-speed-readout",
       ),
       ballCam: mustElement<HTMLInputElement>(root, "#ball-cam"),
+      nameplateLift: mustElement<HTMLInputElement>(root, "#custom-nameplate-lift"),
+      nameplateLiftReadout: mustElement<HTMLElement>(root, "#custom-nameplate-lift-readout"),
       cameraProfileReadout: mustElement<HTMLElement>(root, "#camera-profile-readout"),
       cameraFovReadout: mustElement<HTMLElement>(root, "#camera-fov-readout"),
       cameraHeightReadout: mustElement<HTMLElement>(root, "#camera-height-readout"),

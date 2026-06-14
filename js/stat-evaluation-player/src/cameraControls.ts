@@ -1,9 +1,10 @@
-import type {
-  CameraSettings,
-  ReplayCameraViewMode,
-  ReplayFreeCameraPreset,
-  ReplayPlayerState,
-  ReplayPlayerTrack,
+import {
+  DEFAULT_FLOATING_NAMEPLATE_LIFT_UU,
+  type CameraSettings,
+  type ReplayCameraViewMode,
+  type ReplayFreeCameraPreset,
+  type ReplayPlayerState,
+  type ReplayPlayerTrack,
 } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 
@@ -42,6 +43,8 @@ export interface CameraControlsElements {
   readonly customCameraSwivelSpeedReadout: HTMLElement;
   readonly customCameraTransitionSpeedReadout: HTMLElement;
   readonly ballCam: HTMLInputElement;
+  readonly nameplateLift: HTMLInputElement;
+  readonly nameplateLiftReadout: HTMLElement;
   readonly cameraProfileReadout: HTMLElement;
   readonly cameraFovReadout: HTMLElement;
   readonly cameraHeightReadout: HTMLElement;
@@ -71,6 +74,20 @@ export class CameraControlsController {
 
   get ballCamChecked(): boolean {
     return this.options.elements.ballCam.checked;
+  }
+
+  /** Current floating name-plate lift (Unreal units) from the slider. */
+  get nameplateLiftUu(): number {
+    const value = Number(this.options.elements.nameplateLift.value);
+    return Number.isFinite(value) ? value : DEFAULT_FLOATING_NAMEPLATE_LIFT_UU;
+  }
+
+  /** Apply a persisted name-plate lift to the slider + readout (config load). */
+  applyNameplateLiftUu(value: number | undefined): void {
+    const { nameplateLift, nameplateLiftReadout } = this.options.elements;
+    const lift = value ?? DEFAULT_FLOATING_NAMEPLATE_LIFT_UU;
+    nameplateLift.value = `${lift}`;
+    nameplateLiftReadout.textContent = formatSetting(lift, "", 0);
   }
 
   installEventListeners(signal: AbortSignal): void {
@@ -176,6 +193,18 @@ export class CameraControlsController {
       "change",
       () => {
         this.options.getReplayPlayer()?.setBallCamEnabled(elements.ballCam.checked);
+        this.options.requestConfigSync();
+      },
+      { signal },
+    );
+
+    // The ballchasing overlay reads nameplateLiftUu live each frame, so changing
+    // the slider takes effect without touching the player — just refresh the
+    // readout and persist.
+    elements.nameplateLift.addEventListener(
+      "input",
+      () => {
+        elements.nameplateLiftReadout.textContent = formatSetting(this.nameplateLiftUu, "", 0);
         this.options.requestConfigSync();
       },
       { signal },

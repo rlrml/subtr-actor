@@ -74,6 +74,7 @@ export interface PlayerCameraConfig {
   readonly ballCam?: boolean;
   readonly usePlayerCameraSettings?: boolean;
   readonly customSettings?: CameraSettings | null;
+  readonly nameplateLiftUu?: number;
 }
 
 export interface PlayerOverlayConfig {
@@ -301,6 +302,7 @@ function normalizeCameraConfig(value: unknown): PlayerCameraConfig {
   const ballCam = booleanValue(value.ballCam);
   const usePlayerCameraSettings = booleanValue(value.usePlayerCameraSettings);
   const customSettings = normalizeCameraSettings(value.customSettings);
+  const nameplateLiftUu = finiteNumber(value.nameplateLiftUu);
   if (mode !== undefined) config.mode = mode;
   if (freePreset !== undefined) config.freePreset = freePreset;
   if (attachedPlayerId !== undefined) config.attachedPlayerId = attachedPlayerId;
@@ -309,6 +311,7 @@ function normalizeCameraConfig(value: unknown): PlayerCameraConfig {
     config.usePlayerCameraSettings = usePlayerCameraSettings;
   }
   if (customSettings !== undefined) config.customSettings = customSettings;
+  if (nameplateLiftUu !== undefined) config.nameplateLiftUu = nameplateLiftUu;
   return config;
 }
 

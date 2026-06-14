@@ -192,6 +192,20 @@ export function getAppTemplate(): string {
               <input id="ball-cam" type="checkbox" disabled />
               <span>Ball cam</span>
             </label>
+            <label>
+              <span class="camera-setting-label">
+                <span>Name plate height</span>
+                <strong id="custom-nameplate-lift-readout">250</strong>
+              </span>
+              <input
+                id="custom-nameplate-lift"
+                type="range"
+                min="0"
+                max="700"
+                step="10"
+                value="250"
+              />
+            </label>
             <dl class="detail-grid">
               <div>
                 <dt>Profile</dt>

@@ -51,7 +51,10 @@ export {
   normalizeBallchasingReplayId,
 } from "./ballchasing";
 export type { BallchasingReplayDownloadOptions } from "./ballchasing";
-export { createBallchasingOverlayPlugin } from "./ballchasing-overlay";
+export {
+  createBallchasingOverlayPlugin,
+  DEFAULT_FLOATING_NAMEPLATE_LIFT_UU,
+} from "./ballchasing-overlay";
 export type { BallchasingOverlayPluginOptions } from "./ballchasing-overlay";
 export { BOOST_RAW_MAX, boostAmountToPercent, boostPercentToAmount } from "./boost-units";
 export { createBoostPadOverlayPlugin } from "./boost-pad-overlay";
