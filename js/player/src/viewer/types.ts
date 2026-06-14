@@ -194,6 +194,12 @@ export type ViewerPluginDefinition = ViewerPlugin | ViewerPluginFactory;
 export interface ViewerOptions {
   plugins?: ViewerPluginDefinition[];
   autoplay?: boolean;
+  /**
+   * Base URL for bundled viewer assets (`models/`, `draco/`, optional
+   * `skyboxes/`). Defaults to Vite's `BASE_URL`, which keeps GitHub Pages
+   * subpath deployments working when assets are copied beside the app bundle.
+   */
+  assetBase?: string | URL;
   /** Initial playback rate (default 1). Viewer-native alias of initialPlaybackRate. */
   speed?: number;
   /** Wrap to t=0 at the end instead of pausing (default false). */

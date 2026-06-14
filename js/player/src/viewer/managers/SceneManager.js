@@ -1,10 +1,12 @@
 import * as THREE from "three";
-import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
+import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { resolveViewerAssetUrl } from "../asset-url.js";
 
 export class SceneManager {
-  constructor(container) {
+  constructor(container, options = {}) {
     this.container = typeof container === "string" ? document.getElementById(container) : container;
+    this.assetBase = options.assetBase;
     if (!this.container) {
       console.error("Invalid container passed to SceneManager");
       return;
@@ -80,9 +82,11 @@ export class SceneManager {
    */
   applyEnvironment(env) {
     return new Promise((resolve) => {
-      const rgbeLoader = new RGBELoader();
-      rgbeLoader.load(
-        env.skyboxUrl,
+      const hdrLoader = new HDRLoader();
+      const path = resolveViewerAssetUrl(env.skyboxUrl, this.assetBase);
+
+      hdrLoader.load(
+        path,
         (texture) => {
           // Dispose of previous HDR skybox texture if one is mounted.
           if (this.scene.background && this.scene.background.dispose) {
