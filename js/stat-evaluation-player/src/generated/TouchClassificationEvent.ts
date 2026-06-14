@@ -10,4 +10,4 @@ export type TouchClassificationEvent = {
  * classification was derived from. Join on this instead of player + frame.
  * `None` only for data serialized before touch ids existed.
  */
-touch_id?: number, time: number, frame: number, sample_time: number, sample_frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, kind: string, height_band: string, surface: string, dodge_state: string, intention: string, first_touch: boolean, contested: boolean, role: RoleState, play_depth: PlayDepthState, ball_speed_change: number, ball_movement?: TouchBallMovement | null, };
+touch_id?: number, time: number, frame: number, sample_time: number, sample_frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, ball_position?: [number, number, number] | null, is_team_0: boolean, kind: string, height_band: string, surface: string, dodge_state: string, intention: string, first_touch: boolean, contested: boolean, role: RoleState, play_depth: PlayDepthState, ball_speed_change: number, ball_movement?: TouchBallMovement | null, };

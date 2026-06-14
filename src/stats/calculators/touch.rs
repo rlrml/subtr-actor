@@ -95,6 +95,12 @@ pub struct TouchClassificationEvent {
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
+    // Ball position (uu) at the touch's sample frame: the actual point of contact
+    // on the ball's trajectory, unlike `player_position` (the car centre, up to a
+    // hitbox+ball-radius away). Diagrams placing a touch on the ball's path prefer
+    // this. Non-doc comment so ts-rs keeps the binding in sync with `player_position`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ball_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub kind: String,
     pub height_band: String,
@@ -425,6 +431,7 @@ impl TouchCalculator {
                         Self::player_position(players, player_id)
                             .map(|position| position.to_array())
                     }),
+                ball_position: ball.position().map(|position| position.to_array()),
                 is_team_0: touch_event.team_is_team_0,
                 kind: classification.kind.as_label_value().to_owned(),
                 height_band: classification.height_band.as_label().value.to_owned(),
