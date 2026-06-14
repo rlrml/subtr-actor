@@ -16,6 +16,7 @@ import { loadReplay } from "./adapter/wasm.js";
 import { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
 import { ViewerPlayer } from "./ViewerPlayer.js";
 import { createCameraPlugin } from "./plugins/camera.js";
+import { createScoredTextPlugin } from "./plugins/scored-text.js";
 import type { ViewerOptions } from "./types.js";
 import type { ReplayLoadResult } from "../types";
 
@@ -62,6 +63,16 @@ export function createViewerFromParsed(
   // pushes any parity camera state already set onto it (installPlugin).
   if (!viewer.getPlugins().some((plugin) => plugin.id === "camera")) {
     viewer.addPlugin(createCameraPlugin());
+  }
+  // The original ballcam "<PLAYER> SCORED !!" goal banner ships on by default
+  // (opt out with `scoredText: false`). Skipped when the consumer already
+  // installed their own scored-text plugin (same id), so a custom-configured
+  // banner wins.
+  if (
+    options.scoredText !== false &&
+    !viewer.getPlugins().some((plugin) => plugin.id === "scored-text")
+  ) {
+    viewer.addPlugin(createScoredTextPlugin());
   }
   return viewer;
 }

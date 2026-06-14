@@ -106,9 +106,11 @@ Key modules:
   now fires in the core: `ViewerPlayer` feeds the replay's goal events to the
   effects system and `ActorManager` triggers the blast at the ball as playback
   crosses each goal (gated by `effects`, default on). The centered
-  "&lt;PLAYER&gt; SCORED !!" banner is a separate, toggleable plugin
+  "&lt;PLAYER&gt; SCORED !!" banner is a separate plugin
   (`createScoredTextPlugin()`) — a faithful reproduction of the original gold
-  6rem Bourgeois HUD text, add/remove it at runtime like any other plugin.
+  6rem Bourgeois HUD text. `createViewer` auto-installs it (default on; opt out
+  with `scoredText: false`, or pass your own to override), and it can be
+  added/removed at runtime like any other plugin.
 - **@rlrml/player control-surface parity (Phase 1).** `ViewerPlayer` now
   exposes `@rlrml/player`'s `ReplayPlayer` API: the full
   `ReplayPlayerState`-shaped state (frameIndex, camera fields, display

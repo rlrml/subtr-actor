@@ -204,8 +204,13 @@ export interface ViewerOptions {
   speed?: number;
   /** Wrap to t=0 at the end instead of pausing (default false). */
   loop?: boolean;
-  /** Boost/supersonic/ball trail effects (default true). */
+  /** Boost/supersonic/ball trail effects, including the goal explosion (default true). */
   effects?: boolean;
+  /**
+   * Auto-install the "<PLAYER> SCORED !!" goal banner plugin (default true).
+   * Set false to opt out, or pass your own scored-text plugin in `plugins`.
+   */
+  scoredText?: boolean;
   /**
    * Skybox environment driving the background + image-based lighting
    * (reflections/ambient on cars, arena, ball). A built-in id (default

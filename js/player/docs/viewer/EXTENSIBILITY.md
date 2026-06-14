@@ -21,8 +21,9 @@ player. They are meant to return as plugins on a hook system modeled directly on
 > ball-orbit / RL-style follow modes, recorded-or-forced ball cam, RL camera
 > settings — follow mode seeds from the player's recorded replay preset —
 > and the horizontal→vertical FOV conversion), plus `createScoredTextPlugin()`
-> (the original centered "&lt;PLAYER&gt; SCORED !!" goal banner — a toggleable
-> DOM overlay). Trail effects
+> (the original centered "&lt;PLAYER&gt; SCORED !!" goal banner — a DOM overlay
+> auto-installed by `createViewer`, default on, opt out with `scoredText: false`).
+> Trail effects
 > (boost/supersonic/ball) are wired in the core via the real EffectsManager
 > (`effects: false` opts out), and the core render loop keeps the original
 > GameEngine per-frame path (animation mixer, boost/supersonic particle state,
