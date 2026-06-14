@@ -101,6 +101,14 @@ Key modules:
   ultra-wide floor. The dev harness mounts a mode/player dropdown + ball-cam
   toggle (`B` key) + stiffness slider, and accepts
   `?follow=<player>&t=<seconds>` URL params.
+- **Goal explosion + scored text.** The team-colored goal explosion (the
+  original GameEngine's pooled particle/shockwave burst, in `EffectsManager`)
+  now fires in the core: `ViewerPlayer` feeds the replay's goal events to the
+  effects system and `ActorManager` triggers the blast at the ball as playback
+  crosses each goal (gated by `effects`, default on). The centered
+  "&lt;PLAYER&gt; SCORED !!" banner is a separate, toggleable plugin
+  (`createScoredTextPlugin()`) — a faithful reproduction of the original gold
+  6rem Bourgeois HUD text, add/remove it at runtime like any other plugin.
 - **@rlrml/player control-surface parity (Phase 1).** `ViewerPlayer` now
   exposes `@rlrml/player`'s `ReplayPlayer` API: the full
   `ReplayPlayerState`-shaped state (frameIndex, camera fields, display

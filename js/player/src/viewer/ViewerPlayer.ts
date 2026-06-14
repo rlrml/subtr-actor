@@ -312,8 +312,9 @@ export class ViewerPlayer extends EventTarget {
     this.sceneManager.initDefaultEnvironment();
     this.applyEnvironmentSpec(options.environment ?? DEFAULT_ENVIRONMENT_ID);
     this.arenaManager = new ArenaManager(this.scene, { assetBase: options.assetBase });
-    // Trails (boost / supersonic / ball). Explosions stay dormant until the
-    // adapter exposes goal/demo events (its event getters are still stubs).
+    // Trails (boost / supersonic / ball) plus the team-colored goal explosion,
+    // which fires from ActorManager when playback reaches each goal (see the
+    // setGoalEvents() feed below).
     this.effectsEnabled = options.effects ?? true;
     this.effectsManager = this.effectsEnabled ? new EffectsManager(this.scene) : effectsStub;
     this.actorManager = new ActorManager(this.scene, this.effectsManager, {
@@ -327,10 +328,26 @@ export class ViewerPlayer extends EventTarget {
     // Hitbox wireframes (driven by the hitboxWireframesEnabled /
     // hitboxOnlyModeEnabled parity toggles; updated per frame in render()).
     this.hitboxManager = new HitboxManager(this.scene);
-    // NOTE: deliberately NOT calling effectsManager.setRenderContext() yet — it
-    // pre-warms the explosion shader pools, which blocks the main thread for
-    // seconds, and nothing can trigger explosions until the adapter exposes
-    // goal/demo events. Call it when those events land.
+    // Feed the replay's goal events (frame, time, scoring team, scorer) to the
+    // effects system. ActorManager fires the matching explosion as playback
+    // crosses each goal. Uses the normalized ReplayModel timeline, so scorer
+    // name + team resolution is shared with the rest of the player.
+    if (this.effectsEnabled && this.replay) {
+      this.effectsManager.setGoalEvents(
+        this.replay.timelineEvents
+          .filter((event) => event.kind === "goal")
+          .map((event) => ({
+            frame: event.frame,
+            time: event.time,
+            team: event.isTeamZero ? 0 : 1,
+            playerName: event.playerName ?? "",
+          })),
+      );
+    }
+    // setRenderContext() pre-warms the explosion shader pools — a multi-second,
+    // main-thread-blocking compile. Deferred behind `ready` (below) so it
+    // finishes under the load overlay, well before the first goal, instead of
+    // hitching on the first explosion.
 
     // Default camera: simple orbit. The full follow/ballcam path is a later
     // bring-up; plugins can also drive `camera` directly.
@@ -350,7 +367,15 @@ export class ViewerPlayer extends EventTarget {
         console.warn("[viewer] arena load failed", e);
       }),
       this.actorManager.waitForBallModel().catch(() => false),
-    ]).then(() => undefined);
+    ]).then(() => {
+      if (this.effectsEnabled) {
+        try {
+          this.effectsManager.setRenderContext(this.renderer, this.camera);
+        } catch (e) {
+          console.warn("[viewer] explosion warmup failed", e);
+        }
+      }
+    });
 
     this.installResizeHandling();
     for (const definition of options.plugins ?? []) {

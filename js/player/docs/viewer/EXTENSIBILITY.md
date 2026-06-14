@@ -20,11 +20,15 @@ player. They are meant to return as plugins on a hook system modeled directly on
 > (the full original CameraManager behind one handle: orbit / free-fly /
 > ball-orbit / RL-style follow modes, recorded-or-forced ball cam, RL camera
 > settings — follow mode seeds from the player's recorded replay preset —
-> and the horizontal→vertical FOV conversion). Trail effects
+> and the horizontal→vertical FOV conversion), plus `createScoredTextPlugin()`
+> (the original centered "&lt;PLAYER&gt; SCORED !!" goal banner — a toggleable
+> DOM overlay). Trail effects
 > (boost/supersonic/ball) are wired in the core via the real EffectsManager
 > (`effects: false` opts out), and the core render loop keeps the original
 > GameEngine per-frame path (animation mixer, boost/supersonic particle state,
-> wheel rotations, seek-time resets); explosions wait on adapter events.
+> wheel rotations, seek-time resets). Goal explosions are now wired too: the
+> core feeds the replay's goal events to EffectsManager and fires the
+> team-colored explosion as playback crosses each goal.
 
 ## The `ViewerPlugin` contract
 
