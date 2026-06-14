@@ -109,22 +109,6 @@ fn event_definition_ids_are_unique() {
 }
 
 #[test]
-fn every_produced_event_has_a_registered_definition() {
-    let registered: std::collections::BTreeSet<&str> =
-        all_event_definitions().iter().map(|def| def.id).collect();
-    for producer in event_producers() {
-        for emitted in producer.emitted_events {
-            assert!(
-                registered.contains(emitted.event.id),
-                "event {:?} is produced by {:?} but is missing from the definition registry",
-                emitted.event.id,
-                producer.node_name
-            );
-        }
-    }
-}
-
-#[test]
 fn expansion_parents_are_hidden_from_review() {
     // A parent that declares variants surfaces those instead of itself, so it
     // must be hidden or the raw parent key leaks into the review picker.

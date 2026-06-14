@@ -22,6 +22,7 @@ impl_analysis_node! {
     node = RushNode,
     state = RushCalculator,
     name = "rush",
+    emitted_events = crate::stats::calculators::RUSH_EMITTED_EVENTS,
     dependencies = [
         frame_info_dependency() => FrameInfo,
         gameplay_state_dependency() => GameplayState,
