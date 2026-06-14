@@ -320,7 +320,6 @@ private:
   bool uiScoreboardOpen = true;
   bool uiEventsOpen = false;
   bool uiStatusOpen = false;
-  bool uiCameraOpen = false;
   bool uiPlaybackControlsOpen = false;
   bool uiRecordingOpen = false;
   bool uiGraphInspectorOpen = false;
@@ -350,20 +349,6 @@ private:
   bool renderEffectAbsolutePositioningEnabled = false;
   bool renderEffectSpeedFlipEnabled = false;
   bool renderEffectTouchEnabled = false;
-  int cameraViewMode = 0;
-  int cameraFreePreset = -1;
-  uint32_t cameraSelectedPlayerIndex = 0;
-  std::string cameraSelectedPlayerId;
-  float cameraDistanceScale = 1.0f;
-  bool cameraCustomSettingsEnabled = false;
-  bool cameraBallCamEnabled = false;
-  float cameraCustomFov = 110.0f;
-  float cameraCustomHeight = 100.0f;
-  float cameraCustomPitch = -4.0f;
-  float cameraCustomDistance = 270.0f;
-  float cameraCustomStiffness = 0.0f;
-  float cameraCustomSwivelSpeed = 1.0f;
-  float cameraCustomTransitionSpeed = 1.0f;
   float playbackCurrentTime = 0.0f;
   bool playbackPlaying = false;
   float playbackRate = 1.0f;
@@ -418,7 +403,6 @@ private:
   UiWindowPlacement scoreboardPlacement;
   UiWindowPlacement eventsPlacement;
   UiWindowPlacement statusPlacement;
-  UiWindowPlacement cameraPlacement;
   UiWindowPlacement playbackControlsPlacement;
   UiWindowPlacement recordingPlacement;
   UiWindowPlacement graphInspectorPlacement;
@@ -479,7 +463,6 @@ private:
   void renderEventsWindow();
   void renderEventSourceControls();
   void renderStatusWindow();
-  void renderCameraWindow();
   void applyPlaybackConfigToReplay(std::string_view sourceLabel);
   void renderPlaybackControlsWindow();
   void renderRecordingWindow();
@@ -632,9 +615,6 @@ private:
   std::string webPlayerIdForWindow(const UiStatsWindow &window) const;
   std::optional<std::string> webPlayerIdForWindowConfig(const UiStatsWindow &window) const;
   void resolveStatsWindowPlayerSelection(UiStatsWindow &window);
-  std::string webCameraPlayerId() const;
-  std::optional<std::string> webCameraPlayerIdConfig() const;
-  void resolveCameraPlayerSelection();
   void renderAdHocTargetSelector(
       UiStatsWindow &window,
       UiStatsWindow::Entry &entry,

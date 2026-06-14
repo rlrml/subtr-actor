@@ -86,8 +86,6 @@ void SubtrActorPlugin::renderFloatingWindowLayer() {
       renderWithFloatingWindowStyle([&]() { renderEventPlaylistWindow(); });
     } else if (id == "status") {
       renderWithFloatingWindowStyle([&]() { renderStatusWindow(); });
-    } else if (id == "camera") {
-      renderWithFloatingWindowStyle([&]() { renderCameraWindow(); });
     } else if (id == "playback") {
       renderWithFloatingWindowStyle([&]() { renderPlaybackControlsWindow(); });
     } else if (id == "recording") {

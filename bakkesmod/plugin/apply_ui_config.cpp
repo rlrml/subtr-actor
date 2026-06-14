@@ -176,49 +176,6 @@ void SubtrActorPlugin::applyUiConfigJson(
     boostPickupAnimationEnabled = parseJsonBoolProperty(*overlays, "boostPickupAnimation")
                                       .value_or(boostPickupAnimationEnabled);
   }
-  cameraViewMode = static_cast<int>(
-      std::clamp(parseJsonNumberProperty(json, "camera_view_mode").value_or(0.0), 0.0, 3.0));
-  cameraFreePreset = static_cast<int>(
-      std::clamp(parseJsonNumberProperty(json, "camera_free_preset").value_or(-1.0), -1.0, 1.0));
-  cameraSelectedPlayerId =
-      parseJsonStringProperty(json, "camera_selected_player_id").value_or("");
-  cameraSelectedPlayerIndex = static_cast<uint32_t>(
-      std::max(0.0, parseJsonNumberProperty(json, "camera_selected_player_index").value_or(0.0)));
-  cameraDistanceScale = static_cast<float>(std::clamp(
-      parseJsonNumberProperty(json, "camera_distance_scale").value_or(cameraDistanceScale),
-      0.75,
-      4.0));
-  cameraCustomSettingsEnabled =
-      parseJsonBoolProperty(json, "camera_custom_settings_enabled")
-          .value_or(cameraCustomSettingsEnabled);
-  cameraBallCamEnabled =
-      parseJsonBoolProperty(json, "camera_ball_cam_enabled").value_or(cameraBallCamEnabled);
-  cameraCustomFov = static_cast<float>(
-      std::clamp(parseJsonNumberProperty(json, "camera_custom_fov").value_or(110.0), 60.0, 130.0));
-  cameraCustomHeight = static_cast<float>(std::clamp(
-      parseJsonNumberProperty(json, "camera_custom_height").value_or(100.0),
-      40.0,
-      250.0));
-  cameraCustomPitch = static_cast<float>(std::clamp(
-      parseJsonNumberProperty(json, "camera_custom_pitch").value_or(-4.0),
-      -30.0,
-      30.0));
-  cameraCustomDistance = static_cast<float>(std::clamp(
-      parseJsonNumberProperty(json, "camera_custom_distance").value_or(270.0),
-      100.0,
-      500.0));
-  cameraCustomStiffness = static_cast<float>(std::clamp(
-      parseJsonNumberProperty(json, "camera_custom_stiffness").value_or(0.0),
-      0.0,
-      1.0));
-  cameraCustomSwivelSpeed = static_cast<float>(std::clamp(
-      parseJsonNumberProperty(json, "camera_custom_swivel_speed").value_or(1.0),
-      1.0,
-      10.0));
-  cameraCustomTransitionSpeed = static_cast<float>(std::clamp(
-      parseJsonNumberProperty(json, "camera_custom_transition_speed").value_or(1.0),
-      0.5,
-      2.0));
   recordingFps = static_cast<int>(
       std::clamp(parseJsonNumberProperty(json, "recording_fps").value_or(60.0), 1.0, 120.0));
   recordingPlaybackRateIndex = static_cast<int>(std::clamp(
@@ -226,84 +183,6 @@ void SubtrActorPlugin::applyUiConfigJson(
       0.0,
       3.0));
 
-  if (const auto camera = parseJsonObjectProperty(json, "camera")) {
-    const std::optional<std::string> mode = parseJsonStringProperty(*camera, "mode");
-    if (mode == "follow") {
-      cameraViewMode = 1;
-      cameraFreePreset = -1;
-    } else if (mode == "free") {
-      cameraViewMode = 0;
-      cameraFreePreset = -1;
-    }
-    const std::optional<std::string> freePreset =
-        parseJsonStringProperty(*camera, "freePreset");
-    if (freePreset == "overhead") {
-      cameraFreePreset = 0;
-      if (cameraViewMode != 1) {
-        cameraViewMode = 2;
-      }
-    } else if (freePreset == "side") {
-      cameraFreePreset = 1;
-      if (cameraViewMode != 1) {
-        cameraViewMode = 3;
-      }
-    } else if (jsonPropertyIsNull(*camera, "freePreset")) {
-      cameraFreePreset = -1;
-    }
-    if (jsonPropertyExists(*camera, "attachedPlayerId")) {
-      cameraSelectedPlayerId.clear();
-    }
-    if (const auto attachedPlayerId = parseJsonStringProperty(*camera, "attachedPlayerId")) {
-      cameraSelectedPlayerId = *attachedPlayerId;
-      if (const auto parsedPlayerIndex = parseUnsignedIntegerString(*attachedPlayerId)) {
-        cameraSelectedPlayerIndex = *parsedPlayerIndex;
-      } else if (const auto uniquePlayerIndex = uniqueIdPlayerIndices.find(*attachedPlayerId);
-                 uniquePlayerIndex != uniqueIdPlayerIndices.end()) {
-        cameraSelectedPlayerIndex = uniquePlayerIndex->second;
-      }
-    }
-    cameraDistanceScale = static_cast<float>(std::clamp(
-        parseJsonNumberProperty(*camera, "distanceScale").value_or(cameraDistanceScale),
-        0.75,
-        4.0));
-    cameraBallCamEnabled =
-        parseJsonBoolProperty(*camera, "ballCam").value_or(cameraBallCamEnabled);
-    if (const auto customSettings = parseJsonObjectProperty(*camera, "customSettings")) {
-      cameraCustomSettingsEnabled = true;
-      cameraCustomFov = static_cast<float>(std::clamp(
-          parseJsonNumberProperty(*customSettings, "fov").value_or(cameraCustomFov),
-          60.0,
-          130.0));
-      cameraCustomHeight = static_cast<float>(std::clamp(
-          parseJsonNumberProperty(*customSettings, "height").value_or(cameraCustomHeight),
-          40.0,
-          250.0));
-      cameraCustomPitch = static_cast<float>(std::clamp(
-          parseJsonNumberProperty(*customSettings, "pitch").value_or(cameraCustomPitch),
-          -30.0,
-          30.0));
-      cameraCustomDistance = static_cast<float>(std::clamp(
-          parseJsonNumberProperty(*customSettings, "distance").value_or(cameraCustomDistance),
-          100.0,
-          500.0));
-      cameraCustomStiffness = static_cast<float>(std::clamp(
-          parseJsonNumberProperty(*customSettings, "stiffness").value_or(cameraCustomStiffness),
-          0.0,
-          1.0));
-      cameraCustomSwivelSpeed = static_cast<float>(std::clamp(
-          parseJsonNumberProperty(*customSettings, "swivelSpeed")
-              .value_or(cameraCustomSwivelSpeed),
-          1.0,
-          10.0));
-      cameraCustomTransitionSpeed = static_cast<float>(std::clamp(
-          parseJsonNumberProperty(*customSettings, "transitionSpeed")
-              .value_or(cameraCustomTransitionSpeed),
-          0.5,
-          2.0));
-    } else if (jsonPropertyIsNull(*camera, "customSettings")) {
-      cameraCustomSettingsEnabled = false;
-    }
-  }
   if (const auto recording = parseJsonObjectProperty(json, "recording")) {
     recordingFps = static_cast<int>(
         std::clamp(parseJsonNumberProperty(*recording, "fps").value_or(recordingFps), 1.0, 120.0));
