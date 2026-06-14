@@ -6,6 +6,10 @@ Python bindings for [subtr-actor](https://github.com/rlrml/subtr-actor), a Rocke
 
 ```bash
 pip install subtr-actor-py
+# or, with uv:
+uv add subtr-actor-py
+# or, with Poetry:
+poetry add subtr-actor-py
 ```
 
 ## Usage

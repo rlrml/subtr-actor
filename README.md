@@ -160,6 +160,10 @@ cargo add subtr-actor
 
 ```bash
 pip install subtr-actor-py
+# or, with uv:
+uv add subtr-actor-py
+# or, with Poetry:
+poetry add subtr-actor-py
 ```
 
 ### JavaScript
