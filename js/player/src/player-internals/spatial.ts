@@ -428,6 +428,14 @@ export function updateAttachedCamera(options: {
   desiredCameraPosition: THREE.Vector3;
   desiredLookTarget: THREE.Vector3;
   blendState?: AttachedCameraBlendState;
+  /**
+   * When true, rotate the chase camera by the followed player's replicated
+   * camera yaw/pitch (free-look swivel) instead of locking it to car
+   * orientation. Opt-in: the angles need per-replay sign tuning and only
+   * matter while the player is free-looking, so the default keeps the existing
+   * synthetic framing.
+   */
+  replayCameraLook?: boolean;
 }): void {
   const {
     cameraViewMode,
@@ -448,6 +456,7 @@ export function updateAttachedCamera(options: {
     replay,
     sceneState,
     blendState: providedBlendState,
+    replayCameraLook = false,
   } = options;
   const controls = sceneState.controls;
   const blendState =
@@ -500,8 +509,37 @@ export function updateAttachedCamera(options: {
 
   const basePosition = worldPosition(renderFrame.position ?? frame.position, fieldScale);
   const orientation = getOrientationVectors(renderFrame);
-  const forward = orientation?.forward ?? DEFAULT_FORWARD.clone();
-  const right = orientation?.right ?? new THREE.Vector3(0, 1, 0);
+  const forward = (orientation?.forward ?? DEFAULT_FORWARD.clone()).clone();
+  const right = (orientation?.right ?? new THREE.Vector3(0, 1, 0)).clone();
+
+  // Optional replay-driven free-look: swivel the chase basis by the player's
+  // replicated camera yaw about world-up (plus a 180° flip while behind-view /
+  // rear camera is active). Pitch is folded into the chase pitch below.
+  // Disabled by default (see `replayCameraLook`).
+  let replayPitch = 0;
+  if (replayCameraLook) {
+    let yawOffset = frame.cameraYaw ?? 0;
+    const events = attachedPlayer.cameraEvents;
+    if (events) {
+      for (let index = events.length - 1; index >= 0; index -= 1) {
+        const change = events[index]!;
+        if (change.frame > frameIndex) {
+          continue;
+        }
+        if (change.behindViewActive != null) {
+          if (change.behindViewActive) {
+            yawOffset += Math.PI;
+          }
+          break;
+        }
+      }
+    }
+    if (yawOffset !== 0) {
+      forward.applyAxisAngle(DEFAULT_UP, yawOffset).normalize();
+      right.applyAxisAngle(DEFAULT_UP, yawOffset).normalize();
+    }
+    replayPitch = frame.cameraPitch ?? 0;
+  }
 
   const cameraSettings = {
     ...attachedPlayer.cameraSettings,
@@ -509,7 +547,7 @@ export function updateAttachedCamera(options: {
   };
   const distance = (cameraSettings.distance ?? 270) * fieldScale * cameraDistanceScale;
   const height = (cameraSettings.height ?? 100) * fieldScale * CHASE_CAMERA_HEIGHT_MULTIPLIER;
-  const pitch = THREE.MathUtils.degToRad(cameraSettings.pitch ?? -4);
+  const pitch = THREE.MathUtils.degToRad(cameraSettings.pitch ?? -4) + replayPitch;
   const lookDirection = forward.clone().applyAxisAngle(right, pitch).normalize();
   const chaseAnchor = basePosition.clone().addScaledVector(DEFAULT_UP, height);
   const followOffset = forward

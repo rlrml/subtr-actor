@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import {
   createReplayScene,
+  EXAMPLE_CAR_WHEEL_RADIUS_UU,
+  getCarWheels,
   setHitboxOverlayOnlyMode,
   updateBoostMeter,
   type ReplayScene,
@@ -64,6 +66,48 @@ import type {
 
 const DEFAULT_FIELD_SCALE = 1;
 
+const WHEEL_MAX_STEER_RAD = Math.PI / 6;
+const WHEEL_SPIN_AXIS = new THREE.Vector3(0, 1, 0);
+const WHEEL_LAY_DOWN_QUAT = new THREE.Quaternion().setFromAxisAngle(
+  new THREE.Vector3(0, 0, 1),
+  Math.PI / 2,
+);
+const wheelSpinQuat = new THREE.Quaternion();
+
+/**
+ * Animates the example car's wheels from replay data: front wheels steer from
+ * the normalized steer input, and all wheels spin proportionally to how far the
+ * car travelled (accumulated on the mesh's userData). Wheels always spin in the
+ * roll direction to avoid the wagon-wheel strobe. No-op for car meshes without
+ * the example-car wheel rig.
+ */
+function updateExampleCarWheels(
+  mesh: THREE.Object3D,
+  steer: number | null | undefined,
+  position: Vec3,
+): void {
+  const wheels = getCarWheels(mesh);
+  if (!wheels) {
+    return;
+  }
+  const wheelState = mesh.userData as { wheelSpin?: number; lastWheelPos?: Vec3 };
+  const last = wheelState.lastWheelPos;
+  if (last) {
+    const distance = Math.hypot(position.x - last.x, position.y - last.y, position.z - last.z);
+    wheelState.wheelSpin = (wheelState.wheelSpin ?? 0) + distance / EXAMPLE_CAR_WHEEL_RADIUS_UU;
+  }
+  wheelState.lastWheelPos = { x: position.x, y: position.y, z: position.z };
+
+  wheelSpinQuat.setFromAxisAngle(WHEEL_SPIN_AXIS, wheelState.wheelSpin ?? 0);
+  const steerAngle = -(steer ?? 0) * WHEEL_MAX_STEER_RAD;
+  for (const { pivot, wheel, isFront } of wheels) {
+    wheel.quaternion.copy(WHEEL_LAY_DOWN_QUAT).multiply(wheelSpinQuat);
+    if (isFront) {
+      pivot.rotation.z = steerAngle;
+    }
+  }
+}
+
 type ReplayPlayerListener = (state: ReplayPlayerState) => void;
 type InstalledReplayPlayerPlugin = {
   definition: ReplayPlayerPluginDefinition;
@@ -109,6 +153,7 @@ export class ReplayPlayer extends EventTarget {
   private attachedPlayerId: string | null;
   private ballCamEnabled: boolean;
   private useReplayBallCam: boolean;
+  private useReplayCameraLook: boolean;
   private lastEffectiveBallCamEnabled = false;
   private boostMeterEnabled: boolean;
   private boostPickupAnimationEnabled: boolean;
@@ -134,6 +179,7 @@ export class ReplayPlayer extends EventTarget {
     this.cameraViewMode = initialSettings.cameraViewMode;
     this.ballCamEnabled = initialSettings.ballCamEnabled;
     this.useReplayBallCam = initialSettings.useReplayBallCam;
+    this.useReplayCameraLook = options.initialUseReplayCameraLook ?? false;
     this.lastEffectiveBallCamEnabled = initialSettings.ballCamEnabled;
     this.attachedCameraBlendState = {
       currentBlend: initialSettings.ballCamEnabled ? 1 : 0,
@@ -257,6 +303,12 @@ export class ReplayPlayer extends EventTarget {
 
   setUseReplayBallCam(enabled: boolean): void {
     this.useReplayBallCam = enabled;
+    this.render();
+    this.emitChange();
+  }
+
+  setUseReplayCameraLook(enabled: boolean): void {
+    this.useReplayCameraLook = enabled;
     this.render();
     this.emitChange();
   }
@@ -854,6 +906,8 @@ export class ReplayPlayer extends EventTarget {
         mesh.quaternion.identity();
       }
 
+      updateExampleCarWheels(mesh, frame?.steer, interpolatedPosition);
+
       const currentBoostFraction = frame?.boostFraction ?? 0;
       const nextBoostFraction = nextFrame?.boostFraction ?? currentBoostFraction;
       boostFraction = THREE.MathUtils.lerp(
@@ -928,6 +982,7 @@ export class ReplayPlayer extends EventTarget {
       desiredCameraPosition: this.desiredCameraPosition,
       desiredLookTarget: this.desiredLookTarget,
       blendState: this.attachedCameraBlendState,
+      replayCameraLook: this.useReplayCameraLook,
     });
     if (this.cameraViewMode === "free" && this.freeCameraTransition) {
       const completed = updateFreeCameraTransition({

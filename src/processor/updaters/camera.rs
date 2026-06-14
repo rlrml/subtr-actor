@@ -17,12 +17,19 @@ impl<'a> ReplayProcessor<'a> {
         _frame: &boxcars::Frame,
         frame_index: usize,
     ) -> SubtrActorResult<()> {
-        let player_ids: Vec<PlayerId> = self.iter_player_ids_in_order().cloned().collect();
-        for player_id in player_ids {
+        // Move the accumulators out so the per-player loop can hold an immutable
+        // borrow of `self` (for the queries + player order) without also needing
+        // `&mut self`. This avoids cloning the player-id list into a fresh Vec
+        // every frame; player ids are only cloned on the rare frames where a
+        // toggle actually changes.
+        let mut last = std::mem::take(&mut self.player_camera_state_last);
+        let mut events = std::mem::take(&mut self.player_camera_events);
+
+        for player_id in self.iter_player_ids_in_order() {
             let current: PlayerCameraToggleState = (
-                self.get_ball_cam_active(&player_id).ok(),
-                self.get_behind_view_active(&player_id).ok(),
-                self.get_driving(&player_id).ok(),
+                self.get_ball_cam_active(player_id).ok(),
+                self.get_behind_view_active(player_id).ok(),
+                self.get_driving(player_id).ok(),
             );
 
             // Nothing replicated yet for this player; don't record empty changes.
@@ -30,14 +37,13 @@ impl<'a> ReplayProcessor<'a> {
                 continue;
             }
 
-            if self.player_camera_state_last.get(&player_id) == Some(&current) {
+            if last.get(player_id) == Some(&current) {
                 continue;
             }
-            self.player_camera_state_last
-                .insert(player_id.clone(), current);
+            last.insert(player_id.clone(), current);
 
-            self.player_camera_events.push((
-                player_id,
+            events.push((
+                player_id.clone(),
                 PlayerCameraStateChange {
                     frame: frame_index,
                     ball_cam_active: current.0,
@@ -47,6 +53,8 @@ impl<'a> ReplayProcessor<'a> {
             ));
         }
 
+        self.player_camera_state_last = last;
+        self.player_camera_events = events;
         Ok(())
     }
 }

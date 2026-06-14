@@ -18,8 +18,8 @@ export type PlayerCameraFrame = {
 /**
  * Raw camera pitch byte (0-255) as replicated; convert at display time.
  */
-pitch: number | null,
+pitch?: number | null,
 /**
  * Raw camera yaw byte (0-255) as replicated; convert at display time.
  */
-yaw: number | null, };
+yaw?: number | null, };

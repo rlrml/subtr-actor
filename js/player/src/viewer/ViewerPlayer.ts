@@ -884,6 +884,22 @@ export class ViewerPlayer extends EventTarget {
     return this.adapter.playerList.find((p) => p.id === id)?.name ?? null;
   }
 
+  /**
+   * When ball cam has not been manually overridden (`ballCamEnabledValue ===
+   * null`), drive the follow camera from the attached player's replay ball-cam
+   * state (resolved per-frame onto `entity.isBallCam` by the adapter), matching
+   * the core @rlrml/player behavior. A manual `setBallCamEnabled` takes over.
+   */
+  private applyReplayBallCam(): void {
+    if (this.ballCamEnabledValue !== null) return;
+    if (this.cameraViewModeValue !== "follow" || !this.attachedPlayerIdValue) return;
+    const name = this.playerNameForId(this.attachedPlayerIdValue);
+    if (!name) return;
+    const entity = this.adapter.getAllPlayers().find((player) => player.name === name);
+    if (!entity) return;
+    this.getCameraPlugin()?.setBallCam(entity.isBallCam);
+  }
+
   /** Push the parity view-mode/attachment onto the camera plugin. */
   private syncCameraAttachment(): void {
     const camera = this.getCameraPlugin();
@@ -1017,6 +1033,7 @@ export class ViewerPlayer extends EventTarget {
     }
     this.actorManager.updateFromFramework(this.adapter, this.currentTime);
     this.updatePlayerStates();
+    this.applyReplayBallCam();
     this.updateHitboxVisualization();
     this.effectsManager.update(dt, this.playing, this.speed);
     if (this.playing) {
