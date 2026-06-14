@@ -88,7 +88,6 @@ pub enum EventCategory {
     Core,
     Mechanic,
     Positioning,
-    Movement,
     Annotation,
     Other,
     /// Label-like metadata rows (e.g. goal context). These are hidden from the
@@ -899,7 +898,7 @@ define_stats_event!(
     MOVEMENT_EVENT_DEFINITION,
     "movement",
     "Movement",
-    EventCategory::Movement
+    EventCategory::Other
 );
 define_stats_event!(
     PlayerActivityEvent,

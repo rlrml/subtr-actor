@@ -235,7 +235,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "movement",
     "label": "Movement",
-    "category": "movement",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
