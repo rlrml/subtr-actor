@@ -34,6 +34,7 @@ import {
   getFreeCameraPreset,
   interpolateQuaternion,
   interpolatePositionHermite,
+  isPositionDiscontinuity,
   rootPosition,
   updateFreeCameraTransition,
   updateAttachedCamera,
@@ -784,9 +785,17 @@ export class ReplayPlayer extends EventTarget {
       }
       renderPosition = interpolatedPosition;
       mesh.position.copy(rootPosition(interpolatedPosition));
+      // When the position snaps across a teleport (demo respawn / kickoff
+      // reposition), snap the orientation too instead of slerping through the
+      // relocation, which otherwise spins the car between frames.
+      const positionTeleport = isPositionDiscontinuity(
+        frame?.position ?? null,
+        nextFrame?.position ?? null,
+        frameWindow.dt,
+      );
       const rotation = interpolateQuaternion(
         frame?.rotation ?? null,
-        nextFrame?.rotation ?? null,
+        positionTeleport ? null : (nextFrame?.rotation ?? null),
         frameWindow.alpha,
       );
       if (rotation) {
