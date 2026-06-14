@@ -24,6 +24,15 @@ pub(crate) static BOT_KEY: &str = "Engine.PlayerReplicationInfo:bBot";
 pub(crate) static CAMERA_SETTINGS_PRI_KEY: &str = "TAGame.CameraSettingsActor_TA:PRI";
 pub(crate) static CAMERA_SETTINGS_PROFILE_KEY: &str =
     "TAGame.CameraSettingsActor_TA:ProfileSettings";
+// Dynamic, per-frame camera state replicated on the
+// `TAGame.CameraSettingsActor_TA` actor (linked back to a player actor via
+// [`CAMERA_SETTINGS_PRI_KEY`]). These let us reconstruct a player's actual
+// in-game camera (ball cam toggle + look direction) during playback rather
+// than synthesizing one from car/ball geometry.
+pub(crate) static CAMERA_BALL_CAM_KEY: &str = "TAGame.CameraSettingsActor_TA:bUsingSecondaryCamera";
+pub(crate) static CAMERA_BEHIND_VIEW_KEY: &str = "TAGame.CameraSettingsActor_TA:bUsingBehindView";
+pub(crate) static CAMERA_PITCH_KEY: &str = "TAGame.CameraSettingsActor_TA:CameraPitch";
+pub(crate) static CAMERA_YAW_KEY: &str = "TAGame.CameraSettingsActor_TA:CameraYaw";
 pub(crate) static CLIENT_LOADOUTS_KEY: &str = "TAGame.PRI_TA:ClientLoadouts";
 pub(crate) static COMPONENT_ACTIVE_KEY: &str = "TAGame.CarComponent_TA:ReplicatedActive";
 pub(crate) static DEMOLISH_EXTENDED_KEY: &str = "TAGame.Car_TA:ReplicatedDemolishExtended";
@@ -32,6 +41,15 @@ pub(crate) static DEMOLISH_GOAL_EXPLOSION_KEY: &str =
 pub(crate) static DODGES_REFRESHED_COUNTER_KEY: &str = "TAGame.Car_TA:DodgesRefreshedCounter";
 pub(crate) static IGNORE_SYNCING_KEY: &str = "TAGame.RBActor_TA:bIgnoreSyncing";
 pub(crate) static HANDBRAKE_KEY: &str = "TAGame.Vehicle_TA:bReplicatedHandbrake";
+// Per-frame vehicle inputs replicated on the car's `TAGame.Vehicle_TA` actor.
+// These drive accurate wheel steering/spin and engine state during playback.
+pub(crate) static THROTTLE_KEY: &str = "TAGame.Vehicle_TA:ReplicatedThrottle";
+pub(crate) static STEER_KEY: &str = "TAGame.Vehicle_TA:ReplicatedSteer";
+pub(crate) static DRIVING_KEY: &str = "TAGame.Vehicle_TA:bDriving";
+// Dodge impulse/torque replicated on the dodge component the instant a dodge
+// fires; combined with `dodge_active` they give the exact flip direction.
+pub(crate) static DODGE_IMPULSE_KEY: &str = "TAGame.CarComponent_Dodge_TA:DodgeImpulse";
+pub(crate) static DODGE_TORQUE_KEY: &str = "TAGame.CarComponent_Dodge_TA:DodgeTorque";
 pub(crate) static LAST_BOOST_AMOUNT_KEY: &str =
     "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount.Last";
 pub(crate) static MATCH_ASSISTS_KEY: &str = "TAGame.PRI_TA:MatchAssists";

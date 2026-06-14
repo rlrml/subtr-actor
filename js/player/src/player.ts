@@ -108,6 +108,8 @@ export class ReplayPlayer extends EventTarget {
   private freeCameraTransition: FreeCameraTransition | null = null;
   private attachedPlayerId: string | null;
   private ballCamEnabled: boolean;
+  private useReplayBallCam: boolean;
+  private lastEffectiveBallCamEnabled = false;
   private boostMeterEnabled: boolean;
   private boostPickupAnimationEnabled: boolean;
   private hitboxWireframesEnabled: boolean;
@@ -131,6 +133,8 @@ export class ReplayPlayer extends EventTarget {
     this.attachedPlayerId = initialSettings.attachedPlayerId;
     this.cameraViewMode = initialSettings.cameraViewMode;
     this.ballCamEnabled = initialSettings.ballCamEnabled;
+    this.useReplayBallCam = initialSettings.useReplayBallCam;
+    this.lastEffectiveBallCamEnabled = initialSettings.ballCamEnabled;
     this.attachedCameraBlendState = {
       currentBlend: initialSettings.ballCamEnabled ? 1 : 0,
       targetBlend: initialSettings.ballCamEnabled ? 1 : 0,
@@ -244,8 +248,44 @@ export class ReplayPlayer extends EventTarget {
 
   setBallCamEnabled(enabled: boolean): void {
     this.ballCamEnabled = enabled;
+    // A manual toggle is an explicit override: stop following the replay's
+    // ball-cam state until the caller re-enables replay-driven mode.
+    this.useReplayBallCam = false;
     this.render();
     this.emitChange();
+  }
+
+  setUseReplayBallCam(enabled: boolean): void {
+    this.useReplayBallCam = enabled;
+    this.render();
+    this.emitChange();
+  }
+
+  /**
+   * The ball-cam state to actually apply this frame. When replay-driven ball
+   * cam is enabled and we are following a player, we resolve their ball-cam
+   * toggle from the coalesced camera-event stream (the last change at or before
+   * this frame). Otherwise we fall back to the manual `ballCamEnabled` flag.
+   */
+  private resolveEffectiveBallCam(frameIndex: number): boolean {
+    if (this.useReplayBallCam && this.attachedPlayerId) {
+      const attachedPlayer = this.replay.players.find(
+        (player) => player.id === this.attachedPlayerId,
+      );
+      const events = attachedPlayer?.cameraEvents;
+      if (events) {
+        for (let index = events.length - 1; index >= 0; index -= 1) {
+          const event = events[index]!;
+          if (event.frame > frameIndex) {
+            continue;
+          }
+          if (event.ballCamActive != null) {
+            return event.ballCamActive;
+          }
+        }
+      }
+    }
+    return this.ballCamEnabled;
   }
 
   setBoostMeterEnabled(enabled: boolean): void {
@@ -367,6 +407,14 @@ export class ReplayPlayer extends EventTarget {
     }
     if (nextState.ballCamEnabled !== undefined) {
       this.ballCamEnabled = nextState.ballCamEnabled;
+      // Patching the manual flag is a manual override unless the patch also
+      // explicitly re-enables replay-driven ball cam.
+      if (nextState.useReplayBallCam === undefined) {
+        this.useReplayBallCam = false;
+      }
+    }
+    if (nextState.useReplayBallCam !== undefined) {
+      this.useReplayBallCam = nextState.useReplayBallCam;
     }
     if (nextState.boostMeterEnabled !== undefined) {
       this.boostMeterEnabled = nextState.boostMeterEnabled;
@@ -430,6 +478,8 @@ export class ReplayPlayer extends EventTarget {
       cameraViewMode: this.cameraViewMode,
       attachedPlayerId: this.attachedPlayerId,
       ballCamEnabled: this.ballCamEnabled,
+      useReplayBallCam: this.useReplayBallCam,
+      effectiveBallCamEnabled: this.lastEffectiveBallCamEnabled,
       boostMeterEnabled: this.boostMeterEnabled,
       boostPickupAnimationEnabled: this.boostPickupAnimationEnabled,
       hitboxWireframesEnabled: this.hitboxWireframesEnabled,
@@ -854,13 +904,15 @@ export class ReplayPlayer extends EventTarget {
       });
     }
 
+    const effectiveBallCamEnabled = this.resolveEffectiveBallCam(frameIndex);
+    this.lastEffectiveBallCamEnabled = effectiveBallCamEnabled;
     updateAttachedCamera({
       sceneState: this.sceneState,
       replay: this.replay,
       fieldScale: this.fieldScale,
       cameraViewMode: this.cameraViewMode,
       attachedPlayerId: this.attachedPlayerId,
-      ballCamEnabled: this.ballCamEnabled,
+      ballCamEnabled: effectiveBallCamEnabled,
       cameraDistanceScale: this.cameraDistanceScale,
       customCameraSettings: this.customCameraSettings,
       frameIndex,

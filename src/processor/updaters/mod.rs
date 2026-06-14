@@ -1,6 +1,7 @@
 use super::*;
 
 mod boost;
+mod camera;
 mod demolishes;
 mod goals;
 mod mappings;

@@ -271,6 +271,31 @@ pub struct PlayerStatEvent {
     pub shot: Option<ShotEventMetadata>,
 }
 
+/// A coalesced change in a player's discrete camera/vehicle toggles.
+///
+/// Ball cam, behind-view, and the driving flag flip only a handful of times per
+/// match, so rather than storing a value on every [`PlayerFrame`] these are
+/// emitted as one change per player whenever any of them flips. Each change
+/// carries the full discrete state from that frame onward, so a consumer
+/// resolves "ball cam at frame N" with a last-change-before-N lookup.
+///
+/// Changes are grouped by player on [`ReplayData`](crate::ReplayData) (so the
+/// player id is stored once, not per change) and ordered by frame within each
+/// player. A field is `None` when the replay never replicated it for that
+/// player; `time` and `is_team_0` are intentionally omitted because both are
+/// derivable from `frame` and the player id.
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PlayerCameraStateChange {
+    pub frame: usize,
+    /// Whether ball cam (secondary camera) is active from this frame onward.
+    pub ball_cam_active: Option<bool>,
+    /// Whether behind-view is active from this frame onward.
+    pub behind_view_active: Option<bool>,
+    /// Whether the car reports the driving flag from this frame onward.
+    pub driving: Option<bool>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchEvent {

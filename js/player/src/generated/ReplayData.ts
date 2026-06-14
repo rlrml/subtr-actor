@@ -4,7 +4,9 @@ import type { DemolishInfo } from "./DemolishInfo.ts";
 import type { DodgeRefreshedEvent } from "./DodgeRefreshedEvent.ts";
 import type { FrameData } from "./FrameData.ts";
 import type { GoalEvent } from "./GoalEvent.ts";
+import type { PlayerCameraStateChange } from "./PlayerCameraStateChange.ts";
 import type { PlayerStatEvent } from "./PlayerStatEvent.ts";
+import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { ReplayMeta } from "./ReplayMeta.ts";
 import type { ReplayTickMark } from "./ReplayTickMark.ts";
 import type { ResolvedBoostPad } from "./ResolvedBoostPad.ts";
@@ -79,6 +81,12 @@ touch_events: Array<TouchEvent>,
  * Exact dodge refresh events observed via the replay's refreshed-dodge counter
  */
 dodge_refreshed_events: Array<DodgeRefreshedEvent>,
+/**
+ * Coalesced camera/vehicle-toggle changes (ball cam, behind-view, driving)
+ * grouped by player — the player id is stored once and each entry holds
+ * that player's frame-ordered changes, rather than a value per frame.
+ */
+player_camera_events: Array<[RemoteIdTs, Array<PlayerCameraStateChange>]>,
 /**
  * Exact player stat counter increments observed during the replay
  */

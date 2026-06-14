@@ -490,4 +490,126 @@ impl<'a> ReplayProcessor<'a> {
         )
         .cloned()
     }
+
+    /// Returns the raw throttle byte (0-255, ~128 neutral) replicated on the
+    /// player's car this frame.
+    pub fn get_throttle(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_car_actor_id(player_id)?,
+            THROTTLE_KEY,
+            boxcars::Attribute::Byte
+        )
+        .cloned()
+    }
+
+    /// Returns the raw steer byte (0-255, ~128 centered) replicated on the
+    /// player's car this frame.
+    pub fn get_steer(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_car_actor_id(player_id)?,
+            STEER_KEY,
+            boxcars::Attribute::Byte
+        )
+        .cloned()
+    }
+
+    /// Returns whether the player's car currently reports the driving flag.
+    pub fn get_driving(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_car_actor_id(player_id)?,
+            DRIVING_KEY,
+            boxcars::Attribute::Boolean
+        )
+        .cloned()
+    }
+
+    /// Returns the impulse vector (raw replay units) of the player's most
+    /// recent dodge, read from the dodge component actor.
+    pub fn get_dodge_impulse(&self, player_id: &PlayerId) -> SubtrActorResult<(f32, f32, f32)> {
+        let vector = get_actor_attribute_matching!(
+            self,
+            &self.get_dodge_actor_id(player_id)?,
+            DODGE_IMPULSE_KEY,
+            boxcars::Attribute::Location
+        )?;
+        Ok((vector.x, vector.y, vector.z))
+    }
+
+    /// Returns the torque vector (raw replay units) of the player's most
+    /// recent dodge, read from the dodge component actor.
+    pub fn get_dodge_torque(&self, player_id: &PlayerId) -> SubtrActorResult<(f32, f32, f32)> {
+        let vector = get_actor_attribute_matching!(
+            self,
+            &self.get_dodge_actor_id(player_id)?,
+            DODGE_TORQUE_KEY,
+            boxcars::Attribute::Location
+        )?;
+        Ok((vector.x, vector.y, vector.z))
+    }
+
+    /// Resolves a player to the `TAGame.CameraSettingsActor_TA` actor that
+    /// replicates their live camera state, when one has been linked.
+    pub(crate) fn get_player_camera_settings_actor_id(
+        &self,
+        player_id: &PlayerId,
+    ) -> SubtrActorResult<boxcars::ActorId> {
+        let player_actor_id = self.get_player_actor_id(player_id)?;
+        self.player_actor_to_camera_settings_actor
+            .get(&player_actor_id)
+            .copied()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::ActorNotFound {
+                    name: "Camera Settings",
+                    player_id: player_id.clone(),
+                })
+            })
+    }
+
+    /// Returns whether the player's camera is in ball-cam (secondary camera)
+    /// mode this frame.
+    pub fn get_ball_cam_active(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_player_camera_settings_actor_id(player_id)?,
+            CAMERA_BALL_CAM_KEY,
+            boxcars::Attribute::Boolean
+        )
+        .cloned()
+    }
+
+    /// Returns whether the player's camera is in behind-view mode this frame.
+    pub fn get_behind_view_active(&self, player_id: &PlayerId) -> SubtrActorResult<bool> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_player_camera_settings_actor_id(player_id)?,
+            CAMERA_BEHIND_VIEW_KEY,
+            boxcars::Attribute::Boolean
+        )
+        .cloned()
+    }
+
+    /// Returns the raw camera pitch byte (0-255) replicated for the player.
+    pub fn get_camera_pitch(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_player_camera_settings_actor_id(player_id)?,
+            CAMERA_PITCH_KEY,
+            boxcars::Attribute::Byte
+        )
+        .cloned()
+    }
+
+    /// Returns the raw camera yaw byte (0-255) replicated for the player.
+    pub fn get_camera_yaw(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        get_actor_attribute_matching!(
+            self,
+            &self.get_player_camera_settings_actor_id(player_id)?,
+            CAMERA_YAW_KEY,
+            boxcars::Attribute::Byte
+        )
+        .cloned()
+    }
 }

@@ -109,6 +109,50 @@ impl BallFrame {
     }
 }
 
+/// Replay-driven continuous camera look state for a player at a single frame.
+///
+/// Captured from the player's `TAGame.CameraSettingsActor_TA` actor. Rocket
+/// League does not replicate the camera's world position, so this is the raw
+/// material a renderer uses to *reconstruct* the player's point of view rather
+/// than a literal camera transform. The discrete camera toggles (ball cam,
+/// behind-view) flip rarely and are carried in the coalesced
+/// [`PlayerCameraStateChange`] stream instead of on every frame.
+///
+/// Every field is optional: it is `None` when the replay does not replicate
+/// that attribute for the player (e.g. very old replays, or a player whose
+/// camera-settings actor has not appeared yet).
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PlayerCameraFrame {
+    /// Raw camera pitch byte (0-255) as replicated; convert at display time.
+    pub pitch: Option<u8>,
+    /// Raw camera yaw byte (0-255) as replicated; convert at display time.
+    pub yaw: Option<u8>,
+}
+
+/// Replay-driven vehicle input/state for a player at a single frame.
+///
+/// Captured from the car's `TAGame.Vehicle_TA` actor and dodge component.
+/// These let a renderer drive accurate wheel steering/spin and flip direction
+/// instead of estimating them from position deltas. The rarely-flipping driving
+/// flag lives in the coalesced [`PlayerCameraStateChange`] stream instead.
+///
+/// Every field is optional: it is `None` when the replay does not replicate
+/// that attribute for the frame.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PlayerInputFrame {
+    /// Raw throttle byte (0-255, ~128 neutral); convert at display time.
+    pub throttle: Option<u8>,
+    /// Raw steer byte (0-255, ~128 centered); convert at display time.
+    pub steer: Option<u8>,
+    /// Impulse vector `(x, y, z)` in raw replay units of the most recent
+    /// dodge. Meaningful while [`PlayerFrame::Data::dodge_active`] is set.
+    pub dodge_impulse: Option<(f32, f32, f32)>,
+    /// Torque vector `(x, y, z)` in raw replay units of the most recent dodge.
+    pub dodge_torque: Option<(f32, f32, f32)>,
+}
+
 /// Represents a player's state for a single frame in a Rocket League replay.
 ///
 /// Contains comprehensive information about a player's position, movement,
@@ -146,6 +190,10 @@ pub enum PlayerFrame {
         team: Option<i32>,
         /// Whether the player is on team 0 (blue team typically)
         is_team_0: Option<bool>,
+        /// Replay-driven camera state (ball cam, look direction) for the player
+        camera: PlayerCameraFrame,
+        /// Replay-driven vehicle inputs (throttle, steer, dodge vectors)
+        input: PlayerInputFrame,
     },
 }
 
@@ -185,6 +233,22 @@ impl PlayerFrame {
         let double_jump_active = processor.get_double_jump_active(player_id).unwrap_or(0) % 2 == 1;
         let dodge_active = processor.get_dodge_active(player_id).unwrap_or(0) % 2 == 1;
 
+        // Replay-driven continuous camera/vehicle state. Each read is optional:
+        // older replays and frames without the attribute simply leave it `None`
+        // so consumers can fall back to a synthesized value. Discrete toggles
+        // (ball cam, behind-view, driving) are emitted as coalesced
+        // `PlayerCameraStateChange`s rather than stored on every frame.
+        let camera = PlayerCameraFrame {
+            pitch: processor.get_camera_pitch(player_id).ok(),
+            yaw: processor.get_camera_yaw(player_id).ok(),
+        };
+        let input = PlayerInputFrame {
+            throttle: processor.get_throttle(player_id).ok(),
+            steer: processor.get_steer(player_id).ok(),
+            dodge_impulse: processor.get_dodge_impulse(player_id).ok(),
+            dodge_torque: processor.get_dodge_torque(player_id).ok(),
+        };
+
         // Extract player identity information
         let player_name = processor.get_player_name(player_id).ok();
         let team = processor
@@ -204,6 +268,8 @@ impl PlayerFrame {
             player_name,
             team,
             is_team_0,
+            camera,
+            input,
         ))
     }
 
@@ -221,6 +287,8 @@ impl PlayerFrame {
     /// * `player_name` - The player's name, if available
     /// * `team` - The player's team number, if available
     /// * `is_team_0` - Whether the player is on team 0, if available
+    /// * `camera` - Replay-driven camera state for the player
+    /// * `input` - Replay-driven vehicle input/state for the player
     ///
     /// # Returns
     ///
@@ -240,6 +308,8 @@ impl PlayerFrame {
         player_name: Option<String>,
         team: Option<i32>,
         is_team_0: Option<bool>,
+        camera: PlayerCameraFrame,
+        input: PlayerInputFrame,
     ) -> Self {
         Self::Data {
             rigid_body,
@@ -252,6 +322,8 @@ impl PlayerFrame {
             player_name,
             team,
             is_team_0,
+            camera,
+            input,
         }
     }
 }
@@ -546,6 +618,11 @@ pub struct ReplayData {
     pub touch_events: Vec<TouchEvent>,
     /// Exact dodge refresh events observed via the replay's refreshed-dodge counter
     pub dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
+    /// Coalesced camera/vehicle-toggle changes (ball cam, behind-view, driving)
+    /// grouped by player — the player id is stored once and each entry holds
+    /// that player's frame-ordered changes, rather than a value per frame.
+    #[ts(as = "Vec<(crate::interop::ts_bindings::RemoteIdTs, Vec<PlayerCameraStateChange>)>")]
+    pub player_camera_events: Vec<(PlayerId, Vec<PlayerCameraStateChange>)>,
     /// Exact player stat counter increments observed during the replay
     pub player_stat_events: Vec<PlayerStatEvent>,
     /// Exact goal events observed during the replay
@@ -607,6 +684,23 @@ fn replay_tick_marks(
                 .map(|frame| frame.time),
         })
         .collect()
+}
+
+/// Groups the processor's flat `(player, change)` camera stream by player,
+/// preserving first-appearance player order and per-player frame order, so the
+/// serialized form stores each player id once instead of per change.
+pub(crate) fn group_player_camera_events(
+    events: &[(PlayerId, PlayerCameraStateChange)],
+) -> Vec<(PlayerId, Vec<PlayerCameraStateChange>)> {
+    let mut grouped: Vec<(PlayerId, Vec<PlayerCameraStateChange>)> = Vec::new();
+    for (player_id, change) in events {
+        if let Some((_, changes)) = grouped.iter_mut().find(|(id, _)| id == player_id) {
+            changes.push(change.clone());
+        } else {
+            grouped.push((player_id.clone(), vec![change.clone()]));
+        }
+    }
+    grouped
 }
 
 pub(crate) fn player_stat_events_with_shot_saves(
@@ -794,6 +888,7 @@ impl ReplayDataCollector {
             boost_pads: processor.resolved_boost_pads(),
             touch_events: processor.touch_events().to_vec(),
             dodge_refreshed_events: processor.dodge_refreshed_events().to_vec(),
+            player_camera_events: group_player_camera_events(processor.player_camera_events()),
             player_stat_events: player_stat_events_with_shot_saves(processor.player_stat_events()),
             goal_events: processor.goal_events().to_vec(),
             replay_tick_marks: replay_tick_marks(processor.replay, &frame_data.metadata_frames),

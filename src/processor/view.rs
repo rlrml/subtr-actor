@@ -65,6 +65,12 @@ pub trait ProcessorView {
     fn get_double_jump_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8>;
     fn get_dodge_active(&self, player_id: &PlayerId) -> SubtrActorResult<u8>;
     fn get_powerslide_active(&self, player_id: &PlayerId) -> SubtrActorResult<bool>;
+    fn get_throttle(&self, player_id: &PlayerId) -> SubtrActorResult<u8>;
+    fn get_steer(&self, player_id: &PlayerId) -> SubtrActorResult<u8>;
+    fn get_dodge_impulse(&self, player_id: &PlayerId) -> SubtrActorResult<(f32, f32, f32)>;
+    fn get_dodge_torque(&self, player_id: &PlayerId) -> SubtrActorResult<(f32, f32, f32)>;
+    fn get_camera_pitch(&self, player_id: &PlayerId) -> SubtrActorResult<u8>;
+    fn get_camera_yaw(&self, player_id: &PlayerId) -> SubtrActorResult<u8>;
     fn get_player_match_assists(&self, player_id: &PlayerId) -> SubtrActorResult<i32>;
     fn get_player_match_goals(&self, player_id: &PlayerId) -> SubtrActorResult<i32>;
     fn get_player_match_saves(&self, player_id: &PlayerId) -> SubtrActorResult<i32>;
@@ -76,6 +82,7 @@ pub trait ProcessorView {
     fn boost_pad_events(&self) -> &[BoostPadEvent];
     fn touch_events(&self) -> &[TouchEvent];
     fn dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent];
+    fn player_camera_events(&self) -> &[(PlayerId, PlayerCameraStateChange)];
     fn player_stat_events(&self) -> &[PlayerStatEvent];
     fn goal_events(&self) -> &[GoalEvent];
     fn current_frame_active_demo_events(&self) -> &[DemoEventSample] {
@@ -248,6 +255,30 @@ impl ProcessorView for ReplayProcessor<'_> {
         ReplayProcessor::get_powerslide_active(self, player_id)
     }
 
+    fn get_throttle(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        ReplayProcessor::get_throttle(self, player_id)
+    }
+
+    fn get_steer(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        ReplayProcessor::get_steer(self, player_id)
+    }
+
+    fn get_dodge_impulse(&self, player_id: &PlayerId) -> SubtrActorResult<(f32, f32, f32)> {
+        ReplayProcessor::get_dodge_impulse(self, player_id)
+    }
+
+    fn get_dodge_torque(&self, player_id: &PlayerId) -> SubtrActorResult<(f32, f32, f32)> {
+        ReplayProcessor::get_dodge_torque(self, player_id)
+    }
+
+    fn get_camera_pitch(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        ReplayProcessor::get_camera_pitch(self, player_id)
+    }
+
+    fn get_camera_yaw(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        ReplayProcessor::get_camera_yaw(self, player_id)
+    }
+
     fn get_player_match_assists(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
         ReplayProcessor::get_player_match_assists(self, player_id)
     }
@@ -286,6 +317,10 @@ impl ProcessorView for ReplayProcessor<'_> {
 
     fn dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent] {
         &self.dodge_refreshed_events
+    }
+
+    fn player_camera_events(&self) -> &[(PlayerId, PlayerCameraStateChange)] {
+        &self.player_camera_events
     }
 
     fn player_stat_events(&self) -> &[PlayerStatEvent] {
