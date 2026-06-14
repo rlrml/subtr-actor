@@ -312,7 +312,7 @@ export function createBoostPadsPlugin(): ViewerPlugin {
       // Three.js expects: x, y (height), z (depth)
       // So we need to swap Y and Z here (unlike physics which does it in the compiler)
       const groundLevel = 10; // Just above ground to avoid z-fighting (in UU)
-      const floatHeight = isBig ? 150 : groundLevel; // Big pads at 150 UU, small pads near ground
+      const floatHeight = isBig ? 130 : groundLevel; // Big pads at 130 UU, small pads near ground
 
       mesh.position.set(
         pad.position.x, // X stays the same
