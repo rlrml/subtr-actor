@@ -5,10 +5,10 @@
  *
  * Stored per season so callers can display or reason about a boundary at finer
  * than day precision. Season *resolution* still uses only the date (see
- * [`season_for_date`]): the replay `Date` header is timezone-less local
+ * `season_for_date`): the replay `Date` header is timezone-less local
  * wall-clock, so its time-of-day cannot be meaningfully compared against a UTC
  * instant. The time is therefore informational, and rough for older seasons
- * (see [`SEASON_BOUNDARIES`]).
+ * (see `SEASON_BOUNDARIES`).
  */
 export type SeasonStart = {
 /**

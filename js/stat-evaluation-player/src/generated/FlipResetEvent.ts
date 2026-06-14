@@ -2,6 +2,9 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { Vector3fTs } from "./Vector3fTs.ts";
 
+/**
+ * A frame-level dodge refresh observed as occurring on the ball (a flip reset).
+ */
 export type FlipResetEvent = { time: number, frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean,
 /**
  * Heuristic confidence in the range `[0.0, 1.0]`.

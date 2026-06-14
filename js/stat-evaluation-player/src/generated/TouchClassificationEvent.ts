@@ -4,6 +4,9 @@ import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { RoleState } from "./RoleState.ts";
 import type { TouchBallMovement } from "./TouchBallMovement.ts";
 
+/**
+ * A classified ball touch with strength kind, surface/height context, and an inferred intention.
+ */
 export type TouchClassificationEvent = {
 /**
  * Identity of the source [`TouchEvent`](crate::TouchEvent) this
