@@ -2,10 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "@rlrml/player";
-import {
-  STATS_EVENT_STREAM_COUNT_TYPES,
-  STATS_MECHANIC_EVENT_COUNT_TYPES,
-} from "./eventCountDerivation.ts";
+import type { FlickEvent } from "./generated/FlickEvent.ts";
+import { STATS_EVENT_STREAM_COUNT_TYPES } from "./eventCountDerivation.ts";
 import type { StatModuleContext } from "./statModules.ts";
 import {
   buildEventPlaylistItems,
@@ -13,7 +11,8 @@ import {
   getEventPlaylistSources,
   getEventTimelineSources,
 } from "./eventTimelineSources.ts";
-import { createStatsTimeline } from "./testStatsTimeline.ts";
+import { EVENT_TYPE_TIMELINE_KINDS } from "./timelineMarkers.ts";
+import { createLegacyStatsTimeline, createStatsTimeline } from "./testStatsTimeline.ts";
 
 function createSourceTestContext(): {
   ctx: StatModuleContext;
@@ -61,11 +60,15 @@ test("event timeline sources include empty canonical stats streams", () => {
     assert.ok(sourceIds.has(`stats-stream:${streamId}`), `missing stats stream ${streamId}`);
   }
 
-  for (const mechanicKind of STATS_MECHANIC_EVENT_COUNT_TYPES.filter(
-    (kind) => kind !== "wavedash",
-  )) {
+  for (const mechanicKind of EVENT_TYPE_TIMELINE_KINDS) {
     assert.ok(sourceIds.has(`mechanic:${mechanicKind}`), `missing mechanic ${mechanicKind}`);
   }
+
+  // air_dribble and flip_reset exist only as goal tags (no standalone events),
+  // and wavedash is owned by its stat module, so none get an Event-types lane.
+  assert.ok(!sourceIds.has("mechanic:air_dribble"));
+  assert.ok(!sourceIds.has("mechanic:flip_reset"));
+  assert.ok(!sourceIds.has("mechanic:wavedash"));
 
   assert.equal(
     streamSources.every((source) => source.count === 0),
@@ -86,6 +89,32 @@ test("event playlist filters include empty canonical stats streams", () => {
     playlistSources.find((source) => source.id === "stats-stream:player_activity")?.events.length,
     0,
   );
+});
+
+test("typed mechanic payloads populate their Event-types lane", () => {
+  const replay = {
+    frames: Array.from({ length: 4 }, (_, frame) => ({ time: frame })),
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createLegacyStatsTimeline({
+    flick_events: [
+      {
+        time: 2,
+        frame: 2,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        kind: "other",
+      } as unknown as FlickEvent,
+    ],
+  });
+  const ctx = { replay, statsTimeline } as StatModuleContext;
+
+  const flickSource = getTestTimelineSources(ctx).find((source) => source.id === "mechanic:flick");
+  assert.ok(flickSource, "mechanic:flick lane should exist");
+  assert.equal(flickSource.count, 1);
+  assert.equal(flickSource.buildTimelineEvents().length, 1);
+  assert.equal(flickSource.buildTimelineEvents()[0]?.frame, 2);
 });
 
 test("event playlist sources include generic stats event streams such as positioning activity", () => {

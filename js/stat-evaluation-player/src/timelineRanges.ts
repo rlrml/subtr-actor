@@ -1,12 +1,7 @@
 import type { ReplayBoostPadSize, ReplayModel, ReplayTimelineRange } from "@rlrml/player";
 import type { PlayerStatsSnapshot, StatsFrame, StatsTimeline } from "./statsTimeline.ts";
-import { statsEventEnvelopes, statsEventPayloads } from "./statsTimeline.ts";
-import {
-  formatMechanicKind,
-  isVisibleMechanicKind,
-  mechanicShortLabel,
-  teamTimelineColor,
-} from "./timelinePresentation.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
+import { teamTimelineColor } from "./timelinePresentation.ts";
 import type { BoostPickupActivity } from "./generated/BoostPickupActivity.ts";
 import type { BoostPickupDetection } from "./generated/BoostPickupDetection.ts";
 import type { BoostPickupFieldHalf } from "./generated/BoostPickupFieldHalf.ts";
@@ -56,60 +51,6 @@ function getReplayFrameTime(
   fallbackTime: number,
 ): number {
   return replay?.frames?.[frame ?? -1]?.time ?? fallbackTime;
-}
-
-export function buildMechanicTimelineRanges(
-  statsTimeline: StatsTimeline,
-  replay: ReplayModel,
-  enabledKinds?: Iterable<string>,
-): ReplayTimelineRange[] {
-  const enabled = enabledKinds ? new Set(enabledKinds) : null;
-  const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
-
-  return statsEventEnvelopes(statsTimeline)
-    .filter(
-      (event) =>
-        isVisibleMechanicKind(event.meta.stream) &&
-        event.payload.kind === "timeline" &&
-        event.meta.timing.type === "span" &&
-        (!enabled || enabled.has(event.meta.stream)),
-    )
-    .map((event): ReplayTimelineRange => {
-      if (event.meta.timing.type !== "span") {
-        throw new Error("unreachable non-span mechanic event");
-      }
-
-      const playerId = remoteIdToString(event.meta.primary_player as Record<string, unknown>);
-      const playerName = playerNames.get(playerId) ?? playerId;
-      const mechanicLabel = formatMechanicKind(event.meta.stream);
-      const startTime = getReplayFrameTime(
-        replay,
-        event.meta.timing.start_frame,
-        event.meta.timing.start_time,
-      );
-      const endTime = Math.max(
-        startTime,
-        getReplayFrameTime(replay, event.meta.timing.end_frame, event.meta.timing.end_time),
-      );
-
-      return {
-        id: event.meta.id,
-        startTime,
-        endTime,
-        lane: `mechanic:${event.meta.stream}`,
-        laneLabel: mechanicLabel,
-        label: `${playerName} ${mechanicLabel.toLowerCase()}`,
-        shortLabel: mechanicShortLabel(event.meta.stream),
-        isTeamZero: event.meta.team_is_team_0 ?? false,
-        color: teamTimelineColor(event.meta.team_is_team_0 ?? null) ?? undefined,
-      };
-    })
-    .sort((left, right) => {
-      if (left.startTime !== right.startTime) {
-        return left.startTime - right.startTime;
-      }
-      return (left.id ?? "").localeCompare(right.id ?? "");
-    });
 }
 
 function resolveBallHalfControlState(

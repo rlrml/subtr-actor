@@ -1,19 +1,13 @@
 import type { ReplayPlayerTrack, ReplayTimelineEvent, ReplayTimelineRange } from "@rlrml/player";
-import {
-  STATS_EVENT_STREAM_COUNT_TYPES,
-  STATS_MECHANIC_EVENT_COUNT_TYPES,
-} from "./eventCountDerivation.ts";
+import { STATS_EVENT_STREAM_COUNT_TYPES } from "./eventCountDerivation.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import type { Event } from "./statsTimeline.ts";
 import { statsEventEnvelopes } from "./statsTimeline.ts";
 import {
-  buildMechanicPlaylistEvents,
-  buildMechanicTimelineEvents,
+  EVENT_TYPE_TIMELINE_BUILDERS,
+  EVENT_TYPE_TIMELINE_KINDS,
   formatMechanicKind,
-  getMechanicKinds,
-  isVisibleMechanicKind,
 } from "./timelineMarkers.ts";
-import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
 
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_PREFIXES = ["stats-stream:"] as const;
@@ -454,13 +448,10 @@ function buildGenericStatsEventSources(
   });
 }
 
-function getEventTimelineMechanicKinds(ctx: StatModuleContext): string[] {
-  return [
-    ...new Set([
-      ...STATS_MECHANIC_EVENT_COUNT_TYPES.filter(isVisibleMechanicKind),
-      ...getMechanicKinds(ctx.statsTimeline),
-    ]),
-  ].sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
+function getEventTimelineMechanicKinds(): string[] {
+  return [...EVENT_TYPE_TIMELINE_KINDS].sort((left, right) =>
+    formatMechanicKind(left).localeCompare(formatMechanicKind(right)),
+  );
 }
 
 export function getEventTimelineSources({
@@ -552,11 +543,9 @@ export function getEventTimelineSources({
     ...buildGenericStatsEventSources(ctx, activeTimelineEventSourceIds, toggleEventSource),
   );
 
-  for (const kind of getEventTimelineMechanicKinds(ctx)) {
-    const timelineEvents = buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const playlistEvents = buildMechanicPlaylistEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const timelineRanges = buildMechanicTimelineRanges(ctx.statsTimeline, ctx.replay, [kind]);
-    const count = timelineEvents.length + timelineRanges.length;
+  for (const kind of getEventTimelineMechanicKinds()) {
+    const timelineEvents = EVENT_TYPE_TIMELINE_BUILDERS[kind]!(ctx.statsTimeline, ctx.replay);
+    const count = timelineEvents.length;
     sources.push({
       id: `mechanic:${kind}`,
       playlistId: `mechanic:${kind}`,
@@ -570,10 +559,7 @@ export function getEventTimelineSources({
         return timelineEvents;
       },
       buildPlaylistEvents() {
-        return playlistEvents;
-      },
-      buildTimelineRanges() {
-        return timelineRanges;
+        return timelineEvents;
       },
       setActive(enabled) {
         setMechanicTimelineKind(kind, enabled);

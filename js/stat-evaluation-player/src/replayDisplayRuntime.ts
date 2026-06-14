@@ -68,7 +68,6 @@ export interface ReplayDisplayRuntimeOptions {
   renderMechanicsTimelineControls(): void;
   renderEventPlaylistWindow(): void;
   renderModuleSettings(): void;
-  migrateMechanicBackedTimelineEventSelections(): void;
   syncBoostPadOverlayPlugin(): void;
   setupActiveModules(): void;
   renderSnapshot(state: ReplayPlayerState): void;
@@ -126,7 +125,6 @@ export async function loadReplayBundleForDisplay(
     options.setStatsTimeline(loadedReplay.statsTimeline);
     options.setStatsFrameLookup(loadedReplay.statsFrameLookup);
     options.setStatRegistry(createStatRegistry(null));
-    options.migrateMechanicBackedTimelineEventSelections();
 
     const timelineOverlay = createTimelineOverlayPlugin({
       replayEventsLabel: "Replay",
