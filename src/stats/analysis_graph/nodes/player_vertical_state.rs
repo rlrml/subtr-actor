@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks per-player airborne/vertical state derived from player frame state.
 pub struct PlayerVerticalStateNode {
     calculator: PlayerVerticalStateCalculator,
     state: PlayerVerticalState,

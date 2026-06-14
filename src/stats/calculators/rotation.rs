@@ -5,6 +5,7 @@ const DEFAULT_FIRST_MAN_AMBIGUITY_MARGIN: f32 = 250.0;
 const DEFAULT_FIRST_MAN_DEBOUNCE_SECONDS: f32 = 0.35;
 const DEFAULT_FIRST_MAN_STINT_END_GRACE_SECONDS: f32 = 0.35;
 
+/// A player's rotational role (first/second/third man).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -90,6 +91,7 @@ pub struct FirstManChangeEvent {
     pub next_first_man: PlayerId,
 }
 
+/// Configuration thresholds for rotation classification.
 #[derive(Debug, Clone)]
 pub struct RotationCalculatorConfig {
     pub role_depth_margin: f32,
@@ -170,6 +172,7 @@ impl TeamFirstManTracker {
     }
 }
 
+/// Tracks rotational roles over time.
 #[derive(Debug, Clone, Default)]
 pub struct RotationCalculator {
     config: RotationCalculatorConfig,

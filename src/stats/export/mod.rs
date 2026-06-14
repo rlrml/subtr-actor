@@ -1,3 +1,18 @@
+//! Exported stat fields: the report-facing model that turns accumulated stats
+//! into labeled, unit-tagged values.
+//!
+//! Every accumulator in [`crate::stats::accumulators`] implements
+//! [`StatFieldProvider`] here, declaring the [`ExportedStat`]s it publishes
+//! (each with a [`StatUnit`] and human-readable [`StatLabel`]s). Consumers walk
+//! these definitions instead of hard-coding field lists, so adding a stat means
+//! adding it to one provider.
+//!
+//! The submodules in this module are thin: each holds the `StatFieldProvider`
+//! impl for one stat group (the structs themselves live in
+//! [`crate::stats::accumulators`]). To see every exported group, browse the
+//! [`StatFieldProvider`] *Implementors* list. Confidence semantics are
+//! described in the [confidence guide](crate::guides::stat_confidence).
+
 use serde::{Deserialize, Deserializer, Serialize};
 
 mod air_dribble;
@@ -365,6 +380,14 @@ impl ExportedStat {
     }
 }
 
+/// Publishes a stat container's values as labeled, unit-tagged [`ExportedStat`]s.
+///
+/// Implemented by every accumulator in [`crate::stats::accumulators`] that
+/// contributes to the exported report. The *Implementors* list below is the
+/// catalog of all exported stat groups. Implement
+/// [`visit_stat_fields`](StatFieldProvider::visit_stat_fields) to emit one
+/// [`ExportedStat`] per field; [`stat_fields`](StatFieldProvider::stat_fields)
+/// collects them into a `Vec` for callers that want the whole set.
 pub trait StatFieldProvider {
     fn visit_stat_fields(&self, visitor: &mut dyn FnMut(ExportedStat));
 

@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects ceiling shots from ball/player positions and touch events during live play.
 pub struct CeilingShotNode {
     calculator: CeilingShotCalculator,
 }

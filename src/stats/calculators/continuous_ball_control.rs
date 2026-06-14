@@ -1,10 +1,12 @@
 use super::*;
 
+/// Per-frame state of an active continuous ball-control sequence.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ContinuousBallControlState {
     pub completed_sequences: Vec<CompletedBallControlSequence<BallCarryKind>>,
 }
 
+/// A single sampled frame of a continuous ball-control sequence.
 #[derive(Debug, Clone, Copy)]
 pub struct ContinuousBallControlSample<K> {
     pub kind: K,
@@ -14,6 +16,7 @@ pub struct ContinuousBallControlSample<K> {
     pub speed: f32,
 }
 
+/// A candidate ball-control sequence being evaluated.
 #[derive(Debug, Clone)]
 pub struct ContinuousBallControlCandidate<K> {
     pub player_id: PlayerId,
@@ -23,18 +26,21 @@ pub struct ContinuousBallControlCandidate<K> {
     pub sample: ContinuousBallControlSample<K>,
 }
 
+/// Per-player status within continuous ball-control tracking.
 #[derive(Debug, Clone)]
 pub struct ContinuousBallControlPlayerStatus {
     pub player_id: PlayerId,
     pub is_airborne: bool,
 }
 
+/// A touch recorded during a continuous ball-control sequence.
 #[derive(Debug, Clone)]
 pub struct ContinuousBallControlTouch {
     pub player_id: PlayerId,
     pub is_airborne: bool,
 }
 
+/// A finished continuous ball-control sequence with its samples and touches.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompletedBallControlSequence<K> {
     pub player_id: PlayerId,
@@ -76,6 +82,7 @@ struct ActiveBallControlSequence<K> {
     air_touch_count: u32,
 }
 
+/// Generic tracker that groups per-frame samples into continuous ball-control sequences.
 #[derive(Debug, Clone)]
 pub struct ContinuousBallControlTracker<K> {
     active_sequence: Option<ActiveBallControlSequence<K>>,

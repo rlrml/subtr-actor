@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks per-player movement classification/stats from player and vertical state during live play.
 pub struct MovementNode {
     calculator: MovementCalculator,
 }

@@ -299,6 +299,7 @@ impl InFlightItem for ActiveKickoff {
     }
 }
 
+/// Detects and classifies kickoffs and their outcomes.
 #[derive(Debug, Clone, Default)]
 pub struct KickoffCalculator {
     active: InFlightLedger<ActiveKickoff>,

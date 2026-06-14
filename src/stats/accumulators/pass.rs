@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated pass stats: completed/received counts, distances, advance.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PassPlayerStats {
@@ -33,6 +34,7 @@ impl PassPlayerStats {
     }
 }
 
+/// Per-team accumulated pass stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PassTeamStats {
@@ -60,6 +62,7 @@ impl PassTeamStats {
     }
 }
 
+/// Accumulates pass stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PassStatsAccumulator {
     player_stats: HashMap<PlayerId, PassPlayerStats>,

@@ -1,5 +1,6 @@
 use super::*;
 
+/// Match-wide accumulated kickoff win/possession/goal tallies.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffStats {
@@ -27,6 +28,7 @@ pub struct KickoffStats {
     pub labeled_player_counts: LabeledCounts,
 }
 
+/// Per-player accumulated kickoff stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffPlayerStats {
@@ -44,6 +46,7 @@ pub struct KickoffPlayerStats {
     pub labeled_event_counts: LabeledCounts,
 }
 
+/// Per-team accumulated kickoff stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffTeamStats {
@@ -283,6 +286,7 @@ impl KickoffTeamStats {
     }
 }
 
+/// Accumulates kickoff stats over the replay from kickoff events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct KickoffStatsAccumulator {
     stats: KickoffStats,

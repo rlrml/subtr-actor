@@ -18,6 +18,7 @@ fn movement_height_band_label(value: &str) -> StatLabel {
     }
 }
 
+/// Accumulated movement stats: tracked time, distance, speed integral, and time in speed/air bands.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct MovementStats {
@@ -130,6 +131,7 @@ impl MovementStats {
     }
 }
 
+/// Accumulates per-player movement stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct MovementStatsAccumulator {
     player_stats: HashMap<PlayerId, MovementStats>,

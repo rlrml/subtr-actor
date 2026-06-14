@@ -4,6 +4,7 @@ const ONE_TIMER_MIN_BALL_SPEED: f32 = 1000.0;
 const ONE_TIMER_MIN_GOAL_ALIGNMENT_COSINE: f32 = 0.65;
 const GOAL_CENTER_Y: f32 = 5120.0;
 
+/// A first-touch shot taken off an incoming pass without trapping the ball.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct OneTimerEvent {
@@ -27,6 +28,7 @@ pub struct OneTimerEvent {
     pub goal_alignment: f32,
 }
 
+/// Detects one-timers from ball state and upstream pass detection.
 #[derive(Debug, Clone, Default)]
 pub struct OneTimerCalculator {
     events: EventStream<OneTimerEvent>,

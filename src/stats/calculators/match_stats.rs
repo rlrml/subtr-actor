@@ -20,6 +20,7 @@ const GOAL_CAUGHT_AHEAD_MIN_BALL_DELTA_Y: f32 = 2200.0;
 // above this threshold, in uu/s) so `ball_speed_at_goal` reflects the speed of
 // the shot as it crossed the line instead of a spurious 0.
 const MIN_TRACKED_BALL_SPEED: f32 = 1.0;
+/// Classification of how a goal's buildup developed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -30,6 +31,7 @@ pub enum GoalBuildupKind {
     Other,
 }
 
+/// A change to a player's core scoreboard stats.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct CorePlayerScoreboardEvent {
@@ -47,6 +49,7 @@ pub struct CorePlayerScoreboardEvent {
     pub shots_delta: i32,
 }
 
+/// Per-player context attached to a goal.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 pub struct CorePlayerGoalContextEvent {
     pub time: f32,
@@ -79,6 +82,7 @@ pub struct CorePlayerGoalContextEvent {
     pub ball_air_time_before_goal: Option<f32>,
 }
 
+/// Kind of high-level match timeline event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub enum TimelineEventKind {
@@ -90,6 +94,7 @@ pub enum TimelineEventKind {
     Death,
 }
 
+/// A high-level match timeline event (goal, demo, etc.).
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TimelineEvent {
@@ -104,6 +109,7 @@ pub struct TimelineEvent {
     pub is_team_0: Option<bool>,
 }
 
+/// A position recorded in a goal's context.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalContextPosition {
@@ -122,6 +128,7 @@ impl From<glam::Vec3> for GoalContextPosition {
     }
 }
 
+/// Per-player context surrounding a goal.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalPlayerContext {
@@ -135,6 +142,7 @@ pub struct GoalPlayerContext {
     pub is_most_back: bool,
 }
 
+/// Touch context leading into a goal.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalTouchContext {
@@ -156,6 +164,7 @@ pub struct GoalTouchContext {
     pub players: Vec<GoalPlayerContext>,
 }
 
+/// Aggregated context for a single goal.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct GoalContextEvent {
@@ -256,6 +265,7 @@ impl PlayerScoreboardSample {
     }
 }
 
+/// Accumulates match-level scoreboard stats and per-goal context.
 #[derive(Debug, Clone, Default)]
 pub struct MatchStatsCalculator {
     previous_player_scoreboard_samples: HashMap<PlayerId, PlayerScoreboardSample>,

@@ -190,6 +190,7 @@ mechanic_goal_tag_node!(
     DemoCalculator
 );
 
+/// Tags goals scored via a half-volley by joining match-stats goals with half-volley events.
 pub struct HalfVolleyGoalNode {
     calculator: HalfVolleyGoalCalculator,
 }

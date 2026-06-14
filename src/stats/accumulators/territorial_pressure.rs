@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-team accumulated territorial-pressure session counts and durations.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TerritorialPressureStats {
@@ -76,6 +77,7 @@ impl TerritorialPressureStats {
     }
 }
 
+/// Per-team accumulated territorial-pressure stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TerritorialPressureTeamStats {
@@ -91,6 +93,7 @@ pub struct TerritorialPressureTeamStats {
     pub average_session_time: f32,
 }
 
+/// Accumulates territorial-pressure stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TerritorialPressureStatsAccumulator {
     stats: TerritorialPressureStats,

@@ -1,3 +1,66 @@
+//! The analysis-graph runtime: a dependency DAG of [`AnalysisNode`]s that turn
+//! raw replay frames into derived state, gameplay events, and stats.
+//!
+//! # How it works
+//!
+//! Each node implements [`AnalysisNode`]: it declares the upstream state it
+//! needs via [`dependencies`](AnalysisNode::dependencies), reads that state
+//! through an [`AnalysisStateContext`] each frame in
+//! [`evaluate`](AnalysisNode::evaluate), and exposes its own typed
+//! [`state`](AnalysisNode::state) for downstream nodes. Source nodes read the
+//! per-frame `FrameInput`; higher-level nodes build
+//! on their outputs. The graph topologically resolves dependencies, so adding a
+//! node automatically pulls in everything it needs.
+//!
+//! Most nodes are thin wrappers around a *calculator* (see [`crate::stats`]);
+//! the node handles graph plumbing while the calculator holds the detection
+//! logic.
+//!
+//! # Building a graph
+//!
+//! - [`AnalysisGraph::new`] + [`with_node`](AnalysisGraph::with_node) /
+//!   [`push_node`](AnalysisGraph::push_node) to assemble nodes by hand.
+//! - [`graph_with_builtin_analysis_nodes`] / [`graph_with_all_analysis_nodes`]
+//!   to build from the built-in registry by name.
+//! - [`collect_builtin_analysis_graph_for_replay`] to build *and* run a graph
+//!   over a replay in one call.
+//!
+//! The names accepted by the registry are listed in
+//! [`BUILTIN_ANALYSIS_NODE_NAMES`] (with aliases in
+//! [`BUILTIN_ANALYSIS_NODE_ALIASES`]).
+//!
+//! # The nodes
+//!
+//! All node types are re-exported from this module; their first-line summaries
+//! appear in the item list below, and the [`AnalysisNode`] *Implementors* list
+//! is another way to browse them. By role:
+//!
+//! - **Per-frame source state** — [`FrameInfoNode`], [`GameplayStateNode`],
+//!   [`BallFrameStateNode`], [`PlayerFrameStateNode`], [`FrameEventsStateNode`],
+//!   [`LivePlayNode`], [`SettingsNode`].
+//! - **Shared derived state** — [`TouchStateNode`], [`PossessionStateNode`],
+//!   [`PlayerPossessionNode`], [`PossessionNode`], [`BallHalfNode`],
+//!   [`PlayerVerticalStateNode`], [`PositioningNode`], [`RotationNode`],
+//!   [`BackboardBounceStateNode`], [`FiftyFiftyStateNode`],
+//!   [`ContinuousBallControlNode`].
+//! - **Mechanic detection** — [`FlickNode`], [`MustyFlickNode`],
+//!   [`HalfFlipNode`], [`SpeedFlipNode`], [`WavedashNode`], [`PowerslideNode`],
+//!   [`FlipImpulseNode`], [`DodgeResetNode`], [`WallAerialNode`],
+//!   [`WallAerialShotNode`], [`CeilingShotNode`], [`DoubleTapNode`],
+//!   [`HalfVolleyNode`], [`OneTimerNode`], [`BallCarryNode`] (carries/air
+//!   dribbles).
+//! - **Play & contest detection** — [`TouchNode`], [`PassNode`], [`CenterNode`],
+//!   [`KickoffNode`], [`BumpNode`], [`DemoNode`], [`RushNode`],
+//!   [`ControlledPlayNode`], [`TerritorialPressureNode`], [`WhiffNode`],
+//!   [`FiftyFiftyNode`], [`BackboardNode`], [`MovementNode`], [`BoostNode`].
+//! - **Match-level & projection** — [`MatchStatsNode`], goal-tag nodes (e.g.
+//!   [`HalfVolleyGoalNode`] plus the `*_goal` registry names),
+//!   [`StatsProjectionNode`], [`StatsTimelineEventsNode`],
+//!   [`StatsTimelineFrameNode`].
+//!
+//! See the [stats-runtime guide](crate::guides::calculators_and_analysis_nodes)
+//! for the full DAG map.
+
 use std::collections::HashSet;
 
 use serde::Serialize;

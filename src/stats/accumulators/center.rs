@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated centering-pass stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct CenterPlayerStats {
@@ -41,6 +42,7 @@ impl CenterPlayerStats {
     }
 }
 
+/// Per-team accumulated centering-pass stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct CenterTeamStats {
@@ -77,6 +79,7 @@ impl CenterTeamStats {
     }
 }
 
+/// Accumulates centering-pass stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CenterStatsAccumulator {
     player_stats: HashMap<PlayerId, CenterPlayerStats>,

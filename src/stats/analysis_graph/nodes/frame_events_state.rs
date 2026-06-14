@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Exposes per-frame discrete game events extracted from raw frame input.
 pub struct FrameEventsStateNode {
     state: FrameEventsState,
 }

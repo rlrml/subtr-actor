@@ -12,6 +12,7 @@ const WALL_TAKEOFF_MIN_Z: f32 = 120.0;
 const SIDE_WALL_START_ABS_X: f32 = 3200.0;
 const BACK_WALL_START_ABS_Y: f32 = 4600.0;
 
+/// Where an air dribble originated (ground vs wall).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]

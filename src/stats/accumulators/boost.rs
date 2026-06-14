@@ -8,6 +8,7 @@ use crate::stats::common::vertical_state_label;
 const BOOST_ZERO_BAND_RAW: f32 = 1.0;
 const BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
 
+/// Accumulated boost stats: time in boost bands, boost integral, and pads collected/stolen/used.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BoostStats {

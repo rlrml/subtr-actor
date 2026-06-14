@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Holds the collected replay stats-timeline events.
 #[derive(Debug, Clone, Default)]
 pub struct StatsTimelineEventsState {
     pub events: ReplayStatsTimelineEvents,
@@ -24,6 +25,7 @@ const MECHANIC_WALL_AERIAL: &str = "wall_aerial";
 const MECHANIC_WALL_AERIAL_SHOT: &str = "wall_aerial_shot";
 const MECHANIC_WAVEDASH: &str = "wavedash";
 
+/// List of mechanic kind identifiers emitted into the stats timeline.
 pub const STATS_TIMELINE_MECHANIC_KINDS: &[&str] = &[
     MECHANIC_AIR_DRIBBLE,
     MECHANIC_BALL_CARRY,
@@ -43,6 +45,7 @@ pub const STATS_TIMELINE_MECHANIC_KINDS: &[&str] = &[
     MECHANIC_WAVEDASH,
 ];
 
+/// Collects mechanic/goal/state events from all calculators into a compact stats-timeline event stream.
 pub struct StatsTimelineEventsNode {
     state: StatsTimelineEventsState,
 }

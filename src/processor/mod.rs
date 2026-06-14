@@ -1,3 +1,28 @@
+//! The replay-walking core: model actor state from raw `boxcars` frames and
+//! track derived gameplay events.
+//!
+//! [`ReplayProcessor`] is the heart of the crate. Construct it from a parsed
+//! [`boxcars::Replay`], then drive a [`Collector`] over it
+//! with [`process`](ReplayProcessor::process) /
+//! [`process_all`](ReplayProcessor::process_all). As it advances through the
+//! network frames it maintains modeled [actor state](crate::actor_state),
+//! resolves player/car/ball relationships, and records derived events such as
+//! touches, boost-pad pickups, dodge refreshes, goals, demolishes, and player
+//! stat changes.
+//!
+//! Collectors observe the processor through the read-only
+//! [`ProcessorView`] interface, which exposes the queries
+//! defined across this module (player lookups, rigid bodies, boost amounts,
+//! etc.).
+//!
+//! # Per-frame updaters
+//!
+//! The processor's frame loop applies a fixed sequence of *updaters* — each an
+//! `impl ReplayProcessor` method block in the `updaters` submodule (boost,
+//! goals, demolishes, camera, player stats, tracking, mappings). They are
+//! invoked in order on every frame; there is no central registry beyond that
+//! call sequence in the frame loop.
+
 use crate::*;
 use boxcars;
 use std::collections::HashMap;

@@ -83,6 +83,7 @@ pub type BallDepthEvent = PlayerStateSpan<BallDepthState>;
 pub type DepthRoleEvent = PlayerStateSpan<DepthRoleState>;
 pub type BallProximityEvent = PlayerStateSpan<BallProximityState>;
 
+/// Possession context used in positioning classification.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -139,6 +140,7 @@ impl PositioningSignalSnapshot {
     }
 }
 
+/// Configuration thresholds for positioning classification.
 #[derive(Debug, Clone)]
 pub struct PositioningCalculatorConfig {
     pub most_back_forward_threshold_y: f32,
@@ -256,6 +258,7 @@ struct PlayerFrameFacets {
     possession_state: PositioningPossessionState,
 }
 
+/// Tracks per-player field positioning over time.
 #[derive(Debug, Clone, Default)]
 pub struct PositioningCalculator {
     config: PositioningCalculatorConfig,

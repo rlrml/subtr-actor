@@ -52,6 +52,53 @@
 //! event calculators, and the exported stat-field model built around
 //! `ExportedStat`.
 //!
+//! ## Architecture / module map
+//!
+//! Read top-down — each module's own documentation expands on the summary
+//! here and links to the collections of implementations it contains.
+//!
+//! - [`processor`] — the replay-walking core. [`ReplayProcessor`] models actor
+//!   state from `boxcars` network frames and tracks derived events, applying a
+//!   sequence of per-frame state updaters.
+//! - [`collector`] — the output layer. The [`Collector`] trait is the extension
+//!   point; built-in collectors are [`ReplayDataCollector`] (structured frames),
+//!   [`NDArrayCollector`] ([numeric features][collector::ndarray]), and the
+//!   stats-timeline collectors ([`collector::stats`]).
+//! - [`stats`] — the analysis layer. A dependency graph of
+//!   [analysis nodes][stats::analysis_graph] wraps
+//!   [gameplay-event calculators][StatsEvent] that detect mechanics; results
+//!   land in accumulators and the [exported stat-field model][stats::export].
+//! - [`replay_model`] / [`replay_meta`] — the serde-friendly higher-level game
+//!   state and replay metadata produced for export and playback UIs.
+//! - [`interop`] — bindings-facing helpers shared by the Python and
+//!   JavaScript/WASM wrappers (e.g. the replay-player manifest).
+//! - [`util`] — geometry, search, and small data-structure helpers used
+//!   throughout the crate.
+//!
+//! ## Where to find collections of implementations
+//!
+//! Several parts of the crate are large families of similar types. Each has a
+//! catalog in its module documentation, and the shared trait's *Implementors*
+//! list is a second way to browse them:
+//!
+//! | Collection | Module | Shared trait / registry |
+//! |---|---|---|
+//! | Gameplay-event calculators | [`stats::analysis_graph`] | [`StatsEvent`] |
+//! | Analysis-graph nodes | [`stats::analysis_graph`] | [`AnalysisNode`](stats::analysis_graph::AnalysisNode) |
+//! | Stat accumulators | [`stats::accumulators`] | (plain accumulation structs) |
+//! | Exported stat fields | [`stats::export`] | [`StatFieldProvider`] |
+//! | NDArray feature adders | [`collector::ndarray`] | [`FeatureAdder`] family + string registry |
+//! | Processor state updaters | [`processor`] | (`impl ReplayProcessor` methods) |
+//!
+//! ## In-depth guides
+//!
+//! Longer prose guides are rendered into the API docs under [`guides`]:
+//!
+//! - [`guides::calculators_and_analysis_nodes`] — the stats runtime DAG layout.
+//! - [`guides::stat_confidence`] — how to read exported-stat confidence levels.
+//! - [`guides::replay_format_evolution`] — replay-format changes that matter
+//!   to parsing.
+//!
 //! ## Examples
 //!
 //! ### Collect structured replay data
@@ -155,6 +202,29 @@ pub mod search {
 pub mod actor_state {
     //! Compatibility re-export for processor actor-state types.
     pub use crate::processor::actor_state::*;
+}
+
+/// In-depth prose guides, rendered from the repository's `docs/` directory.
+///
+/// These pages give background and design context that does not belong on any
+/// single type. They are documentation-only modules (no code).
+pub mod guides {
+    /// Map of the stats runtime: how calculators, analysis-graph nodes, and
+    /// accumulators fit together into the analysis DAG.
+    #[doc = include_str!("../docs/calculators-and-analysis-nodes.md")]
+    pub mod calculators_and_analysis_nodes {}
+
+    /// How to interpret the confidence levels attached to exported stats.
+    #[doc = include_str!("../docs/stat-confidence.md")]
+    pub mod stat_confidence {}
+
+    /// Working notes on Rocket League replay-format changes that affect parsing.
+    #[doc = include_str!("../docs/replay-format-evolution.md")]
+    pub mod replay_format_evolution {
+        // The guide uses markdown link-reference definitions, which rustdoc's
+        // bare-URL lint flags even though they render correctly.
+        #![allow(rustdoc::bare_urls)]
+    }
 }
 
 pub use crate::actor_state::*;

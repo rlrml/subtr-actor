@@ -3,6 +3,7 @@ use super::*;
 pub const PLAYER_GROUND_Z_THRESHOLD: f32 = 20.0;
 pub const PLAYER_HIGH_AIR_Z_THRESHOLD: f32 = 642.775 + BALL_RADIUS_Z;
 
+/// Vertical band a player occupies (ground, low air, high air).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlayerVerticalBand {
     Ground,
@@ -49,6 +50,7 @@ impl PlayerVerticalBand {
     }
 }
 
+/// A sampled per-player vertical-state measurement.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PlayerVerticalSample {
     pub height: f32,
@@ -64,6 +66,7 @@ impl PlayerVerticalSample {
     }
 }
 
+/// Per-player airborne/vertical state.
 #[derive(Debug, Clone, Default)]
 pub struct PlayerVerticalState {
     pub players: HashMap<PlayerId, PlayerVerticalSample>,
@@ -84,6 +87,7 @@ impl PlayerVerticalState {
     }
 }
 
+/// Tracks per-player airborne/vertical state.
 #[derive(Default)]
 pub struct PlayerVerticalStateCalculator;
 

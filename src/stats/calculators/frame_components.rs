@@ -2,6 +2,7 @@ use crate::*;
 
 use super::{BallSample, DemoEventSample, PlayerSample};
 
+/// Per-frame timing and index metadata.
 #[derive(Debug, Clone, Default)]
 pub struct FrameInfo {
     pub frame_number: usize,
@@ -10,6 +11,7 @@ pub struct FrameInfo {
     pub seconds_remaining: Option<i32>,
 }
 
+/// Per-frame gameplay state such as game phase and ball-hit flags.
 #[derive(Debug, Clone, Default)]
 pub struct GameplayState {
     pub game_state: Option<i32>,
@@ -47,6 +49,7 @@ impl GameplayState {
     }
 }
 
+/// Per-frame ball state (present with position/velocity, or absent).
 #[derive(Debug, Clone, Default)]
 pub enum BallFrameState {
     #[default]
@@ -93,6 +96,7 @@ impl From<Option<BallSample>> for BallFrameState {
     }
 }
 
+/// Per-frame per-player state (position, velocity, boost, inputs).
 #[derive(Debug, Clone, Default)]
 pub struct PlayerFrameState {
     pub players: Vec<PlayerSample>,
@@ -112,6 +116,7 @@ impl PlayerFrameState {
     }
 }
 
+/// Per-frame discrete game events extracted from the replay.
 #[derive(Debug, Clone, Default)]
 pub struct FrameEventsState {
     pub active_demos: Vec<DemoEventSample>,

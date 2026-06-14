@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Derives team/possession stats from ball-frame and shared possession state.
 pub struct PossessionNode {
     calculator: PossessionCalculator,
 }

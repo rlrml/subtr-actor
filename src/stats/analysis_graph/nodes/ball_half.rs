@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks which half of the field the ball is in from ball-frame and live-play state.
 pub struct BallHalfNode {
     calculator: BallHalfCalculator,
 }
