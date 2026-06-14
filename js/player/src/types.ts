@@ -487,10 +487,14 @@ export interface ReplayPlayerState {
   cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
-  /** Whether the followed player's replicated ball-cam toggle drives the camera. */
-  useReplayBallCam: boolean;
+  /**
+   * Whether the followed player's replicated ball-cam toggle drives the camera.
+   * Optional so the structurally-compatible viewer `ViewerState` (which has no
+   * such notion) stays assignable to `ReplayPlayerState`.
+   */
+  useReplayBallCam?: boolean;
   /** Effective ball-cam state actually applied this frame (replay or manual). */
-  effectiveBallCamEnabled: boolean;
+  effectiveBallCamEnabled?: boolean;
   boostMeterEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
   hitboxWireframesEnabled: boolean;

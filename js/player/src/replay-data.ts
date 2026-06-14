@@ -729,9 +729,7 @@ async function indexReplayPlayersAsync(
  * Maps the per-player coalesced camera-toggle changes (already grouped and
  * frame-ordered on the Rust side) into a lookup keyed by player id string.
  */
-function buildCameraEventsByPlayer(
-  raw: RawReplayFramesData,
-): Map<string, CameraStateChange[]> {
+function buildCameraEventsByPlayer(raw: RawReplayFramesData): Map<string, CameraStateChange[]> {
   const byPlayer = new Map<string, CameraStateChange[]>();
   for (const [player, changes] of raw.player_camera_events ?? []) {
     byPlayer.set(
