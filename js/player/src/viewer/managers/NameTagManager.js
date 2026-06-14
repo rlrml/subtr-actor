@@ -33,7 +33,7 @@ export class NameTagManager {
 
     // Sprite scale (screen units since sizeAttenuation is false)
     this.spriteScale = 0.06;
-    this.spriteWorldHeight = 1.2; // World units above car
+    this.spriteWorldHeight = 90; // UU above car, roughly one car height plus clearance
   }
 
   setPlayerTeams(teams) {
@@ -59,39 +59,17 @@ export class NameTagManager {
       tagData.lastBoost = boost;
     }
 
-    // Update position (above car, height adjusts based on camera distance)
+    // Update position above the car. Keep the anchor stable in world space so
+    // close follow/ball-cam shots do not pull the label away from the car.
     if (carPosition && this.camera) {
-      // Calculate distance from camera to car
-      const distance = this.camera.position.distanceTo(carPosition);
+      tagData.sprite.position.set(
+        carPosition.x,
+        carPosition.y + this.spriteWorldHeight,
+        carPosition.z,
+      );
 
-      // Adjust height based on distance (scaled for 100x arena):
-      // Close (distance < 500): lower height (~80)
-      // Far (distance > 5000): higher height (~200)
-      const minHeight = 80;
-      const maxHeight = 200;
-      const minDist = 500;
-      const maxDist = 5000;
-
-      const t = Math.max(0, Math.min(1, (distance - minDist) / (maxDist - minDist)));
-      const dynamicHeight = minHeight + t * (maxHeight - minHeight);
-
-      tagData.sprite.position.set(carPosition.x, carPosition.y + dynamicHeight, carPosition.z);
-
-      // Hybrid size behavior:
-      // - Far away: constant screen size (base scale)
-      // - Close up: grows on screen (world-space size)
-      const proximityThreshold = 800; // Distance at which size starts growing
       const aspectRatio = this.canvasWidth / this.canvasHeight;
-
-      if (distance < proximityThreshold) {
-        // Close: scale increases as we get closer (simulates world-space size)
-        const growthFactor = proximityThreshold / Math.max(distance, 100);
-        const closeScale = this.spriteScale * growthFactor;
-        tagData.sprite.scale.set(closeScale * aspectRatio, closeScale, 1);
-      } else {
-        // Far: constant screen size
-        tagData.sprite.scale.set(this.spriteScale * aspectRatio, this.spriteScale, 1);
-      }
+      tagData.sprite.scale.set(this.spriteScale * aspectRatio, this.spriteScale, 1);
 
       tagData.sprite.visible = true;
     }
