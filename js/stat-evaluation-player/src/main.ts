@@ -63,6 +63,7 @@ import {
   type PlaybackReadoutsController,
 } from "./playbackReadouts.ts";
 import { installMountEventListeners } from "./mountEventListeners.ts";
+import { installFreeCameraKeyboard } from "./freeCameraKeyboard.ts";
 import { createActiveModulesRuntime } from "./activeModulesRuntime.ts";
 import { getMechanicsReviewMechanicKind, type MechanicsReviewItem } from "./mechanicsReview.ts";
 import { createMechanicsReviewReplayLoadsController } from "./mechanicsReviewReplayLoads.ts";
@@ -1010,6 +1011,11 @@ export function mountStatEvaluationPlayer(
   mechanicsReviewController?.installEventListeners(listeners.signal);
   recordingWindowController?.installEventListeners(listeners.signal);
   cameraControlsController?.installEventListeners(listeners.signal);
+  // WASD flies the free camera whenever no text field has focus.
+  installFreeCameraKeyboard({
+    getReplayPlayer: () => replayPlayer,
+    signal: listeners.signal,
+  });
 
   // Allow an embedding parent window (e.g. the Rocket Sense stats UI) to drive
   // the active review clip without reloading the replay, so hovering a goal can
