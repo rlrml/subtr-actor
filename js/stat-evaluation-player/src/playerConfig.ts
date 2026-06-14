@@ -71,7 +71,10 @@ export interface PlayerCameraConfig {
   readonly mode?: ReplayCameraViewMode;
   readonly freePreset?: ReplayFreeCameraPreset | null;
   readonly attachedPlayerId?: string | null;
+  /** Forced ball cam (`true`) / car cam (`false`). Ignored when `useReplayBallCam`. */
   readonly ballCam?: boolean;
+  /** Follow the attached player's recorded ball-cam toggle ("player" view). */
+  readonly useReplayBallCam?: boolean;
   readonly usePlayerCameraSettings?: boolean;
   readonly customSettings?: CameraSettings | null;
   readonly nameplateLiftUu?: number;
@@ -300,6 +303,7 @@ function normalizeCameraConfig(value: unknown): PlayerCameraConfig {
           : undefined;
   const attachedPlayerId = stringOrNull(value.attachedPlayerId);
   const ballCam = booleanValue(value.ballCam);
+  const useReplayBallCam = booleanValue(value.useReplayBallCam);
   const usePlayerCameraSettings = booleanValue(value.usePlayerCameraSettings);
   const customSettings = normalizeCameraSettings(value.customSettings);
   const nameplateLiftUu = finiteNumber(value.nameplateLiftUu);
@@ -307,6 +311,7 @@ function normalizeCameraConfig(value: unknown): PlayerCameraConfig {
   if (freePreset !== undefined) config.freePreset = freePreset;
   if (attachedPlayerId !== undefined) config.attachedPlayerId = attachedPlayerId;
   if (ballCam !== undefined) config.ballCam = ballCam;
+  if (useReplayBallCam !== undefined) config.useReplayBallCam = useReplayBallCam;
   if (usePlayerCameraSettings !== undefined) {
     config.usePlayerCameraSettings = usePlayerCameraSettings;
   }

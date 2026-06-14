@@ -49,6 +49,15 @@
   box-shadow: inset 0 0 0 1px rgba(142, 197, 255, 0.12);
 }
 
+.camera-ball-cam {
+  display: grid;
+  gap: var(--ui-gap-xs);
+}
+
+.camera-ball-cam-modes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .camera-settings-controls {
   display: grid;
   gap: var(--ui-gap-sm);

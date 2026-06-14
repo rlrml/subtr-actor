@@ -148,7 +148,10 @@ export async function loadReplayBundleForDisplay(
       initialCustomCameraSettings: getCustomCameraSettingsFromConfig(config?.camera),
       initialAttachedPlayerId: config?.camera.attachedPlayerId ?? null,
       initialCameraViewMode: config?.camera.mode,
-      initialBallCamEnabled: config?.camera.ballCam ?? false,
+      // Ball cam defaults to "player" (follow the recorded toggle): leave the
+      // initial override unset (null) so the camera plugin tracks the recorded
+      // state. A saved config's forced ball/car cam is applied by
+      // applyConfigToReplayPlayer immediately after construction.
       initialBoostPickupAnimationEnabled: config?.overlays.boostPickupAnimation ?? false,
       initialHitboxWireframesEnabled:
         config?.overlays.hitboxWireframes ?? elements.hitboxWireframes.checked,

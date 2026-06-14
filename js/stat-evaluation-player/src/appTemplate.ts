@@ -188,10 +188,18 @@ export function getAppTemplate(): string {
                 />
               </label>
             </div>
-            <label class="toggle">
-              <input id="ball-cam" type="checkbox" disabled />
-              <span>Ball cam</span>
-            </label>
+            <div class="camera-ball-cam">
+              <span class="label">Ball cam</span>
+              <div
+                class="camera-presets camera-ball-cam-modes"
+                role="group"
+                aria-label="Ball cam mode"
+              >
+                <button id="ball-cam-off" type="button" disabled>Off</button>
+                <button id="ball-cam-on" type="button" disabled>On</button>
+                <button id="ball-cam-player" type="button" disabled>Player</button>
+              </div>
+            </div>
             <label>
               <span class="camera-setting-label">
                 <span>Name plate height</span>
