@@ -569,7 +569,13 @@ export function createBallchasingOverlayPlugin(
   let originalContainerPosition = "";
   const playerElements = new Map<string, PlayerOverlayElements>();
   const projected = new THREE.Vector3();
-  const floatingOffset = new THREE.Vector3(0, 0, 255);
+  // World-space lift applied to each car before projecting the floating label,
+  // so the name/boost pill sits above the car instead of on it. Resolved along
+  // the scene's up axis in buildHud — the viewer renders Y-up while
+  // @rlrml/player's own scene is Z-up, so we read it from the camera rather
+  // than hardcoding an axis.
+  const FLOATING_LIFT_UU = 250;
+  const floatingOffset = new THREE.Vector3(0, FLOATING_LIFT_UU, 0);
 
   function syncAttachedPlayer(attachedPlayerId: string | null): void {
     for (const [playerId, elements] of playerElements.entries()) {
@@ -730,7 +736,10 @@ export function createBallchasingOverlayPlugin(
       });
     }
 
-    floatingOffset.set(0, 0, 255 * (context.options.fieldScale ?? 1));
+    floatingOffset
+      .copy(context.scene.camera.up)
+      .normalize()
+      .multiplyScalar(FLOATING_LIFT_UU * (context.options.fieldScale ?? 1));
     container.append(root);
     syncAttachedPlayer(context.player.getState().attachedPlayerId);
     syncFollowedHud({ ...context, state: context.player.getState() });
