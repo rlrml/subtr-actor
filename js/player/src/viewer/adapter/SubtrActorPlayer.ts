@@ -42,14 +42,14 @@ type RawPlayerFrame =
         team: number | null;
         is_team_0: boolean | null;
         camera?: {
-          pitch: number | null;
-          yaw: number | null;
+          pitch?: number | null;
+          yaw?: number | null;
         };
         input?: {
-          throttle: number | null;
-          steer: number | null;
-          dodge_impulse: [number, number, number] | null;
-          dodge_torque: [number, number, number] | null;
+          throttle?: number | null;
+          steer?: number | null;
+          dodge_impulse?: [number, number, number] | null;
+          dodge_torque?: [number, number, number] | null;
         };
       };
     };

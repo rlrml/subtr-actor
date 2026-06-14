@@ -451,6 +451,12 @@ export interface ReplayPlayerOptions {
    * `true`. Calling `setBallCamEnabled` turns this off (manual override).
    */
   initialUseReplayBallCam?: boolean;
+  /**
+   * Opt-in (default false): rotate the follow camera by the player's replicated
+   * camera yaw/pitch (free-look swivel) instead of locking to car orientation.
+   * Needs per-replay sign tuning; off by default to preserve the synthetic feel.
+   */
+  initialUseReplayCameraLook?: boolean;
   initialBoostMeterEnabled?: boolean;
   initialBoostPickupAnimationEnabled?: boolean;
   initialHitboxWireframesEnabled?: boolean;

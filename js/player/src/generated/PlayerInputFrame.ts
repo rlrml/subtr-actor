@@ -15,17 +15,17 @@ export type PlayerInputFrame = {
 /**
  * Raw throttle byte (0-255, ~128 neutral); convert at display time.
  */
-throttle: number | null,
+throttle?: number | null,
 /**
  * Raw steer byte (0-255, ~128 centered); convert at display time.
  */
-steer: number | null,
+steer?: number | null,
 /**
  * Impulse vector `(x, y, z)` in raw replay units of the most recent
  * dodge. Meaningful while [`PlayerFrame::Data::dodge_active`] is set.
  */
-dodge_impulse: [number, number, number] | null,
+dodge_impulse?: [number, number, number] | null,
 /**
  * Torque vector `(x, y, z)` in raw replay units of the most recent dodge.
  */
-dodge_torque: [number, number, number] | null, };
+dodge_torque?: [number, number, number] | null, };

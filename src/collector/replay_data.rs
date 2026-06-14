@@ -125,8 +125,10 @@ impl BallFrame {
 #[ts(export)]
 pub struct PlayerCameraFrame {
     /// Raw camera pitch byte (0-255) as replicated; convert at display time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pitch: Option<u8>,
     /// Raw camera yaw byte (0-255) as replicated; convert at display time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub yaw: Option<u8>,
 }
 
@@ -143,13 +145,17 @@ pub struct PlayerCameraFrame {
 #[ts(export)]
 pub struct PlayerInputFrame {
     /// Raw throttle byte (0-255, ~128 neutral); convert at display time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub throttle: Option<u8>,
     /// Raw steer byte (0-255, ~128 centered); convert at display time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steer: Option<u8>,
     /// Impulse vector `(x, y, z)` in raw replay units of the most recent
     /// dodge. Meaningful while [`PlayerFrame::Data::dodge_active`] is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dodge_impulse: Option<(f32, f32, f32)>,
     /// Torque vector `(x, y, z)` in raw replay units of the most recent dodge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dodge_torque: Option<(f32, f32, f32)>,
 }
 
