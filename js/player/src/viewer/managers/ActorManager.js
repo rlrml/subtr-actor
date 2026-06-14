@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { getCarHitboxInfo } from "../data/hitboxes.js";
+import { resolveViewerAssetUrl } from "../asset-url.js";
 import { CarModelLoader } from "./CarModelLoader.js";
 
 export class ActorManager {
-  constructor(scene, effectsManager) {
+  constructor(scene, effectsManager, options = {}) {
     this.scene = scene;
     this.effectsManager = effectsManager;
+    this.assetBase = options.assetBase;
     this.actors = {}; // actorId -> Mesh
     this.ballActorId = null;
     this.ballIndicator = null;
@@ -25,7 +27,7 @@ export class ActorManager {
     this.carBodyIds = {}; // actorId -> bodyId
 
     // Car model loader for FBX models
-    this.carModelLoader = new CarModelLoader();
+    this.carModelLoader = new CarModelLoader({ assetBase: this.assetBase });
     this.pendingCarReplacements = new Map(); // actorId -> hitboxType (cars waiting for model)
 
     // Reusable vectors for interpolation
@@ -96,7 +98,7 @@ export class ActorManager {
     const gltfLoader = new GLTFLoader();
     this.ballModelReady = new Promise((resolve) => {
       gltfLoader.load(
-        "/models/ball/scene.gltf",
+        resolveViewerAssetUrl("models/ball/scene.gltf", this.assetBase),
         (gltf) => {
           this.ballModel = gltf.scene;
           console.log("✓ Ball model loaded");

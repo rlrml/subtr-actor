@@ -55,9 +55,9 @@ export default defineConfig(({ command, mode }) => {
   return {
     base: "./",
     plugins: [wasm(), ensureWasmBindingsPlugin()],
-    // The 3D viewer loads its models/draco assets from absolute web-root paths
-    // (/models/..., /draco/...); serve js/player/public at the root in dev and
-    // copy it into site builds. The library build ships no assets.
+    // Site/dev builds serve the bundled 3D viewer assets beside the app. The
+    // viewer resolves them through Vite's BASE_URL so subpath deployments such
+    // as GitHub Pages do not depend on web-root /models or /draco paths.
     publicDir: useLocalAliases ? path.resolve(import.meta.dirname, "../player/public") : false,
     resolve: {
       alias: useLocalAliases
@@ -67,6 +67,7 @@ export default defineConfig(({ command, mode }) => {
               "../pkg/rl_replay_subtr_actor.js",
             ),
             "@rlrml/player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+            "camera-controls": path.resolve(import.meta.dirname, "node_modules/camera-controls"),
             three: path.resolve(import.meta.dirname, "node_modules/three"),
           }
         : undefined,

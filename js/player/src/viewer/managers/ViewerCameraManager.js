@@ -12,15 +12,17 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { resolveViewerAssetUrl } from "../asset-url.js";
 
 export class ViewerCameraManager {
   /**
    * @param {THREE.Scene} scene - The scene to add camera meshes to
    * @param {THREE.Camera} camera - The main camera (for label orientation)
    */
-  constructor(scene, camera) {
+  constructor(scene, camera, options = {}) {
     this.scene = scene;
     this.camera = camera;
+    this.assetBase = options.assetBase;
 
     // Map of participantId -> { mesh, label, color, nickname }
     this.viewerCameras = new Map();
@@ -31,7 +33,7 @@ export class ViewerCameraManager {
     // Model loading
     this.gltfLoader = new GLTFLoader();
     const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
+    dracoLoader.setDecoderPath(resolveViewerAssetUrl("draco/", this.assetBase));
     this.gltfLoader.setDRACOLoader(dracoLoader);
 
     // Cached model template
@@ -72,7 +74,7 @@ export class ViewerCameraManager {
     this.modelLoading = new Promise((resolve, reject) => {
       console.log("[ViewerCameraManager] Loading camera drone model...");
       this.gltfLoader.load(
-        "/models/camera/camera_drone.glb",
+        resolveViewerAssetUrl("models/camera/camera_drone.glb", this.assetBase),
         (gltf) => {
           console.log("[ViewerCameraManager] Loaded camera drone model successfully");
           this.modelTemplate = gltf.scene;
