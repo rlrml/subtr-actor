@@ -167,7 +167,11 @@ export async function loadReplayBundleForDisplay(
             if (replay) replay.textContent = `${replayFps.toFixed(0)} fps`;
           },
         }),
-        fromReplayPlayerPlugin(createBallchasingOverlayPlugin()),
+        fromReplayPlayerPlugin(
+          createBallchasingOverlayPlugin({
+            floatingLiftUu: () => options.getCameraControlsController()?.nameplateLiftUu,
+          }),
+        ),
         fromReplayPlayerPlugin(
           createBoostPickupAnimationPlugin({
             includePickup: options.includeBoostPickupAnimationPickup,
