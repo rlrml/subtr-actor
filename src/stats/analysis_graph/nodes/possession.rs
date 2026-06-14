@@ -27,6 +27,10 @@ impl AnalysisNode for PossessionNode {
         "possession"
     }
 
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::POSSESSION_EMITTED_EVENTS
+    }
+
     fn dependencies(&self) -> NodeDependencies {
         vec![
             frame_info_dependency(),

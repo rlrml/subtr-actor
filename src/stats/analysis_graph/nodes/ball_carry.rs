@@ -35,6 +35,10 @@ impl AnalysisNode for BallCarryNode {
         "ball_carry"
     }
 
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::BALL_CARRY_EMITTED_EVENTS
+    }
+
     fn dependencies(&self) -> Vec<AnalysisDependency> {
         vec![continuous_ball_control_dependency()]
     }

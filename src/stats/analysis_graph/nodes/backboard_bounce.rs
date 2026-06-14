@@ -20,6 +20,7 @@ impl_analysis_node! {
     node = BackboardBounceStateNode,
     state = BackboardBounceState,
     name = "backboard_bounce_state",
+    emitted_events = crate::stats::calculators::BACKBOARD_BOUNCE_STATE_EMITTED_EVENTS,
     dependencies = [
         frame_info_dependency() => FrameInfo,
         ball_frame_state_dependency() => BallFrameState,

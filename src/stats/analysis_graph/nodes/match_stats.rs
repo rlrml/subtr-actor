@@ -27,6 +27,10 @@ impl AnalysisNode for MatchStatsNode {
         "match_stats"
     }
 
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::MATCH_STATS_EMITTED_EVENTS
+    }
+
     fn dependencies(&self) -> Vec<AnalysisDependency> {
         vec![
             frame_info_dependency(),

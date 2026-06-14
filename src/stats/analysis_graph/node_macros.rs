@@ -3,6 +3,7 @@ macro_rules! impl_analysis_node {
         node = $node:ident,
         state = $state:ty,
         name = $name:literal,
+        $(emitted_events = $emitted:expr_2021,)?
         dependencies = [$($dependency:expr_2021 => $dependency_ty:ty),* $(,)?],
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
         call = $field:ident.$method:ident
@@ -21,6 +22,14 @@ macro_rules! impl_analysis_node {
             fn name(&self) -> &'static str {
                 $name
             }
+
+            $(
+                fn emitted_events(
+                    &self,
+                ) -> &'static [$crate::stats::calculators::EmittedEvent] {
+                    $emitted
+                }
+            )?
 
             fn dependencies(&self) -> Vec<AnalysisDependency> {
                 vec![$($dependency),*]
@@ -61,6 +70,7 @@ macro_rules! impl_analysis_node {
         node = $node:ident,
         state = $state:ty,
         name = $name:literal,
+        $(emitted_events = $emitted:expr_2021,)?
         dependencies = [$($dependency:expr_2021 => $dependency_ty:ty),* $(,)?],
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
         update_state = $field:ident.$method:ident
@@ -79,6 +89,14 @@ macro_rules! impl_analysis_node {
             fn name(&self) -> &'static str {
                 $name
             }
+
+            $(
+                fn emitted_events(
+                    &self,
+                ) -> &'static [$crate::stats::calculators::EmittedEvent] {
+                    $emitted
+                }
+            )?
 
             fn dependencies(&self) -> Vec<AnalysisDependency> {
                 vec![$($dependency),*]
@@ -120,6 +138,7 @@ macro_rules! impl_analysis_node {
         node = $node:ident,
         state = $state:ty,
         name = $name:literal,
+        $(emitted_events = $emitted:expr_2021,)?
         dependencies = [$($dependency:expr_2021),* $(,)?],
         inputs = {$($binding:ident : $binding_ty:ty),* $(,)?},
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
@@ -139,6 +158,14 @@ macro_rules! impl_analysis_node {
             fn name(&self) -> &'static str {
                 $name
             }
+
+            $(
+                fn emitted_events(
+                    &self,
+                ) -> &'static [$crate::stats::calculators::EmittedEvent] {
+                    $emitted
+                }
+            )?
 
             fn dependencies(&self) -> Vec<AnalysisDependency> {
                 vec![$($dependency),*]

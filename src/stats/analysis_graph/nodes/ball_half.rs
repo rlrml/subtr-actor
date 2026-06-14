@@ -31,6 +31,10 @@ impl AnalysisNode for BallHalfNode {
         "ball_half"
     }
 
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::BALL_HALF_EMITTED_EVENTS
+    }
+
     fn dependencies(&self) -> NodeDependencies {
         vec![
             frame_info_dependency(),

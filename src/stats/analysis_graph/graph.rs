@@ -1,7 +1,7 @@
 use std::any::{Any, TypeId, type_name};
 use std::collections::{HashMap, HashSet};
 
-use crate::stats::calculators::{EmittedEvent, event_producers};
+use crate::stats::calculators::EmittedEvent;
 use crate::*;
 
 #[derive(Clone, Copy)]
@@ -130,6 +130,16 @@ pub trait AnalysisNode: 'static {
 
     fn name(&self) -> &'static str;
 
+    /// Static catalog of the events this node emits, if any.
+    ///
+    /// The node is the source of truth for what it produces: a graph's emitted
+    /// events come from walking its actual nodes (see
+    /// [`AnalysisGraph::emitted_events`]), so there is no name-keyed side
+    /// registry that can drift out of sync with the nodes themselves.
+    fn emitted_events(&self) -> &'static [EmittedEvent] {
+        &[]
+    }
+
     fn on_replay_meta(&mut self, _meta: &ReplayMeta) -> SubtrActorResult<()> {
         Ok(())
     }
@@ -149,6 +159,8 @@ pub trait AnalysisNode: 'static {
 
 pub trait AnalysisNodeDyn: 'static {
     fn name(&self) -> &'static str;
+
+    fn emitted_events(&self) -> &'static [EmittedEvent];
 
     fn provides_state_type_id(&self) -> TypeId;
 
@@ -171,6 +183,10 @@ where
 {
     fn name(&self) -> &'static str {
         AnalysisNode::name(self)
+    }
+
+    fn emitted_events(&self) -> &'static [EmittedEvent] {
+        AnalysisNode::emitted_events(self)
     }
 
     fn provides_state_type_id(&self) -> TypeId {
@@ -474,21 +490,11 @@ impl AnalysisGraph {
 
     pub fn emitted_events(&mut self) -> SubtrActorResult<Vec<EmittedEvent>> {
         self.resolve()?;
-        let node_names = self
+        Ok(self
             .nodes
             .iter()
-            .map(|node| node.name())
-            .collect::<HashSet<_>>();
-        Ok(self
-            .event_producers()
-            .iter()
-            .filter(|producer| node_names.contains(producer.node_name))
-            .flat_map(|producer| producer.emitted_events.iter().copied())
+            .flat_map(|node| node.emitted_events().iter().copied())
             .collect())
-    }
-
-    fn event_producers(&self) -> &'static [crate::stats::calculators::EventProducerDefinition] {
-        event_producers()
     }
 
     fn provider_index_by_type(&self) -> SubtrActorResult<HashMap<TypeId, usize>> {
