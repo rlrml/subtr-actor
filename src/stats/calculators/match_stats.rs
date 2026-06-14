@@ -86,8 +86,6 @@ pub enum TimelineEventKind {
     Shot,
     Save,
     Assist,
-    Kill,
-    Death,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]

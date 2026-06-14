@@ -9,13 +9,13 @@ use linkme::distributed_slice;
 use super::{
     BackboardBounceEvent, BallCarryEvent, BallDepthEvent, BallHalfEvent, BallProximityEvent,
     BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent, ControlledPlayEvent,
-    CorePlayerScoreboardEvent, DepthRoleEvent, DodgeEvent, DodgeResetEvent, DoubleTapEvent,
-    FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent, FirstManChangeEvent, FlickEvent,
-    FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent,
-    PassEvent, PlayerActivityEvent, PlayerPossessionEvent, PossessionEvent, PowerslideEvent,
-    RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
-    TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
-    WhiffEvent,
+    CorePlayerScoreboardEvent, DemolitionEvent, DepthRoleEvent, DodgeEvent, DodgeResetEvent,
+    DoubleTapEvent, FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent, FirstManChangeEvent,
+    FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
+    OneTimerEvent, PassEvent, PlayerActivityEvent, PlayerPossessionEvent, PossessionEvent,
+    PowerslideEvent, RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent,
+    TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
+    WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::Event;
 
@@ -474,17 +474,9 @@ pub const ASSIST_EVENT_DEFINITION: EventDefinition =
     pending_event_definition("assist", "Assist", EventCategory::Core);
 register_stats_event_definition!(ASSIST_EVENT_DEFINITION);
 
-pub const DEATH_EVENT_DEFINITION: EventDefinition =
-    pending_event_definition("death", "Death", EventCategory::Core);
-register_stats_event_definition!(DEATH_EVENT_DEFINITION);
-
 pub const GOAL_EVENT_DEFINITION: EventDefinition =
     pending_event_definition("goal", "Goal", EventCategory::Core);
 register_stats_event_definition!(GOAL_EVENT_DEFINITION);
-
-pub const KILL_EVENT_DEFINITION: EventDefinition =
-    pending_event_definition("kill", "Demolition", EventCategory::Core);
-register_stats_event_definition!(KILL_EVENT_DEFINITION);
 
 pub const SAVE_EVENT_DEFINITION: EventDefinition =
     pending_event_definition("save", "Save", EventCategory::Core);
@@ -860,6 +852,13 @@ define_stats_event!(
     EventCategory::Other
 );
 define_stats_event!(
+    DemolitionEvent,
+    DEMOLITION_EVENT_DEFINITION,
+    "demolition",
+    "Demolition",
+    EventCategory::Other
+);
+define_stats_event!(
     PossessionEvent,
     POSSESSION_EVENT_DEFINITION,
     "possession",
@@ -1004,7 +1003,7 @@ const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
 ];
 
 const DEMO_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
-    &TIMELINE_EVENT_DEFINITION,
+    &DEMOLITION_EVENT_DEFINITION,
     "demo",
     "DemoNode",
     "DemoCalculator",

@@ -339,14 +339,6 @@ fn process_frame_accepts_explicit_live_event_arrays_for_graph_input() {
     );
     assert!(
         finalized_events.iter().any(|event| {
-            event.kind == SaMechanicKind::Death
-                && event.player_index == 1
-                && event.frame_number == 1
-        }),
-        "explicit live demolish events should drain victim death events through the finalized full graph"
-    );
-    assert!(
-        finalized_events.iter().any(|event| {
             event.kind == SaMechanicKind::Goal && event.player_index == 0 && event.frame_number == 1
         }),
         "explicit live goal events should drain finalized goal events through the full graph"
@@ -577,7 +569,7 @@ fn duplicate_explicit_live_demolishes_are_suppressed_for_graph_input() {
         .graph
         .state::<DemoCalculator>()
         .expect("full analysis graph should expose demo calculator state");
-    assert_eq!(demo.timeline().len(), 2);
+    assert_eq!(demo.events().len(), 1);
     unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
 }
 

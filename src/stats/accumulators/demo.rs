@@ -37,30 +37,20 @@ impl DemoStatsAccumulator {
         &self.team_one_stats
     }
 
-    pub fn apply_timeline_event(&mut self, event: &TimelineEvent) {
-        let Some(player_id) = event.player_id.as_ref() else {
-            return;
-        };
-
-        match event.kind {
-            TimelineEventKind::Kill => {
-                self.player_stats
-                    .entry(player_id.clone())
-                    .or_default()
-                    .demos_inflicted += 1;
-                match event.is_team_0 {
-                    Some(true) => self.team_zero_stats.demos_inflicted += 1,
-                    Some(false) => self.team_one_stats.demos_inflicted += 1,
-                    None => {}
-                }
-            }
-            TimelineEventKind::Death => {
-                self.player_stats
-                    .entry(player_id.clone())
-                    .or_default()
-                    .demos_taken += 1;
-            }
-            _ => {}
+    pub fn apply_demolition_event(&mut self, event: &DemolitionEvent) {
+        self.player_stats
+            .entry(event.attacker.clone())
+            .or_default()
+            .demos_inflicted += 1;
+        match event.attacker_is_team_0 {
+            Some(true) => self.team_zero_stats.demos_inflicted += 1,
+            Some(false) => self.team_one_stats.demos_inflicted += 1,
+            None => {}
         }
+
+        self.player_stats
+            .entry(event.victim.clone())
+            .or_default()
+            .demos_taken += 1;
     }
 }

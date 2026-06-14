@@ -219,13 +219,12 @@ fn test_demo_events_reconstruct_serialized_partial_sums() {
         .expect("Expected stats timeline data");
 
     assert!(
-        timeline_payloads_by_stream(&timeline, "timeline", |payload| match payload {
-            EventPayload::Timeline(event) => Some(event),
+        !timeline_payloads_by_stream(&timeline, "demolition", |payload| match payload {
+            EventPayload::Demolition(event) => Some(event),
             _ => None,
         })
-        .iter()
-        .any(|event| matches!(event.kind, TimelineEventKind::Kill | TimelineEventKind::Death)),
-        "expected demo fixture to contain kill/death timeline events"
+        .is_empty(),
+        "expected demo fixture to contain demolition events"
     );
     assert_demo_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
 }

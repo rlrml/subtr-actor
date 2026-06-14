@@ -212,6 +212,7 @@ pub fn stats_timeline_event_label(stream: &str) -> String {
         "boost_pickups" => "Boost pickup",
         "boost_respawn" => "Respawn",
         "bump" => "Bump",
+        "demolition" => "Demolition",
         "flick" => "Flick",
         "musty_flick" => "Musty flick",
         _ => return title_case_event_stream(stream),
@@ -363,6 +364,7 @@ pub enum EventPayload {
     BoostPickup(BoostPickupEvent),
     Respawn(RespawnEvent),
     Bump(BumpEvent),
+    Demolition(DemolitionEvent),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]

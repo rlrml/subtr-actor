@@ -107,9 +107,9 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "death",
-    "label": "Death",
-    "category": "core",
+    "key": "demolition",
+    "label": "Demolition",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
@@ -221,13 +221,6 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "kickoff",
     "label": "Kickoff",
-    "category": "core",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
-    "key": "kill",
-    "label": "Demolition",
     "category": "core",
     "hidden_from_review": false,
     "variants": []

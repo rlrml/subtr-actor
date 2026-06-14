@@ -1512,7 +1512,7 @@ impl DemoGoalCalculator {
         demo: &DemoCalculator,
     ) -> SubtrActorResult<()> {
         self.events.replace_all_assuming_append_only(
-            self.tag_goals(match_stats.goal_context_events(), demo.timeline()),
+            self.tag_goals(match_stats.goal_context_events(), demo.events()),
         );
         Ok(())
     }
@@ -1520,7 +1520,7 @@ impl DemoGoalCalculator {
     fn tag_goals(
         &self,
         goals: &[GoalContextEvent],
-        demo_events: &[TimelineEvent],
+        demo_events: &[DemolitionEvent],
     ) -> Vec<GoalTagAssignment> {
         let mut tags = Vec::new();
         for (goal_index, goal) in goals.iter().enumerate() {
@@ -1533,20 +1533,16 @@ impl DemoGoalCalculator {
                     goal.time - event.time <= self.config.max_event_to_goal_seconds
                 })
                 .max_by(|left, right| {
-                    left.1.time.total_cmp(&right.1.time).then_with(|| {
-                        left.1
-                            .frame
-                            .unwrap_or_default()
-                            .cmp(&right.1.frame.unwrap_or_default())
-                    })
+                    left.1
+                        .time
+                        .total_cmp(&right.1.time)
+                        .then_with(|| left.1.frame.cmp(&right.1.frame))
                 })
             else {
                 continue;
             };
 
-            let Some(attacker) = event.player_id.as_ref() else {
-                continue;
-            };
+            let attacker = &event.attacker;
 
             tags.push(mechanic_goal_tag(
                 ctx,

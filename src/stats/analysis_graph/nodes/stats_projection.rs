@@ -536,8 +536,8 @@ impl StatsProjectionNode {
             self.last_powerslide_sample_frame = Some(frame.frame_number);
         }
         let demo = ctx.get::<DemoCalculator>()?;
-        for event in Self::events_since(&mut self.cursors.demo_timeline, demo.timeline()) {
-            self.state.demo.apply_timeline_event(event);
+        for event in Self::events_since(&mut self.cursors.demo_timeline, demo.events()) {
+            self.state.demo.apply_demolition_event(event);
         }
         let center = ctx.get::<CenterCalculator>()?;
         for event in Self::events_since(&mut self.cursors.center, center.events()) {

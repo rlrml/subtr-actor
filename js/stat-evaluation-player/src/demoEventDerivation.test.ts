@@ -10,11 +10,23 @@ const orangePlayer = { Steam: "orange-demo" } as Record<string, unknown>;
 test("demo event derivation can populate compacted player and team stats", () => {
   const timeline = createStatsTimeline({
     events: {
-      timeline: [
-        { time: 2, kind: "Kill", player_id: bluePlayer, is_team_0: true },
-        { time: 2, kind: "Death", player_id: orangePlayer, is_team_0: false },
-        { time: 3, kind: "Kill", player_id: orangePlayer, is_team_0: false },
-        { time: 3, kind: "Death", player_id: bluePlayer, is_team_0: true },
+      demolition: [
+        {
+          time: 2,
+          frame: 20,
+          attacker: bluePlayer,
+          victim: orangePlayer,
+          attacker_is_team_0: true,
+          victim_is_team_0: false,
+        },
+        {
+          time: 3,
+          frame: 30,
+          attacker: orangePlayer,
+          victim: bluePlayer,
+          attacker_is_team_0: false,
+          victim_is_team_0: true,
+        },
       ],
     },
     frames: [

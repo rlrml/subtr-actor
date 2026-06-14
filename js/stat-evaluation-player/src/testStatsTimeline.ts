@@ -92,6 +92,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "boost_pickups", stream: "boost_pickups", kind: "boost_pickup" },
   { field: "boost_respawn", stream: "boost_respawn", kind: "respawn" },
   { field: "bump", stream: "bump", kind: "bump" },
+  { field: "demolition", stream: "demolition", kind: "demolition" },
 ];
 
 function legacyBucketEvents(record: Record<string, unknown> | undefined): Event[] {

@@ -1188,6 +1188,22 @@ pub(in crate::collector::stats::playback) fn parse_bump_event(
     })
 }
 
+pub(in crate::collector::stats::playback) fn parse_demolition_event(
+    value: &Value,
+) -> SubtrActorResult<DemolitionEvent> {
+    let object = json_object(value, "demolition event")?;
+    Ok(DemolitionEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        attacker: json_required_remote_id(object, "attacker")?,
+        victim: json_required_remote_id(object, "victim")?,
+        attacker_is_team_0: object.get("attacker_is_team_0").and_then(Value::as_bool),
+        victim_is_team_0: object.get("victim_is_team_0").and_then(Value::as_bool),
+        attacker_position: json_optional_vec3(object.get("attacker_position"))?,
+        victim_position: json_optional_vec3(object.get("victim_position"))?,
+    })
+}
+
 pub(in crate::collector::stats::playback) fn parse_boost_pickup_event(
     value: &Value,
 ) -> SubtrActorResult<BoostPickupEvent> {

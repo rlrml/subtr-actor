@@ -174,7 +174,6 @@ impl StatsTimelineEventsNode {
         let bump = ctx.get::<BumpCalculator>()?;
 
         let mut timeline = match_stats.timeline().to_vec();
-        timeline.extend(demo.timeline().to_vec());
         timeline.sort_by(|left, right| left.time.total_cmp(&right.time));
         let goal_tag_assignments = combined_goal_tag_assignments(&[
             aerial_goal.events(),
@@ -236,6 +235,7 @@ impl StatsTimelineEventsNode {
                 touch,
                 boost,
                 bump,
+                demo,
                 flick,
                 musty_flick,
             ),
@@ -369,6 +369,7 @@ fn build_replay_events(
     touch: &TouchCalculator,
     boost: &BoostCalculator,
     bump: &BumpCalculator,
+    demo: &DemoCalculator,
     flick: &FlickCalculator,
     musty_flick: &MustyFlickCalculator,
 ) -> Vec<Event> {
@@ -1087,6 +1088,21 @@ fn build_replay_events(
             Some(event.initiator_position),
             None,
             Some(event.confidence),
+        ));
+    }
+
+    for (index, event) in demo.events().iter().enumerate() {
+        events.push(make_event(
+            "demolition",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::Demolition(event.clone()),
+            Some(event.attacker.clone()),
+            Some(event.victim.clone()),
+            event.attacker_is_team_0,
+            event.attacker_position,
+            None,
+            None,
         ));
     }
 

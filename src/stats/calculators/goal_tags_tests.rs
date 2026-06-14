@@ -309,14 +309,16 @@ fn bump_event(time: f32, frame: usize, initiator: PlayerId, victim: PlayerId) ->
     }
 }
 
-fn demo_event(time: f32, frame: usize, attacker: PlayerId) -> TimelineEvent {
-    TimelineEvent {
+fn demo_event(time: f32, frame: usize, attacker: PlayerId) -> DemolitionEvent {
+    DemolitionEvent {
         time,
-        frame: Some(frame),
-        kind: TimelineEventKind::Kill,
-        player_id: Some(attacker),
-        player_position: Some([10.0, 1200.0, 20.0]),
-        is_team_0: Some(true),
+        frame,
+        attacker,
+        victim: player_id(0),
+        attacker_is_team_0: Some(true),
+        victim_is_team_0: Some(false),
+        attacker_position: Some([10.0, 1200.0, 20.0]),
+        victim_position: None,
     }
 }
 
@@ -1096,15 +1098,13 @@ fn demo_goal_marks_by_scorer_when_scorer_gets_demo() {
 }
 
 #[test]
-fn demo_goal_rejects_deaths_opponent_demos_and_stale_demos() {
+fn demo_goal_rejects_opponent_demos_and_stale_demos() {
     let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
-    let mut death = demo_event(9.1, 91, player_id(2));
-    death.kind = TimelineEventKind::Death;
     let mut opponent_demo = demo_event(9.1, 91, player_id(3));
-    opponent_demo.is_team_0 = Some(false);
+    opponent_demo.attacker_is_team_0 = Some(false);
     let stale_demo = demo_event(6.5, 65, player_id(2));
 
-    let events = DemoGoalCalculator::new().tag_goals(&[goal], &[death, opponent_demo, stale_demo]);
+    let events = DemoGoalCalculator::new().tag_goals(&[goal], &[opponent_demo, stale_demo]);
 
     assert!(events.is_empty());
 }
