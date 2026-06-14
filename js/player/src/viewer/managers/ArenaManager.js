@@ -2,10 +2,12 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { resolveViewerAssetUrl } from "../asset-url.js";
 
 export class ArenaManager {
-  constructor(scene) {
+  constructor(scene, options = {}) {
     this.scene = scene;
+    this.assetBase = options.assetBase;
     this.arenaMeshes = []; // Store references to arena meshes for raycasting
     this.drawingCollider = null; // Simplified mesh for drawing raycasting
     this.drawingColliderMeshes = []; // Individual meshes from the collider
@@ -14,7 +16,7 @@ export class ArenaManager {
 
     // Setup DRACO loader for compressed meshes
     this.dracoLoader = new DRACOLoader();
-    this.dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
+    this.dracoLoader.setDecoderPath(resolveViewerAssetUrl("draco/", this.assetBase));
 
     // Setup GLTF loader with DRACO support
     this.gltfLoader = new GLTFLoader();
@@ -25,7 +27,9 @@ export class ArenaManager {
     try {
       console.log("Loading arena mesh...");
 
-      const gltf = await this.gltfLoader.loadAsync("/models/stadium/stadium.glb");
+      const gltf = await this.gltfLoader.loadAsync(
+        resolveViewerAssetUrl("models/stadium/stadium.glb", this.assetBase),
+      );
       const arena = gltf.scene;
 
       // Rotate arena 180 degrees around Y axis to match replay coordinate system
@@ -180,7 +184,9 @@ export class ArenaManager {
     try {
       console.log("[ArenaManager] Loading drawing collider...");
       const objLoader = new OBJLoader();
-      const collider = await objLoader.loadAsync("/models/stadium/DrawingArena.obj");
+      const collider = await objLoader.loadAsync(
+        resolveViewerAssetUrl("models/stadium/DrawingArena.obj", this.assetBase),
+      );
 
       // Apply rotations to match arena orientation
       // X rotation: +90 degrees to lay the collider flat (it's modeled vertically)
@@ -257,7 +263,9 @@ export class ArenaManager {
     try {
       console.log("[ArenaManager] Loading arena decoration mesh...");
 
-      const gltf = await this.gltfLoader.loadAsync("/models/stadium/arene.glb");
+      const gltf = await this.gltfLoader.loadAsync(
+        resolveViewerAssetUrl("models/stadium/arene.glb", this.assetBase),
+      );
       this.arenaDecorMesh = gltf.scene;
       this.showArenaDecor = show;
 

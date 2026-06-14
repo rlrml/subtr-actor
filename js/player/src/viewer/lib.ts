@@ -68,6 +68,7 @@ export function createViewerFromParsed(
 
 export { ViewerPlayer } from "./ViewerPlayer.js";
 export { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
+export { getViewerAssetBase, resolveViewerAssetUrl, setViewerAssetBase } from "./asset-url.js";
 export type {
   RecordedCameraSettings,
   SubtrActorPlayerOptions,

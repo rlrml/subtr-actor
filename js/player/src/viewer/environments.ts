@@ -16,8 +16,9 @@ export interface ViewerEnvironment {
   /** Stable id (also the key used to look it up). */
   id: string;
   /**
-   * URL of the equirectangular HDR skybox, resolved against the web root.
-   * Bundled assets live under `public/skyboxes/` and ship with the package.
+   * URL of the equirectangular HDR skybox, resolved against the viewer asset
+   * base unless absolute. Bundled assets live under `public/skyboxes/` and ship
+   * with the package.
    */
   skyboxUrl: string;
   /** `renderer.toneMappingExposure` while this environment is active (default 1.0). */

@@ -50,10 +50,15 @@ function ensureWasmBindingsPlugin() {
 export default defineConfig({
   base: "./",
   plugins: [ensureWasmBindingsPlugin()],
+  publicDir: path.resolve(import.meta.dirname, "../player/public"),
   resolve: {
     alias: {
       "@rlrml/subtr-actor": path.resolve(import.meta.dirname, "../pkg/rl_replay_subtr_actor.js"),
       "@rlrml/player": path.resolve(import.meta.dirname, "../player/src/lib.ts"),
+      "camera-controls": path.resolve(
+        import.meta.dirname,
+        "../stat-evaluation-player/node_modules/camera-controls",
+      ),
       three: path.resolve(import.meta.dirname, "../stat-evaluation-player/node_modules/three"),
     },
   },

@@ -14,6 +14,7 @@ export {
   ViewerPlayer,
   ViewerPlayer as ReplayPlayer,
 } from "./viewer/lib";
+export { getViewerAssetBase, resolveViewerAssetUrl, setViewerAssetBase } from "./viewer/asset-url";
 export type {
   CameraPlugin,
   CameraPluginMode,

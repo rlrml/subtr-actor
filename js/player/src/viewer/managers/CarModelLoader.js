@@ -3,6 +3,7 @@ import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { resolveViewerAssetUrl } from "../asset-url.js";
 
 /**
  * CarModelLoader - Loads and manages car models (GLB format) with team-colored materials
@@ -19,14 +20,15 @@ import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.j
  * - Merc hitbox -> merc
  */
 export class CarModelLoader {
-  constructor() {
+  constructor(options = {}) {
+    this.assetBase = options.assetBase;
     this.fbxLoader = new FBXLoader();
     this.gltfLoader = new GLTFLoader();
     this.textureLoader = new THREE.TextureLoader();
 
     // Setup DRACO loader for compressed GLB files (local copy for better caching)
     const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath("/draco/");
+    dracoLoader.setDecoderPath(resolveViewerAssetUrl("draco/", this.assetBase));
     this.gltfLoader.setDRACOLoader(dracoLoader);
 
     // Cache for loaded models (we clone them for each car)
@@ -267,7 +269,7 @@ export class CarModelLoader {
   }
 
   async _loadModelInternal(modelType) {
-    const basePath = `/models/cars/${modelType}`;
+    const basePath = `models/cars/${modelType}`;
     const config = this.modelConfig[modelType] || {
       format: "glb",
       file: `${modelType}.glb`,
@@ -464,7 +466,9 @@ export class CarModelLoader {
     }
 
     // Start loading
-    const loadPromise = this._loadGLB(`/models/wheels/${wheelModelName}`);
+    const loadPromise = this._loadGLB(
+      resolveViewerAssetUrl(`models/wheels/${wheelModelName}`, this.assetBase),
+    );
     this.wheelLoadingPromises.set(wheelModelName, loadPromise);
 
     try {

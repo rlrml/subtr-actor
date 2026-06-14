@@ -306,17 +306,19 @@ export class ViewerPlayer extends EventTarget {
       options.initialSkipPostGoalTransitionsEnabled ?? true;
     this.skipKickoffsEnabledValue = options.initialSkipKickoffsEnabled ?? false;
 
-    this.sceneManager = new SceneManager(container);
+    this.sceneManager = new SceneManager(container, { assetBase: options.assetBase });
     // Neutral IBL renders instantly so playback starts immediately; the HDR
     // environment (default "space") loads lazily and swaps in once decoded.
     this.sceneManager.initDefaultEnvironment();
     this.applyEnvironmentSpec(options.environment ?? DEFAULT_ENVIRONMENT_ID);
-    this.arenaManager = new ArenaManager(this.scene);
+    this.arenaManager = new ArenaManager(this.scene, { assetBase: options.assetBase });
     // Trails (boost / supersonic / ball). Explosions stay dormant until the
     // adapter exposes goal/demo events (its event getters are still stubs).
     this.effectsEnabled = options.effects ?? true;
     this.effectsManager = this.effectsEnabled ? new EffectsManager(this.scene) : effectsStub;
-    this.actorManager = new ActorManager(this.scene, this.effectsManager);
+    this.actorManager = new ActorManager(this.scene, this.effectsManager, {
+      assetBase: options.assetBase,
+    });
     if (options.motionInterpolation) {
       this.setMotionInterpolation(options.motionInterpolation);
     }
