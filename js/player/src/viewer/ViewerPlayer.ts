@@ -18,6 +18,7 @@ import { ActorManager } from "./managers/ActorManager.js";
 import { EffectsManager } from "./managers/EffectsManager.js";
 import { HitboxManager } from "./managers/HitboxManager.js";
 import type { SubtrActorPlayer } from "./adapter/SubtrActorPlayer.js";
+import { createBoostPadsPlugin } from "./plugins/boost-pads.js";
 // Timeline projection / skip-window semantics are @rlrml/player's own
 // ReplayModel utilities, so both players agree on what gets skipped and how
 // replay time maps onto the (skip-aware) timeline.
@@ -381,6 +382,9 @@ export class ViewerPlayer extends EventTarget {
     for (const definition of options.plugins ?? []) {
       this.installPlugin(definition, false);
     }
+    if (!this.plugins.some((entry) => entry.plugin.id === "boost-pads")) {
+      this.installPlugin(createBoostPadsPlugin(), false);
+    }
     this.applyInitialCameraOptions();
     // @rlrml/player semantics: don't start inside a skipped window (t=0 is a
     // kickoff, so skip-kickoffs jumps straight to live play).
@@ -539,7 +543,11 @@ export class ViewerPlayer extends EventTarget {
     this.emitChange();
   }
 
-  setBallCamEnabled(enabled: boolean): void {
+  /**
+   * Force ball cam (`true`) or car cam (`false`), or pass `null` to follow the
+   * attached player's recorded ball-cam toggle ("player" view — the default).
+   */
+  setBallCamEnabled(enabled: boolean | null): void {
     this.ballCamEnabledValue = enabled;
     this.getCameraPlugin()?.setBallCam(enabled);
     this.emitChange();
@@ -613,7 +621,12 @@ export class ViewerPlayer extends EventTarget {
       this.freeCameraTransition = null;
       this.syncCameraAttachment();
     }
-    if (patch.ballCamEnabled !== undefined) {
+    // "player" view wins when requested (mirrors @rlrml/player: useReplayBallCam
+    // overrides the manual ballCamEnabled flag). null = follow recorded state.
+    if (patch.useReplayBallCam === true) {
+      this.ballCamEnabledValue = null;
+      this.getCameraPlugin()?.setBallCam(null);
+    } else if (patch.ballCamEnabled !== undefined) {
       this.ballCamEnabledValue = patch.ballCamEnabled;
       this.getCameraPlugin()?.setBallCam(patch.ballCamEnabled);
     }
@@ -685,6 +698,9 @@ export class ViewerPlayer extends EventTarget {
       cameraViewMode,
       attachedPlayerId,
       ballCamEnabled: camera ? camera.getBallCam() : (this.ballCamEnabledValue ?? false),
+      // null override = follow the player's recorded ball-cam toggle.
+      useReplayBallCam: this.ballCamEnabledValue === null,
+      effectiveBallCamEnabled: camera ? camera.getBallCam() : (this.ballCamEnabledValue ?? false),
       boostMeterEnabled: this.boostMeterEnabledValue,
       boostPickupAnimationEnabled: this.boostPickupAnimationEnabledValue,
       hitboxWireframesEnabled: this.hitboxWireframesEnabledValue,

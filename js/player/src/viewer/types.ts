@@ -76,6 +76,16 @@ export interface ViewerState {
   cameraViewMode: ViewerCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
+  /**
+   * True when the camera follows the attached player's replicated ball-cam
+   * toggle ("player" view) instead of a forced ball/car cam. Mirrors
+   * `@rlrml/player`'s `ReplayPlayerState.useReplayBallCam`; optional so the
+   * shape stays compatible. When true, `ballCamEnabled` reflects whatever the
+   * recorded toggle currently resolves to.
+   */
+  useReplayBallCam?: boolean;
+  /** Effective ball-cam state actually applied this frame (recorded or forced). */
+  effectiveBallCamEnabled?: boolean;
   boostMeterEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
   hitboxWireframesEnabled: boolean;
@@ -98,6 +108,7 @@ export type ViewerStatePatch = Partial<
     | "cameraViewMode"
     | "attachedPlayerId"
     | "ballCamEnabled"
+    | "useReplayBallCam"
     | "boostMeterEnabled"
     | "boostPickupAnimationEnabled"
     | "hitboxWireframesEnabled"

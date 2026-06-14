@@ -63,6 +63,7 @@ import {
   type PlaybackReadoutsController,
 } from "./playbackReadouts.ts";
 import { installMountEventListeners } from "./mountEventListeners.ts";
+import { installFreeCameraKeyboard } from "./freeCameraKeyboard.ts";
 import { createActiveModulesRuntime } from "./activeModulesRuntime.ts";
 import { getMechanicsReviewMechanicKind, type MechanicsReviewItem } from "./mechanicsReview.ts";
 import { createMechanicsReviewReplayLoadsController } from "./mechanicsReviewReplayLoads.ts";
@@ -288,10 +289,6 @@ function clearStandalonePlugins(): void {
 
 function syncBoostPadOverlayPlugin(): void {
   activeModulesRuntime.syncBoostPadOverlayPlugin();
-}
-
-function toggleBoostPadOverlay(): void {
-  activeModulesRuntime.toggleBoostPadOverlay();
 }
 
 function syncTimelineEvents(): void {
@@ -757,7 +754,9 @@ export function mountStatEvaluationPlayer(
         root,
         "#custom-camera-transition-speed-readout",
       ),
-      ballCam: mustElement<HTMLInputElement>(root, "#ball-cam"),
+      ballCamOffButton: mustElement<HTMLButtonElement>(root, "#ball-cam-off"),
+      ballCamOnButton: mustElement<HTMLButtonElement>(root, "#ball-cam-on"),
+      ballCamPlayerButton: mustElement<HTMLButtonElement>(root, "#ball-cam-player"),
       nameplateLift: mustElement<HTMLInputElement>(root, "#custom-nameplate-lift"),
       nameplateLiftReadout: mustElement<HTMLElement>(root, "#custom-nameplate-lift-readout"),
       cameraProfileReadout: mustElement<HTMLElement>(root, "#camera-profile-readout"),
@@ -785,7 +784,6 @@ export function mountStatEvaluationPlayer(
     getActiveCapabilityIds,
     getBoostPickupAnimationEnabled: () =>
       replayPlayer?.getState().boostPickupAnimationEnabled ?? false,
-    getBoostPadOverlayEnabled: () => activeModulesRuntime.getBoostPadOverlayEnabled(),
     toggleCapability,
     toggleBoostPickupAnimation() {
       const next = !(replayPlayer?.getState().boostPickupAnimationEnabled ?? false);
@@ -795,7 +793,6 @@ export function mountStatEvaluationPlayer(
       renderModuleSettings();
       scheduleConfigUrlUpdate();
     },
-    toggleBoostPadOverlay,
     syncTimelineEvents,
     syncTimelineRanges,
     renderTimelineEventCount,
@@ -1008,6 +1005,11 @@ export function mountStatEvaluationPlayer(
   mechanicsReviewController?.installEventListeners(listeners.signal);
   recordingWindowController?.installEventListeners(listeners.signal);
   cameraControlsController?.installEventListeners(listeners.signal);
+  // WASD flies the free camera whenever no text field has focus.
+  installFreeCameraKeyboard({
+    getReplayPlayer: () => replayPlayer,
+    signal: listeners.signal,
+  });
 
   // Allow an embedding parent window (e.g. the Rocket Sense stats UI) to drive
   // the active review clip without reloading the replay, so hovering a goal can

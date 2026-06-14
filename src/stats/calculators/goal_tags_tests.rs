@@ -274,6 +274,7 @@ fn touch_classification_event(
         sample_frame: frame,
         player,
         player_position: Some([0.0, 2200.0, 60.0]),
+        ball_position: None,
         is_team_0: true,
         kind: "medium_hit".to_owned(),
         height_band: "ground".to_owned(),

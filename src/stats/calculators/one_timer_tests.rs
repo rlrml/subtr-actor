@@ -64,6 +64,28 @@ fn update_pass(
         .unwrap();
 }
 
+fn update_pass_with_backboard(
+    calculator: &mut PassCalculator,
+    frame: FrameInfo,
+    ball: BallFrameState,
+    touch_events: Vec<TouchEvent>,
+    backboard_bounce_state: &BackboardBounceState,
+) {
+    calculator
+        .update(
+            &frame,
+            &ball,
+            &TouchState {
+                touch_events,
+                ..TouchState::default()
+            },
+            backboard_bounce_state,
+            &FiftyFiftyState::default(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+}
+
 fn update_one_timer(
     calculator: &mut OneTimerCalculator,
     pass_calculator: &PassCalculator,
@@ -143,6 +165,94 @@ fn rejects_slow_receiver_touch_even_after_completed_pass() {
         &pass_calculator,
         frame(20, 2.0),
         ball(800.0, glam::Vec3::new(0.0, 400.0, 0.0)),
+    );
+
+    assert!(one_timer.player_stats().get(&receiver).is_none());
+    assert!(one_timer.events().is_empty());
+}
+
+#[test]
+fn rejects_backboard_pass_double_tap() {
+    let passer = PlayerId::Steam(1);
+    let receiver = PlayerId::Steam(2);
+    let mut pass_calculator = PassCalculator::new();
+    let mut one_timer = OneTimerCalculator::new();
+
+    update_pass(
+        &mut pass_calculator,
+        frame(10, 1.0),
+        ball(0.0, glam::Vec3::ZERO),
+        vec![touch(10, 1.0, passer.clone(), true)],
+    );
+    update_one_timer(
+        &mut one_timer,
+        &pass_calculator,
+        frame(10, 1.0),
+        ball(0.0, glam::Vec3::ZERO),
+    );
+
+    // The passer knocks the ball off the backboard before the teammate finishes
+    // it: this is a double tap / backboard play, not a one-timer.
+    let backboard_bounce_state = BackboardBounceState {
+        last_bounce_event: Some(BackboardBounceEvent {
+            time: 1.5,
+            frame: 15,
+            player: passer,
+            player_position: None,
+            is_team_0: true,
+        }),
+        ..BackboardBounceState::default()
+    };
+    update_pass_with_backboard(
+        &mut pass_calculator,
+        frame(20, 2.0),
+        ball(800.0, glam::Vec3::new(0.0, 1600.0, 0.0)),
+        vec![touch(20, 2.0, receiver.clone(), true)],
+        &backboard_bounce_state,
+    );
+    update_one_timer(
+        &mut one_timer,
+        &pass_calculator,
+        frame(20, 2.0),
+        ball(800.0, glam::Vec3::new(0.0, 1600.0, 0.0)),
+    );
+
+    // The underlying pass is detected, but classified as a backboard pass...
+    assert_eq!(pass_calculator.events().len(), 1);
+    assert_eq!(pass_calculator.events()[0].pass_kind, PassKind::Backboard);
+    // ...so it must not be counted as a one-timer.
+    assert!(one_timer.player_stats().get(&receiver).is_none());
+    assert!(one_timer.events().is_empty());
+}
+
+#[test]
+fn rejects_fast_goal_aligned_touch_that_sails_wide_of_net() {
+    let passer = PlayerId::Steam(1);
+    let receiver = PlayerId::Steam(2);
+    let mut pass_calculator = PassCalculator::new();
+    let mut one_timer = OneTimerCalculator::new();
+
+    update_pass(
+        &mut pass_calculator,
+        frame(10, 1.0),
+        ball(0.0, glam::Vec3::ZERO),
+        vec![touch(10, 1.0, passer, true)],
+    );
+    // Fast and pointed at the goal's general direction (passes the alignment
+    // cosine), but the sideways component carries it well wide of the posts:
+    // off net, so it is not a one-timer.
+    let velocity = glam::Vec3::new(600.0, 1500.0, 0.0);
+    update_pass(
+        &mut pass_calculator,
+        frame(20, 2.0),
+        ball(800.0, velocity),
+        vec![touch(20, 2.0, receiver.clone(), true)],
+    );
+    update_one_timer(
+        &mut one_timer,
+        &pass_calculator,
+        frame(20, 2.0),
+        ball(800.0, velocity),
     );
 
     assert!(one_timer.player_stats().get(&receiver).is_none());
