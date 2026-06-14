@@ -12,6 +12,153 @@ import type { ViewerPlugin, ViewerPluginContext, ViewerRenderContext } from "../
 
 type PadMesh = THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
 
+const BOOST_PAD_CHILD_MESH_KEYS = [
+  "baseGroup",
+  "glowMesh",
+  "innerGlowMesh",
+  "lensColumnMesh",
+  "lensRimMesh",
+  "topGlowMesh",
+  "coreGlowMesh",
+  "highlightMesh",
+] as const;
+
+function createHorizontalGlowDisk(
+  radius: number,
+  color: number,
+  opacity: number,
+  renderOrder: number,
+): THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial> {
+  const mesh = new THREE.Mesh(
+    new THREE.CircleGeometry(radius, 32),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.renderOrder = renderOrder;
+  return mesh;
+}
+
+function setBasicGroupOpacity(group: THREE.Object3D | undefined, opacityScale: number): void {
+  if (!group) {
+    return;
+  }
+  group.traverse((child) => {
+    const mesh = child as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+    if (!mesh.isMesh || !(mesh.material instanceof THREE.MeshBasicMaterial)) {
+      return;
+    }
+    const baseOpacity = mesh.userData.baseOpacity as number | undefined;
+    mesh.material.opacity = (baseOpacity ?? mesh.material.opacity) * opacityScale;
+  });
+}
+
+function configureBigBaseMesh(
+  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>,
+  opacity: number,
+  renderOrder: number,
+): void {
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.renderOrder = renderOrder;
+  mesh.frustumCulled = false;
+  mesh.userData.baseOpacity = opacity;
+  mesh.material.transparent = true;
+  mesh.material.opacity = opacity;
+  mesh.material.side = THREE.DoubleSide;
+  mesh.material.depthWrite = false;
+}
+
+function createBigBoostBase(radius: number): THREE.Group {
+  const group = new THREE.Group();
+  group.renderOrder = 98;
+  group.frustumCulled = false;
+
+  const darkMaterial = new THREE.MeshBasicMaterial({ color: 0x11110d });
+  const panelMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffa000,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const center = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.55, 48), darkMaterial.clone());
+  configureBigBaseMesh(center, 0.86, 98);
+  group.add(center);
+
+  const centerRing = new THREE.Mesh(
+    new THREE.RingGeometry(radius * 0.45, radius * 0.62, 48),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd13a,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  configureBigBaseMesh(centerRing, 0.78, 100);
+  centerRing.position.y = 1.4;
+  group.add(centerRing);
+
+  function createArmShape(
+    innerRadius: number,
+    outerRadius: number,
+    halfAngle: number,
+  ): THREE.Shape {
+    const shape = new THREE.Shape();
+    const points: Array<[number, number]> = [
+      [innerRadius * Math.cos(-halfAngle * 0.72), innerRadius * Math.sin(-halfAngle * 0.72)],
+      [outerRadius * Math.cos(-halfAngle), outerRadius * Math.sin(-halfAngle)],
+      [outerRadius * Math.cos(halfAngle), outerRadius * Math.sin(halfAngle)],
+      [innerRadius * Math.cos(halfAngle * 0.72), innerRadius * Math.sin(halfAngle * 0.72)],
+    ];
+    points.forEach(([x, z], index) => {
+      if (index === 0) {
+        shape.moveTo(x, z);
+      } else {
+        shape.lineTo(x, z);
+      }
+    });
+    shape.closePath();
+    return shape;
+  }
+
+  for (let index = 0; index < 3; index += 1) {
+    const rotation = (index * (Math.PI * 2)) / 3 + Math.PI / 2;
+    const arm = new THREE.Mesh(
+      new THREE.ShapeGeometry(createArmShape(radius * 0.52, radius * 1.42, 0.33)),
+      darkMaterial.clone(),
+    );
+    configureBigBaseMesh(arm, 0.86, 98);
+    arm.rotation.z = rotation;
+    group.add(arm);
+
+    const panel = new THREE.Mesh(
+      new THREE.ShapeGeometry(createArmShape(radius * 0.66, radius * 1.2, 0.21)),
+      panelMaterial.clone(),
+    );
+    configureBigBaseMesh(panel, 0.86, 99);
+    panel.position.y = 1.1;
+    panel.rotation.z = rotation;
+    group.add(panel);
+  }
+
+  return group;
+}
+
+function setChildMeshAvailability(mesh: PadMesh, available: boolean): void {
+  for (const key of BOOST_PAD_CHILD_MESH_KEYS) {
+    const child = mesh.userData[key] as
+      | THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
+      | THREE.Group
+      | undefined;
+    if (!child) {
+      continue;
+    }
+    child.visible = available;
+  }
+}
+
 export function createBoostPadsPlugin(): ViewerPlugin {
   let boostPadMeshes = new Map<number, PadMesh>();
 
@@ -31,29 +178,71 @@ export function createBoostPadsPlugin(): ViewerPlugin {
       let mesh: PadMesh;
 
       if (isBig) {
-        // Big pads: Glowing sphere (dimensions in Unreal Units)
-        // Big boost pads in RL are ~144 UU diameter, we use a smaller visual sphere
-        const radius = 50; // Visual sphere radius in UU
-        geometry = new THREE.SphereGeometry(radius, 16, 16);
-        material = new THREE.MeshStandardMaterial({
-          color: 0xffdd44, // Bright yellow/orange core
-          emissive: 0xffaa00,
-          emissiveIntensity: 1.0,
-          metalness: 0.3,
-          roughness: 0.2,
+        // Big pads: translucent golden lens over a dark/gold base.
+        const radius = 37; // Visual sphere radius in UU
+        geometry = new THREE.SphereGeometry(radius, 24, 18);
+        material = new THREE.MeshPhysicalMaterial({
+          color: 0xffb21a,
+          emissive: 0xff8a00,
+          emissiveIntensity: 0.42,
+          metalness: 0.04,
+          roughness: 0.08,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.025,
+          transmission: 0.18,
+          thickness: 30,
+          ior: 1.42,
+          envMapIntensity: 1.9,
+          blending: THREE.AdditiveBlending,
           transparent: true, // CRITICAL: Required for opacity changes
-          opacity: 1.0,
+          opacity: 0.68,
           depthWrite: false, // Fix transparency sorting with arena walls
         });
         mesh = new THREE.Mesh(geometry, material);
         mesh.renderOrder = 100; // Render after arena walls
 
+        const baseGroup = createBigBoostBase(radius * 2.05);
+        baseGroup.position.y = -140;
+        mesh.add(baseGroup);
+        mesh.userData.baseGroup = baseGroup;
+
+        const lensColumnMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(radius * 0.12, radius * 0.18, 112, 24, 1, true),
+          new THREE.MeshBasicMaterial({
+            color: 0xffc340,
+            transparent: true,
+            opacity: 0.28,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          }),
+        );
+        lensColumnMesh.position.y = -62;
+        lensColumnMesh.renderOrder = 99;
+        mesh.add(lensColumnMesh);
+        mesh.userData.lensColumnMesh = lensColumnMesh;
+
+        const lensRimMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(radius * 1.03, 24, 14),
+          new THREE.MeshBasicMaterial({
+            color: 0xffdf7a,
+            transparent: true,
+            opacity: 0.32,
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide,
+            depthWrite: false,
+          }),
+        );
+        lensRimMesh.renderOrder = 101;
+        mesh.add(lensRimMesh);
+        mesh.userData.lensRimMesh = lensRimMesh;
+
         // Add glow effect - larger transparent sphere with additive blending
-        const glowGeometry = new THREE.SphereGeometry(radius * 2.0, 16, 16);
+        const glowGeometry = new THREE.SphereGeometry(radius * 1.3, 20, 14);
         const glowMaterial = new THREE.MeshBasicMaterial({
-          color: 0xffaa00,
+          color: 0xffb62b,
           transparent: true,
-          opacity: 0.3,
+          opacity: 0.16,
           blending: THREE.AdditiveBlending,
           side: THREE.BackSide, // Render inside of sphere for halo effect
           depthWrite: false,
@@ -64,11 +253,11 @@ export function createBoostPadsPlugin(): ViewerPlugin {
         mesh.userData.glowMesh = glowMesh;
 
         // Add second smaller glow layer for more intensity
-        const innerGlowGeometry = new THREE.SphereGeometry(radius * 1.4, 16, 16);
+        const innerGlowGeometry = new THREE.SphereGeometry(radius * 1.12, 20, 14);
         const innerGlowMaterial = new THREE.MeshBasicMaterial({
-          color: 0xffcc00,
+          color: 0xffc12a,
           transparent: true,
-          opacity: 0.4,
+          opacity: 0.22,
           blending: THREE.AdditiveBlending,
           side: THREE.BackSide,
           depthWrite: false,
@@ -82,21 +271,40 @@ export function createBoostPadsPlugin(): ViewerPlugin {
       } else {
         // Small pads: Flat cylinder at ground level (dimensions in Unreal Units)
         // Small boost pads in RL are ~64 UU diameter
-        const radius = 40; // Visual radius in UU
-        const height = 5; // Flat disk height in UU
-        geometry = new THREE.CylinderGeometry(radius, radius, height, 16);
-        material = new THREE.MeshStandardMaterial({
-          color: 0xffcc00, // Yellow/orange
-          emissive: 0xff9900,
-          emissiveIntensity: 0.4,
-          metalness: 0.2,
-          roughness: 0.8,
+        const radius = 45; // Visual radius in UU
+        const height = 8; // Low reflective puck height in UU
+        geometry = new THREE.CylinderGeometry(radius, radius * 0.92, height, 32);
+        material = new THREE.MeshPhysicalMaterial({
+          color: 0xffc21a,
+          emissive: 0xff9700,
+          emissiveIntensity: 0.72,
+          metalness: 0.88,
+          roughness: 0.14,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.05,
+          envMapIntensity: 2.0,
           transparent: true, // CRITICAL: Required for opacity changes
           opacity: 1.0,
           depthWrite: false, // Fix transparency sorting with arena walls
         });
         mesh = new THREE.Mesh(geometry, material);
         mesh.renderOrder = 100; // Render after arena walls
+
+        const topGlowMesh = createHorizontalGlowDisk(radius * 1.42, 0xffb000, 0.34, 101);
+        topGlowMesh.position.y = height / 2 + 0.15;
+        mesh.add(topGlowMesh);
+        mesh.userData.topGlowMesh = topGlowMesh;
+
+        const coreGlowMesh = createHorizontalGlowDisk(radius * 0.74, 0xffff9a, 0.42, 102);
+        coreGlowMesh.position.y = height / 2 + 0.35;
+        mesh.add(coreGlowMesh);
+        mesh.userData.coreGlowMesh = coreGlowMesh;
+
+        const highlightMesh = createHorizontalGlowDisk(radius * 0.42, 0xfff8d0, 0.46, 103);
+        highlightMesh.position.set(-radius * 0.18, height / 2 + 0.55, -radius * 0.12);
+        highlightMesh.scale.y = 0.34;
+        mesh.add(highlightMesh);
+        mesh.userData.highlightMesh = highlightMesh;
       }
 
       // Position the boost pad (adapter provides positions in UU)
@@ -122,7 +330,7 @@ export function createBoostPadsPlugin(): ViewerPlugin {
 
       // Add point light for big pads directly to scene
       if (mesh.userData.needsLight) {
-        const light = new THREE.PointLight(0xffaa00, 1.0, 600);
+        const light = new THREE.PointLight(0xff9d00, 0.7, 480);
         light.decay = 0; // No decay, but limited by distance
         light.position.set(pad.position.x, floatHeight - 50, pad.position.y);
         ctx.scene.add(light);
@@ -147,14 +355,16 @@ export function createBoostPadsPlugin(): ViewerPlugin {
 
       if (isAvailable) {
         // Available - orange/yellow (normal color)
-        mesh.material.color.setHex(pad.isBig ? 0xffdd44 : 0xffcc00);
-        mesh.material.emissive.setHex(pad.isBig ? 0xffaa00 : 0xff9900);
-        mesh.material.emissiveIntensity = pad.isBig ? 1.0 : 0.4;
-        mesh.material.opacity = 1.0;
+        mesh.material.color.setHex(pad.isBig ? 0xffb21a : 0xffc21a);
+        mesh.material.emissive.setHex(pad.isBig ? 0xff8a00 : 0xff9700);
+        mesh.material.emissiveIntensity = pad.isBig ? 0.42 : 0.72;
+        mesh.material.opacity = pad.isBig ? 0.68 : 1.0;
         mesh.visible = true;
+        setChildMeshAvailability(mesh, true);
+        setBasicGroupOpacity(mesh.userData.baseGroup as THREE.Group | undefined, 1);
         // Turn on light and glow for big pads
         if (mesh.userData.light) {
-          mesh.userData.light.intensity = 1.0;
+          mesh.userData.light.intensity = 0.85;
         }
         if (mesh.userData.glowMesh) {
           mesh.userData.glowMesh.visible = true;
@@ -164,11 +374,16 @@ export function createBoostPadsPlugin(): ViewerPlugin {
         }
       } else {
         // Picked up - transparent (faded out)
-        mesh.material.color.setHex(pad.isBig ? 0xffaa00 : 0xffcc00);
+        mesh.material.color.setHex(pad.isBig ? 0x8a4c00 : 0x8a5400);
         mesh.material.emissive.setHex(0x000000); // No emission when inactive
         mesh.material.emissiveIntensity = 0.0;
         mesh.material.opacity = 0.2; // Very transparent
         mesh.visible = true; // Still visible but faded
+        setChildMeshAvailability(mesh, false);
+        if (mesh.userData.baseGroup) {
+          mesh.userData.baseGroup.visible = true;
+          setBasicGroupOpacity(mesh.userData.baseGroup as THREE.Group, 0.26);
+        }
         // Turn off light and glow for big pads
         if (mesh.userData.light) {
           mesh.userData.light.intensity = 0;
@@ -201,13 +416,20 @@ export function createBoostPadsPlugin(): ViewerPlugin {
         ctx.scene.remove(mesh);
         mesh.geometry.dispose();
         mesh.material.dispose();
-        for (const key of ["glowMesh", "innerGlowMesh"] as const) {
+        for (const key of BOOST_PAD_CHILD_MESH_KEYS) {
           const glow = mesh.userData[key] as
             | THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
+            | THREE.Group
             | undefined;
           if (glow) {
-            glow.geometry.dispose();
-            glow.material.dispose();
+            glow.traverse((child) => {
+              const childMesh = child as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+              if (!childMesh.isMesh) {
+                return;
+              }
+              childMesh.geometry.dispose();
+              childMesh.material.dispose();
+            });
           }
         }
         const light = mesh.userData.light as THREE.PointLight | undefined;
