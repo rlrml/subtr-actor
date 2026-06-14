@@ -1,8 +1,6 @@
 #![allow(clippy::result_large_err)]
 
-//! # subtr-actor
-//!
-//! `subtr-actor` turns raw [`boxcars`] replay data into higher-level game
+//! `subtr-actor` turns raw [`boxcars`](https://docs.rs/boxcars) replay data into higher-level game
 //! state, derived replay events, structured frame payloads, and dense numeric
 //! features for analytics and ML workflows.
 //!
@@ -12,42 +10,42 @@
 //!
 //! ## Processing model
 //!
-//! - [`ReplayProcessor`] walks the replay's network frames, models actor state,
+//! - `ReplayProcessor` walks the replay's network frames, models actor state,
 //!   and tracks derived replay events such as touches, boost pad pickups,
 //!   dodge refreshes, goals, player stat events, and demolishes.
-//! - [`Collector`] is the core extension point. Collectors observe the replay
+//! - `Collector` is the core extension point. Collectors observe the replay
 //!   frame by frame and can either process every frame or control sampling via
-//!   [`TimeAdvance`].
-//! - [`ReplayProcessor::process_all`] lets multiple collectors share a single
+//!   `TimeAdvance`.
+//! - `ReplayProcessor::process_all` lets multiple collectors share a single
 //!   replay pass when you want to build several outputs at once.
-//! - [`FrameRateDecorator`] and [`CallbackCollector`] provide lightweight
+//! - `FrameRateDecorator` and `CallbackCollector` provide lightweight
 //!   utilities for downsampling a collector or attaching side-effectful hooks
 //!   such as progress reporting and debugging.
 //!
 //! ## Primary output layers
 //!
-//! - [`ReplayDataCollector`] builds a serde-friendly replay payload with frame
+//! - `ReplayDataCollector` builds a serde-friendly replay payload with frame
 //!   data, replay metadata, and derived event streams suitable for JSON export
 //!   and playback UIs.
-//! - [`NDArrayCollector`] emits a dense [`::ndarray::Array2`] with replay
+//! - `NDArrayCollector` emits a dense `ndarray::Array2` with replay
 //!   metadata and headers. It supports both explicit feature adders and the
-//!   string-based registry exposed through [`NDArrayCollector::from_strings`]
-//!   and [`NDArrayCollector::from_strings_typed`].
-//! - [`StatsCollector`] accumulates graph-backed replay statistics as a
+//!   string-based registry exposed through `NDArrayCollector::from_strings`
+//!   and `NDArrayCollector::from_strings_typed`.
+//! - `StatsCollector` accumulates graph-backed replay statistics as a
 //!   module-keyed dynamic payload suitable for builtin module selection and
 //!   JSON export.
-//! - [`StatsTimelineEventCollector`] accumulates graph-backed replay statistics
+//! - `StatsTimelineEventCollector` accumulates graph-backed replay statistics
 //!   as event streams plus lightweight frame scaffolding. This is the preferred
 //!   timeline export when callers do not need to serialize full per-frame
 //!   partial sums.
-//! - [`StatsTimelineCollector`] preserves the legacy full snapshot timeline
-//!   form ([`ReplayStatsTimeline`]) for parity checks and compatibility.
+//! - `StatsTimelineCollector` preserves the legacy full snapshot timeline
+//!   form (`ReplayStatsTimeline`) for parity checks and compatibility.
 //!
 //! ## Stats and exports
 //!
-//! The [`stats`] module houses analysis calculators, graph nodes, stat
+//! The `stats` module houses analysis calculators, graph nodes, stat
 //! event calculators, and the exported stat-field model built around
-//! [`ExportedStat`].
+//! `ExportedStat`.
 //!
 //! ## Examples
 //!

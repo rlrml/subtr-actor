@@ -1,15 +1,135 @@
 # subtr-actor
 
-[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![Docs.rs](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Unreleased commits](https://img.shields.io/github/commits-since/rlrml/subtr-actor/latest?style=flat-square&label=unreleased)](https://github.com/rlrml/subtr-actor/compare/v0.12.0...master) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg) [![Rust version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square&label=rust)](https://crates.io/crates/subtr-actor) [![Python version](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square&label=python)](https://pypi.org/project/subtr-actor-py/) [![JS bindings version](https://img.shields.io/npm/v/%40rlrml%2Fsubtr-actor?style=flat-square&label=js%20bindings)](https://www.npmjs.com/package/@rlrml/subtr-actor) [![JS player version](https://img.shields.io/npm/v/%40rlrml%2Fplayer?style=flat-square&label=js%20player)](https://www.npmjs.com/package/@rlrml/player) [![JS stats player version](https://img.shields.io/npm/v/%40rlrml%2Fstats-player?style=flat-square&label=js%20stats%20player)](https://www.npmjs.com/package/@rlrml/stats-player)
+[![Workflow Status](https://github.com/rlrml/subtr-actor/workflows/main/badge.svg)](https://github.com/rlrml/subtr-actor/actions?query=workflow%3A%22main%22) [![Docs.rs](https://docs.rs/subtr-actor/badge.svg)](https://docs.rs/subtr-actor) [![Unreleased commits](https://img.shields.io/github/commits-since/rlrml/subtr-actor/latest?style=flat-square&label=unreleased)](https://github.com/rlrml/subtr-actor/releases) ![Maintenance](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg) [![Rust version](https://img.shields.io/crates/v/subtr-actor.svg?style=flat-square&label=rust)](https://crates.io/crates/subtr-actor) [![Python version](https://img.shields.io/pypi/v/subtr-actor-py?style=flat-square&label=python)](https://pypi.org/project/subtr-actor-py/) [![JS bindings version](https://img.shields.io/npm/v/%40rlrml%2Fsubtr-actor?style=flat-square&label=js%20bindings)](https://www.npmjs.com/package/@rlrml/subtr-actor) [![JS player version](https://img.shields.io/npm/v/%40rlrml%2Fplayer?style=flat-square&label=js%20player)](https://www.npmjs.com/package/@rlrml/player) [![JS stats player version](https://img.shields.io/npm/v/%40rlrml%2Fstats-player?style=flat-square&label=js%20stats%20player)](https://www.npmjs.com/package/@rlrml/stats-player)
 
-`subtr-actor` turns Rocket League replay files into higher-level data than the raw actor graph exposed by [`boxcars`](https://docs.rs/boxcars/).
+<!-- The section below is generated from the crate-level docs in `src/lib.rs`
+     by `cargo rdme`. Do not edit it by hand: run `just readme` to regenerate,
+     and `just check` verifies it stays in sync. -->
+<!-- cargo-rdme start -->
 
-It supports two main workflows:
+`subtr-actor` turns raw [`boxcars`](https://docs.rs/boxcars) replay data into higher-level game
+state, derived replay events, structured frame payloads, and dense numeric
+features for analytics and ML workflows.
 
-- structured replay data for inspection, export, and analysis
-- dense numeric arrays for ML and other downstream pipelines
+The Rust crate is the source of truth for the replay-processing pipeline.
+The Python and JavaScript bindings build on the same collector APIs and
+string-addressable feature registry exposed here.
 
-The core crate is written in Rust, with bindings for Python and JavaScript.
+## Processing model
+
+- `ReplayProcessor` walks the replay's network frames, models actor state,
+  and tracks derived replay events such as touches, boost pad pickups,
+  dodge refreshes, goals, player stat events, and demolishes.
+- `Collector` is the core extension point. Collectors observe the replay
+  frame by frame and can either process every frame or control sampling via
+  `TimeAdvance`.
+- `ReplayProcessor::process_all` lets multiple collectors share a single
+  replay pass when you want to build several outputs at once.
+- `FrameRateDecorator` and `CallbackCollector` provide lightweight
+  utilities for downsampling a collector or attaching side-effectful hooks
+  such as progress reporting and debugging.
+
+## Primary output layers
+
+- `ReplayDataCollector` builds a serde-friendly replay payload with frame
+  data, replay metadata, and derived event streams suitable for JSON export
+  and playback UIs.
+- `NDArrayCollector` emits a dense `ndarray::Array2` with replay
+  metadata and headers. It supports both explicit feature adders and the
+  string-based registry exposed through `NDArrayCollector::from_strings`
+  and `NDArrayCollector::from_strings_typed`.
+- `StatsCollector` accumulates graph-backed replay statistics as a
+  module-keyed dynamic payload suitable for builtin module selection and
+  JSON export.
+- `StatsTimelineEventCollector` accumulates graph-backed replay statistics
+  as event streams plus lightweight frame scaffolding. This is the preferred
+  timeline export when callers do not need to serialize full per-frame
+  partial sums.
+- `StatsTimelineCollector` preserves the legacy full snapshot timeline
+  form (`ReplayStatsTimeline`) for parity checks and compatibility.
+
+## Stats and exports
+
+The `stats` module houses analysis calculators, graph nodes, stat
+event calculators, and the exported stat-field model built around
+`ExportedStat`.
+
+## Examples
+
+### Collect structured replay data
+
+```rust
+use boxcars::ParserBuilder;
+use subtr_actor::ReplayDataCollector;
+
+let bytes = std::fs::read("replay.replay").unwrap();
+let replay = ParserBuilder::new(&bytes)
+    .must_parse_network_data()
+    .on_error_check_crc()
+    .parse()
+    .unwrap();
+
+let replay_data = ReplayDataCollector::new().get_replay_data(&replay).unwrap();
+println!("frames: {}", replay_data.frame_data.frame_count());
+println!("touches: {}", replay_data.touch_events.len());
+```
+
+### Build a sampled feature matrix
+
+```rust
+use boxcars::ParserBuilder;
+use subtr_actor::{Collector, FrameRateDecorator, NDArrayCollector};
+
+let bytes = std::fs::read("replay.replay").unwrap();
+let replay = ParserBuilder::new(&bytes)
+    .must_parse_network_data()
+    .on_error_check_crc()
+    .parse()
+    .unwrap();
+
+let mut collector = NDArrayCollector::<f32>::from_strings(
+    &["BallRigidBody", "CurrentTime"],
+    &["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"],
+)
+.unwrap();
+
+FrameRateDecorator::new_from_fps(30.0, &mut collector)
+    .process_replay(&replay)
+    .unwrap();
+
+let (meta, features) = collector.get_meta_and_ndarray().unwrap();
+println!("players: {}", meta.replay_meta.player_count());
+println!("shape: {:?}", features.raw_dim());
+```
+
+### Export compact event-backed stats timeline
+
+```rust
+use boxcars::ParserBuilder;
+use subtr_actor::StatsTimelineEventCollector;
+
+let bytes = std::fs::read("replay.replay").unwrap();
+let replay = ParserBuilder::new(&bytes)
+    .must_parse_network_data()
+    .on_error_check_crc()
+    .parse()
+    .unwrap();
+
+let timeline = StatsTimelineEventCollector::new()
+    .get_replay_stats_timeline_scaffold(&replay)
+    .unwrap();
+
+println!("timeline frames: {}", timeline.frames.len());
+let rush_events = timeline
+    .events
+    .events
+    .iter()
+    .filter(|event| event.meta.stream == "rush")
+    .count();
+println!("rush events: {rush_events}");
+```
+
+<!-- cargo-rdme end -->
 
 ## Packages
 
@@ -19,21 +139,12 @@ The core crate is written in Rust, with bindings for Python and JavaScript.
 - JavaScript replay player: [`@rlrml/player`](https://www.npmjs.com/package/@rlrml/player)
 - JavaScript stats player: [`@rlrml/stats-player`](https://www.npmjs.com/package/@rlrml/stats-player) ([see it in action](https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/problematic-private-duel-2026-03-20.replay))
 
-## What You Get
-
-- A higher-level replay model built from `boxcars`
-- Frame-by-frame structured game state via `ReplayDataCollector`
-- Configurable numeric feature extraction via `NDArrayCollector`
-- Frame-rate resampling with `FrameRateDecorator`
-- A similar replay-processing model across Rust, Python, and JS
-
 ## Installation
 
 ### Rust
 
-```toml
-[dependencies]
-subtr-actor = "0.12.0"
+```bash
+cargo add subtr-actor
 ```
 
 ### Python
@@ -48,77 +159,17 @@ pip install subtr-actor-py
 npm install @rlrml/subtr-actor
 ```
 
-### JavaScript Player
+### JavaScript player
 
 ```bash
 npm install @rlrml/player three
 ```
 
-## Quick Start
+## Using the bindings
 
-### Rust: get structured replay data
-
-```rust
-use boxcars::ParserBuilder;
-use subtr_actor::ReplayDataCollector;
-
-fn main() -> anyhow::Result<()> {
-    let data = std::fs::read("example.replay")?;
-    let replay = ParserBuilder::new(&data)
-        .must_parse_network_data()
-        .on_error_check_crc()
-        .parse()?;
-
-    let replay_data = ReplayDataCollector::new()
-        .get_replay_data(&replay)
-        .map_err(|e| e.variant)?;
-
-    println!("{}", replay_data.as_json()?);
-    Ok(())
-}
-```
-
-If you want replay data plus outputs from other collectors, run them together in
-one pass with `ReplayProcessor::process_all()` and then assemble the final
-payload from the pieces. `ReplayDataCollector::get_replay_data()` remains a
-convenience wrapper around that pattern.
-
-### Rust: build an ndarray for ML
-
-```rust
-use subtr_actor::*;
-
-fn main() -> anyhow::Result<()> {
-    let data = std::fs::read("example.replay")?;
-    let replay = boxcars::ParserBuilder::new(&data)
-        .must_parse_network_data()
-        .on_error_check_crc()
-        .parse()?;
-
-    let mut collector = NDArrayCollector::new(
-        vec![
-            NDArrayFeatureAdder::plain(InterpolatedBallRigidBodyNoVelocities::arc_new(0.003)),
-            NDArrayFeatureAdder::plain(CurrentTime::arc_new()),
-        ],
-        vec![
-            NDArrayPlayerFeatureAdder::plain(
-                InterpolatedPlayerRigidBodyNoVelocities::arc_new(0.003),
-            ),
-            NDArrayPlayerFeatureAdder::plain(PlayerBoost::arc_new()),
-            NDArrayPlayerFeatureAdder::plain(PlayerAnyJump::arc_new()),
-        ],
-    );
-
-    FrameRateDecorator::new_from_fps(30.0, &mut collector)
-        .process_replay(&replay)
-        .map_err(|e| e.variant)?;
-
-    let (meta, array) = collector.get_meta_and_ndarray().map_err(|e| e.variant)?;
-    println!("rows={} cols={}", array.nrows(), array.ncols());
-    println!("players={}", meta.replay_meta.player_stats.len());
-    Ok(())
-}
-```
+The Rust examples above carry over to the bindings: you choose feature adders by
+name and get back replay metadata plus a numeric array. `PlayerBoost` is exposed
+in raw replay units (`0-255`), not a percentage.
 
 ### Python
 
@@ -167,31 +218,16 @@ console.log(result.shape);
 console.log(result.metadata.column_headers.player_headers.slice(0, 5));
 ```
 
-## Core Concepts
+### Common feature names
 
-### `ReplayDataCollector`
-
-Use this when you want a serializable, frame-by-frame representation of the replay without dealing directly with the low-level actor graph.
-
-### `NDArrayCollector`
-
-Use this when you want numeric features in a 2D matrix. In Rust you construct feature adders directly; in the Python and JS bindings you provide feature-adder names as strings.
-
-### `FrameRateDecorator`
-
-Use this to resample replay processing to a fixed FPS before collecting data.
-
-## Common Feature Names
-
-These are useful when working through the Python or JavaScript bindings:
+These string identifiers select feature adders through the Python and JavaScript
+bindings:
 
 - Global: `BallRigidBody`, `CurrentTime`, `SecondsRemaining`
 - Player: `PlayerRigidBody`, `PlayerBoost`, `PlayerAnyJump`, `PlayerJump`, `PlayerEvent:touch`
 
 Analysis-backed player event indicators use `PlayerEvent:<event_name>` and emit
 `1` for a sampled frame when that player has a new event, otherwise `0`.
-
-`PlayerBoost` is exposed in raw replay units (`0-255`), not percentage.
 
 ## Documentation
 
@@ -224,6 +260,10 @@ just build-js
 ```
 
 `just build-js` builds the repo-local bundler target into `js/pkg`. To build the web-target package that matches `npm publish`, run `npm --prefix js install` once and then `npm --prefix js run build`.
+
+The crate-level docs in `src/lib.rs` are the source of truth for the overview
+section above. Run `just readme` after editing them to regenerate this file;
+`just check` fails if the two drift apart.
 
 ## License
 

@@ -107,6 +107,7 @@
           pkgs.maturin
           pkgs.zlib
           rustToolchain
+          pkgs.cargo-rdme
           pkgs.curl
           pkgs.leveldb
           pkgs.python311Packages.twine
