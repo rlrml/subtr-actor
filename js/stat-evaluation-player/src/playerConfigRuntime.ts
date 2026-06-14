@@ -118,6 +118,7 @@ export function getCameraConfigSnapshot({
     ballCam: state?.ballCamEnabled ?? cameraControlsController?.ballCamChecked,
     usePlayerCameraSettings: state?.customCameraSettings === null,
     customSettings: state?.customCameraSettings,
+    nameplateLiftUu: cameraControlsController?.nameplateLiftUu,
   };
 }
 

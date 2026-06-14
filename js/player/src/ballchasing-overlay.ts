@@ -8,11 +8,25 @@ import type {
 import { boostAmountToPercent } from "./boost-units";
 import { findFrameIndexAtTime } from "./replay-data";
 
+/**
+ * Default world-space lift (Unreal units) applied to each car before
+ * projecting its floating name/boost label, so the pill sits above the car
+ * instead of on it. Exposed so consumers can seed UI controls with the same
+ * default the plugin uses.
+ */
+export const DEFAULT_FLOATING_NAMEPLATE_LIFT_UU = 250;
+
 export interface BallchasingOverlayPluginOptions {
   showFloatingNames?: boolean;
   showFloatingBoostBars?: boolean;
   showTeamBoostHud?: boolean;
   showFollowedPlayerHud?: boolean;
+  /**
+   * How far (Unreal units) to lift the floating name/boost pills above each
+   * car. A function is read every frame, so callers can wire it to a live UI
+   * control. Defaults to {@link DEFAULT_FLOATING_NAMEPLATE_LIFT_UU}.
+   */
+  floatingLiftUu?: number | (() => number | null | undefined);
 }
 
 interface PlayerOverlayElements {
@@ -568,14 +582,22 @@ export function createBallchasingOverlayPlugin(
   let changedContainerPosition = false;
   let originalContainerPosition = "";
   const playerElements = new Map<string, PlayerOverlayElements>();
+  const floatingLiftSource = options.floatingLiftUu;
   const projected = new THREE.Vector3();
   // World-space lift applied to each car before projecting the floating label,
-  // so the name/boost pill sits above the car instead of on it. Resolved along
-  // the scene's up axis in buildHud — the viewer renders Y-up while
-  // @rlrml/player's own scene is Z-up, so we read it from the camera rather
-  // than hardcoding an axis.
-  const FLOATING_LIFT_UU = 250;
-  const floatingOffset = new THREE.Vector3(0, FLOATING_LIFT_UU, 0);
+  // so the name/boost pill sits above the car instead of on it. Recomputed each
+  // frame in beforeRender along the scene's up axis (read from the camera) — the
+  // viewer renders Y-up while @rlrml/player's own scene is Z-up, so we never
+  // hardcode an axis — and scaled by the (optionally live) configured lift.
+  const floatingOffset = new THREE.Vector3();
+
+  function resolveFloatingLiftUu(): number {
+    const raw =
+      typeof floatingLiftSource === "function" ? floatingLiftSource() : floatingLiftSource;
+    return typeof raw === "number" && Number.isFinite(raw)
+      ? raw
+      : DEFAULT_FLOATING_NAMEPLATE_LIFT_UU;
+  }
 
   function syncAttachedPlayer(attachedPlayerId: string | null): void {
     for (const [playerId, elements] of playerElements.entries()) {
@@ -736,10 +758,6 @@ export function createBallchasingOverlayPlugin(
       });
     }
 
-    floatingOffset
-      .copy(context.scene.camera.up)
-      .normalize()
-      .multiplyScalar(FLOATING_LIFT_UU * (context.options.fieldScale ?? 1));
     container.append(root);
     syncAttachedPlayer(context.player.getState().attachedPlayerId);
     syncFollowedHud({ ...context, state: context.player.getState() });
@@ -771,6 +789,13 @@ export function createBallchasingOverlayPlugin(
       if (!root) {
         return;
       }
+
+      // Recompute the lift each frame so a live UI control takes effect
+      // immediately, and so the up axis tracks whichever scene we render in.
+      floatingOffset
+        .copy(context.scene.camera.up)
+        .normalize()
+        .multiplyScalar(resolveFloatingLiftUu() * (context.options.fieldScale ?? 1));
 
       let followedHudUpdated = false;
       for (const [playerIndex, player] of context.players.entries()) {
