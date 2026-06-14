@@ -177,35 +177,6 @@ void SubtrActorPlugin::resolveStatsWindowPlayerSelection(UiStatsWindow &window) 
   }
 }
 
-std::string SubtrActorPlugin::webCameraPlayerId() const {
-  if (!cameraSelectedPlayerId.empty() &&
-      !parseUnsignedIntegerString(cameraSelectedPlayerId)) {
-    return cameraSelectedPlayerId;
-  }
-  return webPlayerIdForIndex(cameraSelectedPlayerIndex);
-}
-
-std::optional<std::string> SubtrActorPlugin::webCameraPlayerIdConfig() const {
-  if (!cameraSelectedPlayerId.empty()) {
-    return cameraSelectedPlayerId;
-  }
-  return webPlayerIdForIndexIfKnown(cameraSelectedPlayerIndex);
-}
-
-void SubtrActorPlugin::resolveCameraPlayerSelection() {
-  if (cameraSelectedPlayerId.empty()) {
-    return;
-  }
-  if (const auto parsedPlayerIndex = parseUnsignedIntegerString(cameraSelectedPlayerId)) {
-    cameraSelectedPlayerIndex = *parsedPlayerIndex;
-    return;
-  }
-  if (const auto uniquePlayerIndex = uniqueIdPlayerIndices.find(cameraSelectedPlayerId);
-      uniquePlayerIndex != uniqueIdPlayerIndices.end()) {
-    cameraSelectedPlayerIndex = uniquePlayerIndex->second;
-  }
-}
-
 void SubtrActorPlugin::onLoad() {
   cvarManager->registerCvar(
       "subtr_actor_enabled",

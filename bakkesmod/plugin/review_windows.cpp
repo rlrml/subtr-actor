@@ -493,12 +493,6 @@ void SubtrActorPlugin::renderMechanicsReviewWindow() {
   }
   ImGui::SameLine(0.0f, actionGap);
   if (mechanicsReviewButton("Replay clip", replayDisabled, actionButtonWidth)) {
-    if (current != nullptr && current->has_player != 0) {
-      cameraSelectedPlayerIndex = current->player_index;
-      cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);
-      cameraViewMode = 1;
-      cameraFreePreset = -1;
-    }
     playbackCurrentTime = clipStart;
     playbackPlaying = true;
     playbackSkipPostGoalTransitions = false;
