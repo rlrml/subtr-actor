@@ -67,10 +67,22 @@ jobs:
             sleep $((attempt * 60))
           done
 
+      - name: Assemble site
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `result` is a read-only Nix store symlink; copy it into a writable
+          # staging dir so we can drop in extra static pages.
+          rm -rf site
+          cp -rL result site
+          chmod -R u+w site
+          # Publish the committed, Rust-generated event/stat reference page.
+          cp docs/event-definitions.html site/events.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: ./result
+          path: ./site
 
   deploy:
     name: Deploy Pages
