@@ -117,6 +117,54 @@ test("typed mechanic payloads populate their Event-types lane", () => {
   assert.equal(flickSource.buildTimelineEvents()[0]?.frame, 2);
 });
 
+test("per-player span streams fan out into one lane per player", () => {
+  const replay = {
+    frames: Array.from({ length: 8 }, (_, frame) => ({ time: frame })),
+    players: [
+      { id: "Steam:blue-id", name: "Blue" },
+      { id: "Steam:orange-id", name: "Orange" },
+    ],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      player_activity: [
+        {
+          time: 1,
+          frame: 1,
+          end_time: 3,
+          end_frame: 3,
+          duration: 2,
+          player: { Steam: "blue-id" },
+          is_team_0: true,
+          state: "tracked",
+        },
+        {
+          time: 2,
+          frame: 2,
+          end_time: 5,
+          end_frame: 5,
+          duration: 3,
+          player: { Steam: "orange-id" },
+          is_team_0: false,
+          state: "tracked",
+        },
+      ],
+    },
+  });
+  const ctx = { replay, statsTimeline } as StatModuleContext;
+
+  const source = getTestTimelineSources(ctx).find(
+    (candidate) => candidate.id === "stats-stream:player_activity",
+  );
+  assert.ok(source, "player_activity stream source should exist");
+  const lanes = new Set((source.buildTimelineRanges?.() ?? []).map((range) => range.lane));
+  assert.deepEqual([...lanes].sort(), [
+    "stats-stream:player_activity:player:Steam:blue-id",
+    "stats-stream:player_activity:player:Steam:orange-id",
+  ]);
+});
+
 test("event playlist sources include generic stats event streams such as positioning activity", () => {
   const replay = {
     frames: Array.from({ length: 13 }, (_, frame) => ({ time: frame === 12 ? 1.25 : frame })),
@@ -262,8 +310,8 @@ test("controlled play timeline source renders spans as timeline ranges", () => {
       id: "stats-stream:controlled_play:5:12:0",
       startTime: 0.55,
       endTime: 1.25,
-      lane: "stats-stream:controlled_play",
-      laneLabel: "Controlled Play",
+      lane: "stats-stream:controlled_play:team:0",
+      laneLabel: "Blue controlled play",
       label: "Blue controlled play",
       shortLabel: "CP",
       isTeamZero: true,
@@ -386,8 +434,8 @@ test("span-based stats event streams build ranges instead of timeline markers", 
       id: "stats-stream:territorial_pressure:1:5:0",
       startTime: 1,
       endTime: 5,
-      lane: "stats-stream:territorial_pressure",
-      laneLabel: "Territorial Pressure",
+      lane: "stats-stream:territorial_pressure:team:1",
+      laneLabel: "Orange territorial pressure",
       label: "Orange territorial pressure",
       shortLabel: "TP",
       isTeamZero: false,

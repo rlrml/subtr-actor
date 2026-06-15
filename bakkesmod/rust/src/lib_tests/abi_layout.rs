@@ -273,6 +273,7 @@ fn event_envelope(
             id: id.to_owned(),
             stream: stream.to_owned(),
             label: stream.replace('_', " "),
+            scope: event_stream_scope(stream),
             timing: EventTiming::Moment { frame, time },
             primary_player,
             secondary_player: None,

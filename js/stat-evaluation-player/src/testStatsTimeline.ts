@@ -9,6 +9,7 @@ import type {
   MaterializedStatsTimeline,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
+import type { EventScope } from "./generated/EventScope.ts";
 import {
   createPlayerStatsSnapshot,
   createTeamStatsSnapshot,
@@ -110,6 +111,23 @@ function legacyBucketEvents(record: Record<string, unknown> | undefined): Event[
   });
 }
 
+function eventStreamScope(stream: string): EventScope {
+  if (stream === "timeline" || stream === "goal_context" || stream === "core_player") {
+    return "match";
+  }
+  if (
+    stream === "possession" ||
+    stream === "ball_half" ||
+    stream === "territorial_pressure" ||
+    stream === "controlled_play" ||
+    stream === "fifty_fifty" ||
+    stream === "rush"
+  ) {
+    return "team";
+  }
+  return "player";
+}
+
 function legacyMechanicEvents(record: Record<string, unknown> | undefined): Event[] {
   if (!record) {
     return [];
@@ -127,6 +145,7 @@ function legacyMechanicEvents(record: Record<string, unknown> | undefined): Even
         id: typeof record.id === "string" ? record.id : `${stream}:${index}`,
         stream,
         label: titleCaseStream(stream),
+        scope: eventStreamScope(stream),
         timing,
         primary_player:
           (record.player as Event["meta"]["primary_player"]) ??
@@ -224,6 +243,7 @@ function payloadEvent<K extends StatsEventPayloadKind>(
       id: `${stream}:${frameId}:${index}`,
       stream,
       label: titleCaseStream(stream),
+      scope: eventStreamScope(stream),
       timing,
       primary_player:
         (record.player as Event["meta"]["primary_player"]) ??

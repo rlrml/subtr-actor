@@ -30,7 +30,7 @@ use subtr_actor::{
     ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
     StatsTimelineCollector, StatsTimelineEventCollector, SubtrActorError, SubtrActorErrorVariant,
     SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent, TouchStateCalculator,
-    WhiffEvent, boost_amount_to_percent, builtin_analysis_node_json,
+    WhiffEvent, boost_amount_to_percent, builtin_analysis_node_json, event_stream_scope,
     builtin_stats_graph_snapshot_json, builtin_stats_module_config_json,
     builtin_stats_module_frame_json, builtin_stats_module_json, builtin_stats_module_names,
     car_hitbox_for_body_id, default_car_hitbox, default_stats_timeline_config,

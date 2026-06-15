@@ -220,6 +220,27 @@ pub fn stats_timeline_event_label(stream: &str) -> String {
     label.to_owned()
 }
 
+/// The entity scope for an event stream. Player-attributed streams are the
+/// common case, so they are the default; team- and match-scoped streams are
+/// enumerated explicitly. This is the authoritative source for how a client
+/// fans a stream out into per-entity lanes.
+pub fn event_stream_scope(stream: &str) -> EventScope {
+    match stream {
+        // Whole-match rows: scoreboard/goal annotations that are not split per
+        // entity on the timeline.
+        "timeline" | "goal_context" | "core_player" => EventScope::Match,
+        // Per-team control/contest streams.
+        "possession"
+        | "ball_half"
+        | "territorial_pressure"
+        | "controlled_play"
+        | "fifty_fifty"
+        | "rush" => EventScope::Team,
+        // Everything else is attributed to a primary player.
+        _ => EventScope::Player,
+    }
+}
+
 fn title_case_event_stream(stream: &str) -> String {
     stream
         .split('_')
@@ -292,12 +313,28 @@ pub struct EventProperty {
     pub value: EventPropertyValue,
 }
 
+/// Which entity an event belongs to, so a client can spawn one timeline lane
+/// per relevant entity (per team, per player) instead of merging everything
+/// onto a single row. Especially useful for span streams.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum EventScope {
+    /// One lane for the whole match (e.g. goals, goal context).
+    Match,
+    /// One lane per team (e.g. possession, ball-half control).
+    Team,
+    /// One lane per player (e.g. per-player mechanics and activity spans).
+    Player,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct EventMeta {
     pub id: String,
     pub stream: String,
     pub label: String,
+    pub scope: EventScope,
     pub timing: EventTiming,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]

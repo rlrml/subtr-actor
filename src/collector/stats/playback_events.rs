@@ -39,6 +39,7 @@ fn make_event(
             id: format!("{stream}:{frame_id}:{index}"),
             stream: stream.to_owned(),
             label: stats_timeline_event_label(stream),
+            scope: event_stream_scope(stream),
             timing,
             primary_player,
             secondary_player,

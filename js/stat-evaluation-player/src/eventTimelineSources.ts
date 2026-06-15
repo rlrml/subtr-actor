@@ -360,6 +360,19 @@ function buildGenericStatsEventTimelineRanges(
           ? `${teamLabel} ${streamLabel.toLowerCase()}`
           : streamLabel;
 
+      // The event's scope decides how the stream fans out into lanes: a
+      // per-player stream gets one lane per player, a per-team stream one lane
+      // per team, and a match-scoped stream stays a single merged row.
+      let lane = `stats-stream:${streamId}`;
+      let laneLabel = streamLabel;
+      if (event.meta.scope === "player" && playerId) {
+        lane = `stats-stream:${streamId}:player:${playerId}`;
+        laneLabel = playerName ? `${playerName} ${streamLabel.toLowerCase()}` : streamLabel;
+      } else if (event.meta.scope === "team" && isTeamZero != null) {
+        lane = `stats-stream:${streamId}:team:${isTeamZero ? "0" : "1"}`;
+        laneLabel = teamLabel ? `${teamLabel} ${streamLabel.toLowerCase()}` : streamLabel;
+      }
+
       return [
         {
           id: `stats-stream:${eventId}`,
@@ -368,8 +381,8 @@ function buildGenericStatsEventTimelineRanges(
             ctx.replay.frames[timing.startFrame ?? -1]?.time ?? timing.startTime,
             ctx.replay.frames[timing.endFrame ?? -1]?.time ?? timing.endTime,
           ),
-          lane: `stats-stream:${streamId}`,
-          laneLabel: streamLabel,
+          lane,
+          laneLabel,
           label,
           shortLabel: eventStreamShortLabel(streamId),
           isTeamZero,
