@@ -23,7 +23,7 @@ const DEFINITION_ID_TO_STREAM: Record<string, string> = {
 
 // Native scoreboard stats are surfaced collectively by the "core" event source
 // (see coreEventDerivation.ts), not as individual stream toggles.
-const CORE_AGGREGATED = new Set(["assist", "death", "goal", "kill", "save", "shot"]);
+const CORE_AGGREGATED = new Set(["assist", "goal", "save", "shot"]);
 
 // Registry entries that are intentionally not surfaced as their own viewer
 // timeline stream.

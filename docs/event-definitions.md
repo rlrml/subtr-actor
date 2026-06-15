@@ -350,6 +350,34 @@ _None documented._
 
 _None documented._
 
+### Demolition (`demolition`)
+
+- Category: `other`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `demo` via `DemoNode` / `DemoCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Depth Role (`depth_role`)
 
 - Category: `positioning`
@@ -1064,7 +1092,6 @@ _None documented._
   - False negative evidence: `not_evaluated`
   - Testing: `untested`
 - Producers:
-  - `demo` via `DemoNode` / `DemoCalculator`
   - `match_stats` via `MatchStatsNode` / `MatchStatsCalculator`
 
 **Summary**
