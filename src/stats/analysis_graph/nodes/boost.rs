@@ -22,6 +22,7 @@ impl_analysis_node! {
     node = BoostNode,
     state = BoostCalculator,
     name = "boost",
+    emitted_events = crate::stats::calculators::BOOST_EMITTED_EVENTS,
     dependencies = [
         frame_info_dependency(),
         gameplay_state_dependency(),

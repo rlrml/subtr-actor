@@ -241,34 +241,6 @@ pub struct EmittedEvent {
     pub producer: ProducerDefinition,
 }
 
-/// Static registration for the events emitted by one analysis node.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct EventProducerDefinition {
-    pub node_name: &'static str,
-    pub emitted_events: &'static [EmittedEvent],
-}
-
-/// Distributed static catalog of event producers.
-///
-/// Each analysis node can register its own emitted events next to the node or
-/// calculator implementation. Documentation generation should walk this slice
-/// instead of maintaining a second central catalog.
-#[cfg(not(target_arch = "wasm32"))]
-#[distributed_slice]
-pub static EVENT_PRODUCERS: [EventProducerDefinition];
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn event_producers() -> &'static [EventProducerDefinition] {
-    &EVENT_PRODUCERS
-}
-
-/// `linkme` does not support `wasm32-unknown-unknown`, so the static
-/// documentation registry is available on host/tooling builds only for now.
-#[cfg(target_arch = "wasm32")]
-pub fn event_producers() -> &'static [EventProducerDefinition] {
-    &[]
-}
-
 /// Distributed catalog of every [`EventDefinition`].
 ///
 /// `define_stats_event!` (and `register_event_definition!` for payload-less
@@ -440,17 +412,6 @@ macro_rules! define_stats_event {
         }
 
         register_stats_event_definition!($definition);
-    };
-}
-
-macro_rules! register_event_producer {
-    ($static_name:ident, $node_name:literal, $emitted_events:expr_2021) => {
-        #[cfg(not(target_arch = "wasm32"))]
-        #[distributed_slice(EVENT_PRODUCERS)]
-        static $static_name: EventProducerDefinition = EventProducerDefinition {
-            node_name: $node_name,
-            emitted_events: $emitted_events,
-        };
     };
 }
 
@@ -987,7 +948,7 @@ define_stats_event!(
 // `all_event_definitions()`. Defining an event via `define_stats_event!` (or
 // `register_stats_event_definition!`) is now the only registration step.
 
-const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
+pub(crate) const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
         &TIMELINE_EVENT_DEFINITION,
         "match_stats",
@@ -1002,175 +963,175 @@ const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
 ];
 
-const DEMO_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const DEMO_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &DEMOLITION_EVENT_DEFINITION,
     "demo",
     "DemoNode",
     "DemoCalculator",
 )];
 
-const BACKBOARD_BOUNCE_STATE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const BACKBOARD_BOUNCE_STATE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &BACKBOARD_BOUNCE_EVENT_DEFINITION,
     "backboard_bounce_state",
     "BackboardBounceStateNode",
     "BackboardBounceCalculator",
 )];
 
-const CEILING_SHOT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const CEILING_SHOT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &CEILING_SHOT_EVENT_DEFINITION,
     "ceiling_shot",
     "CeilingShotNode",
     "CeilingShotCalculator",
 )];
 
-const WALL_AERIAL_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const WALL_AERIAL_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &WALL_AERIAL_EVENT_DEFINITION,
     "wall_aerial",
     "WallAerialNode",
     "WallAerialCalculator",
 )];
 
-const WALL_AERIAL_SHOT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const WALL_AERIAL_SHOT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &WALL_AERIAL_SHOT_EVENT_DEFINITION,
     "wall_aerial_shot",
     "WallAerialShotNode",
     "WallAerialShotCalculator",
 )];
 
-const CENTER_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const CENTER_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &CENTER_EVENT_DEFINITION,
     "center",
     "CenterNode",
     "CenterCalculator",
 )];
 
-const FLICK_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const FLICK_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &FLICK_EVENT_DEFINITION,
     "flick",
     "FlickNode",
     "FlickCalculator",
 )];
 
-const MUSTY_FLICK_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const MUSTY_FLICK_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &MUSTY_FLICK_EVENT_DEFINITION,
     "musty_flick",
     "MustyFlickNode",
     "MustyFlickCalculator",
 )];
 
-const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &DODGE_RESET_EVENT_DEFINITION,
     "dodge_reset",
     "DodgeResetNode",
     "DodgeResetCalculator",
 )];
 
-const DOUBLE_TAP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const DOUBLE_TAP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &DOUBLE_TAP_EVENT_DEFINITION,
     "double_tap",
     "DoubleTapNode",
     "DoubleTapCalculator",
 )];
 
-const ONE_TIMER_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const ONE_TIMER_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &ONE_TIMER_EVENT_DEFINITION,
     "one_timer",
     "OneTimerNode",
     "OneTimerCalculator",
 )];
 
-const PASS_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const PASS_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &PASS_EVENT_DEFINITION,
     "pass",
     "PassNode",
     "PassCalculator",
 )];
 
-const BALL_CARRY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const BALL_CARRY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &BALL_CARRY_EVENT_DEFINITION,
     "ball_carry",
     "BallCarryNode",
     "BallCarryCalculator",
 )];
 
-const CONTROLLED_PLAY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const CONTROLLED_PLAY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &CONTROLLED_PLAY_EVENT_DEFINITION,
     "controlled_play",
     "ControlledPlayNode",
     "ControlledPlayCalculator",
 )];
 
-const FIFTY_FIFTY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const FIFTY_FIFTY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &FIFTY_FIFTY_EVENT_DEFINITION,
     "fifty_fifty",
     "FiftyFiftyNode",
     "FiftyFiftyCalculator",
 )];
 
-const RUSH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const RUSH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &RUSH_EVENT_DEFINITION,
     "rush",
     "RushNode",
     "RushCalculator",
 )];
 
-const DODGE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const DODGE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &DODGE_EVENT_DEFINITION,
     "dodge",
     "FlipImpulseNode",
     "FlipImpulseCalculator",
 )];
 
-const SPEED_FLIP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const SPEED_FLIP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &SPEED_FLIP_EVENT_DEFINITION,
     "speed_flip",
     "SpeedFlipNode",
     "SpeedFlipCalculator",
 )];
 
-const HALF_FLIP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const HALF_FLIP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &HALF_FLIP_EVENT_DEFINITION,
     "half_flip",
     "HalfFlipNode",
     "HalfFlipCalculator",
 )];
 
-const HALF_VOLLEY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const HALF_VOLLEY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &HALF_VOLLEY_EVENT_DEFINITION,
     "half_volley",
     "HalfVolleyNode",
     "HalfVolleyCalculator",
 )];
 
-const WAVEDASH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const WAVEDASH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &WAVEDASH_EVENT_DEFINITION,
     "wavedash",
     "WavedashNode",
     "WavedashCalculator",
 )];
 
-const WHIFF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const WHIFF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &WHIFF_EVENT_DEFINITION,
     "whiff",
     "WhiffNode",
     "WhiffCalculator",
 )];
 
-const POWERSLIDE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const POWERSLIDE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &POWERSLIDE_EVENT_DEFINITION,
     "powerslide",
     "PowerslideNode",
     "PowerslideCalculator",
 )];
 
-const TOUCH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const TOUCH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &TOUCH_CLASSIFICATION_EVENT_DEFINITION,
     "touch",
     "TouchNode",
     "TouchCalculator",
 )];
 
-const BOOST_EMITTED_EVENTS: &[EmittedEvent] = &[
+pub(crate) const BOOST_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
         &BOOST_PICKUP_EVENT_DEFINITION,
         "boost",
@@ -1185,49 +1146,49 @@ const BOOST_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
 ];
 
-const BUMP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const BUMP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &BUMP_EVENT_DEFINITION,
     "bump",
     "BumpNode",
     "BumpCalculator",
 )];
 
-const POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &POSSESSION_EVENT_DEFINITION,
     "possession",
     "PossessionNode",
     "PossessionCalculator",
 )];
 
-const PLAYER_POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const PLAYER_POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &PLAYER_POSSESSION_EVENT_DEFINITION,
     "player_possession",
     "PlayerPossessionNode",
     "PlayerPossessionCalculator",
 )];
 
-const BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &PRESSURE_EVENT_DEFINITION,
     "ball_half",
     "BallHalfNode",
     "BallHalfCalculator",
 )];
 
-const TERRITORIAL_BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const TERRITORIAL_BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     "territorial_pressure",
     "TerritorialPressureNode",
     "TerritorialPressureCalculator",
 )];
 
-const MOVEMENT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const MOVEMENT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &MOVEMENT_EVENT_DEFINITION,
     "movement",
     "MovementNode",
     "MovementCalculator",
 )];
 
-const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
+pub(crate) const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
         &PLAYER_ACTIVITY_EVENT_DEFINITION,
         "positioning",
@@ -1266,7 +1227,7 @@ const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
 ];
 
-const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
+pub(crate) const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
         &ROTATION_ROLE_EVENT_DEFINITION,
         "rotation",
@@ -1281,136 +1242,12 @@ const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
     ),
 ];
 
-const STATS_TIMELINE_EVENTS_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const STATS_TIMELINE_EVENTS_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &TIMELINE_ENVELOPE_EVENT_DEFINITION,
     "stats_timeline_events",
     "StatsTimelineEventsNode",
     "StatsTimelineEventsState",
 )];
-
-register_event_producer!(
-    MATCH_STATS_EVENT_PRODUCER,
-    "match_stats",
-    MATCH_STATS_EMITTED_EVENTS
-);
-register_event_producer!(DEMO_EVENT_PRODUCER, "demo", DEMO_EMITTED_EVENTS);
-register_event_producer!(
-    BACKBOARD_BOUNCE_STATE_EVENT_PRODUCER,
-    "backboard_bounce_state",
-    BACKBOARD_BOUNCE_STATE_EMITTED_EVENTS
-);
-register_event_producer!(
-    CEILING_SHOT_EVENT_PRODUCER,
-    "ceiling_shot",
-    CEILING_SHOT_EMITTED_EVENTS
-);
-register_event_producer!(
-    WALL_AERIAL_EVENT_PRODUCER,
-    "wall_aerial",
-    WALL_AERIAL_EMITTED_EVENTS
-);
-register_event_producer!(
-    WALL_AERIAL_SHOT_EVENT_PRODUCER,
-    "wall_aerial_shot",
-    WALL_AERIAL_SHOT_EMITTED_EVENTS
-);
-register_event_producer!(CENTER_EVENT_PRODUCER, "center", CENTER_EMITTED_EVENTS);
-register_event_producer!(FLICK_EVENT_PRODUCER, "flick", FLICK_EMITTED_EVENTS);
-register_event_producer!(
-    MUSTY_FLICK_EVENT_PRODUCER,
-    "musty_flick",
-    MUSTY_FLICK_EMITTED_EVENTS
-);
-register_event_producer!(
-    DODGE_RESET_EVENT_PRODUCER,
-    "dodge_reset",
-    DODGE_RESET_EMITTED_EVENTS
-);
-register_event_producer!(
-    DOUBLE_TAP_EVENT_PRODUCER,
-    "double_tap",
-    DOUBLE_TAP_EMITTED_EVENTS
-);
-register_event_producer!(
-    ONE_TIMER_EVENT_PRODUCER,
-    "one_timer",
-    ONE_TIMER_EMITTED_EVENTS
-);
-register_event_producer!(PASS_EVENT_PRODUCER, "pass", PASS_EMITTED_EVENTS);
-register_event_producer!(
-    BALL_CARRY_EVENT_PRODUCER,
-    "ball_carry",
-    BALL_CARRY_EMITTED_EVENTS
-);
-register_event_producer!(
-    CONTROLLED_PLAY_EVENT_PRODUCER,
-    "controlled_play",
-    CONTROLLED_PLAY_EMITTED_EVENTS
-);
-register_event_producer!(
-    FIFTY_FIFTY_EVENT_PRODUCER,
-    "fifty_fifty",
-    FIFTY_FIFTY_EMITTED_EVENTS
-);
-register_event_producer!(RUSH_EVENT_PRODUCER, "rush", RUSH_EMITTED_EVENTS);
-register_event_producer!(DODGE_EVENT_PRODUCER, "dodge", DODGE_EMITTED_EVENTS);
-register_event_producer!(
-    SPEED_FLIP_EVENT_PRODUCER,
-    "speed_flip",
-    SPEED_FLIP_EMITTED_EVENTS
-);
-register_event_producer!(
-    HALF_FLIP_EVENT_PRODUCER,
-    "half_flip",
-    HALF_FLIP_EMITTED_EVENTS
-);
-register_event_producer!(
-    HALF_VOLLEY_EVENT_PRODUCER,
-    "half_volley",
-    HALF_VOLLEY_EMITTED_EVENTS
-);
-register_event_producer!(WAVEDASH_EVENT_PRODUCER, "wavedash", WAVEDASH_EMITTED_EVENTS);
-register_event_producer!(WHIFF_EVENT_PRODUCER, "whiff", WHIFF_EMITTED_EVENTS);
-register_event_producer!(
-    POWERSLIDE_EVENT_PRODUCER,
-    "powerslide",
-    POWERSLIDE_EMITTED_EVENTS
-);
-register_event_producer!(TOUCH_EVENT_PRODUCER, "touch", TOUCH_EMITTED_EVENTS);
-register_event_producer!(BOOST_EVENT_PRODUCER, "boost", BOOST_EMITTED_EVENTS);
-register_event_producer!(BUMP_EVENT_PRODUCER, "bump", BUMP_EMITTED_EVENTS);
-register_event_producer!(
-    POSSESSION_EVENT_PRODUCER,
-    "possession",
-    POSSESSION_EMITTED_EVENTS
-);
-register_event_producer!(
-    PLAYER_POSSESSION_EVENT_PRODUCER,
-    "player_possession",
-    PLAYER_POSSESSION_EMITTED_EVENTS
-);
-register_event_producer!(
-    BALL_HALF_EVENT_PRODUCER,
-    "ball_half",
-    BALL_HALF_EMITTED_EVENTS
-);
-register_event_producer!(
-    TERRITORIAL_BALL_HALF_EVENT_PRODUCER,
-    "territorial_pressure",
-    TERRITORIAL_BALL_HALF_EMITTED_EVENTS
-);
-register_event_producer!(MOVEMENT_EVENT_PRODUCER, "movement", MOVEMENT_EMITTED_EVENTS);
-register_event_producer!(
-    POSITIONING_EVENT_PRODUCER,
-    "positioning",
-    POSITIONING_EMITTED_EVENTS
-);
-register_event_producer!(ROTATION_EVENT_PRODUCER, "rotation", ROTATION_EMITTED_EVENTS);
-register_event_producer!(
-    STATS_TIMELINE_EVENTS_EVENT_PRODUCER,
-    "stats_timeline_events",
-    STATS_TIMELINE_EVENTS_EMITTED_EVENTS
-);
 
 #[cfg(test)]
 #[path = "event_definition_tests.rs"]

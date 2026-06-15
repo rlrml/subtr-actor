@@ -3,9 +3,10 @@ use std::path::PathBuf;
 
 use anyhow::{Context, bail};
 use clap::Parser;
+use subtr_actor::analysis_graph::all_analysis_nodes;
 use subtr_actor::{
     ALL_GOAL_TAG_DEFINITIONS, DetectionConfidence, EmittedEvent, EventDefinition,
-    EventProducerDefinition, GoalTagDefinition, KnownIssueRef, ProducerDefinition, event_producers,
+    GoalTagDefinition, KnownIssueRef, ProducerDefinition,
 };
 
 #[derive(Debug, Parser)]
@@ -28,7 +29,15 @@ struct EventDoc {
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    let markdown = render_docs(event_producers(), ALL_GOAL_TAG_DEFINITIONS)?;
+    // Walk the actual analysis nodes so docs are sourced from the same place
+    // the runtime is: each node reports the events it emits. There is no
+    // separate name-keyed producer registry to keep in sync.
+    let nodes = all_analysis_nodes();
+    let emitted_events: Vec<EmittedEvent> = nodes
+        .iter()
+        .flat_map(|node| node.emitted_events().iter().copied())
+        .collect();
+    let markdown = render_docs(&emitted_events, ALL_GOAL_TAG_DEFINITIONS)?;
 
     match (args.output, args.check) {
         (Some(output), true) => {
@@ -58,34 +67,29 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn render_docs(
-    producers: &[EventProducerDefinition],
+    emitted_events: &[EmittedEvent],
     goal_tags: &[GoalTagDefinition],
 ) -> anyhow::Result<String> {
     let mut markdown = String::new();
     markdown.push_str("# Stat Definitions\n\n");
     markdown.push_str("Generated from static Rust metadata. Do not edit by hand.\n\n");
-    render_event_docs(&mut markdown, producers)?;
+    render_event_docs(&mut markdown, emitted_events)?;
     render_goal_tag_docs(&mut markdown, goal_tags);
     Ok(markdown)
 }
 
-fn render_event_docs(
-    markdown: &mut String,
-    producers: &[EventProducerDefinition],
-) -> anyhow::Result<()> {
+fn render_event_docs(markdown: &mut String, emitted_events: &[EmittedEvent]) -> anyhow::Result<()> {
     let mut events = BTreeMap::<&'static str, EventDoc>::new();
 
-    for producer in producers {
-        for emitted in producer.emitted_events {
-            let entry = events.entry(emitted.event.id).or_insert_with(|| EventDoc {
-                definition: emitted.event,
-                producers: Vec::new(),
-            });
-            if entry.definition != emitted.event {
-                bail!("conflicting event definitions for {}", emitted.event.id);
-            }
-            entry.producers.push(emitted.producer);
+    for emitted in emitted_events {
+        let entry = events.entry(emitted.event.id).or_insert_with(|| EventDoc {
+            definition: emitted.event,
+            producers: Vec::new(),
+        });
+        if entry.definition != emitted.event {
+            bail!("conflicting event definitions for {}", emitted.event.id);
         }
+        entry.producers.push(emitted.producer);
     }
 
     markdown.push_str("## Events\n\n");

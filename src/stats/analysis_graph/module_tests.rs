@@ -28,6 +28,28 @@ fn parse_replay(path: &str) -> boxcars::Replay {
         .unwrap_or_else(|_| panic!("Failed to parse replay: {}", replay_path.display()))
 }
 
+/// Every event a node emits must have a corresponding registered
+/// [`EventDefinition`]. Sourced by walking the actual analysis nodes — the
+/// nodes are the authoritative producers of their events, so this can't drift
+/// the way a separate name-keyed producer registry could.
+#[test]
+fn every_emitted_event_has_a_registered_definition() {
+    let registered: HashSet<&str> = crate::all_event_definitions()
+        .iter()
+        .map(|definition| definition.id)
+        .collect();
+    for node in all_analysis_nodes() {
+        for emitted in node.emitted_events() {
+            assert!(
+                registered.contains(emitted.event.id),
+                "event {:?} is emitted by node {:?} but is missing from the definition registry",
+                emitted.event.id,
+                node.name(),
+            );
+        }
+    }
+}
+
 fn builtin_analysis_node_name_set() -> HashSet<&'static str> {
     builtin_analysis_node_names().iter().copied().collect()
 }
