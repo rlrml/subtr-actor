@@ -395,7 +395,3 @@ impl AnalysisNode for StatsTimelineFrameNode {
         &self.state
     }
 }
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(StatsTimelineFrameNode::new())
-}

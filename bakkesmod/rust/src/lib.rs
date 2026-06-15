@@ -30,15 +30,15 @@ use subtr_actor::{
     ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
     StatsTimelineCollector, StatsTimelineEventCollector, SubtrActorError, SubtrActorErrorVariant,
     SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent, TouchStateCalculator,
-    WhiffEvent, boost_amount_to_percent, builtin_analysis_node_json, event_stream_scope,
+    WhiffEvent, boost_amount_to_percent, builtin_analysis_node_json,
     builtin_stats_graph_snapshot_json, builtin_stats_module_config_json,
     builtin_stats_module_frame_json, builtin_stats_module_json, builtin_stats_module_names,
-    car_hitbox_for_body_id, default_car_hitbox, default_stats_timeline_config,
+    car_hitbox_for_body_id, default_car_hitbox, default_stats_timeline_config, event_stream_scope,
     geometry::apply_velocities_to_rigid_body,
     hitbox_family_for_body_id,
     stats::analysis_graph::{
         AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
-        builtin_analysis_node_aliases, builtin_analysis_node_names, graph_with_all_analysis_nodes,
+        builtin_analysis_node_names, graph_with_all_analysis_nodes,
     },
 };
 #[cfg(test)]
@@ -165,7 +165,6 @@ fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
     let callable_analysis_node_names = callable_analysis_node_names_for_graph(graph);
     serde_json::to_vec(&serde_json::json!({
         "builtin_analysis_node_names": builtin_analysis_node_names(),
-        "builtin_analysis_node_aliases": builtin_analysis_node_aliases(),
         "callable_analysis_node_names": callable_analysis_node_names,
         "builtin_stats_module_names": builtin_stats_module_names(),
         "graph_output_names": LIVE_GRAPH_OUTPUT_NAMES,

@@ -1150,7 +1150,3 @@ fn build_replay_events(
     });
     events
 }
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(StatsTimelineEventsNode::new())
-}

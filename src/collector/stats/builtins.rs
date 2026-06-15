@@ -1059,8 +1059,6 @@ pub fn builtin_analysis_node_json(
     node_name: &str,
     graph: &AnalysisGraph,
 ) -> SubtrActorResult<Value> {
-    let node_name = crate::stats::analysis_graph::canonical_builtin_analysis_node_name(node_name)
-        .unwrap_or(node_name);
     let value = match node_name {
         "core" | "match_stats" => builtin_module_json("core", graph)?,
         "stats_timeline_events" => serialize_to_json_value(
