@@ -1,0 +1,1425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>subtr-actor — Stat &amp; Event Definitions</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --fg: #1b1f24;
+  --muted: #5b6573;
+  --border: #d7dce2;
+  --card: #f6f8fa;
+  --accent: #2f6feb;
+  --code-bg: #eef1f4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #9aa6b2;
+    --border: #2a313a;
+    --card: #161b22;
+    --accent: #6ea8ff;
+    --code-bg: #1f262e;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 5rem; }
+h1 { font-size: 1.9rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.35rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--border); padding-bottom: .35rem; }
+h3 { font-size: 1.1rem; margin: 0; }
+.subtitle { color: var(--muted); margin: 0 0 1.5rem; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: .85em; }
+code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.search {
+  width: 100%;
+  padding: .6rem .8rem;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  margin-bottom: 1.5rem;
+}
+table.toc { width: 100%; border-collapse: collapse; }
+table.toc th, table.toc td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.toc th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
+table.toc td.summary { color: var(--muted); }
+.cat-group { margin-top: 1rem; }
+.cat-group > .cat-head { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); margin: 1.25rem 0 .35rem; font-weight: 700; }
+.badge {
+  display: inline-block;
+  font-size: .72rem;
+  font-weight: 600;
+  padding: .12em .55em;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.event {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  margin: .9rem 0;
+  background: var(--card);
+  scroll-margin-top: 1rem;
+}
+.event .head { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.event .head .id { color: var(--muted); }
+.event .summary { margin: .6rem 0 .25rem; }
+.section-label { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 700; margin: .85rem 0 .3rem; }
+ul.tight { margin: .2rem 0; padding-left: 1.2rem; }
+ul.tight li { margin: .15rem 0; }
+.conf { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .3rem; }
+.conf .badge b { color: var(--fg); font-weight: 700; }
+.producers code { font-size: .8em; }
+.muted { color: var(--muted); }
+.toplink { float: right; font-size: .8rem; }
+.count { color: var(--muted); font-weight: 400; font-size: .9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Stat &amp; Event Definitions</h1>
+<p class="subtitle">Generated from static Rust metadata — do not edit by hand. <span class="count">43 events</span></p>
+<input id="search" class="search" type="search" placeholder="Filter events by name, id, category, or summary…" autocomplete="off">
+<h2 id="contents">Contents</h2>
+<div class="cat-group" data-group><div class="cat-head">Core</div>
+<table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
+<tr data-search="core player scoreboard core_player_scoreboard core definition pending."><td><a href="#event-core_player_scoreboard">Core Player Scoreboard</a></td><td><code>core_player_scoreboard</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="replay timeline event timeline core definition pending."><td><a href="#event-timeline">Replay Timeline Event</a></td><td><code>timeline</code></td><td class="summary">Definition pending.</td></tr>
+</tbody></table></div>
+<div class="cat-group" data-group><div class="cat-head">Mechanic</div>
+<table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
+<tr data-search="backboard bounce backboard_bounce mechanic a ball rebound off the opponent backboard attributed to the player who sent the ball there."><td><a href="#event-backboard_bounce">Backboard Bounce</a></td><td><code>backboard_bounce</code></td><td class="summary">A ball rebound off the opponent backboard attributed to the player who sent the ball there.</td></tr>
+<tr data-search="ball carry ball_carry mechanic a sustained player-ball control sequence, covering grounded carries and air dribbles."><td><a href="#event-ball_carry">Ball Carry</a></td><td><code>ball_carry</code></td><td class="summary">A sustained player-ball control sequence, covering grounded carries and air dribbles.</td></tr>
+<tr data-search="ceiling shot ceiling_shot mechanic a shot touch shortly after the player contacts the ceiling and drops back toward the ball."><td><a href="#event-ceiling_shot">Ceiling Shot</a></td><td><code>ceiling_shot</code></td><td class="summary">A shot touch shortly after the player contacts the ceiling and drops back toward the ball.</td></tr>
+<tr data-search="center center mechanic a touch that moves the ball from a wide attacking position toward the central attacking area."><td><a href="#event-center">Center</a></td><td><code>center</code></td><td class="summary">A touch that moves the ball from a wide attacking position toward the central attacking area.</td></tr>
+<tr data-search="controlled play controlled_play mechanic a same-player possession episode with multiple touches and sustained close-ball time."><td><a href="#event-controlled_play">Controlled Play</a></td><td><code>controlled_play</code></td><td class="summary">A same-player possession episode with multiple touches and sustained close-ball time.</td></tr>
+<tr data-search="dodge dodge mechanic a dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable."><td><a href="#event-dodge">Dodge</a></td><td><code>dodge</code></td><td class="summary">A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.</td></tr>
+<tr data-search="dodge reset dodge_reset mechanic a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch."><td><a href="#event-dodge_reset">Dodge Reset</a></td><td><code>dodge_reset</code></td><td class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</td></tr>
+<tr data-search="double tap double_tap mechanic a same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory."><td><a href="#event-double_tap">Double Tap</a></td><td><code>double_tap</code></td><td class="summary">A same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.</td></tr>
+<tr data-search="event event mechanic a shared event envelope with common metadata and a typed event payload."><td><a href="#event-event">Event</a></td><td><code>event</code></td><td class="summary">A shared event envelope with common metadata and a typed event payload.</td></tr>
+<tr data-search="flick flick mechanic a dodge-powered touch following a short controlled carry setup."><td><a href="#event-flick">Flick</a></td><td><code>flick</code></td><td class="summary">A dodge-powered touch following a short controlled carry setup.</td></tr>
+<tr data-search="half flip half_flip mechanic a dodge sequence that starts while driving backward and reorients the car to move forward."><td><a href="#event-half_flip">Half Flip</a></td><td><code>half_flip</code></td><td class="summary">A dodge sequence that starts while driving backward and reorients the car to move forward.</td></tr>
+<tr data-search="half volley half_volley mechanic a fast touch shortly after the ball bounces off the floor, paired with a recent player dodge."><td><a href="#event-half_volley">Half Volley</a></td><td><code>half_volley</code></td><td class="summary">A fast touch shortly after the ball bounces off the floor, paired with a recent player dodge.</td></tr>
+<tr data-search="musty flick musty_flick mechanic a back-flip style flick where the ball is contacted behind/on top of the car during a dominant pitch rotation."><td><a href="#event-musty_flick">Musty Flick</a></td><td><code>musty_flick</code></td><td class="summary">A back-flip style flick where the ball is contacted behind/on top of the car during a dominant pitch rotation.</td></tr>
+<tr data-search="one timer one_timer mechanic a fast receiver touch from a completed pass that is immediately directed toward goal."><td><a href="#event-one_timer">One Timer</a></td><td><code>one_timer</code></td><td class="summary">A fast receiver touch from a completed pass that is immediately directed toward goal.</td></tr>
+<tr data-search="pass pass mechanic a same-team touch sequence where one player sends the ball to a different teammate."><td><a href="#event-pass">Pass</a></td><td><code>pass</code></td><td class="summary">A same-team touch sequence where one player sends the ball to a different teammate.</td></tr>
+<tr data-search="powerslide powerslide mechanic a state-change event for effective grounded powerslide use."><td><a href="#event-powerslide">Powerslide</a></td><td><code>powerslide</code></td><td class="summary">A state-change event for effective grounded powerslide use.</td></tr>
+<tr data-search="speed flip speed_flip mechanic a ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips."><td><a href="#event-speed_flip">Speed Flip</a></td><td><code>speed_flip</code></td><td class="summary">A ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.</td></tr>
+<tr data-search="wall aerial wall_aerial mechanic an aerial play that starts from controlled ball movement on a side or back wall."><td><a href="#event-wall_aerial">Wall Aerial</a></td><td><code>wall_aerial</code></td><td class="summary">An aerial play that starts from controlled ball movement on a side or back wall.</td></tr>
+<tr data-search="wall aerial shot wall_aerial_shot mechanic a shot credited to a player shortly after taking off from a wall."><td><a href="#event-wall_aerial_shot">Wall Aerial Shot</a></td><td><code>wall_aerial_shot</code></td><td class="summary">A shot credited to a player shortly after taking off from a wall.</td></tr>
+<tr data-search="wavedash wavedash mechanic a low airborne dodge that lands quickly and converts the dodge into ground speed."><td><a href="#event-wavedash">Wavedash</a></td><td><code>wavedash</code></td><td class="summary">A low airborne dodge that lands quickly and converts the dodge into ground speed.</td></tr>
+</tbody></table></div>
+<div class="cat-group" data-group><div class="cat-head">Other</div>
+<table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
+<tr data-search="ball half ball_half other definition pending."><td><a href="#event-ball_half">Ball Half</a></td><td><code>ball_half</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="boost pickup boost_pickups other definition pending."><td><a href="#event-boost_pickups">Boost Pickup</a></td><td><code>boost_pickups</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="respawn boost_respawn other definition pending."><td><a href="#event-boost_respawn">Respawn</a></td><td><code>boost_respawn</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="bump bump other definition pending."><td><a href="#event-bump">Bump</a></td><td><code>bump</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="demolition demolition other definition pending."><td><a href="#event-demolition">Demolition</a></td><td><code>demolition</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="50/50 fifty_fifty other a contested ball interaction involving touches or pressure from both teams in a short window."><td><a href="#event-fifty_fifty">50/50</a></td><td><code>fifty_fifty</code></td><td class="summary">A contested ball interaction involving touches or pressure from both teams in a short window.</td></tr>
+<tr data-search="movement movement other definition pending."><td><a href="#event-movement">Movement</a></td><td><code>movement</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="player possession player_possession other a contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity."><td><a href="#event-player_possession">Player Possession</a></td><td><code>player_possession</code></td><td class="summary">A contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity.</td></tr>
+<tr data-search="possession possession other definition pending."><td><a href="#event-possession">Possession</a></td><td><code>possession</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="rush rush other a quick possession transition where the attacking team has numbers moving out of its defensive half."><td><a href="#event-rush">Rush</a></td><td><code>rush</code></td><td class="summary">A quick possession transition where the attacking team has numbers moving out of its defensive half.</td></tr>
+<tr data-search="territorial pressure territorial_pressure other definition pending."><td><a href="#event-territorial_pressure">Territorial Pressure</a></td><td><code>territorial_pressure</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="touch touch other a classified ball touch with strength kind, surface/height context, and an inferred intention."><td><a href="#event-touch">Touch</a></td><td><code>touch</code></td><td class="summary">A classified ball touch with strength kind, surface/height context, and an inferred intention.</td></tr>
+<tr data-search="whiff whiff other a committed attempt near the ball that does not result in that player touching it."><td><a href="#event-whiff">Whiff</a></td><td><code>whiff</code></td><td class="summary">A committed attempt near the ball that does not result in that player touching it.</td></tr>
+</tbody></table></div>
+<div class="cat-group" data-group><div class="cat-head">Positioning</div>
+<table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
+<tr data-search="ball depth ball_depth positioning definition pending."><td><a href="#event-ball_depth">Ball Depth</a></td><td><code>ball_depth</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="ball proximity ball_proximity positioning definition pending."><td><a href="#event-ball_proximity">Ball Proximity</a></td><td><code>ball_proximity</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="depth role depth_role positioning definition pending."><td><a href="#event-depth_role">Depth Role</a></td><td><code>depth_role</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="field half field_half positioning definition pending."><td><a href="#event-field_half">Field Half</a></td><td><code>field_half</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="field third field_third positioning definition pending."><td><a href="#event-field_third">Field Third</a></td><td><code>field_third</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="first-man change first_man_change positioning definition pending."><td><a href="#event-first_man_change">First-Man Change</a></td><td><code>first_man_change</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="player activity player_activity positioning definition pending."><td><a href="#event-player_activity">Player Activity</a></td><td><code>player_activity</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="rotation role rotation_role positioning definition pending."><td><a href="#event-rotation_role">Rotation Role</a></td><td><code>rotation_role</code></td><td class="summary">Definition pending.</td></tr>
+</tbody></table></div>
+<h2 id="events">Events</h2>
+<div class="cat-group" data-group><div class="cat-head">Core</div>
+<div class="event" id="event-core_player_scoreboard" data-search="core player scoreboard core_player_scoreboard core definition pending.">
+<div class="head"><h3>Core Player Scoreboard</h3><code class="id">core_player_scoreboard</code><span class="badge">Core</span><span class="badge">hidden from review</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>match_stats</code> via <code>MatchStatsNode</code> / <code>MatchStatsCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-timeline" data-search="replay timeline event timeline core definition pending.">
+<div class="head"><h3>Replay Timeline Event</h3><code class="id">timeline</code><span class="badge">Core</span><span class="badge">hidden from review</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>match_stats</code> via <code>MatchStatsNode</code> / <code>MatchStatsCalculator</code></li>
+</ul>
+</div>
+</div>
+<div class="cat-group" data-group><div class="cat-head">Mechanic</div>
+<div class="event" id="event-backboard_bounce" data-search="backboard bounce backboard_bounce mechanic a ball rebound off the opponent backboard attributed to the player who sent the ball there.">
+<div class="head"><h3>Backboard Bounce</h3><code class="id">backboard_bounce</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A ball rebound off the opponent backboard attributed to the player who sent the ball there.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Track the last touch during live play and attribute a later backboard rebound to that touch when it occurs within the configured attribution window.</li>
+<li>Require the ball to be high, near the backboard face, moving toward the backboard before the rebound, and moving away after the rebound.</li>
+<li>Ignore frames with a simultaneous touch so the rebound is not confused with a player-ball contact.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>backboard_bounce_state</code> via <code>BackboardBounceStateNode</code> / <code>BackboardBounceCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-ball_carry" data-search="ball carry ball_carry mechanic a sustained player-ball control sequence, covering grounded carries and air dribbles.">
+<div class="head"><h3>Ball Carry</h3><code class="id">ball_carry</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A sustained player-ball control sequence, covering grounded carries and air dribbles.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Use continuous ball-control tracking to build player-owned sequences while live play is active.</li>
+<li>Sample grounded carries from close horizontal/vertical ball gaps over the car, excluding wall contact.</li>
+<li>Sample air dribbles with the air-dribble policy, then emit completed sequences that meet the duration and validity rules for their carry kind.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>ball_carry</code> via <code>BallCarryNode</code> / <code>BallCarryCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-ceiling_shot" data-search="ceiling shot ceiling_shot mechanic a shot touch shortly after the player contacts the ceiling and drops back toward the ball.">
+<div class="head"><h3>Ceiling Shot</h3><code class="id">ceiling_shot</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A shot touch shortly after the player contacts the ceiling and drops back toward the ball.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Record recent ceiling contacts when the car is near the ceiling and oriented roof-first against it.</li>
+<li>Match a later touch by the same player within the ceiling-contact window after the player has separated from the ceiling.</li>
+<li>Score the candidate from contact timing, height, separation, forward alignment, approach speed, ball impulse, and ceiling-contact alignment.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>ceiling_shot</code> via <code>CeilingShotNode</code> / <code>CeilingShotCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-center" data-search="center center mechanic a touch that moves the ball from a wide attacking position toward the central attacking area.">
+<div class="head"><h3>Center</h3><code class="id">center</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A touch that moves the ball from a wide attacking position toward the central attacking area.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start a pending center from a live-play touch, unless that player immediately has a shot or goal event.</li>
+<li>Watch the ball for a short window after the touch and require meaningful travel from a wide x-position toward a more central x-position in the attacking half.</li>
+<li>Clear the candidate when it ages out, loses attribution, or becomes a shot/goal by the same player instead of a center.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>center</code> via <code>CenterNode</code> / <code>CenterCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-controlled_play" data-search="controlled play controlled_play mechanic a same-player possession episode with multiple touches and sustained close-ball time.">
+<div class="head"><h3>Controlled Play</h3><code class="id">controlled_play</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A same-player possession episode with multiple touches and sustained close-ball time.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start a player-owned candidate from an attributed touch during live play.</li>
+<li>Require at least two distinct touches by the same player with at least one second between the first and last touch.</li>
+<li>Require sustained proximity to the ball and finish the candidate when another player touches, live play ends, or the touch chain times out.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>controlled_play</code> via <code>ControlledPlayNode</code> / <code>ControlledPlayCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-dodge" data-search="dodge dodge mechanic a dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.">
+<div class="head"><h3>Dodge</h3><code class="id">dodge</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start on the replay&#39;s dodge-active rising edge for each player.</li>
+<li>Sample the player&#39;s velocity change over the early dodge window and subtract an approximate forward boost contribution when boost is active.</li>
+<li>Store the impulse estimate as dodge_impulse, including car-local direction classification plus raw and compensated world-space vectors for visualization and downstream mechanic detectors.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>dodge</code> via <code>FlipImpulseNode</code> / <code>FlipImpulseCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-dodge_reset" data-search="dodge reset dodge_reset mechanic a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.">
+<div class="head"><h3>Dodge Reset</h3><code class="id">dodge_reset</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.</li>
+<li>Classify the refresh as on-ball (a flip reset) when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.</li>
+<li>Keep on-ball resets pending in an in-flight ledger; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` with its reset-to-use latency.</li>
+<li>Resolve every pending reset into an outcome: used, landed, superseded by a newer reset, expired, or cut off by a goal, live play ending, or the replay ending.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>dodge_reset</code> via <code>DodgeResetNode</code> / <code>DodgeResetCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-double_tap" data-search="double tap double_tap mechanic a same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.">
+<div class="head"><h3>Double Tap</h3><code class="id">double_tap</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Arm a pending double tap from a backboard-bounce event attributed to the player who sent the ball to the backboard.</li>
+<li>Require the same player and team to touch the ball again during live play within the follow-up window.</li>
+<li>Accept the follow-up only when the post-touch straight-line ball trajectory projects into or close to the opponent goal mouth.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>double_tap</code> via <code>DoubleTapNode</code> / <code>DoubleTapCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-event" data-search="event event mechanic a shared event envelope with common metadata and a typed event payload.">
+<div class="head"><h3>Event</h3><code class="id">event</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A shared event envelope with common metadata and a typed event payload.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Collect completed events from the analysis graph at finish time.</li>
+<li>Wrap each typed event payload with common timing, participant, team, position, confidence, and stream metadata.</li>
+<li>Serialize timeline events as a single heterogeneous event list for playback and analysis consumers.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>stats_timeline_events</code> via <code>StatsTimelineEventsNode</code> / <code>StatsTimelineEventsState</code></li>
+</ul>
+</div>
+<div class="event" id="event-flick" data-search="flick flick mechanic a dodge-powered touch following a short controlled carry setup.">
+<div class="head"><h3>Flick</h3><code class="id">flick</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A dodge-powered touch following a short controlled carry setup.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Track controlled setup windows where the current controlling player keeps the ball close above the car within local-position and gap thresholds.</li>
+<li>Measure signed horizontal setup rotation so reverse flicks can be labeled as left or right based on the direction the car rotated before the flick.</li>
+<li>Record dodge starts that happen immediately after, or during, a qualifying setup.</li>
+<li>Emit on a same-player touch shortly after the dodge when the ball impulse is large and directed away from the player, with confidence from setup duration, timing, impulse, and separation.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>flick</code> via <code>FlickNode</code> / <code>FlickCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-half_flip" data-search="half flip half_flip mechanic a dodge sequence that starts while driving backward and reorients the car to move forward.">
+<div class="head"><h3>Half Flip</h3><code class="id">half_flip</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A dodge sequence that starts while driving backward and reorients the car to move forward.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start candidates on grounded dodge rising edges when the car is moving backward relative to its facing direction.</li>
+<li>Track reorientation during the evaluation window, including forward-vector reversal, alignment with the resulting velocity, and vertical flip evidence.</li>
+<li>Emit when the candidate shows enough reversal, reorientation, flip motion, and speed evidence to clear the confidence threshold.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>half_flip</code> via <code>HalfFlipNode</code> / <code>HalfFlipCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-half_volley" data-search="half volley half_volley mechanic a fast touch shortly after the ball bounces off the floor, paired with a recent player dodge.">
+<div class="head"><h3>Half Volley</h3><code class="id">half_volley</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A fast touch shortly after the ball bounces off the floor, paired with a recent player dodge.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Detect floor bounces from ball height and vertical velocity reversal when no touch occurs on the bounce frame.</li>
+<li>Track each player&#39;s recent ground contact and dodge start.</li>
+<li>Emit on a same-player touch shortly after the floor bounce and dodge when the post-touch ball speed clears the configured threshold.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>half_volley</code> via <code>HalfVolleyNode</code> / <code>HalfVolleyCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-musty_flick" data-search="musty flick musty_flick mechanic a back-flip style flick where the ball is contacted behind/on top of the car during a dominant pitch rotation.">
+<div class="head"><h3>Musty Flick</h3><code class="id">musty_flick</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A back-flip style flick where the ball is contacted behind/on top of the car during a dominant pitch rotation.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Track dodge starts and keep only recent candidates whose car orientation is compatible with a musty-style setup.</li>
+<li>On a same-player touch, require the ball to be behind and above the car in local space, with rear/top alignment and forward approach speed.</li>
+<li>Require a meaningful ball speed change and pitch-dominant angular velocity, then score confidence from timing, alignment, approach, pitch, impulse, and setup orientation.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>musty_flick</code> via <code>MustyFlickNode</code> / <code>MustyFlickCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-one_timer" data-search="one timer one_timer mechanic a fast receiver touch from a completed pass that is immediately directed toward goal.">
+<div class="head"><h3>One Timer</h3><code class="id">one_timer</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A fast receiver touch from a completed pass that is immediately directed toward goal.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Consume newly completed pass events on the frame they are recorded.</li>
+<li>Require the current ball speed after the receiver&#39;s touch to exceed the one-timer speed threshold.</li>
+<li>Require the post-touch ball velocity to align with the opponent goal center direction.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>one_timer</code> via <code>OneTimerNode</code> / <code>OneTimerCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-pass" data-search="pass pass mechanic a same-team touch sequence where one player sends the ball to a different teammate.">
+<div class="head"><h3>Pass</h3><code class="id">pass</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A same-team touch sequence where one player sends the ball to a different teammate.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Track the last attributed touch in live play and compare it to each new touch.</li>
+<li>Emit when a different teammate touches the ball within the pass window after the ball has traveled far enough.</li>
+<li>Classify the pass as direct, backboard, fifty-fifty, or fifty-fifty backboard using intervening backboard-bounce and fifty-fifty state.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>pass</code> via <code>PassNode</code> / <code>PassCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-powerslide" data-search="powerslide powerslide mechanic a state-change event for effective grounded powerslide use.">
+<div class="head"><h3>Powerslide</h3><code class="id">powerslide</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A state-change event for effective grounded powerslide use.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Read each player&#39;s powerslide-active input/state on every frame.</li>
+<li>Treat powerslide as effective only while the player is close enough to the ground.</li>
+<li>Emit when a player&#39;s effective powerslide state changes between active and inactive.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>powerslide</code> via <code>PowerslideNode</code> / <code>PowerslideCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-speed_flip" data-search="speed flip speed_flip mechanic a ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.">
+<div class="head"><h3>Speed Flip</h3><code class="id">speed_flip</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start candidates on dodge rising edges while the player is grounded, moving in the car&#39;s forward direction, and, for kickoff cases, within the kickoff-start window.</li>
+<li>Track speed, forward alignment, boost alignment, diagonal angular-velocity balance, and early forward acceleration during a short evaluation window.</li>
+<li>Emit when the combined diagonal, cancel, speed, and alignment confidence score clears the speed-flip threshold before the candidate expires.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>speed_flip</code> via <code>SpeedFlipNode</code> / <code>SpeedFlipCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-wall_aerial" data-search="wall aerial wall_aerial mechanic an aerial play that starts from controlled ball movement on a side or back wall.">
+<div class="head"><h3>Wall Aerial</h3><code class="id">wall_aerial</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">An aerial play that starts from controlled ball movement on a side or back wall.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Track wall-control sequences where the last toucher keeps the ball close while positioned on a side or back wall.</li>
+<li>Arm a wall-aerial candidate when the player leaves the wall soon after a qualifying wall-control setup.</li>
+<li>Emit on a later aerial touch by the same player when the player and ball are high enough, the setup/takeoff windows hold, and the confidence score clears the threshold.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>wall_aerial</code> via <code>WallAerialNode</code> / <code>WallAerialCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-wall_aerial_shot" data-search="wall aerial shot wall_aerial_shot mechanic a shot credited to a player shortly after taking off from a wall.">
+<div class="head"><h3>Wall Aerial Shot</h3><code class="id">wall_aerial_shot</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A shot credited to a player shortly after taking off from a wall.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Track recent wall contact for each player and arm a candidate when the player leaves the wall while still above the ground threshold.</li>
+<li>Match a subsequent shot stat event by that player within the takeoff-to-shot window.</li>
+<li>Require the shot touch to occur off the wall with sufficient player and ball height, then score confidence from timing, height, goal alignment, and ball speed.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>wall_aerial_shot</code> via <code>WallAerialShotNode</code> / <code>WallAerialShotCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-wavedash" data-search="wavedash wavedash mechanic a low airborne dodge that lands quickly and converts the dodge into ground speed.">
+<div class="head"><h3>Wavedash</h3><code class="id">wavedash</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A low airborne dodge that lands quickly and converts the dodge into ground speed.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start candidates on dodge rising edges from a low but airborne height.</li>
+<li>Watch for a landing within the wavedash window while the car is sufficiently upright.</li>
+<li>Score confidence from dodge-to-landing timing, starting height, speed gain or landing speed, and landing uprightness.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>wavedash</code> via <code>WavedashNode</code> / <code>WavedashCalculator</code></li>
+</ul>
+</div>
+</div>
+<div class="cat-group" data-group><div class="cat-head">Other</div>
+<div class="event" id="event-ball_half" data-search="ball half ball_half other definition pending.">
+<div class="head"><h3>Ball Half</h3><code class="id">ball_half</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>ball_half</code> via <code>BallHalfNode</code> / <code>BallHalfCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-boost_pickups" data-search="boost pickup boost_pickups other definition pending.">
+<div class="head"><h3>Boost Pickup</h3><code class="id">boost_pickups</code><span class="badge">Other</span><span class="badge">hidden from review</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>boost</code> via <code>BoostNode</code> / <code>BoostCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-boost_respawn" data-search="respawn boost_respawn other definition pending.">
+<div class="head"><h3>Respawn</h3><code class="id">boost_respawn</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>boost</code> via <code>BoostNode</code> / <code>BoostCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-bump" data-search="bump bump other definition pending.">
+<div class="head"><h3>Bump</h3><code class="id">bump</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>bump</code> via <code>BumpNode</code> / <code>BumpCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-demolition" data-search="demolition demolition other definition pending.">
+<div class="head"><h3>Demolition</h3><code class="id">demolition</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>demo</code> via <code>DemoNode</code> / <code>DemoCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-fifty_fifty" data-search="50/50 fifty_fifty other a contested ball interaction involving touches or pressure from both teams in a short window.">
+<div class="head"><h3>50/50</h3><code class="id">fifty_fifty</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A contested ball interaction involving touches or pressure from both teams in a short window.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start an active 50/50 when a frame contains touches from both teams, including kickoff-specific tracking.</li>
+<li>Continue the contest for short follow-up touch windows while either involved team remains in contact.</li>
+<li>Resolve after a delay once ball movement, possession state, or max duration gives a winner, possession outcome, or neutral result.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>fifty_fifty</code> via <code>FiftyFiftyNode</code> / <code>FiftyFiftyCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-movement" data-search="movement movement other definition pending.">
+<div class="head"><h3>Movement</h3><code class="id">movement</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>movement</code> via <code>MovementNode</code> / <code>MovementCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-player_possession" data-search="player possession player_possession other a contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity.">
+<div class="head"><h3>Player Possession</h3><code class="id">player_possession</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Follow the shared possession tracker&#39;s controlling player and open a span when a player establishes control.</li>
+<li>Bridge contested or pending-turnover interruptions shorter than the merge gap when the same player re-establishes control, excluding the gap from possessed duration.</li>
+<li>Accumulate distinct touches (with aerial/wall classification), signed ball travel toward the opponent goal, and per-frame carry/air-dribble samples while the span is active.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>player_possession</code> via <code>PlayerPossessionNode</code> / <code>PlayerPossessionCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-possession" data-search="possession possession other definition pending.">
+<div class="head"><h3>Possession</h3><code class="id">possession</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>possession</code> via <code>PossessionNode</code> / <code>PossessionCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-rush" data-search="rush rush other a quick possession transition where the attacking team has numbers moving out of its defensive half.">
+<div class="head"><h3>Rush</h3><code class="id">rush</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A quick possession transition where the attacking team has numbers moving out of its defensive half.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start from a possession change when the ball is still in the new attacking team&#39;s defensive half.</li>
+<li>Count non-demoed attackers near or ahead of the ball and defenders between the ball and their own goal.</li>
+<li>Emit once the new attacking team retains possession long enough with at least two attackers and at least one defender in the rush shape.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>rush</code> via <code>RushNode</code> / <code>RushCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-territorial_pressure" data-search="territorial pressure territorial_pressure other definition pending.">
+<div class="head"><h3>Territorial Pressure</h3><code class="id">territorial_pressure</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>territorial_pressure</code> via <code>TerritorialPressureNode</code> / <code>TerritorialPressureCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-touch" data-search="touch touch other a classified ball touch with strength kind, surface/height context, and an inferred intention.">
+<div class="head"><h3>Touch</h3><code class="id">touch</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A classified ball touch with strength kind, surface/height context, and an inferred intention.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Classify each touch&#39;s strength kind (control, medium hit, hard hit) from the ball speed change it produces.</li>
+<li>Record surface, height band, and dodge context for the touching player at contact time.</li>
+<li>Resolve a single mutually-exclusive intention by precedence: replay-confirmed saves and shots first, then contested challenges, then geometric save/shot trajectory projections, then clears out of the defensive third, then passes led toward a teammate, falling back to neutral.</li>
+<li>Retroactively upgrade pass/neutral touches to a control intention by outcome: the toucher stayed close to the ball while matching its velocity for most of a short follow window, or earned the follow-up touch themselves.</li>
+<li>Mark a touch as a first touch when it starts a new reception: the previous global touch was by a different player or far enough in the past.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>touch</code> via <code>TouchNode</code> / <code>TouchCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-whiff" data-search="whiff whiff other a committed attempt near the ball that does not result in that player touching it.">
+<div class="head"><h3>Whiff</h3><code class="id">whiff</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A committed attempt near the ball that does not result in that player touching it.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start candidates when a player gets within hitbox distance of the ball while moving or dodging toward it with sufficient alignment and closing speed.</li>
+<li>Track the closest approach while the candidate remains near the ball.</li>
+<li>Resolve as a whiff when the player exits the candidate window without touching, or as beaten-to-ball when an opponent touches first.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>whiff</code> via <code>WhiffNode</code> / <code>WhiffCalculator</code></li>
+</ul>
+</div>
+</div>
+<div class="cat-group" data-group><div class="cat-head">Positioning</div>
+<div class="event" id="event-ball_depth" data-search="ball depth ball_depth positioning definition pending.">
+<div class="head"><h3>Ball Depth</h3><code class="id">ball_depth</code><span class="badge">Positioning</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>positioning</code> via <code>PositioningNode</code> / <code>PositioningCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-ball_proximity" data-search="ball proximity ball_proximity positioning definition pending.">
+<div class="head"><h3>Ball Proximity</h3><code class="id">ball_proximity</code><span class="badge">Positioning</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>positioning</code> via <code>PositioningNode</code> / <code>PositioningCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-depth_role" data-search="depth role depth_role positioning definition pending.">
+<div class="head"><h3>Depth Role</h3><code class="id">depth_role</code><span class="badge">Positioning</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>positioning</code> via <code>PositioningNode</code> / <code>PositioningCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-field_half" data-search="field half field_half positioning definition pending.">
+<div class="head"><h3>Field Half</h3><code class="id">field_half</code><span class="badge">Positioning</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>positioning</code> via <code>PositioningNode</code> / <code>PositioningCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-field_third" data-search="field third field_third positioning definition pending.">
+<div class="head"><h3>Field Third</h3><code class="id">field_third</code><span class="badge">Positioning</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>positioning</code> via <code>PositioningNode</code> / <code>PositioningCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-first_man_change" data-search="first-man change first_man_change positioning definition pending.">
+<div class="head"><h3>First-Man Change</h3><code class="id">first_man_change</code><span class="badge">Positioning</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>rotation</code> via <code>RotationNode</code> / <code>RotationCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-player_activity" data-search="player activity player_activity positioning definition pending.">
+<div class="head"><h3>Player Activity</h3><code class="id">player_activity</code><span class="badge">Positioning</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>positioning</code> via <code>PositioningNode</code> / <code>PositioningCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-rotation_role" data-search="rotation role rotation_role positioning definition pending.">
+<div class="head"><h3>Rotation Role</h3><code class="id">rotation_role</code><span class="badge">Positioning</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>rotation</code> via <code>RotationNode</code> / <code>RotationCalculator</code></li>
+</ul>
+</div>
+</div>
+<h2 id="goal-tags">Goal Tags</h2>
+<div class="event" id="goal-aerial_goal" data-search="aerial goal aerial_goal a goal whose scorer last touched the ball while it was high in the air.">
+<div class="head"><h3>Aerial Goal</h3><code class="id">aerial_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal whose scorer last touched the ball while it was high in the air.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Inspect each goal context and its scorer-last-touch evidence.</li>
+<li>Require the last-touch ball height to meet the aerial-goal threshold.</li>
+<li>Attach goal-context and last-touch evidence to the goal tag metadata.</li>
+</ul>
+</div>
+<div class="event" id="goal-high_aerial_goal" data-search="high aerial goal high_aerial_goal a stricter aerial-goal tag for goals scored from a higher last-touch ball height.">
+<div class="head"><h3>High Aerial Goal</h3><code class="id">high_aerial_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A stricter aerial-goal tag for goals scored from a higher last-touch ball height.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Inspect each goal context and its scorer-last-touch evidence.</li>
+<li>Require the last-touch ball height to meet the high-aerial threshold.</li>
+<li>Allow the regular aerial-goal tag to also apply when both thresholds are met.</li>
+</ul>
+</div>
+<div class="event" id="goal-long_distance_goal" data-search="long-distance goal long_distance_goal a goal where the scorer&#39;s last touch started from deep enough in the attacking team&#39;s half-space.">
+<div class="head"><h3>Long-Distance Goal</h3><code class="id">long_distance_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal where the scorer&#39;s last touch started from deep enough in the attacking team&#39;s half-space.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Use the scorer-last-touch ball position from goal context.</li>
+<li>Normalize field direction by scoring team and compare the touch y-position to the long-distance threshold.</li>
+<li>Attach goal-context and last-touch evidence to the goal tag metadata.</li>
+</ul>
+</div>
+<div class="event" id="goal-own_half_goal" data-search="own-half goal own_half_goal a long-distance goal where the scorer&#39;s last touch came from their own half and close enough in time to the goal.">
+<div class="head"><h3>Own-Half Goal</h3><code class="id">own_half_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A long-distance goal where the scorer&#39;s last touch came from their own half and close enough in time to the goal.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Use the scorer-last-touch ball position and time from goal context.</li>
+<li>Require the touch to be in the scoring team&#39;s own half and within the own-half touch-to-goal window.</li>
+<li>Allow the long-distance goal tag to also apply when both distance thresholds are met.</li>
+</ul>
+</div>
+<div class="event" id="goal-empty_net_goal" data-search="empty net goal empty_net_goal a goal where defenders are judged too far or too poorly positioned to cover the net.">
+<div class="head"><h3>Empty Net Goal</h3><code class="id">empty_net_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal where defenders are judged too far or too poorly positioned to cover the net.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Inspect defending-player positions in the goal context.</li>
+<li>Compare defender depth and distance against the empty-net thresholds.</li>
+<li>Avoid tagging very deep attacking touches as empty nets when the touch position is outside the configured range.</li>
+</ul>
+</div>
+<div class="event" id="goal-counter_attack_goal" data-search="counter-attack goal counter_attack_goal a goal whose buildup was classified as a counterattack.">
+<div class="head"><h3>Counter-Attack Goal</h3><code class="id">counter_attack_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal whose buildup was classified as a counterattack.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Use the goal-buildup classification computed in goal context.</li>
+<li>Tag goals whose buildup kind is counterattack.</li>
+<li>Attach goal-buildup evidence to the goal tag metadata.</li>
+</ul>
+</div>
+<div class="event" id="goal-sustained_pressure_goal" data-search="sustained pressure goal sustained_pressure_goal a goal whose buildup was classified as sustained offensive pressure.">
+<div class="head"><h3>Sustained Pressure Goal</h3><code class="id">sustained_pressure_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal whose buildup was classified as sustained offensive pressure.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Use the goal-buildup classification computed in goal context.</li>
+<li>Tag goals whose buildup kind is sustained pressure.</li>
+<li>Attach goal-buildup evidence to the goal tag metadata.</li>
+</ul>
+</div>
+<div class="event" id="goal-flick_goal" data-search="flick goal flick_goal a goal linked to a recent flick event.">
+<div class="head"><h3>Flick Goal</h3><code class="id">flick_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal linked to a recent flick event.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Compare recent flick events against each goal&#39;s scorer-last-touch context.</li>
+<li>Require the flick to fall within the configured event-to-goal window.</li>
+<li>Prefer by-scorer evidence when the flick player matches the scorer&#39;s last touch.</li>
+</ul>
+</div>
+<div class="event" id="goal-ceiling_shot_goal" data-search="ceiling-shot goal ceiling_shot_goal a goal linked to a recent ceiling-shot event.">
+<div class="head"><h3>Ceiling-Shot Goal</h3><code class="id">ceiling_shot_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal linked to a recent ceiling-shot event.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Compare recent ceiling-shot events against each goal&#39;s scorer-last-touch context.</li>
+<li>Require the ceiling shot to fall within the configured event-to-goal window.</li>
+<li>Attach a related ceiling-shot event reference and ceiling-shot evidence to the goal tag metadata.</li>
+</ul>
+</div>
+<div class="event" id="goal-double_tap_goal" data-search="double-tap goal double_tap_goal a goal linked to a recent double-tap event.">
+<div class="head"><h3>Double-Tap Goal</h3><code class="id">double_tap_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal linked to a recent double-tap event.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Compare recent double-tap events against each goal&#39;s scorer-last-touch context.</li>
+<li>Require the double tap to fall within the configured event-to-goal window.</li>
+<li>Attach a related-event reference and mechanic evidence to the goal tag metadata.</li>
+</ul>
+</div>
+<div class="event" id="goal-one_timer_goal" data-search="one-timer goal one_timer_goal a goal linked to a recent one-timer event.">
+<div class="head"><h3>One-Timer Goal</h3><code class="id">one_timer_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal linked to a recent one-timer event.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Compare recent one-timer events against each goal&#39;s scorer-last-touch context.</li>
+<li>Require the one timer to fall within the configured event-to-goal window.</li>
+<li>Prefer by-scorer evidence when the one-timer receiver matches the scorer&#39;s last touch.</li>
+</ul>
+</div>
+<div class="event" id="goal-passing_goal" data-search="passing goal passing_goal a goal where a completed pass is linked to the scoring touch.">
+<div class="head"><h3>Passing Goal</h3><code class="id">passing_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal where a completed pass is linked to the scoring touch.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Compare pass events against each goal&#39;s scorer-last-touch context.</li>
+<li>Require the pass receiver to match the scorer&#39;s last touch within the pass-to-goal window.</li>
+<li>Attach a related pass-event reference and pass evidence to the goal tag metadata.</li>
+</ul>
+</div>
+<div class="event" id="goal-air_dribble_goal" data-search="air-dribble goal air_dribble_goal a goal linked to an air-dribble ball-carry sequence that reaches the scoring touch.">
+<div class="head"><h3>Air-Dribble Goal</h3><code class="id">air_dribble_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal linked to an air-dribble ball-carry sequence that reaches the scoring touch.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Inspect completed ball-carry events whose kind is air dribble.</li>
+<li>Match air-dribble sequences to goals by timing and scorer-last-touch context.</li>
+<li>Attach a related ball-carry event reference and air-dribble evidence to the goal tag metadata.</li>
+</ul>
+</div>
+<div class="event" id="goal-flip_reset_goal" data-search="flip-reset goal flip_reset_goal a goal linked to a recent on-ball dodge reset or flip-reset event.">
+<div class="head"><h3>Flip-Reset Goal</h3><code class="id">flip_reset_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal linked to a recent on-ball dodge reset or flip-reset event.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Compare reset-related mechanic events against each goal&#39;s scorer-last-touch context.</li>
+<li>Require the reset evidence to fall within the configured event-to-goal window.</li>
+<li>Prefer by-scorer evidence when the reset player matches the scorer&#39;s last touch.</li>
+</ul>
+</div>
+<div class="event" id="goal-flip_into_ball_goal" data-search="flip-into-ball goal flip_into_ball_goal a goal where the scorer flipped (dodged) into the ball on the scoring touch.">
+<div class="head"><h3>Flip-Into-Ball Goal</h3><code class="id">flip_into_ball_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal where the scorer flipped (dodged) into the ball on the scoring touch.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Match the scorer&#39;s last touch to its touch-classification event by touch id (player and frame for data predating touch ids).</li>
+<li>Require the scoring touch&#39;s dodge state to be active and the touch to fall within the touch-to-goal window.</li>
+<li>Limitation: the dodge state covers any active dodge overlapping the touch, so incidental flips that happen to contact the ball can also qualify; dodge direction toward the ball is not yet verified.</li>
+</ul>
+</div>
+<div class="event" id="goal-bump_goal" data-search="bump goal bump_goal a goal linked to a recent scoring-team bump on an opponent.">
+<div class="head"><h3>Bump Goal</h3><code class="id">bump_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal linked to a recent scoring-team bump on an opponent.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Compare non-team bump events against each goal&#39;s timing and scoring team.</li>
+<li>Require the bump initiator to be on the scoring team and within the configured event-to-goal window.</li>
+<li>Attach a related bump-event reference and bump evidence, even when the initiator is not the scorer.</li>
+</ul>
+</div>
+<div class="event" id="goal-demo_goal" data-search="demo goal demo_goal a goal linked to a recent scoring-team demolition.">
+<div class="head"><h3>Demo Goal</h3><code class="id">demo_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal linked to a recent scoring-team demolition.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Compare demolition kill events against each goal&#39;s timing and scoring team.</li>
+<li>Require the demo attacker to be on the scoring team and within the configured event-to-goal window.</li>
+<li>Attach a related demo-event reference and demo evidence, even when the attacker is not the scorer.</li>
+</ul>
+</div>
+<div class="event" id="goal-half_volley_goal" data-search="half-volley goal half_volley_goal a goal where the scorer&#39;s last touch matches a recent half-volley candidate.">
+<div class="head"><h3>Half-Volley Goal</h3><code class="id">half_volley_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal where the scorer&#39;s last touch matches a recent half-volley candidate.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Compare half-volley events against each goal&#39;s scorer-last-touch context.</li>
+<li>Require the half-volley touch to be close enough to the goal and sufficiently aligned toward goal.</li>
+<li>Attach a related half-volley event reference and half-volley evidence to the goal tag metadata.</li>
+</ul>
+</div>
+<div class="event" id="goal-kickoff_goal" data-search="kickoff goal kickoff_goal a goal flowing directly from the kickoff exchange.">
+<div class="head"><h3>Kickoff Goal</h3><code class="id">kickoff_goal</code><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A goal flowing directly from the kickoff exchange.</p>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Use the kickoff calculator&#39;s goal attribution as the source of truth.</li>
+<li>Require the goal to land within the kickoff-goal timing window of the first touch.</li>
+<li>Reject goals where the conceding team settled possession or the play reset through the scoring team&#39;s own half.</li>
+<li>Attach goal-context evidence so the tag appears with the goal label.</li>
+</ul>
+</div>
+</div>
+<script>
+const search = document.getElementById('search');
+const rows = Array.from(document.querySelectorAll('[data-search]'));
+const groups = Array.from(document.querySelectorAll('[data-group]'));
+function applyFilter() {
+  const q = search.value.trim().toLowerCase();
+  for (const el of rows) {
+    const hit = !q || el.getAttribute('data-search').includes(q);
+    el.style.display = hit ? '' : 'none';
+  }
+  for (const g of groups) {
+    const anyVisible = Array.from(g.querySelectorAll('[data-search]'))
+      .some(el => el.style.display !== 'none');
+    g.style.display = anyVisible ? '' : 'none';
+  }
+}
+search.addEventListener('input', applyFilter);
+</script>
+</body>
+</html>
