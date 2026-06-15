@@ -26,6 +26,21 @@ enum SampleMode {
     Timeline,
 }
 
+/// Map a stats-module name to the analysis node that provides its state.
+///
+/// Most modules share their providing node's name. The exceptions are modules
+/// that are a second view onto another node's calculator: `core` is served by
+/// the `match_stats` node, and `air_dribble` by the `ball_carry` node. This is
+/// the only place that translation lives — there is no global node-name alias
+/// table.
+fn stats_module_analysis_node_name(module_name: &str) -> &str {
+    match module_name {
+        "core" => "match_stats",
+        "air_dribble" => "ball_carry",
+        other => other,
+    }
+}
+
 struct BuiltinModuleSelection {
     module_names: Vec<&'static str>,
 }
@@ -68,7 +83,11 @@ impl BuiltinModuleSelection {
         if self.module_names == builtin_stats_module_names() {
             return Ok(build_legacy_timeline_graph());
         }
-        let mut node_names = self.module_names.clone();
+        let mut node_names: Vec<&str> = self
+            .module_names
+            .iter()
+            .map(|module_name| stats_module_analysis_node_name(module_name))
+            .collect();
         node_names.push("stats_projection");
         graph_with_builtin_analysis_nodes(node_names)
     }
@@ -650,3 +669,7 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "collector_tests.rs"]
+mod tests;

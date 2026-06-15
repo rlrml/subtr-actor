@@ -4,7 +4,6 @@ import type { BoostPickupFilterController } from "./boostPickupFilters.ts";
 import type { EventTimelineSource } from "./eventTimelineSources.ts";
 import type { ModuleCapabilityKind } from "./moduleControls.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
-import { getMechanicKinds, mechanicKindToModuleId } from "./timelineMarkers.ts";
 
 export interface ActiveModulesRuntimeOptions {
   readonly modules: readonly StatModule[];
@@ -97,7 +96,6 @@ export class ActiveModulesRuntime {
     this.activeTimelineEventSourceIds = new Set(timelineEvents);
     this.activeTimelineRangeModuleIds = new Set(timelineRanges);
     this.activeMechanicTimelineKinds = new Set(mechanics);
-    this.migrateMechanicBackedTimelineEventSelections();
     this.activeRenderEffectModuleIds = new Set(renderEffects);
     void boostPads;
   }
@@ -182,16 +180,6 @@ export class ActiveModulesRuntime {
     this.syncTimelineRanges();
     this.options.renderTimelineEventCount();
     this.options.requestConfigSync();
-  }
-
-  migrateMechanicBackedTimelineEventSelections(): void {
-    const ctx = this.options.getContext();
-    for (const kind of getMechanicKinds(ctx?.statsTimeline ?? null)) {
-      const moduleId = mechanicKindToModuleId(kind);
-      if (this.activeTimelineEventSourceIds.delete(moduleId)) {
-        this.activeMechanicTimelineKinds.add(kind);
-      }
-    }
   }
 
   clearTimelineEventSources(): void {

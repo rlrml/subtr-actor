@@ -2,10 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ReplayModel } from "@rlrml/player";
-import {
-  STATS_EVENT_STREAM_COUNT_TYPES,
-  STATS_MECHANIC_EVENT_COUNT_TYPES,
-} from "./eventCountDerivation.ts";
+import type { FlickEvent } from "./generated/FlickEvent.ts";
+import { STATS_EVENT_STREAM_COUNT_TYPES } from "./eventCountDerivation.ts";
 import type { StatModuleContext } from "./statModules.ts";
 import {
   buildEventPlaylistItems,
@@ -13,7 +11,8 @@ import {
   getEventPlaylistSources,
   getEventTimelineSources,
 } from "./eventTimelineSources.ts";
-import { createStatsTimeline } from "./testStatsTimeline.ts";
+import { EVENT_TYPE_TIMELINE_KINDS } from "./timelineMarkers.ts";
+import { createLegacyStatsTimeline, createStatsTimeline } from "./testStatsTimeline.ts";
 
 function createSourceTestContext(): {
   ctx: StatModuleContext;
@@ -61,11 +60,15 @@ test("event timeline sources include empty canonical stats streams", () => {
     assert.ok(sourceIds.has(`stats-stream:${streamId}`), `missing stats stream ${streamId}`);
   }
 
-  for (const mechanicKind of STATS_MECHANIC_EVENT_COUNT_TYPES.filter(
-    (kind) => kind !== "wavedash",
-  )) {
+  for (const mechanicKind of EVENT_TYPE_TIMELINE_KINDS) {
     assert.ok(sourceIds.has(`mechanic:${mechanicKind}`), `missing mechanic ${mechanicKind}`);
   }
+
+  // air_dribble and flip_reset exist only as goal tags (no standalone events),
+  // and wavedash is owned by its stat module, so none get an Event-types lane.
+  assert.ok(!sourceIds.has("mechanic:air_dribble"));
+  assert.ok(!sourceIds.has("mechanic:flip_reset"));
+  assert.ok(!sourceIds.has("mechanic:wavedash"));
 
   assert.equal(
     streamSources.every((source) => source.count === 0),
@@ -86,6 +89,80 @@ test("event playlist filters include empty canonical stats streams", () => {
     playlistSources.find((source) => source.id === "stats-stream:player_activity")?.events.length,
     0,
   );
+});
+
+test("typed mechanic payloads populate their Event-types lane", () => {
+  const replay = {
+    frames: Array.from({ length: 4 }, (_, frame) => ({ time: frame })),
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createLegacyStatsTimeline({
+    flick_events: [
+      {
+        time: 2,
+        frame: 2,
+        player: { Steam: "blue-id" },
+        is_team_0: true,
+        kind: "other",
+      } as unknown as FlickEvent,
+    ],
+  });
+  const ctx = { replay, statsTimeline } as StatModuleContext;
+
+  const flickSource = getTestTimelineSources(ctx).find((source) => source.id === "mechanic:flick");
+  assert.ok(flickSource, "mechanic:flick lane should exist");
+  assert.equal(flickSource.count, 1);
+  assert.equal(flickSource.buildTimelineEvents().length, 1);
+  assert.equal(flickSource.buildTimelineEvents()[0]?.frame, 2);
+});
+
+test("per-player span streams fan out into one lane per player", () => {
+  const replay = {
+    frames: Array.from({ length: 8 }, (_, frame) => ({ time: frame })),
+    players: [
+      { id: "Steam:blue-id", name: "Blue" },
+      { id: "Steam:orange-id", name: "Orange" },
+    ],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      player_activity: [
+        {
+          time: 1,
+          frame: 1,
+          end_time: 3,
+          end_frame: 3,
+          duration: 2,
+          player: { Steam: "blue-id" },
+          is_team_0: true,
+          state: "tracked",
+        },
+        {
+          time: 2,
+          frame: 2,
+          end_time: 5,
+          end_frame: 5,
+          duration: 3,
+          player: { Steam: "orange-id" },
+          is_team_0: false,
+          state: "tracked",
+        },
+      ],
+    },
+  });
+  const ctx = { replay, statsTimeline } as StatModuleContext;
+
+  const source = getTestTimelineSources(ctx).find(
+    (candidate) => candidate.id === "stats-stream:player_activity",
+  );
+  assert.ok(source, "player_activity stream source should exist");
+  const lanes = new Set((source.buildTimelineRanges?.() ?? []).map((range) => range.lane));
+  assert.deepEqual([...lanes].sort(), [
+    "stats-stream:player_activity:player:Steam:blue-id",
+    "stats-stream:player_activity:player:Steam:orange-id",
+  ]);
 });
 
 test("event playlist sources include generic stats event streams such as positioning activity", () => {
@@ -233,8 +310,8 @@ test("controlled play timeline source renders spans as timeline ranges", () => {
       id: "stats-stream:controlled_play:5:12:0",
       startTime: 0.55,
       endTime: 1.25,
-      lane: "stats-stream:controlled_play",
-      laneLabel: "Controlled Play",
+      lane: "stats-stream:controlled_play:team:0",
+      laneLabel: "Blue controlled play",
       label: "Blue controlled play",
       shortLabel: "CP",
       isTeamZero: true,
@@ -357,8 +434,8 @@ test("span-based stats event streams build ranges instead of timeline markers", 
       id: "stats-stream:territorial_pressure:1:5:0",
       startTime: 1,
       endTime: 5,
-      lane: "stats-stream:territorial_pressure",
-      laneLabel: "Territorial Pressure",
+      lane: "stats-stream:territorial_pressure:team:1",
+      laneLabel: "Orange territorial pressure",
       label: "Orange territorial pressure",
       shortLabel: "TP",
       isTeamZero: false,

@@ -189,14 +189,12 @@ pub(super) fn bump_event_matches_goal(event: &BumpEvent, goal: &GoalContextEvent
         && event.frame <= goal.frame
 }
 
-pub(super) fn demo_event_matches_goal(event: &TimelineEvent, goal: &GoalContextEvent) -> bool {
+pub(super) fn demo_event_matches_goal(event: &DemolitionEvent, goal: &GoalContextEvent) -> bool {
     const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
 
-    event.kind == TimelineEventKind::Kill
-        && event.is_team_0 == Some(goal.scoring_team_is_team_0)
+    event.attacker_is_team_0 == Some(goal.scoring_team_is_team_0)
         && event.time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
-        && event.frame.is_some_and(|frame| frame <= goal.frame)
-        && event.player_id.is_some()
+        && event.frame <= goal.frame
 }
 
 pub(super) fn position_to_vec(position: GoalContextPosition) -> glam::Vec3 {
@@ -322,13 +320,13 @@ pub(super) fn bump_evidence(event: &BumpEvent) -> GoalTagEvidence {
     }
 }
 
-pub(super) fn demo_evidence(event: &TimelineEvent) -> GoalTagEvidence {
+pub(super) fn demo_evidence(event: &DemolitionEvent) -> GoalTagEvidence {
     GoalTagEvidence {
         kind: GoalTagEvidenceKind::Demo,
         time: event.time,
-        frame: event.frame.unwrap_or_default(),
-        player: event.player_id.clone(),
-        player_position: event.player_position.map(|position| GoalContextPosition {
+        frame: event.frame,
+        player: Some(event.attacker.clone()),
+        player_position: event.attacker_position.map(|position| GoalContextPosition {
             x: position[0],
             y: position[1],
             z: position[2],

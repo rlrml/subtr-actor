@@ -354,17 +354,12 @@ fn assert_demo_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events: Vec<_> = timeline_payloads_by_stream(timeline, "timeline", |payload| match payload {
-        EventPayload::Timeline(event) => Some(event),
-        _ => None,
-    })
-        .into_iter()
-        .filter(|event| {
-            matches!(
-                event.kind,
-                TimelineEventKind::Kill | TimelineEventKind::Death
-            )
+    let mut events: Vec<_> =
+        timeline_payloads_by_stream(timeline, "demolition", |payload| match payload {
+            EventPayload::Demolition(event) => Some(event),
+            _ => None,
         })
+        .into_iter()
         .collect();
     events.sort_by(|left, right| left.time.total_cmp(&right.time));
 
@@ -376,25 +371,19 @@ fn assert_demo_events_reconstruct_serialized_partial_sums(
     for frame in &timeline.frames {
         while event_index < events.len() && events[event_index].time <= frame.time {
             let event = &events[event_index];
-            if let Some(player_id) = event.player_id.as_ref() {
-                match event.kind {
-                    TimelineEventKind::Kill => {
-                        players
-                            .entry(player_id.clone())
-                            .or_default()
-                            .demos_inflicted += 1;
-                        match event.is_team_0 {
-                            Some(true) => team_zero.demos_inflicted += 1,
-                            Some(false) => team_one.demos_inflicted += 1,
-                            None => {}
-                        }
-                    }
-                    TimelineEventKind::Death => {
-                        players.entry(player_id.clone()).or_default().demos_taken += 1;
-                    }
-                    _ => {}
-                }
+            players
+                .entry(event.attacker.clone())
+                .or_default()
+                .demos_inflicted += 1;
+            match event.attacker_is_team_0 {
+                Some(true) => team_zero.demos_inflicted += 1,
+                Some(false) => team_one.demos_inflicted += 1,
+                None => {}
             }
+            players
+                .entry(event.victim.clone())
+                .or_default()
+                .demos_taken += 1;
             event_index += 1;
         }
 

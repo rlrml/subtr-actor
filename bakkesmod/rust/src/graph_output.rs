@@ -84,11 +84,6 @@ pub(crate) fn callable_analysis_node_names_for_graph(graph: &AnalysisGraph) -> V
             .iter()
             .map(|name| (*name).to_owned()),
     );
-    names.extend(
-        builtin_analysis_node_aliases()
-            .iter()
-            .map(|alias| alias.alias.to_owned()),
-    );
     names.into_iter().collect()
 }
 

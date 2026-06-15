@@ -116,9 +116,10 @@ pub use gameplay_state::GameplayStateNode;
 #[allow(unused_imports)]
 pub use goal_tags::{
     AerialGoalNode, AirDribbleGoalNode, BumpGoalNode, CeilingShotGoalNode, CounterAttackGoalNode,
-    DemoGoalNode, EmptyNetGoalNode, FlickGoalNode, FlipIntoBallGoalNode, FlipResetGoalNode,
-    HalfVolleyGoalNode, HighAerialGoalNode, LongDistanceGoalNode, OneTimerGoalNode,
-    OwnHalfGoalNode, PassingGoalNode,
+    DemoGoalNode, DoubleTapGoalNode, EmptyNetGoalNode, FlickGoalNode, FlipIntoBallGoalNode,
+    FlipResetGoalNode, HalfVolleyGoalNode, HighAerialGoalNode, KickoffGoalNode,
+    LongDistanceGoalNode, OneTimerGoalNode, OwnHalfGoalNode, PassingGoalNode,
+    SustainedPressureGoalNode,
 };
 #[allow(unused_imports)]
 pub use half_flip::HalfFlipNode;

@@ -70,7 +70,7 @@ fn persistent_active_demo_samples_do_not_double_count() {
             .map(|stats| stats.demos_taken),
         Some(1)
     );
-    assert_eq!(calculator.timeline().len(), 2);
+    assert_eq!(calculator.events().len(), 1);
 
     calculator
         .update(&frame(13, 13.0), &players, &FrameEventsState::default())
@@ -93,5 +93,5 @@ fn persistent_active_demo_samples_do_not_double_count() {
             .map(|stats| stats.demos_inflicted),
         Some(2)
     );
-    assert_eq!(calculator.timeline().len(), 4);
+    assert_eq!(calculator.events().len(), 2);
 }

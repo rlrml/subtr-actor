@@ -174,7 +174,6 @@ impl StatsTimelineEventsNode {
         let bump = ctx.get::<BumpCalculator>()?;
 
         let mut timeline = match_stats.timeline().to_vec();
-        timeline.extend(demo.timeline().to_vec());
         timeline.sort_by(|left, right| left.time.total_cmp(&right.time));
         let goal_tag_assignments = combined_goal_tag_assignments(&[
             aerial_goal.events(),
@@ -236,6 +235,7 @@ impl StatsTimelineEventsNode {
                 touch,
                 boost,
                 bump,
+                demo,
                 flick,
                 musty_flick,
             ),
@@ -317,6 +317,7 @@ fn make_event(
             id: format!("{stream}:{frame_id}:{index}"),
             stream: stream.to_owned(),
             label: stats_timeline_event_label(stream),
+            scope: event_stream_scope(stream),
             timing,
             primary_player,
             secondary_player,
@@ -373,6 +374,7 @@ fn build_replay_events(
     touch: &TouchCalculator,
     boost: &BoostCalculator,
     bump: &BumpCalculator,
+    demo: &DemoCalculator,
     flick: &FlickCalculator,
     musty_flick: &MustyFlickCalculator,
 ) -> Vec<Event> {
@@ -1094,6 +1096,21 @@ fn build_replay_events(
         ));
     }
 
+    for (index, event) in demo.events().iter().enumerate() {
+        events.push(make_event(
+            "demolition",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::Demolition(event.clone()),
+            Some(event.attacker.clone()),
+            Some(event.victim.clone()),
+            event.attacker_is_team_0,
+            event.attacker_position,
+            None,
+            None,
+        ));
+    }
+
     for (index, event) in flick.events().iter().enumerate() {
         events.push(make_event(
             MECHANIC_FLICK,
@@ -1136,8 +1153,4 @@ fn build_replay_events(
             .then_with(|| left.meta.id.cmp(&right.meta.id))
     });
     events
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(StatsTimelineEventsNode::new())
 }

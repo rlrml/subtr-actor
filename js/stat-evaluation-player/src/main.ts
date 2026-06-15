@@ -263,10 +263,6 @@ function setupActiveModules(): void {
   activeModulesRuntime.setupActiveModules();
 }
 
-function migrateMechanicBackedTimelineEventSelections(): void {
-  activeModulesRuntime.migrateMechanicBackedTimelineEventSelections();
-}
-
 function teardownActiveModules(): void {
   activeModulesRuntime.teardownActiveModules();
 }
@@ -562,7 +558,6 @@ async function loadReplayBundleForDisplay(
     renderMechanicsTimelineControls,
     renderEventPlaylistWindow,
     renderModuleSettings,
-    migrateMechanicBackedTimelineEventSelections,
     syncBoostPadOverlayPlugin,
     setupActiveModules,
     renderSnapshot,

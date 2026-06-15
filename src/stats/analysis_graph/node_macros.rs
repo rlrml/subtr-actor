@@ -61,6 +61,10 @@ macro_rules! impl_analysis_node {
             }
         }
 
+        // Constructor used by `*_dependency()` helpers when this node is depended
+        // on. Nodes are otherwise instantiated by type through the registry, so a
+        // node with no dependents legitimately leaves this unused.
+        #[allow(dead_code)]
         pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
             Box::new($node::new())
         }
@@ -129,6 +133,10 @@ macro_rules! impl_analysis_node {
             }
         }
 
+        // Constructor used by `*_dependency()` helpers when this node is depended
+        // on. Nodes are otherwise instantiated by type through the registry, so a
+        // node with no dependents legitimately leaves this unused.
+        #[allow(dead_code)]
         pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
             Box::new($node::new())
         }
@@ -201,6 +209,10 @@ macro_rules! impl_analysis_node {
             }
         }
 
+        // Constructor used by `*_dependency()` helpers when this node is depended
+        // on. Nodes are otherwise instantiated by type through the registry, so a
+        // node with no dependents legitimately leaves this unused.
+        #[allow(dead_code)]
         pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
             Box::new($node::new())
         }

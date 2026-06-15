@@ -50,11 +50,8 @@ fn every_emitted_event_has_a_registered_definition() {
     }
 }
 
-fn canonical_builtin_analysis_node_name_set() -> HashSet<&'static str> {
-    builtin_analysis_node_names()
-        .iter()
-        .filter_map(|name| canonical_builtin_analysis_node_name(name))
-        .collect()
+fn builtin_analysis_node_name_set() -> HashSet<&'static str> {
+    builtin_analysis_node_names().iter().copied().collect()
 }
 
 #[test]
@@ -64,7 +61,7 @@ fn all_analysis_nodes_matches_builtin_registry() {
         .map(|node| node.name())
         .collect::<HashSet<_>>();
 
-    assert_eq!(node_names, canonical_builtin_analysis_node_name_set());
+    assert_eq!(node_names, builtin_analysis_node_name_set());
     assert!(node_names.contains("kickoff"));
 }
 
@@ -129,58 +126,29 @@ fn materialized_timeline_frame_state_is_terminal_export_only() {
 
 #[test]
 fn every_builtin_stats_module_is_graph_callable() {
+    // Drives the real module -> node mapping in the stats collector, which is the
+    // only place stats-module names (e.g. `core`, `air_dribble`) are translated to
+    // the analysis nodes that provide them.
     for module_name in builtin_stats_module_names() {
-        let mut graph = graph_with_builtin_analysis_nodes([*module_name])
-            .unwrap_or_else(|_| panic!("stats module should be graph-callable: {module_name}"));
-        graph
-            .resolve()
-            .unwrap_or_else(|_| panic!("stats module graph should resolve: {module_name}"));
+        crate::StatsCollector::try_only_modules([*module_name]).unwrap_or_else(|_| {
+            panic!("stats module should build an analysis graph: {module_name}")
+        });
     }
 }
 
 #[test]
-fn core_alias_and_match_stats_share_one_provider() {
-    assert!(
-        builtin_analysis_node_aliases()
-            .iter()
-            .any(|alias| alias.alias == "core" && alias.node_name == "match_stats")
-    );
-
-    let mut graph = graph_with_builtin_analysis_nodes(["core", "match_stats"])
-        .expect("core alias and match_stats should be accepted together");
+fn duplicate_node_requests_share_one_provider() {
+    let mut graph = graph_with_builtin_analysis_nodes(["ball_carry", "ball_carry"])
+        .expect("duplicate node requests should be accepted");
     graph
         .resolve()
-        .expect("core alias and match_stats should not duplicate providers");
-
-    let names = graph.node_names().collect::<Vec<_>>();
-    assert_eq!(
-        names.iter().filter(|name| **name == "match_stats").count(),
-        1
-    );
-    assert!(!names.contains(&"core"));
-}
-
-#[test]
-fn air_dribble_alias_and_ball_carry_share_one_provider() {
-    assert!(builtin_analysis_node_names().contains(&"air_dribble"));
-    assert!(
-        builtin_analysis_node_aliases()
-            .iter()
-            .any(|alias| alias.alias == "air_dribble" && alias.node_name == "ball_carry")
-    );
-
-    let mut graph = graph_with_builtin_analysis_nodes(["air_dribble", "ball_carry"])
-        .expect("air_dribble alias and ball_carry should be accepted together");
-    graph
-        .resolve()
-        .expect("air_dribble alias and ball_carry should not duplicate providers");
+        .expect("duplicate node requests should not duplicate providers");
 
     let names = graph.node_names().collect::<Vec<_>>();
     assert_eq!(
         names.iter().filter(|name| **name == "ball_carry").count(),
         1
     );
-    assert!(!names.contains(&"air_dribble"));
     assert!(graph.state::<BallCarryCalculator>().is_some());
 }
 
@@ -229,19 +197,6 @@ fn every_builtin_analysis_node_has_shared_json_output_on_real_replay() {
         assert!(
             !value.is_null(),
             "builtin analysis node should expose non-null JSON: {name}"
-        );
-    }
-    for alias in builtin_analysis_node_aliases() {
-        let value = builtin_analysis_node_json(alias.alias, &graph).unwrap_or_else(|_| {
-            panic!(
-                "builtin analysis node alias should serialize: {} -> {}",
-                alias.alias, alias.node_name
-            )
-        });
-        assert!(
-            !value.is_null(),
-            "builtin analysis node alias should expose non-null JSON: {}",
-            alias.alias
         );
     }
     let all_nodes = builtin_analysis_nodes_json(&graph)

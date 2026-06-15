@@ -360,6 +360,7 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "center",
         "controlled_play",
         "core_player_scoreboard",
+        "demolition",
         "dodge_reset",
         "double_tap",
         "event",

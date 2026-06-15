@@ -1,6 +1,6 @@
+import type { DemolitionEvent } from "./generated/DemolitionEvent.ts";
 import type { DemoPlayerStats } from "./generated/DemoPlayerStats.ts";
 import type { DemoTeamStats } from "./generated/DemoTeamStats.ts";
-import type { TimelineEvent } from "./generated/TimelineEvent.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
 import { statsEventPayloads } from "./statsTimeline.ts";
 
@@ -28,9 +28,8 @@ function defaultDemoTeamStats(): DemoTeamStats {
   };
 }
 
-function sortDemoTimelineEvents(events: readonly TimelineEvent[]): TimelineEvent[] {
+function sortDemolitionEvents(events: readonly DemolitionEvent[]): DemolitionEvent[] {
   return events
-    .filter((event) => event.kind === "Kill" || event.kind === "Death")
     .map((event, index) => ({ event, index }))
     .sort((left, right) => {
       if (left.event.time !== right.event.time) {
@@ -64,33 +63,34 @@ export function applyDemoEventDerivedStats(
 export function createDemoEventDerivedStatsAccumulator(timeline: MaterializedStatsTimeline): {
   applyFrame(frame: StatsFrame): void;
 } {
-  const events = sortDemoTimelineEvents(statsEventPayloads(timeline, "timeline"));
+  const events = sortDemolitionEvents(statsEventPayloads(timeline, "demolition"));
 
   let eventIndex = 0;
   const players = new Map<string, DemoPlayerStats>();
   const teamZero = defaultDemoTeamStats();
   const teamOne = defaultDemoTeamStats();
 
+  function playerStats(playerId: unknown): DemoPlayerStats {
+    const playerKey = remoteIdKey(playerId);
+    const stats = players.get(playerKey) ?? defaultDemoPlayerStats();
+    players.set(playerKey, stats);
+    return stats;
+  }
+
   return {
     applyFrame(frame: StatsFrame): void {
       while (eventIndex < events.length && events[eventIndex]!.time <= frame.time) {
-        const event = events[eventIndex] as TimelineEvent;
-        if (event.player_id != null) {
-          const playerKey = remoteIdKey(event.player_id);
-          const stats = players.get(playerKey) ?? defaultDemoPlayerStats();
-          players.set(playerKey, stats);
+        const event = events[eventIndex] as DemolitionEvent;
 
-          if (event.kind === "Kill") {
-            stats.demos_inflicted += 1;
-            if (event.is_team_0 === true) {
-              teamZero.demos_inflicted += 1;
-            } else if (event.is_team_0 === false) {
-              teamOne.demos_inflicted += 1;
-            }
-          } else if (event.kind === "Death") {
-            stats.demos_taken += 1;
-          }
+        playerStats(event.attacker).demos_inflicted += 1;
+        if (event.attacker_is_team_0 === true) {
+          teamZero.demos_inflicted += 1;
+        } else if (event.attacker_is_team_0 === false) {
+          teamOne.demos_inflicted += 1;
         }
+
+        playerStats(event.victim).demos_taken += 1;
+
         eventIndex += 1;
       }
 

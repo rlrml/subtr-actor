@@ -1,19 +1,13 @@
 import type { ReplayPlayerTrack, ReplayTimelineEvent, ReplayTimelineRange } from "@rlrml/player";
-import {
-  STATS_EVENT_STREAM_COUNT_TYPES,
-  STATS_MECHANIC_EVENT_COUNT_TYPES,
-} from "./eventCountDerivation.ts";
+import { STATS_EVENT_STREAM_COUNT_TYPES } from "./eventCountDerivation.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import type { Event } from "./statsTimeline.ts";
 import { statsEventEnvelopes } from "./statsTimeline.ts";
 import {
-  buildMechanicPlaylistEvents,
-  buildMechanicTimelineEvents,
+  EVENT_TYPE_TIMELINE_BUILDERS,
+  EVENT_TYPE_TIMELINE_KINDS,
   formatMechanicKind,
-  getMechanicKinds,
-  isVisibleMechanicKind,
 } from "./timelineMarkers.ts";
-import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
 
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_PREFIXES = ["stats-stream:"] as const;
@@ -42,20 +36,6 @@ const CURATED_STATS_EVENT_STREAM_IDS = new Set<string>([
   "powerslide",
   "touch",
   "bump",
-]);
-const SPAN_BASED_STATS_EVENT_STREAM_IDS = new Set<string>([
-  "possession",
-  "ball_half",
-  "territorial_pressure",
-  "controlled_play",
-  "player_activity",
-  "field_third",
-  "field_half",
-  "ball_depth",
-  "depth_role",
-  "ball_proximity",
-  "rotation_role",
-  "rush",
 ]);
 const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#3b82f6",
@@ -380,6 +360,19 @@ function buildGenericStatsEventTimelineRanges(
           ? `${teamLabel} ${streamLabel.toLowerCase()}`
           : streamLabel;
 
+      // The event's scope decides how the stream fans out into lanes: a
+      // per-player stream gets one lane per player, a per-team stream one lane
+      // per team, and a match-scoped stream stays a single merged row.
+      let lane = `stats-stream:${streamId}`;
+      let laneLabel = streamLabel;
+      if (event.meta.scope === "player" && playerId) {
+        lane = `stats-stream:${streamId}:player:${playerId}`;
+        laneLabel = playerName ? `${playerName} ${streamLabel.toLowerCase()}` : streamLabel;
+      } else if (event.meta.scope === "team" && isTeamZero != null) {
+        lane = `stats-stream:${streamId}:team:${isTeamZero ? "0" : "1"}`;
+        laneLabel = teamLabel ? `${teamLabel} ${streamLabel.toLowerCase()}` : streamLabel;
+      }
+
       return [
         {
           id: `stats-stream:${eventId}`,
@@ -388,8 +381,8 @@ function buildGenericStatsEventTimelineRanges(
             ctx.replay.frames[timing.startFrame ?? -1]?.time ?? timing.startTime,
             ctx.replay.frames[timing.endFrame ?? -1]?.time ?? timing.endTime,
           ),
-          lane: `stats-stream:${streamId}`,
-          laneLabel: streamLabel,
+          lane,
+          laneLabel,
           label,
           shortLabel: eventStreamShortLabel(streamId),
           isTeamZero,
@@ -423,7 +416,9 @@ function buildGenericStatsEventSources(
       return [];
     }
 
-    const isSpanBased = SPAN_BASED_STATS_EVENT_STREAM_IDS.has(streamId);
+    // Span-vs-moment is a structural fact carried by every envelope's timing,
+    // so derive it from the stream's events instead of a hand-maintained list.
+    const isSpanBased = events.some((event) => event.meta.timing.type === "span");
     const timelineRanges = isSpanBased
       ? buildGenericStatsEventTimelineRanges(ctx, streamId, events)
       : [];
@@ -454,13 +449,10 @@ function buildGenericStatsEventSources(
   });
 }
 
-function getEventTimelineMechanicKinds(ctx: StatModuleContext): string[] {
-  return [
-    ...new Set([
-      ...STATS_MECHANIC_EVENT_COUNT_TYPES.filter(isVisibleMechanicKind),
-      ...getMechanicKinds(ctx.statsTimeline),
-    ]),
-  ].sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
+function getEventTimelineMechanicKinds(): string[] {
+  return [...EVENT_TYPE_TIMELINE_KINDS].sort((left, right) =>
+    formatMechanicKind(left).localeCompare(formatMechanicKind(right)),
+  );
 }
 
 export function getEventTimelineSources({
@@ -552,11 +544,9 @@ export function getEventTimelineSources({
     ...buildGenericStatsEventSources(ctx, activeTimelineEventSourceIds, toggleEventSource),
   );
 
-  for (const kind of getEventTimelineMechanicKinds(ctx)) {
-    const timelineEvents = buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const playlistEvents = buildMechanicPlaylistEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const timelineRanges = buildMechanicTimelineRanges(ctx.statsTimeline, ctx.replay, [kind]);
-    const count = timelineEvents.length + timelineRanges.length;
+  for (const kind of getEventTimelineMechanicKinds()) {
+    const timelineEvents = EVENT_TYPE_TIMELINE_BUILDERS[kind]!(ctx.statsTimeline, ctx.replay);
+    const count = timelineEvents.length;
     sources.push({
       id: `mechanic:${kind}`,
       playlistId: `mechanic:${kind}`,
@@ -570,10 +560,7 @@ export function getEventTimelineSources({
         return timelineEvents;
       },
       buildPlaylistEvents() {
-        return playlistEvents;
-      },
-      buildTimelineRanges() {
-        return timelineRanges;
+        return timelineEvents;
       },
       setActive(enabled) {
         setMechanicTimelineKind(kind, enabled);

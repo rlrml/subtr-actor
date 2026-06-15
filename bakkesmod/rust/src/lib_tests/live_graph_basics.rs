@@ -353,13 +353,9 @@ fn live_graph_contains_every_shared_analysis_node() {
         );
     }
     for name in &builtin_names {
-        let live_name = builtin_analysis_node_aliases()
-            .iter()
-            .find_map(|alias| (alias.alias == *name).then_some(alias.node_name))
-            .unwrap_or(name);
         assert!(
-            live_names.contains(live_name),
-            "live graph should include every builtin analysis node or resolved alias: {name}"
+            live_names.contains(name),
+            "live graph should include every builtin analysis node: {name}"
         );
     }
     assert!(live_names.contains("stats_timeline_frame"));
@@ -776,7 +772,9 @@ fn exposes_live_graph_info_json() {
     assert!(builtin_names
         .iter()
         .any(|name| name == "continuous_ball_control"));
-    assert!(builtin_names.iter().any(|name| name == "air_dribble"));
+    // `air_dribble` is a stats module, not an analysis node; its node is `ball_carry`.
+    assert!(builtin_names.iter().any(|name| name == "ball_carry"));
+    assert!(!builtin_names.iter().any(|name| name == "air_dribble"));
     assert!(builtin_names.iter().any(|name| name == "frame_info"));
     assert!(builtin_names.iter().any(|name| name == "live_play"));
     assert!(builtin_names
@@ -785,15 +783,6 @@ fn exposes_live_graph_info_json() {
     assert!(builtin_names
         .iter()
         .any(|name| name == "stats_timeline_events"));
-    let builtin_aliases = value["builtin_analysis_node_aliases"]
-        .as_array()
-        .expect("builtin aliases should be an array");
-    assert!(builtin_aliases
-        .iter()
-        .any(|alias| alias["alias"] == "core" && alias["node_name"] == "match_stats"));
-    assert!(builtin_aliases
-        .iter()
-        .any(|alias| alias["alias"] == "air_dribble" && alias["node_name"] == "ball_carry"));
     let callable_names = value["callable_analysis_node_names"]
         .as_array()
         .expect("callable names should be an array");
@@ -805,10 +794,12 @@ fn exposes_live_graph_info_json() {
                 .to_owned()
         })
         .collect::<BTreeSet<_>>();
-    assert!(callable_names.iter().any(|name| name == "core"));
+    // `core` and `air_dribble` are stats-module names, not analysis nodes, so they
+    // are no longer callable as nodes; their providing nodes are.
     assert!(callable_names.iter().any(|name| name == "match_stats"));
-    assert!(callable_names.iter().any(|name| name == "air_dribble"));
     assert!(callable_names.iter().any(|name| name == "ball_carry"));
+    assert!(!callable_names.iter().any(|name| name == "core"));
+    assert!(!callable_names.iter().any(|name| name == "air_dribble"));
     assert!(callable_names
         .iter()
         .any(|name| name == "continuous_ball_control"));
@@ -912,13 +903,9 @@ fn exposes_live_graph_info_json() {
         "every resolved graph node reported by graph_info should be callable by name"
     );
     for builtin_name in builtin_analysis_node_names() {
-        let live_name = builtin_analysis_node_aliases()
-            .iter()
-            .find_map(|alias| (alias.alias == *builtin_name).then_some(alias.node_name))
-            .unwrap_or(builtin_name);
         assert!(
-            node_names.iter().any(|name| name == live_name),
-            "graph info should expose live graph node or resolved alias {builtin_name}"
+            node_names.iter().any(|name| name == builtin_name),
+            "graph info should expose live graph node {builtin_name}"
         );
     }
     assert!(node_names

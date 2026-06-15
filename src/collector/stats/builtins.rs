@@ -371,7 +371,7 @@ struct DemoStatsExport<'a> {
     team_zero: &'a DemoTeamStats,
     team_one: &'a DemoTeamStats,
     player_stats: Vec<PlayerStatsEntry<'a, DemoPlayerStats>>,
-    timeline: &'a [TimelineEvent],
+    demolitions: &'a [DemolitionEvent],
 }
 
 pub fn builtin_stats_module_names() -> &'static [&'static str] {
@@ -905,7 +905,7 @@ pub(crate) fn builtin_module_json(
                 team_zero: projection.demo.team_zero_stats(),
                 team_one: projection.demo.team_one_stats(),
                 player_stats: player_stats_entries(projection.demo.player_stats()),
-                timeline: calculator.timeline(),
+                demolitions: calculator.events(),
             })
         }
         _ => SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
@@ -1059,8 +1059,6 @@ pub fn builtin_analysis_node_json(
     node_name: &str,
     graph: &AnalysisGraph,
 ) -> SubtrActorResult<Value> {
-    let node_name = crate::stats::analysis_graph::canonical_builtin_analysis_node_name(node_name)
-        .unwrap_or(node_name);
     let value = match node_name {
         "core" | "match_stats" => builtin_module_json("core", graph)?,
         "stats_timeline_events" => serialize_to_json_value(
