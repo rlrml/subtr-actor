@@ -4,8 +4,8 @@
 measurements, and higher-level gameplay heuristics. This document tracks the
 current confidence level for the exported statistic identifiers.
 
-The identifier format below is `<domain>.<name>`, matching the exported
-`StatDescriptor` fields. Labeled variants use the same identifier plus labels.
+The identifier format below is `<domain>.<name>`. Labeled variants use the
+same identifier plus labels.
 This is not a formal accuracy benchmark; confidence is an implementation-status
 assessment based on source semantics, tests, manual replay inspection, and how
 much inference the stat requires.

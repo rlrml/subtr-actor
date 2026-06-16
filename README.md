@@ -60,8 +60,8 @@ dense numeric features for analytics and ML workflows.
 ## Stats and exports
 
 The `stats` module houses analysis calculators, graph nodes, stat
-event calculators, and the exported stat-field model built around
-`ExportedStat`.
+event calculators, and the labeled stat-aggregation types
+(`LabeledCounts`, `LabeledFloatSums`) consumed by the stats collectors.
 
 ## Examples
 
