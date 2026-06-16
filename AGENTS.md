@@ -14,9 +14,10 @@ The same core pipeline is exposed through Python and JavaScript bindings.
   `replay_data.rs` emits structured frame data, `ndarray/` builds numeric
   feature matrices, and `stats_timeline.rs` produces cumulative stat snapshots.
 - `src/stats/`: Higher-level stat extraction modules for exported replay
-  statistics. `reducers/` contains the per-frame stat reducers, `export/`
-  defines exported stat fields and module wiring, and `comparison/` holds
-  stat-comparison tooling.
+  statistics. `accumulators/` contains the per-stat accumulators,
+  `calculators/` and `analysis_graph/` define the stats DAG, and `labels.rs`
+  holds the labeled stat-aggregation types (`LabeledCounts`,
+  `LabeledFloatSums`).
 - `js/player/`: Reusable replay player library package. It handles replay
   loading, normalization, scene playback, camera APIs, timeline overlays, and
   plugin-based viewer extensions on top of the core WASM bindings.
@@ -36,8 +37,8 @@ The same core pipeline is exposed through Python and JavaScript bindings.
   [`docs/calculators-and-analysis-nodes.md`](./docs/calculators-and-analysis-nodes.md).
 - Most feature extraction work lands either in `src/collector/ndarray/`,
   `src/collector/replay_data.rs`, `src/collector/stats_timeline.rs`, or
-  `src/stats/export/`, depending on whether the output is numeric, structured,
-  cumulative-over-time, or report-oriented.
+  `src/stats/` (accumulators and the analysis DAG), depending on whether the
+  output is numeric, structured, cumulative-over-time, or stat-oriented.
 - Replay-player infrastructure work usually belongs in `js/player/`. Stats UI
   and stat-timeline visualization work usually belongs in
   `js/stat-evaluation-player/`.
