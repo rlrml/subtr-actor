@@ -80,6 +80,9 @@ pub enum GoalTagEventStream {
 pub enum GoalTagEvidenceKind {
     GoalContext,
     ScorerLastTouch,
+    /// A touch in the goal's leadup (not necessarily the scorer's last touch)
+    /// that satisfied a tag's criteria, e.g. the high-aerial build-up touch.
+    LeadupTouch,
     DefenderPosition,
     GoalBuildup,
     Flick,
@@ -221,11 +224,11 @@ pub const ALL_GOAL_TAG_DEFINITIONS: &[GoalTagDefinition] = &[
         GoalTagKind::HighAerialGoal,
         "high_aerial_goal",
         "High Aerial Goal",
-        "A stricter aerial-goal tag for goals scored from a higher last-touch ball height.",
+        "A goal whose scoring possession includes a touch taken from a high ball height, even when the finishing touch itself was lower.",
         &[
-            "Inspect each goal context and its scorer-last-touch evidence.",
-            "Require the last-touch ball height to meet the high-aerial threshold.",
-            "Allow the regular aerial-goal tag to also apply when both thresholds are met.",
+            "Scan the scoring team's touches within the possession that led to the goal (back to the last turnover or neutral loose ball).",
+            "Require at least one such touch to meet the high-aerial ball-height threshold.",
+            "Tag the goal from the highest qualifying touch, attaching it as leadup-touch evidence.",
         ],
     ),
     goal_tag_definition(
@@ -1005,14 +1008,33 @@ impl AerialGoalCalculator {
 }
 
 impl HighAerialGoalCalculator {
-    pub fn update(&mut self, match_stats: &MatchStatsCalculator) -> SubtrActorResult<()> {
-        self.events
-            .replace_all_assuming_append_only(self.tag_goals(match_stats.goal_context_events()));
+    pub fn update(
+        &mut self,
+        match_stats: &MatchStatsCalculator,
+        touch: &TouchCalculator,
+        possession: &PossessionCalculator,
+    ) -> SubtrActorResult<()> {
+        self.events.replace_all_assuming_append_only(self.tag_goals(
+            match_stats.goal_context_events(),
+            touch.events(),
+            &possession.projected_events(),
+        ));
         Ok(())
     }
 
-    fn tag_goals(&self, goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
-        tag_goals_by_height(goals, GoalTagKind::HighAerialGoal, self.config.min_ball_z)
+    fn tag_goals(
+        &self,
+        goals: &[GoalContextEvent],
+        touch_events: &[TouchClassificationEvent],
+        possession_events: &[PossessionEvent],
+    ) -> Vec<GoalTagAssignment> {
+        tag_goals_by_possession_touch_height(
+            goals,
+            touch_events,
+            possession_events,
+            GoalTagKind::HighAerialGoal,
+            self.config.min_ball_z,
+        )
     }
 }
 

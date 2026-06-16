@@ -1221,14 +1221,14 @@ ul.tight li { margin: .15rem 0; }
 <li>Attach goal-context and last-touch evidence to the goal tag metadata.</li>
 </ul>
 </div>
-<div class="event" id="goal-high_aerial_goal" data-search="high aerial goal high_aerial_goal a stricter aerial-goal tag for goals scored from a higher last-touch ball height.">
+<div class="event" id="goal-high_aerial_goal" data-search="high aerial goal high_aerial_goal a goal whose scoring possession includes a touch taken from a high ball height, even when the finishing touch itself was lower.">
 <div class="head"><h3>High Aerial Goal</h3><code class="id">high_aerial_goal</code><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A stricter aerial-goal tag for goals scored from a higher last-touch ball height.</p>
+<p class="summary">A goal whose scoring possession includes a touch taken from a high ball height, even when the finishing touch itself was lower.</p>
 <div class="section-label">Approach</div>
 <ul class="tight">
-<li>Inspect each goal context and its scorer-last-touch evidence.</li>
-<li>Require the last-touch ball height to meet the high-aerial threshold.</li>
-<li>Allow the regular aerial-goal tag to also apply when both thresholds are met.</li>
+<li>Scan the scoring team&#39;s touches within the possession that led to the goal (back to the last turnover or neutral loose ball).</li>
+<li>Require at least one such touch to meet the high-aerial ball-height threshold.</li>
+<li>Tag the goal from the highest qualifying touch, attaching it as leadup-touch evidence.</li>
 </ul>
 </div>
 <div class="event" id="goal-long_distance_goal" data-search="long-distance goal long_distance_goal a goal where the scorer&#39;s last touch started from deep enough in the attacking team&#39;s half-space.">

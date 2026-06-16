@@ -91,11 +91,6 @@ macro_rules! mechanic_goal_tag_node {
 
 goal_tag_node!(AerialGoalNode, AerialGoalCalculator, "aerial_goal");
 goal_tag_node!(
-    HighAerialGoalNode,
-    HighAerialGoalCalculator,
-    "high_aerial_goal"
-);
-goal_tag_node!(
     LongDistanceGoalNode,
     LongDistanceGoalCalculator,
     "long_distance_goal"
@@ -189,6 +184,52 @@ mechanic_goal_tag_node!(
     demo_dependency,
     DemoCalculator
 );
+
+pub struct HighAerialGoalNode {
+    calculator: HighAerialGoalCalculator,
+}
+
+impl HighAerialGoalNode {
+    pub fn new() -> Self {
+        Self {
+            calculator: HighAerialGoalCalculator::new(),
+        }
+    }
+}
+
+impl Default for HighAerialGoalNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AnalysisNode for HighAerialGoalNode {
+    type State = HighAerialGoalCalculator;
+
+    fn name(&self) -> &'static str {
+        "high_aerial_goal"
+    }
+
+    fn dependencies(&self) -> NodeDependencies {
+        vec![
+            match_stats_dependency(),
+            touch_dependency(),
+            possession_dependency(),
+        ]
+    }
+
+    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        self.calculator.update(
+            ctx.get::<MatchStatsCalculator>()?,
+            ctx.get::<TouchCalculator>()?,
+            ctx.get::<PossessionCalculator>()?,
+        )
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.calculator
+    }
+}
 
 pub struct HalfVolleyGoalNode {
     calculator: HalfVolleyGoalCalculator,
