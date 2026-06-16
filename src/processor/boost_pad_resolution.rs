@@ -1,9 +1,9 @@
-use crate::stats::calculators::standard_soccar_boost_pad_layout;
+use crate::boost_pad_locations::{
+    PadPositionEstimate, STANDARD_PAD_MATCH_RADIUS_BIG, STANDARD_PAD_MATCH_RADIUS_SMALL,
+    standard_soccar_boost_pad_layout,
+};
 use crate::*;
 use std::collections::{HashMap, HashSet};
-
-const STANDARD_PAD_MATCH_RADIUS_SMALL: f32 = 450.0;
-const STANDARD_PAD_MATCH_RADIUS_BIG: f32 = 1000.0;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct BoostPadResolutionState {
@@ -124,33 +124,5 @@ impl BoostPadResolutionState {
         };
 
         best_candidate(false).or_else(|| best_candidate(true))
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-struct PadPositionEstimate {
-    observations: Vec<glam::Vec3>,
-}
-
-impl PadPositionEstimate {
-    fn observe(&mut self, position: glam::Vec3) {
-        self.observations.push(position);
-    }
-
-    fn observations(&self) -> &[glam::Vec3] {
-        self.observations.as_slice()
-    }
-
-    fn mean(&self) -> Option<glam::Vec3> {
-        if self.observations.is_empty() {
-            return None;
-        }
-
-        let sum = self
-            .observations
-            .iter()
-            .copied()
-            .fold(glam::Vec3::ZERO, |acc, position| acc + position);
-        Some(sum / self.observations.len() as f32)
     }
 }
