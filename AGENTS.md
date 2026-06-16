@@ -42,6 +42,14 @@ The same core pipeline is exposed through Python and JavaScript bindings.
 - Replay-player infrastructure work usually belongs in `js/player/`. Stats UI
   and stat-timeline visualization work usually belongs in
   `js/stat-evaluation-player/`.
+- A dribble *flick* is the final dodge touch at the end of a run of `control`
+  touches, and that single touch's launch impulse is delivered over several
+  frames (the car drags the ball through the dodge) — not in the one frame the
+  touch is first detected. So flick detection measures the ball's *peak*
+  velocity change over a short window after the dodge-touch, and gates on real
+  carry evidence (ball moving with the car), rather than a single-frame delta.
+  See `FLICK_IMPULSE_WINDOW_SECONDS` / `FLICK_MAX_CARRY_REL_HORIZONTAL_SPEED` in
+  `src/stats/calculators/flick.rs`.
 
 ## Agent Workspace
 
