@@ -1282,13 +1282,13 @@ A goal whose scorer last touched the ball while it was high in the air.
 
 **Summary**
 
-A stricter aerial-goal tag for goals scored from a higher last-touch ball height.
+A goal whose scoring possession includes a touch taken from a high ball height, even when the finishing touch itself was lower.
 
 **Approach**
 
-- Inspect each goal context and its scorer-last-touch evidence.
-- Require the last-touch ball height to meet the high-aerial threshold.
-- Allow the regular aerial-goal tag to also apply when both thresholds are met.
+- Scan the scoring team's touches within the possession that led to the goal (back to the last turnover or neutral loose ball).
+- Require at least one such touch to meet the high-aerial ball-height threshold.
+- Tag the goal from the highest qualifying touch, attaching it as leadup-touch evidence.
 
 ### Long-Distance Goal (`long_distance_goal`)
 
