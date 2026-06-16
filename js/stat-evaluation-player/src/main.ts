@@ -64,6 +64,7 @@ import {
 } from "./playbackReadouts.ts";
 import { installMountEventListeners } from "./mountEventListeners.ts";
 import { installFreeCameraKeyboard } from "./freeCameraKeyboard.ts";
+import { installMissedEventCapture } from "./missedEventCaptureWindow.ts";
 import { createActiveModulesRuntime } from "./activeModulesRuntime.ts";
 import { getMechanicsReviewMechanicKind, type MechanicsReviewItem } from "./mechanicsReview.ts";
 import { createMechanicsReviewReplayLoadsController } from "./mechanicsReviewReplayLoads.ts";
@@ -1002,6 +1003,14 @@ export function mountStatEvaluationPlayer(
   cameraControlsController?.installEventListeners(listeners.signal);
   // WASD flies the free camera whenever no text field has focus.
   installFreeCameraKeyboard({
+    getReplayPlayer: () => replayPlayer,
+    signal: listeners.signal,
+  });
+  // `M` captures a "missed event" (a mechanic the detector failed to emit) at
+  // the current playhead for export / upload to rocket-sense. Uploading needs
+  // the replay's rocket-sense UUID, supplied via a `?replayId=` query param;
+  // without it, capture still works for JSON export.
+  installMissedEventCapture({
     getReplayPlayer: () => replayPlayer,
     signal: listeners.signal,
   });
