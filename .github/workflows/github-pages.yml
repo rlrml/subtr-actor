@@ -72,12 +72,25 @@ jobs:
         run: |
           set -euo pipefail
           # `result` is a read-only Nix store symlink; copy it into a writable
-          # staging dir so we can drop in extra static pages.
+          # staging dir so we can drop in extra static pages. GitHub Pages can
+          # reject Nix-derived artifact metadata with only a generic deployment
+          # error, so explicitly normalize ownership and modes while copying.
           rm -rf site
-          cp -rL result site
-          chmod -R u+w site
+          mkdir site
+          cp --recursive --dereference --no-preserve=mode,ownership result/. site/
+          chmod -R u+rwX,go+rX site
           # Publish the committed, Rust-generated event/stat reference page.
           cp docs/event-definitions.html site/events.html
+
+      - name: Validate Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f site/index.html
+          if find site -type l -print -quit | grep -q .; then
+            echo "Pages artifact must not contain symlinks" >&2
+            exit 1
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
