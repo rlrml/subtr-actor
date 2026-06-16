@@ -127,6 +127,8 @@
 //! println!("rush events: {rush_events}");
 //! ```
 
+#[path = "domain/boost_pad_locations.rs"]
+pub mod boost_pad_locations;
 #[path = "domain/boost_units.rs"]
 pub mod boost_units;
 pub mod clip;
@@ -158,6 +160,7 @@ pub mod actor_state {
 }
 
 pub use crate::actor_state::*;
+pub use crate::boost_pad_locations::*;
 pub use crate::boost_units::*;
 pub use crate::clip::*;
 pub use crate::collector::*;
