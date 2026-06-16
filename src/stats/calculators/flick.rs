@@ -1,9 +1,20 @@
 use super::*;
 
+/// Ball gravity (Unreal units / s²) used to remove the gravitational component
+/// when estimating the velocity change a touch imparted to the ball.
+const BALL_GRAVITY_Z: f32 = -650.0;
+
+/// How long after a flick-candidate touch the detector keeps measuring the
+/// ball's velocity change. A flick's power is not delivered in the single frame
+/// the touch is first detected: when a car carries/drags the ball through the
+/// dodge (e.g. a 180 flick) the ball keeps accelerating for a few frames after
+/// contact. Measuring the *peak* gravity-compensated impulse over this window —
+/// instead of one frame — is what lets those flicks clear the impulse gate.
+const FLICK_IMPULSE_WINDOW_SECONDS: f32 = 0.15;
+
 const FLICK_MAX_DODGE_TO_TOUCH_SECONDS: f32 = 0.32;
 const FLICK_MAX_CONTROL_TO_DODGE_SECONDS: f32 = 0.08;
 const FLICK_MAX_SETUP_STALE_SECONDS: f32 = 0.35;
-const FLICK_DODGE_LAG_TOLERANCE_SECONDS: f32 = 0.12;
 const FLICK_MIN_PENDING_DODGE_SETUP_SECONDS: f32 = 0.10;
 const FLICK_MIN_SETUP_SECONDS: f32 = 0.20;
 const FLICK_MIN_BALL_SPEED_CHANGE: f32 = 325.0;
@@ -12,6 +23,16 @@ const FLICK_MAX_CONTROL_BALL_Z: f32 = 700.0;
 const FLICK_MAX_CONTROL_HORIZONTAL_GAP: f32 = BALL_RADIUS_Z * 1.7;
 const FLICK_MIN_CONTROL_VERTICAL_GAP: f32 = 35.0;
 const FLICK_MAX_CONTROL_VERTICAL_GAP: f32 = 280.0;
+/// Carry evidence threshold: the *minimum* horizontal speed difference between
+/// the ball and the car observed across a flick setup must fall at or below this
+/// for the setup to count as a genuine carry/dribble. A real flick rides the
+/// ball on the car, so at some point during the setup their horizontal
+/// velocities track within tens of uu/s (observed minima ~24–46). A loose ball
+/// the car is merely driving at keeps its own velocity, so the difference never
+/// drops — its setup-minimum stays ~600+. Taking the minimum over the whole
+/// setup (rather than gating per frame) keeps the high relative velocity at the
+/// instant of the dodge from causing a false negative.
+const FLICK_MAX_CARRY_REL_HORIZONTAL_SPEED: f32 = 300.0;
 const FLICK_MIN_LOCAL_Z: f32 = 20.0;
 const FLICK_MAX_LOCAL_X_BEHIND: f32 = 95.0;
 const FLICK_MAX_LOCAL_X_FRONT: f32 = 210.0;
@@ -123,6 +144,9 @@ pub struct FlickEvent {
 struct FlickControlObservation {
     horizontal_gap: f32,
     vertical_gap: f32,
+    /// Horizontal speed difference between ball and car this frame, or `None`
+    /// when velocity data is unavailable. See [`FLICK_MAX_CARRY_REL_HORIZONTAL_SPEED`].
+    relative_horizontal_speed: Option<f32>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -139,6 +163,14 @@ struct ActiveFlickSetup {
     start_forward: Option<glam::Vec3>,
     max_horizontal_rotation_degrees: f32,
     signed_horizontal_rotation_degrees: f32,
+    /// Smallest ball-vs-car horizontal speed difference seen during a *non-dodge*
+    /// frame of the setup, or `f32::INFINITY` if none. See
+    /// [`FLICK_MAX_CARRY_REL_HORIZONTAL_SPEED`].
+    min_relative_horizontal_speed: f32,
+    /// Whether any frame of the setup carried ball+car velocity data. Lets the
+    /// carry check stay lenient on replays without velocities while still
+    /// rejecting a setup that *has* velocity data but no non-dodge carry.
+    observed_velocity: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -154,6 +186,8 @@ struct FlickSetupSummary {
     touch_count: u32,
     rotation_under_ball_degrees: f32,
     setup_rotation_degrees: f32,
+    min_relative_horizontal_speed: f32,
+    observed_velocity: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -164,16 +198,28 @@ struct RecentDodgeStart {
     rotation_at_dodge: Option<glam::Quat>,
 }
 
+/// A touch that looks like it could be a flick, kept alive for a short window so
+/// the detector can watch the ball's full velocity change (see
+/// [`FLICK_IMPULSE_WINDOW_SECONDS`]). `peak_impulse` is the largest
+/// gravity-compensated change observed since just before the touch; `ball` and
+/// `player` are snapshotted at the touch so the flick geometry is measured at
+/// contact while its power is measured across the window.
 #[derive(Debug, Clone)]
-struct PendingFlickTouch {
+struct PendingFlick {
     touch_event: TouchEvent,
     ball: BallFrameState,
     player: PlayerSample,
-    dodge_start: RecentDodgeStart,
-    ball_impulse: glam::Vec3,
+    /// Dodge start recorded by a genuine dodge-active transition, when present.
+    real_dodge_start: Option<RecentDodgeStart>,
+    /// Whether the touch was classified as a dodge contact downstream.
+    classified_dodge: bool,
+    /// Ball velocity in the frame just before the touch.
+    pre_velocity: glam::Vec3,
+    peak_impulse: glam::Vec3,
+    peak_magnitude: f32,
 }
 
-impl PartialEq for PendingFlickTouch {
+impl PartialEq for PendingFlick {
     fn eq(&self, other: &Self) -> bool {
         self.touch_event.touch_id == other.touch_event.touch_id
             && self.touch_event.player == other.touch_event.player
@@ -187,7 +233,7 @@ pub struct FlickCalculator {
     active_setups: HashMap<PlayerId, ActiveFlickSetup>,
     recent_setups: HashMap<PlayerId, FlickSetupSummary>,
     recent_dodge_starts: HashMap<PlayerId, RecentDodgeStart>,
-    pending_dodge_touches: Vec<PendingFlickTouch>,
+    pending_flicks: Vec<PendingFlick>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     previous_ball_velocity: Option<glam::Vec3>,
 }
@@ -213,22 +259,18 @@ impl FlickCalculator {
         ((value - min_value) / (max_value - min_value)).clamp(0.0, 1.0)
     }
 
-    fn ball_impulse(
-        frame: &FrameInfo,
-        ball: &BallFrameState,
-        previous_ball_velocity: Option<glam::Vec3>,
+    /// Velocity change imparted to the ball between `reference_velocity` and
+    /// `current_velocity`, with gravity over `elapsed` removed. With
+    /// `elapsed == dt` and the previous frame's velocity this is the
+    /// single-frame impulse; with a longer `elapsed` it measures the change
+    /// accumulated across a flick's contact window.
+    fn gravity_compensated_impulse(
+        current_velocity: glam::Vec3,
+        reference_velocity: glam::Vec3,
+        elapsed: f32,
     ) -> glam::Vec3 {
-        const BALL_GRAVITY_Z: f32 = -650.0;
-
-        let Some(ball) = ball.sample() else {
-            return glam::Vec3::ZERO;
-        };
-        let Some(previous_ball_velocity) = previous_ball_velocity else {
-            return glam::Vec3::ZERO;
-        };
-
-        let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * frame.dt.max(0.0));
-        ball.velocity() - previous_ball_velocity - expected_linear_delta
+        let expected_linear_delta = glam::Vec3::new(0.0, 0.0, BALL_GRAVITY_Z * elapsed.max(0.0));
+        current_velocity - reference_velocity - expected_linear_delta
     }
 
     fn control_observation(
@@ -261,6 +303,21 @@ impl FlickCalculator {
             return None;
         }
 
+        // How closely the ball tracks the car horizontally this frame. A real
+        // flick is set up by a carry/dribble where the ball rides the car, so
+        // this stays small; a loose ball the car is merely driving at keeps its
+        // own velocity. `None` when velocity data is unavailable so the carry
+        // check downstream stays lenient on such replays.
+        let relative_horizontal_speed = match (
+            ball.rigid_body.linear_velocity.as_ref().map(vec_to_glam),
+            player.velocity(),
+        ) {
+            (Some(ball_velocity), Some(player_velocity)) => {
+                Some((ball_velocity.truncate() - player_velocity.truncate()).length())
+            }
+            _ => None,
+        };
+
         let local_ball_position =
             quat_to_glam(&player_rigid_body.rotation).inverse() * (ball_position - player_position);
         if local_ball_position.x < -FLICK_MAX_LOCAL_X_BEHIND
@@ -274,6 +331,7 @@ impl FlickCalculator {
         Some(FlickControlObservation {
             horizontal_gap,
             vertical_gap,
+            relative_horizontal_speed,
         })
     }
 
@@ -291,7 +349,21 @@ impl FlickCalculator {
             touch_count: setup.touch_count,
             rotation_under_ball_degrees: setup.max_horizontal_rotation_degrees,
             setup_rotation_degrees: setup.signed_horizontal_rotation_degrees,
+            min_relative_horizontal_speed: setup.min_relative_horizontal_speed,
+            observed_velocity: setup.observed_velocity,
         }
+    }
+
+    /// Whether a setup shows genuine carry/dribble evidence: at some non-dodge
+    /// frame the ball tracked the car closely. Lenient when no velocity data was
+    /// available at all (replays without velocities keep prior behavior), but a
+    /// setup that *has* velocity data yet never shows a non-dodge carry — a car
+    /// that drove into a loose ball while already dodging — is rejected. This is
+    /// what separates a flick off a dribble from a dodge into a loose ball that
+    /// merely passed through the control volume.
+    fn setup_shows_carry(setup: &FlickSetupSummary) -> bool {
+        !setup.observed_velocity
+            || setup.min_relative_horizontal_speed <= FLICK_MAX_CARRY_REL_HORIZONTAL_SPEED
     }
 
     fn setup_qualifies(setup: &FlickSetupSummary) -> bool {
@@ -427,7 +499,29 @@ impl FlickCalculator {
                     start_forward: current_forward,
                     max_horizontal_rotation_degrees: 0.0,
                     signed_horizontal_rotation_degrees: 0.0,
+                    min_relative_horizontal_speed: f32::INFINITY,
+                    observed_velocity: false,
                 });
+
+            // Carry evidence is the dribble *before* the flick. Once the player
+            // is dodging, the ball is being struck, and its post-contact velocity
+            // can transiently align with the car — so only frames where the
+            // player is not dodging count toward the carry minimum.
+            if let Some(relative_horizontal_speed) = observation.relative_horizontal_speed {
+                setup.observed_velocity = true;
+                // Carry evidence is the dribble *before* the flick. Once the
+                // player is dodging the ball is being struck, and its
+                // post-contact velocity can transiently align with the car — so
+                // only frames where the player is not dodging count toward the
+                // carry minimum. A setup whose control frames are *all* during a
+                // dodge (a car that drove into a loose ball while already
+                // flicking) therefore shows no carry and is rejected below.
+                if !player.dodge_active {
+                    setup.min_relative_horizontal_speed = setup
+                        .min_relative_horizontal_speed
+                        .min(relative_horizontal_speed);
+                }
+            }
 
             if setup.last_frame != frame.frame_number {
                 setup.last_time = frame.time;
@@ -478,6 +572,9 @@ impl FlickCalculator {
                 continue;
             };
             if !Self::setup_qualifies(&setup) {
+                continue;
+            }
+            if !Self::setup_shows_carry(&setup) {
                 continue;
             }
             if frame.time - setup.last_time > FLICK_MAX_CONTROL_TO_DODGE_SECONDS {
@@ -657,6 +754,9 @@ impl FlickCalculator {
         if setup.duration < FLICK_MIN_PENDING_DODGE_SETUP_SECONDS {
             return None;
         }
+        if !Self::setup_shows_carry(&setup) {
+            return None;
+        }
         Some(RecentDodgeStart {
             time: touch_event.time,
             frame: touch_event.frame,
@@ -668,69 +768,134 @@ impl FlickCalculator {
         })
     }
 
-    fn store_pending_dodge_touch(
+    /// Open (or refresh) a pending flick for a touch by a player who has a
+    /// recent control setup (i.e. was dribbling/carrying). The pending entry is
+    /// what lets the detector watch the ball's velocity change across the
+    /// [`FLICK_IMPULSE_WINDOW_SECONDS`] window rather than only at the touch
+    /// frame.
+    fn store_pending_flick(
         &mut self,
         ball: &BallFrameState,
         player: &PlayerSample,
         touch_event: &TouchEvent,
-        ball_impulse: glam::Vec3,
+        pre_velocity: glam::Vec3,
     ) {
-        if self.pending_dodge_touches.iter().any(|pending| {
+        let already_tracked = self.pending_flicks.iter().any(|pending| {
             pending.touch_event.touch_id == touch_event.touch_id
                 && pending.touch_event.player == touch_event.player
                 && pending.touch_event.frame == touch_event.frame
-        }) {
+        });
+        if already_tracked {
+            // Same touch reappearing on a later frame: keep accumulating into
+            // its existing window rather than resetting it.
             return;
         }
-        let Some(dodge_start) = self.pending_dodge_start_for_touch(player, touch_event) else {
+        // Require at least the loose pending-setup threshold; the stricter
+        // dodge/confidence gates are enforced when the window resolves.
+        let has_setup = self
+            .recent_setup_for_player(&player.player_id, touch_event.time)
+            .is_some_and(|setup| setup.duration >= FLICK_MIN_PENDING_DODGE_SETUP_SECONDS);
+        if !has_setup {
             return;
-        };
-        self.pending_dodge_touches.push(PendingFlickTouch {
+        }
+        // One flick per dodge: a newer touch by the same player supersedes its
+        // earlier window so a single dribble cannot emit multiple flicks when
+        // its control touches fall within one impulse window of each other.
+        self.pending_flicks
+            .retain(|pending| pending.player.player_id != player.player_id);
+        self.pending_flicks.push(PendingFlick {
             touch_event: touch_event.clone(),
             ball: ball.clone(),
             player: player.clone(),
-            dodge_start,
-            ball_impulse,
+            real_dodge_start: self.dodge_start_for_touch(player),
+            classified_dodge: false,
+            pre_velocity,
+            peak_impulse: glam::Vec3::ZERO,
+            peak_magnitude: 0.0,
         });
     }
 
-    fn resolve_pending_dodge_touches(
+    /// Per-frame step: grow each pending flick's peak impulse from the live ball
+    /// velocity, refresh its dodge evidence, and emit as soon as the peak clears
+    /// the gates. Entries that never qualify are dropped once the window closes.
+    fn update_and_resolve_pending_flicks(
         &mut self,
         frame: &FrameInfo,
+        ball: &BallFrameState,
         touch_classification_events: &[TouchClassificationEvent],
     ) {
-        let mut resolved = Vec::new();
-        self.pending_dodge_touches.retain(|pending| {
-            if frame.time - pending.touch_event.time > FLICK_DODGE_LAG_TOLERANCE_SECONDS {
+        let current_velocity = ball.velocity();
+        let mut pending = std::mem::take(&mut self.pending_flicks);
+        let mut emitted = Vec::new();
+        pending.retain_mut(|flick| {
+            let elapsed = (frame.time - flick.touch_event.time).max(0.0);
+            if elapsed > FLICK_IMPULSE_WINDOW_SECONDS {
                 return false;
             }
-            if Self::classified_as_dodge_touch(&pending.touch_event, touch_classification_events) {
-                resolved.push(pending.clone());
+
+            if let Some(velocity) = current_velocity {
+                let impulse =
+                    Self::gravity_compensated_impulse(velocity, flick.pre_velocity, elapsed);
+                let magnitude = impulse.length();
+                if magnitude > flick.peak_magnitude {
+                    flick.peak_magnitude = magnitude;
+                    flick.peak_impulse = impulse;
+                }
+            }
+
+            if flick.real_dodge_start.is_none() {
+                flick.real_dodge_start = self.dodge_start_for_touch(&flick.player);
+            }
+            if !flick.classified_dodge {
+                flick.classified_dodge = Self::classified_as_dodge_touch(
+                    &flick.touch_event,
+                    touch_classification_events,
+                );
+            }
+
+            // A genuine dodge transition stands on its own; otherwise the touch
+            // must have been classified as a dodge contact (the old pending
+            // path) and have a recent control setup to synthesize a start from.
+            let dodge_start = flick.real_dodge_start.clone().or_else(|| {
+                if flick.classified_dodge {
+                    self.pending_dodge_start_for_touch(&flick.player, &flick.touch_event)
+                } else {
+                    None
+                }
+            });
+            let Some(dodge_start) = dodge_start else {
+                return true;
+            };
+
+            if let Some(event) = self.candidate_event(
+                &flick.ball,
+                &flick.player,
+                &flick.touch_event,
+                &dodge_start,
+                flick.peak_impulse,
+            ) {
+                emitted.push(event);
                 return false;
             }
             true
         });
-        for pending in resolved {
-            if let Some(event) = self.candidate_event(
-                &pending.ball,
-                &pending.player,
-                &pending.touch_event,
-                &pending.dodge_start,
-                pending.ball_impulse,
-            ) {
-                self.apply_event(frame, event);
-            }
+        self.pending_flicks = pending;
+        for event in emitted {
+            self.apply_event(frame, event);
         }
     }
 
     fn apply_touch_events(
         &mut self,
-        frame: &FrameInfo,
+        _frame: &FrameInfo,
         ball: &BallFrameState,
         players: &PlayerFrameState,
         touch_events: &[TouchEvent],
     ) {
-        let ball_impulse = Self::ball_impulse(frame, ball, self.previous_ball_velocity);
+        let pre_velocity = self
+            .previous_ball_velocity
+            .or_else(|| ball.velocity())
+            .unwrap_or(glam::Vec3::ZERO);
 
         for touch_event in touch_events {
             let Some(player_id) = touch_event.player.as_ref() else {
@@ -743,17 +908,10 @@ impl FlickCalculator {
             else {
                 continue;
             };
-            let Some(dodge_start) = self.dodge_start_for_touch(player) else {
-                self.store_pending_dodge_touch(ball, player, touch_event, ball_impulse);
-                continue;
-            };
-            let Some(event) =
-                self.candidate_event(ball, player, touch_event, &dodge_start, ball_impulse)
-            else {
-                continue;
-            };
-
-            self.apply_event(frame, event);
+            // Open a measurement window for any touch by a dribbling player; the
+            // impulse, dodge, and confidence gates resolve over the window in
+            // `update_and_resolve_pending_flicks`.
+            self.store_pending_flick(ball, player, touch_event, pre_velocity);
         }
     }
 
@@ -761,7 +919,7 @@ impl FlickCalculator {
         self.active_setups.clear();
         self.recent_setups.clear();
         self.recent_dodge_starts.clear();
-        self.pending_dodge_touches.clear();
+        self.pending_flicks.clear();
         self.previous_dodge_active.clear();
         self.previous_ball_velocity = ball.velocity();
     }
@@ -781,7 +939,6 @@ impl FlickCalculator {
             return Ok(());
         }
         self.prune_recent_state(frame.time);
-        self.resolve_pending_dodge_touches(frame, touch_classification_events);
         self.update_control_setups(
             frame,
             ball,
@@ -791,6 +948,7 @@ impl FlickCalculator {
         );
         self.track_dodge_starts(frame, players);
         self.apply_touch_events(frame, ball, players, &touch_state.touch_events);
+        self.update_and_resolve_pending_flicks(frame, ball, touch_classification_events);
         self.previous_ball_velocity = ball.velocity();
         Ok(())
     }

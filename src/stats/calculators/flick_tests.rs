@@ -39,7 +39,11 @@ fn player_with_yaw_and_angular_velocity(
         hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body_with_yaw(
             glam::Vec3::new(0.0, 0.0, 17.0),
-            glam::Vec3::new(650.0, 0.0, 0.0),
+            // Setup balls in these fixtures sit at a fixed position (a stationary
+            // carry), so the car shares their velocity — otherwise the carry gate
+            // (ball must track the car) would read a car driving under a loose
+            // ball. Car linear velocity is otherwise unused by flick detection.
+            glam::Vec3::ZERO,
             yaw,
             local_angular_velocity,
         )),
@@ -93,6 +97,33 @@ fn players_with_yaw_and_angular_velocity(
             yaw,
             local_angular_velocity,
         )],
+    }
+}
+
+/// A single team-zero car with an explicit linear velocity, for exercising the
+/// carry gate (ball-tracks-car) against a moving car.
+fn moving_players(dodge_active: bool, velocity: glam::Vec3) -> PlayerFrameState {
+    PlayerFrameState {
+        players: vec![PlayerSample {
+            player_id: boxcars::RemoteId::Steam(1),
+            is_team_0: true,
+            hitbox: default_car_hitbox(),
+            rigid_body: Some(rigid_body(
+                glam::Vec3::new(0.0, 0.0, 17.0),
+                velocity,
+                glam::Vec3::new(0.0, 5.0, 0.0),
+            )),
+            boost_amount: None,
+            last_boost_amount: None,
+            boost_active: false,
+            dodge_active,
+            powerslide_active: false,
+            match_goals: None,
+            match_assists: None,
+            match_saves: None,
+            match_shots: None,
+            match_score: None,
+        }],
     }
 }
 
@@ -552,6 +583,63 @@ fn frontflip_pitch_forward_impulse_is_not_labeled_reverse() {
 }
 
 #[test]
+fn rejects_dodge_into_loose_ball_that_is_not_carried() {
+    // A car driving fast into a loose ball that merely passes through the control
+    // volume, then dodging, is not a flick — the ball never tracks the car. This
+    // is otherwise identical to `counts_controlled_dodge_touch_with_large_ball_impulse`;
+    // only the ball-vs-car relative velocity differs. Regression for the
+    // false-positive flick at ~52.9s in problematic-private-duel-2026-03-20,
+    // where a dodge-pop off a loose ball was labeled a flick.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    // Car and loose ball differ by ~600 uu/s horizontally — well above the carry
+    // threshold, so no setup frame counts as a carry.
+    let car_velocity = glam::Vec3::new(1400.0, 0.0, 0.0);
+    let loose_ball_velocity = glam::Vec3::new(800.0, 0.0, 0.0);
+
+    for (frame_number, time) in [(1, 0.1), (2, 0.2), (3, 0.3)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &ball(glam::Vec3::new(60.0, 0.0, 112.0), loose_ball_velocity),
+                &moving_players(frame_number == 3, car_velocity),
+                &touch_state(Vec::new()),
+                &TouchCalculator::new(),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    calculator
+        .update(
+            &frame(4, 0.4),
+            &ball(
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                glam::Vec3::new(1350.0, 0.0, 520.0),
+            ),
+            &moving_players(true, car_velocity),
+            &touch_state(vec![TouchEvent {
+                touch_id: None,
+                time: 0.4,
+                frame: 4,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: Some(0.0),
+                dodge_contact: false,
+            }]),
+            &TouchCalculator::new(),
+            &live_play,
+        )
+        .unwrap();
+
+    assert!(calculator.player_stats().get(&player_id).is_none());
+    assert!(calculator.events().is_empty());
+}
+
+#[test]
 fn rejects_dodge_touch_without_controlled_setup() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = FlickCalculator::new();
@@ -772,4 +860,78 @@ fn rejects_dodge_after_ball_has_left_car() {
 
     assert!(calculator.events().is_empty());
     assert!(calculator.player_stats().get(&player_id).is_none());
+}
+
+#[test]
+fn counts_flick_whose_ball_impulse_arrives_after_the_touch_frame() {
+    // A carry / 180 flick drags the ball through the dodge: the touch is
+    // detected before the ball has finished accelerating, so the single-frame
+    // impulse at the touch frame is well below the flick threshold. The
+    // windowed peak impulse must still recognize the flick a few frames later.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    let control_touch = |frame_number: usize, time: f32| TouchEvent {
+        touch_id: None,
+        time,
+        frame: frame_number,
+        team_is_team_0: true,
+        player: Some(player_id.clone()),
+        player_position: None,
+        closest_approach_distance: Some(0.0),
+        dodge_contact: false,
+    };
+
+    // Dribble setup with the dodge transition on the third frame.
+    for (frame_number, time) in [(1, 0.1), (2, 0.2), (3, 0.3)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
+                &players(frame_number == 3),
+                &touch_state(vec![control_touch(frame_number, time)]),
+                &TouchCalculator::new(),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    // Dodge touch: the ball has barely changed velocity yet, so the single-frame
+    // impulse is far below `FLICK_MIN_BALL_SPEED_CHANGE`. No flick yet.
+    calculator
+        .update(
+            &frame(4, 0.4),
+            &ball(
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                glam::Vec3::new(40.0, 0.0, 20.0),
+            ),
+            &players(true),
+            &touch_state(vec![control_touch(4, 0.4)]),
+            &TouchCalculator::new(),
+            &live_play,
+        )
+        .unwrap();
+    assert!(calculator.events().is_empty());
+
+    // One frame later — still inside the impulse window — the flick's power has
+    // fully landed. The peak impulse now clears the gate and the flick fires,
+    // exactly once.
+    calculator
+        .update(
+            &frame(5, 0.5),
+            &ball(
+                glam::Vec3::new(260.0, 0.0, 205.0),
+                glam::Vec3::new(1350.0, 0.0, 560.0),
+            ),
+            &players(true),
+            &TouchState::default(),
+            &TouchCalculator::new(),
+            &live_play,
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    assert!(calculator.events()[0].ball_speed_change >= FLICK_MIN_BALL_SPEED_CHANGE);
+    assert_eq!(calculator.player_stats().get(&player_id).unwrap().count, 1);
 }
