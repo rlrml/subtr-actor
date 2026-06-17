@@ -33,6 +33,7 @@ export function getAppTemplate(): string {
               <button type="button" data-window-toggle="boost-pickups">Boost pickup filters</button>
               <button type="button" data-window-toggle="touch-controls">Touch controls</button>
               <button type="button" data-window-toggle="shot-visualization">Shot chart</button>
+              <button type="button" data-window-toggle="missed-events">Missed events</button>
               <button type="button" data-create-stats-window="player">New player stats</button>
               <button type="button" data-create-stats-window="team">New team stats</button>
               <button type="button" data-create-stats-window="all-players">New all players stats</button>
@@ -365,6 +366,40 @@ export function getAppTemplate(): string {
                 <dt>Type</dt>
                 <dd id="recording-type">WebM</dd>
               </div>
+            </div>
+          </section>
+
+          <section
+            class="floating-window floating-window-missed-events"
+            data-window-id="missed-events"
+            hidden
+            style="--window-x: calc(100vw - 28rem); --window-y: 28rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <h2>Missed events</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="missed-events">
+                Hide
+              </button>
+            </header>
+            <div class="missed-event-body">
+              <div class="missed-event-controls">
+                <label>
+                  <span class="label">Mechanic</span>
+                  <select id="missed-event-mechanic"></select>
+                </label>
+                <button id="missed-event-capture" type="button">Capture (M)</button>
+              </div>
+              <ol id="missed-event-list" class="missed-event-list"></ol>
+              <div class="transport-row">
+                <button id="missed-event-export" type="button">Export JSON</button>
+                <button id="missed-event-upload" type="button">Upload all</button>
+                <button id="missed-event-clear" type="button">Clear</button>
+              </div>
+              <p id="missed-event-status" class="missed-event-status">
+                Press M to capture a missed event at the playhead.
+              </p>
             </div>
           </section>
 
