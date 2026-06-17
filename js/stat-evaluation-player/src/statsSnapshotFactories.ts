@@ -80,6 +80,13 @@ export function createTeamStatsSnapshot(
         neutral_time: 0,
         labeled_time: { entries: [] },
       },
+      ball_third: {
+        tracked_time: 0,
+        defensive_third_time: 0,
+        neutral_third_time: 0,
+        offensive_third_time: 0,
+        labeled_time: { entries: [] },
+      },
       territorial_pressure: {
         tracked_time: 0,
         session_count: 0,

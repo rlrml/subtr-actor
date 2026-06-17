@@ -215,6 +215,25 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
+            .module_player_events("ball_third", "events", parse_ball_third_event)?
+            .into_iter()
+            .enumerate()
+        {
+            events.push(make_event(
+                "ball_third",
+                index,
+                span(event.frame, event.end_frame, event.time, event.end_time),
+                EventPayload::BallThird(event.clone()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ));
+        }
+
+        for (index, event) in self
             .module_player_events(
                 "territorial_pressure",
                 "events",

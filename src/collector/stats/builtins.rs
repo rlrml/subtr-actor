@@ -410,6 +410,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "player_possession",
         "possession",
         "ball_half",
+        "ball_third",
         "territorial_pressure",
         "rotation",
         "rush",
@@ -704,6 +705,14 @@ pub(crate) fn builtin_module_json(
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsWithEventsExport {
                 stats: projection.ball_half.stats(),
+                events: calculator.events(),
+            })
+        }
+        "ball_third" => {
+            let calculator = graph_state::<BallThirdCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsWithEventsExport {
+                stats: projection.ball_third.stats(),
                 events: calculator.events(),
             })
         }
@@ -1369,6 +1378,12 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: projection.ball_half.stats(),
             })?
         }
+        "ball_third" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsExport {
+                stats: projection.ball_third.stats(),
+            })?
+        }
         "territorial_pressure" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsExport {
@@ -1557,6 +1572,12 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<BallHalfCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "ball_half_neutral_zone_half_width_y": calculator.config().neutral_zone_half_width_y,
+            }))?)
+        }
+        "ball_third" => {
+            let calculator = graph_state::<BallThirdCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "ball_third_boundary_y": calculator.config().boundary_y,
             }))?)
         }
         "territorial_pressure" => {

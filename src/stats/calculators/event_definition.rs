@@ -8,14 +8,14 @@ use linkme::distributed_slice;
 
 use super::{
     BackboardBounceEvent, BallCarryEvent, BallDepthEvent, BallHalfEvent, BallProximityEvent,
-    BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent, ControlledPlayEvent,
-    CorePlayerScoreboardEvent, DepthRoleEvent, DodgeEvent, DodgeResetEvent, DoubleTapEvent,
-    FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent, FirstManChangeEvent, FlickEvent,
-    FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent, OneTimerEvent,
-    PassEvent, PlayerActivityEvent, PlayerPossessionEvent, PossessionEvent, PowerslideEvent,
-    RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent, TerritorialPressureEvent,
-    TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
-    WhiffEvent,
+    BallThirdEvent, BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent,
+    ControlledPlayEvent, CorePlayerScoreboardEvent, DepthRoleEvent, DodgeEvent, DodgeResetEvent,
+    DoubleTapEvent, FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent, FirstManChangeEvent,
+    FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
+    OneTimerEvent, PassEvent, PlayerActivityEvent, PlayerPossessionEvent, PossessionEvent,
+    PowerslideEvent, RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent,
+    TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
+    WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::Event;
 
@@ -887,6 +887,13 @@ define_stats_event!(
     EventCategory::Other
 );
 define_stats_event!(
+    BallThirdEvent,
+    BALL_THIRD_EVENT_DEFINITION,
+    "ball_third",
+    "Ball Third",
+    EventCategory::Other
+);
+define_stats_event!(
     TerritorialPressureEvent,
     TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     "territorial_pressure",
@@ -1214,6 +1221,13 @@ const BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "BallHalfCalculator",
 )];
 
+const BALL_THIRD_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &BALL_THIRD_EVENT_DEFINITION,
+    "ball_third",
+    "BallThirdNode",
+    "BallThirdCalculator",
+)];
+
 const TERRITORIAL_BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     "territorial_pressure",
@@ -1394,6 +1408,11 @@ register_event_producer!(
     BALL_HALF_EVENT_PRODUCER,
     "ball_half",
     BALL_HALF_EMITTED_EVENTS
+);
+register_event_producer!(
+    BALL_THIRD_EVENT_PRODUCER,
+    "ball_third",
+    BALL_THIRD_EMITTED_EVENTS
 );
 register_event_producer!(
     TERRITORIAL_BALL_HALF_EVENT_PRODUCER,

@@ -612,6 +612,7 @@ function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
 
   const possessionTotal = finalFrame.team_zero.possession.tracked_time;
   const ballHalfTotal = finalFrame.team_zero.ball_half.tracked_time;
+  const ballThirdTotal = finalFrame.team_zero.ball_third.tracked_time;
   page.append(
     renderMetricGrid([
       createSummaryCard(
@@ -631,6 +632,16 @@ function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
         "Orange pressure",
         formatShare(finalFrame.team_zero.ball_half.defensive_half_time, ballHalfTotal),
         "Time in Blue half",
+      ),
+      createSummaryCard(
+        "Blue final third",
+        formatShare(finalFrame.team_zero.ball_third.offensive_third_time, ballThirdTotal),
+        "Time in Orange third",
+      ),
+      createSummaryCard(
+        "Orange final third",
+        formatShare(finalFrame.team_zero.ball_third.defensive_third_time, ballThirdTotal),
+        "Time in Blue third",
       ),
     ]),
   );
@@ -661,6 +672,29 @@ function renderTerritoryPage(finalFrame: StatsFrame): HTMLElement {
       ),
     ),
     renderTerritoryShareChart(finalFrame, "Field half pressure"),
+    renderChartCard(
+      "Ball third control",
+      renderPieChartRows(
+        [
+          {
+            label: "Blue third",
+            value: finalFrame.team_zero.ball_third.defensive_third_time,
+            color: TEAM_COLORS[0]!,
+          },
+          {
+            label: "Neutral third",
+            value: finalFrame.team_zero.ball_third.neutral_third_time,
+            color: "#65d6ad",
+          },
+          {
+            label: "Orange third",
+            value: finalFrame.team_zero.ball_third.offensive_third_time,
+            color: TEAM_COLORS[1]!,
+          },
+        ],
+        formatSeconds,
+      ),
+    ),
     renderChartCard(
       "Player field thirds",
       renderStackedRows(

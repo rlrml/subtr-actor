@@ -16,6 +16,7 @@ import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { FieldThirdEvent } from "./statsTimeline.ts";
 import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
 import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
+import type { BallThirdEvent } from "./generated/BallThirdEvent.ts";
 
 const RANGE_MERGE_EPSILON_SECONDS = 0.02;
 const DELTA_EPSILON = 0.0001;
@@ -31,6 +32,7 @@ const BOOST_PICKUP_DETECTION_COLORS: Record<BoostPickupDetection, string> = {
   reported_only: "rgba(59, 130, 246, 0.9)",
 };
 type BallHalfControlState = "team_zero_side" | "team_one_side" | "neutral";
+type BallThirdControlState = "team_zero_third" | "team_one_third" | "neutral_third";
 
 export interface BoostPickupTimelineRangeOptions {
   sizes?: Iterable<ReplayBoostPadSize>;
@@ -421,6 +423,140 @@ export function buildBallHalfTimelineRanges(
     );
     const nextRange = halfControlState
       ? createBallHalfRange(halfControlState, startTime, endTime)
+      : null;
+
+    mergeRange(ranges, nextRange);
+    previousFrame = frame;
+  }
+
+  return ranges;
+}
+
+function resolveBallThirdControlState(
+  deltaTeamZero: number,
+  deltaTeamOne: number,
+  deltaNeutral: number,
+): BallThirdControlState | null {
+  if (deltaNeutral > DELTA_EPSILON) {
+    return "neutral_third";
+  }
+  if (deltaTeamZero > deltaTeamOne + DELTA_EPSILON) {
+    return "team_zero_third";
+  }
+  if (deltaTeamOne > deltaTeamZero + DELTA_EPSILON) {
+    return "team_one_third";
+  }
+
+  return null;
+}
+
+function createBallThirdRange(
+  thirdControlState: BallThirdControlState,
+  startTime: number,
+  endTime: number,
+): ReplayTimelineRange {
+  if (thirdControlState === "neutral_third") {
+    return {
+      id: `third-control:neutral_third:${startTime.toFixed(3)}`,
+      startTime,
+      endTime,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Neutral third control",
+      color: "rgba(209, 217, 224, 0.7)",
+      isTeamZero: null,
+    };
+  }
+
+  const isTeamZero = thirdControlState === "team_zero_third";
+  return {
+    id: `third-control:${thirdControlState}:${startTime.toFixed(3)}`,
+    startTime,
+    endTime,
+    lane: "third-control",
+    laneLabel: "Third Control",
+    label: isTeamZero ? "Blue third control" : "Orange third control",
+    color: teamTimelineColor(isTeamZero) ?? undefined,
+    isTeamZero,
+  };
+}
+
+function buildBallThirdTimelineRangesFromEvents(
+  timeline: StatsTimeline,
+  replay?: ReplayModel,
+): ReplayTimelineRange[] {
+  const events = sortTimelineEvents(statsEventPayloads(timeline, "ball_third"));
+  const ranges: ReplayTimelineRange[] = [];
+  let eventIndex = 0;
+  let active = false;
+  let fieldThird: BallThirdControlState = "neutral_third";
+
+  let previousFrame: StatsTimeline["frames"][number] | null = null;
+  for (const frame of timeline.frames) {
+    while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
+      const event = events[eventIndex] as BallThirdEvent;
+      active = event.active;
+      fieldThird =
+        event.field_third === "team_zero_third" || event.field_third === "team_one_third"
+          ? event.field_third
+          : "neutral_third";
+      eventIndex += 1;
+    }
+
+    if (!Number.isFinite(frame.time) || !Number.isFinite(frame.dt) || frame.dt <= 0) {
+      previousFrame = frame;
+      continue;
+    }
+
+    const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
+    mergeRange(ranges, active ? createBallThirdRange(fieldThird, startTime, endTime) : null);
+    previousFrame = frame;
+  }
+
+  return ranges;
+}
+
+export function buildBallThirdTimelineRanges(
+  timeline: StatsTimeline,
+  replay?: ReplayModel,
+): ReplayTimelineRange[] {
+  if (statsEventPayloads(timeline, "ball_third").length > 0) {
+    return buildBallThirdTimelineRangesFromEvents(timeline, replay);
+  }
+
+  const ranges: ReplayTimelineRange[] = [];
+
+  let previousTeamZero = 0;
+  let previousTeamOne = 0;
+  let previousNeutral = 0;
+
+  let previousFrame: StatsTimeline["frames"][number] | null = null;
+  for (const frame of timeline.frames) {
+    if (!Number.isFinite(frame.time) || !Number.isFinite(frame.dt) || frame.dt <= 0) {
+      previousFrame = frame;
+      continue;
+    }
+
+    const statsFrame = frame as StatsFrame;
+    const currentTeamZero = statsFrame.team_zero?.ball_third?.defensive_third_time ?? 0;
+    const currentTeamOne = statsFrame.team_one?.ball_third?.defensive_third_time ?? 0;
+    const currentNeutral = statsFrame.team_zero?.ball_third?.neutral_third_time ?? 0;
+    const deltaTeamZero = currentTeamZero - previousTeamZero;
+    const deltaTeamOne = currentTeamOne - previousTeamOne;
+    const deltaNeutral = currentNeutral - previousNeutral;
+
+    previousTeamZero = currentTeamZero;
+    previousTeamOne = currentTeamOne;
+    previousNeutral = currentNeutral;
+
+    const { startTime, endTime } = resolveRangeBounds(frame, previousFrame, replay);
+    const thirdControlState = resolveBallThirdControlState(
+      deltaTeamZero,
+      deltaTeamOne,
+      deltaNeutral,
+    );
+    const nextRange = thirdControlState
+      ? createBallThirdRange(thirdControlState, startTime, endTime)
       : null;
 
     mergeRange(ranges, nextRange);

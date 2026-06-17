@@ -70,10 +70,6 @@ pub(in crate::collector::stats::playback) fn parse_possession_event(
         duration: json_required_f32(object, "duration")?,
         possession_state: json_required_str(object, "possession_state")?.to_owned(),
         player_id: json_optional_remote_id(object.get("player_id"))?,
-        field_third: match object.get("field_third") {
-            None | Some(Value::Null) => None,
-            Some(_) => Some(json_required_str(object, "field_third")?.to_owned()),
-        },
     })
 }
 
@@ -125,6 +121,23 @@ pub(in crate::collector::stats::playback) fn parse_ball_half_event(
         active: json_required_bool(object, "active")?,
         duration: json_required_f32(object, "duration")?,
         field_half: json_required_str(object, "field_half")?.to_owned(),
+    })
+}
+
+pub(in crate::collector::stats::playback) fn parse_ball_third_event(
+    value: &Value,
+) -> SubtrActorResult<BallThirdEvent> {
+    let object = json_object(value, "ball_third event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
+    Ok(BallThirdEvent {
+        time,
+        frame,
+        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
+        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
+        active: json_required_bool(object, "active")?,
+        duration: json_required_f32(object, "duration")?,
+        field_third: json_required_str(object, "field_third")?.to_owned(),
     })
 }
 

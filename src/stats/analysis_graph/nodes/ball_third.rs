@@ -2,35 +2,39 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
-pub struct PossessionNode {
-    calculator: PossessionCalculator,
+pub struct BallThirdNode {
+    calculator: BallThirdCalculator,
 }
 
-impl PossessionNode {
+impl BallThirdNode {
     pub fn new() -> Self {
+        Self::with_config(BallThirdCalculatorConfig::default())
+    }
+
+    pub fn with_config(config: BallThirdCalculatorConfig) -> Self {
         Self {
-            calculator: PossessionCalculator::new(),
+            calculator: BallThirdCalculator::with_config(config),
         }
     }
 }
 
-impl Default for PossessionNode {
+impl Default for BallThirdNode {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl AnalysisNode for PossessionNode {
-    type State = PossessionCalculator;
+impl AnalysisNode for BallThirdNode {
+    type State = BallThirdCalculator;
 
     fn name(&self) -> &'static str {
-        "possession"
+        "ball_third"
     }
 
     fn dependencies(&self) -> NodeDependencies {
         vec![
             frame_info_dependency(),
-            possession_state_dependency(),
+            ball_frame_state_dependency(),
             live_play_dependency(),
         ]
     }
@@ -38,7 +42,7 @@ impl AnalysisNode for PossessionNode {
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
-            ctx.get::<PossessionState>()?,
+            ctx.get::<BallFrameState>()?,
             ctx.get::<LivePlayState>()?,
         )
     }
@@ -54,5 +58,5 @@ impl AnalysisNode for PossessionNode {
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(PossessionNode::new())
+    Box::new(BallThirdNode::new())
 }
