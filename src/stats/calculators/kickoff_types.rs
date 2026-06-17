@@ -362,6 +362,12 @@ pub struct KickoffSupportEvent {
     pub player: PlayerId,
     pub is_team_0: bool,
     pub start_position: [f32; 3],
+    /// Horizontal distance (uu) of the support player's spawn from field
+    /// center — i.e. from the ball's kickoff position at the origin. Larger
+    /// values mean the player started further back/wider; a `cheat` support
+    /// closes this gap as the kickoff develops while a back-positioned support
+    /// keeps it.
+    pub start_distance_from_center: f32,
     pub spawn_position: KickoffSpawnPosition,
     pub start_boost: Option<f32>,
     pub boost_after: Option<f32>,

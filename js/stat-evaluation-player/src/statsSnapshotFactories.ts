@@ -406,6 +406,8 @@ export function createPlayerStatsSnapshot(
         support_go_for_boosts: 0,
         support_cheats: 0,
         support_other: 0,
+        support_distance_sample_count: 0,
+        cumulative_support_distance_from_center: 0,
         kickoff_goal_count: 0,
         boost_after_sample_count: 0,
         cumulative_boost_after: 0,

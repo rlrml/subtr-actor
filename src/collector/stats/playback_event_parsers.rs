@@ -904,6 +904,8 @@ fn parse_kickoff_support_event(value: &Value) -> SubtrActorResult<KickoffSupport
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         start_position: json_required_vec3(object, "start_position")?,
+        start_distance_from_center: json_optional_f32(object.get("start_distance_from_center"))?
+            .unwrap_or(0.0),
         spawn_position: decode_json_value(json_required_value(object, "spawn_position")?.clone())?,
         start_boost: json_optional_f32(object.get("start_boost"))?,
         boost_after: json_optional_f32(object.get("boost_after"))?,
