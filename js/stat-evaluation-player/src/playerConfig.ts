@@ -24,7 +24,8 @@ export type SingletonWindowId =
   | "replay-loading"
   | "boost-pickups"
   | "touch-controls"
-  | "shot-visualization";
+  | "shot-visualization"
+  | "missed-events";
 export type ConfigWindowKind = SingletonWindowId | "stats";
 
 export interface ConfigViewportSize {
@@ -449,7 +450,8 @@ function isSingletonWindowId(value: unknown): value is SingletonWindowId {
     value === "mechanics-review" ||
     value === "replay-loading" ||
     value === "boost-pickups" ||
-    value === "touch-controls"
+    value === "touch-controls" ||
+    value === "missed-events"
   );
 }
 

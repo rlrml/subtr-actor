@@ -64,7 +64,10 @@ import {
 } from "./playbackReadouts.ts";
 import { installMountEventListeners } from "./mountEventListeners.ts";
 import { installFreeCameraKeyboard } from "./freeCameraKeyboard.ts";
-import { installMissedEventCapture } from "./missedEventCaptureWindow.ts";
+import {
+  createMissedEventCaptureController,
+  type MissedEventCaptureController,
+} from "./missedEventCaptureWindow.ts";
 import { createActiveModulesRuntime } from "./activeModulesRuntime.ts";
 import { getMechanicsReviewMechanicKind, type MechanicsReviewItem } from "./mechanicsReview.ts";
 import { createMechanicsReviewReplayLoadsController } from "./mechanicsReviewReplayLoads.ts";
@@ -226,6 +229,7 @@ let currentMountCleanup: (() => void) | null = null;
 let statRegistry: StatDefinition[] = createStatRegistry(null);
 let cameraControlsController: CameraControlsController | null = null;
 let recordingWindowController: RecordingWindowController | null = null;
+let missedEventCaptureController: MissedEventCaptureController | null = null;
 let statsWindowsController: StatsWindowsController | null = null;
 let eventPlaylistController: EventPlaylistWindowController | null = null;
 let eventTimelineControlsController: EventTimelineControlsController | null = null;
@@ -844,6 +848,19 @@ export function mountStatEvaluationPlayer(
     },
     requestConfigSync: scheduleConfigUrlUpdate,
   });
+  missedEventCaptureController = createMissedEventCaptureController({
+    elements: {
+      mechanic: mustElement<HTMLSelectElement>(root, "#missed-event-mechanic"),
+      capture: mustElement<HTMLButtonElement>(root, "#missed-event-capture"),
+      list: mustElement<HTMLOListElement>(root, "#missed-event-list"),
+      export: mustElement<HTMLButtonElement>(root, "#missed-event-export"),
+      upload: mustElement<HTMLButtonElement>(root, "#missed-event-upload"),
+      clear: mustElement<HTMLButtonElement>(root, "#missed-event-clear"),
+      status: mustElement<HTMLElement>(root, "#missed-event-status"),
+    },
+    getReplayPlayer: () => replayPlayer,
+    showWindow: () => windowCommands.showWindow("missed-events"),
+  });
   configBindings = createPlayerConfigBindings({
     modules: MODULES,
     playbackRate,
@@ -1000,21 +1017,13 @@ export function mountStatEvaluationPlayer(
 
   mechanicsReviewController?.installEventListeners(listeners.signal);
   recordingWindowController?.installEventListeners(listeners.signal);
+  missedEventCaptureController?.installEventListeners(listeners.signal);
   cameraControlsController?.installEventListeners(listeners.signal);
   // WASD flies the free camera whenever no text field has focus.
   installFreeCameraKeyboard({
     getReplayPlayer: () => replayPlayer,
     signal: listeners.signal,
   });
-  // `M` captures a "missed event" (a mechanic the detector failed to emit) at
-  // the current playhead for export / upload to rocket-sense. Uploading needs
-  // the replay's rocket-sense UUID, supplied via a `?replayId=` query param;
-  // without it, capture still works for JSON export.
-  installMissedEventCapture({
-    getReplayPlayer: () => replayPlayer,
-    signal: listeners.signal,
-  });
-
   // Allow an embedding parent window (e.g. the Rocket Sense stats UI) to drive
   // the active review clip without reloading the replay, so hovering a goal can
   // scrub the player to that goal's clip. Messages are only honored from the

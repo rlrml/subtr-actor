@@ -7,13 +7,23 @@ import {
   type MissedEventCaptureRecord,
 } from "./missedEventCapture.ts";
 
+export interface MissedEventCaptureElements {
+  readonly mechanic: HTMLSelectElement;
+  readonly capture: HTMLButtonElement;
+  readonly list: HTMLOListElement;
+  readonly export: HTMLButtonElement;
+  readonly upload: HTMLButtonElement;
+  readonly clear: HTMLButtonElement;
+  readonly status: HTMLElement;
+}
+
 export interface MissedEventCaptureOptions {
+  readonly elements: MissedEventCaptureElements;
   getReplayPlayer(): StatsReplayPlayer | null;
-  signal: AbortSignal;
   /** Fallback replay id when no `replayId` query param is present. */
   getReplayId?(): string | null;
-  /** Defaults to `document.body`. */
-  mountParent?: HTMLElement;
+  /** Reveal the missed-events window (e.g. when capturing via the hotkey). */
+  showWindow(): void;
 }
 
 /** Capture-at-playhead hotkey. */
@@ -44,198 +54,161 @@ function downloadJson(filename: string, value: unknown): void {
 }
 
 /**
- * Install the "missed event" capture affordance: an `M` hotkey that records the
- * selected mechanic at the current playhead (attached player as subject), a
- * compact panel listing captures, and Export-JSON / Upload-all actions. Upload
- * targets the rocket-sense missed-event endpoint; export always works even with
- * no replay id / backend.
+ * Drives the "Missed events" window: an `M` hotkey records the selected mechanic
+ * at the current playhead (attached player as subject), the window lists the
+ * captures, and Export-JSON / Upload-all act on them. Upload targets the
+ * rocket-sense missed-event endpoint; export always works even with no replay id
+ * / backend. The window itself (chrome, drag, show/hide) is owned by the shared
+ * floating-window system; this controller only owns its body content.
  */
-export function installMissedEventCapture(options: MissedEventCaptureOptions): {
-  capture(): void;
-  records(): readonly MissedEventCaptureRecord[];
-} {
-  const { getReplayPlayer, signal } = options;
-  const parent = options.mountParent ?? document.body;
-  const records: MissedEventCaptureRecord[] = [];
-  let localIdSeq = 0;
+export class MissedEventCaptureController {
+  private readonly records: MissedEventCaptureRecord[] = [];
+  private localIdSeq = 0;
 
-  const panel = document.createElement("section");
-  panel.className = "missed-capture";
-  panel.hidden = true;
-  panel.innerHTML = `
-    <header class="missed-capture__head">
-      <span class="missed-capture__title">Missed events (<span data-count>0</span>)</span>
-      <button type="button" data-action="hide" title="Hide">×</button>
-    </header>
-    <div class="missed-capture__controls">
-      <label>Mechanic
-        <select data-mechanic></select>
-      </label>
-      <button type="button" data-action="capture">Capture (M)</button>
-    </div>
-    <ol class="missed-capture__list" data-list></ol>
-    <div class="missed-capture__actions">
-      <button type="button" data-action="export">Export JSON</button>
-      <button type="button" data-action="upload">Upload all</button>
-      <button type="button" data-action="clear">Clear</button>
-    </div>
-    <p class="missed-capture__status" data-status></p>
-  `;
-  parent.appendChild(panel);
+  constructor(private readonly options: MissedEventCaptureOptions) {}
 
-  const select = panel.querySelector<HTMLSelectElement>("[data-mechanic]")!;
-  for (const mechanic of MISSED_EVENT_MECHANIC_OPTIONS) {
-    const option = document.createElement("option");
-    option.value = mechanic;
-    option.textContent = mechanic.replaceAll("_", " ");
-    select.appendChild(option);
-  }
-  const listEl = panel.querySelector<HTMLOListElement>("[data-list]")!;
-  const countEl = panel.querySelector<HTMLElement>("[data-count]")!;
-  const statusEl = panel.querySelector<HTMLElement>("[data-status]")!;
+  installEventListeners(signal: AbortSignal): void {
+    const { elements } = this.options;
 
-  const setStatus = (message: string): void => {
-    statusEl.textContent = message;
-  };
-
-  const resolveReplayId = (): string | null =>
-    resolveCaptureReplayId(window.location.search, options.getReplayId?.() ?? null);
-
-  const render = (): void => {
-    countEl.textContent = String(records.length);
-    listEl.replaceChildren();
-    for (const record of records) {
-      const item = document.createElement("li");
-      const subject = record.playerName ?? record.subjectId ?? "no subject";
-      item.innerHTML = `
-        <span class="missed-capture__row">
-          <strong>${record.mechanic}</strong>
-          @ ${record.time.toFixed(2)}s · f${record.frame} · ${subject}
-          ${record.replayId ? "" : "· <em>no replay id</em>"}
-        </span>
-      `;
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.textContent = "✕";
-      remove.title = "Remove";
-      remove.addEventListener(
-        "click",
-        () => {
-          const index = records.findIndex((entry) => entry.localId === record.localId);
-          if (index >= 0) {
-            records.splice(index, 1);
-            render();
-          }
-        },
-        { signal },
-      );
-      item.appendChild(remove);
-      listEl.appendChild(item);
+    for (const mechanic of MISSED_EVENT_MECHANIC_OPTIONS) {
+      const option = document.createElement("option");
+      option.value = mechanic;
+      option.textContent = mechanic.replaceAll("_", " ");
+      elements.mechanic.appendChild(option);
     }
-    panel.hidden = records.length === 0;
-  };
 
-  const capture = (): void => {
-    const player = getReplayPlayer();
+    elements.capture.addEventListener("click", () => this.capture(), { signal });
+    elements.export.addEventListener("click", () => this.exportJson(), { signal });
+    elements.upload.addEventListener("click", () => void this.uploadAll(), { signal });
+    elements.clear.addEventListener(
+      "click",
+      () => {
+        this.records.length = 0;
+        this.render();
+        this.setStatus("Cleared.");
+      },
+      { signal },
+    );
+
+    window.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key.toLowerCase() !== CAPTURE_KEY || event.repeat) {
+          return;
+        }
+        if (event.metaKey || event.ctrlKey || event.altKey || isTextEntryFocused()) {
+          return;
+        }
+        event.preventDefault();
+        this.capture();
+      },
+      { signal },
+    );
+
+    this.render();
+  }
+
+  capture(): void {
+    const player = this.options.getReplayPlayer();
     if (!player) {
-      setStatus("No replay loaded.");
+      this.setStatus("No replay loaded.");
       return;
     }
-    localIdSeq += 1;
+    this.localIdSeq += 1;
     const record = captureMissedEventFromPlayer(player, {
-      mechanic: select.value || "flick",
-      replayId: resolveReplayId(),
-      localId: `missed-${localIdSeq}`,
+      mechanic: this.options.elements.mechanic.value || "flick",
+      replayId: this.resolveReplayId(),
+      localId: `missed-${this.localIdSeq}`,
     });
-    records.push(record);
-    render();
-    setStatus(
+    this.records.push(record);
+    this.options.showWindow();
+    this.render();
+    this.setStatus(
       `Captured ${record.mechanic} @ ${record.time.toFixed(2)}s` +
         (record.replayId ? "." : " (no replay id — export only)."),
     );
-  };
+  }
 
-  const uploadAll = async (): Promise<void> => {
-    if (records.length === 0) {
-      setStatus("Nothing to upload.");
+  private exportJson(): void {
+    if (this.records.length === 0) {
+      this.setStatus("Nothing to export.");
+      return;
+    }
+    downloadJson("missed-events.json", {
+      capturedFrom: "stat-evaluation-player",
+      replayId: this.resolveReplayId(),
+      missedEvents: this.records,
+    });
+    this.setStatus(`Exported ${this.records.length}.`);
+  }
+
+  private async uploadAll(): Promise<void> {
+    if (this.records.length === 0) {
+      this.setStatus("Nothing to upload.");
       return;
     }
     let uploaded = 0;
     const failures: string[] = [];
-    for (const record of [...records]) {
+    for (const record of [...this.records]) {
       const result = await uploadMissedEvent(record);
       if (result.ok) {
         uploaded += 1;
-        const index = records.findIndex((entry) => entry.localId === record.localId);
+        const index = this.records.findIndex((entry) => entry.localId === record.localId);
         if (index >= 0) {
-          records.splice(index, 1);
+          this.records.splice(index, 1);
         }
       } else {
         failures.push(`${record.mechanic}@${record.time.toFixed(1)}s: ${result.message}`);
       }
     }
-    render();
-    setStatus(
+    this.render();
+    this.setStatus(
       failures.length === 0
         ? `Uploaded ${uploaded}.`
         : `Uploaded ${uploaded}, ${failures.length} failed — ${failures[0]}`,
     );
-  };
+  }
 
-  panel.querySelector("[data-action='capture']")?.addEventListener("click", capture, { signal });
-  panel.querySelector("[data-action='hide']")?.addEventListener(
-    "click",
-    () => {
-      panel.hidden = true;
-    },
-    { signal },
-  );
-  panel.querySelector("[data-action='export']")?.addEventListener(
-    "click",
-    () => {
-      if (records.length === 0) {
-        setStatus("Nothing to export.");
-        return;
-      }
-      downloadJson("missed-events.json", {
-        capturedFrom: "stat-evaluation-player",
-        replayId: resolveReplayId(),
-        missedEvents: records,
+  private render(): void {
+    const { list } = this.options.elements;
+    list.replaceChildren();
+    for (const record of this.records) {
+      const item = document.createElement("li");
+      const subject = record.playerName ?? record.subjectId ?? "no subject";
+      const detail = document.createElement("span");
+      detail.className = "missed-event-row";
+      detail.textContent =
+        `${record.mechanic} @ ${record.time.toFixed(2)}s · f${record.frame} · ${subject}` +
+        (record.replayId ? "" : " · no replay id");
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "✕";
+      remove.title = "Remove";
+      remove.addEventListener("click", () => {
+        const index = this.records.findIndex((entry) => entry.localId === record.localId);
+        if (index >= 0) {
+          this.records.splice(index, 1);
+          this.render();
+        }
       });
-      setStatus(`Exported ${records.length}.`);
-    },
-    { signal },
-  );
-  panel
-    .querySelector("[data-action='upload']")
-    ?.addEventListener("click", () => void uploadAll(), { signal });
-  panel.querySelector("[data-action='clear']")?.addEventListener(
-    "click",
-    () => {
-      records.length = 0;
-      render();
-      setStatus("Cleared.");
-    },
-    { signal },
-  );
 
-  window.addEventListener(
-    "keydown",
-    (event) => {
-      if (event.key.toLowerCase() !== CAPTURE_KEY || event.repeat) {
-        return;
-      }
-      if (event.metaKey || event.ctrlKey || event.altKey || isTextEntryFocused()) {
-        return;
-      }
-      event.preventDefault();
-      capture();
-    },
-    { signal },
-  );
+      item.append(detail, remove);
+      list.appendChild(item);
+    }
+  }
 
-  return {
-    capture,
-    records: () => records,
-  };
+  private setStatus(message: string): void {
+    this.options.elements.status.textContent = message;
+  }
+
+  private resolveReplayId(): string | null {
+    return resolveCaptureReplayId(window.location.search, this.options.getReplayId?.() ?? null);
+  }
+}
+
+export function createMissedEventCaptureController(
+  options: MissedEventCaptureOptions,
+): MissedEventCaptureController {
+  return new MissedEventCaptureController(options);
 }
