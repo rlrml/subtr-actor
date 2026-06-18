@@ -71,7 +71,7 @@ export default [
     // until those features are wired. Relax unused-vars here only; correctness
     // rules (no-undef, etc.) stay on. New first-party code lives in TS and is
     // linted strictly.
-    files: ["player/src/viewer/managers/**/*.js", "player/src/viewer/lib/**/*.js"],
+    files: ["player/src/player/managers/**/*.js", "player/src/player/lib/**/*.js"],
     rules: {
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": "off",

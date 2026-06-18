@@ -370,7 +370,9 @@ export class SpectatorCameraManager {
         (this.hiddenFollowers && this.hiddenFollowers.has(participantId));
       container.visible = !shouldBeHidden;
       if (shouldBeHidden) {
-        console.log(`[SpectatorCameraManager] *** New viewer ${nickname} HIDDEN (following someone)`);
+        console.log(
+          `[SpectatorCameraManager] *** New viewer ${nickname} HIDDEN (following someone)`,
+        );
       }
 
       // Add to scene
