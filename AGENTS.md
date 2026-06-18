@@ -20,8 +20,8 @@ The same core pipeline is exposed through Python and JavaScript bindings.
   `LabeledFloatSums`).
 - `js/player/`: Reusable replay player library package. It handles replay
   loading, normalization, scene playback, camera APIs, timeline overlays, and
-  plugin-based viewer extensions on top of the core WASM bindings.
-- `js/stat-evaluation-player/`: Stats-focused replay viewer package built on top
+  plugin-based player extensions on top of the core WASM bindings.
+- `js/stat-evaluation-player/`: Stats-focused replay player UI built on top
   of `js/player/` plus the stats timeline bindings. It is the main home for UI
   that visualizes stat accumulation, overlays, and per-module stat panels
   during playback.

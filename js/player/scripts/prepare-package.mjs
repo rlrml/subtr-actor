@@ -34,7 +34,7 @@ async function main() {
     recursive: true,
   });
   await cp(path.resolve(packageDir, "README.md"), path.join(outputDir, "README.md"));
-  await cp(path.resolve(packageDir, "VIEWER_README.md"), path.join(outputDir, "VIEWER_README.md"));
+  await cp(path.resolve(packageDir, "PLAYER_ENGINE.md"), path.join(outputDir, "PLAYER_ENGINE.md"));
   await cp(path.resolve(packageDir, "LICENSE"), path.join(outputDir, "LICENSE"));
   await writeFile(
     path.join(outputDir, "package.json"),

@@ -13,11 +13,11 @@
   },
   "include": [
     "src/**/*.ts",
-    "src/viewer/adapter/**/*.ts",
-    "src/viewer/plugins/**/*.ts",
-    "src/viewer/lib.ts",
-    "src/viewer/types.ts",
-    "src/viewer/ViewerPlayer.ts"
+    "src/player/adapter/**/*.ts",
+    "src/player/plugins/**/*.ts",
+    "src/player/lib.ts",
+    "src/player/types.ts",
+    "src/player/ReplayPlayer.ts"
   ],
-  "exclude": ["src/viewer/dev/**", "src/**/*.test.ts"]
+  "exclude": ["src/player/dev/**", "src/**/*.test.ts"]
 }

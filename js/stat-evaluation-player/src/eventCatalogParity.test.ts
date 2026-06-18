@@ -9,12 +9,12 @@ import {
 
 // `EVENT_DEFINITION_CATALOG` is generated from the subtr-actor Rust event
 // registry (the single source of truth). This test fails if a registry event is
-// not represented anywhere in the viewer, so adding an event in Rust forces it to
-// be wired into the viewer (or explicitly excepted here) instead of silently
+// not represented anywhere in the player, so adding an event in Rust forces it to
+// be wired into the player (or explicitly excepted here) instead of silently
 // going missing — the TypeScript mirror of Rust's
 // `every_produced_event_has_a_registered_definition`.
 
-// The viewer keys events off analysis-graph *stream* names. Those mostly equal
+// The player keys events off analysis-graph *stream* names. Those mostly equal
 // the registry's definition ids; these few legitimately differ.
 const DEFINITION_ID_TO_STREAM: Record<string, string> = {
   backboard_bounce: "backboard",
@@ -25,13 +25,13 @@ const DEFINITION_ID_TO_STREAM: Record<string, string> = {
 // (see coreEventDerivation.ts), not as individual stream toggles.
 const CORE_AGGREGATED = new Set(["assist", "goal", "save", "shot"]);
 
-// Registry entries that are intentionally not surfaced as their own viewer
+// Registry entries that are intentionally not surfaced as their own player
 // timeline stream.
 const NOT_SURFACED = new Set([
   "event", // the generic timeline envelope, not a concrete event type
 ]);
 
-test("every registry event is represented in the viewer (or explicitly excepted)", () => {
+test("every registry event is represented in the player (or explicitly excepted)", () => {
   const viewerStreams = new Set<string>([
     ...STATS_EVENT_STREAM_COUNT_TYPES,
     ...STATS_MECHANIC_EVENT_COUNT_TYPES,
@@ -48,7 +48,7 @@ test("every registry event is represented in the viewer (or explicitly excepted)
   assert.deepEqual(
     missing,
     [],
-    `Registry events missing from the viewer: ${missing.join(", ")}. Add the stream id to ` +
+    `Registry events missing from the player: ${missing.join(", ")}. Add the stream id to ` +
       `STATS_EVENT_STREAM_COUNT_TYPES / STATS_MECHANIC_EVENT_COUNT_TYPES in eventCountDerivation.ts, ` +
       `or extend the alias / exception sets in this test.`,
   );

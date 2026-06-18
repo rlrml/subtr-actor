@@ -5,6 +5,7 @@ import type { PlaybackBound } from "./generated/PlaybackBound";
 import type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
 import type { PlaylistEndMode } from "./generated/PlaylistEndMode";
 import type { ReplayHitboxSpec } from "./hitboxes";
+import type { PlayerOptions } from "./player/types";
 
 export type { PlaybackBound } from "./generated/PlaybackBound";
 export type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
@@ -468,7 +469,7 @@ export interface ReplayPlayerOptions {
 }
 
 export interface ReplayPlaylistPlayerOptions
-  extends Omit<ReplayPlayerOptions, "autoplay">, PlaylistPlaybackOptions {
+  extends Omit<PlayerOptions, "autoplay">, PlaylistPlaybackOptions {
   autoplay?: boolean;
   initialItemIndex?: number;
   preloadPolicy?: ReplayPreloadPolicy;
@@ -489,7 +490,7 @@ export interface ReplayPlayerState {
   ballCamEnabled: boolean;
   /**
    * Whether the followed player's replicated ball-cam toggle drives the camera.
-   * Optional so the structurally-compatible viewer `ViewerState` (which has no
+   * Optional so the structurally-compatible `PlayerState` (which has no
    * such notion) stays assignable to `ReplayPlayerState`.
    */
   useReplayBallCam?: boolean;
