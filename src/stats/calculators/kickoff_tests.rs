@@ -2887,7 +2887,7 @@ fn kickoff_goal_attribution_window_closes_after_max_seconds() {
 
     calculator
         .update(
-            &frame(140, 11.2),
+            &frame(140, 13.2),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -2908,7 +2908,7 @@ fn kickoff_goal_attribution_window_closes_after_max_seconds() {
     // A goal landing after the window stays unattributed.
     calculator
         .update(
-            &frame(145, 11.6),
+            &frame(145, 13.6),
             &GameplayState {
                 ball_has_been_hit: Some(true),
                 ..GameplayState::default()
@@ -2917,7 +2917,7 @@ fn kickoff_goal_attribution_window_closes_after_max_seconds() {
             &PlayerFrameState::default(),
             &TouchState::default(),
             &FrameEventsState {
-                goal_events: vec![goal(true, 145, 11.6)],
+                goal_events: vec![goal(true, 145, 13.6)],
                 ..FrameEventsState::default()
             },
         )

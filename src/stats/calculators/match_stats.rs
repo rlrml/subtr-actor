@@ -4,6 +4,7 @@ const GOAL_BUILDUP_LOOKBACK_SECONDS: f32 = 12.0;
 const COUNTER_ATTACK_MAX_ATTACK_SECONDS: f32 = 4.0;
 const COUNTER_ATTACK_MIN_DEFENSIVE_HALF_SECONDS: f32 = 4.0;
 const COUNTER_ATTACK_MIN_DEFENSIVE_THIRD_SECONDS: f32 = 1.0;
+const SUSTAINED_PRESSURE_MIN_TIME_AFTER_KICKOFF_SECONDS: f32 = 12.0;
 const SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS: f32 = 6.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS: f32 = 7.0;
 const SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS: f32 = 3.5;
@@ -1083,7 +1084,12 @@ impl MatchStatsCalculator {
         if current_attack_time <= COUNTER_ATTACK_MAX_ATTACK_SECONDS && has_defensive_pressure_signal
         {
             GoalBuildupKind::CounterAttack
-        } else if current_attack_time >= SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS
+        } else if self
+            .active_kickoff_touch_time
+            .is_none_or(|kickoff_touch_time| {
+                goal_time - kickoff_touch_time >= SUSTAINED_PRESSURE_MIN_TIME_AFTER_KICKOFF_SECONDS
+            })
+            && current_attack_time >= SUSTAINED_PRESSURE_MIN_ATTACK_SECONDS
             && offensive_half_time >= SUSTAINED_PRESSURE_MIN_OFFENSIVE_HALF_SECONDS
             && offensive_third_time >= SUSTAINED_PRESSURE_MIN_OFFENSIVE_THIRD_SECONDS
         {
