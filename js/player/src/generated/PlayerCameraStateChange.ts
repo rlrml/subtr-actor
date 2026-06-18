@@ -4,7 +4,7 @@
  * A coalesced change in a player's discrete camera/vehicle toggles.
  *
  * Ball cam, behind-view, and the driving flag flip only a handful of times per
- * match, so rather than storing a value on every [`PlayerFrame`] these are
+ * match, so rather than storing a value on every [`PlayerFrame`](crate::PlayerFrame) these are
  * emitted as one change per player whenever any of them flips. Each change
  * carries the full discrete state from that frame onward, so a consumer
  * resolves "ball cam at frame N" with a last-change-before-N lookup.

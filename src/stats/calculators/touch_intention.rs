@@ -80,6 +80,7 @@ impl TouchIntention {
     }
 }
 
+/// The resolved touch intention with supporting context.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TouchIntentionResolution {
     pub intention: TouchIntention,

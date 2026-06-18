@@ -6,6 +6,7 @@ const DEFAULT_TERRITORIAL_PRESSURE_MIN_ESTABLISH_THIRD_SECONDS: f32 = 0.75;
 const DEFAULT_TERRITORIAL_PRESSURE_RELIEF_GRACE_SECONDS: f32 = 3.0;
 const DEFAULT_TERRITORIAL_PRESSURE_CONFIRMED_RELIEF_GRACE_SECONDS: f32 = 1.25;
 
+/// Why a territorial-pressure session ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -16,6 +17,7 @@ pub enum TerritorialPressureEndReason {
     ReplayEnd,
 }
 
+/// A session of sustained territorial pressure by one team.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TerritorialPressureEvent {
@@ -30,6 +32,7 @@ pub struct TerritorialPressureEvent {
     pub end_reason: TerritorialPressureEndReason,
 }
 
+/// Configuration thresholds for territorial-pressure detection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TerritorialPressureCalculatorConfig {
     pub neutral_zone_half_width_y: f32,
@@ -52,6 +55,7 @@ impl Default for TerritorialPressureCalculatorConfig {
     }
 }
 
+/// Tracks territorial-pressure sessions during live play.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TerritorialPressureCalculator {
     config: TerritorialPressureCalculatorConfig,

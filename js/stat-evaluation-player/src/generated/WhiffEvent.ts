@@ -2,4 +2,7 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { WhiffEventKind } from "./WhiffEventKind.ts";
 
+/**
+ * A committed attempt near the ball that does not result in that player touching it.
+ */
 export type WhiffEvent = { kind: WhiffEventKind, time: number, frame: number, resolved_time: number, resolved_frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, closest_approach_distance: number, forward_alignment: number, approach_speed: number, dodge_active: boolean, aerial: boolean, };

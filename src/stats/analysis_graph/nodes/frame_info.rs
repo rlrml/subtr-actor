@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Exposes per-frame timing/frame metadata extracted from raw frame input.
 pub struct FrameInfoNode {
     state: FrameInfo,
 }

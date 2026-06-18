@@ -1,5 +1,6 @@
 use super::*;
 
+/// Maintains shared 50/50 contest state for downstream consumers.
 #[derive(Default)]
 pub struct FiftyFiftyStateCalculator {
     active_event: Option<ActiveFiftyFifty>,

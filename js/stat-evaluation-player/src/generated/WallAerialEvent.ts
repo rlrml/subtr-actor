@@ -2,4 +2,7 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { WallAerialWall } from "./WallAerialWall.ts";
 
+/**
+ * An aerial play that starts from controlled ball movement on a side or back wall.
+ */
 export type WallAerialEvent = { time: number, frame: number, sample_time: number, sample_frame: number, player: RemoteIdTs, is_team_0: boolean, wall: WallAerialWall, wall_contact_time: number, wall_contact_frame: number, takeoff_time: number, takeoff_frame: number, time_since_takeoff: number, wall_contact_position: [number, number, number], takeoff_position: [number, number, number], player_position: [number, number, number], ball_position: [number, number, number], setup_start_time: number, setup_start_frame: number, setup_duration: number, ball_speed: number, ball_speed_change: number, goal_alignment: number, confidence: number, };

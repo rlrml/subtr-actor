@@ -2,4 +2,7 @@
 import type { GoalContextPosition } from "./GoalContextPosition.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * Per-player context surrounding a goal.
+ */
 export type GoalPlayerContext = { player: RemoteIdTs, is_team_0: boolean, position: GoalContextPosition | null, boost_amount: number | null, average_boost_in_leadup: number | null, min_boost_in_leadup: number | null, is_most_back: boolean, };

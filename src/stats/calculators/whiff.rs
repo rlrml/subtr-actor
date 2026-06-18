@@ -25,6 +25,7 @@ const WHIFF_MAX_DODGE_LATERAL_OFFSET: f32 = 150.0;
 const WHIFF_MIN_LOCAL_FORWARD_OFFSET: f32 = 0.0;
 const WHIFF_MIN_DODGE_LOCAL_FORWARD_OFFSET: f32 = -20.0;
 
+/// Whether a whiff was a true whiff or a beaten-to-ball attempt.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -34,6 +35,7 @@ pub enum WhiffEventKind {
     BeatenToBall,
 }
 
+/// A committed attempt near the ball that does not result in that player touching it.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WhiffEvent {
@@ -106,6 +108,7 @@ impl InFlightItem for ActiveWhiffCandidate {
     }
 }
 
+/// Detects whiffs and beaten-to-ball attempts.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WhiffCalculator {
     active_candidates: KeyedInFlightLedger<PlayerId, ActiveWhiffCandidate>,

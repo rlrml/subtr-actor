@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Exposes per-frame ball state (position/velocity) extracted from raw frame input.
 pub struct BallFrameStateNode {
     state: BallFrameState,
 }

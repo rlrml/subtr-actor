@@ -68,6 +68,7 @@ fn touch_reception_label(first_touch: bool) -> StatLabel {
     )
 }
 
+/// Accumulated touch stats: counts by control, hardness, and aerial context.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchStats {
@@ -268,6 +269,7 @@ impl TouchStats {
     }
 }
 
+/// Accumulates touch stats over the replay from touch events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchStatsAccumulator {
     player_stats: HashMap<PlayerId, TouchStats>,

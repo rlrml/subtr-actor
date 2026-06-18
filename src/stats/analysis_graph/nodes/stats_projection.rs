@@ -4,6 +4,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::{PlayerId, SubtrActorResult};
 
+/// Aggregated per-stat accumulators forming the incremental stats projection.
 #[derive(Debug, Clone, Default)]
 pub struct StatsProjectionState {
     pub core: CoreStatsAccumulator,
@@ -150,6 +151,7 @@ impl IncrementalMovementProjection {
     }
 }
 
+/// Folds every mechanic/state calculator's events into per-frame cumulative stat accumulators.
 #[derive(Debug, Clone, Default)]
 pub struct StatsProjectionNode {
     state: StatsProjectionState,

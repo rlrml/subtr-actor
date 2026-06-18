@@ -78,6 +78,7 @@ struct TouchClassification {
     dodge_state: TouchDodgeState,
 }
 
+/// A classified ball touch with strength kind, surface/height context, and an inferred intention.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchClassificationEvent {
@@ -120,6 +121,7 @@ pub struct TouchClassificationEvent {
     pub ball_movement: Option<TouchBallMovement>,
 }
 
+/// Ball movement produced by a touch.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchBallMovement {
@@ -187,6 +189,7 @@ impl InFlightItem for PendingTouchBallMovementCredit {
     }
 }
 
+/// Classifies ball touches into typed touch events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchCalculator {
     events: EventStream<TouchClassificationEvent>,

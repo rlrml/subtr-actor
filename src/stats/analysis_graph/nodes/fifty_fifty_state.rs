@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks 50/50 contest state from ball/player/touch/possession state as shared state.
 pub struct FiftyFiftyStateNode {
     calculator: FiftyFiftyStateCalculator,
     state: FiftyFiftyState,

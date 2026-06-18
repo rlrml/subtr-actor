@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks per-player field positioning (thirds/halves/roles/proximity) from frame and possession state.
 pub struct PositioningNode {
     calculator: PositioningCalculator,
 }

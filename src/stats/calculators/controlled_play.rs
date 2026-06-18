@@ -12,6 +12,7 @@ pub(crate) const MIN_EPISODE_DURATION_SECONDS: f32 = 1.00;
 pub(crate) const MIN_FIRST_TO_LAST_TOUCH_DURATION_SECONDS: f32 = 1.00;
 pub(crate) const MIN_TOUCHES: u32 = 2;
 
+/// A span of sustained controlled play with ball-progress metrics.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ControlledPlayEvent {
@@ -139,6 +140,7 @@ impl InFlightItem for ActiveControlledPlay {
     }
 }
 
+/// Detects stretches of controlled play from ball/player positions and touches.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ControlledPlayCalculator {
     events: EventStream<ControlledPlayEvent>,

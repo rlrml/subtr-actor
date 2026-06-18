@@ -1,5 +1,6 @@
 use super::*;
 
+/// Accumulated controlled-play stats: counts, times, and ball advance.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ControlledPlayStats {
@@ -20,6 +21,7 @@ impl ControlledPlayStats {
     }
 }
 
+/// Accumulates controlled-play stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ControlledPlayStatsAccumulator {
     player_stats: HashMap<PlayerId, ControlledPlayStats>,

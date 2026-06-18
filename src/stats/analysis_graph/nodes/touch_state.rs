@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects raw ball touches per frame from ball/player state and frame events as shared state.
 pub struct TouchStateNode {
     calculator: TouchStateCalculator,
     state: TouchState,

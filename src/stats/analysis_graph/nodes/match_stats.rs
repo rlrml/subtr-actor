@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Accumulates match-level stats and goal contexts; attaches per-goal territorial pressure at finish.
 pub struct MatchStatsNode {
     calculator: MatchStatsCalculator,
 }

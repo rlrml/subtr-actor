@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Exposes per-frame gameplay state (game phase, ball-hit, etc.) from raw frame input.
 pub struct GameplayStateNode {
     state: GameplayState,
 }

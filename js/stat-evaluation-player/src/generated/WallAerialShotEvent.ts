@@ -2,4 +2,7 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { WallAerialWall } from "./WallAerialWall.ts";
 
+/**
+ * A shot credited to a player shortly after taking off from a wall.
+ */
 export type WallAerialShotEvent = { time: number, frame: number, player: RemoteIdTs, is_team_0: boolean, wall: WallAerialWall, wall_contact_time: number, wall_contact_frame: number, takeoff_time: number, takeoff_frame: number, time_since_takeoff: number, wall_contact_position: [number, number, number], takeoff_position: [number, number, number], player_position: [number, number, number], ball_position: [number, number, number], ball_speed: number | null, goal_alignment: number | null, confidence: number, };

@@ -1,5 +1,6 @@
 use super::*;
 
+/// Derives backboard-play stats from detected backboard bounces.
 #[derive(Debug, Clone, Default)]
 pub struct BackboardCalculator {
     events: EventStream<BackboardBounceEvent>,

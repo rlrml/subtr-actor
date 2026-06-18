@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Holds the materialized per-frame stats snapshot DTO.
 #[derive(Debug, Clone, Default)]
 pub struct StatsTimelineFrameState {
     pub frame: Option<ReplayStatsFrame>,

@@ -56,12 +56,14 @@ const REVERSE_FLICK_MIN_FORWARD_IMPULSE: f32 = 450.0;
 const REVERSE_FLICK_MIN_FORWARD_IMPULSE_ALIGNMENT: f32 = 0.55;
 const REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES: f32 = 15.0;
 
+/// The kind of flick detected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlickKind {
     Other,
     Reverse,
 }
 
+/// Rotation direction of the car during the flick setup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlickSetupRotationDirection {
     Unknown,
@@ -118,6 +120,7 @@ pub(crate) fn flick_setup_rotation_direction_label(value: &str) -> StatLabel {
     }
 }
 
+/// A dodge-powered touch following a short controlled carry setup.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlickEvent {
@@ -240,6 +243,7 @@ impl PartialEq for PendingFlick {
     }
 }
 
+/// Detects flicks from ball/player state and touches.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlickCalculator {
     events: EventStream<FlickEvent>,

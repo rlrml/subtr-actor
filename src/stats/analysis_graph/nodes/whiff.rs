@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects whiffs and beaten-to-ball attempts from ball/player state and touches during live play.
 pub struct WhiffNode {
     calculator: WhiffCalculator,
 }

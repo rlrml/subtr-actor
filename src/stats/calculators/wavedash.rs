@@ -7,6 +7,7 @@ const WAVEDASH_MAX_DODGE_START_Z: f32 = 320.0;
 const WAVEDASH_MIN_LANDING_UPRIGHTNESS: f32 = 0.15;
 const WAVEDASH_MIN_CONFIDENCE: f32 = 0.45;
 
+/// A low airborne dodge that lands quickly and converts the dodge into ground speed.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WavedashEvent {
@@ -37,6 +38,7 @@ struct ActiveWavedashCandidate {
     start_height: f32,
 }
 
+/// Detects wavedashes from player frame state.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WavedashCalculator {
     events: EventStream<WavedashEvent>,

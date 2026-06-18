@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects passes from touches, backboard-bounce, and 50/50 state during live play.
 pub struct PassNode {
     calculator: PassCalculator,
 }

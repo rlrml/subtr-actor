@@ -23,6 +23,7 @@ struct MovementClassification {
     height_band: PlayerVerticalBand,
 }
 
+/// A change in a player's movement classification.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct MovementEvent {
@@ -56,6 +57,7 @@ impl MovementEvent {
     }
 }
 
+/// Tracks per-player movement classification and stats.
 #[derive(Debug, Clone, Default)]
 pub struct MovementCalculator {
     player_teams: HashMap<PlayerId, bool>,

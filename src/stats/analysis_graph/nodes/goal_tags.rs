@@ -231,6 +231,7 @@ impl AnalysisNode for HighAerialGoalNode {
     }
 }
 
+/// Tags goals scored via a half-volley by joining match-stats goals with half-volley events.
 pub struct HalfVolleyGoalNode {
     calculator: HalfVolleyGoalCalculator,
 }

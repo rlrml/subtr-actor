@@ -1,5 +1,6 @@
 use super::*;
 
+/// Accumulated possession time split by team and neutral.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PossessionStats {
     pub tracked_time: f32,
@@ -67,6 +68,7 @@ impl PossessionStats {
     }
 }
 
+/// Per-team accumulated possession stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PossessionTeamStats {
@@ -78,6 +80,7 @@ pub struct PossessionTeamStats {
     pub labeled_time: LabeledFloatSums,
 }
 
+/// Accumulates possession stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PossessionStatsAccumulator {
     stats: PossessionStats,

@@ -3,4 +3,7 @@ import type { GoalContextPosition } from "./GoalContextPosition.ts";
 import type { GoalTagEvidenceKind } from "./GoalTagEvidenceKind.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * Evidence linking an event to a tagged goal.
+ */
 export type GoalTagEvidence = { kind: GoalTagEvidenceKind, time: number, frame: number, player: RemoteIdTs | null, player_position?: GoalContextPosition | null, };

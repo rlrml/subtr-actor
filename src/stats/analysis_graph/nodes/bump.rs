@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects player-on-player bumps from player frame/events and 50/50 state.
 pub struct BumpNode {
     calculator: BumpCalculator,
 }
