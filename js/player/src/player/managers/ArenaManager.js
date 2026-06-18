@@ -51,11 +51,7 @@ function prepareArenaTemplate(arena) {
   const disableFrustumCullingPatterns = ["Glow", "Glass"];
 
   // Meshes that should NOT cast shadows (ceilings, transparent elements)
-  const noCastShadowMeshes = [
-    "Plafond_Hexagone_T0",
-    "Plafond_Hexagone_T1",
-    "Plafond_Transparent",
-  ];
+  const noCastShadowMeshes = ["Plafond_Hexagone_T0", "Plafond_Hexagone_T1", "Plafond_Transparent"];
 
   arena.traverse((child) => {
     if (!child.isMesh) {
