@@ -115,6 +115,36 @@ fn primary_touch_event(touch_events: &[TouchEvent]) -> Option<&TouchEvent> {
         .min_by(|left, right| touch_event_ordering(left, right))
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct TouchEventContactFields {
+    local_ball_position: Option<[f32; 3]>,
+    local_hitbox_point: Option<[f32; 3]>,
+    world_hitbox_point: Option<[f32; 3]>,
+}
+
+fn touch_event_contact_fields(
+    ball_position: glam::Vec3,
+    player_body: &boxcars::RigidBody,
+    hitbox: CarHitbox,
+) -> TouchEventContactFields {
+    let Some(estimate) = car_hitbox_contact_estimate(ball_position, player_body, hitbox) else {
+        return TouchEventContactFields::default();
+    };
+
+    let car_position = vec_to_glam(&player_body.location);
+    let car_rotation = quat_to_glam(&player_body.rotation);
+    let hitbox_center = glam::Vec3::new(hitbox.offset, 0.0, hitbox.elevation);
+    let hitbox_rotation = glam::Quat::from_rotation_y(hitbox.angle.to_radians());
+    let world_hitbox_point = car_position
+        + car_rotation * (hitbox_center + hitbox_rotation * estimate.local_contact_point);
+
+    TouchEventContactFields {
+        local_ball_position: Some(estimate.local_ball_position.to_array()),
+        local_hitbox_point: Some(estimate.local_contact_point.to_array()),
+        world_hitbox_point: Some(world_hitbox_point.to_array()),
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RecentTeamTouch {
     frame: usize,
@@ -185,6 +215,8 @@ impl TouchStateCalculator {
                 if !accepted_contact_gap(closest_contact_gap, ball_deviation) {
                     return None;
                 }
+                let contact_fields =
+                    touch_event_contact_fields(ball.position(), rigid_body, player.hitbox);
 
                 Some(TouchEvent {
                     touch_id: None,
@@ -194,6 +226,9 @@ impl TouchStateCalculator {
                     player: Some(player.player_id.clone()),
                     player_position: Some(rigid_body.location),
                     closest_approach_distance: Some(closest_contact_gap),
+                    contact_local_ball_position: contact_fields.local_ball_position,
+                    contact_local_hitbox_point: contact_fields.local_hitbox_point,
+                    contact_world_hitbox_point: contact_fields.world_hitbox_point,
                     dodge_contact: player.dodge_active,
                 })
             })
@@ -295,15 +330,22 @@ impl TouchStateCalculator {
             .filter(|(closest_contact_gap, _, _)| {
                 *closest_contact_gap <= MARKER_CONTACT_ATTRIBUTION_MAX_GAP
             })
-            .map(|(closest_contact_gap, player, rigid_body)| TouchEvent {
-                touch_id: None,
-                time: event.time,
-                frame: event.frame,
-                team_is_team_0: event.team_is_team_0,
-                player: Some(player.player_id.clone()),
-                player_position: Some(rigid_body.location),
-                closest_approach_distance: Some(closest_contact_gap),
-                dodge_contact: player.dodge_active,
+            .map(|(closest_contact_gap, player, rigid_body)| {
+                let contact_fields =
+                    touch_event_contact_fields(ball.position(), rigid_body, player.hitbox);
+                TouchEvent {
+                    touch_id: None,
+                    time: event.time,
+                    frame: event.frame,
+                    team_is_team_0: event.team_is_team_0,
+                    player: Some(player.player_id.clone()),
+                    player_position: Some(rigid_body.location),
+                    closest_approach_distance: Some(closest_contact_gap),
+                    contact_local_ball_position: contact_fields.local_ball_position,
+                    contact_local_hitbox_point: contact_fields.local_hitbox_point,
+                    contact_world_hitbox_point: contact_fields.world_hitbox_point,
+                    dodge_contact: player.dodge_active,
+                }
             })
     }
 
@@ -360,6 +402,15 @@ impl TouchStateCalculator {
             closest_approach_distance: event
                 .closest_approach_distance
                 .or(candidate.closest_approach_distance),
+            contact_local_ball_position: event
+                .contact_local_ball_position
+                .or(candidate.contact_local_ball_position),
+            contact_local_hitbox_point: event
+                .contact_local_hitbox_point
+                .or(candidate.contact_local_hitbox_point),
+            contact_world_hitbox_point: event
+                .contact_world_hitbox_point
+                .or(candidate.contact_world_hitbox_point),
             dodge_contact: event.dodge_contact || candidate.dodge_contact,
         })
     }
@@ -392,6 +443,13 @@ impl TouchStateCalculator {
                 )
             })
             .map(|(closest_contact_gap, _current_contact_gap)| closest_contact_gap);
+        let contact_fields = ball
+            .position()
+            .zip(rigid_body)
+            .map(|(ball_position, rigid_body)| {
+                touch_event_contact_fields(ball_position, rigid_body, player.hitbox)
+            })
+            .unwrap_or_default();
 
         TouchEvent {
             team_is_team_0: player.is_team_0,
@@ -399,6 +457,15 @@ impl TouchStateCalculator {
                 .player_position
                 .or_else(|| rigid_body.map(|rigid_body| rigid_body.location)),
             closest_approach_distance: event.closest_approach_distance.or(closest_contact_gap),
+            contact_local_ball_position: event
+                .contact_local_ball_position
+                .or(contact_fields.local_ball_position),
+            contact_local_hitbox_point: event
+                .contact_local_hitbox_point
+                .or(contact_fields.local_hitbox_point),
+            contact_world_hitbox_point: event
+                .contact_world_hitbox_point
+                .or(contact_fields.world_hitbox_point),
             dodge_contact: event.dodge_contact || player.dodge_active,
             ..event.clone()
         }
@@ -419,6 +486,9 @@ impl TouchStateCalculator {
                 .map(|position| glam_to_vec(&glam::Vec3::from_array(position)))
                 .or(candidate.player_position),
             closest_approach_distance: candidate.closest_approach_distance,
+            contact_local_ball_position: candidate.contact_local_ball_position,
+            contact_local_hitbox_point: candidate.contact_local_hitbox_point,
+            contact_world_hitbox_point: candidate.contact_world_hitbox_point,
             dodge_contact: candidate.dodge_contact,
         }
     }
@@ -500,6 +570,8 @@ impl TouchStateCalculator {
                 if closest_contact_gap > GEOMETRIC_CONTEST_MAX_GAP {
                     return None;
                 }
+                let contact_fields =
+                    touch_event_contact_fields(ball.position(), rigid_body, player.hitbox);
                 Some(TouchEvent {
                     touch_id: None,
                     time: frame.time,
@@ -508,6 +580,9 @@ impl TouchStateCalculator {
                     player: Some(player.player_id.clone()),
                     player_position: Some(rigid_body.location),
                     closest_approach_distance: Some(closest_contact_gap),
+                    contact_local_ball_position: contact_fields.local_ball_position,
+                    contact_local_hitbox_point: contact_fields.local_hitbox_point,
+                    contact_world_hitbox_point: contact_fields.world_hitbox_point,
                     dodge_contact: player.dodge_active,
                 })
             })

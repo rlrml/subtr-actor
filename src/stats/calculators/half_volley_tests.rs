@@ -64,6 +64,9 @@ fn touch(frame_number: usize, player_id: PlayerId) -> TouchEvent {
         player: Some(player_id),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }
 }

@@ -43,6 +43,9 @@ fn touch(player_id: PlayerId, is_team_0: bool, dodge_contact: bool) -> TouchEven
         player: Some(player_id),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact,
     }
 }
@@ -56,6 +59,9 @@ fn touch_at(player_id: PlayerId, is_team_0: bool, time: f32, frame: usize) -> To
         player: Some(player_id),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }
 }

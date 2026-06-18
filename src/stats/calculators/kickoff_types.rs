@@ -362,6 +362,32 @@ pub struct KickoffTakerEvent {
     pub ball_direction: KickoffBallDirection,
     pub first_touch_time: Option<f32>,
     pub first_touch_frame: Option<usize>,
+    /// Car center position at the taker's first kickoff touch, when the touch
+    /// could be matched to a player sample on that frame.
+    pub contact_player_position: Option<[f32; 3]>,
+    pub contact_player_velocity: Option<[f32; 3]>,
+    pub contact_car_forward: Option<[f32; 3]>,
+    /// Ball center in the taker's local hitbox coordinates at contact.
+    pub contact_local_ball_position: Option<[f32; 3]>,
+    /// Closest point on the taker's local hitbox to the ball center.
+    pub contact_local_contact_point: Option<[f32; 3]>,
+    /// Estimated ball-to-hitbox gap after subtracting the ball collision radius.
+    pub contact_gap: Option<f32>,
+    /// Team-normalized distance from car center to ball along the attack axis.
+    /// Positive means the taker is behind the ball on their own-goal side.
+    pub contact_behind_ball_depth: Option<f32>,
+    /// Team-normalized left/right offset of car center from the ball.
+    pub contact_lateral_offset: Option<f32>,
+    pub contact_lateral_abs_offset: Option<f32>,
+    /// Alignment of taker velocity with the opponent-goal direction (`-1..=1`).
+    pub contact_velocity_attack_alignment: Option<f32>,
+    /// Alignment of taker velocity with the car-to-ball direction (`-1..=1`).
+    pub contact_velocity_ball_alignment: Option<f32>,
+    /// Alignment of taker nose direction with the opponent-goal direction.
+    pub contact_nose_attack_alignment: Option<f32>,
+    /// Alignment of the ball's first-touch exit velocity with the taker's
+    /// opponent-goal direction.
+    pub contact_ball_exit_attack_alignment: Option<f32>,
     pub outcome: KickoffTakerOutcome,
     pub approach: KickoffApproach,
 }

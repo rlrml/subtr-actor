@@ -82,6 +82,9 @@ fn touch(frame: usize, time: f32, id: u64, position: glam::Vec3) -> TouchEvent {
         player: Some(player_id(id)),
         player_position: Some(glam_to_vec(&position)),
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }
 }

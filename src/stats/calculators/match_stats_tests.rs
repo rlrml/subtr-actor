@@ -204,6 +204,9 @@ fn goal_context_links_scorer_touch_with_ball_location_and_speeds() {
                     player: Some(scorer.clone()),
                     player_position: None,
                     closest_approach_distance: Some(0.0),
+                    contact_local_ball_position: None,
+                    contact_local_hitbox_point: None,
+                    contact_world_hitbox_point: None,
                     dodge_contact: false,
                 }],
                 ..TouchState::default()
@@ -637,6 +640,9 @@ fn time_after_kickoff_uses_kickoff_first_touch_not_latest_touch() {
         player: Some(scorer.clone()),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
 

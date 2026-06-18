@@ -22,6 +22,9 @@ fn touch_at(player_id: &PlayerId, time: f32) -> TouchEvent {
         player: Some(player_id.clone()),
         player_position: None,
         closest_approach_distance: None,
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }
 }

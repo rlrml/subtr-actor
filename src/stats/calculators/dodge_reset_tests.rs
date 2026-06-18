@@ -94,6 +94,9 @@ fn touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
         player: Some(player),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }
 }
@@ -107,6 +110,9 @@ fn raw_team_touch_event(time: f32, frame: usize) -> TouchEvent {
         player: None,
         player_position: None,
         closest_approach_distance: None,
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }
 }

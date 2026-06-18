@@ -902,6 +902,27 @@ fn parse_kickoff_taker_event(value: &Value) -> SubtrActorResult<KickoffTakerEven
             .unwrap_or_default(),
         first_touch_time: json_optional_f32(object.get("first_touch_time"))?,
         first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
+        contact_player_position: json_optional_vec3(object.get("contact_player_position"))?,
+        contact_player_velocity: json_optional_vec3(object.get("contact_player_velocity"))?,
+        contact_car_forward: json_optional_vec3(object.get("contact_car_forward"))?,
+        contact_local_ball_position: json_optional_vec3(object.get("contact_local_ball_position"))?,
+        contact_local_contact_point: json_optional_vec3(object.get("contact_local_contact_point"))?,
+        contact_gap: json_optional_f32(object.get("contact_gap"))?,
+        contact_behind_ball_depth: json_optional_f32(object.get("contact_behind_ball_depth"))?,
+        contact_lateral_offset: json_optional_f32(object.get("contact_lateral_offset"))?,
+        contact_lateral_abs_offset: json_optional_f32(object.get("contact_lateral_abs_offset"))?,
+        contact_velocity_attack_alignment: json_optional_f32(
+            object.get("contact_velocity_attack_alignment"),
+        )?,
+        contact_velocity_ball_alignment: json_optional_f32(
+            object.get("contact_velocity_ball_alignment"),
+        )?,
+        contact_nose_attack_alignment: json_optional_f32(
+            object.get("contact_nose_attack_alignment"),
+        )?,
+        contact_ball_exit_attack_alignment: json_optional_f32(
+            object.get("contact_ball_exit_attack_alignment"),
+        )?,
         outcome: decode_json_value(json_required_value(object, "outcome")?.clone())?,
         approach: object
             .get("approach")
