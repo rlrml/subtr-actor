@@ -4,6 +4,113 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { resolvePlayerAssetUrl } from "../asset-url.js";
 
+const stadiumTemplatePromises = new Map();
+
+async function loadStadiumTemplate(gltfLoader, assetBase) {
+  const url = resolvePlayerAssetUrl("models/stadium/stadium.glb", assetBase);
+  let templatePromise = stadiumTemplatePromises.get(url);
+  if (!templatePromise) {
+    templatePromise = gltfLoader
+      .loadAsync(url)
+      .then((gltf) => {
+        const arena = gltf.scene;
+        prepareArenaTemplate(arena);
+        return arena;
+      })
+      .catch((error) => {
+        stadiumTemplatePromises.delete(url);
+        throw error;
+      });
+    stadiumTemplatePromises.set(url, templatePromise);
+  }
+  return templatePromise;
+}
+
+function prepareArenaTemplate(arena) {
+  // Materials that need visibility fix (disappear at certain camera angles)
+  const visibilityFixMaterials = [
+    "Sol_Trait_T0",
+    "Sol_Trait_T1",
+    "Milieu_Forme",
+    "Milieu_Forme.001",
+    "cage_T0",
+    "cage_T1",
+    "Couleur_Hexagone_T0",
+    "Couleur_Hexagone_T1",
+    "wall_gradient_color_2",
+    "wall_gradient_color_2.001",
+    "Fond_BackBoard_Transparent", // For Transparant_BackBoard_+_Cage meshes
+    "dégradé_transparent_T0",
+    "dégradé_transparent_T1", // Glow effects on field edges
+    "grid_transperant", // Goal glass mesh
+    "Detail_Milieu",
+    "Detail_Milieu.001", // Field mid details
+  ];
+
+  // Mesh name patterns that need frustum culling disabled (glow effects with incorrect bounding box)
+  const disableFrustumCullingPatterns = ["Glow", "Glass"];
+
+  // Meshes that should NOT cast shadows (ceilings, transparent elements)
+  const noCastShadowMeshes = ["Plafond_Hexagone_T0", "Plafond_Hexagone_T1", "Plafond_Transparent"];
+
+  arena.traverse((child) => {
+    if (!child.isMesh) {
+      return;
+    }
+
+    child.receiveShadow = true;
+    // Disable castShadow for ceiling meshes
+    child.castShadow = !noCastShadowMeshes.includes(child.name);
+
+    // Disable frustum culling for glow meshes (they have incorrect bounding boxes)
+    const shouldDisableFrustumCulling = disableFrustumCullingPatterns.some((pattern) =>
+      child.name.includes(pattern),
+    );
+    if (shouldDisableFrustumCulling) {
+      console.log(`[ArenaManager] Disabling frustum culling for: ${child.name}`);
+      child.frustumCulled = false;
+    }
+
+    // Hexagon patterns render far louder here than the game's subtle originals.
+    if (child.material && /^Hexagone_T[01]$/.test(child.material.name ?? "")) {
+      child.material = child.material.clone();
+      child.material.transparent = true;
+      child.material.opacity = 0.18;
+      child.material.depthWrite = false;
+      child.renderOrder = 1;
+    }
+
+    // Field advert strip carries a baked ballcam.tv ad texture; hide the ad face.
+    if (child.material && child.material.name === "bannière_pub") {
+      child.visible = false;
+    }
+
+    // Floor hex overlay + OOB honeycomb apron.
+    if (child.material && child.material.name === "Sol_Hexagone") {
+      child.material = child.material.clone();
+      child.material.color.setScalar(0.35);
+      child.material.metalness = 0;
+      child.material.roughness = 1;
+    }
+
+    // Fix visibility issues (disappearing at certain angles)
+    if (
+      child.material &&
+      child.material.name &&
+      visibilityFixMaterials.includes(child.material.name)
+    ) {
+      console.log(
+        `[ArenaManager] Fixing visibility for: ${child.name} (material: ${child.material.name})`,
+      );
+      child.material = child.material.clone();
+      child.material.side = THREE.DoubleSide; // Render both sides
+      child.material.depthWrite = false; // Don't write to depth buffer
+      child.renderOrder = 1; // Render after floor
+      child.frustumCulled = false; // Also disable frustum culling for these
+    }
+  });
+}
+
 export class ArenaManager {
   constructor(scene, options = {}) {
     this.scene = scene;
@@ -27,10 +134,8 @@ export class ArenaManager {
     try {
       console.log("Loading arena mesh...");
 
-      const gltf = await this.gltfLoader.loadAsync(
-        resolvePlayerAssetUrl("models/stadium/stadium.glb", this.assetBase),
-      );
-      const arena = gltf.scene;
+      const template = await loadStadiumTemplate(this.gltfLoader, this.assetBase);
+      const arena = template.clone(true);
 
       // Rotate arena 180 degrees around Y axis to match replay coordinate system
       // In Rocket League replays, team 0 (blue) spawns at negative Y coordinates
@@ -38,104 +143,13 @@ export class ArenaManager {
       // This rotation ensures the blue side of the arena mesh faces the blue team's spawn
       // arena.rotation.y = Math.PI; // 180 degrees
 
-      // Materials that need visibility fix (disappear at certain camera angles)
-      const visibilityFixMaterials = [
-        "Sol_Trait_T0",
-        "Sol_Trait_T1",
-        "Milieu_Forme",
-        "Milieu_Forme.001",
-        "cage_T0",
-        "cage_T1",
-        "Couleur_Hexagone_T0",
-        "Couleur_Hexagone_T1",
-        "wall_gradient_color_2",
-        "wall_gradient_color_2.001",
-        "Fond_BackBoard_Transparent", // For Transparant_BackBoard_+_Cage meshes
-        "dégradé_transparent_T0",
-        "dégradé_transparent_T1", // Glow effects on field edges
-        "grid_transperant", // Goal glass mesh
-        "Detail_Milieu",
-        "Detail_Milieu.001", // Field mid details
-      ];
-
-      // Mesh name patterns that need frustum culling disabled (glow effects with incorrect bounding box)
-      const disableFrustumCullingPatterns = ["Glow", "Glass"];
-
-      // Meshes that should NOT cast shadows (ceilings, transparent elements)
-      const noCastShadowMeshes = [
-        "Plafond_Hexagone_T0",
-        "Plafond_Hexagone_T1",
-        "Plafond_Transparent",
-      ];
-
-      // Enable shadow receiving on arena meshes and collect for raycasting
+      // Collect instance meshes for raycasting. The immutable decoded template
+      // is shared across player instances with the same asset root, so event
+      // review can switch replays without reparsing the stadium GLB every time.
       arena.traverse((child) => {
         if (child.isMesh) {
-          child.receiveShadow = true;
-          // Disable castShadow for ceiling meshes
-          child.castShadow = !noCastShadowMeshes.includes(child.name);
-
           // Store mesh reference for raycasting (drawing/pings)
           this.arenaMeshes.push(child);
-
-          // Disable frustum culling for glow meshes (they have incorrect bounding boxes)
-          const shouldDisableFrustumCulling = disableFrustumCullingPatterns.some((pattern) =>
-            child.name.includes(pattern),
-          );
-          if (shouldDisableFrustumCulling) {
-            console.log(`[ArenaManager] Disabling frustum culling for: ${child.name}`);
-            child.frustumCulled = false;
-          }
-
-          // Hexagon patterns render far louder here than the game's subtle
-          // originals. They're baked into the model (outline geometry for the
-          // force-field cage, a texture for the floor/out-of-bounds honeycomb),
-          // so line width can't be thinned directly.
-          //
-          // Force-field cage walls + center-circle accents (Hexagone_T0/T1):
-          // translucency (+ no depth write, so the cage never occludes gameplay)
-          // gets the barely-there in-game look and makes the lines read thinner.
-          if (child.material && /^Hexagone_T[01]$/.test(child.material.name ?? "")) {
-            child.material = child.material.clone();
-            child.material.transparent = true;
-            child.material.opacity = 0.18;
-            child.material.depthWrite = false;
-            child.renderOrder = 1;
-          }
-
-          // Field advert strip carries a baked ballcam.tv ad texture
-          // (bannière_pub material on AdvertStrip_Field) — hide the ad face and
-          // keep the AdvertStrip_Frame structure as a neutral board.
-          if (child.material && child.material.name === "bannière_pub") {
-            child.visible = false;
-          }
-
-          // Floor hex overlay + OOB honeycomb apron (Sol_Hexagone): opacity is
-          // the wrong tool here — the floor stack has solid team-color layers
-          // underneath that show through. Instead dim the texture and drop the
-          // metallic sheen that makes the grid glow at glancing camera angles.
-          if (child.material && child.material.name === "Sol_Hexagone") {
-            child.material = child.material.clone();
-            child.material.color.setScalar(0.35);
-            child.material.metalness = 0;
-            child.material.roughness = 1;
-          }
-
-          // Fix visibility issues (disappearing at certain angles)
-          if (
-            child.material &&
-            child.material.name &&
-            visibilityFixMaterials.includes(child.material.name)
-          ) {
-            console.log(
-              `[ArenaManager] Fixing visibility for: ${child.name} (material: ${child.material.name})`,
-            );
-            child.material = child.material.clone();
-            child.material.side = THREE.DoubleSide; // Render both sides
-            child.material.depthWrite = false; // Don't write to depth buffer
-            child.renderOrder = 1; // Render after floor
-            child.frustumCulled = false; // Also disable frustum culling for these
-          }
         }
       });
 

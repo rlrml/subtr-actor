@@ -71,6 +71,9 @@ type FreeCameraTransition = {
   up: THREE.Vector3;
   fov: number;
 };
+type FreeCameraPresetOptions = {
+  instant?: boolean;
+};
 
 // With `effects: false`, every EffectsManager call from ActorManager is a no-op.
 const effectsStub = new Proxy({}, { get: () => () => {} });
@@ -307,7 +310,10 @@ export class ReplayPlayer extends EventTarget {
       options.initialSkipPostGoalTransitionsEnabled ?? true;
     this.skipKickoffsEnabledValue = options.initialSkipKickoffsEnabled ?? false;
 
-    this.sceneManager = new SceneManager(container, { assetBase: options.assetBase });
+    this.sceneManager = new SceneManager(container, {
+      assetBase: options.assetBase,
+      preserveDrawingBuffer: options.preserveDrawingBuffer,
+    });
     // Neutral IBL renders instantly so playback starts immediately; the HDR
     // environment (default "space") loads lazily and swaps in once decoded.
     this.sceneManager.initDefaultEnvironment();
@@ -535,11 +541,23 @@ export class ReplayPlayer extends EventTarget {
     this.emitChange();
   }
 
-  setFreeCameraPreset(preset: PlayerFreeCameraPreset): void {
+  setFreeCameraPreset(preset: PlayerFreeCameraPreset, options: FreeCameraPresetOptions = {}): void {
     this.cameraViewModeValue = "free";
     this.attachmentTouched = true;
     this.syncCameraAttachment(); // leave follow mode if we were in it
-    this.freeCameraTransition = getFreeCameraPreset(preset, this.camera.aspect);
+    const transition = getFreeCameraPreset(preset, this.camera.aspect);
+    if (options.instant) {
+      this.camera.position.copy(transition.position);
+      this.controls.target.copy(transition.target);
+      this.camera.up.copy(transition.up).normalize();
+      this.camera.fov = transition.fov;
+      this.camera.updateProjectionMatrix();
+      this.camera.lookAt(transition.target);
+      this.controls.enabled = true;
+      this.freeCameraTransition = null;
+    } else {
+      this.freeCameraTransition = transition;
+    }
     this.emitChange();
   }
 
@@ -1040,7 +1058,7 @@ export class ReplayPlayer extends EventTarget {
     this.scheduleAnimationFrame();
   };
 
-  private render(dt = 0): void {
+  renderFrame(dt = 0): void {
     this.adapter.seek(this.currentTime);
     // Original GameEngine frame order: advance the THREE animation system (when
     // active it owns positions) BEFORE updateFromFramework applies entity state.
@@ -1074,6 +1092,10 @@ export class ReplayPlayer extends EventTarget {
     }
     this.updateFreeCameraTransition();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private render(dt = 0): void {
+    this.renderFrame(dt);
   }
 
   private updateFreeCameraTransition(): void {
