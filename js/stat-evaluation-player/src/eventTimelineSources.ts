@@ -48,12 +48,16 @@ const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#ec4899",
 ];
 const EVENT_PLAYLIST_NEUTRAL_COLOR = "#d1d9e0";
+const EVENT_STREAM_TEAM_ZERO_COLOR = EVENT_PLAYLIST_PLAYER_COLORS[0]!;
+const EVENT_STREAM_TEAM_ONE_COLOR = EVENT_PLAYLIST_PLAYER_COLORS[4]!;
 
 interface EventWindowSourceDefinition {
   id: string;
   label: string;
   buildEvents(ctx: StatModuleContext): ReplayTimelineEvent[];
 }
+
+type EventColorResolver = (event: Event) => string | null;
 
 export interface EventTimelineSource {
   id: string;
@@ -202,6 +206,47 @@ function payloadRecord(event: Event): Record<string, unknown> {
   return isRecord(event.payload.payload) ? event.payload.payload : {};
 }
 
+function teamColor(isTeamZero: boolean | null | undefined): string | null {
+  if (isTeamZero === true) {
+    return EVENT_STREAM_TEAM_ZERO_COLOR;
+  }
+  if (isTeamZero === false) {
+    return EVENT_STREAM_TEAM_ONE_COLOR;
+  }
+  return null;
+}
+
+function fieldHalfColor(fieldHalf: unknown): string | null {
+  if (fieldHalf === "team_zero_side") {
+    return EVENT_STREAM_TEAM_ZERO_COLOR;
+  }
+  if (fieldHalf === "team_one_side") {
+    return EVENT_STREAM_TEAM_ONE_COLOR;
+  }
+  if (fieldHalf === "neutral") {
+    return EVENT_PLAYLIST_NEUTRAL_COLOR;
+  }
+  return null;
+}
+
+const EVENT_STREAM_COLOR_RESOLVERS: Partial<Record<string, EventColorResolver>> = {
+  ball_half(event) {
+    return fieldHalfColor(payloadRecord(event).field_half);
+  },
+};
+
+function resolveGenericStatsEventColor(
+  streamId: string,
+  event: Event,
+  isTeamZero: boolean | null,
+): string {
+  return (
+    EVENT_STREAM_COLOR_RESOLVERS[streamId]?.(event) ??
+    teamColor(isTeamZero) ??
+    EVENT_PLAYLIST_NEUTRAL_COLOR
+  );
+}
+
 function joinEventDetails(parts: Array<string | null>): string {
   return parts.filter((part): part is string => Boolean(part)).join(" | ");
 }
@@ -317,6 +362,7 @@ function buildGenericStatsEventTimelineEvents(
     const isTeamZero = event.meta.team_is_team_0 ?? null;
     const teamLabel = isTeamZero == null ? null : isTeamZero ? "Blue" : "Orange";
     const eventId = event.meta.id || `${streamId}:${timing.frame ?? timing.time}:${index}`;
+    const color = resolveGenericStatsEventColor(streamId, event, isTeamZero);
 
     return [
       {
@@ -334,12 +380,7 @@ function buildGenericStatsEventTimelineEvents(
         playerId,
         playerName,
         isTeamZero,
-        color:
-          isTeamZero == null
-            ? EVENT_PLAYLIST_NEUTRAL_COLOR
-            : isTeamZero
-              ? EVENT_PLAYLIST_PLAYER_COLORS[0]
-              : EVENT_PLAYLIST_PLAYER_COLORS[4],
+        color,
       },
     ];
   });
@@ -369,6 +410,7 @@ function buildGenericStatsEventTimelineRanges(
       const teamLabel = isTeamZero == null ? null : isTeamZero ? "Blue" : "Orange";
       const playerId = remoteIdToString(event.meta.primary_player);
       const playerName = playerId ? (playerNames.get(playerId) ?? playerId) : null;
+      const color = resolveGenericStatsEventColor(streamId, event, isTeamZero);
       const eventId =
         event.meta.id ||
         `${streamId}:${timing.startFrame ?? timing.startTime}:${timing.endFrame ?? timing.endTime}:${index}`;
@@ -404,12 +446,7 @@ function buildGenericStatsEventTimelineRanges(
           label,
           shortLabel: eventStreamShortLabel(streamId),
           isTeamZero,
-          color:
-            isTeamZero == null
-              ? EVENT_PLAYLIST_NEUTRAL_COLOR
-              : isTeamZero
-                ? EVENT_PLAYLIST_PLAYER_COLORS[0]
-                : EVENT_PLAYLIST_PLAYER_COLORS[4],
+          color,
         },
       ];
     })
