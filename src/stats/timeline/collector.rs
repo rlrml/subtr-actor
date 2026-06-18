@@ -23,16 +23,21 @@ pub fn build_timeline_event_graph() -> AnalysisGraph {
 }
 
 pub fn default_stats_timeline_config() -> StatsTimelineConfig {
+    let positioning_defaults = PositioningCalculatorConfig::default();
     let rotation_defaults = RotationCalculatorConfig::default();
     let territorial_pressure_defaults = TerritorialPressureCalculatorConfig::default();
     StatsTimelineConfig {
-        most_back_forward_threshold_y: PositioningCalculatorConfig::default()
-            .most_back_forward_threshold_y,
-        level_ball_depth_margin: PositioningCalculatorConfig::default().level_ball_depth_margin,
-        closest_to_ball_switch_margin: PositioningCalculatorConfig::default()
-            .closest_to_ball_switch_margin,
-        closest_to_ball_switch_min_seconds: PositioningCalculatorConfig::default()
-            .closest_to_ball_switch_min_seconds,
+        most_back_forward_threshold_y: positioning_defaults.most_back_forward_threshold_y,
+        level_ball_depth_margin: positioning_defaults.level_ball_depth_margin,
+        closest_to_ball_switch_margin: positioning_defaults.closest_to_ball_switch_margin,
+        closest_to_ball_switch_min_seconds: positioning_defaults.closest_to_ball_switch_min_seconds,
+        shadow_defense_max_ball_y: positioning_defaults.shadow_defense_max_ball_y,
+        shadow_defense_min_goal_side_y: positioning_defaults.shadow_defense_min_goal_side_y,
+        shadow_defense_min_gap: positioning_defaults.shadow_defense_min_gap,
+        shadow_defense_max_gap: positioning_defaults.shadow_defense_max_gap,
+        shadow_defense_max_lateral_gap: positioning_defaults.shadow_defense_max_lateral_gap,
+        shadow_defense_min_retreat_speed: positioning_defaults.shadow_defense_min_retreat_speed,
+        shadow_defense_max_speed_delta: positioning_defaults.shadow_defense_max_speed_delta,
         ball_half_neutral_zone_half_width_y: BallHalfCalculatorConfig::default()
             .neutral_zone_half_width_y,
         territorial_pressure_neutral_zone_half_width_y: territorial_pressure_defaults

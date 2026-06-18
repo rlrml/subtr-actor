@@ -22,6 +22,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "ball_depth",
   "depth_role",
   "ball_proximity",
+  "shadow_defense",
   "rotation_role",
   "first_man_change",
   "goal_context",

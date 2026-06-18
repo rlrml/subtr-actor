@@ -886,6 +886,7 @@ pub(crate) fn builtin_module_json(
                 "ball_depth_events": calculator.ball_depth_events(),
                 "depth_role_events": calculator.depth_role_events(),
                 "ball_proximity_events": calculator.ball_proximity_events(),
+                "shadow_defense_events": calculator.shadow_defense_events(),
             }))
         }
         "powerslide" => {

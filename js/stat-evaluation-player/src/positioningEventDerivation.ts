@@ -7,6 +7,7 @@ import type {
   FieldHalfEvent,
   FieldThirdEvent,
   PlayerActivityEvent,
+  ShadowDefenseEvent,
   StatsFrame,
   MaterializedStatsTimeline,
 } from "./statsTimeline.ts";
@@ -18,7 +19,8 @@ type PositioningSpanEvent =
   | FieldHalfEvent
   | BallDepthEvent
   | DepthRoleEvent
-  | BallProximityEvent;
+  | BallProximityEvent
+  | ShadowDefenseEvent;
 
 interface EventStreamCursor {
   applyThroughFrame(frame: StatsFrame): void;
@@ -63,6 +65,7 @@ function defaultPositioningStats(): PositioningStats {
     time_closest_to_ball_team: 0,
     time_closest_to_ball_absolute: 0,
     time_farthest_from_ball: 0,
+    time_shadow_defense: 0,
     time_behind_ball: 0,
     time_level_with_ball: 0,
     time_in_front_of_ball: 0,
@@ -203,6 +206,14 @@ function applyBallProximityEvent(
   }
 }
 
+function applyShadowDefenseEvent(stats: PositioningStats, event: ShadowDefenseEvent): void {
+  switch (event.state) {
+    case "shadowing":
+      stats.time_shadow_defense = addF32(stats.time_shadow_defense, event.duration);
+      break;
+  }
+}
+
 function assignPositioningStats(
   target: PositioningStats,
   source: PositioningStats | undefined,
@@ -296,6 +307,9 @@ export function createPositioningEventDerivedStatsAccumulator(
         event.is_team_0 ? teamZero : teamOne,
         event,
       ),
+    ),
+    createEventStreamCursor(statsEventPayloads(timeline, "shadow_defense"), (event) =>
+      applyShadowDefenseEvent(playerStatsFor(players, event), event),
     ),
   ];
 

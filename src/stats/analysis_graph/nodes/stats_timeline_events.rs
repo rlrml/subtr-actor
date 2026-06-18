@@ -579,6 +579,21 @@ fn build_replay_events(
         ));
     }
 
+    for (index, event) in positioning.shadow_defense_events().iter().enumerate() {
+        events.push(make_event(
+            "shadow_defense",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::ShadowDefense(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
     for (index, event) in rotation.role_events().iter().enumerate() {
         events.push(make_event(
             "rotation_role",

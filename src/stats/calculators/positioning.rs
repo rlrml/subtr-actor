@@ -3,6 +3,13 @@ use super::*;
 const DEFAULT_LEVEL_BALL_DEPTH_MARGIN: f32 = 150.0;
 const DEFAULT_CLOSEST_TO_BALL_SWITCH_MARGIN: f32 = 100.0;
 const DEFAULT_CLOSEST_TO_BALL_SWITCH_MIN_SECONDS: f32 = 0.2;
+const DEFAULT_SHADOW_DEFENSE_MAX_BALL_Y: f32 = BOOST_PAD_CENTER_MID_Y;
+const DEFAULT_SHADOW_DEFENSE_MIN_GOAL_SIDE_Y: f32 = 250.0;
+const DEFAULT_SHADOW_DEFENSE_MIN_GAP: f32 = 700.0;
+const DEFAULT_SHADOW_DEFENSE_MAX_GAP: f32 = 3200.0;
+const DEFAULT_SHADOW_DEFENSE_MAX_LATERAL_GAP: f32 = 1300.0;
+const DEFAULT_SHADOW_DEFENSE_MIN_RETREAT_SPEED: f32 = 100.0;
+const DEFAULT_SHADOW_DEFENSE_MAX_SPEED_DELTA: f32 = 900.0;
 
 /// Whether the player is participating in the frame: on the field being
 /// tracked, or waiting out a demolition.
@@ -83,6 +90,18 @@ pub type BallDepthEvent = PlayerStateSpan<BallDepthState>;
 pub type DepthRoleEvent = PlayerStateSpan<DepthRoleState>;
 pub type BallProximityEvent = PlayerStateSpan<BallProximityState>;
 
+/// Whether a defender is shadowing an opponent-controlled attack toward their
+/// own net: retreating goal-side of the threat while staying close enough to
+/// challenge or save.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ShadowDefenseState {
+    Shadowing,
+}
+
+pub type ShadowDefenseEvent = PlayerStateSpan<ShadowDefenseState>;
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -145,6 +164,13 @@ pub struct PositioningCalculatorConfig {
     pub level_ball_depth_margin: f32,
     pub closest_to_ball_switch_margin: f32,
     pub closest_to_ball_switch_min_seconds: f32,
+    pub shadow_defense_max_ball_y: f32,
+    pub shadow_defense_min_goal_side_y: f32,
+    pub shadow_defense_min_gap: f32,
+    pub shadow_defense_max_gap: f32,
+    pub shadow_defense_max_lateral_gap: f32,
+    pub shadow_defense_min_retreat_speed: f32,
+    pub shadow_defense_max_speed_delta: f32,
 }
 
 impl Default for PositioningCalculatorConfig {
@@ -154,6 +180,13 @@ impl Default for PositioningCalculatorConfig {
             level_ball_depth_margin: DEFAULT_LEVEL_BALL_DEPTH_MARGIN,
             closest_to_ball_switch_margin: DEFAULT_CLOSEST_TO_BALL_SWITCH_MARGIN,
             closest_to_ball_switch_min_seconds: DEFAULT_CLOSEST_TO_BALL_SWITCH_MIN_SECONDS,
+            shadow_defense_max_ball_y: DEFAULT_SHADOW_DEFENSE_MAX_BALL_Y,
+            shadow_defense_min_goal_side_y: DEFAULT_SHADOW_DEFENSE_MIN_GOAL_SIDE_Y,
+            shadow_defense_min_gap: DEFAULT_SHADOW_DEFENSE_MIN_GAP,
+            shadow_defense_max_gap: DEFAULT_SHADOW_DEFENSE_MAX_GAP,
+            shadow_defense_max_lateral_gap: DEFAULT_SHADOW_DEFENSE_MAX_LATERAL_GAP,
+            shadow_defense_min_retreat_speed: DEFAULT_SHADOW_DEFENSE_MIN_RETREAT_SPEED,
+            shadow_defense_max_speed_delta: DEFAULT_SHADOW_DEFENSE_MAX_SPEED_DELTA,
         }
     }
 }
@@ -251,6 +284,7 @@ struct PlayerFrameFacets {
     ball_depth_segments: Vec<(BallDepthState, f32)>,
     depth_role: Option<DepthRoleState>,
     proximity: BallProximityState,
+    shadow_defense: Option<ShadowDefenseState>,
     distance_to_ball: Option<f32>,
     distance_to_teammates: Option<f32>,
     possession_state: PositioningPossessionState,
@@ -270,6 +304,7 @@ pub struct PositioningCalculator {
     ball_depth: PlayerSpanTracker<BallDepthState>,
     depth_role: PlayerSpanTracker<DepthRoleState>,
     ball_proximity: PlayerSpanTracker<BallProximityState>,
+    shadow_defense: PlayerSpanTracker<ShadowDefenseState>,
     signal: HashMap<PlayerId, PositioningSignalSnapshot>,
 }
 
@@ -313,6 +348,10 @@ impl PositioningCalculator {
         self.ball_proximity.projected_events()
     }
 
+    pub fn shadow_defense_events(&self) -> Vec<ShadowDefenseEvent> {
+        self.shadow_defense.projected_events()
+    }
+
     /// Players with a span (any facet) closed during the current frame's update.
     pub fn new_event_players(&self) -> Vec<PlayerId> {
         let mut players: Vec<PlayerId> = self
@@ -350,6 +389,12 @@ impl PositioningCalculator {
                     .iter()
                     .map(|span| span.player.clone()),
             )
+            .chain(
+                self.shadow_defense
+                    .new_events()
+                    .iter()
+                    .map(|span| span.player.clone()),
+            )
             .collect();
         players.dedup();
         players
@@ -363,6 +408,7 @@ impl PositioningCalculator {
         self.ball_depth.close_all();
         self.depth_role.close_all();
         self.ball_proximity.close_all();
+        self.shadow_defense.close_all();
     }
 
     fn close_all_spans(&mut self) {
@@ -383,6 +429,75 @@ impl PositioningCalculator {
                     .insert(player.player_id.clone(), position);
             }
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn shadow_defense_state(
+        &self,
+        frame: &FrameInfo,
+        defender_position: glam::Vec3,
+        defender_previous_position: glam::Vec3,
+        ball_position: glam::Vec3,
+        previous_ball_position: glam::Vec3,
+        attacker_position: glam::Vec3,
+        attacker_previous_position: glam::Vec3,
+        defender_is_team_0: bool,
+    ) -> Option<ShadowDefenseState> {
+        if frame.dt <= 0.0 {
+            return None;
+        }
+
+        let defender = normalized_xy(defender_is_team_0, defender_position);
+        let previous_defender = normalized_xy(defender_is_team_0, defender_previous_position);
+        let ball = normalized_xy(defender_is_team_0, ball_position);
+        let previous_ball = normalized_xy(defender_is_team_0, previous_ball_position);
+        let attacker = normalized_xy(defender_is_team_0, attacker_position);
+        let previous_attacker = normalized_xy(defender_is_team_0, attacker_previous_position);
+
+        if ball.y > self.config.shadow_defense_max_ball_y {
+            return None;
+        }
+
+        let deepest_threat_y = ball.y.min(attacker.y);
+        if defender.y + self.config.shadow_defense_min_goal_side_y >= deepest_threat_y {
+            return None;
+        }
+
+        let threat = if defender.distance(ball) <= defender.distance(attacker) {
+            ball
+        } else {
+            attacker
+        };
+        let gap = defender.distance(threat);
+        if !(self.config.shadow_defense_min_gap..=self.config.shadow_defense_max_gap).contains(&gap)
+        {
+            return None;
+        }
+
+        let own_goal = glam::vec2(0.0, -BOOST_PAD_GOAL_LINE_Y);
+        if distance_to_segment_2d(defender, ball, own_goal)
+            > self.config.shadow_defense_max_lateral_gap
+        {
+            return None;
+        }
+
+        let defender_velocity_y = (defender.y - previous_defender.y) / frame.dt;
+        let ball_velocity_y = (ball.y - previous_ball.y) / frame.dt;
+        let attacker_velocity_y = (attacker.y - previous_attacker.y) / frame.dt;
+        let threat_velocity_y = ball_velocity_y.min(attacker_velocity_y);
+        if defender_velocity_y > -self.config.shadow_defense_min_retreat_speed {
+            return None;
+        }
+        if threat_velocity_y > -self.config.shadow_defense_min_retreat_speed {
+            return None;
+        }
+        if (defender_velocity_y - threat_velocity_y).abs()
+            > self.config.shadow_defense_max_speed_delta
+        {
+            return None;
+        }
+
+        Some(ShadowDefenseState::Shadowing)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -487,6 +602,28 @@ impl PositioningCalculator {
                     BallDepthState::AheadOfBall,
                 ],
             );
+
+            if let Some(attacker_id) = possession_player_before_sample
+                && let Some(attacker) = players.player(attacker_id)
+                && attacker.is_team_0 != player.is_team_0
+                && let Some(attacker_position) = attacker.position()
+            {
+                let attacker_previous_position = self
+                    .previous_player_positions
+                    .get(&attacker.player_id)
+                    .copied()
+                    .unwrap_or(attacker_position);
+                entry.shadow_defense = self.shadow_defense_state(
+                    frame,
+                    position,
+                    previous_position,
+                    ball_position,
+                    previous_ball_position,
+                    attacker_position,
+                    attacker_previous_position,
+                    player.is_team_0,
+                );
+            }
         }
 
         let positioned_players: Vec<_> = players
@@ -725,6 +862,20 @@ impl PositioningCalculator {
             } else {
                 self.ball_proximity.close(player);
             }
+
+            match entry.shadow_defense {
+                Some(state) if tracked => self.shadow_defense.record(
+                    frame.frame_number,
+                    frame_start,
+                    frame.time,
+                    frame.dt,
+                    player,
+                    entry.player_position,
+                    entry.is_team_0,
+                    state,
+                ),
+                _ => self.shadow_defense.close(player),
+            }
         }
     }
 
@@ -745,6 +896,7 @@ impl PositioningCalculator {
         self.ball_depth.begin_update();
         self.depth_role.begin_update();
         self.ball_proximity.begin_update();
+        self.shadow_defense.begin_update();
         self.process_sample(
             frame,
             gameplay,
@@ -765,6 +917,20 @@ impl PositioningCalculator {
     pub fn signals(&self) -> &HashMap<PlayerId, PositioningSignalSnapshot> {
         &self.signal
     }
+}
+
+fn normalized_xy(is_team_0: bool, position: glam::Vec3) -> glam::Vec2 {
+    glam::vec2(position.x, normalized_y(is_team_0, position))
+}
+
+fn distance_to_segment_2d(point: glam::Vec2, start: glam::Vec2, end: glam::Vec2) -> f32 {
+    let segment = end - start;
+    let length_squared = segment.length_squared();
+    if length_squared <= f32::EPSILON {
+        return point.distance(start);
+    }
+    let t = ((point - start).dot(segment) / length_squared).clamp(0.0, 1.0);
+    point.distance(start + segment * t)
 }
 
 /// Record a frame's ordered sub-frame segments for one fraction-derived facet,

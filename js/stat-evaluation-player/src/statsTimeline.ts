@@ -33,6 +33,7 @@ import type { FieldHalfState } from "./generated/FieldHalfState.ts";
 import type { BallDepthState } from "./generated/BallDepthState.ts";
 import type { DepthRoleState } from "./generated/DepthRoleState.ts";
 import type { BallProximityState } from "./generated/BallProximityState.ts";
+import type { ShadowDefenseState } from "./generated/ShadowDefenseState.ts";
 import type { RoleState } from "./generated/RoleState.ts";
 import type { FirstManChangeEvent } from "./generated/FirstManChangeEvent.ts";
 import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
@@ -82,6 +83,7 @@ export type FieldHalfEvent = PlayerStateSpan<FieldHalfState>;
 export type BallDepthEvent = PlayerStateSpan<BallDepthState>;
 export type DepthRoleEvent = PlayerStateSpan<DepthRoleState>;
 export type BallProximityEvent = PlayerStateSpan<BallProximityState>;
+export type ShadowDefenseEvent = PlayerStateSpan<ShadowDefenseState>;
 export type RotationRoleEvent = PlayerStateSpan<RoleState>;
 export interface StatsFrameLookup {
   get(frameNumber: number): StatsFrame | undefined;
@@ -115,6 +117,7 @@ export type {
   BallDepthState,
   DepthRoleState,
   BallProximityState,
+  ShadowDefenseState,
   RoleState,
   FirstManChangeEvent,
   BallHalfEvent,

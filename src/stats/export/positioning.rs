@@ -138,6 +138,12 @@ impl StatFieldProvider for PositioningStats {
         ));
         visitor(ExportedStat::float(
             "positioning",
+            "time_shadow_defense",
+            StatUnit::Seconds,
+            self.time_shadow_defense,
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
             "percent_defensive_third",
             StatUnit::Percent,
             self.defensive_third_pct(),
@@ -225,6 +231,12 @@ impl StatFieldProvider for PositioningStats {
             "percent_farthest_from_ball",
             StatUnit::Percent,
             self.farthest_from_ball_pct(),
+        ));
+        visitor(ExportedStat::float(
+            "positioning",
+            "percent_shadow_defense",
+            StatUnit::Percent,
+            self.shadow_defense_pct(),
         ));
     }
 }

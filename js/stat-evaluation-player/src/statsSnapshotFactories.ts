@@ -588,6 +588,7 @@ export function createPlayerStatsSnapshot(
         time_closest_to_ball_team: 0,
         time_closest_to_ball_absolute: 0,
         time_farthest_from_ball: 0,
+        time_shadow_defense: 0,
         time_behind_ball: 0,
         time_level_with_ball: 0,
         time_in_front_of_ball: 0,

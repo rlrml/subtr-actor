@@ -54,6 +54,7 @@ const SPAN_BASED_STATS_EVENT_STREAM_IDS = new Set<string>([
   "ball_depth",
   "depth_role",
   "ball_proximity",
+  "shadow_defense",
   "rotation_role",
   "rush",
 ]);
@@ -290,6 +291,11 @@ function formatGenericStatsEventLabel({
     const role = titleCaseValue(payload.state);
     const prefix = playerName ? `${playerName} depth role` : streamLabel;
     return joinEventDetails([role ? `${prefix}: ${role.toLowerCase()}` : prefix, duration]);
+  }
+
+  if (event.payload.kind === "shadow_defense") {
+    const prefix = playerName ? `${playerName} shadow defense` : streamLabel;
+    return joinEventDetails([prefix, duration]);
   }
 
   if (event.payload.kind === "rotation_role") {

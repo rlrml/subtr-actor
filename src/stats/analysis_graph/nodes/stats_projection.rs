@@ -520,6 +520,9 @@ impl StatsProjectionNode {
         for event in positioning.ball_proximity_events().iter() {
             self.state.positioning.apply_ball_proximity_event(event);
         }
+        for event in positioning.shadow_defense_events().iter() {
+            self.state.positioning.apply_shadow_defense_event(event);
+        }
         for (player, signal) in positioning.signals() {
             self.state.positioning.apply_signal(player, signal);
         }
