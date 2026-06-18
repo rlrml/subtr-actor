@@ -37,21 +37,6 @@ const CURATED_STATS_EVENT_STREAM_IDS = new Set<string>([
   "touch",
   "bump",
 ]);
-const SPAN_BASED_STATS_EVENT_STREAM_IDS = new Set<string>([
-  "possession",
-  "ball_half",
-  "ball_third",
-  "territorial_pressure",
-  "controlled_play",
-  "player_activity",
-  "field_third",
-  "field_half",
-  "ball_depth",
-  "depth_role",
-  "ball_proximity",
-  "rotation_role",
-  "rush",
-]);
 const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#3b82f6",
   "#06b6d4",

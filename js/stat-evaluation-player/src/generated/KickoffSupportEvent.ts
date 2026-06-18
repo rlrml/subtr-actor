@@ -3,6 +3,9 @@ import type { KickoffSpawnPosition } from "./KickoffSpawnPosition.ts";
 import type { KickoffSupportBehavior } from "./KickoffSupportBehavior.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * Kickoff event for a supporting player.
+ */
 export type KickoffSupportEvent = { player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number],
 /**
  * Horizontal distance (uu) of the support player's spawn from field

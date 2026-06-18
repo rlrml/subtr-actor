@@ -8,12 +8,12 @@ use linkme::distributed_slice;
 
 use super::{
     BackboardBounceEvent, BallCarryEvent, BallDepthEvent, BallHalfEvent, BallProximityEvent,
-    BallThirdEvent, BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent, ControlledPlayEvent,
-    CorePlayerScoreboardEvent, DemolitionEvent, DepthRoleEvent, DodgeEvent, DodgeResetEvent,
-    DoubleTapEvent, FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent, FirstManChangeEvent,
-    FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
-    OneTimerEvent, PassEvent, PlayerActivityEvent, PlayerPossessionEvent, PossessionEvent,
-    PowerslideEvent, RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent,
+    BallThirdEvent, BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent,
+    ControlledPlayEvent, CorePlayerScoreboardEvent, DemolitionEvent, DepthRoleEvent, DodgeEvent,
+    DodgeResetEvent, DoubleTapEvent, FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent,
+    FirstManChangeEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
+    MustyFlickEvent, OneTimerEvent, PassEvent, PlayerActivityEvent, PlayerPossessionEvent,
+    PossessionEvent, PowerslideEvent, RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent,
     TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
     WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
