@@ -383,6 +383,7 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "possession",
         "powerslide",
         "ball_half",
+        "ball_third",
         "rotation_role",
         "first_man_change",
         "rush",

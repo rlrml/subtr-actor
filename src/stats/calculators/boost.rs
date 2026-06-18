@@ -15,6 +15,7 @@ enum BoostIncreaseReason {
     Unknown,
 }
 
+/// Whether a boost pad is a small or big (full) pad.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -58,6 +59,7 @@ impl TryFrom<BoostIncreaseReason> for BoostPickupPadType {
     }
 }
 
+/// Field half where a boost pickup occurred.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -67,6 +69,7 @@ pub enum BoostPickupFieldHalf {
     Unknown,
 }
 
+/// Field-zone classification for a boost pickup location.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -76,6 +79,7 @@ pub enum BoostPickupPadZone {
     Defensive,
 }
 
+/// Player activity context at the time of a boost pickup.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -85,6 +89,7 @@ pub enum BoostPickupActivity {
     Unknown,
 }
 
+/// How a boost pickup was detected (pad pickup vs inferred).
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -160,6 +165,7 @@ pub struct RespawnEvent {
     pub boost_granted: Option<f32>,
 }
 
+/// The kind of boost respawn.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -204,11 +210,13 @@ pub(crate) fn boost_supersonic_label(supersonic: bool) -> StatLabel {
     }
 }
 
+/// Configuration thresholds for boost pickup/respawn detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct BoostCalculatorConfig {
     pub include_non_live_pickups: bool,
 }
 
+/// Tracks boost-pad pickups and boost respawns per player.
 #[derive(Debug, Clone, Default)]
 pub struct BoostCalculator {
     config: BoostCalculatorConfig,

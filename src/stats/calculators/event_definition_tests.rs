@@ -32,6 +32,7 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<BumpEvent>();
     assert_stats_event::<PossessionEvent>();
     assert_stats_event::<BallHalfEvent>();
+    assert_stats_event::<BallThirdEvent>();
     assert_stats_event::<TerritorialPressureEvent>();
     assert_stats_event::<MovementEvent>();
     assert_stats_event::<PlayerActivityEvent>();

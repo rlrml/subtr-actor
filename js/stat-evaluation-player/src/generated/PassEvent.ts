@@ -2,4 +2,7 @@
 import type { PassKind } from "./PassKind.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * A same-team touch sequence where one player sends the ball to a different teammate.
+ */
 export type PassEvent = { time: number, frame: number, sample_time: number, sample_frame: number, passer: RemoteIdTs, passer_position?: [number, number, number] | null, receiver: RemoteIdTs, receiver_position?: [number, number, number] | null, is_team_0: boolean, start_time: number, start_frame: number, duration: number, ball_travel_distance: number, ball_advance_distance: number, pass_kind: PassKind, };

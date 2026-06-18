@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects one-timers from ball state and upstream pass detection during live play.
 pub struct OneTimerNode {
     calculator: OneTimerCalculator,
 }

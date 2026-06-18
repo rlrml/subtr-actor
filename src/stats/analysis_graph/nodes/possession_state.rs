@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks current ball-possession state from touches and live-play state as shared state.
 pub struct PossessionStateNode {
     calculator: PossessionStateCalculator,
     state: PossessionState,

@@ -1,21 +1,22 @@
 pub(crate) use super::graph::*;
 use crate::stats::calculators::{
     AerialGoalCalculator, AirDribbleGoalCalculator, BackboardBounceState, BackboardCalculator,
-    BallCarryCalculator, BallFrameState, BallHalfCalculator, BoostCalculator, BumpCalculator,
-    BumpGoalCalculator, CeilingShotCalculator, CeilingShotGoalCalculator, CenterCalculator,
-    ContinuousBallControlState, ControlledPlayCalculator, CounterAttackGoalCalculator,
-    DemoCalculator, DemoGoalCalculator, DodgeResetCalculator, DoubleTapCalculator,
-    DoubleTapGoalCalculator, EmptyNetGoalCalculator, FiftyFiftyCalculator, FiftyFiftyState,
-    FlickCalculator, FlickGoalCalculator, FlipImpulseCalculator, FlipIntoBallGoalCalculator,
-    FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState, HalfFlipCalculator,
-    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator, KickoffCalculator,
-    KickoffGoalCalculator, LivePlayState, LongDistanceGoalCalculator, MatchStatsCalculator,
-    MovementCalculator, MustyFlickCalculator, OneTimerCalculator, OneTimerGoalCalculator,
-    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerFrameState,
-    PlayerPossessionCalculator, PlayerVerticalState, PositioningCalculator, PossessionCalculator,
-    PossessionState, PowerslideCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
-    SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchCalculator, TouchState,
-    WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
+    BallCarryCalculator, BallFrameState, BallHalfCalculator, BallThirdCalculator, BoostCalculator,
+    BumpCalculator, BumpGoalCalculator, CeilingShotCalculator, CeilingShotGoalCalculator,
+    CenterCalculator, ContinuousBallControlState, ControlledPlayCalculator,
+    CounterAttackGoalCalculator, DemoCalculator, DemoGoalCalculator, DodgeResetCalculator,
+    DoubleTapCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator, FiftyFiftyCalculator,
+    FiftyFiftyState, FlickCalculator, FlickGoalCalculator, FlipImpulseCalculator,
+    FlipIntoBallGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo,
+    GameplayState, HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
+    HighAerialGoalCalculator, KickoffCalculator, KickoffGoalCalculator, LivePlayState,
+    LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator, MustyFlickCalculator,
+    OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator,
+    PassingGoalCalculator, PlayerFrameState, PlayerPossessionCalculator, PlayerVerticalState,
+    PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
+    RotationCalculator, RushCalculator, SpeedFlipCalculator, SustainedPressureGoalCalculator,
+    TerritorialPressureCalculator, TouchCalculator, TouchState, WallAerialCalculator,
+    WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -23,6 +24,7 @@ pub(crate) mod backboard_bounce;
 pub(crate) mod ball_carry;
 pub(crate) mod ball_frame_state;
 pub(crate) mod ball_half;
+pub(crate) mod ball_third;
 pub(crate) mod boost;
 pub(crate) mod bump;
 pub(crate) mod ceiling_shot;
@@ -81,6 +83,8 @@ pub use ball_carry::BallCarryNode;
 pub use ball_frame_state::BallFrameStateNode;
 #[allow(unused_imports)]
 pub use ball_half::BallHalfNode;
+#[allow(unused_imports)]
+pub use ball_third::BallThirdNode;
 #[allow(unused_imports)]
 pub use boost::BoostNode;
 #[allow(unused_imports)]
@@ -368,6 +372,10 @@ pub(crate) fn player_possession_dependency() -> AnalysisDependency {
 
 pub(crate) fn ball_half_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<BallHalfCalculator>(ball_half::boxed_default)
+}
+
+pub(crate) fn ball_third_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<BallThirdCalculator>(ball_third::boxed_default)
 }
 
 pub(crate) fn territorial_pressure_dependency() -> AnalysisDependency {

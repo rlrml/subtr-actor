@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Classifies ball touches (with rotation/possession/50-50/vertical context) into touch events/stats.
 pub struct TouchNode {
     calculator: TouchCalculator,
 }

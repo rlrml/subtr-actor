@@ -35,6 +35,7 @@ pub fn default_stats_timeline_config() -> StatsTimelineConfig {
             .closest_to_ball_switch_min_seconds,
         ball_half_neutral_zone_half_width_y: BallHalfCalculatorConfig::default()
             .neutral_zone_half_width_y,
+        ball_third_boundary_y: BallThirdCalculatorConfig::default().boundary_y,
         territorial_pressure_neutral_zone_half_width_y: territorial_pressure_defaults
             .neutral_zone_half_width_y,
         territorial_pressure_min_establish_seconds: territorial_pressure_defaults

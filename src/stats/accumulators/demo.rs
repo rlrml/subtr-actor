@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated demolitions inflicted and taken.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DemoPlayerStats {
@@ -7,12 +8,14 @@ pub struct DemoPlayerStats {
     pub demos_taken: u32,
 }
 
+/// Per-team accumulated demolition stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DemoTeamStats {
     pub demos_inflicted: u32,
 }
 
+/// Accumulates demolition stats over the replay from kill/death events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DemoStatsAccumulator {
     player_stats: HashMap<PlayerId, DemoPlayerStats>,

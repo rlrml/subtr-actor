@@ -13,8 +13,21 @@ const BALL_GRAVITY_Z: f32 = -650.0;
 const FLICK_IMPULSE_WINDOW_SECONDS: f32 = 0.15;
 
 const FLICK_MAX_DODGE_TO_TOUCH_SECONDS: f32 = 0.32;
+/// How far *before* the dodge transition the flick contact may register. The
+/// ball can start accelerating a frame or two before the dodge-active byte
+/// flips, so the touch that the pending flick anchors to sometimes precedes the
+/// recorded dodge start. Allow a small negative `time_since_dodge` rather than
+/// rejecting these as "touch before dodge".
+const FLICK_DODGE_LEAD_TOLERANCE_SECONDS: f32 = 0.12;
 const FLICK_MAX_CONTROL_TO_DODGE_SECONDS: f32 = 0.08;
 const FLICK_MAX_SETUP_STALE_SECONDS: f32 = 0.35;
+/// How long a control setup survives without a fresh control observation before
+/// it is finished. A real carry/dribble lets the ball wobble in and out of the
+/// tight control volume (the ball briefly exceeds the gap thresholds), so
+/// finishing the setup on the first dropped frame fragments one ~0.5s carry into
+/// sub-`FLICK_MIN_SETUP_SECONDS` pieces that never qualify. Bridging brief gaps
+/// keeps the setup continuous while still ending it when the carry truly stops.
+const FLICK_SETUP_GAP_GRACE_SECONDS: f32 = 0.12;
 const FLICK_MIN_PENDING_DODGE_SETUP_SECONDS: f32 = 0.10;
 const FLICK_MIN_SETUP_SECONDS: f32 = 0.20;
 const FLICK_MIN_BALL_SPEED_CHANGE: f32 = 325.0;
@@ -43,12 +56,14 @@ const REVERSE_FLICK_MIN_FORWARD_IMPULSE: f32 = 450.0;
 const REVERSE_FLICK_MIN_FORWARD_IMPULSE_ALIGNMENT: f32 = 0.55;
 const REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES: f32 = 15.0;
 
+/// The kind of flick detected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlickKind {
     Other,
     Reverse,
 }
 
+/// Rotation direction of the car during the flick setup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlickSetupRotationDirection {
     Unknown,
@@ -105,6 +120,7 @@ pub(crate) fn flick_setup_rotation_direction_label(value: &str) -> StatLabel {
     }
 }
 
+/// A dodge-powered touch following a short controlled carry setup.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlickEvent {
@@ -227,6 +243,7 @@ impl PartialEq for PendingFlick {
     }
 }
 
+/// Detects flicks from ball/player state and touches.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlickCalculator {
     events: EventStream<FlickEvent>,
@@ -552,7 +569,18 @@ impl FlickCalculator {
 
         let active_ids: Vec<_> = self.active_setups.keys().cloned().collect();
         for player_id in active_ids {
-            if !observed_players.contains(&player_id) {
+            if observed_players.contains(&player_id) {
+                continue;
+            }
+            // Keep the setup alive across brief observation gaps; only finish it
+            // once the ball has been out of the control volume long enough that
+            // the carry is genuinely over.
+            let gap_elapsed = self
+                .active_setups
+                .get(&player_id)
+                .map(|setup| frame.time - setup.last_time > FLICK_SETUP_GAP_GRACE_SECONDS)
+                .unwrap_or(true);
+            if gap_elapsed {
                 self.finish_setup(&player_id);
             }
         }
@@ -615,7 +643,9 @@ impl FlickCalculator {
         let player_rigid_body = player.rigid_body.as_ref()?;
         let player_position = player.position()?;
         let time_since_dodge = touch_event.time - dodge_start.time;
-        if !(0.0..=FLICK_MAX_DODGE_TO_TOUCH_SECONDS).contains(&time_since_dodge) {
+        if !(-FLICK_DODGE_LEAD_TOLERANCE_SECONDS..=FLICK_MAX_DODGE_TO_TOUCH_SECONDS)
+            .contains(&time_since_dodge)
+        {
             return None;
         }
 

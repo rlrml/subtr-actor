@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Determines whether each frame is live play (and its gameplay phase) from gameplay/events.
 pub struct LivePlayNode {
     tracker: LivePlayTracker,
     state: LivePlayState,

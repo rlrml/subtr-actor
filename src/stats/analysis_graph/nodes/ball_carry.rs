@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects ball carries and air dribbles from continuous ball-control sequences.
 pub struct BallCarryNode {
     calculator: BallCarryCalculator,
 }

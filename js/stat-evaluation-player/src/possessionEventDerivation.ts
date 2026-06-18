@@ -1,3 +1,5 @@
+import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
+import type { BallThirdEvent } from "./generated/BallThirdEvent.ts";
 import type { LabeledFloatSums } from "./generated/LabeledFloatSums.ts";
 import type { PossessionEvent } from "./generated/PossessionEvent.ts";
 import type { PossessionTeamStats } from "./generated/PossessionTeamStats.ts";
@@ -17,6 +19,7 @@ interface PossessionState {
   active: boolean;
   possessionState: string;
   fieldThird: string | null;
+  fieldHalf: string | null;
 }
 
 function f32(value: number): number {
@@ -47,7 +50,7 @@ function defaultPossessionTeamStats(): PossessionTeamStats {
   };
 }
 
-function sortPossessionEvents(events: readonly PossessionEvent[]): PossessionEvent[] {
+function sortByFrameTime<T extends { frame: number; time: number }>(events: readonly T[]): T[] {
   return events
     .map((event, index) => ({ event, index }))
     .sort((left, right) => {
@@ -60,6 +63,10 @@ function sortPossessionEvents(events: readonly PossessionEvent[]): PossessionEve
       return left.index - right.index;
     })
     .map(({ event }) => event);
+}
+
+function sortPossessionEvents(events: readonly PossessionEvent[]): PossessionEvent[] {
+  return sortByFrameTime(events);
 }
 
 function sortLabels(labels: StatLabel[]): StatLabel[] {
@@ -112,12 +119,6 @@ function relativePossessionLabel(label: StatLabel, isTeamZero: boolean): StatLab
   return { ...label };
 }
 
-function fieldHalfForThird(fieldThird: string): string {
-  if (fieldThird === "team_zero_third") return "team_zero_side";
-  if (fieldThird === "team_one_third") return "team_one_side";
-  return "neutral";
-}
-
 function possessionTeamStats(raw: RawPossessionStats, isTeamZero: boolean): PossessionTeamStats {
   const labeled_time: LabeledFloatSums = { entries: [] };
   for (const entry of raw.labeled_time.entries) {
@@ -139,7 +140,6 @@ function possessionTeamStats(raw: RawPossessionStats, isTeamZero: boolean): Poss
 function applyPossessionEvent(state: PossessionState, event: PossessionEvent): void {
   state.active = event.active;
   state.possessionState = event.possession_state;
-  state.fieldThird = event.field_third ?? null;
 }
 
 function accumulatePossessionFrame(
@@ -164,7 +164,9 @@ function accumulatePossessionFrame(
   const labels: StatLabel[] = [{ key: "possession_state", value: state.possessionState }];
   if (state.fieldThird != null) {
     labels.push({ key: "field_third", value: state.fieldThird });
-    labels.push({ key: "field_half", value: fieldHalfForThird(state.fieldThird) });
+  }
+  if (state.fieldHalf != null) {
+    labels.push({ key: "field_half", value: state.fieldHalf });
   }
   addLabeledTime(raw.labeled_time, labels, dt);
 }
@@ -192,13 +194,20 @@ export function createPossessionEventDerivedStatsAccumulator(timeline: Materiali
   applyFrame(frame: StatsFrame): void;
 } {
   const events = sortPossessionEvents(statsEventPayloads(timeline, "possession"));
+  // The ball's third/half come from the canonical ball_third / ball_half
+  // streams, joined with possession per frame — possession events carry no zone.
+  const ballThirdEvents = sortByFrameTime(statsEventPayloads(timeline, "ball_third"));
+  const ballHalfEvents = sortByFrameTime(statsEventPayloads(timeline, "ball_half"));
 
   let eventIndex = 0;
+  let ballThirdIndex = 0;
+  let ballHalfIndex = 0;
   const raw = defaultRawPossessionStats();
   const state: PossessionState = {
     active: false,
     possessionState: "neutral",
     fieldThird: null,
+    fieldHalf: null,
   };
 
   return {
@@ -206,6 +215,22 @@ export function createPossessionEventDerivedStatsAccumulator(timeline: Materiali
       while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
         applyPossessionEvent(state, events[eventIndex] as PossessionEvent);
         eventIndex += 1;
+      }
+      while (
+        ballThirdIndex < ballThirdEvents.length &&
+        ballThirdEvents[ballThirdIndex]!.frame <= frame.frame_number
+      ) {
+        const event = ballThirdEvents[ballThirdIndex] as BallThirdEvent;
+        state.fieldThird = event.active ? event.field_third : null;
+        ballThirdIndex += 1;
+      }
+      while (
+        ballHalfIndex < ballHalfEvents.length &&
+        ballHalfEvents[ballHalfIndex]!.frame <= frame.frame_number
+      ) {
+        const event = ballHalfEvents[ballHalfIndex] as BallHalfEvent;
+        state.fieldHalf = event.active ? event.field_half : null;
+        ballHalfIndex += 1;
       }
 
       accumulatePossessionFrame(raw, state, frame);

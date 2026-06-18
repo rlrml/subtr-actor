@@ -2,4 +2,7 @@
 import type { LabeledCounts } from "./LabeledCounts.ts";
 import type { LabeledFloatSums } from "./LabeledFloatSums.ts";
 
+/**
+ * Accumulated boost stats: time in boost bands, boost integral, and pads collected/stolen/used.
+ */
 export type BoostStats = { tracked_time: number, boost_integral: number, time_zero_boost: number, time_hundred_boost: number, time_boost_0_25: number, time_boost_25_50: number, time_boost_50_75: number, time_boost_75_100: number, amount_collected: number, amount_collected_inactive: number, big_pads_collected_inactive: number, small_pads_collected_inactive: number, amount_stolen: number, big_pads_collected: number, small_pads_collected: number, big_pads_stolen: number, small_pads_stolen: number, amount_collected_big: number, amount_stolen_big: number, amount_collected_small: number, amount_stolen_small: number, amount_respawned: number, overfill_total: number, overfill_from_stolen: number, amount_used: number, amount_used_while_grounded: number, amount_used_while_airborne: number, amount_used_while_supersonic: number, labeled_amounts?: LabeledFloatSums, labeled_counts?: LabeledCounts, };

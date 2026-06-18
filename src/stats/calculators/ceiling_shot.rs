@@ -12,6 +12,7 @@ const CEILING_SHOT_MIN_FORWARD_APPROACH_SPEED: f32 = 90.0;
 const CEILING_SHOT_MIN_BALL_SPEED_CHANGE: f32 = 120.0;
 const CEILING_SHOT_MIN_CONFIDENCE: f32 = 0.54;
 
+/// A shot taken shortly after a player contacts the ceiling and drops back to the ball.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct CeilingShotEvent {
@@ -50,6 +51,7 @@ struct CeilingContactObservation {
     roof_alignment: f32,
 }
 
+/// Detects ceiling shots from ball/player positions and touches.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CeilingShotCalculator {
     events: EventStream<CeilingShotEvent>,

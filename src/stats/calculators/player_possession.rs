@@ -238,7 +238,7 @@ impl ActivePlayerPossession {
 /// (including field-third moves) and drops the player during pending-turnover
 /// windows. This calculator instead emits one event per continuous stretch of
 /// player control, bridging contested interruptions shorter than
-/// [`PLAYER_POSSESSION_MERGE_GAP_SECONDS`], so consumers get a stable
+/// `PLAYER_POSSESSION_MERGE_GAP_SECONDS`, so consumers get a stable
 /// "possession" unit for duration, touch, and ball-progress stats.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PlayerPossessionCalculator {
@@ -287,7 +287,7 @@ impl PlayerPossessionCalculator {
 
     fn field_third(ball: &BallFrameState) -> Option<String> {
         ball.sample().map(|sample| {
-            possession::FieldThirdLabel::from_ball(sample)
+            BallThirdLabel::from_ball(sample)
                 .as_label_value()
                 .to_owned()
         })

@@ -13,6 +13,7 @@ pub(crate) const WALL_AERIAL_MIN_TOUCH_BALL_Z: f32 = 400.0;
 const WALL_AERIAL_REFERENCE_BALL_SPEED_CHANGE: f32 = 80.0;
 pub(crate) const WALL_AERIAL_HIGH_CONFIDENCE: f32 = 0.78;
 
+/// Which wall an aerial play started from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
@@ -84,6 +85,7 @@ pub(crate) fn wall_aerial_goal_alignment(
     goal_direction.dot(ball_velocity.normalize_or_zero())
 }
 
+/// An aerial play that starts from controlled ball movement on a side or back wall.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WallAerialEvent {
@@ -167,6 +169,7 @@ struct ArmedWallAerial {
     recorded: bool,
 }
 
+/// Detects wall aerials during live play.
 #[derive(Debug, Clone, Default)]
 pub struct WallAerialCalculator {
     events: EventStream<WallAerialEvent>,

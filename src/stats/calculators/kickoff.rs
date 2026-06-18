@@ -299,6 +299,7 @@ impl InFlightItem for ActiveKickoff {
     }
 }
 
+/// Detects and classifies kickoffs and their outcomes.
 #[derive(Debug, Clone, Default)]
 pub struct KickoffCalculator {
     active: InFlightLedger<ActiveKickoff>,
@@ -1664,6 +1665,7 @@ impl KickoffCalculator {
                     player: player.player.clone(),
                     is_team_0: player.is_team_0,
                     start_position: player.start_position,
+                    start_distance_from_center: Self::kickoff_start_distance(player),
                     spawn_position: player.spawn_position,
                     start_boost: player.start_boost,
                     boost_after,

@@ -18,6 +18,7 @@ const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "boost-pickups",
   "touch-controls",
   "shot-visualization",
+  "missed-events",
 ];
 
 export interface FloatingWindowControllerOptions {

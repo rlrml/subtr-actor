@@ -1,5 +1,6 @@
 use super::*;
 
+/// Match-wide accumulated kickoff win/possession/goal tallies.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffStats {
@@ -27,6 +28,7 @@ pub struct KickoffStats {
     pub labeled_player_counts: LabeledCounts,
 }
 
+/// Per-player accumulated kickoff stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffPlayerStats {
@@ -37,6 +39,11 @@ pub struct KickoffPlayerStats {
     pub support_go_for_boosts: u32,
     pub support_cheats: u32,
     pub support_other: u32,
+    /// Kickoffs on which this player was a non-taker (support) and contributed
+    /// a `start_distance_from_center` sample.
+    pub support_distance_sample_count: u32,
+    /// Sum of support spawn distances from field center, for averaging.
+    pub cumulative_support_distance_from_center: f32,
     pub kickoff_goal_count: u32,
     pub boost_after_sample_count: u32,
     pub cumulative_boost_after: f32,
@@ -44,6 +51,7 @@ pub struct KickoffPlayerStats {
     pub labeled_event_counts: LabeledCounts,
 }
 
+/// Per-team accumulated kickoff stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffTeamStats {
@@ -240,6 +248,8 @@ impl KickoffPlayerStats {
             if support.first_touch_time.is_some() {
                 self.touches += 1;
             }
+            self.support_distance_sample_count += 1;
+            self.cumulative_support_distance_from_center += support.start_distance_from_center;
             match support.support_behavior {
                 KickoffSupportBehavior::GoForBoost => self.support_go_for_boosts += 1,
                 KickoffSupportBehavior::Cheat => self.support_cheats += 1,
@@ -263,6 +273,16 @@ impl KickoffPlayerStats {
             self.cumulative_boost_after / self.boost_after_sample_count as f32
         }
     }
+
+    /// Mean spawn distance from field center across kickoffs on which this
+    /// player was support.
+    pub fn average_support_distance_from_center(&self) -> f32 {
+        if self.support_distance_sample_count == 0 {
+            0.0
+        } else {
+            self.cumulative_support_distance_from_center / self.support_distance_sample_count as f32
+        }
+    }
 }
 
 impl KickoffTeamStats {
@@ -283,6 +303,7 @@ impl KickoffTeamStats {
     }
 }
 
+/// Accumulates kickoff stats over the replay from kickoff events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct KickoffStatsAccumulator {
     stats: KickoffStats,

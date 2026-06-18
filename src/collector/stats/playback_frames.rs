@@ -53,6 +53,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_stats_or_default::<BallHalfStats>(frame, "ball_half"),
         );
         timeline.insert(
+            "ball_third".to_owned(),
+            self.frame_stats_or_default::<BallThirdStats>(frame, "ball_third"),
+        );
+        timeline.insert(
             "territorial_pressure".to_owned(),
             self.frame_stats_or_default::<TerritorialPressureStats>(frame, "territorial_pressure"),
         );
@@ -122,6 +126,9 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .for_team(is_team_zero),
             ball_half: self
                 .frame_stats_or_default_typed::<BallHalfStats>(frame, "ball_half")?
+                .for_team(is_team_zero),
+            ball_third: self
+                .frame_stats_or_default_typed::<BallThirdStats>(frame, "ball_third")?
                 .for_team(is_team_zero),
             territorial_pressure: self
                 .frame_stats_or_default_typed::<TerritorialPressureStats>(
@@ -334,6 +341,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             serialize_to_json_value(
                 &self
                     .frame_stats_or_default_typed::<BallHalfStats>(frame, "ball_half")?
+                    .for_team(is_team_zero),
+            )?,
+        );
+        team.insert(
+            "ball_third".to_owned(),
+            serialize_to_json_value(
+                &self
+                    .frame_stats_or_default_typed::<BallThirdStats>(frame, "ball_third")?
                     .for_team(is_team_zero),
             )?,
         );

@@ -5,4 +5,7 @@ import type { GoalTagEvidence } from "./GoalTagEvidence.ts";
 import type { GoalTagModifier } from "./GoalTagModifier.ts";
 import type { GoalTagPerformer } from "./GoalTagPerformer.ts";
 
+/**
+ * Metadata describing a goal-tag definition.
+ */
 export type GoalTagMetadata = { confidence: number, performer?: GoalTagPerformer | null, modifiers?: Array<GoalTagModifier>, related_events?: Array<GoalTagEventRef>, details?: Array<GoalTagDetail>, evidence?: Array<GoalTagEvidence>, };

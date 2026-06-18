@@ -2,6 +2,7 @@ use super::*;
 
 const SPEED_FLIP_HIGH_CONFIDENCE: f32 = 0.75;
 
+/// Per-player accumulated speed-flip stats with confidence.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct SpeedFlipStats {
@@ -57,6 +58,7 @@ impl SpeedFlipStats {
     }
 }
 
+/// Accumulates speed-flip stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpeedFlipStatsAccumulator {
     player_stats: HashMap<PlayerId, SpeedFlipStats>,

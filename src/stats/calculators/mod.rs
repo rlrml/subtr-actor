@@ -104,6 +104,8 @@ pub mod powerslide;
 pub use powerslide::*;
 pub mod ball_half;
 pub use ball_half::*;
+pub mod ball_third;
+pub use ball_third::*;
 pub mod rotation;
 pub use rotation::*;
 pub mod rush;

@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Derives 50/50 stats and events from the shared fifty-fifty state node.
 pub struct FiftyFiftyNode {
     calculator: FiftyFiftyCalculator,
 }

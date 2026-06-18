@@ -568,11 +568,14 @@ def main() -> int:
     # Rocket League already provides camera and playback controls in-game, and the
     # plugin does not support a real multi-replay queue. Keep those replay-player
     # surfaces out of the BakkesMod launcher even though the web player retains them.
+    # The missed-event capture window is a post-hoc recall-labeling tool for the web
+    # stats player, so it is likewise web-only and stays out of the live plugin.
     plugin_excluded_web_window_ids = (
         "camera",
         "playback",
         "mechanics-review",
         "replay-loading",
+        "missed-events",
     )
     plugin_expected_web_singleton_window_ids = tuple(
         window_id

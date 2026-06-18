@@ -21,35 +21,7 @@ impl PossessionStateLabel {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(clippy::enum_variant_names)]
-pub(crate) enum FieldThirdLabel {
-    TeamZeroThird,
-    NeutralThird,
-    TeamOneThird,
-}
-
-impl FieldThirdLabel {
-    pub(crate) fn from_ball(ball: &BallSample) -> Self {
-        let ball_y = ball.position().y;
-        if ball_y < -FIELD_ZONE_BOUNDARY_Y {
-            Self::TeamZeroThird
-        } else if ball_y > FIELD_ZONE_BOUNDARY_Y {
-            Self::TeamOneThird
-        } else {
-            Self::NeutralThird
-        }
-    }
-
-    pub(crate) fn as_label_value(self) -> &'static str {
-        match self {
-            Self::TeamZeroThird => "team_zero_third",
-            Self::NeutralThird => "neutral_third",
-            Self::TeamOneThird => "team_one_third",
-        }
-    }
-}
-
+/// A team-possession span.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PossessionEvent {
@@ -62,7 +34,6 @@ pub struct PossessionEvent {
     pub possession_state: String,
     #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub player_id: Option<PlayerId>,
-    pub field_third: Option<String>,
 }
 
 impl PossessionEvent {
@@ -239,6 +210,7 @@ impl PossessionTracker {
 #[path = "possession_tests.rs"]
 mod tests;
 
+/// Derives team possession from ball and touch state.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PossessionCalculator {
     tracker: PossessionTracker,
@@ -252,7 +224,6 @@ struct PossessionEventState {
     active: bool,
     possession_state: PossessionStateLabel,
     player_id: Option<PlayerId>,
-    field_third: Option<FieldThirdLabel>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -289,6 +260,17 @@ impl PossessionCalculator {
         self.events.push(pending.event);
     }
 
+    /// The event covering the most recently processed frame (the in-progress
+    /// pending span, or the last committed event once flushed). Used by the
+    /// projection to read the current possession state per frame without
+    /// rebuilding from the full event stream.
+    pub fn current_event(&self) -> Option<&PossessionEvent> {
+        self.pending_event
+            .as_ref()
+            .map(|pending| &pending.event)
+            .or_else(|| self.events.all().last())
+    }
+
     fn emit_event_if_changed(
         &mut self,
         frame: &FrameInfo,
@@ -296,13 +278,11 @@ impl PossessionCalculator {
         duration: f32,
         possession_state: PossessionStateLabel,
         player_id: Option<PlayerId>,
-        field_third: Option<FieldThirdLabel>,
     ) {
         let event_state = PossessionEventState {
             active,
             possession_state,
             player_id: player_id.clone(),
-            field_third,
         };
         if self.last_emitted_event_state.as_ref() == Some(&event_state) && duration == 0.0 {
             return;
@@ -316,7 +296,6 @@ impl PossessionCalculator {
             duration,
             possession_state: possession_state.as_label_value().to_owned(),
             player_id,
-            field_third: field_third.map(|label| label.as_label_value().to_owned()),
         };
         self.record_event(event_state.clone(), frame, event);
         self.last_emitted_event_state = Some(event_state);
@@ -349,24 +328,15 @@ impl PossessionCalculator {
     pub fn update(
         &mut self,
         frame: &FrameInfo,
-        ball: &BallFrameState,
         possession_state: &PossessionState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
         if !live_play_state.is_live_play {
-            self.emit_event_if_changed(
-                frame,
-                false,
-                0.0,
-                PossessionStateLabel::Neutral,
-                None,
-                None,
-            );
+            self.emit_event_if_changed(frame, false, 0.0, PossessionStateLabel::Neutral, None);
             return Ok(());
         }
 
-        let field_third = ball.sample().map(FieldThirdLabel::from_ball);
         let (state, player_id) =
             if let Some(possession_team_is_team_0) = possession_state.active_team_before_sample {
                 if possession_team_is_team_0 {
@@ -383,7 +353,7 @@ impl PossessionCalculator {
             } else {
                 (PossessionStateLabel::Neutral, None)
             };
-        self.emit_event_if_changed(frame, true, frame.dt, state, player_id, field_third);
+        self.emit_event_if_changed(frame, true, frame.dt, state, player_id);
         Ok(())
     }
 }

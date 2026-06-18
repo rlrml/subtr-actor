@@ -642,6 +642,9 @@ fn kickoff_classifies_fake_and_missed_expected_takers() {
     assert_eq!(blue_support_event.player, blue_support);
     assert_eq!(blue_support_event.first_touch_time, Some(1.0));
     assert_eq!(blue_support_event.boost_after, Some(12.0));
+    // Spawned at (0, -4608), so the horizontal distance from field center is
+    // exactly its |y|.
+    assert_eq!(blue_support_event.start_distance_from_center, 4608.0);
 
     let orange_taker_event = event.team_one_taker.as_ref().unwrap();
     assert_eq!(orange_taker_event.player, orange_taker);

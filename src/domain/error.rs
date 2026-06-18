@@ -1,3 +1,8 @@
+//! Crate-wide error type and result alias.
+//!
+//! Most fallible operations return [`SubtrActorResult`], whose error is
+//! [`SubtrActorError`] (a [`SubtrActorErrorVariant`] plus a captured backtrace).
+
 use crate::*;
 use std::backtrace::Backtrace;
 use thiserror::Error;

@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Derives backboard-play stats from the upstream backboard-bounce state.
 pub struct BackboardNode {
     calculator: BackboardCalculator,
 }

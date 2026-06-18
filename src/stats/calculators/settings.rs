@@ -1,5 +1,6 @@
 use super::*;
 
+/// Captured per-player camera/control settings.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PlayerSettings {
     pub steering_sensitivity: Option<f32>,
@@ -12,6 +13,7 @@ pub struct PlayerSettings {
     pub camera_transition_speed: Option<f32>,
 }
 
+/// Captures replay/match settings from metadata.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SettingsCalculator {
     player_settings: HashMap<PlayerId, PlayerSettings>,

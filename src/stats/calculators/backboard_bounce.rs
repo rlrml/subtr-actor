@@ -1,5 +1,6 @@
 use super::*;
 
+/// A ball rebound off the opponent backboard attributed to the player who sent it there.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BackboardBounceEvent {
@@ -16,12 +17,14 @@ pub struct BackboardBounceEvent {
 #[path = "backboard_bounce_tests.rs"]
 mod tests;
 
+/// Per-frame tracking state for backboard bounces.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BackboardBounceState {
     pub bounce_events: Vec<BackboardBounceEvent>,
     pub last_bounce_event: Option<BackboardBounceEvent>,
 }
 
+/// Detects backboard bounces and attributes them to the player who sent the ball.
 #[derive(Default)]
 pub struct BackboardBounceCalculator {
     previous_ball_velocity: Option<glam::Vec3>,

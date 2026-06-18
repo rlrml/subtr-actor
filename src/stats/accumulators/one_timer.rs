@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated one-timer stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct OneTimerPlayerStats {
@@ -32,6 +33,7 @@ impl OneTimerPlayerStats {
     }
 }
 
+/// Per-team accumulated one-timer stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct OneTimerTeamStats {
@@ -50,6 +52,7 @@ impl OneTimerTeamStats {
     }
 }
 
+/// Accumulates one-timer stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct OneTimerStatsAccumulator {
     player_stats: HashMap<PlayerId, OneTimerPlayerStats>,

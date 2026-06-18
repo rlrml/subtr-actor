@@ -1,6 +1,7 @@
 use super::*;
 use crate::stats::calculators::WALL_AERIAL_HIGH_CONFIDENCE;
 
+/// Per-player accumulated wall-aerial-shot stats with confidence.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WallAerialShotStats {
@@ -40,6 +41,7 @@ impl WallAerialShotStats {
     }
 }
 
+/// Accumulates wall-aerial-shot stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WallAerialShotStatsAccumulator {
     player_stats: HashMap<PlayerId, WallAerialShotStats>,

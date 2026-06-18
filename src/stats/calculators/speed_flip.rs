@@ -25,6 +25,7 @@ const SPEED_FLIP_MIN_BOOST_ALIGNMENT: f32 = 0.80;
 const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
 const BOOST_ACCELERATION_UU_PER_SECOND_SQUARED: f32 = 991.6667;
 
+/// A ground-started diagonal dodge/cancel acceleration pattern, primarily for kickoff speed flips.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct SpeedFlipEvent {
@@ -114,6 +115,7 @@ impl InFlightItem for ActiveSpeedFlipCandidate {
     }
 }
 
+/// Detects speed flips from gameplay/ball/player state.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpeedFlipCalculator {
     events: EventStream<SpeedFlipEvent>,
