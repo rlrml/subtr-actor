@@ -75,6 +75,19 @@ export type {
   ReplayPlayerInfo,
 } from "./adapter/SubtrActorPlayer.js";
 export { loadReplay, parseReplay } from "./adapter/wasm.js";
+export {
+  capturePlayerImage,
+  capturePlayerImageFromParsed,
+  capturePlayerImages,
+  capturePlayerImagesFromParsed,
+} from "./capture.js";
+export type {
+  PlayerImageBallCamMode,
+  PlayerImageCamera,
+  PlayerImageCaptureOptions,
+  PlayerImageCaptureRequest,
+  PlayerImageCaptureResult,
+} from "./capture.js";
 // Skybox environments (background + image-based lighting). The built-in "space"
 // is the default; register more or pass a descriptor inline. See environments.ts.
 export {
