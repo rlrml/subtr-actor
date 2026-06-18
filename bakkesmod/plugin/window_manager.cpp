@@ -185,7 +185,7 @@ void SubtrActorPlugin::renderGraphInspectorWindow() {
   ImGui::End();
 }
 
-std::array<SubtrActorPlugin::SingletonWindowControl, 15>
+std::array<SubtrActorPlugin::SingletonWindowControl, 14>
 SubtrActorPlugin::singletonWindowControls() {
   const float eventPlaylistX = rightAnchoredUiX(432.0f);
   const float statusX = rightAnchoredUiX(330.0f);
@@ -195,7 +195,6 @@ SubtrActorPlugin::singletonWindowControls() {
   const float replayLoadingX = rightAnchoredUiX(512.0f);
   const float moduleControlsX = rightAnchoredUiX(430.0f);
   const float shotVisualizationX = rightAnchoredUiX(608.0f);
-  const float missedEventsX = rightAnchoredUiX(448.0f);
   const float touchControlsX = rightAnchoredUiX(384.0f);
 
   return {{
@@ -319,18 +318,6 @@ SubtrActorPlugin::singletonWindowControls() {
        256.0f,
        608.0f,
        520.0f},
-      {"Missed events",
-       "missed-events",
-       "missed_events_open",
-       "missed_events",
-       true,
-       11,
-       &uiMissedEventsOpen,
-       &missedEventsPlacement,
-       missedEventsX,
-       448.0f,
-       448.0f,
-       420.0f},
       {"Module controls",
        "module-controls",
        "module_controls_open",
@@ -390,7 +377,7 @@ SubtrActorPlugin::webSingletonWindowControls() {
 }
 
 void SubtrActorPlugin::renderSingletonWindowManager() {
-  std::array<SingletonWindowControl, 15> windows = singletonWindowControls();
+  std::array<SingletonWindowControl, 14> windows = singletonWindowControls();
 
   const size_t visibleCount = static_cast<size_t>(std::count_if(
       windows.begin(),

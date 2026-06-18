@@ -301,7 +301,7 @@ std::string SubtrActorPlugin::uiConfigJson() {
   file << "  \"graph_inspector_node_query\": \""
        << escapeJsonString(graphInspectorNodeQuery) << "\",\n";
   file << "  \"placements\": {\n";
-  const std::array<SingletonWindowControl, 15> singletonWindows = singletonWindowControls();
+  const std::array<SingletonWindowControl, 14> singletonWindows = singletonWindowControls();
   for (size_t index = 0; index < singletonWindows.size(); index += 1) {
     const SingletonWindowControl &window = singletonWindows[index];
     const bool visible = window.open != nullptr && *window.open;
