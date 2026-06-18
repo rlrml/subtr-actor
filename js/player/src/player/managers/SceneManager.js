@@ -28,7 +28,10 @@ export class SceneManager {
     // Renderer - NOTE: logarithmicDepthBuffer causes shader recompilation issues
     // It was added to prevent z-fighting, but causes massive freeze on first explosion
     // TODO: Find alternative z-fighting solution (adjust near/far planes, polygon offset, etc.)
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      preserveDrawingBuffer: options.preserveDrawingBuffer === true,
+    });
     this.renderer.setSize(width, height);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
