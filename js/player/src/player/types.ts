@@ -218,6 +218,12 @@ export interface PlayerOptions {
   /** Boost/supersonic/ball trail effects (default true). */
   effects?: boolean;
   /**
+   * Keep the WebGL drawing buffer readable after rendering. Off by default for
+   * normal playback; static image capture enables it before calling
+   * canvas.toBlob()/toDataURL().
+   */
+  preserveDrawingBuffer?: boolean;
+  /**
    * Skybox environment driving the background + image-based lighting
    * (reflections/ambient on cars, arena, ball). A built-in id (default
    * `"space"`), a full `PlayerEnvironment` descriptor, or `false` for neutral
