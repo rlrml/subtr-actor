@@ -1,26 +1,47 @@
 use super::*;
 
-fn rigid_body(position: glam::Vec3, velocity: glam::Vec3) -> boxcars::RigidBody {
+fn rigid_body_with_rotation(
+    position: glam::Vec3,
+    velocity: glam::Vec3,
+    rotation: glam::Quat,
+) -> boxcars::RigidBody {
     boxcars::RigidBody {
         sleeping: false,
         location: glam_to_vec(&position),
-        rotation: boxcars::Quaternion {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-        },
+        rotation: glam_to_quat(&rotation),
         linear_velocity: Some(glam_to_vec(&velocity)),
         angular_velocity: Some(glam_to_vec(&glam::Vec3::ZERO)),
     }
 }
 
+fn rigid_body(position: glam::Vec3, velocity: glam::Vec3) -> boxcars::RigidBody {
+    rigid_body_with_rotation(position, velocity, glam::Quat::IDENTITY)
+}
+
 fn player(player_id: PlayerId, is_team_0: bool, position: glam::Vec3, boost: f32) -> PlayerSample {
+    player_with_velocity_and_rotation(
+        player_id,
+        is_team_0,
+        position,
+        glam::Vec3::ZERO,
+        glam::Quat::IDENTITY,
+        boost,
+    )
+}
+
+fn player_with_velocity_and_rotation(
+    player_id: PlayerId,
+    is_team_0: bool,
+    position: glam::Vec3,
+    velocity: glam::Vec3,
+    rotation: glam::Quat,
+    boost: f32,
+) -> PlayerSample {
     PlayerSample {
         player_id,
         is_team_0,
         hitbox: default_car_hitbox(),
-        rigid_body: Some(rigid_body(position, glam::Vec3::ZERO)),
+        rigid_body: Some(rigid_body_with_rotation(position, velocity, rotation)),
         boost_amount: Some(boost),
         last_boost_amount: None,
         boost_active: false,
@@ -840,6 +861,7 @@ fn kickoff_support_boost_gain_without_boost_route_is_other() {
         first_touch_boost: None,
         first_touch_time: None,
         first_touch_frame: None,
+        first_touch_contact: None,
         approach_trace: KickoffApproachTrace {
             min_boost: Some(85.0),
             last_position: Some([2100.0, 2200.0, 17.0]),
@@ -866,6 +888,7 @@ fn kickoff_support_go_for_boost_requires_immediate_own_back_big() {
         first_touch_boost: None,
         first_touch_time: None,
         first_touch_frame: None,
+        first_touch_contact: None,
         approach_trace: KickoffApproachTrace::default(),
     };
     let movement_start_time = 10.0;
@@ -2023,6 +2046,7 @@ fn kickoff_classifies_known_taker_approaches() {
         first_touch_boost: Some(20.0),
         first_touch_time: Some(1.0),
         first_touch_frame: Some(10),
+        first_touch_contact: None,
         approach_trace: KickoffApproachTrace {
             boost_active_sample_count: 3,
             first_dodge_time: Some(0.35),
@@ -2330,6 +2354,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
                 first_touch_boost: None,
                 first_touch_time: None,
                 first_touch_frame: None,
+                first_touch_contact: None,
                 approach_trace: KickoffApproachTrace::default(),
             },
             KickoffPlayerSnapshot {
@@ -2341,6 +2366,7 @@ fn kickoff_tie_breaks_expected_taker_by_actual_touch_then_left_goes() {
                 first_touch_boost: None,
                 first_touch_time: None,
                 first_touch_frame: None,
+                first_touch_contact: None,
                 approach_trace: KickoffApproachTrace::default(),
             },
         ],
@@ -2375,6 +2401,7 @@ fn kickoff_taker_prefers_ball_committer_when_no_touch() {
             first_touch_boost: None,
             first_touch_time: None,
             first_touch_frame: None,
+            first_touch_contact: None,
             approach_trace: KickoffApproachTrace {
                 min_boost: Some(85.0),
                 last_position: Some([1900.0, 2400.0, 17.0]),
@@ -2390,6 +2417,7 @@ fn kickoff_taker_prefers_ball_committer_when_no_touch() {
             first_touch_boost: None,
             first_touch_time: None,
             first_touch_frame: None,
+            first_touch_contact: None,
             approach_trace: KickoffApproachTrace {
                 min_boost: Some(0.0),
                 last_position: Some([-300.0, 700.0, 17.0]),
@@ -2468,6 +2496,19 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
             ball_direction: KickoffBallDirection::Center,
             first_touch_time: None,
             first_touch_frame: None,
+            contact_player_position: None,
+            contact_player_velocity: None,
+            contact_car_forward: None,
+            contact_local_ball_position: None,
+            contact_local_contact_point: None,
+            contact_gap: None,
+            contact_behind_ball_depth: None,
+            contact_lateral_offset: None,
+            contact_lateral_abs_offset: None,
+            contact_velocity_attack_alignment: None,
+            contact_velocity_ball_alignment: None,
+            contact_nose_attack_alignment: None,
+            contact_ball_exit_attack_alignment: None,
             outcome: KickoffTakerOutcome::Fake,
             approach: KickoffApproach::FakeGoForBoost,
         }),
@@ -2642,6 +2683,114 @@ fn kickoff_captures_ball_contact_position_and_velocity_at_first_touch() {
     assert_eq!(event.first_touch_ball_abs_x, Some(120.0));
     assert_eq!(event.first_touch_ball_height, Some(140.0));
     assert_eq!(event.first_touch_ball_velocity, Some([200.0, 600.0, 50.0]));
+}
+
+#[test]
+fn kickoff_taker_captures_contact_geometry_and_velocity_alignment() {
+    let blue_taker = PlayerId::Steam(64);
+    let orange_taker = PlayerId::Steam(65);
+    let mut calculator = KickoffCalculator::new();
+
+    calculator
+        .update(
+            &frame(0, 0.0),
+            &GameplayState {
+                ball_has_been_hit: Some(false),
+                ..GameplayState::default()
+            },
+            &ball(0.0),
+            &PlayerFrameState {
+                players: vec![
+                    player(
+                        blue_taker.clone(),
+                        true,
+                        glam::Vec3::new(-2048.0, -2560.0, 17.0),
+                        33.0,
+                    ),
+                    player(
+                        orange_taker.clone(),
+                        false,
+                        glam::Vec3::new(2048.0, 2560.0, 17.0),
+                        33.0,
+                    ),
+                ],
+            },
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(10, 1.0),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball_at(
+                glam::Vec3::new(0.0, 0.0, 92.0),
+                glam::Vec3::new(0.0, 800.0, 0.0),
+            ),
+            &PlayerFrameState {
+                players: vec![player_with_velocity_and_rotation(
+                    blue_taker.clone(),
+                    true,
+                    glam::Vec3::new(0.0, -160.0, 17.0),
+                    glam::Vec3::new(0.0, 1200.0, 0.0),
+                    glam::Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
+                    12.0,
+                )],
+            },
+            &TouchState {
+                touch_events: vec![touch(blue_taker.clone(), true, 10, 1.0)],
+                ..TouchState::default()
+            },
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator
+        .update(
+            &frame(35, 3.1),
+            &GameplayState {
+                ball_has_been_hit: Some(true),
+                ..GameplayState::default()
+            },
+            &ball(360.0),
+            &PlayerFrameState::default(),
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        )
+        .unwrap();
+
+    calculator.finish();
+    let event = calculator.events().last().unwrap();
+    let taker = event.team_zero_taker.as_ref().unwrap();
+    assert_eq!(taker.player, blue_taker);
+    assert_eq!(taker.contact_player_position, Some([0.0, -160.0, 17.0]));
+    assert_eq!(taker.contact_player_velocity, Some([0.0, 1200.0, 0.0]));
+    assert_eq!(taker.contact_behind_ball_depth, Some(160.0));
+    assert_eq!(taker.contact_lateral_offset, Some(0.0));
+    assert_eq!(taker.contact_lateral_abs_offset, Some(0.0));
+    assert!(taker.contact_local_ball_position.is_some());
+    assert!(taker.contact_local_contact_point.is_some());
+    assert!(taker.contact_gap.is_some());
+    assert!(
+        (taker.contact_velocity_attack_alignment.unwrap() - 1.0).abs() < 1e-4,
+        "velocity should point toward the opponent goal"
+    );
+    assert!(
+        (taker.contact_velocity_ball_alignment.unwrap() - 1.0).abs() < 1e-4,
+        "velocity should point through the ball"
+    );
+    assert!(
+        (taker.contact_nose_attack_alignment.unwrap() - 1.0).abs() < 1e-4,
+        "car nose should point toward the opponent goal"
+    );
+    assert!(
+        (taker.contact_ball_exit_attack_alignment.unwrap() - 1.0).abs() < 1e-4,
+        "ball exit velocity should point toward the opponent goal"
+    );
 }
 
 #[test]

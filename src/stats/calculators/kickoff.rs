@@ -44,6 +44,7 @@ struct KickoffPlayerSnapshot {
     first_touch_boost: Option<f32>,
     first_touch_time: Option<f32>,
     first_touch_frame: Option<usize>,
+    first_touch_contact: Option<KickoffContactSnapshot>,
     approach_trace: KickoffApproachTrace,
 }
 
@@ -78,6 +79,23 @@ struct KickoffTouchSnapshot {
     frame: usize,
     team_is_team_0: bool,
     player: Option<PlayerId>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct KickoffContactSnapshot {
+    player_position: [f32; 3],
+    player_velocity: Option<[f32; 3]>,
+    car_forward: Option<[f32; 3]>,
+    local_ball_position: Option<[f32; 3]>,
+    local_contact_point: Option<[f32; 3]>,
+    contact_gap: Option<f32>,
+    behind_ball_depth: f32,
+    lateral_offset: f32,
+    lateral_abs_offset: f32,
+    velocity_attack_alignment: Option<f32>,
+    velocity_ball_alignment: Option<f32>,
+    nose_attack_alignment: Option<f32>,
+    ball_exit_attack_alignment: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -598,6 +616,7 @@ impl KickoffCalculator {
             first_touch_boost: None,
             first_touch_time: None,
             first_touch_frame: None,
+            first_touch_contact: None,
             approach_trace: KickoffApproachTrace::default(),
         })
     }
@@ -792,7 +811,86 @@ impl KickoffCalculator {
         }
     }
 
-    fn apply_touches(active: &mut ActiveKickoff, touch_state: &TouchState, ball: &BallFrameState) {
+    fn team_attack_direction(is_team_0: bool) -> glam::Vec2 {
+        glam::Vec2::new(0.0, if is_team_0 { 1.0 } else { -1.0 })
+    }
+
+    fn team_right_direction(is_team_0: bool) -> glam::Vec2 {
+        glam::Vec2::new(if is_team_0 { 1.0 } else { -1.0 }, 0.0)
+    }
+
+    fn normalize_xy(vector: glam::Vec3) -> Option<glam::Vec2> {
+        let xy = vector.truncate();
+        if xy.length_squared() > f32::EPSILON {
+            Some(xy.normalize())
+        } else {
+            None
+        }
+    }
+
+    fn kickoff_contact_snapshot(
+        player: Option<&PlayerSample>,
+        touch: &TouchEvent,
+        ball: &BallFrameState,
+    ) -> Option<KickoffContactSnapshot> {
+        let player_body = player.and_then(|player| player.rigid_body.as_ref());
+        let player_position = player_body
+            .map(|body| vec_to_glam(&body.location))
+            .or_else(|| touch.player_position.as_ref().map(vec_to_glam))?;
+        let ball_position = ball.position()?;
+        let attack_direction = Self::team_attack_direction(touch.team_is_team_0);
+        let right_direction = Self::team_right_direction(touch.team_is_team_0);
+        let ball_from_player = ball_position - player_position;
+        let player_velocity = player.and_then(PlayerSample::velocity);
+        let car_forward = player_body.map(|body| quat_to_glam(&body.rotation) * glam::Vec3::X);
+        let contact_estimate = player_body.zip(player).and_then(|(body, player)| {
+            car_hitbox_contact_estimate(ball_position, body, player.hitbox)
+        });
+        let ball_velocity = ball.velocity();
+
+        Some(KickoffContactSnapshot {
+            player_position: player_position.to_array(),
+            player_velocity: player_velocity.map(|velocity| velocity.to_array()),
+            car_forward: car_forward.map(|forward| forward.to_array()),
+            local_ball_position: contact_estimate
+                .as_ref()
+                .map(|estimate| estimate.local_ball_position.to_array()),
+            local_contact_point: contact_estimate
+                .as_ref()
+                .map(|estimate| estimate.local_contact_point.to_array()),
+            contact_gap: contact_estimate
+                .as_ref()
+                .map(|estimate| (estimate.distance - BALL_COLLISION_RADIUS).max(0.0)),
+            behind_ball_depth: ball_from_player.truncate().dot(attack_direction),
+            lateral_offset: (player_position - ball_position)
+                .truncate()
+                .dot(right_direction),
+            lateral_abs_offset: (player_position - ball_position)
+                .truncate()
+                .dot(right_direction)
+                .abs(),
+            velocity_attack_alignment: player_velocity
+                .and_then(Self::normalize_xy)
+                .map(|velocity| velocity.dot(attack_direction)),
+            velocity_ball_alignment: player_velocity
+                .and_then(Self::normalize_xy)
+                .zip(Self::normalize_xy(ball_from_player))
+                .map(|(velocity, ball_direction)| velocity.dot(ball_direction)),
+            nose_attack_alignment: car_forward
+                .and_then(Self::normalize_xy)
+                .map(|forward| forward.dot(attack_direction)),
+            ball_exit_attack_alignment: ball_velocity
+                .and_then(Self::normalize_xy)
+                .map(|velocity| velocity.dot(attack_direction)),
+        })
+    }
+
+    fn apply_touches(
+        active: &mut ActiveKickoff,
+        touch_state: &TouchState,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+    ) {
         for touch in chronological_touch_events(&touch_state.touch_events) {
             active.touches.push(KickoffTouchSnapshot {
                 time: touch.time,
@@ -825,6 +923,8 @@ impl KickoffCalculator {
                     player.approach_trace.previous_boost.or(player.start_boost);
                 player.first_touch_time = Some(touch.time);
                 player.first_touch_frame = Some(touch.frame);
+                player.first_touch_contact =
+                    Self::kickoff_contact_snapshot(players.player(player_id), touch, ball);
             }
         }
     }
@@ -1633,6 +1733,7 @@ impl KickoffCalculator {
                     },
                 );
                 let taker_boost_after = Self::taker_boost_after(player, boost_after);
+                let contact = player.first_touch_contact.as_ref();
                 let player_event = KickoffTakerEvent {
                     player: player.player.clone(),
                     is_team_0: player.is_team_0,
@@ -1646,6 +1747,25 @@ impl KickoffCalculator {
                     ball_direction: Self::ball_direction(ball, player.is_team_0),
                     first_touch_time: player.first_touch_time,
                     first_touch_frame: player.first_touch_frame,
+                    contact_player_position: contact.map(|contact| contact.player_position),
+                    contact_player_velocity: contact.and_then(|contact| contact.player_velocity),
+                    contact_car_forward: contact.and_then(|contact| contact.car_forward),
+                    contact_local_ball_position: contact
+                        .and_then(|contact| contact.local_ball_position),
+                    contact_local_contact_point: contact
+                        .and_then(|contact| contact.local_contact_point),
+                    contact_gap: contact.and_then(|contact| contact.contact_gap),
+                    contact_behind_ball_depth: contact.map(|contact| contact.behind_ball_depth),
+                    contact_lateral_offset: contact.map(|contact| contact.lateral_offset),
+                    contact_lateral_abs_offset: contact.map(|contact| contact.lateral_abs_offset),
+                    contact_velocity_attack_alignment: contact
+                        .and_then(|contact| contact.velocity_attack_alignment),
+                    contact_velocity_ball_alignment: contact
+                        .and_then(|contact| contact.velocity_ball_alignment),
+                    contact_nose_attack_alignment: contact
+                        .and_then(|contact| contact.nose_attack_alignment),
+                    contact_ball_exit_attack_alignment: contact
+                        .and_then(|contact| contact.ball_exit_attack_alignment),
                     outcome,
                     approach: Self::classify_approach(
                         player,
@@ -1792,7 +1912,7 @@ impl KickoffCalculator {
                 Self::observe_live_action_start(active, ctx.frame);
             }
             Self::apply_player_samples(active, ctx.frame, ctx.players);
-            Self::apply_touches(active, ctx.touch_state, ctx.ball);
+            Self::apply_touches(active, ctx.touch_state, ctx.ball, ctx.players);
             Self::apply_boost_pickups(active, ctx.boost_pickups);
             Self::apply_speed_flip_events(active, ctx.frame, ctx.speed_flip_events);
             if Self::should_capture_resolution(active, ctx.frame) {
@@ -1804,7 +1924,7 @@ impl KickoffCalculator {
             // The frozen event no longer changes, but the kickoff-goal gates
             // still need the touch chain and ball-position history through the
             // attribution window.
-            Self::apply_touches(active, ctx.touch_state, ctx.ball);
+            Self::apply_touches(active, ctx.touch_state, ctx.ball, ctx.players);
         }
         Self::observe_ball_extent(active, ctx.ball);
         if let Some(goal) = Self::earliest_goal(ctx.events) {
