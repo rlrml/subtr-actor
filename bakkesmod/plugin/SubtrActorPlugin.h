@@ -328,6 +328,7 @@ private:
   bool uiReplayLoadingOpen = false;
   bool uiModuleControlsOpen = false;
   bool uiShotVisualizationOpen = false;
+  bool uiMissedEventsOpen = false;
   bool uiTouchControlsOpen = false;
   bool uiBoostPickupControlsOpen = false;
   bool uiLauncherToggleHovered = false;
@@ -411,6 +412,7 @@ private:
   UiWindowPlacement replayLoadingPlacement;
   UiWindowPlacement moduleControlsPlacement;
   UiWindowPlacement shotVisualizationPlacement;
+  UiWindowPlacement missedEventsPlacement;
   UiWindowPlacement touchControlsPlacement;
   UiWindowPlacement boostPickupControlsPlacement;
   std::vector<std::string> cachedStatsModuleNames;
@@ -505,7 +507,7 @@ private:
       bool includeOpenButtons,
       bool webCardHeaders = false,
       bool onlyWebActivePanels = false);
-  std::array<SingletonWindowControl, 14> singletonWindowControls();
+  std::array<SingletonWindowControl, 15> singletonWindowControls();
   std::vector<SingletonWindowControl> webSingletonWindowControls();
   std::array<StatsWindowKindControl, 7> statsWindowKindControls() const;
   void renderSingletonWindowManager();
