@@ -354,7 +354,35 @@ test("generic ball half playlist events include field half and duration", () => 
     replay,
     statsTimeline,
   } as StatModuleContext;
-  const playlistSources = getEventPlaylistSources(ctx, getTestTimelineSources(ctx));
+  const timelineSources = getTestTimelineSources(ctx);
+  const ballHalfSource = timelineSources.find((source) => source.id === "stats-stream:ball_half");
+  assert.ok(ballHalfSource);
+  assert.deepEqual(ballHalfSource.buildTimelineRanges?.(), [
+    {
+      id: "stats-stream:ball_half:2:5:0",
+      startTime: 1,
+      endTime: 2.5,
+      lane: "stats-stream:ball_half",
+      laneLabel: "Ball Half",
+      label: "Ball Half",
+      shortLabel: "BH",
+      isTeamZero: null,
+      color: "#3b82f6",
+    },
+    {
+      id: "stats-stream:ball_half:5:6:1",
+      startTime: 2.5,
+      endTime: 3,
+      lane: "stats-stream:ball_half",
+      laneLabel: "Ball Half",
+      label: "Ball Half",
+      shortLabel: "BH",
+      isTeamZero: null,
+      color: "#d1d9e0",
+    },
+  ]);
+
+  const playlistSources = getEventPlaylistSources(ctx, timelineSources);
 
   const items = buildEventPlaylistItems({
     sources: playlistSources,
@@ -369,6 +397,7 @@ test("generic ball half playlist events include field half and duration", () => 
       frame: item.event.frame,
       label: item.event.label,
       shortLabel: item.event.shortLabel,
+      color: item.color,
     })),
     [
       {
@@ -377,6 +406,7 @@ test("generic ball half playlist events include field half and duration", () => 
         frame: 5,
         label: "Ball on blue side | 1.5s",
         shortLabel: "BH",
+        color: "#3b82f6",
       },
       {
         sourceId: "stats-stream:ball_half",
@@ -384,6 +414,7 @@ test("generic ball half playlist events include field half and duration", () => 
         frame: 6,
         label: "Ball half inactive | 0.5s",
         shortLabel: "BH",
+        color: "#d1d9e0",
       },
     ],
   );
