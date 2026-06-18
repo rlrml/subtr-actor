@@ -6,6 +6,7 @@ const FLIP_IMPULSE_MIN_DELTA: f32 = 10.0;
 const FLIP_IMPULSE_STRONG_DELTA: f32 = 280.0;
 const BOOST_ACCELERATION_UU_PER_SECOND_SQUARED: f32 = 991.6667;
 
+/// An estimated dodge impulse derived from a measurable velocity change.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DodgeImpulse {
@@ -29,6 +30,7 @@ pub struct DodgeImpulse {
     pub confidence: f32,
 }
 
+/// A dodge-start event, optionally carrying an estimated dodge impulse.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DodgeEvent {
@@ -75,6 +77,7 @@ impl InFlightItem for ActiveFlipImpulseCandidate {
     }
 }
 
+/// Detects dodge starts / flip impulses from player frame state.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlipImpulseCalculator {
     events: EventStream<DodgeEvent>,

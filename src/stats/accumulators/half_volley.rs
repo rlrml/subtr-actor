@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated half-volley stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct HalfVolleyPlayerStats {
@@ -23,6 +24,7 @@ impl HalfVolleyPlayerStats {
     }
 }
 
+/// Per-team accumulated half-volley stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct HalfVolleyTeamStats {
@@ -41,6 +43,7 @@ impl HalfVolleyTeamStats {
     }
 }
 
+/// Accumulates half-volley stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct HalfVolleyStatsAccumulator {
     player_stats: HashMap<PlayerId, HalfVolleyPlayerStats>,

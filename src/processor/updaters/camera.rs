@@ -6,7 +6,7 @@ impl<'a> ReplayProcessor<'a> {
     /// frame.
     ///
     /// These flip only a handful of times per match, so rather than storing a
-    /// value on every [`PlayerFrame`] we coalesce them into a per-player change
+    /// value on every [`PlayerFrame`](crate::PlayerFrame) we coalesce them into a per-player change
     /// stream. Each change carries the full discrete state so consumers resolve
     /// the value at an arbitrary frame with a last-change-before lookup. The
     /// underlying attributes are sticky in actor state (the camera-settings and

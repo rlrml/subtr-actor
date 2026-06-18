@@ -389,6 +389,75 @@ test("generic ball half playlist events include field half and duration", () => 
   );
 });
 
+test("generic ball third playlist events include field third and duration", () => {
+  const replay = {
+    frames: Array.from({ length: 8 }, (_, frame) => ({ time: frame * 0.5 })),
+    players: [],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      ball_third: [
+        {
+          time: 1,
+          frame: 2,
+          end_time: 2.5,
+          end_frame: 5,
+          active: true,
+          duration: 1.5,
+          field_third: "team_zero_third",
+        },
+        {
+          time: 2.5,
+          frame: 5,
+          end_time: 3,
+          end_frame: 6,
+          active: false,
+          duration: 0.5,
+          field_third: "neutral_third",
+        },
+      ],
+    },
+  });
+  const ctx = {
+    replay,
+    statsTimeline,
+  } as StatModuleContext;
+  const playlistSources = getEventPlaylistSources(ctx, getTestTimelineSources(ctx));
+
+  const items = buildEventPlaylistItems({
+    sources: playlistSources,
+    activeSourceIds: new Set(["stats-stream:ball_third"]),
+    replayPlayers: replay.players,
+  });
+
+  assert.deepEqual(
+    items.map((item) => ({
+      sourceId: item.sourceId,
+      time: item.event.time,
+      frame: item.event.frame,
+      label: item.event.label,
+      shortLabel: item.event.shortLabel,
+    })),
+    [
+      {
+        sourceId: "stats-stream:ball_third",
+        time: 2.5,
+        frame: 5,
+        label: "Ball in blue third | 1.5s",
+        shortLabel: "BT",
+      },
+      {
+        sourceId: "stats-stream:ball_third",
+        time: 3,
+        frame: 6,
+        label: "Ball third inactive | 0.5s",
+        shortLabel: "BT",
+      },
+    ],
+  );
+});
+
 test("span-based stats event streams build ranges instead of timeline markers", () => {
   const replay = {
     frames: Array.from({ length: 7 }, (_, frame) => ({ time: frame })),

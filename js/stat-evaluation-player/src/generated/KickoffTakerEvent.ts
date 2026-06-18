@@ -5,6 +5,9 @@ import type { KickoffSpawnPosition } from "./KickoffSpawnPosition.ts";
 import type { KickoffTakerOutcome } from "./KickoffTakerOutcome.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * Kickoff event for the player who challenged the ball.
+ */
 export type KickoffTakerEvent = { player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number], spawn_position: KickoffSpawnPosition, start_boost: number | null,
 /**
  * Boost remaining at the moment the taker contacts the ball (the

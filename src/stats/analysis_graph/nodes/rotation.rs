@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks rotational roles (first/second/third man) from positions and events during live play.
 pub struct RotationNode {
     calculator: RotationCalculator,
 }

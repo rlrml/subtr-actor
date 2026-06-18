@@ -2,6 +2,7 @@ use crate::*;
 use serde::Serialize;
 use std::collections::HashMap;
 
+/// A frame-level dodge refresh observed as occurring on the ball (a flip reset).
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlipResetEvent {
@@ -25,6 +26,7 @@ pub struct FlipResetEvent {
     pub closest_approach_distance: f32,
 }
 
+/// A frame where a player's dodge/flip availability is refreshed.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DodgeRefreshedEvent {
@@ -38,6 +40,7 @@ pub struct DodgeRefreshedEvent {
     pub counter_value: i32,
 }
 
+/// A dodge shortly after leaving a wall.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PostWallDodgeEvent {
@@ -52,6 +55,7 @@ pub struct PostWallDodgeEvent {
     pub time_since_wall_contact: f32,
 }
 
+/// A dodge that follows and converts a flip reset.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlipResetFollowupDodgeEvent {
@@ -255,6 +259,7 @@ fn flip_reset_proximity_candidate(
     })
 }
 
+/// Tracks flip resets and their follow-up dodges.
 #[derive(Debug, Clone, Default)]
 pub struct FlipResetTracker {
     flip_reset_events: Vec<FlipResetEvent>,

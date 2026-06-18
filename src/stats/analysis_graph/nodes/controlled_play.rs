@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects stretches of controlled play from ball/player positions and touches.
 pub struct ControlledPlayNode {
     calculator: ControlledPlayCalculator,
 }

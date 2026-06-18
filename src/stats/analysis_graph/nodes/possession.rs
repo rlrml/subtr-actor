@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Derives team/possession stats from ball-frame and shared possession state.
 pub struct PossessionNode {
     calculator: PossessionCalculator,
 }
@@ -34,7 +35,6 @@ impl AnalysisNode for PossessionNode {
     fn dependencies(&self) -> NodeDependencies {
         vec![
             frame_info_dependency(),
-            ball_frame_state_dependency(),
             possession_state_dependency(),
             live_play_dependency(),
         ]
@@ -43,7 +43,6 @@ impl AnalysisNode for PossessionNode {
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         self.calculator.update(
             ctx.get::<FrameInfo>()?,
-            ctx.get::<BallFrameState>()?,
             ctx.get::<PossessionState>()?,
             ctx.get::<LivePlayState>()?,
         )

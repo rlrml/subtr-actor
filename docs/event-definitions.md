@@ -148,6 +148,34 @@ _None documented._
 
 _None documented._
 
+### Ball Third (`ball_third`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `ball_third` via `BallThirdNode` / `BallThirdCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Boost Pickup (`boost_pickups`)
 
 - Category: `other`

@@ -15,6 +15,7 @@ pub const BOOST_USED_SPLIT_TOLERANCE_RAW: f32 = 2.0;
 pub const BOOST_CURRENT_AMOUNT_SETTLE_FRAME_WINDOW: usize = 4;
 pub const BOOST_CURRENT_AMOUNT_DRIFT_WARN_THRESHOLD_BYTES: i16 = 5;
 
+/// The kind of boost-accounting consistency check being tracked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BoostInvariantKind {
     BucketAmounts,
@@ -44,6 +45,7 @@ impl BoostInvariantKind {
     }
 }
 
+/// A detected violation of a boost-accounting invariant.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BoostInvariantViolation {
     pub kind: BoostInvariantKind,
@@ -160,6 +162,7 @@ pub fn projected_current_boost_byte(ledger_current_amount: f32) -> u8 {
     ledger_current_amount.round().clamp(0.0, BOOST_MAX_AMOUNT) as u8
 }
 
+/// A warning that tracked boost drifted from the replay-reported amount.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BoostCurrentAmountDriftWarning {
     pub player_id: PlayerId,
@@ -193,6 +196,7 @@ struct PendingBoostCurrentAmountDrift {
     latest: BoostCurrentAmountDriftWarning,
 }
 
+/// Per-player tracker reconciling tracked boost against replay-reported amounts.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BoostCurrentAmountConsistencyTracker {
     pending_drifts: HashMap<PlayerId, PendingBoostCurrentAmountDrift>,

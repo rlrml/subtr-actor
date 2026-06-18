@@ -2,6 +2,7 @@ use super::*;
 
 const MUSTY_HIGH_CONFIDENCE: f32 = 0.80;
 
+/// Per-player accumulated musty-flick stats with confidence.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct MustyFlickStats {
@@ -60,6 +61,7 @@ impl MustyFlickStats {
     }
 }
 
+/// Accumulates musty-flick stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct MustyFlickStatsAccumulator {
     player_stats: HashMap<PlayerId, MustyFlickStats>,

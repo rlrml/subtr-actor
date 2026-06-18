@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks continuous ball-control sequences per player, emitting completed sequences.
 pub struct ContinuousBallControlNode {
     tracker: ContinuousBallControlTracker<BallCarryKind>,
     state: ContinuousBallControlState,

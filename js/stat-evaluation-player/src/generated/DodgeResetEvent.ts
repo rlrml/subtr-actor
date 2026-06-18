@@ -2,6 +2,9 @@
 import type { FlipResetOutcome } from "./FlipResetOutcome.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * A frame-level dodge refresh marked as occurring on the ball (a flip reset).
+ */
 export type DodgeResetEvent = { time: number, frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, counter_value: number,
 /**
  * Whether the dodge refresh happened on the ball (i.e. this reset is a flip reset).

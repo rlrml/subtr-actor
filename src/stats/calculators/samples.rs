@@ -2,6 +2,7 @@ use boxcars;
 
 use crate::*;
 
+/// A sampled ball state at a frame.
 #[derive(Debug, Clone)]
 pub struct BallSample {
     pub rigid_body: boxcars::RigidBody,
@@ -21,6 +22,7 @@ impl BallSample {
     }
 }
 
+/// A sampled player state at a frame.
 #[derive(Debug, Clone)]
 pub struct PlayerSample {
     pub player_id: PlayerId,
@@ -55,6 +57,7 @@ impl PlayerSample {
     }
 }
 
+/// A sampled demolition event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DemoEventSample {
     pub attacker: PlayerId,

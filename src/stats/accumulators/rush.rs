@@ -14,6 +14,7 @@ pub(crate) const RUSH_DEFENDER_LABELS: [StatLabel; 3] = [
     StatLabel::new("defenders", "3"),
 ];
 
+/// Per-team accumulated rush counts by attacker/defender numbers.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RushStats {
     pub team_zero_count: u32,
@@ -114,6 +115,7 @@ impl RushStats {
     }
 }
 
+/// Per-team accumulated rush stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct RushTeamStats {
@@ -126,6 +128,7 @@ pub struct RushTeamStats {
     pub three_v_three_count: u32,
 }
 
+/// Accumulates rush stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RushStatsAccumulator {
     stats: RushStats,

@@ -2,6 +2,7 @@ use super::*;
 
 const FLICK_HIGH_CONFIDENCE: f32 = 0.80;
 
+/// Per-player accumulated flick stats with confidence.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FlickStats {
@@ -83,6 +84,7 @@ impl FlickStats {
     }
 }
 
+/// Accumulates flick stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlickStatsAccumulator {
     player_stats: HashMap<PlayerId, FlickStats>,

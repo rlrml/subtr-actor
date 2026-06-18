@@ -24,6 +24,7 @@ pub struct DemolitionEvent {
     pub victim_position: Option<[f32; 3]>,
 }
 
+/// Detects demolitions from player frame state and frame events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DemoCalculator {
     player_teams: HashMap<PlayerId, bool>,

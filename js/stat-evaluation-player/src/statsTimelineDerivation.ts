@@ -95,6 +95,10 @@ import {
   createBallHalfEventDerivedStatsAccumulator,
 } from "./ballHalfEventDerivation.ts";
 import {
+  applyBallThirdEventDerivedStats,
+  createBallThirdEventDerivedStatsAccumulator,
+} from "./ballThirdEventDerivation.ts";
+import {
   applyTerritorialPressureEventDerivedStats,
   createTerritorialPressureEventDerivedStatsAccumulator,
 } from "./territorialPressureEventDerivation.ts";
@@ -187,6 +191,13 @@ export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventD
     teamModules: ["ball_half"],
     apply: applyBallHalfEventDerivedStats,
     createFrameAccumulator: createBallHalfEventDerivedStatsAccumulator,
+  },
+  {
+    id: "ball_third",
+    playerModules: [],
+    teamModules: ["ball_third"],
+    apply: applyBallThirdEventDerivedStats,
+    createFrameAccumulator: createBallThirdEventDerivedStatsAccumulator,
   },
   {
     id: "territorial-pressure",

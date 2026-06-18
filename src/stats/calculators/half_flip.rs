@@ -10,6 +10,7 @@ const HALF_FLIP_MIN_FORWARD_REVERSAL: f32 = 0.55;
 const HALF_FLIP_MIN_FORWARD_VERTICAL: f32 = 0.22;
 const HALF_FLIP_MIN_CONFIDENCE: f32 = 0.55;
 
+/// A dodge sequence starting while driving backward that reorients the car to move forward.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct HalfFlipEvent {
@@ -47,6 +48,7 @@ struct ActiveHalfFlipCandidate {
     max_forward_vertical: f32,
 }
 
+/// Detects half-flips from player frame state.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct HalfFlipCalculator {
     events: EventStream<HalfFlipEvent>,

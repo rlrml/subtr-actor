@@ -15,6 +15,7 @@ const MUSTY_MIN_PITCH_DOMINANCE_RATIO: f32 = 1.1;
 const MUSTY_MIN_DODGE_START_FORWARD_Z: f32 = -0.25;
 const MUSTY_MIN_CONFIDENCE: f32 = 0.55;
 
+/// A back-flip style flick contacting the ball atop the car during a dominant pitch rotation.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct MustyFlickEvent {
@@ -47,6 +48,7 @@ struct RecentDodgeStart {
     forward_z: f32,
 }
 
+/// Detects musty flicks from ball/player state and touches.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct MustyFlickCalculator {
     events: EventStream<MustyFlickEvent>,

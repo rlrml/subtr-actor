@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects rushes/over-commits from ball/player/possession state during live play.
 pub struct RushNode {
     calculator: RushCalculator,
 }

@@ -1,5 +1,6 @@
 use super::*;
 
+/// Accumulated possession time split by team and neutral.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PossessionStats {
     pub tracked_time: f32,
@@ -67,6 +68,7 @@ impl PossessionStats {
     }
 }
 
+/// Per-team accumulated possession stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PossessionTeamStats {
@@ -78,6 +80,7 @@ pub struct PossessionTeamStats {
     pub labeled_time: LabeledFloatSums,
 }
 
+/// Accumulates possession stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PossessionStatsAccumulator {
     stats: PossessionStats,
@@ -92,48 +95,46 @@ impl PossessionStatsAccumulator {
         &self.stats
     }
 
-    pub fn apply_event(&mut self, event: &PossessionEvent) {
-        if !event.active {
-            return;
-        }
-
-        self.stats.tracked_time += event.duration;
-        let possession_value = match event.possession_state.as_str() {
+    /// Fold one live-play frame of possession into the cumulative stats.
+    ///
+    /// `possession_state` is the current possession label (`team_zero` /
+    /// `team_one` / `neutral`); `field_third` / `field_half` are the ball's
+    /// current zone labels sourced from the canonical `ball_third` / `ball_half`
+    /// streams. The cross-tab is the per-frame join of possession with those
+    /// zones — possession events themselves carry no zone, so this is the only
+    /// place the dimensions meet.
+    pub fn apply_frame(
+        &mut self,
+        possession_state: &str,
+        field_third: Option<&str>,
+        field_half: Option<&str>,
+        dt: f32,
+    ) {
+        self.stats.tracked_time += dt;
+        let possession_value = match possession_state {
             "team_zero" => {
-                self.stats.team_zero_time += event.duration;
+                self.stats.team_zero_time += dt;
                 "team_zero"
             }
             "team_one" => {
-                self.stats.team_one_time += event.duration;
+                self.stats.team_one_time += dt;
                 "team_one"
             }
             "neutral" => {
-                self.stats.neutral_time += event.duration;
+                self.stats.neutral_time += dt;
                 "neutral"
             }
             _ => return,
         };
 
-        let possession_label = StatLabel::new("possession_state", possession_value);
-        if let Some(field_third) = event
-            .field_third
-            .as_deref()
-            .and_then(static_field_third_label_value)
-        {
-            let field_half = field_half_for_field_third(field_third);
-            self.stats.labeled_time.add(
-                [
-                    possession_label,
-                    StatLabel::new("field_third", field_third),
-                    StatLabel::new("field_half", field_half),
-                ],
-                event.duration,
-            );
-        } else {
-            self.stats
-                .labeled_time
-                .add([possession_label], event.duration);
+        let mut labels = vec![StatLabel::new("possession_state", possession_value)];
+        if let Some(field_third) = field_third.and_then(static_field_third_label_value) {
+            labels.push(StatLabel::new("field_third", field_third));
         }
+        if let Some(field_half) = field_half.and_then(static_field_half_label_value) {
+            labels.push(StatLabel::new("field_half", field_half));
+        }
+        self.stats.labeled_time.add(labels, dt);
     }
 }
 
@@ -146,11 +147,12 @@ fn static_field_third_label_value(value: &str) -> Option<&'static str> {
     }
 }
 
-fn field_half_for_field_third(value: &str) -> &'static str {
+fn static_field_half_label_value(value: &str) -> Option<&'static str> {
     match value {
-        "team_zero_third" => "team_zero_side",
-        "team_one_third" => "team_one_side",
-        _ => "neutral",
+        "team_zero_side" => Some("team_zero_side"),
+        "team_one_side" => Some("team_one_side"),
+        "neutral" => Some("neutral"),
+        _ => None,
     }
 }
 
@@ -204,24 +206,15 @@ fn team_relative_possession_label(label: &StatLabel, is_team_zero: bool) -> Stat
 mod tests {
     use super::*;
 
-    fn event(possession_state: &str, field_third: &str, duration: f32) -> PossessionEvent {
-        PossessionEvent {
-            time: 0.0,
-            frame: 0,
-            end_time: duration,
-            end_frame: 1,
-            active: true,
-            duration,
-            possession_state: possession_state.to_owned(),
-            player_id: None,
-            field_third: Some(field_third.to_owned()),
-        }
-    }
-
     #[test]
     fn possession_labeled_time_includes_field_half() {
         let mut accumulator = PossessionStatsAccumulator::default();
-        accumulator.apply_event(&event("team_zero", "team_zero_third", 2.0));
+        accumulator.apply_frame(
+            "team_zero",
+            Some("team_zero_third"),
+            Some("team_zero_side"),
+            2.0,
+        );
 
         assert_eq!(
             accumulator.stats().labeled_time.entries[0].labels,
@@ -235,9 +228,37 @@ mod tests {
     }
 
     #[test]
+    fn possession_half_is_independent_of_third() {
+        // The neutral third straddles the midfield line: a ball in the neutral
+        // third can be in either half. The half comes from the ball_half stream,
+        // not from the third bucket, so it is not collapsed to a neutral half.
+        let mut accumulator = PossessionStatsAccumulator::default();
+        accumulator.apply_frame(
+            "team_zero",
+            Some("neutral_third"),
+            Some("team_one_side"),
+            1.0,
+        );
+
+        assert_eq!(
+            accumulator.stats().labeled_time.entries[0].labels,
+            vec![
+                StatLabel::new("field_half", "team_one_side"),
+                StatLabel::new("field_third", "neutral_third"),
+                StatLabel::new("possession_state", "team_zero"),
+            ]
+        );
+    }
+
+    #[test]
     fn team_relative_possession_stats_translate_field_half() {
         let mut accumulator = PossessionStatsAccumulator::default();
-        accumulator.apply_event(&event("team_zero", "team_one_third", 3.0));
+        accumulator.apply_frame(
+            "team_zero",
+            Some("team_one_third"),
+            Some("team_one_side"),
+            3.0,
+        );
 
         let team_zero = accumulator.stats().for_team(true);
         assert_eq!(

@@ -8,6 +8,7 @@ const WALL_AERIAL_SHOT_MAX_WALL_CONTACT_TO_TAKEOFF_SECONDS: f32 = 2.25;
 const WALL_AERIAL_SHOT_MAX_TAKEOFF_TO_SHOT_SECONDS: f32 = 2.25;
 const WALL_AERIAL_SHOT_GROUND_CONTACT_MAX_PLAYER_Z: f32 = 80.0;
 
+/// A shot credited to a player shortly after taking off from a wall.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WallAerialShotEvent {
@@ -54,6 +55,7 @@ struct ArmedWallAerialShot {
     takeoff_position: glam::Vec3,
 }
 
+/// Detects wall-aerial shots during live play.
 #[derive(Debug, Clone, Default)]
 pub struct WallAerialShotCalculator {
     events: EventStream<WallAerialShotEvent>,

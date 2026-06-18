@@ -1,9 +1,12 @@
 use super::*;
 
-const DEFAULT_BALL_HALF_NEUTRAL_ZONE_HALF_WIDTH_Y: f32 = 200.0;
+pub(crate) const DEFAULT_BALL_HALF_NEUTRAL_ZONE_HALF_WIDTH_Y: f32 = 200.0;
 
+/// Canonical ball-half classification, shared by the `ball_half` stream and the
+/// possession cross-tab so there is a single definition of the midfield split
+/// (and its neutral deadzone).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-enum BallHalfLabel {
+pub(crate) enum BallHalfLabel {
     TeamZeroSide,
     TeamOneSide,
     #[default]
@@ -11,7 +14,17 @@ enum BallHalfLabel {
 }
 
 impl BallHalfLabel {
-    fn as_label_value(self) -> &'static str {
+    pub(crate) fn from_y(ball_y: f32, neutral_zone_half_width_y: f32) -> Self {
+        if ball_y.abs() <= neutral_zone_half_width_y {
+            Self::Neutral
+        } else if ball_y < 0.0 {
+            Self::TeamZeroSide
+        } else {
+            Self::TeamOneSide
+        }
+    }
+
+    pub(crate) fn as_label_value(self) -> &'static str {
         match self {
             Self::TeamZeroSide => "team_zero_side",
             Self::TeamOneSide => "team_one_side",
@@ -20,6 +33,7 @@ impl BallHalfLabel {
     }
 }
 
+/// A change in which half of the field the ball occupies.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BallHalfEvent {
@@ -40,6 +54,7 @@ impl BallHalfEvent {
     }
 }
 
+/// Configuration thresholds for ball-half classification.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BallHalfCalculatorConfig {
     pub neutral_zone_half_width_y: f32,
@@ -53,6 +68,7 @@ impl Default for BallHalfCalculatorConfig {
     }
 }
 
+/// Tracks which half of the field the ball is in over time.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BallHalfCalculator {
     config: BallHalfCalculatorConfig,
@@ -106,6 +122,15 @@ impl BallHalfCalculator {
             return;
         };
         self.events.push(pending.event);
+    }
+
+    /// The event covering the most recently processed frame (in-progress
+    /// pending span, or the last committed event once flushed).
+    pub fn current_event(&self) -> Option<&BallHalfEvent> {
+        self.pending_event
+            .as_ref()
+            .map(|pending| &pending.event)
+            .or_else(|| self.events.all().last())
     }
 
     pub fn config(&self) -> &BallHalfCalculatorConfig {
@@ -167,14 +192,8 @@ impl BallHalfCalculator {
             return Ok(());
         }
         if let Some(ball) = ball.sample() {
-            let ball_y = ball.position().y;
-            let half = if ball_y.abs() <= self.config.neutral_zone_half_width_y {
-                BallHalfLabel::Neutral
-            } else if ball_y < 0.0 {
-                BallHalfLabel::TeamZeroSide
-            } else {
-                BallHalfLabel::TeamOneSide
-            };
+            let half =
+                BallHalfLabel::from_y(ball.position().y, self.config.neutral_zone_half_width_y);
             self.emit_event_if_changed(frame, true, frame.dt, half);
         } else {
             self.emit_event_if_changed(frame, false, 0.0, BallHalfLabel::Neutral);

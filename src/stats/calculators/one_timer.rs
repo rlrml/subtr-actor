@@ -10,6 +10,7 @@ const GOAL_MOUTH_TRAJECTORY_MARGIN: f32 = BALL_RADIUS_Z * 1.5;
 /// net, not merely aimed in the goal's general direction).
 const ONE_TIMER_MAX_TIME_TO_GOAL_SECONDS: f32 = 4.0;
 
+/// A first-touch shot taken off an incoming pass without trapping the ball.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct OneTimerEvent {
@@ -33,6 +34,7 @@ pub struct OneTimerEvent {
     pub goal_alignment: f32,
 }
 
+/// Detects one-timers from ball state and upstream pass detection.
 #[derive(Debug, Clone, Default)]
 pub struct OneTimerCalculator {
     events: EventStream<OneTimerEvent>,

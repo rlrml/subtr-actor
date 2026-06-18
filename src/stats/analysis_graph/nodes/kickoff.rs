@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects and classifies kickoffs from gameplay/ball/player state, touches, speed-flips, and boost pickups.
 pub struct KickoffNode {
     calculator: KickoffCalculator,
 }

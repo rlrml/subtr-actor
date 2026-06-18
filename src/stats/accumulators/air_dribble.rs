@@ -9,6 +9,7 @@ fn air_dribble_origin_label(origin: AirDribbleOrigin) -> StatLabel {
     StatLabel::new("origin", origin.as_label_value())
 }
 
+/// Accumulated air-dribble stats: counts by origin, durations, distances, speed, and gaps.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct AirDribbleStats {

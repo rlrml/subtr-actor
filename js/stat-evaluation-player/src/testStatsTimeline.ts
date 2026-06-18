@@ -47,6 +47,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "core_player", stream: "core_player", kind: "core_player" },
   { field: "possession", stream: "possession", kind: "possession" },
   { field: "ball_half", stream: "ball_half", kind: "ball_half" },
+  { field: "ball_third", stream: "ball_third", kind: "ball_third" },
   {
     field: "territorial_pressure",
     stream: "territorial_pressure",
@@ -326,6 +327,7 @@ export function createStatsTimeline(
         closest_to_ball_switch_margin: 0,
         closest_to_ball_switch_min_seconds: 0,
         ball_half_neutral_zone_half_width_y: 0,
+        ball_third_boundary_y: 0,
         territorial_pressure_neutral_zone_half_width_y: 0,
         territorial_pressure_min_establish_seconds: 0,
         territorial_pressure_min_establish_third_seconds: 0,

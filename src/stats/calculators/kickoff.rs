@@ -8,7 +8,7 @@ const KICKOFF_DIAGONAL_MIN_ABS_X: f32 = 1500.0;
 const KICKOFF_DIAGONAL_MAX_ABS_Y: f32 = 3300.0;
 const KICKOFF_RESOLUTION_AFTER_FIRST_TOUCH_SECONDS: f32 = 1.25;
 const KICKOFF_FOLLOW_UP_AFTER_FIRST_TOUCH_SECONDS: f32 = 2.0;
-const KICKOFF_GOAL_MAX_SECONDS: f32 = 10.0;
+const KICKOFF_GOAL_MAX_SECONDS: f32 = 12.0;
 const KICKOFF_GOAL_MAX_DEFENSIVE_BALL_Y: f32 = 1280.0;
 const KICKOFF_WIN_PROJECTION_SECONDS: f32 = 0.5;
 const KICKOFF_FIELD_HALF_LENGTH: f32 = 5120.0;
@@ -317,6 +317,7 @@ impl InFlightItem for ActiveKickoff {
     }
 }
 
+/// Detects and classifies kickoffs and their outcomes.
 #[derive(Debug, Clone, Default)]
 pub struct KickoffCalculator {
     active: InFlightLedger<ActiveKickoff>,
@@ -1784,6 +1785,7 @@ impl KickoffCalculator {
                     player: player.player.clone(),
                     is_team_0: player.is_team_0,
                     start_position: player.start_position,
+                    start_distance_from_center: Self::kickoff_start_distance(player),
                     spawn_position: player.spawn_position,
                     start_boost: player.start_boost,
                     boost_after,

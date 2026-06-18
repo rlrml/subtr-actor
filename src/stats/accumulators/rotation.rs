@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated rotation stats: time per man-role and first-man stints.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct RotationPlayerStats {
@@ -49,6 +50,7 @@ impl RotationPlayerStats {
     }
 }
 
+/// Per-team accumulated rotation stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct RotationTeamStats {

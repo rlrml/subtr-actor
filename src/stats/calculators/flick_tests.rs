@@ -977,3 +977,135 @@ fn counts_flick_whose_ball_impulse_arrives_after_the_touch_frame() {
     assert!(calculator.events()[0].ball_speed_change >= FLICK_MIN_BALL_SPEED_CHANGE);
     assert_eq!(calculator.player_stats().get(&player_id).unwrap().count, 1);
 }
+
+// Builds the control touch a dribbling team-zero player taps each frame.
+fn carry_touch(frame_number: usize, time: f32) -> TouchEvent {
+    TouchEvent {
+        touch_id: None,
+        time,
+        frame: frame_number,
+        team_is_team_0: true,
+        player: Some(boxcars::RemoteId::Steam(1)),
+        player_position: None,
+        closest_approach_distance: Some(0.0),
+        dodge_contact: false,
+    }
+}
+
+#[test]
+fn bridges_brief_control_gaps_into_one_setup() {
+    // A real carry lets the ball wobble in and out of the tight control volume.
+    // Here the ball leaves the volume every other frame, so without gap bridging
+    // no continuous run reaches FLICK_MIN_SETUP_SECONDS (each isolated frame is
+    // only one dt) and the flick is never recognized. With bridging the observed
+    // frames accumulate into one qualifying setup.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    let in_volume = || ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO);
+    let out_of_volume = || ball(glam::Vec3::new(260.0, 0.0, 112.0), glam::Vec3::ZERO);
+
+    // Observe / drop / observe / drop: isolated single-frame carries.
+    for (frame_number, time, observed) in [
+        (1usize, 0.1f32, true),
+        (2, 0.2, false),
+        (3, 0.3, true),
+        (4, 0.4, false),
+    ] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &if observed {
+                    in_volume()
+                } else {
+                    out_of_volume()
+                },
+                &players(false),
+                &touch_state(vec![carry_touch(frame_number, time)]),
+                &TouchCalculator::new(),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    // Dodge + flick touch on an observed frame, with the ball launched.
+    calculator
+        .update(
+            &frame(5, 0.5),
+            &ball(
+                glam::Vec3::new(60.0, 0.0, 160.0),
+                glam::Vec3::new(1350.0, 0.0, 520.0),
+            ),
+            &players(true),
+            &touch_state(vec![carry_touch(5, 0.5)]),
+            &TouchCalculator::new(),
+            &live_play,
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    assert!(calculator.events()[0].setup_duration >= FLICK_MIN_SETUP_SECONDS);
+    assert_eq!(calculator.player_stats().get(&player_id).unwrap().count, 1);
+}
+
+#[test]
+fn counts_flick_when_dodge_byte_lags_the_contact() {
+    // The ball can start accelerating a frame or two before the dodge-active byte
+    // flips, so the flick touch precedes the recorded dodge start (a negative
+    // `time_since_dodge`). That must not be rejected as "touch before dodge".
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    // Carry setup (no dodge yet) long enough to qualify.
+    for (frame_number, time) in [(1, 0.1), (2, 0.2), (3, 0.3)] {
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &ball(glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
+                &players(false),
+                &touch_state(vec![carry_touch(frame_number, time)]),
+                &TouchCalculator::new(),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    // Contact frame: the ball is launched but the dodge byte has not flipped yet.
+    calculator
+        .update(
+            &frame(4, 0.4),
+            &ball(
+                glam::Vec3::new(60.0, 0.0, 160.0),
+                glam::Vec3::new(1350.0, 0.0, 520.0),
+            ),
+            &players(false),
+            &touch_state(vec![carry_touch(4, 0.4)]),
+            &TouchCalculator::new(),
+            &live_play,
+        )
+        .unwrap();
+    assert!(calculator.events().is_empty());
+
+    // Dodge byte flips one frame later. No fresh touch this frame, so the flick
+    // stays anchored to the earlier contact and resolves despite the negative
+    // time-since-dodge.
+    calculator
+        .update(
+            &frame(5, 0.5),
+            &ball(
+                glam::Vec3::new(60.0, 0.0, 200.0),
+                glam::Vec3::new(1350.0, 0.0, 540.0),
+            ),
+            &players(true),
+            &touch_state(Vec::new()),
+            &TouchCalculator::new(),
+            &live_play,
+        )
+        .unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    assert!(calculator.events()[0].time_since_dodge < 0.0);
+    assert_eq!(calculator.player_stats().get(&player_id).unwrap().count, 1);
+}

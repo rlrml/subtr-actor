@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated flip/dodge-reset stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DodgeResetStats {
@@ -28,6 +29,7 @@ impl DodgeResetStats {
     }
 }
 
+/// Accumulates flip/dodge-reset stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DodgeResetStatsAccumulator {
     player_stats: HashMap<PlayerId, DodgeResetStats>,

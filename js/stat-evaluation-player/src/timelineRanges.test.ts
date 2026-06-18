@@ -9,6 +9,7 @@ import {
   buildPossessionTimelineRanges,
   buildPowerslideTimelineRanges,
   buildBallHalfTimelineRanges,
+  buildBallThirdTimelineRanges,
   buildRushTimelineRanges,
 } from "./timelineRanges.ts";
 import { createLegacyStatsTimeline, createStatsTimeline } from "./testStatsTimeline.ts";
@@ -314,6 +315,132 @@ test("buildBallHalfTimelineRanges derives spans from compact event timelines", (
       lane: "half-control",
       laneLabel: "Half Control",
       label: "Neutral half control",
+      color: "rgba(209, 217, 224, 0.7)",
+      isTeamZero: null,
+    },
+  ]);
+});
+
+test("buildBallThirdTimelineRanges derives third-control spans from labeled deltas including neutral", () => {
+  const timeline = {
+    replay_meta: {},
+    timeline_events: [],
+    frames: [
+      {
+        frame_number: 1,
+        time: 0.5,
+        dt: 0.5,
+        team_zero: {
+          ball_third: {
+            tracked_time: 0.5,
+            defensive_third_time: 0.5,
+            neutral_third_time: 0,
+            offensive_third_time: 0,
+          },
+        },
+        team_one: {
+          ball_third: {
+            tracked_time: 0.5,
+            defensive_third_time: 0,
+            neutral_third_time: 0,
+            offensive_third_time: 0.5,
+          },
+        },
+        players: [],
+      },
+      {
+        frame_number: 2,
+        time: 1,
+        dt: 0.5,
+        team_zero: {
+          ball_third: {
+            tracked_time: 1,
+            defensive_third_time: 0.5,
+            neutral_third_time: 0.5,
+            offensive_third_time: 0,
+          },
+        },
+        team_one: {
+          ball_third: {
+            tracked_time: 1,
+            defensive_third_time: 0,
+            neutral_third_time: 0.5,
+            offensive_third_time: 0.5,
+          },
+        },
+        players: [],
+      },
+    ],
+  } as StatsTimeline;
+
+  assert.deepEqual(buildBallThirdTimelineRanges(timeline), [
+    {
+      id: "third-control:team_zero_third:0.000",
+      startTime: 0,
+      endTime: 0.5,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Blue third control",
+      color: "#3b82f6",
+      isTeamZero: true,
+    },
+    {
+      id: "third-control:neutral_third:0.500",
+      startTime: 0.5,
+      endTime: 1,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Neutral third control",
+      color: "rgba(209, 217, 224, 0.7)",
+      isTeamZero: null,
+    },
+  ]);
+});
+
+test("buildBallThirdTimelineRanges derives spans from compact event timelines", () => {
+  const timeline = createStatsTimeline({
+    events: {
+      ball_third: [
+        { frame: 1, time: 0.5, active: true, field_third: "team_zero_third" },
+        { frame: 2, time: 1, active: true, field_third: "team_one_third" },
+        { frame: 3, time: 1.5, active: true, field_third: "neutral_third" },
+      ],
+    },
+    frames: [
+      { frame_number: 1, time: 0.5, dt: 0.5, team_zero: {}, team_one: {}, players: [] },
+      { frame_number: 2, time: 1, dt: 0.5, team_zero: {}, team_one: {}, players: [] },
+      { frame_number: 3, time: 1.5, dt: 0.5, team_zero: {}, team_one: {}, players: [] },
+    ],
+  });
+
+  assert.deepEqual(buildBallThirdTimelineRanges(timeline), [
+    {
+      id: "third-control:team_zero_third:0.000",
+      startTime: 0,
+      endTime: 0.5,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Blue third control",
+      color: "#3b82f6",
+      isTeamZero: true,
+    },
+    {
+      id: "third-control:team_one_third:0.500",
+      startTime: 0.5,
+      endTime: 1,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Orange third control",
+      color: "#f59e0b",
+      isTeamZero: false,
+    },
+    {
+      id: "third-control:neutral_third:1.000",
+      startTime: 1,
+      endTime: 1.5,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Neutral third control",
       color: "rgba(209, 217, 224, 0.7)",
       isTeamZero: null,
     },

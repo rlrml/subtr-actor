@@ -191,6 +191,13 @@ function formatFieldThird(value: unknown): string | null {
   return label ? `${label.toLowerCase()} third` : null;
 }
 
+function formatBallThird(value: unknown): string | null {
+  if (value === "team_zero_third") return "Blue third";
+  if (value === "team_one_third") return "Orange third";
+  if (value === "neutral_third") return "Neutral third";
+  return titleCaseValue(value);
+}
+
 function payloadRecord(event: Event): Record<string, unknown> {
   return isRecord(event.payload.payload) ? event.payload.payload : {};
 }
@@ -220,6 +227,17 @@ function formatGenericStatsEventLabel({
         ? "Ball half inactive"
         : half
           ? `Ball on ${half.toLowerCase()}`
+          : null;
+    return joinEventDetails([state ?? streamLabel, duration]);
+  }
+
+  if (event.payload.kind === "ball_third") {
+    const third = formatBallThird(payload.field_third);
+    const state =
+      payload.active === false
+        ? "Ball third inactive"
+        : third
+          ? `Ball in ${third.toLowerCase()}`
           : null;
     return joinEventDetails([state ?? streamLabel, duration]);
   }

@@ -1,3 +1,10 @@
+//! Replay-level metadata: teams, players, and per-player identity/header
+//! information extracted from a parsed replay.
+//!
+//! This is the descriptive context that accompanies frame data and feature
+//! matrices — who played, on which team, and the header properties needed to
+//! interpret the rest of the [model](crate::replay_model).
+
 use std::collections::HashMap;
 
 use boxcars::{HeaderProp, RemoteId};

@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks ball bounces off the backboard from ball/player/touch state; exposes them as shared state.
 pub struct BackboardBounceStateNode {
     calculator: BackboardBounceCalculator,
     state: BackboardBounceState,

@@ -38,6 +38,7 @@ impl FlipResetOutcome {
     }
 }
 
+/// A frame-level dodge refresh marked as occurring on the ball (a flip reset).
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DodgeResetEvent {
@@ -111,6 +112,7 @@ impl InFlightItem for PendingOnBallReset {
     }
 }
 
+/// A flip reset confirmed once later converted by a dodge-powered touch.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ConfirmedFlipResetEvent {
     pub time: f32,
@@ -125,6 +127,7 @@ pub struct ConfirmedFlipResetEvent {
     pub time_since_reset: f32,
 }
 
+/// Detects flip/dodge resets and resolves their outcomes.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DodgeResetCalculator {
     events: EventStream<DodgeResetEvent>,

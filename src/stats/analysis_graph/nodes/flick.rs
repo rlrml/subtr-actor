@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects flicks from ball/player state and touches during live play.
 pub struct FlickNode {
     calculator: FlickCalculator,
 }
