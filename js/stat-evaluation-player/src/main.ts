@@ -259,7 +259,7 @@ function getModuleContext(): StatModuleContext | null {
     replay: replayPlayer.replay,
     statsTimeline,
     statsFrameLookup,
-    // The viewer renders 1:1 in Unreal Units (no @rlrml/player fieldScale).
+    // The player renders 1:1 in Unreal Units (no @rlrml/player fieldScale).
     fieldScale: 1,
   };
 }

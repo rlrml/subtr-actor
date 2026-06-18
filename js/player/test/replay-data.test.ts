@@ -335,7 +335,7 @@ test("hitbox inference covers BakkesMod CARBODY ids", () => {
   }
 });
 
-test("viewer hitbox specs match Rust hitbox presets", () => {
+test("player hitbox specs match Rust hitbox presets", () => {
   for (const [kind, expected] of parseRustHitboxSpecs()) {
     const actual = getReplayHitboxSpec(kind);
     assert.equal(actual.kind, expected.kind);
