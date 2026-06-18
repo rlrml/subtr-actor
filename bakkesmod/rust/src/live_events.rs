@@ -274,6 +274,9 @@ pub(crate) fn explicit_touch_events(
             player,
             closest_approach_distance: (event.has_closest_approach_distance != 0)
                 .then_some(event.closest_approach_distance),
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: false,
         });
     }
@@ -655,6 +658,9 @@ impl SaLiveEventGenerator {
                     player: Some(event.player.clone()),
                     player_position: event.player_position.map(|[x, y, z]| Vector3f { x, y, z }),
                     closest_approach_distance: None,
+                    contact_local_ball_position: None,
+                    contact_local_hitbox_point: None,
+                    contact_world_hitbox_point: None,
                     dodge_contact: true,
                 })
                 .collect();

@@ -144,6 +144,9 @@ fn live_processor_view_satisfies_processor_surface_from_live_frame() {
         player_position: None,
         team_is_team_0: true,
         closest_approach_distance: Some(8.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }];
     let dodge_refreshed_events = vec![DodgeRefreshedEvent {
@@ -425,6 +428,9 @@ fn live_processor_view_exposes_cumulative_history_for_aggregate_inputs() {
                 player: Some(RemoteId::SplitScreen(0)),
                 player_position: None,
                 closest_approach_distance: Some(12.0),
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             }],
             dodge_refreshed_events: vec![DodgeRefreshedEvent {
