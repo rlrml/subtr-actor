@@ -321,6 +321,15 @@ pub struct TouchEvent {
     /// `0.0` means the ball intersects or touches the oriented car hitbox after
     /// subtracting the Rocket League ball collision radius.
     pub closest_approach_distance: Option<f32>,
+    /// Ball center in the car's local hitbox coordinates at the attributed touch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contact_local_ball_position: Option<[f32; 3]>,
+    /// Closest point on the car hitbox to the ball center, in local hitbox coordinates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contact_local_hitbox_point: Option<[f32; 3]>,
+    /// Closest point on the car hitbox to the ball center, in field coordinates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contact_world_hitbox_point: Option<[f32; 3]>,
     pub dodge_contact: bool,
 }
 

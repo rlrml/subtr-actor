@@ -62,6 +62,9 @@ fn touch(player: PlayerId, is_team_0: bool, gap: f32) -> TouchEvent {
         player: Some(player),
         player_position: None,
         closest_approach_distance: Some(gap),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }
 }

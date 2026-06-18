@@ -133,6 +133,9 @@ fn touch(player: PlayerId, team_is_team_0: bool, frame: usize, time: f32) -> Tou
         player: Some(player),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }
 }

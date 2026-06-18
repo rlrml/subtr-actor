@@ -82,6 +82,73 @@ fn player_sample(
     }
 }
 
+fn assert_vec3_close(actual: [f32; 3], expected: glam::Vec3) {
+    for (actual, expected) in actual.into_iter().zip(expected.to_array()) {
+        assert!(
+            (actual - expected).abs() < 1e-4,
+            "expected {actual} to be close to {expected}"
+        );
+    }
+}
+
+#[test]
+fn attributed_touch_records_hitbox_contact_points() {
+    let player_id = boxcars::RemoteId::Steam(100);
+    let hitbox = default_car_hitbox();
+    let hitbox_center = glam::Vec3::new(hitbox.offset, 0.0, hitbox.elevation);
+    let hitbox_rotation = glam::Quat::from_rotation_y(hitbox.angle.to_radians());
+    let local_contact_point = glam::Vec3::new(hitbox.length / 2.0, 0.0, 0.0);
+    let local_ball_position =
+        local_contact_point + glam::Vec3::new(BALL_COLLISION_RADIUS, 0.0, 0.0);
+    let world_ball_position = hitbox_center + hitbox_rotation * local_ball_position;
+    let world_contact_point = hitbox_center + hitbox_rotation * local_contact_point;
+    let players = PlayerFrameState {
+        players: vec![player_sample(
+            player_id.clone(),
+            true,
+            glam::Vec3::ZERO,
+            glam::Vec3::ZERO,
+        )],
+    };
+    let live_play = LivePlayState {
+        gameplay_phase: GameplayPhase::ActivePlay,
+        is_live_play: true,
+    };
+    let mut calculator = TouchStateCalculator::new();
+
+    calculator.update(
+        &frame(0),
+        &ball_at(world_ball_position, glam::Vec3::ZERO),
+        &players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+    let touch_state = calculator.update(
+        &frame(1),
+        &ball_at(world_ball_position, glam::Vec3::new(500.0, 0.0, 0.0)),
+        &players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+
+    assert_eq!(touch_state.touch_events.len(), 1);
+    let touch = &touch_state.touch_events[0];
+    assert_eq!(touch.player, Some(player_id));
+    assert!(touch.closest_approach_distance.unwrap() <= 1e-4);
+    assert_vec3_close(
+        touch.contact_local_ball_position.unwrap(),
+        local_ball_position,
+    );
+    assert_vec3_close(
+        touch.contact_local_hitbox_point.unwrap(),
+        local_contact_point,
+    );
+    assert_vec3_close(
+        touch.contact_world_hitbox_point.unwrap(),
+        world_contact_point,
+    );
+}
+
 #[test]
 fn suppresses_same_player_touch_candidates_inside_cooldown() {
     let player_id = boxcars::RemoteId::Steam(1);
@@ -183,6 +250,9 @@ fn team_only_explicit_touch_events_without_physics_candidate_are_ignored() {
             player: None,
             player_position: None,
             closest_approach_distance: None,
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: false,
         }],
         ..FrameEventsState::default()
@@ -215,6 +285,9 @@ fn team_only_explicit_touch_events_keep_event_time_when_enriched_from_recent_cac
             player: Some(player_id.clone()),
             player_position: Some(glam_to_vec(&glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z))),
             closest_approach_distance: Some(2.0),
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: true,
         },
     );
@@ -231,6 +304,9 @@ fn team_only_explicit_touch_events_keep_event_time_when_enriched_from_recent_cac
             player: None,
             player_position: None,
             closest_approach_distance: None,
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: false,
         }],
         ..FrameEventsState::default()
@@ -269,6 +345,9 @@ fn team_only_explicit_touch_events_ignore_expired_recent_cache_candidates() {
             player: Some(player_id),
             player_position: Some(glam_to_vec(&glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z))),
             closest_approach_distance: Some(2.0),
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: true,
         },
     );
@@ -285,6 +364,9 @@ fn team_only_explicit_touch_events_ignore_expired_recent_cache_candidates() {
             player: None,
             player_position: None,
             closest_approach_distance: None,
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: false,
         }],
         ..FrameEventsState::default()
@@ -319,6 +401,9 @@ fn dodge_refresh_touch_events_keep_refresh_time_when_enriched_from_recent_cache(
             player: Some(player_id.clone()),
             player_position: Some(glam_to_vec(&cached_position)),
             closest_approach_distance: Some(3.0),
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: true,
         },
     );
@@ -372,6 +457,9 @@ fn dodge_refresh_touch_events_ignore_expired_recent_cache_candidates() {
             player: Some(player_id.clone()),
             player_position: Some(glam_to_vec(&glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z))),
             closest_approach_distance: Some(3.0),
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: true,
         },
     );
@@ -421,6 +509,9 @@ fn player_explicit_touch_events_without_physics_candidate_are_accepted() {
             player: Some(player_id.clone()),
             player_position: None,
             closest_approach_distance: None,
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: false,
         }],
         ..FrameEventsState::default()
@@ -484,6 +575,9 @@ fn player_explicit_touch_events_without_physics_choose_best_current_gap() {
                 player: Some(secondary_player_id.clone()),
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             },
             TouchEvent {
@@ -494,6 +588,9 @@ fn player_explicit_touch_events_without_physics_choose_best_current_gap() {
                 player: Some(best_player_id.clone()),
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             },
         ],
@@ -535,6 +632,9 @@ fn player_explicit_touch_events_prefer_current_frame_over_stale_cache() {
             player: Some(player_id.clone()),
             player_position: Some(glam_to_vec(&glam::Vec3::new(500.0, 0.0, BALL_RADIUS_Z))),
             closest_approach_distance: Some(12.0),
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: true,
         },
     );
@@ -551,6 +651,9 @@ fn player_explicit_touch_events_prefer_current_frame_over_stale_cache() {
             player: Some(player_id.clone()),
             player_position: None,
             closest_approach_distance: None,
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: false,
         }],
         ..FrameEventsState::default()
@@ -605,6 +708,9 @@ fn explicit_touch_events_respect_same_player_cooldown() {
                 player: Some(player_id.clone()),
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             }],
             ..FrameEventsState::default()
@@ -624,6 +730,9 @@ fn explicit_touch_events_respect_same_player_cooldown() {
                 player: Some(player_id.clone()),
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             }],
             ..FrameEventsState::default()
@@ -643,6 +752,9 @@ fn explicit_touch_events_respect_same_player_cooldown() {
                 player: Some(player_id.clone()),
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             }],
             ..FrameEventsState::default()
@@ -677,6 +789,9 @@ fn aggregate_explicit_touch_cooldown_processes_events_chronologically() {
                 player: Some(player_id.clone()),
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             },
             TouchEvent {
@@ -687,6 +802,9 @@ fn aggregate_explicit_touch_cooldown_processes_events_chronologically() {
                 player: Some(player_id.clone()),
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             },
         ],
@@ -740,6 +858,9 @@ fn aggregate_last_touch_uses_latest_touch_not_best_older_touch() {
                 player: Some(player_id.clone()),
                 player_position: None,
                 closest_approach_distance: Some(0.0),
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             },
             TouchEvent {
@@ -750,6 +871,9 @@ fn aggregate_last_touch_uses_latest_touch_not_best_older_touch() {
                 player: Some(player_id.clone()),
                 player_position: None,
                 closest_approach_distance: Some(4.0),
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             },
         ],
@@ -795,6 +919,9 @@ fn explicit_touch_events_are_enriched_with_proximity_distance() {
             player: Some(player_id),
             player_position: None,
             closest_approach_distance: None,
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: false,
         }],
         ..FrameEventsState::default()
@@ -966,6 +1093,9 @@ fn current_frame_physics_candidate_wins_over_explicit_team_hint() {
                 player: None,
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             }],
             ..FrameEventsState::default()
@@ -1024,6 +1154,9 @@ fn player_explicit_touch_events_are_kept_alongside_physics_candidates() {
                 player: Some(explicit_player_id.clone()),
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             }],
             ..FrameEventsState::default()
@@ -1076,6 +1209,9 @@ fn duplicate_player_explicit_touch_event_does_not_duplicate_physics_candidate() 
                 player: Some(player_id.clone()),
                 player_position: None,
                 closest_approach_distance: None,
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
                 dodge_contact: false,
             }],
             ..FrameEventsState::default()
@@ -1371,6 +1507,9 @@ fn primary_touch_prefers_current_candidate_over_older_equal_contested_candidate(
             player: Some(cached_opponent_id),
             player_position: None,
             closest_approach_distance: Some(0.0),
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
             dodge_contact: false,
         },
     );
@@ -1418,6 +1557,9 @@ fn primary_touch_event_only_uses_current_frame_touch_events() {
         player: Some(player_id),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let touch_state = TouchState {
@@ -1442,6 +1584,9 @@ fn primary_touch_event_scores_current_events_without_last_touch_hint() {
         player: Some(best_player_id.clone()),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let secondary_touch = TouchEvent {
@@ -1452,6 +1597,9 @@ fn primary_touch_event_scores_current_events_without_last_touch_hint() {
         player: Some(secondary_player_id),
         player_position: None,
         closest_approach_distance: Some(4.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let touch_state = TouchState {
@@ -1481,6 +1629,9 @@ fn primary_touch_event_tie_breaks_by_player_id() {
         player: Some(lower_player_id.clone()),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let higher_player_touch = TouchEvent {
@@ -1491,6 +1642,9 @@ fn primary_touch_event_tie_breaks_by_player_id() {
         player: Some(higher_player_id),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let touch_state = TouchState {
@@ -1520,6 +1674,9 @@ fn best_candidate_for_team_tie_breaks_by_player_id() {
         player: Some(lower_player_id.clone()),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let higher_player_touch = TouchEvent {
@@ -1530,6 +1687,9 @@ fn best_candidate_for_team_tie_breaks_by_player_id() {
         player: Some(higher_player_id.clone()),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let mut calculator = TouchStateCalculator::new();
@@ -1558,6 +1718,9 @@ fn contested_touch_candidates_include_all_close_opponents() {
         player: Some(boxcars::RemoteId::Steam(1)),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let close_opponent = TouchEvent {
@@ -1568,6 +1731,9 @@ fn contested_touch_candidates_include_all_close_opponents() {
         player: Some(boxcars::RemoteId::Steam(2)),
         player_position: None,
         closest_approach_distance: Some(1.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let second_close_opponent = TouchEvent {
@@ -1578,6 +1744,9 @@ fn contested_touch_candidates_include_all_close_opponents() {
         player: Some(boxcars::RemoteId::Steam(3)),
         player_position: None,
         closest_approach_distance: Some(4.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let loose_opponent = TouchEvent {
@@ -1588,6 +1757,9 @@ fn contested_touch_candidates_include_all_close_opponents() {
         player: Some(boxcars::RemoteId::Steam(4)),
         player_position: None,
         closest_approach_distance: Some(8.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let mut calculator = TouchStateCalculator::new();
@@ -1616,6 +1788,9 @@ fn contested_touch_candidates_ignore_stale_opponents() {
         player: Some(boxcars::RemoteId::Steam(1)),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let adjacent_opponent = TouchEvent {
@@ -1626,6 +1801,9 @@ fn contested_touch_candidates_ignore_stale_opponents() {
         player: Some(boxcars::RemoteId::Steam(2)),
         player_position: None,
         closest_approach_distance: Some(1.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let stale_opponent = TouchEvent {
@@ -1636,6 +1814,9 @@ fn contested_touch_candidates_ignore_stale_opponents() {
         player: Some(boxcars::RemoteId::Steam(3)),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
     let mut calculator = TouchStateCalculator::new();

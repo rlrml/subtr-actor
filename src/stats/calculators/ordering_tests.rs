@@ -9,6 +9,9 @@ fn touch(player_id: u64, contact_gap: f32) -> TouchEvent {
         player: Some(PlayerId::Steam(player_id)),
         player_position: None,
         closest_approach_distance: Some(contact_gap),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     }
 }
