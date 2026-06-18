@@ -8,7 +8,7 @@ use linkme::distributed_slice;
 
 use super::{
     BackboardBounceEvent, BallCarryEvent, BallDepthEvent, BallHalfEvent, BallProximityEvent,
-    BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent, ControlledPlayEvent,
+    BallThirdEvent, BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent, ControlledPlayEvent,
     CorePlayerScoreboardEvent, DemolitionEvent, DepthRoleEvent, DodgeEvent, DodgeResetEvent,
     DoubleTapEvent, FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent, FirstManChangeEvent,
     FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent, MustyFlickEvent,
@@ -889,6 +889,13 @@ define_stats_event!(
     EventCategory::Positioning
 );
 define_stats_event!(
+    BallThirdEvent,
+    BALL_THIRD_EVENT_DEFINITION,
+    "ball_third",
+    "Ball Third",
+    EventCategory::Positioning
+);
+define_stats_event!(
     DepthRoleEvent,
     DEPTH_ROLE_EVENT_DEFINITION,
     "depth_role",
@@ -1172,6 +1179,13 @@ pub(crate) const BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "ball_half",
     "BallHalfNode",
     "BallHalfCalculator",
+)];
+
+pub(crate) const BALL_THIRD_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &BALL_THIRD_EVENT_DEFINITION,
+    "ball_third",
+    "BallThirdNode",
+    "BallThirdCalculator",
 )];
 
 pub(crate) const TERRITORIAL_BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(

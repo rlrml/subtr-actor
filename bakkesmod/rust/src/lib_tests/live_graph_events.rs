@@ -208,6 +208,7 @@ fn exposes_current_timeline_frame_json_after_processing_frame() {
         "fifty_fifty",
         "possession",
         "ball_half",
+        "ball_third",
         "rotation",
         "rush",
         "core",

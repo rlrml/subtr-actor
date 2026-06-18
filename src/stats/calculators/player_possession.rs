@@ -287,7 +287,7 @@ impl PlayerPossessionCalculator {
 
     fn field_third(ball: &BallFrameState) -> Option<String> {
         ball.sample().map(|sample| {
-            possession::FieldThirdLabel::from_ball(sample)
+            BallThirdLabel::from_ball(sample)
                 .as_label_value()
                 .to_owned()
         })

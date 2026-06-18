@@ -259,6 +259,7 @@ function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string
     "powerslide:events": "Powerslide",
     "powerslide:ranges": "Powerslide",
     "ball_half:ranges": "Half control",
+    "ball_third:ranges": "Third control",
     "rush:ranges": "Rush",
     "speed-flip:events": "Speed flip",
     "touch:events": "Touch",

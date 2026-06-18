@@ -74,6 +74,7 @@ impl StatsTimelineEventsNode {
             possession_dependency(),
             player_possession_dependency(),
             ball_half_dependency(),
+            ball_third_dependency(),
             territorial_pressure_dependency(),
             rotation_dependency(),
             rush_dependency(),
@@ -122,6 +123,7 @@ impl StatsTimelineEventsNode {
         let possession = ctx.get::<PossessionCalculator>()?;
         let player_possession = ctx.get::<PlayerPossessionCalculator>()?;
         let ball_half = ctx.get::<BallHalfCalculator>()?;
+        let ball_third = ctx.get::<BallThirdCalculator>()?;
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
         let movement = ctx.get::<MovementCalculator>()?;
         let positioning = ctx.get::<PositioningCalculator>()?;
@@ -206,6 +208,7 @@ impl StatsTimelineEventsNode {
                 possession,
                 player_possession,
                 ball_half,
+                ball_third,
                 territorial_pressure,
                 movement,
                 positioning,
@@ -345,6 +348,7 @@ fn build_replay_events(
     possession: &PossessionCalculator,
     player_possession: &PlayerPossessionCalculator,
     ball_half: &BallHalfCalculator,
+    ball_third: &BallThirdCalculator,
     territorial_pressure: &TerritorialPressureCalculator,
     movement: &MovementCalculator,
     positioning: &PositioningCalculator,
@@ -451,6 +455,21 @@ fn build_replay_events(
             index,
             span(event.frame, event.end_frame, event.time, event.end_time),
             EventPayload::BallHalf(event.clone()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in ball_third.events().iter().enumerate() {
+        events.push(make_event(
+            "ball_third",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::BallThird(event.clone()),
             None,
             None,
             None,

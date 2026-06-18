@@ -11,28 +11,22 @@ function assertClose(actual: number | undefined, expected: number): void {
 test("possession event derivation populates compacted team stats", () => {
   const timeline = createStatsTimeline({
     events: {
+      // Possession events carry only who-has-the-ball; the ball's third/half
+      // come from the ball_third / ball_half streams and are joined per frame.
       possession: [
-        {
-          time: 1,
-          frame: 10,
-          active: true,
-          possession_state: "team_zero",
-          field_third: "team_zero_third",
-        },
-        {
-          time: 1.1,
-          frame: 11,
-          active: true,
-          possession_state: "neutral",
-          field_third: "neutral_third",
-        },
-        {
-          time: 1.2,
-          frame: 12,
-          active: true,
-          possession_state: "team_one",
-          field_third: "team_one_third",
-        },
+        { time: 1, frame: 10, active: true, possession_state: "team_zero" },
+        { time: 1.1, frame: 11, active: true, possession_state: "neutral" },
+        { time: 1.2, frame: 12, active: true, possession_state: "team_one" },
+      ],
+      ball_third: [
+        { time: 1, frame: 10, active: true, field_third: "team_zero_third" },
+        { time: 1.1, frame: 11, active: true, field_third: "neutral_third" },
+        { time: 1.2, frame: 12, active: true, field_third: "team_one_third" },
+      ],
+      ball_half: [
+        { time: 1, frame: 10, active: true, field_half: "team_zero_side" },
+        { time: 1.1, frame: 11, active: true, field_half: "team_zero_side" },
+        { time: 1.2, frame: 12, active: true, field_half: "team_one_side" },
       ],
     },
     frames: [

@@ -425,7 +425,6 @@ fn possession_event(state: &str, frame: usize, end_frame: usize) -> PossessionEv
         duration: (end_frame - frame) as f32,
         possession_state: state.to_owned(),
         player_id: None,
-        field_third: None,
     }
 }
 

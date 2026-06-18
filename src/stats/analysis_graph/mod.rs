@@ -67,6 +67,7 @@ builtin_analysis_nodes! {
     PossessionNode,
     PossessionStateNode,
     BallHalfNode,
+    BallThirdNode,
     TerritorialPressureNode,
     RotationNode,
     RushNode,

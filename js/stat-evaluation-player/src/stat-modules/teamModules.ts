@@ -4,6 +4,7 @@ import { renderPlayerFiftyFiftyStats, renderFiftyFiftySummary } from "../fiftyFi
 import { renderPossessionStats } from "../possessionFormatting.ts";
 import type { PossessionBreakdownClass } from "../possessionFormatting.ts";
 import { renderBallHalfStats } from "../ballHalfFormatting.ts";
+import { renderBallThirdStats } from "../ballThirdFormatting.ts";
 import { renderRushStats } from "../rushFormatting.ts";
 import { FiftyFiftyOverlay } from "../fiftyFiftyOverlay.ts";
 import { buildFiftyFiftyTimelineEvents, buildRushTimelineEvents } from "../timelineMarkers.ts";
@@ -11,6 +12,7 @@ import {
   buildFiftyFiftyTimelineRanges,
   buildPossessionTimelineRanges,
   buildBallHalfTimelineRanges,
+  buildBallThirdTimelineRanges,
   buildRushTimelineRanges,
 } from "../timelineRanges.ts";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
@@ -352,6 +354,53 @@ export function createBallHalfModule(): StatModule {
       if (!ballHalf || !player) return "";
 
       return renderBallHalfStats(ballHalf, {
+        labelPerspective: {
+          kind: "team",
+        },
+      });
+    },
+  };
+}
+
+export function createBallThirdModule(): StatModule {
+  return {
+    id: "ball_third",
+    label: "Third Control",
+
+    setup() {},
+
+    teardown() {},
+
+    onBeforeRender() {},
+
+    getTimelineRanges(ctx) {
+      return buildBallThirdTimelineRanges(ctx.statsTimeline, ctx.replay);
+    },
+
+    renderStats(frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
+      const ballThird = statsFrame?.team_zero?.ball_third;
+      if (!ballThird) return "";
+
+      return renderSharedCard(
+        "Field State",
+        renderBallThirdStats(ballThird, {
+          labelPerspective: {
+            kind: "shared",
+          },
+        }),
+      );
+    },
+
+    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
+      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
+      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
+      const ballThird = player?.is_team_0
+        ? statsFrame?.team_zero?.ball_third
+        : statsFrame?.team_one?.ball_third;
+      if (!ballThird || !player) return "";
+
+      return renderBallThirdStats(ballThird, {
         labelPerspective: {
           kind: "team",
         },

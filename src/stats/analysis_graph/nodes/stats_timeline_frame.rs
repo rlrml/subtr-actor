@@ -53,6 +53,7 @@ impl StatsTimelineFrameNode {
             kickoff: projection.kickoff.stats().for_team(is_team_zero),
             possession: projection.possession.stats().for_team(is_team_zero),
             ball_half: projection.ball_half.stats().for_team(is_team_zero),
+            ball_third: projection.ball_third.stats().for_team(is_team_zero),
             territorial_pressure: projection
                 .territorial_pressure
                 .stats()
