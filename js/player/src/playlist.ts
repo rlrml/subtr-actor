@@ -620,20 +620,24 @@ export class ReplayPlaylistPlayer extends EventTarget {
       this.preferences.cameraViewMode = "free";
     }
 
-    this.player = createPlayerFromParsed(this.container, { replay, raw }, {
-      initialPlaybackRate: this.preferences.speed,
-      initialCameraDistanceScale: this.preferences.cameraDistanceScale,
-      initialCustomCameraSettings: this.preferences.customCameraSettings,
-      initialCameraViewMode: this.preferences.cameraViewMode,
-      initialAttachedPlayerId: attachedPlayerId,
-      initialBallCamEnabled: this.preferences.ballCamEnabled,
-      initialBoostPickupAnimationEnabled: this.preferences.boostPickupAnimationEnabled,
-      initialHitboxWireframesEnabled: this.preferences.hitboxWireframesEnabled,
-      initialHitboxOnlyModeEnabled: this.preferences.hitboxOnlyModeEnabled,
-      initialSkipPostGoalTransitionsEnabled: this.preferences.skipPostGoalTransitionsEnabled,
-      initialSkipKickoffsEnabled: this.preferences.skipKickoffsEnabled,
-      plugins: this.options.plugins,
-    });
+    this.player = createPlayerFromParsed(
+      this.container,
+      { replay, raw },
+      {
+        initialPlaybackRate: this.preferences.speed,
+        initialCameraDistanceScale: this.preferences.cameraDistanceScale,
+        initialCustomCameraSettings: this.preferences.customCameraSettings,
+        initialCameraViewMode: this.preferences.cameraViewMode,
+        initialAttachedPlayerId: attachedPlayerId,
+        initialBallCamEnabled: this.preferences.ballCamEnabled,
+        initialBoostPickupAnimationEnabled: this.preferences.boostPickupAnimationEnabled,
+        initialHitboxWireframesEnabled: this.preferences.hitboxWireframesEnabled,
+        initialHitboxOnlyModeEnabled: this.preferences.hitboxOnlyModeEnabled,
+        initialSkipPostGoalTransitionsEnabled: this.preferences.skipPostGoalTransitionsEnabled,
+        initialSkipKickoffsEnabled: this.preferences.skipKickoffsEnabled,
+        plugins: this.options.plugins,
+      },
+    );
     this.player.seek(resolvedItem.start.time);
     this.playerUnsubscribe = this.player.subscribe((state) => {
       this.handlePlayerState(state);
