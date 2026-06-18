@@ -11,7 +11,7 @@
     "public",
     "docs",
     "README.md",
-    "VIEWER_README.md",
+    "PLAYER_ENGINE.md",
     "LICENSE"
   ],
   "exports": {

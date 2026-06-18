@@ -11,7 +11,7 @@ import {
 } from "@rlrml/player";
 import {
   createFpsOverlayPlugin,
-  createViewerFromParsed,
+  createPlayerFromParsed,
   fromReplayPlayerPlugin,
 } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
@@ -137,11 +137,11 @@ export async function loadReplayBundleForDisplay(
     options.setCanvasRecorder(recorder);
     const config = options.getInitialConfig();
 
-    // The viewer implements @rlrml/player's full ReplayPlayer surface; player
+    // The player implements @rlrml/player's full ReplayPlayer surface; player
     // plugins are bridged via fromReplayPlayerPlugin (the original `recorder` /
     // `timelineOverlay` handles share closure state with the wrapped copies, so
     // they keep working for setCanvasRecorder/setTimelineOverlay below).
-    const replayPlayer = createViewerFromParsed(elements.viewport, loadedReplay, {
+    const replayPlayer = createPlayerFromParsed(elements.viewport, loadedReplay, {
       initialPlaybackRate: config?.playback.rate,
       initialCustomCameraSettings: getCustomCameraSettingsFromConfig(config?.camera),
       initialAttachedPlayerId: config?.camera.attachedPlayerId ?? null,

@@ -54,11 +54,11 @@ export interface MissedEventReviewPayload {
 }
 
 /**
- * Resolve the rocket-sense replay UUID for the current viewer session.
+ * Resolve the rocket-sense replay UUID for the current player session.
  *
  * Capture works without it (JSON export is always available), but uploading to
  * rocket-sense needs the replay's DB id. Priority: an explicit `replayId` /
- * `replay-id` query param (how rocket-sense should launch the viewer for
+ * `replay-id` query param (how rocket-sense should launch the player for
  * capture), then a caller-supplied fallback (e.g. the active review item).
  */
 export function resolveCaptureReplayId(search: string, fallback?: string | null): string | null {
