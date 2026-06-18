@@ -3,4 +3,12 @@ import type { KickoffSpawnPosition } from "./KickoffSpawnPosition.ts";
 import type { KickoffSupportBehavior } from "./KickoffSupportBehavior.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
-export type KickoffSupportEvent = { player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number], spawn_position: KickoffSpawnPosition, start_boost: number | null, boost_after: number | null, first_touch_time: number | null, first_touch_frame: number | null, support_behavior: KickoffSupportBehavior, };
+export type KickoffSupportEvent = { player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number],
+/**
+ * Horizontal distance (uu) of the support player's spawn from field
+ * center — i.e. from the ball's kickoff position at the origin. Larger
+ * values mean the player started further back/wider; a `cheat` support
+ * closes this gap as the kickoff develops while a back-positioned support
+ * keeps it.
+ */
+start_distance_from_center: number, spawn_position: KickoffSpawnPosition, start_boost: number | null, boost_after: number | null, first_touch_time: number | null, first_touch_frame: number | null, support_behavior: KickoffSupportBehavior, };
