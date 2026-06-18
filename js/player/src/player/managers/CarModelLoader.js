@@ -5,6 +5,11 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { resolvePlayerAssetUrl } from "../asset-url.js";
 
+const sharedModelCache = new Map();
+const sharedLoadingPromises = new Map();
+const sharedWheelModelCache = new Map();
+const sharedWheelLoadingPromises = new Map();
+
 /**
  * CarModelLoader - Loads and manages car models (GLB format) with team-colored materials
  *
@@ -31,9 +36,10 @@ export class CarModelLoader {
     dracoLoader.setDecoderPath(resolvePlayerAssetUrl("draco/", this.assetBase));
     this.gltfLoader.setDRACOLoader(dracoLoader);
 
-    // Cache for loaded models (we clone them for each car)
-    this.modelCache = new Map(); // modelType -> { model, chassisTexture }
-    this.loadingPromises = new Map(); // modelType -> Promise
+    // Cache for loaded models (we clone them for each car). Shared at module
+    // scope so switching review replays does not reparse the same car GLBs.
+    this.modelCache = sharedModelCache; // asset-root + modelType -> { model, chassisTexture }
+    this.loadingPromises = sharedLoadingPromises; // asset-root + modelType -> Promise
 
     // Model configuration: all models are GLB format
     // format: 'glb'
@@ -94,8 +100,8 @@ export class CarModelLoader {
     };
 
     // Cache for wheel models
-    this.wheelModelCache = new Map();
-    this.wheelLoadingPromises = new Map();
+    this.wheelModelCache = sharedWheelModelCache;
+    this.wheelLoadingPromises = sharedWheelLoadingPromises;
 
     // Deferred preload - will be set when preloadModelsForReplay() is called
     this.preloadReady = Promise.resolve();
@@ -245,27 +251,32 @@ export class CarModelLoader {
    * @returns {Promise<{model: THREE.Group, chassisTexture: THREE.Texture}>}
    */
   async loadModel(modelType) {
+    const cacheKey = this.modelCacheKey(modelType);
     // Return cached if available
-    if (this.modelCache.has(modelType)) {
-      return this.modelCache.get(modelType);
+    if (this.modelCache.has(cacheKey)) {
+      return this.modelCache.get(cacheKey);
     }
 
     // Return existing loading promise if in progress
-    if (this.loadingPromises.has(modelType)) {
-      return this.loadingPromises.get(modelType);
+    if (this.loadingPromises.has(cacheKey)) {
+      return this.loadingPromises.get(cacheKey);
     }
 
     // Start loading
     const loadPromise = this._loadModelInternal(modelType);
-    this.loadingPromises.set(modelType, loadPromise);
+    this.loadingPromises.set(cacheKey, loadPromise);
 
     try {
       const result = await loadPromise;
-      this.modelCache.set(modelType, result);
+      this.modelCache.set(cacheKey, result);
       return result;
     } finally {
-      this.loadingPromises.delete(modelType);
+      this.loadingPromises.delete(cacheKey);
     }
+  }
+
+  modelCacheKey(modelType) {
+    return resolvePlayerAssetUrl(`models/cars/${modelType}`, this.assetBase);
   }
 
   async _loadModelInternal(modelType) {
@@ -462,21 +473,20 @@ export class CarModelLoader {
    * @returns {Promise<THREE.Group>}
    */
   async loadWheelModel(wheelModelName) {
+    const wheelPath = resolvePlayerAssetUrl(`models/wheels/${wheelModelName}`, this.assetBase);
     // Return cached if available
-    if (this.wheelModelCache.has(wheelModelName)) {
-      return this.wheelModelCache.get(wheelModelName);
+    if (this.wheelModelCache.has(wheelPath)) {
+      return this.wheelModelCache.get(wheelPath);
     }
 
     // Return existing loading promise if in progress
-    if (this.wheelLoadingPromises.has(wheelModelName)) {
-      return this.wheelLoadingPromises.get(wheelModelName);
+    if (this.wheelLoadingPromises.has(wheelPath)) {
+      return this.wheelLoadingPromises.get(wheelPath);
     }
 
     // Start loading
-    const loadPromise = this._loadGLB(
-      resolvePlayerAssetUrl(`models/wheels/${wheelModelName}`, this.assetBase),
-    );
-    this.wheelLoadingPromises.set(wheelModelName, loadPromise);
+    const loadPromise = this._loadGLB(wheelPath);
+    this.wheelLoadingPromises.set(wheelPath, loadPromise);
 
     try {
       const wheelModel = await loadPromise;
@@ -490,13 +500,13 @@ export class CarModelLoader {
         }
       });
 
-      this.wheelModelCache.set(wheelModelName, wheelModel);
+      this.wheelModelCache.set(wheelPath, wheelModel);
       return wheelModel;
     } catch (error) {
       console.error(`Failed to load wheel model ${wheelModelName}:`, error);
       throw error;
     } finally {
-      this.wheelLoadingPromises.delete(wheelModelName);
+      this.wheelLoadingPromises.delete(wheelPath);
     }
   }
 
@@ -792,7 +802,7 @@ export class CarModelLoader {
    */
   isModelReady(carName, hitboxType) {
     const modelType = this.getModelTypeForCar(carName, hitboxType);
-    return this.modelCache.has(modelType);
+    return this.modelCache.has(this.modelCacheKey(modelType));
   }
 
   /**
@@ -804,7 +814,7 @@ export class CarModelLoader {
    */
   getCarMeshSync(carName, hitboxType, team = 0) {
     const modelType = this.getModelTypeForCar(carName, hitboxType);
-    const cached = this.modelCache.get(modelType);
+    const cached = this.modelCache.get(this.modelCacheKey(modelType));
 
     if (!cached || !cached.model) {
       return null;
@@ -1041,29 +1051,8 @@ export class CarModelLoader {
   }
 
   dispose() {
-    // Dispose all cached car models and textures
-    this.modelCache.forEach(({ model, chassisTexture }) => {
-      model.traverse((child) => {
-        if (child.isMesh) {
-          if (child.geometry) child.geometry.dispose();
-          const materials = Array.isArray(child.material) ? child.material : [child.material];
-          materials.forEach((mat) => mat.dispose());
-        }
-      });
-      if (chassisTexture) chassisTexture.dispose();
-    });
-    this.modelCache.clear();
-
-    // Dispose all cached wheel models
-    this.wheelModelCache.forEach((wheelModel) => {
-      wheelModel.traverse((child) => {
-        if (child.isMesh) {
-          if (child.geometry) child.geometry.dispose();
-          const materials = Array.isArray(child.material) ? child.material : [child.material];
-          materials.forEach((mat) => mat.dispose());
-        }
-      });
-    });
-    this.wheelModelCache.clear();
+    // Model caches are shared across player instances for the lifetime of the
+    // page. Per-instance disposal must not free shared templates that another
+    // playlist/review player may reuse or currently be cloning.
   }
 }

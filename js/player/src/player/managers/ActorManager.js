@@ -9,6 +9,35 @@ import { CarModelLoader } from "./CarModelLoader.js";
 // skipped/scrubbed-past celebration never leaves the ball stuck hidden.
 const GOAL_BALL_HIDE_DURATION = 2.0;
 
+/** @type {Map<string, Promise<THREE.Group | null>>} */
+const ballModelTemplatePromises = new Map();
+
+/** @returns {Promise<THREE.Group | null>} */
+function loadBallModelTemplate(assetBase) {
+  const url = resolvePlayerAssetUrl("models/ball/scene.gltf", assetBase);
+  let templatePromise = ballModelTemplatePromises.get(url);
+  if (!templatePromise) {
+    const gltfLoader = new GLTFLoader();
+    templatePromise = new Promise((resolve) => {
+      gltfLoader.load(
+        url,
+        (gltf) => {
+          console.log("✓ Ball model loaded");
+          resolve(gltf.scene);
+        },
+        undefined,
+        (error) => {
+          console.error("Failed to load ball model:", error);
+          ballModelTemplatePromises.delete(url);
+          resolve(null); // Resolve even on error to not block shader compilation
+        },
+      );
+    });
+    ballModelTemplatePromises.set(url, templatePromise);
+  }
+  return templatePromise;
+}
+
 export class ActorManager {
   constructor(scene, effectsManager, options = {}) {
     this.scene = scene;
@@ -106,23 +135,11 @@ export class ActorManager {
     // Load ball GLTF model - store promise so we can await it before shader compilation
     this.ballModel = null;
     this._ballModelReplaced = false; // Track if ball model has been replaced
-    const gltfLoader = new GLTFLoader();
-    this.ballModelReady = new Promise((resolve) => {
-      gltfLoader.load(
-        resolvePlayerAssetUrl("models/ball/scene.gltf", this.assetBase),
-        (gltf) => {
-          this.ballModel = gltf.scene;
-          console.log("✓ Ball model loaded");
-          // Note: Don't replace ball mesh here - let GameEngine control when it's safe
-          // This prevents race conditions with shader compilation
-          resolve(true);
-        },
-        undefined,
-        (error) => {
-          console.error("Failed to load ball model:", error);
-          resolve(false); // Resolve even on error to not block shader compilation
-        },
-      );
+    this.ballModelReady = loadBallModelTemplate(this.assetBase).then((template) => {
+      this.ballModel = template;
+      // Note: Don't replace ball mesh here - let GameEngine control when it's safe
+      // This prevents race conditions with shader compilation
+      return template !== null;
     });
   }
 
