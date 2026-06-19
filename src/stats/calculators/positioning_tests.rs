@@ -57,6 +57,14 @@ fn active_gameplay() -> GameplayState {
     }
 }
 
+fn active_gameplay_with_teams(team_zero: usize, team_one: usize) -> GameplayState {
+    GameplayState {
+        ball_has_been_hit: Some(true),
+        current_in_game_team_player_counts: [team_zero, team_one],
+        ..Default::default()
+    }
+}
+
 fn ball_depth_segments(margin: f32, start: f32, end: f32) -> Vec<(BallDepthState, f32)> {
     scalar_state_segments(
         start,
@@ -196,4 +204,108 @@ fn closest_to_ball_requires_stable_challenger_before_switching() {
             boxcars::RemoteId::Steam(*expected_closest)
         );
     }
+}
+
+#[test]
+fn shadow_defense_detects_retreating_goal_side_defender() {
+    let mut calculator = PositioningCalculator::new();
+    let gameplay = active_gameplay_with_teams(1, 1);
+    let defender_id = boxcars::RemoteId::Steam(1);
+    let attacker_id = boxcars::RemoteId::Steam(2);
+
+    let samples = [
+        (-1900.0, -700.0, -400.0),
+        (-2000.0, -800.0, -500.0),
+        (-2100.0, -900.0, -600.0),
+    ];
+    for (frame_number, (defender_y, ball_y, attacker_y)) in samples.iter().enumerate() {
+        let players = PlayerFrameState {
+            players: vec![
+                player(1, true, glam::vec3(0.0, *defender_y, 0.0)),
+                player(2, false, glam::vec3(0.0, *attacker_y, 0.0)),
+            ],
+        };
+        calculator
+            .update(
+                &frame(frame_number, frame_number as f32 * 0.1),
+                &gameplay,
+                &ball(glam::vec3(0.0, *ball_y, 0.0)),
+                &players,
+                &FrameEventsState::default(),
+                &LivePlayState::active_play(),
+                Some(&attacker_id),
+            )
+            .expect("positioning update should succeed");
+    }
+    calculator.flush_pending_events();
+
+    let events = calculator.shadow_defense_events();
+    assert_eq!(events.len(), 1);
+    let event = &events[0];
+    assert_eq!(event.player, defender_id);
+    assert_eq!(event.state, ShadowDefenseState::Shadowing);
+    assert_eq!(event.frame, 1);
+    assert_eq!(event.end_frame, 2);
+    assert!((event.duration - 0.2).abs() < 1e-6);
+}
+
+#[test]
+fn shadow_defense_requires_opponent_possession() {
+    let mut calculator = PositioningCalculator::new();
+    let gameplay = active_gameplay_with_teams(1, 1);
+
+    let samples = [(-1900.0, -700.0), (-2000.0, -800.0)];
+    for (frame_number, (defender_y, ball_y)) in samples.iter().enumerate() {
+        let players = PlayerFrameState {
+            players: vec![
+                player(1, true, glam::vec3(0.0, *defender_y, 0.0)),
+                player(2, false, glam::vec3(0.0, -500.0, 0.0)),
+            ],
+        };
+        calculator
+            .update(
+                &frame(frame_number, frame_number as f32 * 0.1),
+                &gameplay,
+                &ball(glam::vec3(0.0, *ball_y, 0.0)),
+                &players,
+                &FrameEventsState::default(),
+                &LivePlayState::active_play(),
+                None,
+            )
+            .expect("positioning update should succeed");
+    }
+    calculator.flush_pending_events();
+
+    assert!(calculator.shadow_defense_events().is_empty());
+}
+
+#[test]
+fn shadow_defense_excludes_immediate_close_challenge() {
+    let mut calculator = PositioningCalculator::new();
+    let gameplay = active_gameplay_with_teams(1, 1);
+    let attacker_id = boxcars::RemoteId::Steam(2);
+
+    let samples = [(-850.0, -700.0, -400.0), (-950.0, -800.0, -500.0)];
+    for (frame_number, (defender_y, ball_y, attacker_y)) in samples.iter().enumerate() {
+        let players = PlayerFrameState {
+            players: vec![
+                player(1, true, glam::vec3(0.0, *defender_y, 0.0)),
+                player(2, false, glam::vec3(0.0, *attacker_y, 0.0)),
+            ],
+        };
+        calculator
+            .update(
+                &frame(frame_number, frame_number as f32 * 0.1),
+                &gameplay,
+                &ball(glam::vec3(0.0, *ball_y, 0.0)),
+                &players,
+                &FrameEventsState::default(),
+                &LivePlayState::active_play(),
+                Some(&attacker_id),
+            )
+            .expect("positioning update should succeed");
+    }
+    calculator.flush_pending_events();
+
+    assert!(calculator.shadow_defense_events().is_empty());
 }

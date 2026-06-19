@@ -12,7 +12,6 @@ pub(crate) fn mechanic_kind(kind: &str) -> Option<SaMechanicKind> {
         "flip_reset" => Some(SaMechanicKind::FlipReset),
         "half_flip" => Some(SaMechanicKind::HalfFlip),
         "half_volley" => Some(SaMechanicKind::HalfVolley),
-        "musty_flick" => Some(SaMechanicKind::MustyFlick),
         "one_timer" => Some(SaMechanicKind::OneTimer),
         "pass" => Some(SaMechanicKind::Pass),
         "speed_flip" => Some(SaMechanicKind::SpeedFlip),

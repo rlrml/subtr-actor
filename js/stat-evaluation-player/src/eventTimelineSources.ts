@@ -19,7 +19,6 @@ const CURATED_STATS_EVENT_STREAM_IDS = new Set<string>([
   "wall_aerial_shot",
   "center",
   "flick",
-  "musty_flick",
   "dodge_reset",
   "double_tap",
   "fifty_fifty",
@@ -363,6 +362,11 @@ function formatGenericStatsEventLabel({
     const role = titleCaseValue(payload.state);
     const prefix = playerName ? `${playerName} depth role` : streamLabel;
     return joinEventDetails([role ? `${prefix}: ${role.toLowerCase()}` : prefix, duration]);
+  }
+
+  if (event.payload.kind === "shadow_defense") {
+    const prefix = playerName ? `${playerName} shadow defense` : streamLabel;
+    return joinEventDetails([prefix, duration]);
   }
 
   if (event.payload.kind === "rotation_role") {

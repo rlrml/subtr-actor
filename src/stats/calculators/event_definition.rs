@@ -12,8 +12,8 @@ use super::{
     ControlledPlayEvent, CorePlayerScoreboardEvent, DemolitionEvent, DepthRoleEvent, DodgeEvent,
     DodgeResetEvent, DoubleTapEvent, FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent,
     FirstManChangeEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
-    MustyFlickEvent, OneTimerEvent, PassEvent, PlayerActivityEvent, PlayerPossessionEvent,
-    PossessionEvent, PowerslideEvent, RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent,
+    OneTimerEvent, PassEvent, PlayerActivityEvent, PlayerPossessionEvent, PossessionEvent,
+    PowerslideEvent, RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent,
     TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
     WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
@@ -563,19 +563,6 @@ define_stats_event!(
     ]
 );
 define_stats_event!(
-    MustyFlickEvent,
-    MUSTY_FLICK_EVENT_DEFINITION,
-    "musty_flick",
-    "Musty Flick",
-    EventCategory::Mechanic,
-    summary = "A back-flip style flick where the ball is contacted behind/on top of the car during a dominant pitch rotation.",
-    approach = [
-        "Track dodge starts and keep only recent candidates whose car orientation is compatible with a musty-style setup.",
-        "On a same-player touch, require the ball to be behind and above the car in local space, with rear/top alignment and forward approach speed.",
-        "Require a meaningful ball speed change and pitch-dominant angular velocity, then score confidence from timing, alignment, approach, pitch, impulse, and setup orientation.",
-    ]
-);
-define_stats_event!(
     DodgeResetEvent,
     DODGE_RESET_EVENT_DEFINITION,
     "dodge_reset",
@@ -1017,13 +1004,6 @@ pub(crate) const FLICK_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "flick",
     "FlickNode",
     "FlickCalculator",
-)];
-
-pub(crate) const MUSTY_FLICK_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
-    &MUSTY_FLICK_EVENT_DEFINITION,
-    "musty_flick",
-    "MustyFlickNode",
-    "MustyFlickCalculator",
 )];
 
 pub(crate) const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(

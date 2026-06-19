@@ -185,7 +185,6 @@ fn player_event_names_create_registered_analysis_indicators() {
         "PlayerEvent:wall_aerial_shot",
         "PlayerEvent:ceiling_shot",
         "PlayerEvent:flick",
-        "PlayerEvent:musty_flick",
         "PlayerEvent:dodge_reset",
         "PlayerEvent:flip_reset_dodge",
         "PlayerEvent:half_flip",

@@ -642,14 +642,6 @@ fn confidence_band_label_for_derivation(high_confidence: bool) -> StatLabel {
     }
 }
 
-fn vertical_state_label_for_derivation(aerial: bool) -> StatLabel {
-    if aerial {
-        StatLabel::new("vertical_state", "aerial")
-    } else {
-        StatLabel::new("vertical_state", "grounded")
-    }
-}
-
 fn flick_kind_label_for_derivation(value: &str) -> StatLabel {
     match value {
         "reverse" => StatLabel::new("kind", "reverse"),
@@ -752,113 +744,6 @@ fn assert_flick_events_reconstruct_serialized_partial_sums(
         event_index,
         events.len(),
         "{replay_path} unprocessed flick events"
-    );
-}
-
-fn apply_musty_flick_event(stats: &mut MustyFlickStats, event: &MustyFlickEvent) {
-    const MUSTY_HIGH_CONFIDENCE: f32 = 0.80;
-
-    stats.labeled_event_counts.increment([
-        vertical_state_label_for_derivation(event.aerial),
-        confidence_band_label_for_derivation(event.confidence >= MUSTY_HIGH_CONFIDENCE),
-    ]);
-    stats.count = stats.labeled_event_counts.total();
-    stats.aerial_count = stats
-        .labeled_event_counts
-        .count_matching(&[vertical_state_label_for_derivation(true)]);
-    stats.high_confidence_count = stats
-        .labeled_event_counts
-        .count_matching(&[confidence_band_label_for_derivation(true)]);
-    stats.is_last_musty = true;
-    stats.last_musty_time = Some(event.time);
-    stats.last_musty_frame = Some(event.frame);
-    stats.time_since_last_musty = Some(0.0);
-    stats.frames_since_last_musty = Some(0);
-    stats.last_confidence = Some(event.confidence);
-    stats.best_confidence = stats.best_confidence.max(event.confidence);
-    stats.cumulative_confidence += event.confidence;
-}
-
-fn advance_musty_flick_stats(
-    stats: &mut MustyFlickStats,
-    frame: &ReplayStatsFrame,
-    is_last_musty_player: bool,
-) {
-    stats.is_last_musty = is_last_musty_player;
-    stats.time_since_last_musty = stats
-        .last_musty_time
-        .map(|time| (frame.time - time).max(0.0));
-    stats.frames_since_last_musty = stats
-        .last_musty_frame
-        .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
-}
-
-fn assert_musty_flick_events_reconstruct_serialized_partial_sums(
-    replay_path: &str,
-    timeline: &ReplayStatsTimeline,
-) {
-    let mut events = timeline_payloads_by_stream(timeline, "musty_flick", |payload| match payload { EventPayload::MustyFlick(event) => Some(event), _ => None });
-    events.sort_by(|left, right| {
-        left.sample_frame
-            .cmp(&right.sample_frame)
-            .then_with(|| left.sample_time.total_cmp(&right.sample_time))
-    });
-
-    let mut event_index = 0;
-    let mut players: HashMap<PlayerId, MustyFlickStats> = HashMap::new();
-    let mut last_musty_player: Option<PlayerId> = None;
-
-    for frame in &timeline.frames {
-        if frame.is_live_play {
-            for (player_id, stats) in players.iter_mut() {
-                advance_musty_flick_stats(
-                    stats,
-                    frame,
-                    last_musty_player.as_ref() == Some(player_id),
-                );
-            }
-
-            let mut processed_event = false;
-            while event_index < events.len()
-                && events[event_index].sample_frame <= frame.frame_number
-            {
-                let event = &events[event_index];
-                let stats = players.entry(event.player.clone()).or_default();
-                apply_musty_flick_event(stats, event);
-                last_musty_player = Some(event.player.clone());
-                event_index += 1;
-                processed_event = true;
-            }
-
-            if processed_event {
-                for stats in players.values_mut() {
-                    stats.is_last_musty = false;
-                }
-            }
-
-            if let Some(player_id) = last_musty_player.as_ref() {
-                if let Some(stats) = players.get_mut(player_id) {
-                    stats.is_last_musty = true;
-                }
-            }
-        } else {
-            last_musty_player = None;
-        }
-
-        for player in &frame.players {
-            let expected = players.get(&player.player_id).cloned().unwrap_or_default();
-            assert_eq!(
-                player.musty_flick, expected,
-                "{replay_path} player {} musty_flick frame {}",
-                player.name, frame.frame_number,
-            );
-        }
-    }
-
-    assert_eq!(
-        event_index,
-        events.len(),
-        "{replay_path} unprocessed musty-flick events"
     );
 }
 

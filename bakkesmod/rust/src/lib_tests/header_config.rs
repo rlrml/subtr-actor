@@ -319,10 +319,6 @@ fn checked_in_header_matches_event_abi_enums() {
                 SaMechanicKind::Flick as i32,
             ),
             (
-                "SaMechanicKindMustyFlick".to_owned(),
-                SaMechanicKind::MustyFlick as i32,
-            ),
-            (
                 "SaMechanicKindOneTimer".to_owned(),
                 SaMechanicKind::OneTimer as i32,
             ),

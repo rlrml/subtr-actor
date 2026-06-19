@@ -229,7 +229,13 @@ pub mod guides {
     }
 }
 
+pub mod ballistics {
+    //! Free-flight Rocket League ball prediction helpers.
+    pub use crate::util::ballistics::*;
+}
+
 pub use crate::actor_state::*;
+pub use crate::ballistics::*;
 pub use crate::boost_pad_locations::*;
 pub use crate::boost_units::*;
 pub use crate::clip::*;

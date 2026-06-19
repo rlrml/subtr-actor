@@ -200,6 +200,7 @@ export function renderRelativePositioningStats(
     <div class="stat-row"><span class="label">Closest on team</span><span class="value">${formatPositioningTimeShare(positioning, "percent_closest_to_ball_team", "time_closest_to_ball_team")}</span></div>
     <div class="stat-row"><span class="label">Closest overall</span><span class="value">${formatPositioningTimeShare(positioning, "percent_closest_to_ball_absolute", "time_closest_to_ball_absolute")}</span></div>
     <div class="stat-row"><span class="label">Farthest from ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_farthest_from_ball", "time_farthest_from_ball")}</span></div>
+    <div class="stat-row"><span class="label">Shadow defense</span><span class="value">${formatPositioningTimeShare(positioning, "percent_shadow_defense", "time_shadow_defense")}</span></div>
     <div class="stat-row"><span class="label">Behind ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_behind_ball", "time_behind_ball")}</span></div>
     <div class="stat-row"><span class="label">Level with ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_level_with_ball", "time_level_with_ball")}</span></div>
     <div class="stat-row"><span class="label">In front of ball</span><span class="value">${formatPositioningTimeShare(positioning, "percent_in_front_of_ball", "time_in_front_of_ball")}</span></div>
@@ -502,23 +503,6 @@ export function renderDodgeResetStats(
   return `
     <div class="stat-row"><span class="label">Refreshes</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
     <div class="stat-row"><span class="label">Flip resets</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
-  `;
-}
-
-export function renderMustyFlickStats(
-  mustyFlick: PlayerStatsSnapshot["musty_flick"] | undefined,
-): string {
-  const averageConfidence =
-    mustyFlick && mustyFlick.count > 0
-      ? mustyFlick.cumulative_confidence / mustyFlick.count
-      : undefined;
-  return `
-    <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(mustyFlick?.count)}</span></div>
-    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(mustyFlick?.high_confidence_count)}</span></div>
-    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(asNumber(mustyFlick?.last_confidence), 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageConfidence, 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(asNumber(mustyFlick?.best_confidence), 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(mustyFlick?.time_since_last_musty), 2, "s")}</span></div>
   `;
 }
 

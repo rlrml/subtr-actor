@@ -13,6 +13,7 @@ import {
   createFpsOverlayPlugin,
   createPlayerFromParsed,
   fromReplayPlayerPlugin,
+  SubtrActorPlayer,
 } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { CameraControlsController } from "./cameraControls.ts";
@@ -77,19 +78,18 @@ export interface ReplayDisplayRuntimeOptions {
   getCameraControlsController(): CameraControlsController | null;
 }
 
-export async function loadReplayBundleForDisplay(
-  source: ReplayInputSource,
-  bundlePromise: Promise<ReplayLoadBundle>,
-  options: ReplayDisplayRuntimeOptions,
-): Promise<void> {
-  const { elements } = options;
-  elements.statusReadout.textContent = source.preparingStatus;
-  elements.fileInput.disabled = true;
-  options.getReplayLoadModal()?.show(source.name, source.preparingStatus);
-  options.setTransportEnabled(false);
-  options.getCameraControlsController()?.syncAvailability();
-  elements.emptyState.hidden = false;
+function setReplayPlayerCanvasPending(player: StatsReplayPlayer, pending: boolean): void {
+  const { style } = player.renderer.domElement;
+  style.visibility = pending ? "hidden" : "";
+  style.pointerEvents = pending ? "none" : "";
+}
 
+function clearDisplayedReplay(
+  options: ReplayDisplayRuntimeOptions,
+  settings: { destroyPlayer?: boolean; clearPlayerPluginHandles?: boolean } = {},
+): void {
+  const destroyPlayer = settings.destroyPlayer ?? true;
+  const clearPlayerPluginHandles = settings.clearPlayerPluginHandles ?? true;
   const unsubscribe = options.getUnsubscribe();
   if (unsubscribe) {
     unsubscribe();
@@ -97,11 +97,15 @@ export async function loadReplayBundleForDisplay(
   }
 
   options.teardownActiveModules();
-  options.getReplayPlayer()?.destroy();
-  options.setReplayPlayer(null);
-  options.setCanvasRecorder(null);
+  if (destroyPlayer) {
+    options.getReplayPlayer()?.destroy();
+    options.setReplayPlayer(null);
+  }
+  if (clearPlayerPluginHandles) {
+    options.setCanvasRecorder(null);
+    options.setTimelineOverlay(null);
+  }
   options.setLoadedReplayName(null);
-  options.setTimelineOverlay(null);
   options.setStatsTimeline(null);
   options.setStatsFrameLookup(null);
   options.setStatRegistry(createStatRegistry(null));
@@ -116,15 +120,79 @@ export async function loadReplayBundleForDisplay(
   options.renderEventPlaylistWindow();
   options.renderModuleSettings();
   options.syncRecordingWindow();
+}
+
+export async function loadReplayBundleForDisplay(
+  source: ReplayInputSource,
+  bundlePromise: Promise<ReplayLoadBundle>,
+  options: ReplayDisplayRuntimeOptions,
+): Promise<void> {
+  const { elements } = options;
+  let pendingReplayPlayer: StatsReplayPlayer | null = null;
+
+  elements.statusReadout.textContent = source.preparingStatus;
+  elements.fileInput.disabled = true;
+  options.getReplayLoadModal()?.show(source.name, source.preparingStatus);
+  options.setTransportEnabled(false);
+  options.getCameraControlsController()?.syncAvailability();
+  elements.emptyState.hidden = options.getReplayPlayer() !== null;
+  options.getReplayPlayer()?.pause();
 
   try {
     elements.statusReadout.textContent = "Parsing replay...";
     options.getReplayLoadModal()?.show(source.name, "Parsing replay...");
     const loadedReplay = await bundlePromise;
     const { replay } = loadedReplay;
-    options.setStatsTimeline(loadedReplay.statsTimeline);
-    options.setStatsFrameLookup(loadedReplay.statsFrameLookup);
-    options.setStatRegistry(createStatRegistry(null));
+    const existingReplayPlayer = options.getReplayPlayer();
+
+    if (existingReplayPlayer) {
+      clearDisplayedReplay(options, {
+        destroyPlayer: false,
+        clearPlayerPluginHandles: false,
+      });
+      const adapter = new SubtrActorPlayer(loadedReplay.raw as never);
+      await existingReplayPlayer.replaceReplay(adapter, replay, { preservePlayback: false });
+
+      options.setStatsTimeline(loadedReplay.statsTimeline);
+      options.setStatsFrameLookup(loadedReplay.statsFrameLookup);
+      options.setStatRegistry(createStatRegistry(null));
+      options.setReplayPlayer(existingReplayPlayer);
+      options.syncBoostPadOverlayPlugin();
+
+      options.setupActiveModules();
+      options.setUnsubscribe(existingReplayPlayer.subscribe(options.renderSnapshot));
+
+      const config = options.getInitialConfig();
+      if (config) {
+        options.setApplyingConfig(true);
+        try {
+          options.applyConfigToReplayPlayer(config);
+        } finally {
+          options.setApplyingConfig(false);
+        }
+      }
+
+      options.getCameraControlsController()?.populateAttachedPlayerOptions(replay.players);
+      elements.emptyState.hidden = true;
+      elements.statusReadout.textContent = `Loaded ${source.name}`;
+      options.setLoadedReplayName(source.name);
+      elements.playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
+      elements.framesReadout.textContent = `${replay.frameCount}`;
+      options.renderTimelineEventCount();
+      options.renderMechanicsTimelineControls();
+      options.resetEventPlaylistWindow();
+      options.renderEventPlaylistWindow();
+      options.setTransportEnabled(true);
+      options.getCameraControlsController()?.syncAvailability(existingReplayPlayer.getState());
+      options.renderSnapshot(existingReplayPlayer.getState());
+      options.renderStatsWindows(existingReplayPlayer.getState().frameIndex);
+      options.renderScoreboard(existingReplayPlayer.getState().frameIndex);
+      options.syncEventPlaylistTimeline(existingReplayPlayer.getState(), { forceScroll: true });
+      options.renderModuleSettings();
+      options.syncRecordingWindow();
+      options.getReplayLoadModal()?.hide();
+      return;
+    }
 
     const timelineOverlay = createTimelineOverlayPlugin({
       replayEventsLabel: "Replay",
@@ -182,6 +250,17 @@ export async function loadReplayBundleForDisplay(
         fromReplayPlayerPlugin(timelineOverlay),
       ],
     }) as StatsReplayPlayer;
+    pendingReplayPlayer = replayPlayer;
+    setReplayPlayerCanvasPending(replayPlayer, true);
+    await replayPlayer.ready;
+
+    clearDisplayedReplay(options);
+    pendingReplayPlayer = null;
+    setReplayPlayerCanvasPending(replayPlayer, false);
+
+    options.setStatsTimeline(loadedReplay.statsTimeline);
+    options.setStatsFrameLookup(loadedReplay.statsFrameLookup);
+    options.setStatRegistry(createStatRegistry(null));
     if (import.meta.env.DEV) {
       // Console/debug handle (dev server only): inspect playback, A/B camera or
       // motion-interpolation settings live, sample mesh positions, etc.
@@ -223,9 +302,11 @@ export async function loadReplayBundleForDisplay(
     options.getReplayLoadModal()?.hide();
   } catch (error) {
     options.getReplayLoadModal()?.hide();
-    options.getReplayPlayer()?.destroy();
-    options.setReplayPlayer(null);
-    options.setCanvasRecorder(null);
+    pendingReplayPlayer?.destroy();
+    if (!options.getReplayPlayer()) {
+      elements.emptyState.hidden = false;
+      options.setCanvasRecorder(null);
+    }
     options.syncRecordingWindow();
     throw error;
   } finally {

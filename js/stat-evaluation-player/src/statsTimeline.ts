@@ -21,7 +21,6 @@ import type { EventProperty } from "./generated/EventProperty.ts";
 import type { EventPropertyValue } from "./generated/EventPropertyValue.ts";
 import type { EventTiming } from "./generated/EventTiming.ts";
 import type { MovementEvent } from "./generated/MovementEvent.ts";
-import type { MustyFlickEvent } from "./generated/MustyFlickEvent.ts";
 import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
 import type { PassEvent } from "./generated/PassEvent.ts";
 import type { PlayerStatsSnapshot as GeneratedPlayerStatsSnapshot } from "./generated/PlayerStatsSnapshot.ts";
@@ -33,6 +32,7 @@ import type { FieldHalfState } from "./generated/FieldHalfState.ts";
 import type { BallDepthState } from "./generated/BallDepthState.ts";
 import type { DepthRoleState } from "./generated/DepthRoleState.ts";
 import type { BallProximityState } from "./generated/BallProximityState.ts";
+import type { ShadowDefenseState } from "./generated/ShadowDefenseState.ts";
 import type { RoleState } from "./generated/RoleState.ts";
 import type { FirstManChangeEvent } from "./generated/FirstManChangeEvent.ts";
 import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
@@ -83,6 +83,7 @@ export type FieldHalfEvent = PlayerStateSpan<FieldHalfState>;
 export type BallDepthEvent = PlayerStateSpan<BallDepthState>;
 export type DepthRoleEvent = PlayerStateSpan<DepthRoleState>;
 export type BallProximityEvent = PlayerStateSpan<BallProximityState>;
+export type ShadowDefenseEvent = PlayerStateSpan<ShadowDefenseState>;
 export type RotationRoleEvent = PlayerStateSpan<RoleState>;
 export interface StatsFrameLookup {
   get(frameNumber: number): StatsFrame | undefined;
@@ -105,7 +106,6 @@ export type {
   EventPropertyValue,
   EventTiming,
   MovementEvent,
-  MustyFlickEvent,
   OneTimerEvent,
   PassEvent,
   PossessionEvent,
@@ -116,6 +116,7 @@ export type {
   BallDepthState,
   DepthRoleState,
   BallProximityState,
+  ShadowDefenseState,
   RoleState,
   FirstManChangeEvent,
   BallHalfEvent,

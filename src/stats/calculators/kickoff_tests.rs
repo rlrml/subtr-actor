@@ -2039,6 +2039,10 @@ fn kickoff_uses_speed_flip_events_as_approach_source_of_truth() {
     let blue_taker_event = event.team_zero_taker.as_ref().unwrap();
     assert_eq!(blue_taker_event.player, blue_taker);
     assert_eq!(blue_taker_event.approach, KickoffApproach::SpeedFlip);
+    assert_eq!(
+        blue_taker_event.approach_flip_direction,
+        KickoffFlipDirection::Right
+    );
 }
 
 #[test]
@@ -2083,6 +2087,14 @@ fn kickoff_classifies_known_taker_approaches() {
         ),
         KickoffApproach::DiagonalFlip
     );
+    assert_eq!(
+        KickoffCalculator::approach_flip_direction(
+            &speed_flip,
+            KickoffApproach::DiagonalFlip,
+            None,
+        ),
+        KickoffFlipDirection::Right
+    );
 
     let front_flip = KickoffPlayerSnapshot {
         approach_trace: KickoffApproachTrace {
@@ -2103,6 +2115,39 @@ fn kickoff_classifies_known_taker_approaches() {
             false,
         ),
         KickoffApproach::FrontFlip
+    );
+    assert_eq!(
+        KickoffCalculator::approach_flip_direction(&front_flip, KickoffApproach::FrontFlip, None),
+        KickoffFlipDirection::NotApplicable
+    );
+
+    let left_diagonal_flip = KickoffPlayerSnapshot {
+        approach_trace: KickoffApproachTrace {
+            first_dodge_time: Some(0.35),
+            first_dodge_frame: Some(4),
+            first_dodge_forward_component: Some(0.55),
+            first_dodge_side_component: Some(-0.75),
+            max_speed: 1200.0,
+            ..KickoffApproachTrace::default()
+        },
+        ..speed_flip.clone()
+    };
+    assert_eq!(
+        KickoffCalculator::classify_approach(
+            &left_diagonal_flip,
+            KickoffTakerOutcome::Touched,
+            Some(28.0),
+            false,
+        ),
+        KickoffApproach::DiagonalFlip
+    );
+    assert_eq!(
+        KickoffCalculator::approach_flip_direction(
+            &left_diagonal_flip,
+            KickoffApproach::DiagonalFlip,
+            None,
+        ),
+        KickoffFlipDirection::Left
     );
 
     let contact_flip = KickoffPlayerSnapshot {
@@ -2517,6 +2562,7 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
             contact_ball_exit_attack_alignment: None,
             outcome: KickoffTakerOutcome::Fake,
             approach: KickoffApproach::FakeGoForBoost,
+            approach_flip_direction: KickoffFlipDirection::NotApplicable,
         }),
         team_one_taker: None,
         team_zero_non_takers: Vec::new(),

@@ -470,6 +470,7 @@ test("generic ball third playlist events include field third and duration", () =
       frame: item.event.frame,
       label: item.event.label,
       shortLabel: item.event.shortLabel,
+      color: item.color,
     })),
     [
       {
@@ -478,6 +479,7 @@ test("generic ball third playlist events include field third and duration", () =
         frame: 5,
         label: "Ball in blue third | 1.5s",
         shortLabel: "BT",
+        color: "#d1d9e0",
       },
       {
         sourceId: "stats-stream:ball_third",
@@ -485,6 +487,7 @@ test("generic ball third playlist events include field third and duration", () =
         frame: 6,
         label: "Ball third inactive | 0.5s",
         shortLabel: "BT",
+        color: "#d1d9e0",
       },
     ],
   );

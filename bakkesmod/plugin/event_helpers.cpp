@@ -159,8 +159,6 @@ std::string mechanicLabel(SaMechanicKind kind) {
     return "High aerial goal";
   case SaMechanicKindLongDistanceGoal:
     return "Long distance goal";
-  case SaMechanicKindMustyFlick:
-    return "Musty flick";
   case SaMechanicKindOneTimer:
     return "One timer";
   case SaMechanicKindOneTimerGoal:

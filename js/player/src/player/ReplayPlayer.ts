@@ -200,7 +200,7 @@ function createReplayRoot(scene: THREE.Scene): THREE.Group {
 export class ReplayPlayer extends EventTarget {
   readonly container: HTMLElement;
   /** The subtr-actor adapter — the sole data source (timelines + live entities). */
-  readonly adapter: SubtrActorPlayer;
+  adapter: SubtrActorPlayer;
   /**
    * @rlrml/player's normalized `ReplayModel` over the same raw WASM output the
    * adapter consumes (docs/player/PLAYER_PARITY.md Phase 2) — the data surface
@@ -208,7 +208,7 @@ export class ReplayPlayer extends EventTarget {
    * first frame) and player-id format. Null when constructed directly with an
    * adapter only; `createPlayer()` always provides it.
    */
-  readonly replay: ReplayModel | null;
+  replay: ReplayModel | null;
   readonly options: PlayerOptions;
 
   readonly sceneManager: any;
@@ -235,7 +235,7 @@ export class ReplayPlayer extends EventTarget {
   readonly sceneState: ReplayScene;
   private readonly effectsEnabled: boolean;
   /** Resolves when async assets (arena meshes, ball model) are in the scene. */
-  readonly ready: Promise<void>;
+  ready: Promise<void>;
 
   private readonly plugins: InstalledPlugin[] = [];
   private readonly beforeRenderCallbacks: BeforeRenderCallback[] = [];
@@ -272,8 +272,8 @@ export class ReplayPlayer extends EventTarget {
   private attachmentTouched = false;
 
   // ── Timeline projection / skip windows (require a ReplayModel) ──────────────
-  private readonly liveGameState: number | null = null;
-  private readonly kickoffGameState: number | null = null;
+  private liveGameState: number | null = null;
+  private kickoffGameState: number | null = null;
   private timelineSegmentsCacheKey: string | null = null;
   private timelineSegmentsCache: ReplayPlayerTimelineSegment[] = [];
 
@@ -288,10 +288,7 @@ export class ReplayPlayer extends EventTarget {
     this.adapter = adapter;
     this.replay = replay;
     this.options = options;
-    if (replay) {
-      this.liveGameState = inferLiveGameState(replay);
-      this.kickoffGameState = inferKickoffGameState(replay, this.liveGameState);
-    }
+    this.updateReplayGameStates();
     this.speed = Math.max(0.1, options.initialPlaybackRate ?? options.speed ?? 1);
     this.loop = options.loop ?? false;
     this.cameraDistanceScaleValue = Math.max(0.25, options.initialCameraDistanceScale ?? 1);
@@ -335,22 +332,7 @@ export class ReplayPlayer extends EventTarget {
     // Hitbox wireframes (driven by the hitboxWireframesEnabled /
     // hitboxOnlyModeEnabled parity toggles; updated per frame in render()).
     this.hitboxManager = new HitboxManager(this.scene);
-    // Feed the replay's goal events (frame, time, scoring team, scorer) to the
-    // effects system. ActorManager fires the matching explosion as playback
-    // crosses each goal. Uses the normalized ReplayModel timeline, so scorer
-    // name + team resolution is shared with the rest of the player.
-    if (this.effectsEnabled && this.replay) {
-      this.effectsManager.setGoalEvents(
-        this.replay.timelineEvents
-          .filter((event) => event.kind === "goal")
-          .map((event) => ({
-            frame: event.frame,
-            time: event.time,
-            team: event.isTeamZero ? 0 : 1,
-            playerName: event.playerName ?? "",
-          })),
-      );
-    }
+    this.syncGoalEvents();
     // setRenderContext() pre-warms the explosion shader pools — a multi-second,
     // main-thread-blocking compile. Deferred behind `ready` (below) so it
     // finishes under the load overlay, well before the first goal, instead of
@@ -373,16 +355,8 @@ export class ReplayPlayer extends EventTarget {
       this.arenaManager.loadArenaMeshes().catch((e: unknown) => {
         console.warn("[player] arena load failed", e);
       }),
-      this.actorManager.waitForBallModel().catch(() => false),
-    ]).then(() => {
-      if (this.effectsEnabled) {
-        try {
-          this.effectsManager.setRenderContext(this.renderer, this.camera);
-        } catch (e) {
-          console.warn("[player] explosion warmup failed", e);
-        }
-      }
-    });
+      this.prepareReplayAssets(),
+    ]).then(() => undefined);
 
     this.installResizeHandling();
     for (const definition of options.plugins ?? []) {
@@ -415,6 +389,73 @@ export class ReplayPlayer extends EventTarget {
   }
   get duration(): number {
     return this.adapter.duration;
+  }
+
+  /**
+   * Replace the replay data feeding this player without replacing the renderer,
+   * canvas, arena, camera controls, or player instance. This is the replay-boundary
+   * path for playlist/review UIs: replay-specific actors, effects, timelines,
+   * and plugin setup are refreshed against the new adapter while the static
+   * render shell remains mounted.
+   */
+  async replaceReplay(
+    adapter: SubtrActorPlayer,
+    replay: ReplayModel | null,
+    options: { currentTime?: number; preservePlayback?: boolean } = {},
+  ): Promise<void> {
+    if (this.disposed) {
+      throw new Error("Cannot replace replay on a disposed ReplayPlayer");
+    }
+
+    const shouldResume = options.preservePlayback ?? this.playing;
+    if (this.playing) {
+      this.setPlayingInternal(false);
+    }
+
+    this.teardownPlugins();
+    this.effectsManager.reset();
+    this.effectsManager.clearEvents?.();
+    this.hitboxManager.reset();
+    this.actorManager.reset();
+
+    this.adapter = adapter;
+    this.replay = replay;
+    this.updateReplayGameStates();
+    this.timelineSegmentsCacheKey = null;
+    this.timelineSegmentsCache = [];
+    this.hitboxTypeByName = null;
+    this.hitboxesActive = false;
+    this.freeCameraTransition = null;
+
+    this.actorManager.initFromFramework(adapter);
+    this.actorManager.initInterpolants(adapter.getTimelines());
+    this.syncGoalEvents();
+
+    const attachedPlayerId =
+      this.attachedPlayerIdValue &&
+      this.adapter.playerList.some((player) => player.id === this.attachedPlayerIdValue)
+        ? this.attachedPlayerIdValue
+        : null;
+    if (attachedPlayerId !== this.attachedPlayerIdValue) {
+      this.attachedPlayerIdValue = attachedPlayerId;
+      if (this.cameraViewModeValue === "follow") {
+        this.cameraViewModeValue = "free";
+      }
+    }
+
+    this.seekInternal(options.currentTime ?? 0);
+    this.ready = this.prepareReplayAssets();
+    await this.ready;
+
+    this.setupPlugins();
+    this.applyInitialCameraOptions();
+    this.skipPostGoalTransitionIfNeeded();
+    this.skipPastKickoffIfNeeded();
+    if (shouldResume) {
+      this.setPlayingInternal(true);
+    }
+    this.render();
+    this.emitChange();
   }
 
   // ── Environment (skybox + IBL) ──────────────────────────────────────────────
@@ -852,6 +893,65 @@ export class ReplayPlayer extends EventTarget {
       this.actorManager.resumeAnimations();
     } else {
       this.actorManager.pauseAnimations();
+    }
+  }
+
+  private prepareReplayAssets(): Promise<void> {
+    return this.actorManager
+      .waitForBallModel()
+      .catch(() => false)
+      .then(() => {
+        if (this.effectsEnabled) {
+          try {
+            this.effectsManager.setRenderContext(this.renderer, this.camera);
+          } catch (e) {
+            console.warn("[player] explosion warmup failed", e);
+          }
+        }
+      });
+  }
+
+  private updateReplayGameStates(): void {
+    if (!this.replay) {
+      this.liveGameState = null;
+      this.kickoffGameState = null;
+      return;
+    }
+
+    this.liveGameState = inferLiveGameState(this.replay);
+    this.kickoffGameState = inferKickoffGameState(this.replay, this.liveGameState);
+  }
+
+  private syncGoalEvents(): void {
+    if (!this.effectsEnabled) return;
+    this.effectsManager.clearEvents?.();
+    if (!this.replay) return;
+    this.effectsManager.setGoalEvents(
+      this.replay.timelineEvents
+        .filter((event) => event.kind === "goal")
+        .map((event) => ({
+          frame: event.frame,
+          time: event.time,
+          team: event.isTeamZero ? 0 : 1,
+          playerName: event.playerName ?? "",
+        })),
+    );
+  }
+
+  private teardownPlugins(): void {
+    const context = this.createPluginContext();
+    for (const entry of this.plugins) {
+      entry.plugin.teardown?.(context);
+    }
+  }
+
+  private setupPlugins(): void {
+    for (const entry of this.plugins) {
+      entry.plugin.setup?.(this.createPluginContext());
+      if (entry.plugin.id === "camera") {
+        this.pushCameraParityState();
+      }
+      entry.plugin.onStateChange?.(this.createPluginStateContext(this.getState()));
     }
   }
 

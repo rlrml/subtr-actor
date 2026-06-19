@@ -9,6 +9,18 @@ fn test_stats_timeline_frame_lookup_uses_frame_number() {
                 .closest_to_ball_switch_margin,
             closest_to_ball_switch_min_seconds: PositioningCalculatorConfig::default()
                 .closest_to_ball_switch_min_seconds,
+            shadow_defense_max_ball_y: PositioningCalculatorConfig::default()
+                .shadow_defense_max_ball_y,
+            shadow_defense_min_goal_side_y: PositioningCalculatorConfig::default()
+                .shadow_defense_min_goal_side_y,
+            shadow_defense_min_gap: PositioningCalculatorConfig::default().shadow_defense_min_gap,
+            shadow_defense_max_gap: PositioningCalculatorConfig::default().shadow_defense_max_gap,
+            shadow_defense_max_lateral_gap: PositioningCalculatorConfig::default()
+                .shadow_defense_max_lateral_gap,
+            shadow_defense_min_retreat_speed: PositioningCalculatorConfig::default()
+                .shadow_defense_min_retreat_speed,
+            shadow_defense_max_speed_delta: PositioningCalculatorConfig::default()
+                .shadow_defense_max_speed_delta,
             ball_half_neutral_zone_half_width_y: BallHalfCalculatorConfig::default()
                 .neutral_zone_half_width_y,
             ball_third_boundary_y: BallThirdCalculatorConfig::default().boundary_y,
@@ -481,4 +493,3 @@ fn test_stats_timeline_collector_final_frame_matches_analysis_graph() {
         double_tap.events()
     );
 }
-

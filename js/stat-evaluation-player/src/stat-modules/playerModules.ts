@@ -30,7 +30,6 @@ import {
   renderDoubleTapStats,
   renderFlickStats,
   renderHalfFlipStats,
-  renderMustyFlickStats,
   renderOneTimerStats,
   renderPassStats,
   renderPowerslideStats,
@@ -311,42 +310,6 @@ export function createOneTimerModule(): StatModule {
     select: (player) => player.one_timer,
     render: (oneTimer) => renderOneTimerStats(oneTimer),
   });
-}
-
-export function createMustyFlickModule(): StatModule {
-  return {
-    id: "musty-flick",
-    label: "Musty Flick",
-
-    setup() {},
-
-    teardown() {},
-
-    onBeforeRender() {},
-
-    renderStats(frameIndex, ctx) {
-      const statsFrame = getStatsFrameForReplayFrame(ctx.statsFrameLookup, frameIndex);
-      if (!statsFrame) return "";
-
-      return renderGroupedPlayerCards(statsFrame.players, (player) =>
-        renderPlayerCard(
-          player.name,
-          player.is_team_0,
-          renderMustyFlickStats(player.musty_flick),
-          player.musty_flick?.is_last_musty
-            ? '<span class="role-indicator role-forward">Last Musty</span>'
-            : "",
-        ),
-      );
-    },
-
-    renderFocusedPlayerStats(playerId, frameIndex, ctx) {
-      const player = getStatsPlayerSnapshot(ctx, frameIndex, playerId);
-      if (!player) return "";
-
-      return renderMustyFlickStats(player.musty_flick);
-    },
-  };
 }
 
 export function createFlickModule(): StatModule {

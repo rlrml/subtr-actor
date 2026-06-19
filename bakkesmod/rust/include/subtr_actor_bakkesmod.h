@@ -192,7 +192,6 @@ typedef enum SaMechanicKind {
   SaMechanicKindFlipReset = 10,
   SaMechanicKindDoubleTap = 11,
   SaMechanicKindFlick = 12,
-  SaMechanicKindMustyFlick = 13,
   SaMechanicKindOneTimer = 14,
   SaMechanicKindPass = 15,
   SaMechanicKindHalfVolley = 16,

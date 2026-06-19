@@ -377,34 +377,6 @@ pub(in crate::collector::stats::playback) fn parse_flick_event(
     })
 }
 
-pub(in crate::collector::stats::playback) fn parse_musty_flick_event(
-    value: &Value,
-) -> SubtrActorResult<MustyFlickEvent> {
-    let object = json_object(value, "musty flick event")?;
-    let time = json_required_f32(object, "time")?;
-    let frame = json_required_usize(object, "frame")?;
-    Ok(MustyFlickEvent {
-        time,
-        frame,
-        sample_time: json_optional_f32(object.get("sample_time"))?.unwrap_or(time),
-        sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
-        player: json_required_remote_id(object, "player")?,
-        player_position: json_optional_vec3(object.get("player_position"))?,
-        is_team_0: json_required_bool(object, "is_team_0")?,
-        aerial: json_required_bool(object, "aerial")?,
-        dodge_time: json_required_f32(object, "dodge_time")?,
-        dodge_frame: json_required_usize(object, "dodge_frame")?,
-        time_since_dodge: json_required_f32(object, "time_since_dodge")?,
-        confidence: json_required_f32(object, "confidence")?,
-        local_ball_position: json_required_vec3(object, "local_ball_position")?,
-        rear_alignment: json_required_f32(object, "rear_alignment")?,
-        top_alignment: json_required_f32(object, "top_alignment")?,
-        forward_approach_speed: json_required_f32(object, "forward_approach_speed")?,
-        pitch_rate: json_required_f32(object, "pitch_rate")?,
-        ball_speed_change: json_required_f32(object, "ball_speed_change")?,
-    })
-}
-
 pub(in crate::collector::stats::playback) fn parse_goal_context_event(
     value: &Value,
 ) -> SubtrActorResult<GoalContextEvent> {
@@ -926,6 +898,11 @@ fn parse_kickoff_taker_event(value: &Value) -> SubtrActorResult<KickoffTakerEven
         outcome: decode_json_value(json_required_value(object, "outcome")?.clone())?,
         approach: object
             .get("approach")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
+        approach_flip_direction: object
+            .get("approach_flip_direction")
             .map(|value| decode_json_value(value.clone()))
             .transpose()?
             .unwrap_or_default(),

@@ -161,6 +161,7 @@ impl KickoffStats {
                 &KICKOFF_SPAWN_LABELS,
                 &KICKOFF_TAKER_OUTCOME_LABELS,
                 &KICKOFF_APPROACH_LABELS,
+                &KICKOFF_FLIP_DIRECTION_LABELS,
                 &KICKOFF_SUPPORT_BEHAVIOR_LABELS,
                 &KICKOFF_BALL_DIRECTION_LABELS,
             ],

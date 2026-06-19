@@ -1,4 +1,4 @@
-import { ReplayPlayer, createPlayerFromParsed } from "./player/lib";
+import { ReplayPlayer, SubtrActorPlayer, createPlayerFromParsed } from "./player/lib";
 import { findFrameIndexAtTime } from "./replay-data";
 import type {
   CameraSettings,
@@ -567,7 +567,10 @@ export class ReplayPlaylistPlayer extends EventTarget {
       this.currentItemIndex = clampedIndex;
       this.pendingItemIndex = null;
       this.currentResolvedItem = resolvedItem;
-      this.attachPlayer(resolvedItem);
+      const attached = await this.attachPlayer(resolvedItem, generation);
+      if (!attached || this.disposed || generation !== this.loadGeneration) {
+        return;
+      }
       this.loading = false;
       this.error = null;
       this.prefetchNearbyReplays(clampedIndex);
@@ -600,9 +603,10 @@ export class ReplayPlaylistPlayer extends EventTarget {
     return uniqueSourcesFromItems(this.items).map((source) => this.replayCache.getState(source));
   }
 
-  private attachPlayer(resolvedItem: ResolvedPlaylistItem): void {
-    this.detachPlayer();
-
+  private async attachPlayer(
+    resolvedItem: ResolvedPlaylistItem,
+    generation: number,
+  ): Promise<boolean> {
     const loadedReplay = resolvedItem.replay;
     const { replay, raw } = loadedReplay;
     if (!raw) {
@@ -620,7 +624,22 @@ export class ReplayPlaylistPlayer extends EventTarget {
       this.preferences.cameraViewMode = "free";
     }
 
-    this.player = createPlayerFromParsed(
+    if (this.player) {
+      const adapter = new SubtrActorPlayer(raw as never, {
+        motionSmoothing: this.options.motionSmoothing,
+        smoothingBlendFactor: this.options.smoothingBlendFactor,
+        smoothingAnchorInterval: this.options.smoothingAnchorInterval,
+        timelineCompaction: this.options.timelineCompaction,
+        disableFrameFiltering: this.options.disableFrameFiltering,
+      });
+      await this.player.replaceReplay(adapter, replay, {
+        currentTime: resolvedItem.start.time,
+        preservePlayback: this.playbackIntent,
+      });
+      return !(this.disposed || generation !== this.loadGeneration);
+    }
+
+    const player = createPlayerFromParsed(
       this.container,
       { replay, raw },
       {
@@ -638,14 +657,28 @@ export class ReplayPlaylistPlayer extends EventTarget {
         plugins: this.options.plugins,
       },
     );
-    this.player.seek(resolvedItem.start.time);
-    this.playerUnsubscribe = this.player.subscribe((state) => {
+    player.seek(resolvedItem.start.time);
+    try {
+      await player.ready;
+    } catch (error) {
+      player.destroy();
+      throw error;
+    }
+    if (this.disposed || generation !== this.loadGeneration) {
+      player.destroy();
+      return false;
+    }
+
+    this.detachPlayer();
+    this.player = player;
+    this.playerUnsubscribe = player.subscribe((state) => {
       this.handlePlayerState(state);
     });
 
     if (this.playbackIntent) {
-      this.player.play();
+      player.play();
     }
+    return true;
   }
 
   private detachPlayer(): void {

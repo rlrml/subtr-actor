@@ -110,15 +110,6 @@ build_analysis_player_event_indicator!(
 );
 
 build_analysis_player_event_indicator!(
-    AnalysisPlayerMustyFlicks,
-    musty_flick_dependency,
-    MustyFlickCalculator,
-    new_events,
-    |event: &MustyFlickEvent, player_id: &PlayerId| &event.player == player_id,
-    "analysis musty flick event",
-);
-
-build_analysis_player_event_indicator!(
     AnalysisPlayerDodgeResets,
     dodge_reset_dependency,
     DodgeResetCalculator,
@@ -308,9 +299,6 @@ where
         )),
         "flick" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerFlicks::<F>::arc_new(),
-        )),
-        "musty_flick" => Some(NDArrayPlayerFeatureAdder::analysis(
-            AnalysisPlayerMustyFlicks::<F>::arc_new(),
         )),
         "dodge_reset" => Some(NDArrayPlayerFeatureAdder::analysis(
             AnalysisPlayerDodgeResets::<F>::arc_new(),

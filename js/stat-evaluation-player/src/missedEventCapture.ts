@@ -216,7 +216,6 @@ export async function uploadMissedEvent(
 /** Mechanic keys offered in the capture picker. rocket-sense normalizes these. */
 export const MISSED_EVENT_MECHANIC_OPTIONS = [
   "flick",
-  "musty_flick",
   "whiff",
   "double_tap",
   "ceiling_shot",

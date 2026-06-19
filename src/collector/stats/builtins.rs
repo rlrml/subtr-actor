@@ -421,7 +421,6 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "speed_flip",
         "half_flip",
         "flick",
-        "musty_flick",
         "dodge_reset",
         "ball_carry",
         "controlled_play",
@@ -797,14 +796,6 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
-        "musty_flick" => {
-            let calculator = graph_state::<MustyFlickCalculator>(graph, module_name)?;
-            let projection = projected_stats(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(projection.musty_flick.player_stats()),
-                events: calculator.events(),
-            })
-        }
         "dodge_reset" => {
             let calculator = graph_state::<DodgeResetCalculator>(graph, module_name)?;
             let projection = projected_stats(graph, module_name)?;
@@ -895,6 +886,7 @@ pub(crate) fn builtin_module_json(
                 "ball_depth_events": calculator.ball_depth_events(),
                 "depth_role_events": calculator.depth_role_events(),
                 "ball_proximity_events": calculator.ball_proximity_events(),
+                "shadow_defense_events": calculator.shadow_defense_events(),
             }))
         }
         "powerslide" => {
@@ -1448,12 +1440,6 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(projection.flick.player_stats()),
             })?
         }
-        "musty_flick" => {
-            let projection = projected_stats(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsExport {
-                player_stats: player_stats_entries(projection.musty_flick.player_stats()),
-            })?
-        }
         "dodge_reset" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsExport {
@@ -1732,7 +1718,6 @@ pub(crate) fn builtin_snapshot_config_json(
         | "speed_flip"
         | "half_flip"
         | "flick"
-        | "musty_flick"
         | "dodge_reset"
         | "ball_carry"
         | "controlled_play"

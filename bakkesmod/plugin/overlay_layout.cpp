@@ -645,7 +645,6 @@ void SubtrActorPlugin::renderModuleSummaryControls(
       renderEventFilterModuleSummaryToggle("Ceiling shot", "ceiling_shot", idSuffix, toggleWidth);
       renderEventFilterModuleSummaryToggle("Flip reset", "flip_reset", idSuffix, toggleWidth);
       renderEventFilterModuleSummaryToggle("Double tap", "double_tap", idSuffix, toggleWidth);
-      renderEventFilterModuleSummaryToggle("Musty flick", "musty_flick", idSuffix, toggleWidth);
       renderEventFilterModuleSummaryToggle("Demos", "demo", idSuffix, toggleWidth);
       renderBoolModuleSummaryToggle(
           "Team event playlist",

@@ -348,22 +348,6 @@ fn test_flick_events_reconstruct_serialized_partial_sums() {
 
 #[test]
 #[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
-fn test_musty_flick_events_reconstruct_serialized_partial_sums() {
-    let replay_path = "assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay";
-    let replay = parse_replay(replay_path);
-    let timeline = StatsTimelineCollector::new()
-        .get_legacy_replay_stats_timeline(&replay)
-        .expect("Expected stats timeline data");
-
-    assert!(
-        timeline_has_stream(&timeline, "musty_flick"),
-        "expected musty-flick fixture to contain musty-flick events"
-    );
-    assert_musty_flick_events_reconstruct_serialized_partial_sums(replay_path, &timeline);
-}
-
-#[test]
-#[ignore = "replay-backed partial-sum reconstruction is slow; run explicitly when changing timeline derivation"]
 fn test_dodge_reset_events_reconstruct_serialized_partial_sums() {
     let replay_path = "assets/replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay";
     let replay = parse_replay(replay_path);
@@ -554,7 +538,6 @@ fn assert_converted_events_reconstruct_serialized_partial_sums(
     assert_wall_aerial_shot_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_flick_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_ceiling_shot_events_reconstruct_serialized_partial_sums(replay_path, timeline);
-    assert_musty_flick_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_dodge_reset_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_powerslide_events_reconstruct_serialized_partial_sums(replay_path, timeline);
     assert_touch_events_reconstruct_final_serialized_sums(replay_path, timeline);

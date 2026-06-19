@@ -223,12 +223,36 @@ export class ActorManager {
     }
     this.actorToPlayer = {};
     this.actorLinks = {};
+    this.playerNames.clear();
     this.playerNameToCarActorId = {};
     this.playerNameToPriActorId = {};
+    this.playerTeams = {};
     this.actorLoadouts = {};
+    this.carBodyIds = {};
+    this.pendingCarReplacements.clear();
     this._lastGoalScanTime = null;
     this._firedGoalTimes.clear();
-    // playerTeams are static per replay, usually
+    this.ballTimeline = [];
+    this.playerTimelineMap = {};
+    this.ballTimelineCorrected = [];
+    this.playerTimelineMapCorrected = {};
+    this.ballTimelineFiltered = [];
+    this.playerTimelineMapFiltered = {};
+    this.timelineIndices = { ball: 0, players: {} };
+    this.timelineIndicesFiltered = { ball: 0, players: {} };
+    this.timelineIndicesCorrected = { ball: 0, players: {} };
+    this.interpolantsInitialized = false;
+    this.animationMixer?.stopAllAction?.();
+    this.animationMixer = null;
+    this.animationActions = {};
+    this.replayDuration = 0;
+    this.positionBuffers = {};
+    this.rotationBuffers = {};
+    this._lowPassState.clear();
+    this._predictState.clear();
+    this._smoothingBuffers.clear();
+    this._adaptiveState.clear();
+    this._ballModelReplaced = false;
   }
 
   setPlayerTeams(teams) {
@@ -2767,6 +2791,7 @@ export class ActorManager {
     this.scene.add(mesh);
     this.actors[actorId] = mesh;
     this.playerNameToCarActorId[playerName] = actorId;
+    this.playerTeams[playerName] = team;
     this.playerNames.add(playerName);
 
     // Create boost trail for this car

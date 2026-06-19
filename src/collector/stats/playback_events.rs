@@ -419,6 +419,29 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
+            .module_player_events(
+                "positioning",
+                "shadow_defense_events",
+                parse_player_state_span_event,
+            )?
+            .into_iter()
+            .enumerate()
+        {
+            events.push(make_event(
+                "shadow_defense",
+                index,
+                span(event.frame, event.end_frame, event.time, event.end_time),
+                EventPayload::ShadowDefense(event.clone()),
+                Some(event.player.clone()),
+                None,
+                Some(event.is_team_0),
+                event.player_position,
+                None,
+                None,
+            ));
+        }
+
+        for (index, event) in self
             .module_player_events("rotation", "role_events", parse_player_state_span_event)?
             .into_iter()
             .enumerate()
@@ -1081,25 +1104,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                     event.time,
                 ),
                 EventPayload::Flick(event.clone()),
-                Some(event.player.clone()),
-                None,
-                Some(event.is_team_0),
-                event.player_position,
-                None,
-                Some(event.confidence),
-            ));
-        }
-
-        for (index, event) in self
-            .module_player_events("musty_flick", "events", parse_musty_flick_event)?
-            .into_iter()
-            .enumerate()
-        {
-            events.push(make_event(
-                "musty_flick",
-                index,
-                span(event.dodge_frame, event.frame, event.dodge_time, event.time),
-                EventPayload::MustyFlick(event.clone()),
                 Some(event.player.clone()),
                 None,
                 Some(event.is_team_0),

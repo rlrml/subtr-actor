@@ -124,28 +124,6 @@ export function buildFiftyFiftyTimelineEvents(
   }));
 }
 
-export function buildMustyFlickTimelineEvents(
-  statsTimeline: StatsTimeline,
-  replay: ReplayModel,
-): ReplayTimelineEvent[] {
-  return (statsEventPayloads(statsTimeline, "musty_flick") ?? []).map((event, index) => {
-    const playerId = playerIdToString(event.player);
-    const playerName = getReplayPlayerName(replay, playerId);
-    return {
-      id: `musty-flick:${event.frame}:${playerId}:${index + 1}`,
-      time: getReplayFrameTime(replay, event.frame, event.time),
-      frame: event.frame,
-      kind: "musty-flick",
-      label: `${playerName} musty flick`,
-      shortLabel: "M",
-      playerId,
-      playerName,
-      isTeamZero: event.is_team_0,
-      color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-    };
-  });
-}
-
 export function buildFlickTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
@@ -748,7 +726,6 @@ export const EVENT_TYPE_TIMELINE_BUILDERS: Record<
   (statsTimeline: StatsTimeline, replay: ReplayModel) => ReplayTimelineEvent[]
 > = {
   flick: buildFlickTimelineEvents,
-  musty_flick: buildMustyFlickTimelineEvents,
   ceiling_shot: buildCeilingShotTimelineEvents,
   wall_aerial: buildWallAerialTimelineEvents,
   wall_aerial_shot: buildWallAerialShotTimelineEvents,

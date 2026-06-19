@@ -254,7 +254,6 @@ function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string
     "fifty-fifty:ranges": "50/50",
     "dodge:events": "Dodge",
     "half-flip:events": "Half flip",
-    "musty-flick:events": "Musty flick",
     "possession:ranges": "Possession",
     "powerslide:events": "Powerslide",
     "powerslide:ranges": "Powerslide",

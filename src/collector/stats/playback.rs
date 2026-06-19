@@ -196,6 +196,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
 
     fn timeline_config(&self) -> StatsTimelineConfig {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
+        let positioning_defaults = PositioningCalculatorConfig::default();
         let ball_half_config = self.config.get("ball_half").and_then(Value::as_object);
         let ball_third_config = self.config.get("ball_third").and_then(Value::as_object);
         let territorial_pressure_config = self
@@ -252,21 +253,47 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             most_back_forward_threshold_y: positioning_config
                 .and_then(|config| config.get("most_back_forward_threshold_y"))
                 .and_then(json_f32)
-                .unwrap_or(PositioningCalculatorConfig::default().most_back_forward_threshold_y),
+                .unwrap_or(positioning_defaults.most_back_forward_threshold_y),
             level_ball_depth_margin: positioning_config
                 .and_then(|config| config.get("level_ball_depth_margin"))
                 .and_then(json_f32)
-                .unwrap_or(PositioningCalculatorConfig::default().level_ball_depth_margin),
+                .unwrap_or(positioning_defaults.level_ball_depth_margin),
             closest_to_ball_switch_margin: positioning_config
                 .and_then(|config| config.get("closest_to_ball_switch_margin"))
                 .and_then(json_f32)
-                .unwrap_or(PositioningCalculatorConfig::default().closest_to_ball_switch_margin),
+                .unwrap_or(positioning_defaults.closest_to_ball_switch_margin),
             closest_to_ball_switch_min_seconds: positioning_config
                 .and_then(|config| config.get("closest_to_ball_switch_min_seconds"))
                 .and_then(json_f32)
-                .unwrap_or(
-                    PositioningCalculatorConfig::default().closest_to_ball_switch_min_seconds,
-                ),
+                .unwrap_or(positioning_defaults.closest_to_ball_switch_min_seconds),
+            shadow_defense_max_ball_y: positioning_config
+                .and_then(|config| config.get("shadow_defense_max_ball_y"))
+                .and_then(json_f32)
+                .unwrap_or(positioning_defaults.shadow_defense_max_ball_y),
+            shadow_defense_min_goal_side_y: positioning_config
+                .and_then(|config| config.get("shadow_defense_min_goal_side_y"))
+                .and_then(json_f32)
+                .unwrap_or(positioning_defaults.shadow_defense_min_goal_side_y),
+            shadow_defense_min_gap: positioning_config
+                .and_then(|config| config.get("shadow_defense_min_gap"))
+                .and_then(json_f32)
+                .unwrap_or(positioning_defaults.shadow_defense_min_gap),
+            shadow_defense_max_gap: positioning_config
+                .and_then(|config| config.get("shadow_defense_max_gap"))
+                .and_then(json_f32)
+                .unwrap_or(positioning_defaults.shadow_defense_max_gap),
+            shadow_defense_max_lateral_gap: positioning_config
+                .and_then(|config| config.get("shadow_defense_max_lateral_gap"))
+                .and_then(json_f32)
+                .unwrap_or(positioning_defaults.shadow_defense_max_lateral_gap),
+            shadow_defense_min_retreat_speed: positioning_config
+                .and_then(|config| config.get("shadow_defense_min_retreat_speed"))
+                .and_then(json_f32)
+                .unwrap_or(positioning_defaults.shadow_defense_min_retreat_speed),
+            shadow_defense_max_speed_delta: positioning_config
+                .and_then(|config| config.get("shadow_defense_max_speed_delta"))
+                .and_then(json_f32)
+                .unwrap_or(positioning_defaults.shadow_defense_max_speed_delta),
             ball_half_neutral_zone_half_width_y: ball_half_config
                 .and_then(|config| config.get("ball_half_neutral_zone_half_width_y"))
                 .and_then(json_f32)
@@ -430,6 +457,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
 
     fn timeline_config_value(&self) -> SubtrActorResult<Value> {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
+        let positioning_defaults = PositioningCalculatorConfig::default();
         let ball_half_config = self.config.get("ball_half").and_then(Value::as_object);
         let ball_third_config = self.config.get("ball_third").and_then(Value::as_object);
         let territorial_pressure_config = self
@@ -482,9 +510,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 &positioning_config
                     .and_then(|config| config.get("most_back_forward_threshold_y"))
                     .and_then(Value::as_f64)
-                    .unwrap_or(
-                        PositioningCalculatorConfig::default().most_back_forward_threshold_y as f64,
-                    ),
+                    .unwrap_or(positioning_defaults.most_back_forward_threshold_y as f64),
             )?,
         );
         config.insert(
@@ -493,9 +519,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 &positioning_config
                     .and_then(|config| config.get("level_ball_depth_margin"))
                     .and_then(Value::as_f64)
-                    .unwrap_or(
-                        PositioningCalculatorConfig::default().level_ball_depth_margin as f64,
-                    ),
+                    .unwrap_or(positioning_defaults.level_ball_depth_margin as f64),
             )?,
         );
         config.insert(
@@ -504,9 +528,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 &positioning_config
                     .and_then(|config| config.get("closest_to_ball_switch_margin"))
                     .and_then(Value::as_f64)
-                    .unwrap_or(
-                        PositioningCalculatorConfig::default().closest_to_ball_switch_margin as f64,
-                    ),
+                    .unwrap_or(positioning_defaults.closest_to_ball_switch_margin as f64),
             )?,
         );
         config.insert(
@@ -515,10 +537,70 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 &positioning_config
                     .and_then(|config| config.get("closest_to_ball_switch_min_seconds"))
                     .and_then(Value::as_f64)
-                    .unwrap_or(
-                        PositioningCalculatorConfig::default().closest_to_ball_switch_min_seconds
-                            as f64,
-                    ),
+                    .unwrap_or(positioning_defaults.closest_to_ball_switch_min_seconds as f64),
+            )?,
+        );
+        config.insert(
+            "shadow_defense_max_ball_y".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("shadow_defense_max_ball_y"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(positioning_defaults.shadow_defense_max_ball_y as f64),
+            )?,
+        );
+        config.insert(
+            "shadow_defense_min_goal_side_y".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("shadow_defense_min_goal_side_y"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(positioning_defaults.shadow_defense_min_goal_side_y as f64),
+            )?,
+        );
+        config.insert(
+            "shadow_defense_min_gap".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("shadow_defense_min_gap"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(positioning_defaults.shadow_defense_min_gap as f64),
+            )?,
+        );
+        config.insert(
+            "shadow_defense_max_gap".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("shadow_defense_max_gap"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(positioning_defaults.shadow_defense_max_gap as f64),
+            )?,
+        );
+        config.insert(
+            "shadow_defense_max_lateral_gap".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("shadow_defense_max_lateral_gap"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(positioning_defaults.shadow_defense_max_lateral_gap as f64),
+            )?,
+        );
+        config.insert(
+            "shadow_defense_min_retreat_speed".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("shadow_defense_min_retreat_speed"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(positioning_defaults.shadow_defense_min_retreat_speed as f64),
+            )?,
+        );
+        config.insert(
+            "shadow_defense_max_speed_delta".to_owned(),
+            serialize_to_json_value(
+                &positioning_config
+                    .and_then(|config| config.get("shadow_defense_max_speed_delta"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(positioning_defaults.shadow_defense_max_speed_delta as f64),
             )?,
         );
         config.insert(

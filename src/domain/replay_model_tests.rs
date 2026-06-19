@@ -86,6 +86,219 @@ fn shot_event_metadata_uses_orange_goal_direction() {
     assert!(metadata.ball_speed_toward_goal.unwrap() > 1490.0);
 }
 
+#[test]
+fn shot_event_metadata_projects_goal_line_crossing_for_saved_shots() {
+    let ball = rigid_body(
+        glam::Vec3::new(25.0, 5000.0, crate::STANDARD_BALL_RADIUS + 0.5),
+        Some(glam::Vec3::new(0.0, 720.0, -120.0)),
+    );
+
+    let metadata = ShotEventMetadata::from_rigid_bodies(true, &ball, None);
+    let crossing = metadata
+        .projected_goal_line_crossing
+        .expect("shot should project across the positive goal line");
+
+    assert!(crossing.time_after_shot > 0.0);
+    assert_eq!(crossing.position.y, crate::STANDARD_GOAL_LINE_Y);
+    assert_eq!(crossing.position.x, 25.0);
+    assert!(crossing.position.z >= crate::STANDARD_BALL_RADIUS);
+    assert!(crossing.inside_goal_mouth);
+    assert_eq!(
+        crossing.prediction_kind,
+        ShotGoalLineCrossingPredictionKind::SurfaceBounces
+    );
+    let target_hit = metadata
+        .projected_goal_target_hit
+        .expect("goal-bound shot should project a target hit");
+    assert_eq!(target_hit.hit_kind, ShotGoalTargetHitKind::GoalLine);
+    assert_eq!(target_hit.position.y, crate::STANDARD_GOAL_LINE_Y);
+}
+
+#[test]
+fn shot_event_metadata_projects_goal_line_crossing_after_side_wall_bounce() {
+    let ball = rigid_body(
+        glam::Vec3::new(
+            crate::STANDARD_ARENA_SIDE_WALL_X - crate::STANDARD_BALL_RADIUS - 2.0,
+            crate::STANDARD_GOAL_LINE_Y - 240.0,
+            200.0,
+        ),
+        Some(glam::Vec3::new(600.0, 1200.0, 0.0)),
+    );
+
+    let metadata = ShotEventMetadata::from_rigid_bodies(true, &ball, None);
+    let crossing = metadata
+        .projected_goal_line_crossing
+        .expect("shot should project across the positive goal line after wall bounce");
+
+    assert_eq!(crossing.position.y, crate::STANDARD_GOAL_LINE_Y);
+    assert!(crossing.position.x < ball.location.x);
+    assert!(!crossing.inside_goal_mouth);
+    assert_eq!(
+        crossing.prediction_kind,
+        ShotGoalLineCrossingPredictionKind::SurfaceBounces
+    );
+}
+
+#[test]
+fn shot_event_metadata_projects_back_wall_hit_for_wide_shot() {
+    let ball = rigid_body(
+        glam::Vec3::new(
+            crate::STANDARD_GOAL_MOUTH_HALF_WIDTH_X
+                + crate::STANDARD_GOAL_FRAME_RADIUS
+                + crate::STANDARD_BALL_RADIUS * 2.0
+                + 10.0,
+            crate::STANDARD_GOAL_LINE_Y - 220.0,
+            200.0,
+        ),
+        Some(glam::Vec3::new(0.0, 1200.0, 0.0)),
+    );
+
+    let metadata = ShotEventMetadata::from_rigid_bodies(true, &ball, None);
+    let target_hit = metadata
+        .projected_goal_target_hit
+        .expect("wide shot should project a back-wall hit");
+
+    assert_eq!(target_hit.hit_kind, ShotGoalTargetHitKind::BackWall);
+    assert_eq!(target_hit.position.y, crate::STANDARD_GOAL_LINE_Y);
+    assert_eq!(target_hit.position.x, ball.location.x);
+}
+
+#[test]
+fn shot_event_metadata_projects_goal_frame_hit_for_blocked_post_shot() {
+    let ball = rigid_body(
+        glam::Vec3::new(
+            crate::STANDARD_GOAL_MOUTH_HALF_WIDTH_X
+                + crate::STANDARD_GOAL_FRAME_RADIUS
+                + crate::STANDARD_BALL_RADIUS
+                - 5.0,
+            crate::STANDARD_GOAL_LINE_Y - 220.0,
+            200.0,
+        ),
+        Some(glam::Vec3::new(0.0, 1200.0, 0.0)),
+    );
+
+    let metadata = ShotEventMetadata::from_rigid_bodies(true, &ball, None);
+    let target_hit = metadata
+        .projected_goal_target_hit
+        .expect("near-post shot should project a goal-frame hit");
+
+    assert_eq!(target_hit.hit_kind, ShotGoalTargetHitKind::GoalFrame);
+    assert!(target_hit.position.x > crate::STANDARD_GOAL_MOUTH_HALF_WIDTH_X);
+}
+
+#[test]
+fn shot_event_metadata_falls_back_to_free_flight_crossing_when_surface_model_blocks() {
+    let ball = rigid_body(
+        glam::Vec3::new(1689.0, 3808.0, 1142.0),
+        Some(glam::Vec3::new(-608.0, 1090.0, -27.0)),
+    );
+
+    let metadata = ShotEventMetadata::from_rigid_bodies(true, &ball, None);
+    let crossing = metadata
+        .projected_goal_line_crossing
+        .expect("shot should fall back to free-flight goal-line crossing");
+
+    assert_eq!(crossing.position.y, crate::STANDARD_GOAL_LINE_Y);
+    assert!(crossing.inside_goal_mouth);
+    assert_eq!(
+        crossing.prediction_kind,
+        ShotGoalLineCrossingPredictionKind::FreeFlight
+    );
+}
+
+#[test]
+fn saved_shot_free_flight_crossing_rejects_below_floor_projection() {
+    let below_floor_crossing = crate::BallGoalLineCrossing {
+        time: 0.5,
+        position: glam::Vec3::new(0.0, crate::STANDARD_GOAL_LINE_Y, -100.0),
+        velocity: Some(glam::Vec3::new(0.0, 1000.0, -500.0)),
+        inside_goal_mouth: false,
+    };
+    let playable_crossing = crate::BallGoalLineCrossing {
+        position: glam::Vec3::new(
+            0.0,
+            crate::STANDARD_GOAL_LINE_Y,
+            crate::STANDARD_BALL_RADIUS,
+        ),
+        inside_goal_mouth: true,
+        ..below_floor_crossing
+    };
+
+    assert!(!saved_shot_free_flight_crossing_is_physically_plausible(
+        &below_floor_crossing
+    ));
+    assert!(saved_shot_free_flight_crossing_is_physically_plausible(
+        &playable_crossing
+    ));
+}
+
+#[test]
+fn saved_shot_prediction_keeps_playable_crossing() {
+    let ball = rigid_body(
+        glam::Vec3::new(1689.0, 3808.0, 1142.0),
+        Some(glam::Vec3::new(-608.0, 1090.0, -27.0)),
+    );
+
+    let crossing = ShotGoalLineCrossing::predict_saved_shot_from_rigid_body(true, &ball)
+        .expect("saved-shot projection should keep a physically plausible crossing");
+
+    assert_eq!(crossing.position.y, crate::STANDARD_GOAL_LINE_Y);
+    assert!(crossing.inside_goal_mouth);
+    assert_eq!(
+        crossing.prediction_kind,
+        ShotGoalLineCrossingPredictionKind::SavedShotPreSaveSurfaceBounces
+    );
+}
+
+#[test]
+fn saved_shot_prediction_reports_near_post_cross_location() {
+    let ball = rigid_body(
+        glam::Vec3::new(
+            crate::STANDARD_GOAL_MOUTH_HALF_WIDTH_X
+                + crate::STANDARD_GOAL_FRAME_RADIUS
+                + crate::STANDARD_BALL_RADIUS
+                - 5.0,
+            crate::STANDARD_GOAL_LINE_Y - 220.0,
+            200.0,
+        ),
+        Some(glam::Vec3::new(0.0, 1200.0, 0.0)),
+    );
+
+    let saved_crossing = ShotGoalLineCrossing::predict_saved_shot_from_rigid_body(true, &ball)
+        .expect("saved shot should report the counterfactual goal-line crossing location");
+
+    assert_eq!(saved_crossing.position.x, ball.location.x);
+    assert_eq!(saved_crossing.position.y, crate::STANDARD_GOAL_LINE_Y);
+    assert!(!saved_crossing.inside_goal_mouth);
+    assert_eq!(
+        saved_crossing.prediction_kind,
+        ShotGoalLineCrossingPredictionKind::SavedShotPreSaveSurfaceBounces
+    );
+}
+
+#[test]
+fn shot_event_metadata_omits_crossing_when_ball_moves_away_from_goal() {
+    let ball = rigid_body(
+        glam::Vec3::new(0.0, 5000.0, 200.0),
+        Some(glam::Vec3::new(0.0, -1000.0, 0.0)),
+    );
+
+    let metadata = ShotEventMetadata::from_rigid_bodies(true, &ball, None);
+
+    assert!(metadata.projected_goal_line_crossing.is_none());
+    assert!(metadata.projected_goal_target_hit.is_none());
+}
+
+#[test]
+fn shot_event_metadata_omits_crossing_without_ball_velocity() {
+    let ball = rigid_body(glam::Vec3::new(0.0, 4000.0, 200.0), None);
+
+    let metadata = ShotEventMetadata::from_rigid_bodies(true, &ball, None);
+
+    assert!(metadata.projected_goal_line_crossing.is_none());
+    assert!(metadata.projected_goal_target_hit.is_none());
+}
+
 fn date_header(value: &str) -> Vec<(String, boxcars::HeaderProp)> {
     vec![(
         "Date".to_string(),

@@ -67,10 +67,6 @@ import {
   createMovementEventDerivedStatsAccumulator,
 } from "./movementEventDerivation.ts";
 import {
-  applyMustyFlickEventDerivedStats,
-  createMustyFlickEventDerivedStatsAccumulator,
-} from "./mustyFlickEventDerivation.ts";
-import {
   applyOneTimerEventDerivedStats,
   createOneTimerEventDerivedStatsAccumulator,
 } from "./oneTimerEventDerivation.ts";
@@ -345,13 +341,6 @@ export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventD
     teamModules: [],
     apply: applyCeilingShotEventDerivedStats,
     createFrameAccumulator: createCeilingShotEventDerivedStatsAccumulator,
-  },
-  {
-    id: "musty-flick",
-    playerModules: ["musty_flick"],
-    teamModules: [],
-    apply: applyMustyFlickEventDerivedStats,
-    createFrameAccumulator: createMustyFlickEventDerivedStatsAccumulator,
   },
   {
     id: "dodge-reset",

@@ -709,13 +709,29 @@ pub(crate) fn group_player_camera_events(
     grouped
 }
 
+#[cfg(test)]
 pub(crate) fn player_stat_events_with_shot_saves(
     player_stat_events: &[PlayerStatEvent],
 ) -> Vec<PlayerStatEvent> {
+    player_stat_events_with_shot_saves_and_frame_data(player_stat_events, None, None)
+}
+
+fn player_stat_events_with_shot_saves_and_frame_data(
+    player_stat_events: &[PlayerStatEvent],
+    frame_data: Option<&FrameData>,
+    touch_events: Option<&[TouchEvent]>,
+) -> Vec<PlayerStatEvent> {
+    const MAX_SHOT_SAVE_LINK_SECONDS: f32 = 3.0;
+
     let mut annotated_events = player_stat_events.to_vec();
-    let mut pending_shot_indices = Vec::new();
+    let mut pending_shot_indices: Vec<usize> = Vec::new();
 
     for index in 0..annotated_events.len() {
+        let current_time = annotated_events[index].time;
+        pending_shot_indices.retain(|shot_index| {
+            current_time - annotated_events[*shot_index].time <= MAX_SHOT_SAVE_LINK_SECONDS
+        });
+
         match annotated_events[index].kind {
             PlayerStatEventKind::Shot => {
                 if annotated_events[index].shot.is_some() {
@@ -731,12 +747,85 @@ pub(crate) fn player_stat_events_with_shot_saves(
                     is_team_0: annotated_events[index].is_team_0,
                 };
                 let Some(pending_position) = pending_shot_indices.iter().rposition(|shot_index| {
-                    annotated_events[*shot_index].is_team_0 != annotated_events[index].is_team_0
+                    let shot_event = &annotated_events[*shot_index];
+                    if shot_event.is_team_0 == annotated_events[index].is_team_0 {
+                        return false;
+                    }
+                    let save_time_after_shot = annotated_events[index].time - shot_event.time;
+                    if save_time_after_shot <= 0.0
+                        || save_time_after_shot > MAX_SHOT_SAVE_LINK_SECONDS
+                    {
+                        return false;
+                    }
+                    shot_event
+                        .shot
+                        .as_ref()
+                        .and_then(|shot| shot.projected_goal_line_crossing.as_ref())
+                        .is_none_or(|crossing| {
+                            shot_goal_line_crossing_is_after_save_reference(
+                                shot_event,
+                                &save,
+                                crossing,
+                                touch_events,
+                            )
+                        })
                 }) else {
                     continue;
                 };
                 let shot_index = pending_shot_indices.remove(pending_position);
+                let should_estimate_crossing = annotated_events[shot_index]
+                    .shot
+                    .as_ref()
+                    .is_some_and(|shot| {
+                        shot.projected_goal_line_crossing
+                            .as_ref()
+                            .is_none_or(|crossing| !crossing.inside_goal_mouth)
+                    });
+                let estimated_crossing = should_estimate_crossing.then(|| {
+                    frame_data.and_then(|frame_data| {
+                        estimate_saved_shot_goal_line_crossing(
+                            &annotated_events[shot_index],
+                            &save,
+                            frame_data,
+                            touch_events,
+                        )
+                    })
+                });
+                let unavailable_reason = estimated_crossing
+                    .as_ref()
+                    .is_none_or(Option::is_none)
+                    .then(|| {
+                        frame_data.and_then(|frame_data| {
+                            saved_shot_goal_line_crossing_unavailable_reason(
+                                &annotated_events[shot_index],
+                                &save,
+                                frame_data,
+                                touch_events,
+                            )
+                        })
+                    });
                 if let Some(shot) = annotated_events[shot_index].shot.as_mut() {
+                    if let Some(Some(estimated_crossing)) = estimated_crossing {
+                        shot.projected_goal_target_hit = Some(
+                            ShotGoalTargetHit::from_goal_line_crossing(&estimated_crossing),
+                        );
+                        shot.projected_goal_line_crossing = Some(estimated_crossing);
+                        shot.projected_goal_line_crossing_unavailable_reason = None;
+                    } else if shot
+                        .projected_goal_line_crossing
+                        .as_ref()
+                        .is_some_and(saved_shot_crossing_is_unphysical_free_flight)
+                    {
+                        shot.projected_goal_line_crossing = None;
+                    }
+                    if shot.projected_goal_line_crossing.is_none() {
+                        if let Some(Some(unavailable_reason)) = unavailable_reason {
+                            shot.projected_goal_line_crossing_unavailable_reason =
+                                Some(unavailable_reason);
+                        }
+                    } else {
+                        shot.projected_goal_line_crossing_unavailable_reason = None;
+                    }
                     shot.resulting_save = Some(save);
                 }
             }
@@ -745,6 +834,401 @@ pub(crate) fn player_stat_events_with_shot_saves(
     }
 
     annotated_events
+}
+
+fn estimate_saved_shot_goal_line_crossing(
+    shot_event: &PlayerStatEvent,
+    save: &ShotSaveMetadata,
+    frame_data: &FrameData,
+    touch_events: Option<&[TouchEvent]>,
+) -> Option<ShotGoalLineCrossing> {
+    const MAX_SAVE_TOUCH_STAT_LAG_SECONDS: f32 = 0.25;
+
+    let prediction_window = saved_shot_prediction_window(shot_event, save, touch_events);
+    estimate_saved_shot_goal_line_crossing_in_window(shot_event, frame_data, prediction_window)
+        .or_else(|| {
+            let lagged_prediction_window = saved_shot_prediction_window_with_save_touch_lag(
+                shot_event,
+                save,
+                touch_events,
+                MAX_SAVE_TOUCH_STAT_LAG_SECONDS,
+            );
+            (lagged_prediction_window.has_save_touch
+                && !prediction_window.has_save_touch
+                && lagged_prediction_window.estimation_time < prediction_window.shot_time)
+                .then(|| {
+                    estimate_saved_shot_goal_line_crossing_in_window(
+                        shot_event,
+                        frame_data,
+                        lagged_prediction_window,
+                    )
+                })
+                .flatten()
+        })
+}
+
+fn estimate_saved_shot_goal_line_crossing_in_window(
+    shot_event: &PlayerStatEvent,
+    frame_data: &FrameData,
+    prediction_window: SavedShotPredictionWindow,
+) -> Option<ShotGoalLineCrossing> {
+    const MAX_PRE_SAVE_LOOKBACK_SECONDS: f32 = 3.0;
+    const MAX_NO_TOUCH_SHOT_STAT_LAG_SECONDS: f32 = 0.1;
+    const FLOAT_EPSILON: f32 = 0.0001;
+
+    shot_event.shot.as_ref()?;
+
+    let target_direction = if shot_event.is_team_0 { 1.0 } else { -1.0 };
+    let estimation_frame = prediction_window
+        .estimation_frame
+        .min(frame_data.ball_data.frames.len().saturating_sub(1));
+    let mut fallback_crossing = None;
+    for frame_index in (0..=estimation_frame).rev() {
+        let Some(metadata) = frame_data.metadata_frames.get(frame_index) else {
+            continue;
+        };
+        if metadata.time > prediction_window.estimation_time + FLOAT_EPSILON {
+            continue;
+        }
+        if prediction_window.estimation_time - metadata.time > MAX_PRE_SAVE_LOOKBACK_SECONDS {
+            break;
+        }
+        if prediction_window.has_inferred_shot_touch
+            && metadata.time + FLOAT_EPSILON < prediction_window.shot_time
+        {
+            break;
+        }
+
+        let Some(BallFrame::Data { rigid_body }) = frame_data.ball_data.frames.get(frame_index)
+        else {
+            continue;
+        };
+        let Some(velocity) = rigid_body.linear_velocity else {
+            continue;
+        };
+        if target_direction * velocity.y <= 0.0 {
+            continue;
+        }
+
+        let Some(mut crossing) = ShotGoalLineCrossing::predict_saved_shot_from_rigid_body(
+            shot_event.is_team_0,
+            rigid_body,
+        ) else {
+            continue;
+        };
+        let crossing_time = metadata.time + crossing.time_after_shot;
+        let mut prediction_start_time = prediction_window.shot_time;
+        let mut prediction_start_frame = prediction_window.shot_frame;
+        if crossing_time <= prediction_window.shot_time + FLOAT_EPSILON {
+            if prediction_window.has_inferred_shot_touch
+                || prediction_window.has_save_touch
+                || prediction_window.shot_time - crossing_time > MAX_NO_TOUCH_SHOT_STAT_LAG_SECONDS
+                || crossing_time <= metadata.time + FLOAT_EPSILON
+            {
+                continue;
+            }
+            prediction_start_time = metadata.time;
+            prediction_start_frame = frame_index;
+        }
+        if prediction_window.has_save_touch
+            && crossing_time <= prediction_window.estimation_time + FLOAT_EPSILON
+        {
+            continue;
+        }
+        crossing.time_after_shot = crossing_time - prediction_start_time;
+        crossing.prediction_start_time = Some(prediction_start_time);
+        crossing.prediction_start_frame = Some(prediction_start_frame);
+
+        if crossing.inside_goal_mouth {
+            return Some(crossing);
+        }
+        fallback_crossing.get_or_insert(crossing);
+    }
+
+    fallback_crossing
+}
+
+fn saved_shot_goal_line_crossing_unavailable_reason(
+    shot_event: &PlayerStatEvent,
+    save: &ShotSaveMetadata,
+    frame_data: &FrameData,
+    touch_events: Option<&[TouchEvent]>,
+) -> Option<ShotGoalLineCrossingUnavailableReason> {
+    let prediction_window = saved_shot_prediction_window(shot_event, save, touch_events);
+    Some(saved_shot_goal_line_crossing_unavailable_reason_in_window(
+        shot_event,
+        save,
+        frame_data,
+        prediction_window,
+    ))
+}
+
+fn saved_shot_goal_line_crossing_unavailable_reason_in_window(
+    shot_event: &PlayerStatEvent,
+    save: &ShotSaveMetadata,
+    frame_data: &FrameData,
+    prediction_window: SavedShotPredictionWindow,
+) -> ShotGoalLineCrossingUnavailableReason {
+    const MAX_PRE_SAVE_LOOKBACK_SECONDS: f32 = 3.0;
+    const FLOAT_EPSILON: f32 = 0.0001;
+
+    let target_direction = if shot_event.is_team_0 { 1.0 } else { -1.0 };
+    let estimation_frame = prediction_window
+        .estimation_frame
+        .min(frame_data.ball_data.frames.len().saturating_sub(1));
+    let mut saw_velocity = false;
+    let mut inbound_frame_count = 0;
+    let mut projected_inbound_frame_count = 0;
+    let mut unphysical_free_flight_count = 0;
+    let mut crossing_before_or_at_prediction_start_count = 0;
+    let mut crossing_before_or_at_save_touch_count = 0;
+    let mut crossing_before_or_at_save_count = 0;
+
+    for frame_index in (0..=estimation_frame).rev() {
+        let Some(metadata) = frame_data.metadata_frames.get(frame_index) else {
+            continue;
+        };
+        if metadata.time > prediction_window.estimation_time + FLOAT_EPSILON {
+            continue;
+        }
+        if prediction_window.estimation_time - metadata.time > MAX_PRE_SAVE_LOOKBACK_SECONDS {
+            break;
+        }
+        if prediction_window.has_inferred_shot_touch
+            && metadata.time + FLOAT_EPSILON < prediction_window.shot_time
+        {
+            break;
+        }
+
+        let Some(BallFrame::Data { rigid_body }) = frame_data.ball_data.frames.get(frame_index)
+        else {
+            continue;
+        };
+        let Some(velocity) = rigid_body.linear_velocity else {
+            continue;
+        };
+        saw_velocity = true;
+        if target_direction * velocity.y <= 0.0 {
+            continue;
+        }
+
+        inbound_frame_count += 1;
+        let Some((crossing_time, unphysical_free_flight)) =
+            saved_shot_diagnostic_crossing_time(shot_event.is_team_0, rigid_body)
+        else {
+            continue;
+        };
+        projected_inbound_frame_count += 1;
+        if unphysical_free_flight {
+            unphysical_free_flight_count += 1;
+            continue;
+        }
+
+        let absolute_crossing_time = metadata.time + crossing_time;
+        if absolute_crossing_time <= prediction_window.shot_time + FLOAT_EPSILON {
+            crossing_before_or_at_prediction_start_count += 1;
+            continue;
+        }
+        if prediction_window.has_save_touch
+            && absolute_crossing_time <= prediction_window.estimation_time + FLOAT_EPSILON
+        {
+            crossing_before_or_at_save_touch_count += 1;
+            continue;
+        }
+        if absolute_crossing_time <= save.time + FLOAT_EPSILON {
+            crossing_before_or_at_save_count += 1;
+            continue;
+        }
+
+        return ShotGoalLineCrossingUnavailableReason::NoUsableProjection;
+    }
+
+    if !saw_velocity {
+        return ShotGoalLineCrossingUnavailableReason::NoBallVelocity;
+    }
+    if inbound_frame_count == 0 {
+        return ShotGoalLineCrossingUnavailableReason::NoGoalwardBallBeforeSaveReference;
+    }
+    if projected_inbound_frame_count == 0 {
+        return ShotGoalLineCrossingUnavailableReason::NoGoalLineCrossingBeforeSaveReference;
+    }
+    if unphysical_free_flight_count == projected_inbound_frame_count {
+        return ShotGoalLineCrossingUnavailableReason::OnlyUnphysicalFreeFlightCrossings;
+    }
+    if crossing_before_or_at_prediction_start_count == projected_inbound_frame_count {
+        return ShotGoalLineCrossingUnavailableReason::CrossingsBeforePredictionStart;
+    }
+    if crossing_before_or_at_save_touch_count == projected_inbound_frame_count {
+        return ShotGoalLineCrossingUnavailableReason::CrossingsBeforeSaveTouch;
+    }
+    if crossing_before_or_at_save_count == projected_inbound_frame_count {
+        return ShotGoalLineCrossingUnavailableReason::CrossingsBeforeSaveStat;
+    }
+
+    ShotGoalLineCrossingUnavailableReason::NoUsableProjection
+}
+
+fn saved_shot_diagnostic_crossing_time(
+    is_team_0: bool,
+    rigid_body: &boxcars::RigidBody,
+) -> Option<(f32, bool)> {
+    let crossing_config = BallGoalLineCrossingConfig::attacking_goal(is_team_0);
+    let surfaces = standard_soccar_goal_line_prediction_field_surfaces();
+    predict_ball_with_surface_bounces_goal_line_crossing(
+        rigid_body,
+        crossing_config,
+        BallTrajectoryConfig::STANDARD_SOCCAR,
+        BallBounceConfig::STANDARD_SOCCAR,
+        &surfaces,
+    )
+    .map(|crossing| (crossing.time, false))
+    .or_else(|| {
+        predict_free_flight_goal_line_crossing(
+            rigid_body,
+            crossing_config,
+            BallTrajectoryConfig::STANDARD_SOCCAR,
+        )
+        .map(|crossing| {
+            (
+                crossing.time,
+                crossing.position.z < STANDARD_BALL_RADIUS - STANDARD_GOAL_MOUTH_TRAJECTORY_MARGIN,
+            )
+        })
+    })
+}
+
+fn saved_shot_crossing_is_unphysical_free_flight(crossing: &ShotGoalLineCrossing) -> bool {
+    matches!(
+        crossing.prediction_kind,
+        ShotGoalLineCrossingPredictionKind::FreeFlight
+            | ShotGoalLineCrossingPredictionKind::SavedShotPreSaveFreeFlight
+    ) && crossing.position.z < STANDARD_BALL_RADIUS - STANDARD_GOAL_MOUTH_TRAJECTORY_MARGIN
+}
+
+fn shot_goal_line_crossing_is_after_save_reference(
+    shot_event: &PlayerStatEvent,
+    save: &ShotSaveMetadata,
+    crossing: &ShotGoalLineCrossing,
+    touch_events: Option<&[TouchEvent]>,
+) -> bool {
+    const FLOAT_EPSILON: f32 = 0.0001;
+
+    let crossing_time =
+        crossing.prediction_start_time.unwrap_or(shot_event.time) + crossing.time_after_shot;
+    let save_reference_time =
+        saved_shot_prediction_window(shot_event, save, touch_events).save_reference_time();
+    crossing_time > save_reference_time + FLOAT_EPSILON
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SavedShotPredictionWindow {
+    shot_frame: usize,
+    shot_time: f32,
+    has_inferred_shot_touch: bool,
+    has_save_touch: bool,
+    estimation_frame: usize,
+    estimation_time: f32,
+}
+
+impl SavedShotPredictionWindow {
+    fn save_reference_time(self) -> f32 {
+        if self.has_save_touch {
+            self.estimation_time
+        } else {
+            self.estimation_time.max(self.shot_time)
+        }
+    }
+}
+
+fn saved_shot_prediction_window(
+    shot_event: &PlayerStatEvent,
+    save: &ShotSaveMetadata,
+    touch_events: Option<&[TouchEvent]>,
+) -> SavedShotPredictionWindow {
+    saved_shot_prediction_window_with_save_touch_lag(shot_event, save, touch_events, 0.0)
+}
+
+fn saved_shot_prediction_window_with_save_touch_lag(
+    shot_event: &PlayerStatEvent,
+    save: &ShotSaveMetadata,
+    touch_events: Option<&[TouchEvent]>,
+    max_save_touch_stat_lag_seconds: f32,
+) -> SavedShotPredictionWindow {
+    const FLOAT_EPSILON: f32 = 0.0001;
+    const MAX_SHOT_TOUCH_LOOKBACK_SECONDS: f32 = 3.0;
+
+    let save_touch = touch_events.and_then(|touch_events| {
+        let player_touch = touch_events.iter().rev().find(|touch| {
+            touch.team_is_team_0 == save.is_team_0
+                && touch.player.as_ref() == Some(&save.player)
+                && touch.time >= shot_event.time - max_save_touch_stat_lag_seconds - FLOAT_EPSILON
+                && touch.time <= save.time + FLOAT_EPSILON
+        });
+        let team_touch = || {
+            touch_events.iter().rev().find(|touch| {
+                touch.team_is_team_0 == save.is_team_0
+                    && touch.time
+                        >= shot_event.time - max_save_touch_stat_lag_seconds - FLOAT_EPSILON
+                    && touch.time <= save.time + FLOAT_EPSILON
+            })
+        };
+        player_touch.or_else(team_touch)
+    });
+    let shot_touch = touch_events.and_then(|touch_events| {
+        let player_touch = touch_events.iter().rev().find(|touch| {
+            touch.team_is_team_0 == shot_event.is_team_0
+                && touch.player.as_ref() == Some(&shot_event.player)
+                && touch.time >= shot_event.time - MAX_SHOT_TOUCH_LOOKBACK_SECONDS - FLOAT_EPSILON
+                && touch.time <= shot_event.time + FLOAT_EPSILON
+        });
+        let team_touch = || {
+            touch_events.iter().rev().find(|touch| {
+                touch.team_is_team_0 == shot_event.is_team_0
+                    && touch.time
+                        >= shot_event.time - MAX_SHOT_TOUCH_LOOKBACK_SECONDS - FLOAT_EPSILON
+                    && touch.time <= shot_event.time + FLOAT_EPSILON
+            })
+        };
+        player_touch.or_else(team_touch)
+    });
+
+    let (estimation_frame, estimation_time) = save_touch
+        .map(|touch| {
+            let frame = if touch.frame > 0 {
+                touch.frame - 1
+            } else {
+                touch.frame
+            };
+            (frame, touch.time)
+        })
+        .unwrap_or((save.frame, save.time));
+    let has_save_touch = save_touch.is_some();
+    let inferred_shot_touch =
+        shot_touch.filter(|touch| touch.time <= estimation_time + FLOAT_EPSILON);
+    let has_inferred_shot_touch = inferred_shot_touch.is_some();
+    let (shot_frame, shot_time) = inferred_shot_touch
+        .map(|touch| (touch.frame, touch.time))
+        .unwrap_or((shot_event.frame, shot_event.time));
+
+    if shot_frame <= estimation_frame {
+        SavedShotPredictionWindow {
+            shot_frame,
+            shot_time,
+            has_inferred_shot_touch,
+            has_save_touch,
+            estimation_frame,
+            estimation_time,
+        }
+    } else {
+        SavedShotPredictionWindow {
+            shot_frame: shot_event.frame,
+            shot_time: shot_event.time,
+            has_inferred_shot_touch: false,
+            has_save_touch,
+            estimation_frame,
+            estimation_time,
+        }
+    }
 }
 
 impl FrameData {
@@ -895,7 +1379,11 @@ impl ReplayDataCollector {
             touch_events: processor.touch_events().to_vec(),
             dodge_refreshed_events: processor.dodge_refreshed_events().to_vec(),
             player_camera_events: group_player_camera_events(processor.player_camera_events()),
-            player_stat_events: player_stat_events_with_shot_saves(processor.player_stat_events()),
+            player_stat_events: player_stat_events_with_shot_saves_and_frame_data(
+                processor.player_stat_events(),
+                Some(&frame_data),
+                Some(processor.touch_events()),
+            ),
             goal_events: processor.goal_events().to_vec(),
             replay_tick_marks: replay_tick_marks(processor.replay, &frame_data.metadata_frames),
             frame_data,

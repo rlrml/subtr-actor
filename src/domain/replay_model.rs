@@ -9,7 +9,16 @@
 use boxcars::{HeaderProp, RemoteId};
 use serde::Serialize;
 
-use crate::{glam_to_vec, vec_to_glam};
+use crate::{
+    BallBounceConfig, BallCollisionSurface, BallGoalLineCrossingConfig, BallGoalTargetHit,
+    BallGoalTargetHitKind, BallTrajectoryConfig, STANDARD_BALL_RADIUS,
+    STANDARD_GOAL_MOUTH_TRAJECTORY_MARGIN, glam_to_vec,
+    predict_ball_with_surface_bounces_goal_line_crossing,
+    predict_ball_with_surface_bounces_goal_target_hit, predict_free_flight_goal_line_crossing,
+    standard_soccar_goal_line_prediction_field_surfaces,
+    standard_soccar_goal_line_prediction_surfaces, standard_soccar_goal_target_prediction_surfaces,
+    vec_to_glam,
+};
 
 pub type PlayerId = boxcars::RemoteId;
 
@@ -188,6 +197,214 @@ pub struct ShotSaveMetadata {
     pub is_team_0: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum ShotGoalLineCrossingPredictionKind {
+    SurfaceBounces,
+    FreeFlight,
+    SavedShotPreSaveSurfaceBounces,
+    SavedShotPreSaveFreeFlight,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum ShotGoalLineCrossingUnavailableReason {
+    NoBallVelocity,
+    NoGoalwardBallBeforeSaveReference,
+    NoGoalLineCrossingBeforeSaveReference,
+    OnlyUnphysicalFreeFlightCrossings,
+    CrossingsBeforePredictionStart,
+    CrossingsBeforeSaveTouch,
+    CrossingsBeforeSaveStat,
+    NoUsableProjection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum ShotGoalTargetHitKind {
+    GoalLine,
+    BackWall,
+    GoalFrame,
+}
+
+impl From<BallGoalTargetHitKind> for ShotGoalTargetHitKind {
+    fn from(value: BallGoalTargetHitKind) -> Self {
+        match value {
+            BallGoalTargetHitKind::GoalLine => Self::GoalLine,
+            BallGoalTargetHitKind::BackWall => Self::BackWall,
+            BallGoalTargetHitKind::GoalFrame => Self::GoalFrame,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ShotGoalLineCrossing {
+    /// Seconds after the shot touch when the ball is projected to cross the
+    /// target goal line.
+    pub time_after_shot: f32,
+    /// Absolute replay time used as the prediction's shot-touch reference.
+    ///
+    /// When absent, consumers should use the owning [`PlayerStatEvent`]'s time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prediction_start_time: Option<f32>,
+    /// Replay frame used as the prediction's shot-touch reference.
+    ///
+    /// When absent, consumers should use the owning [`PlayerStatEvent`]'s frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prediction_start_frame: Option<usize>,
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
+    pub position: boxcars::Vector3f,
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
+    pub velocity: Option<boxcars::Vector3f>,
+    pub inside_goal_mouth: bool,
+    pub prediction_kind: ShotGoalLineCrossingPredictionKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ShotGoalTargetHit {
+    /// Seconds after the shot touch when the ball is projected to reach the
+    /// goal-line plane, attacking back wall, or goal frame.
+    pub time_after_shot: f32,
+    /// Absolute replay time used as the prediction's shot-touch reference.
+    ///
+    /// When absent, consumers should use the owning [`PlayerStatEvent`]'s time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prediction_start_time: Option<f32>,
+    /// Replay frame used as the prediction's shot-touch reference.
+    ///
+    /// When absent, consumers should use the owning [`PlayerStatEvent`]'s frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prediction_start_frame: Option<usize>,
+    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
+    pub position: boxcars::Vector3f,
+    #[ts(as = "Option<crate::interop::ts_bindings::Vector3fTs>")]
+    pub velocity: Option<boxcars::Vector3f>,
+    pub hit_kind: ShotGoalTargetHitKind,
+}
+
+impl ShotGoalTargetHit {
+    pub(crate) fn predict_from_rigid_body(
+        is_team_0: bool,
+        ball_body: &boxcars::RigidBody,
+    ) -> Option<Self> {
+        predict_ball_with_surface_bounces_goal_target_hit(
+            ball_body,
+            BallGoalLineCrossingConfig::attacking_goal(is_team_0),
+            BallTrajectoryConfig::STANDARD_SOCCAR,
+            BallBounceConfig::STANDARD_SOCCAR,
+            &standard_soccar_goal_target_prediction_surfaces(),
+        )
+        .map(Self::from_ball_goal_target_hit)
+    }
+
+    fn from_ball_goal_target_hit(hit: BallGoalTargetHit) -> Self {
+        Self {
+            time_after_shot: hit.time,
+            prediction_start_time: None,
+            prediction_start_frame: None,
+            position: glam_to_vec(&hit.position),
+            velocity: hit.velocity.map(|velocity| glam_to_vec(&velocity)),
+            hit_kind: hit.hit_kind.into(),
+        }
+    }
+
+    pub(crate) fn from_goal_line_crossing(crossing: &ShotGoalLineCrossing) -> Self {
+        Self {
+            time_after_shot: crossing.time_after_shot,
+            prediction_start_time: crossing.prediction_start_time,
+            prediction_start_frame: crossing.prediction_start_frame,
+            position: crossing.position,
+            velocity: crossing.velocity,
+            hit_kind: if crossing.inside_goal_mouth {
+                ShotGoalTargetHitKind::GoalLine
+            } else {
+                ShotGoalTargetHitKind::BackWall
+            },
+        }
+    }
+}
+
+impl ShotGoalLineCrossing {
+    pub(crate) fn predict_from_rigid_body(
+        is_team_0: bool,
+        ball_body: &boxcars::RigidBody,
+    ) -> Option<Self> {
+        Self::predict_from_rigid_body_with_kinds(
+            is_team_0,
+            ball_body,
+            ShotGoalLineCrossingPredictionKind::SurfaceBounces,
+            ShotGoalLineCrossingPredictionKind::FreeFlight,
+            false,
+            &standard_soccar_goal_line_prediction_surfaces(),
+        )
+    }
+
+    pub(crate) fn predict_saved_shot_from_rigid_body(
+        is_team_0: bool,
+        ball_body: &boxcars::RigidBody,
+    ) -> Option<Self> {
+        Self::predict_from_rigid_body_with_kinds(
+            is_team_0,
+            ball_body,
+            ShotGoalLineCrossingPredictionKind::SavedShotPreSaveSurfaceBounces,
+            ShotGoalLineCrossingPredictionKind::SavedShotPreSaveFreeFlight,
+            true,
+            &standard_soccar_goal_line_prediction_field_surfaces(),
+        )
+    }
+
+    fn predict_from_rigid_body_with_kinds(
+        is_team_0: bool,
+        ball_body: &boxcars::RigidBody,
+        surface_prediction_kind: ShotGoalLineCrossingPredictionKind,
+        free_flight_prediction_kind: ShotGoalLineCrossingPredictionKind,
+        reject_unphysical_free_flight: bool,
+        goal_line_prediction_surfaces: &[BallCollisionSurface],
+    ) -> Option<Self> {
+        let crossing_config = BallGoalLineCrossingConfig::attacking_goal(is_team_0);
+        predict_ball_with_surface_bounces_goal_line_crossing(
+            ball_body,
+            crossing_config,
+            BallTrajectoryConfig::STANDARD_SOCCAR,
+            BallBounceConfig::STANDARD_SOCCAR,
+            goal_line_prediction_surfaces,
+        )
+        .map(|crossing| (crossing, surface_prediction_kind))
+        .or_else(|| {
+            predict_free_flight_goal_line_crossing(
+                ball_body,
+                crossing_config,
+                BallTrajectoryConfig::STANDARD_SOCCAR,
+            )
+            .filter(|crossing| {
+                !reject_unphysical_free_flight
+                    || saved_shot_free_flight_crossing_is_physically_plausible(crossing)
+            })
+            .map(|crossing| (crossing, free_flight_prediction_kind))
+        })
+        .map(|(crossing, prediction_kind)| ShotGoalLineCrossing {
+            time_after_shot: crossing.time,
+            prediction_start_time: None,
+            prediction_start_frame: None,
+            position: glam_to_vec(&crossing.position),
+            velocity: crossing.velocity.map(|velocity| glam_to_vec(&velocity)),
+            inside_goal_mouth: crossing.inside_goal_mouth,
+            prediction_kind,
+        })
+    }
+}
+
+fn saved_shot_free_flight_crossing_is_physically_plausible(
+    crossing: &crate::BallGoalLineCrossing,
+) -> bool {
+    crossing.position.z >= STANDARD_BALL_RADIUS - STANDARD_GOAL_MOUTH_TRAJECTORY_MARGIN
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ShotEventMetadata {
@@ -210,6 +427,13 @@ pub struct ShotEventMetadata {
     pub distance_to_goal_line: f32,
     pub ball_goal_alignment: Option<f32>,
     pub ball_speed_toward_goal: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projected_goal_line_crossing: Option<ShotGoalLineCrossing>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projected_goal_line_crossing_unavailable_reason:
+        Option<ShotGoalLineCrossingUnavailableReason>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projected_goal_target_hit: Option<ShotGoalTargetHit>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resulting_save: Option<ShotSaveMetadata>,
 }
@@ -242,6 +466,10 @@ impl ShotEventMetadata {
                 goal_direction.dot(velocity.normalize_or_zero())
             }
         });
+        let projected_goal_line_crossing =
+            ShotGoalLineCrossing::predict_from_rigid_body(is_team_0, ball_body);
+        let projected_goal_target_hit =
+            ShotGoalTargetHit::predict_from_rigid_body(is_team_0, ball_body);
 
         Self {
             shot_touch_position: ball_body.location,
@@ -258,6 +486,9 @@ impl ShotEventMetadata {
             distance_to_goal_line,
             ball_goal_alignment,
             ball_speed_toward_goal: ball_velocity.map(|velocity| goal_direction.dot(velocity)),
+            projected_goal_line_crossing,
+            projected_goal_line_crossing_unavailable_reason: None,
+            projected_goal_target_hit,
             resulting_save: None,
         }
     }

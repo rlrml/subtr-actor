@@ -240,13 +240,6 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "musty_flick",
-    "label": "Musty Flick",
-    "category": "mechanic",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
     "key": "one_timer",
     "label": "One Timer",
     "category": "mechanic",

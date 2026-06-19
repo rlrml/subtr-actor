@@ -29,6 +29,7 @@ pub struct PositioningStats {
     pub time_closest_to_ball_team: f32,
     pub time_closest_to_ball_absolute: f32,
     pub time_farthest_from_ball: f32,
+    pub time_shadow_defense: f32,
     pub time_behind_ball: f32,
     pub time_level_with_ball: f32,
     pub time_in_front_of_ball: f32,
@@ -150,6 +151,10 @@ impl PositioningStats {
         self.pct(self.time_farthest_from_ball)
     }
 
+    pub fn shadow_defense_pct(&self) -> f32 {
+        self.pct(self.time_shadow_defense)
+    }
+
     pub fn behind_ball_pct(&self) -> f32 {
         self.pct(self.time_behind_ball)
     }
@@ -257,6 +262,13 @@ impl PositioningStatsAccumulator {
         }
         if event.state.farthest_from_ball {
             stats.time_farthest_from_ball += event.duration;
+        }
+    }
+
+    pub fn apply_shadow_defense_event(&mut self, event: &ShadowDefenseEvent) {
+        let stats = self.player_stats.entry(event.player.clone()).or_default();
+        match event.state {
+            ShadowDefenseState::Shadowing => stats.time_shadow_defense += event.duration,
         }
     }
 

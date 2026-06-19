@@ -11,7 +11,6 @@ import {
   buildGoalContextTimelineEvents,
   buildGoalTagTimelineEvents,
   buildHalfVolleyTimelineEvents,
-  buildMustyFlickTimelineEvents,
   buildOneTimerTimelineEvents,
   buildPassTimelineEvents,
   buildRushTimelineEvents,
@@ -261,52 +260,6 @@ test("buildWallAerialShotTimelineEvents maps serialized wall aerial shot events 
       kind: "wall-aerial-shot",
       label: "Blue wall aerial shot 74% | side wall",
       shortLabel: "WS",
-      playerId: "Steam:blue-id",
-      playerName: "Blue",
-      isTeamZero: true,
-      color: "#3b82f6",
-    },
-  ]);
-});
-
-test("buildMustyFlickTimelineEvents maps cumulative musty counts to timeline markers", () => {
-  const replay = {
-    frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
-    players: [{ id: "Steam:blue-id", name: "Blue" }],
-  } as ReplayModel;
-
-  const statsTimeline = createLegacyStatsTimeline({
-    musty_flick_events: [
-      {
-        time: 1.5,
-        frame: 1,
-        sample_time: 1.5,
-        sample_frame: 1,
-        player: { Steam: "blue-id" },
-        is_team_0: true,
-        aerial: false,
-        dodge_time: 1.4,
-        dodge_frame: 1,
-        time_since_dodge: 0.1,
-        confidence: 0.8,
-        local_ball_position: [0, 0, 0],
-        rear_alignment: 0.9,
-        top_alignment: 0.7,
-        forward_approach_speed: 1200,
-        pitch_rate: 2,
-        ball_speed_change: 300,
-      },
-    ],
-  });
-
-  assert.deepEqual(buildMustyFlickTimelineEvents(statsTimeline, replay), [
-    {
-      id: "musty-flick:1:Steam:blue-id:1",
-      time: 1.5,
-      frame: 1,
-      kind: "musty-flick",
-      label: "Blue musty flick",
-      shortLabel: "M",
       playerId: "Steam:blue-id",
       playerName: "Blue",
       isTeamZero: true,

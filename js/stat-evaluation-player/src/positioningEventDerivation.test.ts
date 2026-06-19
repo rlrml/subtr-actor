@@ -79,6 +79,18 @@ test("positioning event derivation prorates spans across the playhead", () => {
           },
         },
       ],
+      shadow_defense: [
+        {
+          time: 1,
+          frame: 10,
+          end_time: 2,
+          end_frame: 20,
+          duration: 1,
+          player: playerId,
+          is_team_0: true,
+          state: "shadowing",
+        },
+      ],
     },
     frames: [
       createStatsFrame({
@@ -149,6 +161,7 @@ test("positioning event derivation prorates spans across the playhead", () => {
   assertClose(positioningAt(2).time_defensive_third, 0.5);
   assertClose(positioningAt(2).time_defensive_half, 0.5);
   assertClose(positioningAt(2).time_closest_to_ball_team, 0.5);
+  assertClose(positioningAt(2).time_shadow_defense, 0.5);
   // Possession time is a whole-match summary total, not a prorated span.
   assertClose(positioningAt(2).time_has_possession, 1);
 
@@ -161,6 +174,7 @@ test("positioning event derivation prorates spans across the playhead", () => {
   assertClose(positioningAt(3).time_defensive_half, 1);
   assertClose(positioningAt(3).time_closest_to_ball_team, 1);
   assertClose(positioningAt(3).time_closest_to_ball_absolute, 1);
+  assertClose(positioningAt(3).time_shadow_defense, 1);
 });
 
 test("positioning event derivation prorates team closest-to-ball stats", () => {

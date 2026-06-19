@@ -64,6 +64,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "ball_depth", stream: "ball_depth", kind: "ball_depth" },
   { field: "depth_role", stream: "depth_role", kind: "depth_role" },
   { field: "ball_proximity", stream: "ball_proximity", kind: "ball_proximity" },
+  { field: "shadow_defense", stream: "shadow_defense", kind: "shadow_defense" },
   { field: "rotation_role", stream: "rotation_role", kind: "rotation_role" },
   { field: "first_man_change", stream: "first_man_change", kind: "first_man_change" },
   { field: "goal_context", stream: "goal_context", kind: "goal_context" },
@@ -73,7 +74,6 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "wall_aerial_shot", stream: "wall_aerial_shot", kind: "wall_aerial_shot" },
   { field: "center", stream: "center", kind: "center" },
   { field: "flick", stream: "flick", kind: "flick" },
-  { field: "musty_flick", stream: "musty_flick", kind: "musty_flick" },
   { field: "dodge_reset", stream: "dodge_reset", kind: "dodge_reset" },
   { field: "double_tap", stream: "double_tap", kind: "double_tap" },
   { field: "fifty_fifty", stream: "fifty_fifty", kind: "fifty_fifty" },
@@ -326,6 +326,13 @@ export function createStatsTimeline(
         level_ball_depth_margin: 0,
         closest_to_ball_switch_margin: 0,
         closest_to_ball_switch_min_seconds: 0,
+        shadow_defense_max_ball_y: 0,
+        shadow_defense_min_goal_side_y: 0,
+        shadow_defense_min_gap: 0,
+        shadow_defense_max_gap: 0,
+        shadow_defense_max_lateral_gap: 0,
+        shadow_defense_min_retreat_speed: 0,
+        shadow_defense_max_speed_delta: 0,
         ball_half_neutral_zone_half_width_y: 0,
         ball_third_boundary_y: 0,
         territorial_pressure_neutral_zone_half_width_y: 0,
@@ -394,7 +401,6 @@ export function createLegacyStatsTimeline(
     wall_aerial_shot_events?: PayloadList<"wall_aerial_shot">;
     center_events?: PayloadList<"center">;
     flick_events?: PayloadList<"flick">;
-    musty_flick_events?: PayloadList<"musty_flick">;
     dodge_reset_events?: PayloadList<"dodge_reset">;
     double_tap_events?: PayloadList<"double_tap">;
     fifty_fifty_events?: PayloadList<"fifty_fifty">;
@@ -415,6 +421,7 @@ export function createLegacyStatsTimeline(
     ball_depth_events?: PayloadList<"ball_depth">;
     depth_role_events?: PayloadList<"depth_role">;
     ball_proximity_events?: PayloadList<"ball_proximity">;
+    shadow_defense_events?: PayloadList<"shadow_defense">;
     rotation_role_events?: PayloadList<"rotation_role">;
     first_man_change_events?: PayloadList<"first_man_change">;
     boost_pickups?: PayloadList<"boost_pickup">;
@@ -447,9 +454,6 @@ export function createLegacyStatsTimeline(
     ),
     ...(overrides.flick_events ?? []).map((event, index) =>
       payloadEvent("flick", "flick", event, index),
-    ),
-    ...(overrides.musty_flick_events ?? []).map((event, index) =>
-      payloadEvent("musty_flick", "musty_flick", event, index),
     ),
     ...(overrides.dodge_reset_events ?? []).map((event, index) =>
       payloadEvent("dodge_reset", "dodge_reset", event, index),
@@ -510,6 +514,9 @@ export function createLegacyStatsTimeline(
     ),
     ...(overrides.ball_proximity_events ?? []).map((event, index) =>
       payloadEvent("ball_proximity", "ball_proximity", event, index),
+    ),
+    ...(overrides.shadow_defense_events ?? []).map((event, index) =>
+      payloadEvent("shadow_defense", "shadow_defense", event, index),
     ),
     ...(overrides.rotation_role_events ?? []).map((event, index) =>
       payloadEvent("rotation_role", "rotation_role", event, index),
