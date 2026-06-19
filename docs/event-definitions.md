@@ -700,6 +700,36 @@ _None documented._
 
 _None documented._
 
+### Flip Reset (`flip_reset`)
+
+- Category: `mechanic`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `flip_reset` via `DodgeResetNode` / `DodgeResetCalculator`
+
+**Summary**
+
+An on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing.
+
+**Approach**
+
+- Consume on-ball dodge refreshes detected from replay state as pending flip-reset candidates.
+- Require a later dodge start by the same player while the reset is still pending.
+- Confirm only when that player touches the ball while dodge-active before landing and within the reset-to-touch window.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Half Flip (`half_flip`)
 
 - Category: `mechanic`

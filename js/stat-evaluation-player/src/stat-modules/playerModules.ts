@@ -29,6 +29,7 @@ import {
   renderDodgeResetStats,
   renderDoubleTapStats,
   renderFlickStats,
+  renderFlipResetStats,
   renderHalfFlipStats,
   renderOneTimerStats,
   renderPassStats,
@@ -282,6 +283,15 @@ export function createDodgeResetModule(): StatModule {
     label: "Dodge Refresh",
     select: (player) => player.dodge_reset,
     render: (dodgeReset) => renderDodgeResetStats(dodgeReset),
+  });
+}
+
+export function createFlipResetModule(): StatModule {
+  return createPlayerStatsModule({
+    id: "flip-reset",
+    label: "Flip Reset",
+    select: (player) => player.flip_reset,
+    render: (flipReset) => renderFlipResetStats(flipReset),
   });
 }
 

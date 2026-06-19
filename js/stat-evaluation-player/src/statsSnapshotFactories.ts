@@ -524,6 +524,11 @@ export function createPlayerStatsSnapshot(
         flip_reset_total_time_to_use: 0,
         flip_reset_min_time_to_use: null,
       },
+      flip_reset: {
+        count: 0,
+        total_time_to_use: 0,
+        min_time_to_use: null,
+      },
       ball_carry: {
         carry_count: 0,
         total_carry_time: 0,

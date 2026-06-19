@@ -916,11 +916,11 @@ define_stats_event!(
     "flip_reset",
     "Flip Reset",
     EventCategory::Mechanic,
-    summary = "A touch candidate where the ball contacts the underside of an airborne car in flip-reset-like geometry.",
+    summary = "An on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing.",
     approach = [
-        "Evaluate touch events using normalized ball and player rigid bodies plus hitbox contact gap.",
-        "Require airborne player/ball height, underside alignment, local ball position under the car, and a bounded hitbox contact gap.",
-        "Also emit proximity-based candidates when replay touch attribution is missing but the ball/car geometry strongly matches a reset contact.",
+        "Consume on-ball dodge refreshes detected from replay state as pending flip-reset candidates.",
+        "Require a later dodge start by the same player while the reset is still pending.",
+        "Confirm only when that player touches the ball while dodge-active before landing and within the reset-to-touch window.",
     ]
 );
 define_stats_event!(
@@ -1006,12 +1006,20 @@ pub(crate) const FLICK_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "FlickCalculator",
 )];
 
-pub(crate) const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
-    &DODGE_RESET_EVENT_DEFINITION,
-    "dodge_reset",
-    "DodgeResetNode",
-    "DodgeResetCalculator",
-)];
+pub(crate) const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[
+    produced_event(
+        &DODGE_RESET_EVENT_DEFINITION,
+        "dodge_reset",
+        "DodgeResetNode",
+        "DodgeResetCalculator",
+    ),
+    produced_event(
+        &FLIP_RESET_EVENT_DEFINITION,
+        "flip_reset",
+        "DodgeResetNode",
+        "DodgeResetCalculator",
+    ),
+];
 
 pub(crate) const DOUBLE_TAP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &DOUBLE_TAP_EVENT_DEFINITION,

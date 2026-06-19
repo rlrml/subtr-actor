@@ -366,6 +366,7 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "event",
         "fifty_fifty",
         "flick",
+        "flip_reset",
         "dodge",
         "half_flip",
         "half_volley",

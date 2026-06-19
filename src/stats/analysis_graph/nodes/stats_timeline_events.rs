@@ -791,6 +791,21 @@ fn build_replay_events(
         ));
     }
 
+    for (index, event) in dodge_reset.confirmed_flip_reset_events().iter().enumerate() {
+        events.push(make_event(
+            MECHANIC_FLIP_RESET,
+            index,
+            span(event.reset_frame, event.frame, event.reset_time, event.time),
+            EventPayload::FlipReset(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        ));
+    }
+
     for (index, event) in double_tap.events().iter().enumerate() {
         events.push(make_event(
             MECHANIC_DOUBLE_TAP,

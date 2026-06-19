@@ -257,6 +257,12 @@ impl StatsTimelineFrameNode {
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),
+            flip_reset: projection
+                .flip_reset
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
             ball_carry: projection
                 .ball_carry
                 .player_stats()

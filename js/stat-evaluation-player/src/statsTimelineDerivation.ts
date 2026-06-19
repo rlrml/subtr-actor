@@ -55,6 +55,10 @@ import {
   createFlickEventDerivedStatsAccumulator,
 } from "./flickEventDerivation.ts";
 import {
+  applyFlipResetEventDerivedStats,
+  createFlipResetEventDerivedStatsAccumulator,
+} from "./flipResetEventDerivation.ts";
+import {
   applyHalfVolleyEventDerivedStats,
   createHalfVolleyEventDerivedStatsAccumulator,
 } from "./halfVolleyEventDerivation.ts";
@@ -341,6 +345,13 @@ export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventD
     teamModules: [],
     apply: applyCeilingShotEventDerivedStats,
     createFrameAccumulator: createCeilingShotEventDerivedStatsAccumulator,
+  },
+  {
+    id: "flip-reset",
+    playerModules: ["flip_reset"],
+    teamModules: [],
+    apply: applyFlipResetEventDerivedStats,
+    createFrameAccumulator: createFlipResetEventDerivedStatsAccumulator,
   },
   {
     id: "dodge-reset",

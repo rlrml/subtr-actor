@@ -75,6 +75,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "center", stream: "center", kind: "center" },
   { field: "flick", stream: "flick", kind: "flick" },
   { field: "dodge_reset", stream: "dodge_reset", kind: "dodge_reset" },
+  { field: "flip_reset", stream: "flip_reset", kind: "flip_reset" },
   { field: "double_tap", stream: "double_tap", kind: "double_tap" },
   { field: "fifty_fifty", stream: "fifty_fifty", kind: "fifty_fifty" },
   { field: "kickoff", stream: "kickoff", kind: "kickoff" },

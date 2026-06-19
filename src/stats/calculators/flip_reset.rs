@@ -2,13 +2,11 @@ use crate::*;
 use serde::Serialize;
 use std::collections::HashMap;
 
-/// A frame-level dodge refresh observed as occurring on the ball (a flip reset).
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
-#[ts(export)]
-pub struct FlipResetEvent {
+/// A heuristic underside-touch candidate used to connect old flip-reset follow-up logic.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct FlipResetCandidateEvent {
     pub time: f32,
     pub frame: usize,
-    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
@@ -16,7 +14,6 @@ pub struct FlipResetEvent {
     /// Heuristic confidence in the range `[0.0, 1.0]`.
     pub confidence: f32,
     /// Ball position relative to the car in the car's local frame.
-    #[ts(as = "crate::interop::ts_bindings::Vector3fTs")]
     pub local_ball_position: boxcars::Vector3f,
     /// Ball-to-car hitbox contact gap in uu used for touch attribution.
     ///
@@ -262,14 +259,14 @@ fn flip_reset_proximity_candidate(
 /// Tracks flip resets and their follow-up dodges.
 #[derive(Debug, Clone, Default)]
 pub struct FlipResetTracker {
-    flip_reset_events: Vec<FlipResetEvent>,
-    current_frame_flip_reset_events: Vec<FlipResetEvent>,
+    flip_reset_events: Vec<FlipResetCandidateEvent>,
+    current_frame_flip_reset_events: Vec<FlipResetCandidateEvent>,
     post_wall_dodge_events: Vec<PostWallDodgeEvent>,
     current_frame_post_wall_dodge_events: Vec<PostWallDodgeEvent>,
     flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
     current_frame_flip_reset_followup_dodge_events: Vec<FlipResetFollowupDodgeEvent>,
     recent_wall_contact_time: HashMap<PlayerId, f32>,
-    recent_flip_reset_candidates: HashMap<PlayerId, FlipResetEvent>,
+    recent_flip_reset_candidates: HashMap<PlayerId, FlipResetCandidateEvent>,
     recent_flip_reset_proximity_event_time: HashMap<PlayerId, f32>,
     current_frame_dodge_rising_edges: Vec<PlayerId>,
     previous_dodge_active: HashMap<PlayerId, bool>,
@@ -320,11 +317,11 @@ impl FlipResetTracker {
         Ok(())
     }
 
-    pub fn flip_reset_events(&self) -> &[FlipResetEvent] {
+    pub fn flip_reset_events(&self) -> &[FlipResetCandidateEvent] {
         &self.flip_reset_events
     }
 
-    pub fn current_frame_flip_reset_events(&self) -> &[FlipResetEvent] {
+    pub fn current_frame_flip_reset_events(&self) -> &[FlipResetCandidateEvent] {
         &self.current_frame_flip_reset_events
     }
 
@@ -347,7 +344,7 @@ impl FlipResetTracker {
     pub fn into_events(
         self,
     ) -> (
-        Vec<FlipResetEvent>,
+        Vec<FlipResetCandidateEvent>,
         Vec<PostWallDodgeEvent>,
         Vec<FlipResetFollowupDodgeEvent>,
     ) {
@@ -363,14 +360,14 @@ impl FlipResetTracker {
         processor: &dyn ProcessorView,
         touch_event: &TouchEvent,
         frame_index: usize,
-    ) -> Option<FlipResetEvent> {
+    ) -> Option<FlipResetCandidateEvent> {
         let player = touch_event.player.as_ref()?;
         let contact_gap = touch_event.closest_approach_distance?;
         let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
         let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
         let heuristic = flip_reset_candidate(&ball_rigid_body, &player_rigid_body, contact_gap)?;
 
-        Some(FlipResetEvent {
+        Some(FlipResetCandidateEvent {
             time: touch_event.time,
             frame: frame_index,
             player: player.clone(),
@@ -390,7 +387,7 @@ impl FlipResetTracker {
         processor: &dyn ProcessorView,
         touch_event: &TouchEvent,
         frame_index: usize,
-    ) -> Option<FlipResetEvent> {
+    ) -> Option<FlipResetCandidateEvent> {
         let player = touch_event.player.as_ref()?;
         let contact_gap = touch_event.closest_approach_distance?;
         let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
@@ -398,7 +395,7 @@ impl FlipResetTracker {
         let heuristic =
             flip_reset_followup_touch_candidate(&ball_rigid_body, &player_rigid_body, contact_gap)?;
 
-        Some(FlipResetEvent {
+        Some(FlipResetCandidateEvent {
             time: touch_event.time,
             frame: frame_index,
             player: player.clone(),
@@ -419,7 +416,7 @@ impl FlipResetTracker {
         player: &PlayerId,
         time: f32,
         frame_index: usize,
-    ) -> Option<FlipResetEvent> {
+    ) -> Option<FlipResetCandidateEvent> {
         let ball_rigid_body = processor.get_normalized_ball_rigid_body().ok()?;
         let player_rigid_body = processor.get_normalized_player_rigid_body(player).ok()?;
         let contact_gap = car_hitbox_ball_contact_gap(
@@ -430,7 +427,7 @@ impl FlipResetTracker {
         let heuristic =
             flip_reset_proximity_candidate(&ball_rigid_body, &player_rigid_body, contact_gap)?;
 
-        Some(FlipResetEvent {
+        Some(FlipResetCandidateEvent {
             time,
             frame: frame_index,
             player: player.clone(),

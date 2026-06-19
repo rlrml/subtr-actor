@@ -202,6 +202,7 @@ fn default_player_stats_snapshot(
         whiff: WhiffStats::default(),
         flick: FlickStats::default(),
         dodge_reset: DodgeResetStats::default(),
+        flip_reset: FlipResetStats::default(),
         ball_carry: BallCarryStats::default(),
         controlled_play: ControlledPlayStats::default(),
         air_dribble: AirDribbleStats::default(),

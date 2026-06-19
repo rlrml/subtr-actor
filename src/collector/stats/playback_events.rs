@@ -663,6 +663,25 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
+            .module_player_events("flip_reset", "events", parse_confirmed_flip_reset_event)?
+            .into_iter()
+            .enumerate()
+        {
+            events.push(make_event(
+                "flip_reset",
+                index,
+                span(event.reset_frame, event.frame, event.reset_time, event.time),
+                EventPayload::FlipReset(event.clone()),
+                Some(event.player.clone()),
+                None,
+                Some(event.is_team_0),
+                event.player_position,
+                None,
+                None,
+            ));
+        }
+
+        for (index, event) in self
             .module_player_events("double_tap", "events", parse_double_tap_event)?
             .into_iter()
             .enumerate()

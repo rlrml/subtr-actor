@@ -502,7 +502,19 @@ export function renderDodgeResetStats(
 ): string {
   return `
     <div class="stat-row"><span class="label">Refreshes</span><span class="value">${formatInteger(dodgeReset?.count)}</span></div>
-    <div class="stat-row"><span class="label">Flip resets</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
+    <div class="stat-row"><span class="label">On ball</span><span class="value">${formatInteger(dodgeReset?.on_ball_count)}</span></div>
+  `;
+}
+
+export function renderFlipResetStats(
+  flipReset: PlayerStatsSnapshot["flip_reset"] | undefined,
+): string {
+  const averageTimeToUse =
+    flipReset && flipReset.count > 0 ? flipReset.total_time_to_use / flipReset.count : undefined;
+  return `
+    <div class="stat-row"><span class="label">Confirmed</span><span class="value">${formatInteger(flipReset?.count)}</span></div>
+    <div class="stat-row"><span class="label">Avg use</span><span class="value">${formatNumber(averageTimeToUse, 2, "s")}</span></div>
+    <div class="stat-row"><span class="label">Fastest use</span><span class="value">${formatNumber(asNumber(flipReset?.min_time_to_use), 2, "s")}</span></div>
   `;
 }
 

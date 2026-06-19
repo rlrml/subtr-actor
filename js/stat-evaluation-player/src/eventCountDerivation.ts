@@ -33,6 +33,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "wall_aerial_shot",
   "center",
   "flick",
+  "flip_reset",
   "dodge_reset",
   "double_tap",
   "fifty_fifty",
@@ -132,7 +133,7 @@ function eventTeamIsTeam0(event: Event): boolean | null {
 }
 
 function mechanicEventCountType(event: Event): StatsEventCountType | null {
-  const kind = event.meta.stream === "dodge_reset" ? "flip_reset" : event.meta.stream;
+  const kind = event.meta.stream;
   if (!STATS_MECHANIC_EVENT_COUNT_TYPE_SET.has(kind) || !isStatsEventCountType(kind)) {
     return null;
   }
