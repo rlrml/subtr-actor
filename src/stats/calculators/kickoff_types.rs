@@ -294,6 +294,37 @@ impl KickoffApproach {
     }
 }
 
+/// Local left/right direction of the dodge used during a kickoff approach.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export, rename_all = "snake_case")]
+pub enum KickoffFlipDirection {
+    Left,
+    Right,
+    #[default]
+    NotApplicable,
+}
+
+impl KickoffFlipDirection {
+    pub fn from_local_side_component(side_component: f32) -> Self {
+        if side_component > f32::EPSILON {
+            Self::Right
+        } else if side_component < -f32::EPSILON {
+            Self::Left
+        } else {
+            Self::NotApplicable
+        }
+    }
+
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::Left => "left",
+            Self::Right => "right",
+            Self::NotApplicable => "not_applicable",
+        }
+    }
+}
+
 /// Behavior of a supporting (non-taking) player on a kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
@@ -390,6 +421,8 @@ pub struct KickoffTakerEvent {
     pub contact_ball_exit_attack_alignment: Option<f32>,
     pub outcome: KickoffTakerOutcome,
     pub approach: KickoffApproach,
+    #[serde(default)]
+    pub approach_flip_direction: KickoffFlipDirection,
 }
 
 /// Kickoff event for a supporting player.

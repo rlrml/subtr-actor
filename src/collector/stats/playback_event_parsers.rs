@@ -929,6 +929,11 @@ fn parse_kickoff_taker_event(value: &Value) -> SubtrActorResult<KickoffTakerEven
             .map(|value| decode_json_value(value.clone()))
             .transpose()?
             .unwrap_or_default(),
+        approach_flip_direction: object
+            .get("approach_flip_direction")
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
     })
 }
 

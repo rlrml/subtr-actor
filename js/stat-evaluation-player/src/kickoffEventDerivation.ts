@@ -116,6 +116,7 @@ function takerLabels(event: KickoffTakerEvent): StatLabel[] {
     { key: "kickoff_spawn", value: event.spawn_position },
     { key: "taker_outcome", value: event.outcome },
     { key: "kickoff_approach", value: event.approach },
+    { key: "approach_flip_direction", value: event.approach_flip_direction },
   ];
 }
 

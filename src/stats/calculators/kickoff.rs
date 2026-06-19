@@ -273,7 +273,7 @@ struct ActiveKickoff {
     first_touch_ball_position: Option<[f32; 3]>,
     first_touch_ball_velocity: Option<[f32; 3]>,
     touches: Vec<KickoffTouchSnapshot>,
-    speed_flip_players: HashSet<PlayerId>,
+    speed_flip_directions: HashMap<PlayerId, KickoffFlipDirection>,
     resolution: Option<KickoffResolutionSnapshot>,
     /// Running ball-y extremes observed since the kickoff's first touch,
     /// including frames after the kickoff's logical close. Used by the
@@ -372,6 +372,11 @@ pub(crate) const KICKOFF_APPROACH_LABELS: [StatLabel; 6] = [
     StatLabel::new("kickoff_approach", "diagonal_flip"),
     StatLabel::new("kickoff_approach", "other"),
 ];
+pub(crate) const KICKOFF_FLIP_DIRECTION_LABELS: [StatLabel; 3] = [
+    StatLabel::new("approach_flip_direction", "left"),
+    StatLabel::new("approach_flip_direction", "right"),
+    StatLabel::new("approach_flip_direction", "not_applicable"),
+];
 pub(crate) const KICKOFF_SUPPORT_BEHAVIOR_LABELS: [StatLabel; 4] = [
     StatLabel::new("support_behavior", "go_for_boost"),
     StatLabel::new("support_behavior", "cheat"),
@@ -457,6 +462,10 @@ pub(crate) fn kickoff_approach_label(approach: KickoffApproach) -> StatLabel {
     StatLabel::new("kickoff_approach", approach.as_label_value())
 }
 
+pub(crate) fn kickoff_flip_direction_label(direction: KickoffFlipDirection) -> StatLabel {
+    StatLabel::new("approach_flip_direction", direction.as_label_value())
+}
+
 pub(crate) fn kickoff_support_behavior_label(behavior: KickoffSupportBehavior) -> StatLabel {
     StatLabel::new("support_behavior", behavior.as_label_value())
 }
@@ -471,6 +480,7 @@ impl KickoffTakerEvent {
             kickoff_spawn_label(self.spawn_position),
             kickoff_taker_outcome_label(self.outcome),
             kickoff_approach_label(self.approach),
+            kickoff_flip_direction_label(self.approach_flip_direction),
             kickoff_ball_direction_label(self.ball_direction),
         ]
     }
@@ -642,7 +652,7 @@ impl KickoffCalculator {
             first_touch_ball_position: None,
             first_touch_ball_velocity: None,
             touches: Vec::new(),
-            speed_flip_players: HashSet::new(),
+            speed_flip_directions: HashMap::new(),
             resolution: None,
             min_ball_y_after_first_touch: None,
             max_ball_y_after_first_touch: None,
@@ -787,7 +797,7 @@ impl KickoffCalculator {
                     let forward = rotation * glam::Vec3::X;
                     let right = rotation * glam::Vec3::Y;
                     trace.first_dodge_forward_component = Some(dodge_direction.dot(forward));
-                    trace.first_dodge_side_component = Some(dodge_direction.dot(right).abs());
+                    trace.first_dodge_side_component = Some(dodge_direction.dot(right));
                 }
             }
         }
@@ -1015,7 +1025,12 @@ impl KickoffCalculator {
                 .iter()
                 .any(|player| player.player == event.player)
             {
-                active.speed_flip_players.insert(event.player.clone());
+                active.speed_flip_directions.insert(
+                    event.player.clone(),
+                    KickoffFlipDirection::from_local_side_component(
+                        event.estimated_dodge_impulse_side_component,
+                    ),
+                );
             }
         }
     }
@@ -1201,7 +1216,7 @@ impl KickoffCalculator {
             .first_dodge_side_component
             .unwrap_or(0.0);
         if Self::approach_dodge_happened_before_contact(player) {
-            if side_component >= KICKOFF_APPROACH_DIAGONAL_FLIP_SIDE_COMPONENT {
+            if side_component.abs() >= KICKOFF_APPROACH_DIAGONAL_FLIP_SIDE_COMPONENT {
                 return KickoffApproach::DiagonalFlip;
             }
             if forward_component >= KICKOFF_APPROACH_FRONT_FLIP_FORWARD_COMPONENT {
@@ -1238,6 +1253,22 @@ impl KickoffCalculator {
         }
 
         KickoffApproach::Other
+    }
+
+    fn approach_flip_direction(
+        player: &KickoffPlayerSnapshot,
+        approach: KickoffApproach,
+        speed_flip_direction: Option<KickoffFlipDirection>,
+    ) -> KickoffFlipDirection {
+        match approach {
+            KickoffApproach::SpeedFlip => speed_flip_direction.unwrap_or_default(),
+            KickoffApproach::DiagonalFlip => player
+                .approach_trace
+                .first_dodge_side_component
+                .map(KickoffFlipDirection::from_local_side_component)
+                .unwrap_or_default(),
+            _ => KickoffFlipDirection::NotApplicable,
+        }
     }
 
     fn center_progress(player: &KickoffPlayerSnapshot) -> f32 {
@@ -1735,6 +1766,14 @@ impl KickoffCalculator {
                 );
                 let taker_boost_after = Self::taker_boost_after(player, boost_after);
                 let contact = player.first_touch_contact.as_ref();
+                let speed_flip_direction =
+                    active.speed_flip_directions.get(&player.player).copied();
+                let approach = Self::classify_approach(
+                    player,
+                    outcome,
+                    taker_boost_after,
+                    speed_flip_direction.is_some(),
+                );
                 let player_event = KickoffTakerEvent {
                     player: player.player.clone(),
                     is_team_0: player.is_team_0,
@@ -1768,11 +1807,11 @@ impl KickoffCalculator {
                     contact_ball_exit_attack_alignment: contact
                         .and_then(|contact| contact.ball_exit_attack_alignment),
                     outcome,
-                    approach: Self::classify_approach(
+                    approach,
+                    approach_flip_direction: Self::approach_flip_direction(
                         player,
-                        outcome,
-                        taker_boost_after,
-                        active.speed_flip_players.contains(&player.player),
+                        approach,
+                        speed_flip_direction,
                     ),
                 };
                 if player_event.is_team_0 {
