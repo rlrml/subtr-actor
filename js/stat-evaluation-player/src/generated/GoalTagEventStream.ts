@@ -3,4 +3,4 @@
 /**
  * Which event stream a goal tag's evidence is drawn from.
  */
-export type GoalTagEventStream = "flick" | "ceiling_shot" | "double_tap" | "one_timer" | "pass" | "ball_carry" | "dodge_reset" | "touch" | "bump" | "demo" | "half_volley";
+export type GoalTagEventStream = "flick" | "ceiling_shot" | "double_tap" | "one_timer" | "pass" | "ball_carry" | "dodge_reset" | "flip_reset" | "touch" | "bump" | "demo" | "half_volley";

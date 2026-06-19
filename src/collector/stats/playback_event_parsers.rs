@@ -23,6 +23,23 @@ pub(in crate::collector::stats::playback) fn parse_dodge_reset_event(
     })
 }
 
+pub(in crate::collector::stats::playback) fn parse_confirmed_flip_reset_event(
+    value: &Value,
+) -> SubtrActorResult<FlipResetEvent> {
+    let object = json_object(value, "flip reset event")?;
+    Ok(FlipResetEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        reset_time: json_required_f32(object, "reset_time")?,
+        reset_frame: json_required_usize(object, "reset_frame")?,
+        player: json_required_remote_id(object, "player")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        counter_value: json_required_i32(object, "counter_value")?,
+        time_since_reset: json_required_f32(object, "time_since_reset")?,
+    })
+}
+
 pub(in crate::collector::stats::playback) fn parse_powerslide_event(
     value: &Value,
 ) -> SubtrActorResult<PowerslideEvent> {

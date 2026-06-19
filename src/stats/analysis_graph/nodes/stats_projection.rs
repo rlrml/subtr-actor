@@ -30,6 +30,7 @@ pub struct StatsProjectionState {
     pub half_flip: HalfFlipStatsAccumulator,
     pub flick: FlickStatsAccumulator,
     pub dodge_reset: DodgeResetStatsAccumulator,
+    pub flip_reset: FlipResetStatsAccumulator,
     pub ball_carry: BallCarryStatsAccumulator,
     pub boost: BoostStatsAccumulator,
     pub bump: BumpStatsAccumulator,
@@ -187,6 +188,7 @@ struct StatsProjectionCursors {
     half_flip: usize,
     flick: usize,
     dodge_reset: usize,
+    flip_reset: usize,
     dodge_reset_flip_reset_outcome: usize,
     ball_carry: usize,
     bump: usize,
@@ -490,6 +492,12 @@ impl StatsProjectionNode {
         let dodge_reset = ctx.get::<DodgeResetCalculator>()?;
         for event in Self::events_since(&mut self.cursors.dodge_reset, dodge_reset.events()) {
             self.state.dodge_reset.apply_event(event);
+        }
+        for event in Self::events_since(
+            &mut self.cursors.flip_reset,
+            dodge_reset.confirmed_flip_reset_events(),
+        ) {
+            self.state.flip_reset.apply_event(event);
         }
         for event in Self::events_since(
             &mut self.cursors.dodge_reset_flip_reset_outcome,

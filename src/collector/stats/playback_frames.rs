@@ -243,6 +243,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "dodge_reset",
                 &player_key,
             )?,
+            flip_reset: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "flip_reset",
+                &player_key,
+            )?,
             ball_carry: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "ball_carry",
@@ -599,6 +604,14 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             self.frame_player_stat_or_default_by_key::<DodgeResetStats>(
                 frame,
                 "dodge_reset",
+                &player_key,
+            )?,
+        );
+        player_value.insert(
+            "flip_reset".to_owned(),
+            self.frame_player_stat_or_default_by_key::<FlipResetStats>(
+                frame,
+                "flip_reset",
                 &player_key,
             )?,
         );

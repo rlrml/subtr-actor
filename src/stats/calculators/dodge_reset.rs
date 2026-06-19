@@ -112,13 +112,15 @@ impl InFlightItem for PendingOnBallReset {
     }
 }
 
-/// A flip reset confirmed once later converted by a dodge-powered touch.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ConfirmedFlipResetEvent {
+/// A flip reset confirmed once later converted by a dodge-powered touch before landing.
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct FlipResetEvent {
     pub time: f32,
     pub frame: usize,
     pub reset_time: f32,
     pub reset_frame: usize,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
@@ -131,7 +133,7 @@ pub struct ConfirmedFlipResetEvent {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DodgeResetCalculator {
     events: EventStream<DodgeResetEvent>,
-    confirmed_flip_reset_events: EventStream<ConfirmedFlipResetEvent>,
+    confirmed_flip_reset_events: EventStream<FlipResetEvent>,
     flip_reset_outcome_events: EventStream<FlipResetOutcomeEvent>,
     pending_on_ball_resets: KeyedInFlightLedger<PlayerId, PendingOnBallReset>,
     pending_reset_dodge_started: HashSet<PlayerId>,
@@ -153,11 +155,11 @@ impl DodgeResetCalculator {
         self.events.new_events()
     }
 
-    pub fn confirmed_flip_reset_events(&self) -> &[ConfirmedFlipResetEvent] {
+    pub fn confirmed_flip_reset_events(&self) -> &[FlipResetEvent] {
         self.confirmed_flip_reset_events.all()
     }
 
-    pub fn new_confirmed_flip_reset_events(&self) -> &[ConfirmedFlipResetEvent] {
+    pub fn new_confirmed_flip_reset_events(&self) -> &[FlipResetEvent] {
         self.confirmed_flip_reset_events.new_events()
     }
 
@@ -355,21 +357,20 @@ impl DodgeResetCalculator {
             return;
         }
 
-        self.confirmed_flip_reset_events
-            .push(ConfirmedFlipResetEvent {
-                time: touch_event.time,
-                frame: touch_event.frame,
-                reset_time: reset_event.time,
-                reset_frame: reset_event.frame,
-                player: player_id.clone(),
-                player_position: touch_event
-                    .player_position
-                    .map(|position| vec_to_glam(&position).to_array())
-                    .or_else(|| players.player_position(player_id)),
-                is_team_0: touch_event.team_is_team_0,
-                counter_value: reset_event.counter_value,
-                time_since_reset,
-            });
+        self.confirmed_flip_reset_events.push(FlipResetEvent {
+            time: touch_event.time,
+            frame: touch_event.frame,
+            reset_time: reset_event.time,
+            reset_frame: reset_event.frame,
+            player: player_id.clone(),
+            player_position: touch_event
+                .player_position
+                .map(|position| vec_to_glam(&position).to_array())
+                .or_else(|| players.player_position(player_id)),
+            is_team_0: touch_event.team_is_team_0,
+            counter_value: reset_event.counter_value,
+            time_since_reset,
+        });
         self.resolve_pending(
             player_id,
             FinalizeReason::Completed,

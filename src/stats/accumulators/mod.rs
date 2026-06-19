@@ -53,6 +53,8 @@ pub mod fifty_fifty;
 pub use fifty_fifty::*;
 pub mod flick;
 pub use flick::*;
+pub mod flip_reset;
+pub use flip_reset::*;
 pub mod half_flip;
 pub use half_flip::*;
 pub mod half_volley;

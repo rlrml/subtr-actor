@@ -70,6 +70,7 @@ pub enum GoalTagEventStream {
     Pass,
     BallCarry,
     DodgeReset,
+    FlipReset,
     Touch,
     Bump,
     Demo,
@@ -1426,7 +1427,7 @@ impl FlipResetGoalCalculator {
     fn tag_goals(
         &self,
         goals: &[GoalContextEvent],
-        events: &[ConfirmedFlipResetEvent],
+        events: &[FlipResetEvent],
     ) -> Vec<GoalTagAssignment> {
         tag_goals_by_point_mechanic_event(
             goals,
@@ -1920,7 +1921,7 @@ impl GoalMechanicPointEvent for DoubleTapEvent {
     }
 }
 
-impl GoalMechanicPointEvent for ConfirmedFlipResetEvent {
+impl GoalMechanicPointEvent for FlipResetEvent {
     fn event_time(&self) -> f32 {
         self.time
     }
@@ -1946,7 +1947,7 @@ impl GoalMechanicPointEvent for ConfirmedFlipResetEvent {
     }
 
     fn event_stream(&self) -> GoalTagEventStream {
-        GoalTagEventStream::DodgeReset
+        GoalTagEventStream::FlipReset
     }
 }
 

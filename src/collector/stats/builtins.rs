@@ -422,6 +422,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "half_flip",
         "flick",
         "dodge_reset",
+        "flip_reset",
         "ball_carry",
         "controlled_play",
         "air_dribble",
@@ -803,6 +804,14 @@ pub(crate) fn builtin_module_json(
                 "player_stats": player_stats_entries(projection.dodge_reset.player_stats()),
                 "events": calculator.events(),
             }))
+        }
+        "flip_reset" => {
+            let calculator = graph_state::<DodgeResetCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsWithEventsExport {
+                player_stats: player_stats_entries(projection.flip_reset.player_stats()),
+                events: calculator.confirmed_flip_reset_events(),
+            })
         }
         "ball_carry" => {
             let calculator = graph_state::<BallCarryCalculator>(graph, module_name)?;
@@ -1446,6 +1455,12 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(projection.dodge_reset.player_stats()),
             })?
         }
+        "flip_reset" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&PlayerStatsExport {
+                player_stats: player_stats_entries(projection.flip_reset.player_stats()),
+            })?
+        }
         "ball_carry" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsExport {
@@ -1719,6 +1734,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "half_flip"
         | "flick"
         | "dodge_reset"
+        | "flip_reset"
         | "ball_carry"
         | "controlled_play"
         | "air_dribble"

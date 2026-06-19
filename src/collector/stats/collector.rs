@@ -37,6 +37,7 @@ fn stats_module_analysis_node_name(module_name: &str) -> &str {
     match module_name {
         "core" => "match_stats",
         "air_dribble" => "ball_carry",
+        "flip_reset" => "dodge_reset",
         other => other,
     }
 }

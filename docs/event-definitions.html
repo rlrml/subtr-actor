@@ -93,7 +93,7 @@ ul.tight li { margin: .15rem 0; }
 <body>
 <div class="wrap">
 <h1>Stat &amp; Event Definitions</h1>
-<p class="subtitle">Generated from static Rust metadata — do not edit by hand. <span class="count">43 events</span></p>
+<p class="subtitle">Generated from static Rust metadata — do not edit by hand. <span class="count">44 events</span></p>
 <input id="search" class="search" type="search" placeholder="Filter events by name, id, category, or summary…" autocomplete="off">
 <h2 id="contents">Contents</h2>
 <div class="cat-group" data-group><div class="cat-head">Core</div>
@@ -113,6 +113,7 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="double tap double_tap mechanic a same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory."><td><a href="#event-double_tap">Double Tap</a></td><td><code>double_tap</code></td><td class="summary">A same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.</td></tr>
 <tr data-search="event event mechanic a shared event envelope with common metadata and a typed event payload."><td><a href="#event-event">Event</a></td><td><code>event</code></td><td class="summary">A shared event envelope with common metadata and a typed event payload.</td></tr>
 <tr data-search="flick flick mechanic a dodge-powered touch following a short controlled carry setup."><td><a href="#event-flick">Flick</a></td><td><code>flick</code></td><td class="summary">A dodge-powered touch following a short controlled carry setup.</td></tr>
+<tr data-search="flip reset flip_reset mechanic an on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing."><td><a href="#event-flip_reset">Flip Reset</a></td><td><code>flip_reset</code></td><td class="summary">An on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing.</td></tr>
 <tr data-search="half flip half_flip mechanic a dodge sequence that starts while driving backward and reorients the car to move forward."><td><a href="#event-half_flip">Half Flip</a></td><td><code>half_flip</code></td><td class="summary">A dodge sequence that starts while driving backward and reorients the car to move forward.</td></tr>
 <tr data-search="half volley half_volley mechanic a fast touch shortly after the ball bounces off the floor, paired with a recent player dodge."><td><a href="#event-half_volley">Half Volley</a></td><td><code>half_volley</code></td><td class="summary">A fast touch shortly after the ball bounces off the floor, paired with a recent player dodge.</td></tr>
 <tr data-search="one timer one_timer mechanic a fast receiver touch from a completed pass that is immediately directed toward goal."><td><a href="#event-one_timer">One Timer</a></td><td><code>one_timer</code></td><td class="summary">A fast receiver touch from a completed pass that is immediately directed toward goal.</td></tr>
@@ -459,6 +460,32 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>flick</code> via <code>FlickNode</code> / <code>FlickCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-flip_reset" data-search="flip reset flip_reset mechanic an on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing.">
+<div class="head"><h3>Flip Reset</h3><code class="id">flip_reset</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">An on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Consume on-ball dodge refreshes detected from replay state as pending flip-reset candidates.</li>
+<li>Require a later dodge start by the same player while the reset is still pending.</li>
+<li>Confirm only when that player touches the ball while dodge-active before landing and within the reset-to-touch window.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>flip_reset</code> via <code>DodgeResetNode</code> / <code>DodgeResetCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-half_flip" data-search="half flip half_flip mechanic a dodge sequence that starts while driving backward and reorients the car to move forward.">

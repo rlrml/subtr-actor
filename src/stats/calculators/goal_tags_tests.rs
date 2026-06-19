@@ -284,12 +284,8 @@ fn air_dribble_event(
     }
 }
 
-fn confirmed_flip_reset_event(
-    time: f32,
-    frame: usize,
-    player: PlayerId,
-) -> ConfirmedFlipResetEvent {
-    ConfirmedFlipResetEvent {
+fn confirmed_flip_reset_event(time: f32, frame: usize, player: PlayerId) -> FlipResetEvent {
+    FlipResetEvent {
         time,
         frame,
         reset_time: time - 0.5,

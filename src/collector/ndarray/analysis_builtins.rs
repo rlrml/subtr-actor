@@ -123,7 +123,7 @@ build_analysis_player_event_indicator!(
     dodge_reset_dependency,
     DodgeResetCalculator,
     new_confirmed_flip_reset_events,
-    |event: &ConfirmedFlipResetEvent, player_id: &PlayerId| &event.player == player_id,
+    |event: &FlipResetEvent, player_id: &PlayerId| &event.player == player_id,
     "analysis flip reset dodge event",
 );
 
