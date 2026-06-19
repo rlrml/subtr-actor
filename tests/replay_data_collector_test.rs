@@ -1,6 +1,9 @@
 use std::path::Path;
 use subtr_actor::collector::replay_data::{BallFrame, PlayerFrame, ReplayDataCollector};
-use subtr_actor::{BOOST_KICKOFF_START_AMOUNT, ReplayProcessor};
+use subtr_actor::{
+    BOOST_KICKOFF_START_AMOUNT, PlayerStatEventKind, ReplayProcessor,
+    ShotGoalLineCrossingPredictionKind, ShotGoalLineCrossingUnavailableReason,
+};
 
 fn parse_replay(path: &str) -> boxcars::Replay {
     let replay_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
@@ -135,4 +138,119 @@ fn replay_data_collectors_can_be_composed_in_a_single_processor_pass() {
     );
     assert_eq!(actual.player_stat_events, expected.player_stat_events);
     assert_eq!(actual.goal_events, expected.goal_events);
+}
+
+#[test]
+fn saved_shot_goal_line_crossing_counts_are_stable_in_replay_fixtures() {
+    let cases = [
+        (
+            "assets/nuttrback-double-tap-goal-7-2026-06-01.replay",
+            5,
+            5,
+            5,
+            3,
+            2,
+            None,
+        ),
+        (
+            "assets/air-dribble-goal-mouth-2026-05-24.replay",
+            6,
+            6,
+            5,
+            5,
+            1,
+            None,
+        ),
+        (
+            "assets/replay-format-2017-03-16-v868-17-net-none-online.replay",
+            8,
+            4,
+            2,
+            4,
+            0,
+            Some([
+                ShotGoalLineCrossingUnavailableReason::NoGoalLineCrossingBeforeSaveReference,
+                ShotGoalLineCrossingUnavailableReason::NoGoalwardBallBeforeSaveReference,
+                ShotGoalLineCrossingUnavailableReason::NoGoalwardBallBeforeSaveReference,
+                ShotGoalLineCrossingUnavailableReason::OnlyUnphysicalFreeFlightCrossings,
+            ]),
+        ),
+    ];
+
+    for (
+        path,
+        expected_saved,
+        expected_projected,
+        expected_inside_goal_mouth,
+        expected_surface,
+        expected_free_flight,
+        expected_unavailable_reasons,
+    ) in cases
+    {
+        let replay = parse_replay(path);
+        let replay_data = ReplayDataCollector::new()
+            .get_replay_data(&replay)
+            .unwrap_or_else(|_| panic!("failed to collect replay data for {path}"));
+
+        let saved_shots = replay_data
+            .player_stat_events
+            .iter()
+            .filter(|event| event.kind == PlayerStatEventKind::Shot)
+            .filter_map(|event| {
+                let shot = event.shot.as_ref()?;
+                let save = shot.resulting_save.as_ref()?;
+                Some((shot, save.time - event.time))
+            })
+            .collect::<Vec<_>>();
+        let saved_shot_crossings = saved_shots
+            .iter()
+            .filter_map(|(shot, save_time_after_shot)| {
+                let crossing = shot.projected_goal_line_crossing.as_ref()?;
+                Some((crossing, *save_time_after_shot))
+            })
+            .collect::<Vec<_>>();
+
+        let surface_count = saved_shot_crossings
+            .iter()
+            .filter(|(crossing, _)| {
+                matches!(
+                    crossing.prediction_kind,
+                    ShotGoalLineCrossingPredictionKind::SurfaceBounces
+                        | ShotGoalLineCrossingPredictionKind::SavedShotPreSaveSurfaceBounces
+                )
+            })
+            .count();
+        let free_flight_count = saved_shot_crossings
+            .iter()
+            .filter(|(crossing, _)| {
+                matches!(
+                    crossing.prediction_kind,
+                    ShotGoalLineCrossingPredictionKind::FreeFlight
+                        | ShotGoalLineCrossingPredictionKind::SavedShotPreSaveFreeFlight
+                )
+            })
+            .count();
+        let inside_goal_mouth_count = saved_shot_crossings
+            .iter()
+            .filter(|(crossing, _)| crossing.inside_goal_mouth)
+            .count();
+        let unavailable_reasons = saved_shots
+            .iter()
+            .filter_map(|(shot, _)| shot.projected_goal_line_crossing_unavailable_reason)
+            .collect::<Vec<_>>();
+
+        assert_eq!(saved_shots.len(), expected_saved, "{path}");
+        assert_eq!(saved_shot_crossings.len(), expected_projected, "{path}");
+        assert_eq!(
+            inside_goal_mouth_count, expected_inside_goal_mouth,
+            "{path}"
+        );
+        assert_eq!(surface_count, expected_surface, "{path}");
+        assert_eq!(free_flight_count, expected_free_flight, "{path}");
+        if let Some(expected_unavailable_reasons) = expected_unavailable_reasons {
+            assert_eq!(unavailable_reasons, expected_unavailable_reasons, "{path}");
+        } else {
+            assert!(unavailable_reasons.is_empty(), "{path}");
+        }
+    }
 }

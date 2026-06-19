@@ -7,6 +7,7 @@
 //!   re-exported at the crate root as `search`.
 //! - `vec_map` — a crate-internal small-map structure.
 
+pub mod ballistics;
 pub mod geometry;
 pub mod search;
 pub(crate) mod vec_map;
