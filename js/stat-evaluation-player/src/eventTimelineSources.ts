@@ -202,6 +202,13 @@ function formatBallThird(value: unknown): string | null {
   return titleCaseValue(value);
 }
 
+function formatPossessionState(value: unknown): string | null {
+  if (value === "team_zero") return "Blue";
+  if (value === "team_one") return "Orange";
+  if (value === "neutral") return "Neutral";
+  return titleCaseValue(value);
+}
+
 function payloadRecord(event: Event): Record<string, unknown> {
   return isRecord(event.payload.payload) ? event.payload.payload : {};
 }
@@ -229,9 +236,32 @@ function fieldHalfColor(fieldHalf: unknown): string | null {
   return null;
 }
 
+function possessionStateColor(possessionState: unknown): string | null {
+  if (possessionState === "team_zero") {
+    return EVENT_STREAM_TEAM_ZERO_COLOR;
+  }
+  if (possessionState === "team_one") {
+    return EVENT_STREAM_TEAM_ONE_COLOR;
+  }
+  if (possessionState === "neutral") {
+    return EVENT_PLAYLIST_NEUTRAL_COLOR;
+  }
+  return null;
+}
+
+function payloadTeamColor(value: unknown): string | null {
+  return typeof value === "boolean" ? teamColor(value) : null;
+}
+
 const EVENT_STREAM_COLOR_RESOLVERS: Partial<Record<string, EventColorResolver>> = {
   ball_half(event) {
     return fieldHalfColor(payloadRecord(event).field_half);
+  },
+  possession(event) {
+    return possessionStateColor(payloadRecord(event).possession_state);
+  },
+  player_possession(event) {
+    return payloadTeamColor(payloadRecord(event).is_team_0);
   },
 };
 
@@ -294,7 +324,7 @@ function formatGenericStatsEventLabel({
   }
 
   if (event.payload.kind === "possession") {
-    const state = titleCaseValue(payload.possession_state);
+    const state = formatPossessionState(payload.possession_state);
     const third = formatFieldThird(payload.field_third);
     const main = state ? `${state} possession` : streamLabel;
     return joinEventDetails([main, third, duration]);

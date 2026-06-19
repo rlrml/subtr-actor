@@ -5,6 +5,7 @@ import type { ReplayModel } from "@rlrml/player";
 import type { FlickEvent } from "./generated/FlickEvent.ts";
 import { STATS_EVENT_STREAM_COUNT_TYPES } from "./eventCountDerivation.ts";
 import type { StatModuleContext } from "./statModules.ts";
+import type { Event } from "./statsTimeline.ts";
 import {
   buildEventPlaylistItems,
   getEventPlaylistSelectedSourceIds,
@@ -484,6 +485,204 @@ test("generic ball third playlist events include field third and duration", () =
         frame: 6,
         label: "Ball third inactive | 0.5s",
         shortLabel: "BT",
+      },
+    ],
+  );
+});
+
+test("generic possession streams derive colors from possession payloads", () => {
+  const replay = {
+    frames: Array.from({ length: 8 }, (_, frame) => ({ time: frame * 0.5 })),
+    players: [
+      { id: "Steam:blue-id", name: "Blue" },
+      { id: "Steam:orange-id", name: "Orange" },
+    ],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      possession: [
+        {
+          time: 1,
+          frame: 2,
+          end_time: 2.5,
+          end_frame: 5,
+          active: true,
+          duration: 1.5,
+          possession_state: "team_zero",
+          player_id: null,
+        },
+        {
+          time: 2.5,
+          frame: 5,
+          end_time: 3,
+          end_frame: 6,
+          active: true,
+          duration: 0.5,
+          possession_state: "team_one",
+          player_id: null,
+        },
+        {
+          time: 3,
+          frame: 6,
+          end_time: 3.5,
+          end_frame: 7,
+          active: true,
+          duration: 0.5,
+          possession_state: "neutral",
+          player_id: null,
+        },
+      ],
+      events: [
+        {
+          meta: {
+            id: "player_possession:2:5:0",
+            stream: "player_possession",
+            label: "Player Possession",
+            scope: "player",
+            timing: {
+              type: "span",
+              start_time: 1,
+              start_frame: 2,
+              end_time: 2.5,
+              end_frame: 5,
+            },
+            primary_player: { Steam: "orange-id" },
+            properties: [],
+          },
+          payload: {
+            kind: "player_possession",
+            payload: {
+              player_id: { Steam: "orange-id" },
+              is_team_0: false,
+              start_frame: 2,
+              end_frame: 5,
+              start_time: 1,
+              end_time: 2.5,
+              duration: 1.5,
+              touch_count: 2,
+              aerial_touch_count: 0,
+              wall_touch_count: 0,
+              advance_distance: 300,
+              retreat_distance: 0,
+              carry_time: 0,
+              air_dribble_time: 0,
+              carry_count: 0,
+              air_dribble_count: 0,
+              close_time: 1.2,
+              sustained_control: true,
+              start_field_third: "neutral_third",
+              end_field_third: "team_zero_third",
+            },
+          },
+        } satisfies Event,
+      ],
+    },
+  });
+  const ctx = {
+    replay,
+    statsTimeline,
+  } as StatModuleContext;
+  const timelineSources = getTestTimelineSources(ctx);
+  const possessionSource = timelineSources.find(
+    (source) => source.id === "stats-stream:possession",
+  );
+  const playerPossessionSource = timelineSources.find(
+    (source) => source.id === "stats-stream:player_possession",
+  );
+
+  assert.ok(possessionSource);
+  assert.deepEqual(possessionSource.buildTimelineRanges?.(), [
+    {
+      id: "stats-stream:possession:2:5:0",
+      startTime: 1,
+      endTime: 2.5,
+      lane: "stats-stream:possession",
+      laneLabel: "Possession",
+      label: "Possession",
+      shortLabel: "P",
+      isTeamZero: null,
+      color: "#3b82f6",
+    },
+    {
+      id: "stats-stream:possession:5:6:1",
+      startTime: 2.5,
+      endTime: 3,
+      lane: "stats-stream:possession",
+      laneLabel: "Possession",
+      label: "Possession",
+      shortLabel: "P",
+      isTeamZero: null,
+      color: "#f97316",
+    },
+    {
+      id: "stats-stream:possession:6:7:2",
+      startTime: 3,
+      endTime: 3.5,
+      lane: "stats-stream:possession",
+      laneLabel: "Possession",
+      label: "Possession",
+      shortLabel: "P",
+      isTeamZero: null,
+      color: "#d1d9e0",
+    },
+  ]);
+
+  assert.ok(playerPossessionSource);
+  assert.deepEqual(playerPossessionSource.buildTimelineRanges?.(), [
+    {
+      id: "stats-stream:player_possession:2:5:0",
+      startTime: 1,
+      endTime: 2.5,
+      lane: "stats-stream:player_possession:player:Steam:orange-id",
+      laneLabel: "Orange player possession",
+      label: "Orange player possession",
+      shortLabel: "PP",
+      isTeamZero: null,
+      color: "#f97316",
+    },
+  ]);
+
+  const playlistSources = getEventPlaylistSources(ctx, timelineSources);
+  const items = buildEventPlaylistItems({
+    sources: playlistSources,
+    activeSourceIds: new Set(["stats-stream:possession"]),
+    replayPlayers: replay.players,
+  });
+
+  assert.deepEqual(
+    items.map((item) => ({
+      sourceId: item.sourceId,
+      time: item.event.time,
+      frame: item.event.frame,
+      label: item.event.label,
+      shortLabel: item.event.shortLabel,
+      color: item.color,
+    })),
+    [
+      {
+        sourceId: "stats-stream:possession",
+        time: 2.5,
+        frame: 5,
+        label: "Blue possession | 1.5s",
+        shortLabel: "P",
+        color: "#3b82f6",
+      },
+      {
+        sourceId: "stats-stream:possession",
+        time: 3,
+        frame: 6,
+        label: "Orange possession | 0.5s",
+        shortLabel: "P",
+        color: "#f97316",
+      },
+      {
+        sourceId: "stats-stream:possession",
+        time: 3.5,
+        frame: 7,
+        label: "Neutral possession | 0.5s",
+        shortLabel: "P",
+        color: "#d1d9e0",
       },
     ],
   );
