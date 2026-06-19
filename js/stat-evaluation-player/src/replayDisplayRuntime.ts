@@ -77,19 +77,13 @@ export interface ReplayDisplayRuntimeOptions {
   getCameraControlsController(): CameraControlsController | null;
 }
 
-export async function loadReplayBundleForDisplay(
-  source: ReplayInputSource,
-  bundlePromise: Promise<ReplayLoadBundle>,
-  options: ReplayDisplayRuntimeOptions,
-): Promise<void> {
-  const { elements } = options;
-  elements.statusReadout.textContent = source.preparingStatus;
-  elements.fileInput.disabled = true;
-  options.getReplayLoadModal()?.show(source.name, source.preparingStatus);
-  options.setTransportEnabled(false);
-  options.getCameraControlsController()?.syncAvailability();
-  elements.emptyState.hidden = false;
+function setReplayPlayerCanvasPending(player: StatsReplayPlayer, pending: boolean): void {
+  const { style } = player.renderer.domElement;
+  style.visibility = pending ? "hidden" : "";
+  style.pointerEvents = pending ? "none" : "";
+}
 
+function clearDisplayedReplay(options: ReplayDisplayRuntimeOptions): void {
   const unsubscribe = options.getUnsubscribe();
   if (unsubscribe) {
     unsubscribe();
@@ -116,15 +110,29 @@ export async function loadReplayBundleForDisplay(
   options.renderEventPlaylistWindow();
   options.renderModuleSettings();
   options.syncRecordingWindow();
+}
+
+export async function loadReplayBundleForDisplay(
+  source: ReplayInputSource,
+  bundlePromise: Promise<ReplayLoadBundle>,
+  options: ReplayDisplayRuntimeOptions,
+): Promise<void> {
+  const { elements } = options;
+  let pendingReplayPlayer: StatsReplayPlayer | null = null;
+
+  elements.statusReadout.textContent = source.preparingStatus;
+  elements.fileInput.disabled = true;
+  options.getReplayLoadModal()?.show(source.name, source.preparingStatus);
+  options.setTransportEnabled(false);
+  options.getCameraControlsController()?.syncAvailability();
+  elements.emptyState.hidden = options.getReplayPlayer() !== null;
+  options.getReplayPlayer()?.pause();
 
   try {
     elements.statusReadout.textContent = "Parsing replay...";
     options.getReplayLoadModal()?.show(source.name, "Parsing replay...");
     const loadedReplay = await bundlePromise;
     const { replay } = loadedReplay;
-    options.setStatsTimeline(loadedReplay.statsTimeline);
-    options.setStatsFrameLookup(loadedReplay.statsFrameLookup);
-    options.setStatRegistry(createStatRegistry(null));
 
     const timelineOverlay = createTimelineOverlayPlugin({
       replayEventsLabel: "Replay",
@@ -182,6 +190,17 @@ export async function loadReplayBundleForDisplay(
         fromReplayPlayerPlugin(timelineOverlay),
       ],
     }) as StatsReplayPlayer;
+    pendingReplayPlayer = replayPlayer;
+    setReplayPlayerCanvasPending(replayPlayer, true);
+    await replayPlayer.ready;
+
+    clearDisplayedReplay(options);
+    pendingReplayPlayer = null;
+    setReplayPlayerCanvasPending(replayPlayer, false);
+
+    options.setStatsTimeline(loadedReplay.statsTimeline);
+    options.setStatsFrameLookup(loadedReplay.statsFrameLookup);
+    options.setStatRegistry(createStatRegistry(null));
     if (import.meta.env.DEV) {
       // Console/debug handle (dev server only): inspect playback, A/B camera or
       // motion-interpolation settings live, sample mesh positions, etc.
@@ -223,9 +242,11 @@ export async function loadReplayBundleForDisplay(
     options.getReplayLoadModal()?.hide();
   } catch (error) {
     options.getReplayLoadModal()?.hide();
-    options.getReplayPlayer()?.destroy();
-    options.setReplayPlayer(null);
-    options.setCanvasRecorder(null);
+    pendingReplayPlayer?.destroy();
+    if (!options.getReplayPlayer()) {
+      elements.emptyState.hidden = false;
+      options.setCanvasRecorder(null);
+    }
     options.syncRecordingWindow();
     throw error;
   } finally {
