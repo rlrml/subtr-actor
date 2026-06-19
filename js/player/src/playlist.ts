@@ -1,4 +1,4 @@
-import { ReplayPlayer, createPlayerFromParsed } from "./player/lib";
+import { ReplayPlayer, SubtrActorPlayer, createPlayerFromParsed } from "./player/lib";
 import { findFrameIndexAtTime } from "./replay-data";
 import type {
   CameraSettings,
@@ -624,6 +624,21 @@ export class ReplayPlaylistPlayer extends EventTarget {
       this.preferences.cameraViewMode = "free";
     }
 
+    if (this.player) {
+      const adapter = new SubtrActorPlayer(raw as never, {
+        motionSmoothing: this.options.motionSmoothing,
+        smoothingBlendFactor: this.options.smoothingBlendFactor,
+        smoothingAnchorInterval: this.options.smoothingAnchorInterval,
+        timelineCompaction: this.options.timelineCompaction,
+        disableFrameFiltering: this.options.disableFrameFiltering,
+      });
+      await this.player.replaceReplay(adapter, replay, {
+        currentTime: resolvedItem.start.time,
+        preservePlayback: this.playbackIntent,
+      });
+      return !(this.disposed || generation !== this.loadGeneration);
+    }
+
     const player = createPlayerFromParsed(
       this.container,
       { replay, raw },
@@ -642,11 +657,7 @@ export class ReplayPlaylistPlayer extends EventTarget {
         plugins: this.options.plugins,
       },
     );
-    const { style } = player.renderer.domElement;
-    style.visibility = "hidden";
-    style.pointerEvents = "none";
     player.seek(resolvedItem.start.time);
-
     try {
       await player.ready;
     } catch (error) {
@@ -659,8 +670,6 @@ export class ReplayPlaylistPlayer extends EventTarget {
     }
 
     this.detachPlayer();
-    style.visibility = "";
-    style.pointerEvents = "";
     this.player = player;
     this.playerUnsubscribe = player.subscribe((state) => {
       this.handlePlayerState(state);

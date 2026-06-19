@@ -13,6 +13,7 @@ import {
   createFpsOverlayPlugin,
   createPlayerFromParsed,
   fromReplayPlayerPlugin,
+  SubtrActorPlayer,
 } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { CameraControlsController } from "./cameraControls.ts";
@@ -83,7 +84,12 @@ function setReplayPlayerCanvasPending(player: StatsReplayPlayer, pending: boolea
   style.pointerEvents = pending ? "none" : "";
 }
 
-function clearDisplayedReplay(options: ReplayDisplayRuntimeOptions): void {
+function clearDisplayedReplay(
+  options: ReplayDisplayRuntimeOptions,
+  settings: { destroyPlayer?: boolean; clearPlayerPluginHandles?: boolean } = {},
+): void {
+  const destroyPlayer = settings.destroyPlayer ?? true;
+  const clearPlayerPluginHandles = settings.clearPlayerPluginHandles ?? true;
   const unsubscribe = options.getUnsubscribe();
   if (unsubscribe) {
     unsubscribe();
@@ -91,11 +97,15 @@ function clearDisplayedReplay(options: ReplayDisplayRuntimeOptions): void {
   }
 
   options.teardownActiveModules();
-  options.getReplayPlayer()?.destroy();
-  options.setReplayPlayer(null);
-  options.setCanvasRecorder(null);
+  if (destroyPlayer) {
+    options.getReplayPlayer()?.destroy();
+    options.setReplayPlayer(null);
+  }
+  if (clearPlayerPluginHandles) {
+    options.setCanvasRecorder(null);
+    options.setTimelineOverlay(null);
+  }
   options.setLoadedReplayName(null);
-  options.setTimelineOverlay(null);
   options.setStatsTimeline(null);
   options.setStatsFrameLookup(null);
   options.setStatRegistry(createStatRegistry(null));
@@ -133,6 +143,56 @@ export async function loadReplayBundleForDisplay(
     options.getReplayLoadModal()?.show(source.name, "Parsing replay...");
     const loadedReplay = await bundlePromise;
     const { replay } = loadedReplay;
+    const existingReplayPlayer = options.getReplayPlayer();
+
+    if (existingReplayPlayer) {
+      clearDisplayedReplay(options, {
+        destroyPlayer: false,
+        clearPlayerPluginHandles: false,
+      });
+      const adapter = new SubtrActorPlayer(loadedReplay.raw as never);
+      await existingReplayPlayer.replaceReplay(adapter, replay, { preservePlayback: false });
+
+      options.setStatsTimeline(loadedReplay.statsTimeline);
+      options.setStatsFrameLookup(loadedReplay.statsFrameLookup);
+      options.setStatRegistry(createStatRegistry(null));
+      options.setReplayPlayer(existingReplayPlayer);
+      options.syncBoostPadOverlayPlugin();
+
+      options.setupActiveModules();
+      options.setUnsubscribe(existingReplayPlayer.subscribe(options.renderSnapshot));
+
+      const config = options.getInitialConfig();
+      if (config) {
+        options.setApplyingConfig(true);
+        try {
+          options.applyConfigToReplayPlayer(config);
+        } finally {
+          options.setApplyingConfig(false);
+        }
+      }
+
+      options.getCameraControlsController()?.populateAttachedPlayerOptions(replay.players);
+      elements.emptyState.hidden = true;
+      elements.statusReadout.textContent = `Loaded ${source.name}`;
+      options.setLoadedReplayName(source.name);
+      elements.playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
+      elements.framesReadout.textContent = `${replay.frameCount}`;
+      options.renderTimelineEventCount();
+      options.renderMechanicsTimelineControls();
+      options.resetEventPlaylistWindow();
+      options.renderEventPlaylistWindow();
+      options.setTransportEnabled(true);
+      options.getCameraControlsController()?.syncAvailability(existingReplayPlayer.getState());
+      options.renderSnapshot(existingReplayPlayer.getState());
+      options.renderStatsWindows(existingReplayPlayer.getState().frameIndex);
+      options.renderScoreboard(existingReplayPlayer.getState().frameIndex);
+      options.syncEventPlaylistTimeline(existingReplayPlayer.getState(), { forceScroll: true });
+      options.renderModuleSettings();
+      options.syncRecordingWindow();
+      options.getReplayLoadModal()?.hide();
+      return;
+    }
 
     const timelineOverlay = createTimelineOverlayPlugin({
       replayEventsLabel: "Replay",
