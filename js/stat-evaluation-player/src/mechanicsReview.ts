@@ -1,4 +1,4 @@
-import type { PlaylistManifestPage } from "@rlrml/player";
+import type { PlaylistManifestPage, ReplayPlayerTrack } from "@rlrml/player";
 import type { ReplayLoadBundle, ReplayLoadProgress } from "./replayLoader.ts";
 import { formatMechanicKind } from "./timelineMarkers.ts";
 
@@ -17,6 +17,16 @@ export interface MechanicsReviewTimingReplay {
 export interface MechanicsReviewPlaybackConfig {
   timeBase?: MechanicsReviewTimeBase;
   [key: string]: unknown;
+}
+
+export type MechanicsReviewBallCamMode = "off" | "on" | "player";
+
+export interface MechanicsReviewClipPerspective {
+  kind: "player";
+  playerId?: string;
+  playerName?: string;
+  ballCam?: MechanicsReviewBallCamMode;
+  usePlayerCameraSettings?: boolean;
 }
 
 export interface MechanicsReviewReplay {
@@ -51,6 +61,7 @@ export interface MechanicsReviewItem {
   start: MechanicsReviewPlaybackBound;
   end: MechanicsReviewPlaybackBound;
   label?: string;
+  perspective?: MechanicsReviewClipPerspective;
   meta?: MechanicsReviewItemMeta;
 }
 
@@ -175,6 +186,54 @@ function parseMechanicsReviewPlayback(value: unknown): MechanicsReviewPlaybackCo
   };
 }
 
+function parseMechanicsReviewPerspective(
+  value: unknown,
+  itemNumber: number,
+): MechanicsReviewClipPerspective | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!isRecord(value)) {
+    throw new Error(`Review item ${itemNumber} perspective must be an object.`);
+  }
+  if (value.kind !== "player") {
+    throw new Error(`Review item ${itemNumber} perspective kind must be "player".`);
+  }
+  const playerId =
+    typeof value.playerId === "string" && value.playerId.trim() ? value.playerId.trim() : undefined;
+  const playerName =
+    typeof value.playerName === "string" && value.playerName.trim()
+      ? value.playerName.trim()
+      : undefined;
+  if (!playerId && !playerName) {
+    throw new Error(`Review item ${itemNumber} player perspective needs playerId or playerName.`);
+  }
+  if (
+    value.ballCam !== undefined &&
+    value.ballCam !== "off" &&
+    value.ballCam !== "on" &&
+    value.ballCam !== "player"
+  ) {
+    throw new Error(`Review item ${itemNumber} perspective ballCam must be off, on, or player.`);
+  }
+  if (
+    value.usePlayerCameraSettings !== undefined &&
+    typeof value.usePlayerCameraSettings !== "boolean"
+  ) {
+    throw new Error(
+      `Review item ${itemNumber} perspective usePlayerCameraSettings must be boolean.`,
+    );
+  }
+
+  return {
+    kind: "player",
+    playerId,
+    playerName,
+    ballCam: value.ballCam,
+    usePlayerCameraSettings: value.usePlayerCameraSettings,
+  };
+}
+
 export function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPlaylist {
   if (!isRecord(value) || !Array.isArray(value.items)) {
     throw new Error("Review playlist must contain an items array.");
@@ -195,6 +254,7 @@ export function parseMechanicsReviewPlaylist(value: unknown): MechanicsReviewPla
       start,
       end,
       label: typeof rawItem.label === "string" ? rawItem.label : undefined,
+      perspective: parseMechanicsReviewPerspective(rawItem.perspective, index + 1),
       meta: isRecord(rawItem.meta) ? rawItem.meta : undefined,
     };
   });
@@ -475,14 +535,35 @@ export function getMechanicsReviewItemLabel(item: MechanicsReviewItem, index: nu
   );
 }
 
-export function getMechanicsReviewPlayerId(item: MechanicsReviewItem): string | null {
-  if (typeof item.meta?.playerId === "string") {
-    return item.meta.playerId;
+export function getMechanicsReviewPlayerName(item: MechanicsReviewItem): string | null {
+  if (typeof item.meta?.playerName === "string" && item.meta.playerName.trim()) {
+    return item.meta.playerName.trim();
   }
-  if (isRecord(item.meta?.target) && typeof item.meta.target.playerId === "string") {
-    return item.meta.target.playerId;
+  if (isRecord(item.meta?.target) && typeof item.meta.target.playerName === "string") {
+    const playerName = item.meta.target.playerName.trim();
+    return playerName ? playerName : null;
   }
   return null;
+}
+
+export function resolveMechanicsReviewPerspectivePlayerTrack(
+  perspective: MechanicsReviewClipPerspective | undefined,
+  players: readonly ReplayPlayerTrack[],
+): ReplayPlayerTrack | null {
+  if (!perspective) {
+    return null;
+  }
+  if (perspective.playerId) {
+    const exact = players.find((player) => player.id === perspective.playerId);
+    if (exact) {
+      return exact;
+    }
+  }
+
+  const playerName = perspective.playerName?.toLowerCase();
+  return playerName
+    ? (players.find((player) => player.name.trim().toLowerCase() === playerName) ?? null)
+    : null;
 }
 
 export function getMechanicsReviewMechanicLabel(item: MechanicsReviewItem): string {

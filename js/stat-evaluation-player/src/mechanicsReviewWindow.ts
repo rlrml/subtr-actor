@@ -6,12 +6,14 @@ import {
   getMechanicsReviewCategoryLabel,
   getMechanicsReviewItemLabel,
   getMechanicsReviewMechanicLabel,
-  getMechanicsReviewPlayerId,
+  getMechanicsReviewPlayerName,
   parseMechanicsReviewPlaylistJson,
+  resolveMechanicsReviewPerspectivePlayerTrack,
   resolveMechanicsReviewBoundTime,
   resolveMechanicsReviewTargetTime,
   resolveMechanicsReviewUrl,
   type ActiveMechanicsReview,
+  type MechanicsReviewBallCamMode,
   type MechanicsReviewItem,
   type MechanicsReviewPlaybackBound,
   type MechanicsReviewPlaylist,
@@ -55,13 +57,17 @@ export interface MechanicsReviewWindowOptions {
   readonly elements: MechanicsReviewWindowElements;
   readonly replayLoads: MechanicsReviewReplayLoadsController;
   getReplayPlayer(): StatsReplayPlayer | null;
-  clearFreeCameraPreset(): void;
   resetReplayTransitionControls(): void;
   activateTimelineSource(item: MechanicsReviewItem): void;
   loadReplayBundleForDisplay(
     source: MechanicsReviewReplaySource,
     bundlePromise: Promise<ReplayLoadBundle>,
   ): Promise<void>;
+  applyClipPerspective(options: {
+    playerId: string;
+    ballCam?: MechanicsReviewBallCamMode;
+    usePlayerCameraSettings?: boolean;
+  }): void;
   showReplayLoadingWindow(): void;
 }
 
@@ -328,12 +334,19 @@ export class MechanicsReviewWindowController {
         throw new Error("Review item has an empty playback range.");
       }
 
-      const playerId = getMechanicsReviewPlayerId(item);
       const activeReplayPlayer = this.options.getReplayPlayer();
-      if (playerId && activeReplayPlayer?.replay.players.some((player) => player.id === playerId)) {
-        activeReplayPlayer.setAttachedPlayer(playerId);
-        activeReplayPlayer.setCameraViewMode("follow");
-        this.options.clearFreeCameraPreset();
+      const playerTrack = activeReplayPlayer
+        ? resolveMechanicsReviewPerspectivePlayerTrack(
+            item.perspective,
+            activeReplayPlayer.replay.players,
+          )
+        : null;
+      if (playerTrack) {
+        this.options.applyClipPerspective({
+          playerId: playerTrack.id,
+          ballCam: item.perspective?.ballCam,
+          usePlayerCameraSettings: item.perspective?.usePlayerCameraSettings,
+        });
       }
 
       this.options.resetReplayTransitionControls();
@@ -460,14 +473,15 @@ export class MechanicsReviewWindowController {
   }
 
   private getPlayerName(item: MechanicsReviewItem): string {
-    if (typeof item.meta?.playerName === "string" && item.meta.playerName.trim()) {
-      return item.meta.playerName;
+    const playerName = getMechanicsReviewPlayerName(item);
+    if (playerName) {
+      return playerName;
     }
-    const playerId = getMechanicsReviewPlayerId(item);
-    return playerId
-      ? (this.options.getReplayPlayer()?.replay.players.find((player) => player.id === playerId)
-          ?.name ?? playerId)
-      : "--";
+
+    const replayPlayers = this.options.getReplayPlayer()?.replay.players ?? [];
+    return (
+      resolveMechanicsReviewPerspectivePlayerTrack(item.perspective, replayPlayers)?.name ?? "--"
+    );
   }
 }
 

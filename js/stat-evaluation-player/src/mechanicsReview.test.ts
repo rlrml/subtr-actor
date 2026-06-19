@@ -2,11 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  parseMechanicsReviewPlaylist,
+  resolveMechanicsReviewPerspectivePlayerTrack,
   resolveMechanicsReviewBoundTime,
   resolveMechanicsReviewTargetTime,
   type MechanicsReviewItem,
   type MechanicsReviewTimingReplay,
 } from "./mechanicsReview.ts";
+import type { ReplayPlayerTrack } from "@rlrml/player";
 
 function replayWithFrame(frameIndex: number, time: number): MechanicsReviewTimingReplay {
   const frames = Array.from({ length: frameIndex + 1 }, (_, index) => ({ time: index / 30 }));
@@ -90,3 +93,87 @@ test("review playlist frame bounds use replay frame playback time directly", () 
 
   assert.equal(resolveMechanicsReviewBoundTime(item, item.start, replay), 63);
 });
+
+test("review playlists preserve optional clip perspective", () => {
+  const playlist = parseMechanicsReviewPlaylist({
+    items: [
+      {
+        replay: "replay-id",
+        start: { kind: "time", value: 1 },
+        end: { kind: "time", value: 2 },
+        perspective: {
+          kind: "player",
+          playerId: "Steam:76561198000000000",
+          playerName: "Scorer",
+          ballCam: "player",
+          usePlayerCameraSettings: true,
+        },
+      },
+    ],
+  });
+
+  assert.deepEqual(playlist.items[0]?.perspective, {
+    kind: "player",
+    playerId: "Steam:76561198000000000",
+    playerName: "Scorer",
+    ballCam: "player",
+    usePlayerCameraSettings: true,
+  });
+});
+
+test("review playlist perspectives reject invalid ball cam modes", () => {
+  assert.throws(
+    () =>
+      parseMechanicsReviewPlaylist({
+        items: [
+          {
+            replay: "replay-id",
+            start: { kind: "time", value: 1 },
+            end: { kind: "time", value: 2 },
+            perspective: {
+              kind: "player",
+              playerName: "Scorer",
+              ballCam: "sometimes",
+            },
+          },
+        ],
+      }),
+    /perspective ballCam/,
+  );
+});
+
+test("review clip perspectives match exact replay track ids", () => {
+  const track = playerTrack("Steam:76561198000000000", "Scorer");
+  assert.equal(
+    resolveMechanicsReviewPerspectivePlayerTrack(
+      { kind: "player", playerId: "Steam:76561198000000000" },
+      [track],
+    )?.id,
+    track.id,
+  );
+});
+
+test("review clip perspectives fall back to player name when ids differ", () => {
+  const track = playerTrack("replay-track-id", "Known Alias");
+  assert.equal(
+    resolveMechanicsReviewPerspectivePlayerTrack(
+      {
+        kind: "player",
+        playerId: "source-event-id",
+        playerName: "Known Alias",
+      },
+      [track],
+    )?.id,
+    track.id,
+  );
+});
+
+function playerTrack(id: string, name: string): ReplayPlayerTrack {
+  return {
+    id,
+    name,
+    isTeamZero: true,
+    cameraSettings: {},
+    frames: [],
+  } as unknown as ReplayPlayerTrack;
+}
