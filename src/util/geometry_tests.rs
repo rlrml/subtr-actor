@@ -109,6 +109,65 @@ fn interpolates_rigid_body_location() {
 }
 
 #[test]
+fn holds_rigid_body_location_when_velocity_is_absent() {
+    let start_body = boxcars::RigidBody {
+        sleeping: true,
+        location: Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 94.05,
+        },
+        rotation: Quaternion {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        },
+        linear_velocity: None,
+        angular_velocity: None,
+    };
+    let end_body = boxcars::RigidBody {
+        sleeping: false,
+        location: Vector3f {
+            x: -4.23,
+            y: 15.73,
+            z: 100.09,
+        },
+        rotation: Quaternion {
+            x: 0.0,
+            y: 0.0,
+            z: 1.0,
+            w: 0.0,
+        },
+        linear_velocity: Some(Vector3f {
+            x: -264.55,
+            y: 2648.58,
+            z: 804.71,
+        }),
+        angular_velocity: Some(Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }),
+    };
+
+    let interpolated_body = get_interpolated_rigid_body(&start_body, 0.0, &end_body, 1.0, 0.9)
+        .expect("interpolation should succeed");
+
+    assert_eq!(interpolated_body.location, start_body.location);
+    assert_eq!(interpolated_body.rotation, start_body.rotation);
+    assert_eq!(interpolated_body.sleeping, start_body.sleeping);
+    assert_eq!(
+        interpolated_body.linear_velocity,
+        start_body.linear_velocity
+    );
+    assert_eq!(
+        interpolated_body.angular_velocity,
+        start_body.angular_velocity
+    );
+}
+
+#[test]
 fn apply_velocities_to_rigid_body_applies_and_normalizes_angular_velocity() {
     let mut body = sample_rigid_body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     body.angular_velocity = Some(Vector3f {

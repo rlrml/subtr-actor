@@ -1077,6 +1077,10 @@ pub fn get_interpolated_rigid_body(
         });
     }
 
+    if start_body.linear_velocity.is_none() || end_body.linear_velocity.is_none() {
+        return Ok(*start_body);
+    }
+
     let duration = end_time - start_time;
     let interpolation_amount = (time - start_time) / duration;
     let start_position = vec_to_glam(&start_body.location);
