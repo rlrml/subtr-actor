@@ -225,7 +225,6 @@ pub enum SaMechanicKind {
     FlipReset = 10,
     DoubleTap = 11,
     Flick = 12,
-    MustyFlick = 13,
     OneTimer = 14,
     Pass = 15,
     HalfVolley = 16,

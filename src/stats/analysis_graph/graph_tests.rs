@@ -370,7 +370,6 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "half_flip",
         "half_volley",
         "movement",
-        "musty_flick",
         "one_timer",
         "pass",
         "player_activity",

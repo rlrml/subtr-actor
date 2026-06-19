@@ -421,7 +421,6 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "speed_flip",
         "half_flip",
         "flick",
-        "musty_flick",
         "dodge_reset",
         "ball_carry",
         "controlled_play",
@@ -794,14 +793,6 @@ pub(crate) fn builtin_module_json(
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
                 player_stats: player_stats_entries(projection.flick.player_stats()),
-                events: calculator.events(),
-            })
-        }
-        "musty_flick" => {
-            let calculator = graph_state::<MustyFlickCalculator>(graph, module_name)?;
-            let projection = projected_stats(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsWithEventsExport {
-                player_stats: player_stats_entries(projection.musty_flick.player_stats()),
                 events: calculator.events(),
             })
         }
@@ -1448,12 +1439,6 @@ pub(crate) fn builtin_snapshot_frame_json(
                 player_stats: player_stats_entries(projection.flick.player_stats()),
             })?
         }
-        "musty_flick" => {
-            let projection = projected_stats(graph, module_name)?;
-            serialize_to_json_value(&PlayerStatsExport {
-                player_stats: player_stats_entries(projection.musty_flick.player_stats()),
-            })?
-        }
         "dodge_reset" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsExport {
@@ -1732,7 +1717,6 @@ pub(crate) fn builtin_snapshot_config_json(
         | "speed_flip"
         | "half_flip"
         | "flick"
-        | "musty_flick"
         | "dodge_reset"
         | "ball_carry"
         | "controlled_play"

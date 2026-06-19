@@ -58,7 +58,6 @@ test("empty event derivations restore default fields for compacted zero-event ti
   deleteField(player.touch, "touch_count");
   deleteField(player.whiff, "whiff_count");
   deleteField(player.flick, "count");
-  deleteField(player.musty_flick, "count");
   deleteField(player.dodge_reset, "count");
   deleteField(player.ball_carry, "carry_count");
   deleteField(player.air_dribble, "count");
@@ -108,7 +107,6 @@ test("empty event derivations restore default fields for compacted zero-event ti
   assert.equal(derivedPlayer.touch.touch_count, 0);
   assert.equal(derivedPlayer.whiff.whiff_count, 0);
   assert.equal(derivedPlayer.flick.count, 0);
-  assert.equal(derivedPlayer.musty_flick.count, 0);
   assert.equal(derivedPlayer.dodge_reset.count, 0);
   assert.equal(derivedPlayer.ball_carry.carry_count, 0);
   assert.equal(derivedPlayer.air_dribble.count, 0);

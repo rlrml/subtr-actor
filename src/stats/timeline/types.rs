@@ -216,7 +216,6 @@ pub fn stats_timeline_event_label(stream: &str) -> String {
         "bump" => "Bump",
         "demolition" => "Demolition",
         "flick" => "Flick",
-        "musty_flick" => "Musty flick",
         _ => return title_case_event_stream(stream),
     };
     label.to_owned()
@@ -383,7 +382,6 @@ pub enum EventPayload {
     WallAerialShot(WallAerialShotEvent),
     Center(CenterEvent),
     Flick(FlickEvent),
-    MustyFlick(MustyFlickEvent),
     DodgeReset(DodgeResetEvent),
     DoubleTap(DoubleTapEvent),
     FiftyFifty(FiftyFiftyEvent),
@@ -497,7 +495,6 @@ pub struct PlayerStatsSnapshot {
     pub touch: TouchStats,
     pub whiff: WhiffStats,
     pub flick: FlickStats,
-    pub musty_flick: MustyFlickStats,
     pub dodge_reset: DodgeResetStats,
     pub ball_carry: BallCarryStats,
     pub controlled_play: ControlledPlayStats,

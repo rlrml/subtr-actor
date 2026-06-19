@@ -19,7 +19,6 @@ export * from "./halfVolleyEventDerivation.ts";
 export * from "./movementFormatting.ts";
 export * from "./movementEventDerivation.ts";
 export * from "./mechanicEventDerivation.ts";
-export * from "./mustyFlickEventDerivation.ts";
 export * from "./oneTimerEventDerivation.ts";
 export * from "./overlays.ts";
 export * from "./passEventDerivation.ts";

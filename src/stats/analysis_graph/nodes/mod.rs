@@ -10,11 +10,11 @@ use crate::stats::calculators::{
     FlipIntoBallGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo,
     GameplayState, HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
     HighAerialGoalCalculator, KickoffCalculator, KickoffGoalCalculator, LivePlayState,
-    LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator, MustyFlickCalculator,
-    OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator,
-    PassingGoalCalculator, PlayerFrameState, PlayerPossessionCalculator, PlayerVerticalState,
-    PositioningCalculator, PossessionCalculator, PossessionState, PowerslideCalculator,
-    RotationCalculator, RushCalculator, SpeedFlipCalculator, SustainedPressureGoalCalculator,
+    LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator, OneTimerCalculator,
+    OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator,
+    PlayerFrameState, PlayerPossessionCalculator, PlayerVerticalState, PositioningCalculator,
+    PossessionCalculator, PossessionState, PowerslideCalculator, RotationCalculator,
+    RushCalculator, SpeedFlipCalculator, SustainedPressureGoalCalculator,
     TerritorialPressureCalculator, TouchCalculator, TouchState, WallAerialCalculator,
     WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
@@ -48,7 +48,6 @@ pub(crate) mod kickoff;
 pub(crate) mod live_play;
 pub(crate) mod match_stats;
 pub(crate) mod movement;
-pub(crate) mod musty_flick;
 pub(crate) mod one_timer;
 pub(crate) mod pass;
 pub(crate) mod player_frame_state;
@@ -137,8 +136,6 @@ pub use live_play::LivePlayNode;
 pub use match_stats::MatchStatsNode;
 #[allow(unused_imports)]
 pub use movement::MovementNode;
-#[allow(unused_imports)]
-pub use musty_flick::MustyFlickNode;
 #[allow(unused_imports)]
 pub use one_timer::OneTimerNode;
 #[allow(unused_imports)]
@@ -422,10 +419,6 @@ pub(crate) fn half_flip_dependency() -> AnalysisDependency {
 
 pub(crate) fn half_volley_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<HalfVolleyCalculator>(half_volley::boxed_default)
-}
-
-pub(crate) fn musty_flick_dependency() -> AnalysisDependency {
-    AnalysisDependency::with_default::<MustyFlickCalculator>(musty_flick::boxed_default)
 }
 
 pub(crate) fn pass_dependency() -> AnalysisDependency {

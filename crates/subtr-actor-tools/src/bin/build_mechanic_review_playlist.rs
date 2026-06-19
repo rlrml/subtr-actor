@@ -33,7 +33,6 @@ const DEFAULT_MIN_CLIP_SECONDS: f32 = 8.0;
 const DEFAULT_DOWNLOAD_DELAY_MS: u64 = 1100;
 const DEFAULT_MECHANICS: &[&str] = &[
     "flick",
-    "musty_flick",
     "one_timer",
     "air_dribble",
     "flip_reset",
@@ -42,7 +41,6 @@ const DEFAULT_MECHANICS: &[&str] = &[
 ];
 const ALL_MECHANICS: &[&str] = &[
     "flick",
-    "musty_flick",
     "one_timer",
     "air_dribble",
     "flip_reset",
@@ -623,7 +621,6 @@ fn graph_node_names_for_mechanics(mechanics: &[&str]) -> Vec<&'static str> {
     for mechanic in mechanics {
         let node = match *mechanic {
             "flick" => Some("flick"),
-            "musty_flick" => Some("musty_flick"),
             "one_timer" => Some("one_timer"),
             "air_dribble" => Some("ball_carry"),
             "ceiling_shot" => Some("ceiling_shot"),

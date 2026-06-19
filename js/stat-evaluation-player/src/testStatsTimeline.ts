@@ -73,7 +73,6 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "wall_aerial_shot", stream: "wall_aerial_shot", kind: "wall_aerial_shot" },
   { field: "center", stream: "center", kind: "center" },
   { field: "flick", stream: "flick", kind: "flick" },
-  { field: "musty_flick", stream: "musty_flick", kind: "musty_flick" },
   { field: "dodge_reset", stream: "dodge_reset", kind: "dodge_reset" },
   { field: "double_tap", stream: "double_tap", kind: "double_tap" },
   { field: "fifty_fifty", stream: "fifty_fifty", kind: "fifty_fifty" },
@@ -394,7 +393,6 @@ export function createLegacyStatsTimeline(
     wall_aerial_shot_events?: PayloadList<"wall_aerial_shot">;
     center_events?: PayloadList<"center">;
     flick_events?: PayloadList<"flick">;
-    musty_flick_events?: PayloadList<"musty_flick">;
     dodge_reset_events?: PayloadList<"dodge_reset">;
     double_tap_events?: PayloadList<"double_tap">;
     fifty_fifty_events?: PayloadList<"fifty_fifty">;
@@ -447,9 +445,6 @@ export function createLegacyStatsTimeline(
     ),
     ...(overrides.flick_events ?? []).map((event, index) =>
       payloadEvent("flick", "flick", event, index),
-    ),
-    ...(overrides.musty_flick_events ?? []).map((event, index) =>
-      payloadEvent("musty_flick", "musty_flick", event, index),
     ),
     ...(overrides.dodge_reset_events ?? []).map((event, index) =>
       payloadEvent("dodge_reset", "dodge_reset", event, index),

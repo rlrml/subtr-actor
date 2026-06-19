@@ -401,7 +401,7 @@ void SubtrActorPlugin::onLoad() {
         cvarManager->log(
             "subtr-actor overlay filters: all, mechanics, team, goal_context, speed_flip, "
             "half_flip, wavedash, ball_carry, air_dribble, ceiling_shot, wall_aerial, "
-            "wall_aerial_shot, center, flip_reset, double_tap, flick, musty_flick, "
+            "wall_aerial_shot, center, flip_reset, double_tap, flick, "
             "one_timer, pass, half_volley, whiff, bump, backboard, boost_pickup, demo, "
             "shot, save, assist, goal");
       },

@@ -242,7 +242,6 @@ fn exposes_current_timeline_frame_json_after_processing_frame() {
         "touch",
         "whiff",
         "flick",
-        "musty_flick",
         "dodge_reset",
         "ball_carry",
         "air_dribble",

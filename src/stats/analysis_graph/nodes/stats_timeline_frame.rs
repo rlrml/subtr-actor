@@ -251,12 +251,6 @@ impl StatsTimelineFrameNode {
                 .get(player_id)
                 .cloned()
                 .unwrap_or_default(),
-            musty_flick: projection
-                .musty_flick
-                .player_stats()
-                .get(player_id)
-                .cloned()
-                .unwrap_or_default(),
             dodge_reset: projection
                 .dodge_reset
                 .player_stats()

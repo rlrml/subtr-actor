@@ -726,7 +726,6 @@ fn maps_normalized_timeline_mechanic_kinds_to_abi_kinds() {
         "flip_reset",
         "half_flip",
         "half_volley",
-        "musty_flick",
         "one_timer",
         "pass",
         "speed_flip",
@@ -766,10 +765,6 @@ fn maps_normalized_timeline_mechanic_kinds_to_abi_kinds() {
     assert_eq!(
         mechanic_kind("half_volley"),
         Some(SaMechanicKind::HalfVolley)
-    );
-    assert_eq!(
-        mechanic_kind("musty_flick"),
-        Some(SaMechanicKind::MustyFlick)
     );
     assert_eq!(mechanic_kind("one_timer"), Some(SaMechanicKind::OneTimer));
     assert_eq!(mechanic_kind("pass"), Some(SaMechanicKind::Pass));

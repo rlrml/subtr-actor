@@ -22,8 +22,8 @@
 //! Calculators group by what they produce (browse them via the [`StatsEvent`]
 //! *Implementors* list, or the `*Calculator` entries in the item list):
 //!
-//! - **Mechanics** — [`FlickCalculator`], [`MustyFlickCalculator`],
-//!   [`HalfFlipCalculator`], [`SpeedFlipCalculator`], [`WavedashCalculator`],
+//! - **Mechanics** — [`FlickCalculator`], [`HalfFlipCalculator`],
+//!   [`SpeedFlipCalculator`], [`WavedashCalculator`],
 //!   [`PowerslideCalculator`], [`FlipImpulseCalculator`],
 //!   [`DodgeResetCalculator`], [`WallAerialCalculator`],
 //!   [`WallAerialShotCalculator`], [`CeilingShotCalculator`],

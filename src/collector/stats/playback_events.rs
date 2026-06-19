@@ -1090,25 +1090,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             ));
         }
 
-        for (index, event) in self
-            .module_player_events("musty_flick", "events", parse_musty_flick_event)?
-            .into_iter()
-            .enumerate()
-        {
-            events.push(make_event(
-                "musty_flick",
-                index,
-                span(event.dodge_frame, event.frame, event.dodge_time, event.time),
-                EventPayload::MustyFlick(event.clone()),
-                Some(event.player.clone()),
-                None,
-                Some(event.is_team_0),
-                event.player_position,
-                None,
-                Some(event.confidence),
-            ));
-        }
-
         events.sort_by(|left, right| {
             event_start_time(left)
                 .total_cmp(&event_start_time(right))

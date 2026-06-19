@@ -238,11 +238,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             },
             whiff: self.frame_player_stat_or_default_typed_by_key(frame, "whiff", &player_key)?,
             flick: self.frame_player_stat_or_default_typed_by_key(frame, "flick", &player_key)?,
-            musty_flick: self.frame_player_stat_or_default_typed_by_key(
-                frame,
-                "musty_flick",
-                &player_key,
-            )?,
             dodge_reset: self.frame_player_stat_or_default_typed_by_key(
                 frame,
                 "dodge_reset",
@@ -598,14 +593,6 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         player_value.insert(
             "flick".to_owned(),
             self.frame_player_stat_or_default_by_key::<FlickStats>(frame, "flick", &player_key)?,
-        );
-        player_value.insert(
-            "musty_flick".to_owned(),
-            self.frame_player_stat_or_default_by_key::<MustyFlickStats>(
-                frame,
-                "musty_flick",
-                &player_key,
-            )?,
         );
         player_value.insert(
             "dodge_reset".to_owned(),

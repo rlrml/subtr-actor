@@ -788,36 +788,6 @@ _None documented._
 
 _None documented._
 
-### Musty Flick (`musty_flick`)
-
-- Category: `mechanic`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `musty_flick` via `MustyFlickNode` / `MustyFlickCalculator`
-
-**Summary**
-
-A back-flip style flick where the ball is contacted behind/on top of the car during a dominant pitch rotation.
-
-**Approach**
-
-- Track dodge starts and keep only recent candidates whose car orientation is compatible with a musty-style setup.
-- On a same-player touch, require the ball to be behind and above the car in local space, with rear/top alignment and forward approach speed.
-- Require a meaningful ball speed change and pitch-dominant angular velocity, then score confidence from timing, alignment, approach, pitch, impulse, and setup orientation.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
 ### One Timer (`one_timer`)
 
 - Category: `mechanic`

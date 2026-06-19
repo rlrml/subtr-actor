@@ -43,8 +43,8 @@
 //!   [`PlayerVerticalStateNode`], [`PositioningNode`], [`RotationNode`],
 //!   [`BackboardBounceStateNode`], [`FiftyFiftyStateNode`],
 //!   [`ContinuousBallControlNode`].
-//! - **Mechanic detection** — [`FlickNode`], [`MustyFlickNode`],
-//!   [`HalfFlipNode`], [`SpeedFlipNode`], [`WavedashNode`], [`PowerslideNode`],
+//! - **Mechanic detection** — [`FlickNode`], [`HalfFlipNode`],
+//!   [`SpeedFlipNode`], [`WavedashNode`], [`PowerslideNode`],
 //!   [`FlipImpulseNode`], [`DodgeResetNode`], [`WallAerialNode`],
 //!   [`WallAerialShotNode`], [`CeilingShotNode`], [`DoubleTapNode`],
 //!   [`HalfVolleyNode`], [`OneTimerNode`], [`BallCarryNode`] (carries/air
@@ -163,9 +163,7 @@ builtin_analysis_nodes! {
     FlipIntoBallGoalNode,
     BumpGoalNode,
     DemoGoalNode,
-    HalfVolleyGoalNode,
-    MustyFlickNode,
-    OneTimerNode,
+    HalfVolleyGoalNode, OneTimerNode,
     PassNode,
     DodgeResetNode,
     BallCarryNode,

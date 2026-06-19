@@ -505,23 +505,6 @@ export function renderDodgeResetStats(
   `;
 }
 
-export function renderMustyFlickStats(
-  mustyFlick: PlayerStatsSnapshot["musty_flick"] | undefined,
-): string {
-  const averageConfidence =
-    mustyFlick && mustyFlick.count > 0
-      ? mustyFlick.cumulative_confidence / mustyFlick.count
-      : undefined;
-  return `
-    <div class="stat-row"><span class="label">Attempts</span><span class="value">${formatInteger(mustyFlick?.count)}</span></div>
-    <div class="stat-row"><span class="label">High conf</span><span class="value">${formatInteger(mustyFlick?.high_confidence_count)}</span></div>
-    <div class="stat-row"><span class="label">Last quality</span><span class="value">${formatNumber(asNumber(mustyFlick?.last_confidence), 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Avg quality</span><span class="value">${formatNumber(averageConfidence, 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Best quality</span><span class="value">${formatNumber(asNumber(mustyFlick?.best_confidence), 0, "%")}</span></div>
-    <div class="stat-row"><span class="label">Since last</span><span class="value">${formatNumber(asNumber(mustyFlick?.time_since_last_musty), 2, "s")}</span></div>
-  `;
-}
-
 export function renderFlickStats(flick: PlayerStatsSnapshot["flick"] | undefined): string {
   const averageConfidence =
     flick && flick.count > 0 ? flick.cumulative_confidence / flick.count : undefined;

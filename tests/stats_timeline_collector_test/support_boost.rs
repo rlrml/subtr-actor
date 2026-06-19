@@ -201,7 +201,6 @@ fn default_player_stats_snapshot(
         touch: TouchStats::default(),
         whiff: WhiffStats::default(),
         flick: FlickStats::default(),
-        musty_flick: MustyFlickStats::default(),
         dodge_reset: DodgeResetStats::default(),
         ball_carry: BallCarryStats::default(),
         controlled_play: ControlledPlayStats::default(),

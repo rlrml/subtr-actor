@@ -235,7 +235,6 @@ constexpr std::array<EventFilterOption, 33> EVENT_FILTER_OPTIONS{{
     {"double_tap", "Double tap", "Mechanics"},
     {"fifty_fifty", "50/50", "Mechanics"},
     {"flick", "Flick", "Mechanics"},
-    {"musty_flick", "Musty flick", "Mechanics"},
     {"one_timer", "One timer", "Mechanics"},
     {"pass", "Pass", "Mechanics"},
     {"half_volley", "Half volley", "Mechanics"},
@@ -243,7 +242,7 @@ constexpr std::array<EventFilterOption, 33> EVENT_FILTER_OPTIONS{{
     {"bump", "Bump", "Mechanics"},
 }};
 
-constexpr std::array<const char *, 24> MECHANIC_FILTER_TOKENS{{
+constexpr std::array<const char *, 23> MECHANIC_FILTER_TOKENS{{
     "speed_flip",
     "half_flip",
     "powerslide",
@@ -259,7 +258,6 @@ constexpr std::array<const char *, 24> MECHANIC_FILTER_TOKENS{{
     "double_tap",
     "fifty_fifty",
     "flick",
-    "musty_flick",
     "one_timer",
     "pass",
     "half_volley",
@@ -311,7 +309,6 @@ constexpr auto UI_STAT_DEFINITIONS = std::to_array<UiStatDefinition>({
     {"player:pass.completed_pass_count", "Completed passes", "Team play", true, false, false},
     {"player:pass.received_pass_count", "Received passes", "Team play", true, false, false},
     {"player:flick.count", "Flicks", "Mechanics", true, false, false},
-    {"player:musty_flick.count", "Musty flicks", "Mechanics", true, false, false},
     {"player:wall_aerial.count", "Wall aerials", "Mechanics", true, false, false},
     {"player:wall_aerial_shot.count", "Wall aerial shots", "Mechanics", true, false, false},
     {"player:ceiling_shot.count", "Ceiling shots", "Mechanics", true, false, false},

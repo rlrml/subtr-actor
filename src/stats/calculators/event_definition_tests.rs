@@ -12,7 +12,6 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<WallAerialShotEvent>();
     assert_stats_event::<CenterEvent>();
     assert_stats_event::<FlickEvent>();
-    assert_stats_event::<MustyFlickEvent>();
     assert_stats_event::<DodgeResetEvent>();
     assert_stats_event::<DoubleTapEvent>();
     assert_stats_event::<OneTimerEvent>();

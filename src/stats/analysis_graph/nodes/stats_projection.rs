@@ -29,7 +29,6 @@ pub struct StatsProjectionState {
     pub speed_flip: SpeedFlipStatsAccumulator,
     pub half_flip: HalfFlipStatsAccumulator,
     pub flick: FlickStatsAccumulator,
-    pub musty_flick: MustyFlickStatsAccumulator,
     pub dodge_reset: DodgeResetStatsAccumulator,
     pub ball_carry: BallCarryStatsAccumulator,
     pub boost: BoostStatsAccumulator,
@@ -187,7 +186,6 @@ struct StatsProjectionCursors {
     speed_flip: usize,
     half_flip: usize,
     flick: usize,
-    musty_flick: usize,
     dodge_reset: usize,
     dodge_reset_flip_reset_outcome: usize,
     ball_carry: usize,
@@ -230,7 +228,6 @@ impl StatsProjectionNode {
             self.state.ceiling_shot.reset_current_last_event_marker();
             self.state.flick.reset_current_last_event_marker();
             self.state.half_flip.reset_current_last_event_marker();
-            self.state.musty_flick.reset_current_last_event_marker();
             self.state.wavedash.reset_current_last_event_marker();
             self.state.whiff.reset_current_last_event_marker();
         }
@@ -239,7 +236,6 @@ impl StatsProjectionNode {
             self.state.ceiling_shot.begin_sample(frame);
             self.state.flick.begin_sample(frame);
             self.state.half_flip.begin_sample(frame);
-            self.state.musty_flick.begin_sample(frame);
             self.state.touch.begin_sample(frame);
             self.state.wavedash.begin_sample(frame);
             self.state.whiff.begin_sample(frame);
@@ -491,12 +487,6 @@ impl StatsProjectionNode {
                 self.state.flick.apply_event(event, frame);
             }
         }
-        let musty_flick = ctx.get::<MustyFlickCalculator>()?;
-        if live_play {
-            for event in Self::events_since(&mut self.cursors.musty_flick, musty_flick.events()) {
-                self.state.musty_flick.apply_event(event, frame);
-            }
-        }
         let dodge_reset = ctx.get::<DodgeResetCalculator>()?;
         for event in Self::events_since(&mut self.cursors.dodge_reset, dodge_reset.events()) {
             self.state.dodge_reset.apply_event(event);
@@ -622,7 +612,6 @@ impl AnalysisNode for StatsProjectionNode {
             speed_flip_dependency(),
             half_flip_dependency(),
             flick_dependency(),
-            musty_flick_dependency(),
             dodge_reset_dependency(),
             ball_carry_dependency(),
             boost_dependency(),

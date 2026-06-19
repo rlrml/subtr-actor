@@ -17,7 +17,6 @@ const MECHANIC_FLICK: &str = "flick";
 const MECHANIC_FLIP_RESET: &str = "flip_reset";
 const MECHANIC_HALF_FLIP: &str = "half_flip";
 const MECHANIC_HALF_VOLLEY: &str = "half_volley";
-const MECHANIC_MUSTY_FLICK: &str = "musty_flick";
 const MECHANIC_ONE_TIMER: &str = "one_timer";
 const MECHANIC_PASS: &str = "pass";
 const MECHANIC_SPEED_FLIP: &str = "speed_flip";
@@ -36,7 +35,6 @@ pub const STATS_TIMELINE_MECHANIC_KINDS: &[&str] = &[
     MECHANIC_FLIP_RESET,
     MECHANIC_HALF_FLIP,
     MECHANIC_HALF_VOLLEY,
-    MECHANIC_MUSTY_FLICK,
     MECHANIC_ONE_TIMER,
     MECHANIC_PASS,
     MECHANIC_SPEED_FLIP,
@@ -88,7 +86,6 @@ impl StatsTimelineEventsNode {
             speed_flip_dependency(),
             half_flip_dependency(),
             flick_dependency(),
-            musty_flick_dependency(),
             dodge_reset_dependency(),
             ball_carry_dependency(),
             boost_dependency(),
@@ -146,7 +143,6 @@ impl StatsTimelineEventsNode {
         let fifty_fifty = ctx.get::<FiftyFiftyCalculator>()?;
         let kickoff = ctx.get::<KickoffCalculator>()?;
         let flick = ctx.get::<FlickCalculator>()?;
-        let musty_flick = ctx.get::<MustyFlickCalculator>()?;
         let aerial_goal = ctx.get::<AerialGoalCalculator>()?;
         let high_aerial_goal = ctx.get::<HighAerialGoalCalculator>()?;
         let long_distance_goal = ctx.get::<LongDistanceGoalCalculator>()?;
@@ -243,7 +239,6 @@ impl StatsTimelineEventsNode {
                 bump,
                 demo,
                 flick,
-                musty_flick,
             ),
         };
         Ok(())
@@ -383,7 +378,6 @@ fn build_replay_events(
     bump: &BumpCalculator,
     demo: &DemoCalculator,
     flick: &FlickCalculator,
-    musty_flick: &MustyFlickCalculator,
 ) -> Vec<Event> {
     let mut events = Vec::new();
 
@@ -1144,21 +1138,6 @@ fn build_replay_events(
                 event.time,
             ),
             EventPayload::Flick(event.clone()),
-            Some(event.player.clone()),
-            None,
-            Some(event.is_team_0),
-            event.player_position,
-            None,
-            Some(event.confidence),
-        ));
-    }
-
-    for (index, event) in musty_flick.events().iter().enumerate() {
-        events.push(make_event(
-            MECHANIC_MUSTY_FLICK,
-            index,
-            span(event.dodge_frame, event.frame, event.dodge_time, event.time),
-            EventPayload::MustyFlick(event.clone()),
             Some(event.player.clone()),
             None,
             Some(event.is_team_0),

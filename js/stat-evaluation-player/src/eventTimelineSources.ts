@@ -19,7 +19,6 @@ const CURATED_STATS_EVENT_STREAM_IDS = new Set<string>([
   "wall_aerial_shot",
   "center",
   "flick",
-  "musty_flick",
   "dodge_reset",
   "double_tap",
   "fifty_fifty",

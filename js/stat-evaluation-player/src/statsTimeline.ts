@@ -21,7 +21,6 @@ import type { EventProperty } from "./generated/EventProperty.ts";
 import type { EventPropertyValue } from "./generated/EventPropertyValue.ts";
 import type { EventTiming } from "./generated/EventTiming.ts";
 import type { MovementEvent } from "./generated/MovementEvent.ts";
-import type { MustyFlickEvent } from "./generated/MustyFlickEvent.ts";
 import type { OneTimerEvent } from "./generated/OneTimerEvent.ts";
 import type { PassEvent } from "./generated/PassEvent.ts";
 import type { PlayerStatsSnapshot as GeneratedPlayerStatsSnapshot } from "./generated/PlayerStatsSnapshot.ts";
@@ -105,7 +104,6 @@ export type {
   EventPropertyValue,
   EventTiming,
   MovementEvent,
-  MustyFlickEvent,
   OneTimerEvent,
   PassEvent,
   PossessionEvent,
