@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Classifies ball touches (with rotation/possession/50-50/vertical context) into touch events/stats.
 pub struct TouchNode {
     calculator: TouchCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for TouchNode {
 
     fn name(&self) -> &'static str {
         "touch"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::TOUCH_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

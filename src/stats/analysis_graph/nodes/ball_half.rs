@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks which half of the field the ball is in from ball-frame and live-play state.
 pub struct BallHalfNode {
     calculator: BallHalfCalculator,
 }
@@ -29,6 +30,10 @@ impl AnalysisNode for BallHalfNode {
 
     fn name(&self) -> &'static str {
         "ball_half"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::BALL_HALF_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

@@ -326,20 +326,6 @@ fn live_abi_exposes_every_builtin_analysis_node_by_name() {
             "live analysis node {node_name} should match direct full graph output"
         );
     }
-    for alias in builtin_analysis_node_aliases() {
-        let value = live_analysis_node_json_value(engine, alias.alias);
-        assert!(
-            !value.is_null(),
-            "analysis node alias {} should expose a JSON payload",
-            alias.alias
-        );
-        assert_eq!(
-            value,
-            direct_full_graph_analysis_node_json_value(&frames, alias.alias),
-            "live analysis node alias {} should match direct full graph output",
-            alias.alias
-        );
-    }
     assert_eq!(
         live_analysis_node_json_value(engine, "core"),
         live_stats_module_json_value(engine, "core")

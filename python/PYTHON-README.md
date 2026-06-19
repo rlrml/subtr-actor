@@ -6,6 +6,10 @@ Python bindings for [subtr-actor](https://github.com/rlrml/subtr-actor), a Rocke
 
 ```bash
 pip install subtr-actor-py
+# or, with uv:
+uv add subtr-actor-py
+# or, with Poetry:
+poetry add subtr-actor-py
 ```
 
 ## Usage
@@ -238,7 +242,7 @@ This binding depends on the workspace crate via:
 ```toml
 [dependencies.subtr-actor]
 path = ".."
-version = "0.12.0"
+version = "1.0.2"
 ```
 
 That keeps local development wired to the workspace crate while still pinning the published dependency version. Use `just bump <version>` to update the workspace and binding versions together.

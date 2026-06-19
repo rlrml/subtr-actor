@@ -127,6 +127,7 @@ export function createPlayerConfigBindings(
       options.skipKickoffs.checked = config.playback.skipKickoffs ?? options.skipKickoffs.checked;
       options.hitboxWireframes.checked = config.overlays.hitboxWireframes;
       options.hitboxOnlyMode.checked = config.overlays.hitboxOnlyMode;
+      options.getCameraControlsController()?.applyNameplateLiftUu(config.camera.nameplateLiftUu);
       if (config.playback.rate !== undefined) {
         options.playbackRate.value = `${config.playback.rate}`;
       }

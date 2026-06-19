@@ -18,4 +18,16 @@ touch_id?: number, time: number, frame: number, team_is_team_0: boolean, player:
  * `0.0` means the ball intersects or touches the oriented car hitbox after
  * subtracting the Rocket League ball collision radius.
  */
-closest_approach_distance: number | null, dodge_contact: boolean, };
+closest_approach_distance: number | null,
+/**
+ * Ball center in the car's local hitbox coordinates at the attributed touch.
+ */
+contact_local_ball_position?: [number, number, number] | null,
+/**
+ * Closest point on the car hitbox to the ball center, in local hitbox coordinates.
+ */
+contact_local_hitbox_point?: [number, number, number] | null,
+/**
+ * Closest point on the car hitbox to the ball center, in field coordinates.
+ */
+contact_world_hitbox_point?: [number, number, number] | null, dodge_contact: boolean, };

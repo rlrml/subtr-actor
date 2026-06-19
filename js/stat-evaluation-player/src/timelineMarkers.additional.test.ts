@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 
 import type { ReplayModel } from "@rlrml/player";
 import {
-  buildBallCarryTimelineEvents,
   buildDodgeResetTimelineEvents,
   buildHalfFlipTimelineEvents,
   buildPowerslideTimelineEvents,
@@ -116,51 +115,6 @@ test("buildDodgeResetTimelineEvents emits non-flip-reset dodge refreshes", () =>
       playerName: "Blue",
       isTeamZero: true,
       color: "#3b82f6",
-    },
-  ]);
-});
-
-test("buildBallCarryTimelineEvents maps carry completions to timeline markers", () => {
-  const replay = {
-    frames: [{ time: 0 }, { time: 1.5 }],
-    players: [{ id: "Steam:orange-id", name: "Orange" }],
-  } as ReplayModel;
-
-  const statsTimeline = createLegacyStatsTimeline({
-    ball_carry_events: [
-      {
-        player_id: { Steam: "orange-id" },
-        is_team_0: false,
-        kind: "carry",
-        start_frame: 0,
-        end_frame: 1,
-        start_time: 0,
-        end_time: 1.5,
-        duration: 1.5,
-        straight_line_distance: 0,
-        path_distance: 0,
-        average_horizontal_gap: 0,
-        average_vertical_gap: 0,
-        average_speed: 0,
-        touch_count: 1,
-        air_touch_count: 0,
-        air_dribble_origin: null,
-      },
-    ],
-  });
-
-  assert.deepEqual(buildBallCarryTimelineEvents(statsTimeline, replay), [
-    {
-      id: "ball-carry:1:Steam:orange-id:1",
-      time: 1.5,
-      frame: 1,
-      kind: "ball-carry",
-      label: "Orange ball carry",
-      shortLabel: "BC",
-      playerId: "Steam:orange-id",
-      playerName: "Orange",
-      isTeamZero: false,
-      color: "#f59e0b",
     },
   ]);
 });

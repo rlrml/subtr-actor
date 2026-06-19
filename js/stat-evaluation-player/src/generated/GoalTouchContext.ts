@@ -3,6 +3,9 @@ import type { GoalContextPosition } from "./GoalContextPosition.ts";
 import type { GoalPlayerContext } from "./GoalPlayerContext.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * Touch context leading into a goal.
+ */
 export type GoalTouchContext = {
 /**
  * Identity of the source [`TouchEvent`](crate::TouchEvent) for this

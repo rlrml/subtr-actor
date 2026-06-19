@@ -1,6 +1,7 @@
 use super::{FrameEventsState, GameplayState};
 use serde::{Deserialize, Serialize};
 
+/// The current phase of gameplay (kickoff, active, replay, etc.).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -27,6 +28,7 @@ impl GameplayPhase {
     }
 }
 
+/// Shared state describing whether the current frame is live play.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LivePlayState {
     pub gameplay_phase: GameplayPhase,
@@ -54,6 +56,7 @@ impl LivePlayState {
     }
 }
 
+/// Determines whether each frame is live play and its gameplay phase.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct LivePlayTracker {
     post_goal_phase_active: bool,

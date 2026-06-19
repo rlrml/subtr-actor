@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects half-volleys from ball/player state and touches during live play.
 pub struct HalfVolleyNode {
     calculator: HalfVolleyCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for HalfVolleyNode {
 
     fn name(&self) -> &'static str {
         "half_volley"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::HALF_VOLLEY_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

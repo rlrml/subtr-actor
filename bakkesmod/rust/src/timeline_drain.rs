@@ -174,6 +174,37 @@ pub(crate) fn push_bump_events_from_timeline(
     }
 }
 
+pub(crate) fn push_demolition_events_from_timeline(
+    pending_events: &mut Vec<SaMechanicEvent>,
+    emitted_mechanic_ids: &mut HashSet<String>,
+    demolitions: impl IntoIterator<Item = impl std::borrow::Borrow<DemolitionEvent>>,
+) {
+    for (index, event) in demolitions.into_iter().enumerate() {
+        let event = event.borrow();
+        let Some(is_team_0) = event.attacker_is_team_0 else {
+            continue;
+        };
+        push_pending_graph_event(
+            pending_events,
+            emitted_mechanic_ids,
+            PendingGraphEvent {
+                id: format!(
+                    "demolition:{}:{}:{}:{index}",
+                    event.frame,
+                    player_index(&event.attacker),
+                    player_index(&event.victim)
+                ),
+                kind: SaMechanicKind::Demo,
+                player_id: event.attacker.clone(),
+                is_team_0,
+                frame_number: event.frame,
+                time: event.time,
+                confidence: 1.0,
+            },
+        );
+    }
+}
+
 pub(crate) fn push_backboard_events_from_timeline(
     pending_events: &mut Vec<SaMechanicEvent>,
     emitted_mechanic_ids: &mut HashSet<String>,
@@ -235,8 +266,6 @@ pub(crate) fn timeline_event_kind(kind: TimelineEventKind) -> SaMechanicKind {
         TimelineEventKind::Shot => SaMechanicKind::Shot,
         TimelineEventKind::Save => SaMechanicKind::Save,
         TimelineEventKind::Assist => SaMechanicKind::Assist,
-        TimelineEventKind::Kill => SaMechanicKind::Demo,
-        TimelineEventKind::Death => SaMechanicKind::Death,
     }
 }
 
@@ -691,6 +720,30 @@ pub(crate) fn replay_annotations_from_timeline(
                     },
                 );
             }
+            EventPayload::Demolition(event) => {
+                let Some(is_team_0) = event.attacker_is_team_0 else {
+                    continue;
+                };
+                push_replay_annotation(
+                    &mut events,
+                    &mut emitted_ids,
+                    &index_map,
+                    PendingGraphEvent {
+                        id: format!(
+                            "replay_demolition:{}:{}:{}:{index}",
+                            event.frame,
+                            replay_player_index(&index_map, &event.attacker),
+                            replay_player_index(&index_map, &event.victim)
+                        ),
+                        kind: SaMechanicKind::Demo,
+                        player_id: event.attacker.clone(),
+                        is_team_0,
+                        frame_number: event.frame,
+                        time: event.time,
+                        confidence: 1.0,
+                    },
+                );
+            }
             EventPayload::Timeline(event) => {
                 let (Some(player_id), Some(is_team_0)) = (&event.player_id, event.is_team_0) else {
                     continue;
@@ -882,6 +935,17 @@ pub(crate) fn push_drainable_events_from_timeline(
             .iter()
             .filter_map(|event| match &event.payload {
                 EventPayload::Bump(payload) => Some(payload),
+                _ => None,
+            }),
+    );
+    push_demolition_events_from_timeline(
+        pending_events,
+        emitted_mechanic_ids,
+        events
+            .events
+            .iter()
+            .filter_map(|event| match &event.payload {
+                EventPayload::Demolition(payload) => Some(payload),
                 _ => None,
             }),
     );

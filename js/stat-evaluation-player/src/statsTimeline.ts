@@ -37,6 +37,7 @@ import type { ShadowDefenseState } from "./generated/ShadowDefenseState.ts";
 import type { RoleState } from "./generated/RoleState.ts";
 import type { FirstManChangeEvent } from "./generated/FirstManChangeEvent.ts";
 import type { BallHalfEvent } from "./generated/BallHalfEvent.ts";
+import type { BallThirdEvent } from "./generated/BallThirdEvent.ts";
 import type { PowerslideEvent } from "./generated/PowerslideEvent.ts";
 import type { ReplayMeta } from "./generated/ReplayMeta.ts";
 import type { ReplayStatsFrame } from "./generated/ReplayStatsFrame.ts";
@@ -121,6 +122,7 @@ export type {
   RoleState,
   FirstManChangeEvent,
   BallHalfEvent,
+  BallThirdEvent,
   PowerslideEvent,
   ReplayMeta,
   RushEvent,

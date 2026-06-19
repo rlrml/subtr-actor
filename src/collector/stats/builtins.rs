@@ -371,7 +371,7 @@ struct DemoStatsExport<'a> {
     team_zero: &'a DemoTeamStats,
     team_one: &'a DemoTeamStats,
     player_stats: Vec<PlayerStatsEntry<'a, DemoPlayerStats>>,
-    timeline: &'a [TimelineEvent],
+    demolitions: &'a [DemolitionEvent],
 }
 
 pub fn builtin_stats_module_names() -> &'static [&'static str] {
@@ -410,6 +410,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "player_possession",
         "possession",
         "ball_half",
+        "ball_third",
         "territorial_pressure",
         "rotation",
         "rush",
@@ -707,6 +708,14 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
+        "ball_third" => {
+            let calculator = graph_state::<BallThirdCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsWithEventsExport {
+                stats: projection.ball_third.stats(),
+                events: calculator.events(),
+            })
+        }
         "territorial_pressure" => {
             let calculator = graph_state::<TerritorialPressureCalculator>(graph, module_name)?;
             let projection = projected_stats(graph, module_name)?;
@@ -906,7 +915,7 @@ pub(crate) fn builtin_module_json(
                 team_zero: projection.demo.team_zero_stats(),
                 team_one: projection.demo.team_one_stats(),
                 player_stats: player_stats_entries(projection.demo.player_stats()),
-                timeline: calculator.timeline(),
+                demolitions: calculator.events(),
             })
         }
         _ => SubtrActorError::new_result(SubtrActorErrorVariant::UnknownStatsModuleName(
@@ -1060,8 +1069,6 @@ pub fn builtin_analysis_node_json(
     node_name: &str,
     graph: &AnalysisGraph,
 ) -> SubtrActorResult<Value> {
-    let node_name = crate::stats::analysis_graph::canonical_builtin_analysis_node_name(node_name)
-        .unwrap_or(node_name);
     let value = match node_name {
         "core" | "match_stats" => builtin_module_json("core", graph)?,
         "stats_timeline_events" => serialize_to_json_value(
@@ -1370,6 +1377,12 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: projection.ball_half.stats(),
             })?
         }
+        "ball_third" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&StatsExport {
+                stats: projection.ball_third.stats(),
+            })?
+        }
         "territorial_pressure" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&StatsExport {
@@ -1558,6 +1571,12 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<BallHalfCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "ball_half_neutral_zone_half_width_y": calculator.config().neutral_zone_half_width_y,
+            }))?)
+        }
+        "ball_third" => {
+            let calculator = graph_state::<BallThirdCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "ball_third_boundary_y": calculator.config().boundary_y,
             }))?)
         }
         "territorial_pressure" => {

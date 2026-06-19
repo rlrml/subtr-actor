@@ -9,6 +9,7 @@ on:
       - Cargo.toml
       - crates/subtr-actor-tools/**
       - docs/event-definitions.md
+      - docs/event-definitions.html
       - src/**
   pull_request:
     branches: [master, main]
@@ -18,6 +19,7 @@ on:
       - Cargo.toml
       - crates/subtr-actor-tools/**
       - docs/event-definitions.md
+      - docs/event-definitions.html
       - src/**
   workflow_dispatch:
 
@@ -31,6 +33,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   STAT_DEFINITIONS_DOC: docs/event-definitions.md
+  STAT_DEFINITIONS_HTML: docs/event-definitions.html
 
 jobs:
   generate:
@@ -50,11 +53,13 @@ jobs:
       - name: Generate stat definition docs
         run: |
           cargo run --package subtr-actor-tools --bin generate_event_docs -- \
-            --output "${STAT_DEFINITIONS_DOC}"
+            --format markdown --output "${STAT_DEFINITIONS_DOC}"
+          cargo run --package subtr-actor-tools --bin generate_event_docs -- \
+            --format html --output "${STAT_DEFINITIONS_HTML}"
 
       - name: Check generated docs are committed
         if: github.event_name == 'pull_request'
-        run: git diff --exit-code -- "${STAT_DEFINITIONS_DOC}"
+        run: git diff --exit-code -- "${STAT_DEFINITIONS_DOC}" "${STAT_DEFINITIONS_HTML}"
 
       - name: Commit generated docs
         if: github.event_name != 'pull_request'
@@ -64,7 +69,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if git diff --quiet -- "${STAT_DEFINITIONS_DOC}"; then
+          if git diff --quiet -- "${STAT_DEFINITIONS_DOC}" "${STAT_DEFINITIONS_HTML}"; then
             echo "Stat definition docs are already up to date."
             exit 0
           fi
@@ -72,6 +77,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git add "${STAT_DEFINITIONS_DOC}"
+          git add "${STAT_DEFINITIONS_DOC}" "${STAT_DEFINITIONS_HTML}"
           git commit -m "Update generated stat definitions [skip-release]"
           git push origin "HEAD:${GITHUB_REF_NAME}"

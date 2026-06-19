@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects wall aerials from ball/player positions and touches during live play.
 pub struct WallAerialNode {
     calculator: WallAerialCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for WallAerialNode {
 
     fn name(&self) -> &'static str {
         "wall_aerial"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::WALL_AERIAL_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

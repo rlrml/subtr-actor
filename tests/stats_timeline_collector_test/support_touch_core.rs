@@ -405,6 +405,9 @@ fn possession_label_for_derivation(key: &'static str, value: &str) -> StatLabel 
         ("field_third", "team_zero_third") => StatLabel::new("field_third", "team_zero_third"),
         ("field_third", "neutral_third") => StatLabel::new("field_third", "neutral_third"),
         ("field_third", "team_one_third") => StatLabel::new("field_third", "team_one_third"),
+        ("field_half", "team_zero_side") => StatLabel::new("field_half", "team_zero_side"),
+        ("field_half", "team_one_side") => StatLabel::new("field_half", "team_one_side"),
+        ("field_half", "neutral") => StatLabel::new("field_half", "neutral"),
         _ => panic!("unexpected possession label {key}={value}"),
     }
 }
@@ -413,7 +416,10 @@ fn possession_label_for_derivation(key: &'static str, value: &str) -> StatLabel 
 struct PossessionDerivationState {
     active: bool,
     possession_state: String,
+    // Ball zone is sourced from the ball_third / ball_half streams (when those
+    // events are active), mirroring the per-frame join the projection performs.
     field_third: Option<String>,
+    field_half: Option<String>,
 }
 
 fn apply_possession_event_for_derivation(
@@ -422,7 +428,6 @@ fn apply_possession_event_for_derivation(
 ) {
     state.active = event.active;
     state.possession_state = event.possession_state.clone();
-    state.field_third = event.field_third.clone();
 }
 
 fn accumulate_possession_frame_for_derivation(
@@ -442,18 +447,15 @@ fn accumulate_possession_frame_for_derivation(
         value => panic!("unexpected possession state {value}"),
     }
 
-    let state_label = possession_label_for_derivation("possession_state", &state.possession_state);
+    let mut labels =
+        vec![possession_label_for_derivation("possession_state", &state.possession_state)];
     if let Some(field_third) = state.field_third.as_deref() {
-        stats.labeled_time.add(
-            [
-                state_label,
-                possession_label_for_derivation("field_third", field_third),
-            ],
-            frame.dt,
-        );
-    } else {
-        stats.labeled_time.add([state_label], frame.dt);
+        labels.push(possession_label_for_derivation("field_third", field_third));
     }
+    if let Some(field_half) = state.field_half.as_deref() {
+        labels.push(possession_label_for_derivation("field_half", field_half));
+    }
+    stats.labeled_time.add(labels, frame.dt);
 }
 
 fn assert_labeled_float_sums_close(
@@ -527,25 +529,65 @@ fn assert_possession_events_reconstruct_serialized_partial_sums(
     replay_path: &str,
     timeline: &ReplayStatsTimeline,
 ) {
-    let mut events = timeline_payloads_by_stream(timeline, "possession", |payload| match payload { EventPayload::Possession(event) => Some(event), _ => None });
+    let mut events = timeline_payloads_by_stream(timeline, "possession", |payload| match payload {
+        EventPayload::Possession(event) => Some(event),
+        _ => None,
+    });
     events.sort_by(|left, right| {
         left.frame
             .cmp(&right.frame)
             .then_with(|| left.time.total_cmp(&right.time))
     });
 
+    let mut ball_third_events =
+        timeline_payloads_by_stream(timeline, "ball_third", |payload| match payload {
+            EventPayload::BallThird(event) => Some(event),
+            _ => None,
+        });
+    ball_third_events.sort_by(|left, right| {
+        left.frame
+            .cmp(&right.frame)
+            .then_with(|| left.time.total_cmp(&right.time))
+    });
+
+    let mut ball_half_events =
+        timeline_payloads_by_stream(timeline, "ball_half", |payload| match payload {
+            EventPayload::BallHalf(event) => Some(event),
+            _ => None,
+        });
+    ball_half_events.sort_by(|left, right| {
+        left.frame
+            .cmp(&right.frame)
+            .then_with(|| left.time.total_cmp(&right.time))
+    });
+
     let mut event_index = 0;
+    let mut ball_third_index = 0;
+    let mut ball_half_index = 0;
     let mut stats = PossessionStats::default();
     let mut state = PossessionDerivationState {
-        active: false,
         possession_state: "neutral".to_owned(),
-        field_third: None,
+        ..Default::default()
     };
 
     for frame in &timeline.frames {
         while event_index < events.len() && events[event_index].frame <= frame.frame_number {
             apply_possession_event_for_derivation(&mut state, &events[event_index]);
             event_index += 1;
+        }
+        while ball_third_index < ball_third_events.len()
+            && ball_third_events[ball_third_index].frame <= frame.frame_number
+        {
+            let event = &ball_third_events[ball_third_index];
+            state.field_third = event.active.then(|| event.field_third.clone());
+            ball_third_index += 1;
+        }
+        while ball_half_index < ball_half_events.len()
+            && ball_half_events[ball_half_index].frame <= frame.frame_number
+        {
+            let event = &ball_half_events[ball_half_index];
+            state.field_half = event.active.then(|| event.field_half.clone());
+            ball_half_index += 1;
         }
 
         accumulate_possession_frame_for_derivation(&mut stats, &state, frame);

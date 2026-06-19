@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Holds the collected replay stats-timeline events.
 #[derive(Debug, Clone, Default)]
 pub struct StatsTimelineEventsState {
     pub events: ReplayStatsTimelineEvents,
@@ -24,6 +25,7 @@ const MECHANIC_WALL_AERIAL: &str = "wall_aerial";
 const MECHANIC_WALL_AERIAL_SHOT: &str = "wall_aerial_shot";
 const MECHANIC_WAVEDASH: &str = "wavedash";
 
+/// List of mechanic kind identifiers emitted into the stats timeline.
 pub const STATS_TIMELINE_MECHANIC_KINDS: &[&str] = &[
     MECHANIC_AIR_DRIBBLE,
     MECHANIC_BALL_CARRY,
@@ -43,6 +45,7 @@ pub const STATS_TIMELINE_MECHANIC_KINDS: &[&str] = &[
     MECHANIC_WAVEDASH,
 ];
 
+/// Collects mechanic/goal/state events from all calculators into a compact stats-timeline event stream.
 pub struct StatsTimelineEventsNode {
     state: StatsTimelineEventsState,
 }
@@ -74,6 +77,7 @@ impl StatsTimelineEventsNode {
             possession_dependency(),
             player_possession_dependency(),
             ball_half_dependency(),
+            ball_third_dependency(),
             territorial_pressure_dependency(),
             rotation_dependency(),
             rush_dependency(),
@@ -122,6 +126,7 @@ impl StatsTimelineEventsNode {
         let possession = ctx.get::<PossessionCalculator>()?;
         let player_possession = ctx.get::<PlayerPossessionCalculator>()?;
         let ball_half = ctx.get::<BallHalfCalculator>()?;
+        let ball_third = ctx.get::<BallThirdCalculator>()?;
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
         let movement = ctx.get::<MovementCalculator>()?;
         let positioning = ctx.get::<PositioningCalculator>()?;
@@ -174,7 +179,6 @@ impl StatsTimelineEventsNode {
         let bump = ctx.get::<BumpCalculator>()?;
 
         let mut timeline = match_stats.timeline().to_vec();
-        timeline.extend(demo.timeline().to_vec());
         timeline.sort_by(|left, right| left.time.total_cmp(&right.time));
         let goal_tag_assignments = combined_goal_tag_assignments(&[
             aerial_goal.events(),
@@ -207,6 +211,7 @@ impl StatsTimelineEventsNode {
                 possession,
                 player_possession,
                 ball_half,
+                ball_third,
                 territorial_pressure,
                 movement,
                 positioning,
@@ -236,6 +241,7 @@ impl StatsTimelineEventsNode {
                 touch,
                 boost,
                 bump,
+                demo,
                 flick,
                 musty_flick,
             ),
@@ -255,6 +261,10 @@ impl AnalysisNode for StatsTimelineEventsNode {
 
     fn name(&self) -> &'static str {
         "stats_timeline_events"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::STATS_TIMELINE_EVENTS_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> Vec<AnalysisDependency> {
@@ -313,6 +323,7 @@ fn make_event(
             id: format!("{stream}:{frame_id}:{index}"),
             stream: stream.to_owned(),
             label: stats_timeline_event_label(stream),
+            scope: event_stream_scope(stream),
             timing,
             primary_player,
             secondary_player,
@@ -340,6 +351,7 @@ fn build_replay_events(
     possession: &PossessionCalculator,
     player_possession: &PlayerPossessionCalculator,
     ball_half: &BallHalfCalculator,
+    ball_third: &BallThirdCalculator,
     territorial_pressure: &TerritorialPressureCalculator,
     movement: &MovementCalculator,
     positioning: &PositioningCalculator,
@@ -369,6 +381,7 @@ fn build_replay_events(
     touch: &TouchCalculator,
     boost: &BoostCalculator,
     bump: &BumpCalculator,
+    demo: &DemoCalculator,
     flick: &FlickCalculator,
     musty_flick: &MustyFlickCalculator,
 ) -> Vec<Event> {
@@ -445,6 +458,21 @@ fn build_replay_events(
             index,
             span(event.frame, event.end_frame, event.time, event.end_time),
             EventPayload::BallHalf(event.clone()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    for (index, event) in ball_third.events().iter().enumerate() {
+        events.push(make_event(
+            "ball_third",
+            index,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::BallThird(event.clone()),
             None,
             None,
             None,
@@ -1105,6 +1133,21 @@ fn build_replay_events(
         ));
     }
 
+    for (index, event) in demo.events().iter().enumerate() {
+        events.push(make_event(
+            "demolition",
+            index,
+            moment(event.frame, event.time),
+            EventPayload::Demolition(event.clone()),
+            Some(event.attacker.clone()),
+            Some(event.victim.clone()),
+            event.attacker_is_team_0,
+            event.attacker_position,
+            None,
+            None,
+        ));
+    }
+
     for (index, event) in flick.events().iter().enumerate() {
         events.push(make_event(
             MECHANIC_FLICK,
@@ -1147,8 +1190,4 @@ fn build_replay_events(
             .then_with(|| left.meta.id.cmp(&right.meta.id))
     });
     events
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(StatsTimelineEventsNode::new())
 }

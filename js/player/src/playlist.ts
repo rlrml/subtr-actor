@@ -1,4 +1,4 @@
-import { ReplayPlayer } from "./player";
+import { ReplayPlayer, createPlayerFromParsed } from "./player/lib";
 import { findFrameIndexAtTime } from "./replay-data";
 import type {
   CameraSettings,
@@ -603,7 +603,13 @@ export class ReplayPlaylistPlayer extends EventTarget {
   private attachPlayer(resolvedItem: ResolvedPlaylistItem): void {
     this.detachPlayer();
 
-    const replay = resolvedItem.replay.replay;
+    const loadedReplay = resolvedItem.replay;
+    const { replay, raw } = loadedReplay;
+    if (!raw) {
+      throw new Error(
+        "ReplayPlaylistPlayer requires LoadedReplay.raw; load replays with loadReplayFromBytes, createReplayBytesSource, or createReplayFileSource.",
+      );
+    }
     const attachedPlayerId = replay.players.some(
       (player) => player.id === this.preferences.attachedPlayerId,
     )
@@ -614,21 +620,24 @@ export class ReplayPlaylistPlayer extends EventTarget {
       this.preferences.cameraViewMode = "free";
     }
 
-    this.player = new ReplayPlayer(this.container, replay, {
-      fieldScale: this.options.fieldScale,
-      initialPlaybackRate: this.preferences.speed,
-      initialCameraDistanceScale: this.preferences.cameraDistanceScale,
-      initialCustomCameraSettings: this.preferences.customCameraSettings,
-      initialCameraViewMode: this.preferences.cameraViewMode,
-      initialAttachedPlayerId: attachedPlayerId,
-      initialBallCamEnabled: this.preferences.ballCamEnabled,
-      initialBoostPickupAnimationEnabled: this.preferences.boostPickupAnimationEnabled,
-      initialHitboxWireframesEnabled: this.preferences.hitboxWireframesEnabled,
-      initialHitboxOnlyModeEnabled: this.preferences.hitboxOnlyModeEnabled,
-      initialSkipPostGoalTransitionsEnabled: this.preferences.skipPostGoalTransitionsEnabled,
-      initialSkipKickoffsEnabled: this.preferences.skipKickoffsEnabled,
-      plugins: this.options.plugins,
-    });
+    this.player = createPlayerFromParsed(
+      this.container,
+      { replay, raw },
+      {
+        initialPlaybackRate: this.preferences.speed,
+        initialCameraDistanceScale: this.preferences.cameraDistanceScale,
+        initialCustomCameraSettings: this.preferences.customCameraSettings,
+        initialCameraViewMode: this.preferences.cameraViewMode,
+        initialAttachedPlayerId: attachedPlayerId,
+        initialBallCamEnabled: this.preferences.ballCamEnabled,
+        initialBoostPickupAnimationEnabled: this.preferences.boostPickupAnimationEnabled,
+        initialHitboxWireframesEnabled: this.preferences.hitboxWireframesEnabled,
+        initialHitboxOnlyModeEnabled: this.preferences.hitboxOnlyModeEnabled,
+        initialSkipPostGoalTransitionsEnabled: this.preferences.skipPostGoalTransitionsEnabled,
+        initialSkipKickoffsEnabled: this.preferences.skipKickoffsEnabled,
+        plugins: this.options.plugins,
+      },
+    );
     this.player.seek(resolvedItem.start.time);
     this.playerUnsubscribe = this.player.subscribe((state) => {
       this.handlePlayerState(state);

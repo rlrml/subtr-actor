@@ -34,6 +34,7 @@ export interface ReplayPlayerInitialSettings {
   attachedPlayerId: string | null;
   cameraViewMode: ReplayCameraViewMode;
   ballCamEnabled: boolean;
+  useReplayBallCam: boolean;
   boostMeterEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
   hitboxWireframesEnabled: boolean;
@@ -94,6 +95,7 @@ export function resolveInitialPlayerSettings(
     cameraViewMode:
       options.initialCameraViewMode ?? (attachedPlayerId ? "follow" : DEFAULT_CAMERA_VIEW_MODE),
     ballCamEnabled: options.initialBallCamEnabled ?? false,
+    useReplayBallCam: options.initialUseReplayBallCam ?? true,
     boostMeterEnabled: options.initialBoostMeterEnabled ?? false,
     boostPickupAnimationEnabled: options.initialBoostPickupAnimationEnabled ?? true,
     hitboxWireframesEnabled: options.initialHitboxWireframesEnabled ?? false,

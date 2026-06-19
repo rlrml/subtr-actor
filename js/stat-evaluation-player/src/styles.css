@@ -4,3 +4,50 @@
 @import "./styles/stats-windows.css";
 @import "./styles/controls.css";
 @import "./styles/responsive.css";
+
+/* Body of the "Missed events" floating window — the window chrome (frame,
+   header, drag, show/hide) comes from the shared floating-window styles. */
+.missed-event-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  max-height: 50vh;
+  font-size: 0.8rem;
+}
+
+.missed-event-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.missed-event-controls select {
+  flex: 1 1 auto;
+}
+
+.missed-event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.missed-event-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 0.3rem;
+  background: rgba(28, 39, 46, 0.9);
+}
+
+.missed-event-status {
+  margin: 0;
+  min-height: 1rem;
+  color: #9fadb7;
+}

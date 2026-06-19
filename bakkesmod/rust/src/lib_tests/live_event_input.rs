@@ -169,7 +169,7 @@ fn live_demolish_events_keep_active_demo_state_until_expiration() {
         .graph
         .state::<DemoCalculator>()
         .expect("full analysis graph should expose demo calculator state");
-    assert_eq!(demo.timeline().len(), 2);
+    assert_eq!(demo.events().len(), 1);
 
     let fourth = live_frame(
         4,
@@ -591,22 +591,7 @@ fn drains_player_owned_events_from_timeline_events() {
                 player_position: None,
                 is_team_0: Some(true),
             }),
-            timeline_event_envelope(TimelineEvent {
-                time: 1.35,
-                frame: Some(13),
-                kind: TimelineEventKind::Kill,
-                player_id: Some(RemoteId::SplitScreen(0)),
-                player_position: None,
-                is_team_0: Some(true),
-            }),
-            timeline_event_envelope(TimelineEvent {
-                time: 1.35,
-                frame: Some(13),
-                kind: TimelineEventKind::Death,
-                player_id: Some(RemoteId::SplitScreen(1)),
-                player_position: None,
-                is_team_0: Some(false),
-            }),
+            demolition_event_envelope(demolition_event(13, 1.35)),
             goal_context_event_envelope(GoalContextEvent {
                 tags: vec![goal_tag(GoalTagKind::FlickGoal)],
                 ..goal_context_event(10, 1.09)
@@ -636,7 +621,7 @@ fn drains_player_owned_events_from_timeline_events() {
         &timeline_events,
     );
 
-    assert_eq!(pending_events.len(), 13);
+    assert_eq!(pending_events.len(), 12);
     assert_eq!(pending_events[0].kind, SaMechanicKind::Goal);
     assert_eq!(pending_events[0].frame_number, 10);
     assert_eq!(pending_events[0].player_index, 0);
@@ -672,16 +657,12 @@ fn drains_player_owned_events_from_timeline_events() {
     assert_eq!(pending_events[9].time, 1.35);
     assert_eq!(pending_events[9].frame_number, 13);
     assert_eq!(pending_events[9].player_index, 0);
-    assert_eq!(pending_events[10].kind, SaMechanicKind::Death);
-    assert_eq!(pending_events[10].time, 1.35);
-    assert_eq!(pending_events[10].frame_number, 13);
+    assert_eq!(pending_events[9].is_team_0, 1);
+    assert_eq!(pending_events[10].kind, SaMechanicKind::FiftyFifty);
+    assert_eq!(pending_events[10].frame_number, 14);
     assert_eq!(pending_events[10].player_index, 1);
     assert_eq!(pending_events[10].is_team_0, 0);
-    assert_eq!(pending_events[11].kind, SaMechanicKind::FiftyFifty);
-    assert_eq!(pending_events[11].frame_number, 14);
-    assert_eq!(pending_events[11].player_index, 1);
-    assert_eq!(pending_events[11].is_team_0, 0);
-    assert_eq!(pending_events[12].kind, SaMechanicKind::SpeedFlip);
+    assert_eq!(pending_events[11].kind, SaMechanicKind::SpeedFlip);
     assert_eq!(pending_team_events.len(), 1);
     assert_eq!(pending_team_events[0].kind, SaTeamEventKind::Rush);
     assert_eq!(pending_team_events[0].is_team_0, 1);
@@ -822,14 +803,6 @@ fn maps_timeline_event_kinds_to_abi_kinds() {
     assert_eq!(
         timeline_event_kind(TimelineEventKind::Assist),
         SaMechanicKind::Assist
-    );
-    assert_eq!(
-        timeline_event_kind(TimelineEventKind::Kill),
-        SaMechanicKind::Demo
-    );
-    assert_eq!(
-        timeline_event_kind(TimelineEventKind::Death),
-        SaMechanicKind::Death
     );
 }
 

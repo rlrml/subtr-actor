@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Derives 50/50 stats and events from the shared fifty-fifty state node.
 pub struct FiftyFiftyNode {
     calculator: FiftyFiftyCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for FiftyFiftyNode {
 
     fn name(&self) -> &'static str {
         "fifty_fifty"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::FIFTY_FIFTY_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

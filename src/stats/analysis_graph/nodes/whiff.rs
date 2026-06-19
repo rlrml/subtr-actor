@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects whiffs and beaten-to-ball attempts from ball/player state and touches during live play.
 pub struct WhiffNode {
     calculator: WhiffCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for WhiffNode {
 
     fn name(&self) -> &'static str {
         "whiff"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::WHIFF_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

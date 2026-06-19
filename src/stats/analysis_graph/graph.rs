@@ -1,7 +1,7 @@
 use std::any::{Any, TypeId, type_name};
 use std::collections::{HashMap, HashSet};
 
-use crate::stats::calculators::{EmittedEvent, event_producers};
+use crate::stats::calculators::EmittedEvent;
 use crate::*;
 
 #[derive(Clone, Copy)]
@@ -125,10 +125,34 @@ impl<'a> AnalysisStateContext<'a> {
     }
 }
 
+/// A node in the [`AnalysisGraph`]: consumes upstream state, runs once per
+/// frame, and exposes its own typed state for downstream nodes.
+///
+/// Implementors are the catalog of analysis nodes (see the
+/// [`nodes`](crate::stats::analysis_graph) module and the *Implementors* list
+/// below). A node declares what it reads via
+/// [`dependencies`](AnalysisNode::dependencies), reads it from the
+/// [`AnalysisStateContext`] in [`evaluate`](AnalysisNode::evaluate), and
+/// publishes [`State`](AnalysisNode::State) via [`state`](AnalysisNode::state).
+/// The blanket [`AnalysisNodeDyn`] impl makes every `AnalysisNode` usable as a
+/// boxed graph node.
 pub trait AnalysisNode: 'static {
+    /// The typed state this node publishes to downstream nodes.
     type State: 'static;
 
+    /// Stable identifier for this node, used for dependency wiring and the
+    /// built-in node registry.
     fn name(&self) -> &'static str;
+
+    /// Static catalog of the events this node emits, if any.
+    ///
+    /// The node is the source of truth for what it produces: a graph's emitted
+    /// events come from walking its actual nodes (see
+    /// [`AnalysisGraph::emitted_events`]), so there is no name-keyed side
+    /// registry that can drift out of sync with the nodes themselves.
+    fn emitted_events(&self) -> &'static [EmittedEvent] {
+        &[]
+    }
 
     fn on_replay_meta(&mut self, _meta: &ReplayMeta) -> SubtrActorResult<()> {
         Ok(())
@@ -149,6 +173,8 @@ pub trait AnalysisNode: 'static {
 
 pub trait AnalysisNodeDyn: 'static {
     fn name(&self) -> &'static str;
+
+    fn emitted_events(&self) -> &'static [EmittedEvent];
 
     fn provides_state_type_id(&self) -> TypeId;
 
@@ -171,6 +197,10 @@ where
 {
     fn name(&self) -> &'static str {
         AnalysisNode::name(self)
+    }
+
+    fn emitted_events(&self) -> &'static [EmittedEvent] {
+        AnalysisNode::emitted_events(self)
     }
 
     fn provides_state_type_id(&self) -> TypeId {
@@ -202,6 +232,14 @@ where
     }
 }
 
+/// A resolved, ordered collection of [`AnalysisNode`]s evaluated together over a
+/// replay.
+///
+/// Add nodes with [`with_node`](AnalysisGraph::with_node) /
+/// [`push_node`](AnalysisGraph::push_node) (or by name via the module-level
+/// `graph_with_*` helpers); the graph topologically orders them by their
+/// dependencies. Drive it frame by frame, then read any node's published state
+/// with [`state`](AnalysisGraph::state).
 #[derive(Default)]
 pub struct AnalysisGraph {
     nodes: Vec<Box<dyn AnalysisNodeDyn>>,
@@ -474,21 +512,11 @@ impl AnalysisGraph {
 
     pub fn emitted_events(&mut self) -> SubtrActorResult<Vec<EmittedEvent>> {
         self.resolve()?;
-        let node_names = self
+        Ok(self
             .nodes
             .iter()
-            .map(|node| node.name())
-            .collect::<HashSet<_>>();
-        Ok(self
-            .event_producers()
-            .iter()
-            .filter(|producer| node_names.contains(producer.node_name))
-            .flat_map(|producer| producer.emitted_events.iter().copied())
+            .flat_map(|node| node.emitted_events().iter().copied())
             .collect())
-    }
-
-    fn event_producers(&self) -> &'static [crate::stats::calculators::EventProducerDefinition] {
-        event_producers()
     }
 
     fn provider_index_by_type(&self) -> SubtrActorResult<HashMap<TypeId, usize>> {

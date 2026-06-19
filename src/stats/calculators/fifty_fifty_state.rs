@@ -1,10 +1,18 @@
 use super::*;
 
+/// Maintains shared 50/50 contest state for downstream consumers.
 #[derive(Default)]
 pub struct FiftyFiftyStateCalculator {
     active_event: Option<ActiveFiftyFifty>,
     last_resolved_event: Option<FiftyFiftyEvent>,
+    pending_initial_touch: Option<PendingFiftyFiftyTouch>,
     kickoff_touch_window_open: bool,
+}
+
+#[derive(Clone)]
+struct PendingFiftyFiftyTouch {
+    touch: TouchEvent,
+    is_kickoff: bool,
 }
 
 impl FiftyFiftyStateCalculator {
@@ -14,6 +22,7 @@ impl FiftyFiftyStateCalculator {
 
     fn reset(&mut self) {
         self.active_event = None;
+        self.pending_initial_touch = None;
     }
 
     fn maybe_resolve_active_event(
@@ -79,6 +88,48 @@ impl FiftyFiftyStateCalculator {
         active_event.last_touch_frame = touch.frame;
     }
 
+    fn touch_pair_in_initial_window(previous: &TouchEvent, current: &TouchEvent) -> bool {
+        current.frame >= previous.frame
+            && current.time >= previous.time
+            && current.time - previous.time <= FIFTY_FIFTY_CONTINUATION_TOUCH_WINDOW_SECONDS
+    }
+
+    fn contested_touch_from_pending(
+        frame: &FrameInfo,
+        players: &PlayerFrameState,
+        pending: &PendingFiftyFiftyTouch,
+        touch_events: &[TouchEvent],
+        is_kickoff: bool,
+    ) -> Option<ActiveFiftyFifty> {
+        let latest_opposing_touch = touch_events
+            .iter()
+            .filter(|touch| touch.team_is_team_0 != pending.touch.team_is_team_0)
+            .filter(|touch| Self::touch_pair_in_initial_window(&pending.touch, touch))
+            .max_by(|left, right| TouchEvent::timestamp_ordering(left, right))?;
+
+        let combined_touches = vec![pending.touch.clone(), latest_opposing_touch.clone()];
+        let mut active = FiftyFiftyCalculator::contested_touch(
+            frame,
+            players,
+            &combined_touches,
+            pending.is_kickoff || is_kickoff,
+        )?;
+        active.start_time = pending.touch.time.min(latest_opposing_touch.time);
+        active.start_frame = pending.touch.frame.min(latest_opposing_touch.frame);
+        Some(active)
+    }
+
+    fn pending_touch_from_events(
+        touch_events: &[TouchEvent],
+        is_kickoff: bool,
+    ) -> Option<PendingFiftyFiftyTouch> {
+        touch_events
+            .iter()
+            .max_by(|left, right| TouchEvent::timestamp_ordering(left, right))
+            .cloned()
+            .map(|touch| PendingFiftyFiftyTouch { touch, is_kickoff })
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
@@ -94,7 +145,7 @@ impl FiftyFiftyStateCalculator {
             self.kickoff_touch_window_open = true;
         }
 
-        if !live_play_state.is_live_play {
+        if !live_play_state.counts_toward_player_motion() {
             self.reset();
             return FiftyFiftyState {
                 active_event: None,
@@ -134,8 +185,30 @@ impl FiftyFiftyStateCalculator {
                     &touch_state.touch_events,
                     self.kickoff_touch_window_open,
                 );
+                if self.active_event.is_some() {
+                    self.pending_initial_touch = None;
+                }
             }
         } else if has_touch {
+            if self.active_event.is_none() {
+                if let Some(pending) = self.pending_initial_touch.as_ref() {
+                    self.active_event = Self::contested_touch_from_pending(
+                        frame,
+                        players,
+                        pending,
+                        &touch_state.touch_events,
+                        self.kickoff_touch_window_open,
+                    );
+                }
+                if self.active_event.is_some() {
+                    self.pending_initial_touch = None;
+                } else {
+                    self.pending_initial_touch = Self::pending_touch_from_events(
+                        &touch_state.touch_events,
+                        self.kickoff_touch_window_open,
+                    );
+                }
+            }
             if let Some(active_event) = self.active_event.as_mut() {
                 Self::update_active_last_touch_from_continuation(
                     frame,

@@ -3,6 +3,7 @@ macro_rules! impl_analysis_node {
         node = $node:ident,
         state = $state:ty,
         name = $name:literal,
+        $(emitted_events = $emitted:expr_2021,)?
         dependencies = [$($dependency:expr_2021 => $dependency_ty:ty),* $(,)?],
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
         call = $field:ident.$method:ident
@@ -21,6 +22,14 @@ macro_rules! impl_analysis_node {
             fn name(&self) -> &'static str {
                 $name
             }
+
+            $(
+                fn emitted_events(
+                    &self,
+                ) -> &'static [$crate::stats::calculators::EmittedEvent] {
+                    $emitted
+                }
+            )?
 
             fn dependencies(&self) -> Vec<AnalysisDependency> {
                 vec![$($dependency),*]
@@ -52,6 +61,10 @@ macro_rules! impl_analysis_node {
             }
         }
 
+        // Constructor used by `*_dependency()` helpers when this node is depended
+        // on. Nodes are otherwise instantiated by type through the registry, so a
+        // node with no dependents legitimately leaves this unused.
+        #[allow(dead_code)]
         pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
             Box::new($node::new())
         }
@@ -61,6 +74,7 @@ macro_rules! impl_analysis_node {
         node = $node:ident,
         state = $state:ty,
         name = $name:literal,
+        $(emitted_events = $emitted:expr_2021,)?
         dependencies = [$($dependency:expr_2021 => $dependency_ty:ty),* $(,)?],
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
         update_state = $field:ident.$method:ident
@@ -79,6 +93,14 @@ macro_rules! impl_analysis_node {
             fn name(&self) -> &'static str {
                 $name
             }
+
+            $(
+                fn emitted_events(
+                    &self,
+                ) -> &'static [$crate::stats::calculators::EmittedEvent] {
+                    $emitted
+                }
+            )?
 
             fn dependencies(&self) -> Vec<AnalysisDependency> {
                 vec![$($dependency),*]
@@ -111,6 +133,10 @@ macro_rules! impl_analysis_node {
             }
         }
 
+        // Constructor used by `*_dependency()` helpers when this node is depended
+        // on. Nodes are otherwise instantiated by type through the registry, so a
+        // node with no dependents legitimately leaves this unused.
+        #[allow(dead_code)]
         pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
             Box::new($node::new())
         }
@@ -120,6 +146,7 @@ macro_rules! impl_analysis_node {
         node = $node:ident,
         state = $state:ty,
         name = $name:literal,
+        $(emitted_events = $emitted:expr_2021,)?
         dependencies = [$($dependency:expr_2021),* $(,)?],
         inputs = {$($binding:ident : $binding_ty:ty),* $(,)?},
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
@@ -139,6 +166,14 @@ macro_rules! impl_analysis_node {
             fn name(&self) -> &'static str {
                 $name
             }
+
+            $(
+                fn emitted_events(
+                    &self,
+                ) -> &'static [$crate::stats::calculators::EmittedEvent] {
+                    $emitted
+                }
+            )?
 
             fn dependencies(&self) -> Vec<AnalysisDependency> {
                 vec![$($dependency),*]
@@ -174,6 +209,10 @@ macro_rules! impl_analysis_node {
             }
         }
 
+        // Constructor used by `*_dependency()` helpers when this node is depended
+        // on. Nodes are otherwise instantiated by type through the registry, so a
+        // node with no dependents legitimately leaves this unused.
+        #[allow(dead_code)]
         pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
             Box::new($node::new())
         }

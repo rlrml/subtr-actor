@@ -78,6 +78,7 @@ struct TouchClassification {
     dodge_state: TouchDodgeState,
 }
 
+/// A classified ball touch with strength kind, surface/height context, and an inferred intention.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchClassificationEvent {
@@ -95,6 +96,12 @@ pub struct TouchClassificationEvent {
     pub player: PlayerId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
+    // Ball position (uu) at the touch's sample frame: the actual point of contact
+    // on the ball's trajectory, unlike `player_position` (the car centre, up to a
+    // hitbox+ball-radius away). Diagrams placing a touch on the ball's path prefer
+    // this. Non-doc comment so ts-rs keeps the binding in sync with `player_position`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ball_position: Option<[f32; 3]>,
     pub is_team_0: bool,
     pub kind: String,
     pub height_band: String,
@@ -114,6 +121,7 @@ pub struct TouchClassificationEvent {
     pub ball_movement: Option<TouchBallMovement>,
 }
 
+/// Ball movement produced by a touch.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchBallMovement {
@@ -181,6 +189,7 @@ impl InFlightItem for PendingTouchBallMovementCredit {
     }
 }
 
+/// Classifies ball touches into typed touch events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TouchCalculator {
     events: EventStream<TouchClassificationEvent>,
@@ -425,6 +434,7 @@ impl TouchCalculator {
                         Self::player_position(players, player_id)
                             .map(|position| position.to_array())
                     }),
+                ball_position: ball.position().map(|position| position.to_array()),
                 is_team_0: touch_event.team_is_team_0,
                 kind: classification.kind.as_label_value().to_owned(),
                 height_band: classification.height_band.as_label().value.to_owned(),

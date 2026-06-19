@@ -14,13 +14,14 @@ The same core pipeline is exposed through Python and JavaScript bindings.
   `replay_data.rs` emits structured frame data, `ndarray/` builds numeric
   feature matrices, and `stats_timeline.rs` produces cumulative stat snapshots.
 - `src/stats/`: Higher-level stat extraction modules for exported replay
-  statistics. `reducers/` contains the per-frame stat reducers, `export/`
-  defines exported stat fields and module wiring, and `comparison/` holds
-  stat-comparison tooling.
+  statistics. `accumulators/` contains the per-stat accumulators,
+  `calculators/` and `analysis_graph/` define the stats DAG, and `labels.rs`
+  holds the labeled stat-aggregation types (`LabeledCounts`,
+  `LabeledFloatSums`).
 - `js/player/`: Reusable replay player library package. It handles replay
   loading, normalization, scene playback, camera APIs, timeline overlays, and
-  plugin-based viewer extensions on top of the core WASM bindings.
-- `js/stat-evaluation-player/`: Stats-focused replay viewer package built on top
+  plugin-based player extensions on top of the core WASM bindings.
+- `js/stat-evaluation-player/`: Stats-focused replay player UI built on top
   of `js/player/` plus the stats timeline bindings. It is the main home for UI
   that visualizes stat accumulation, overlays, and per-module stat panels
   during playback.
@@ -36,11 +37,19 @@ The same core pipeline is exposed through Python and JavaScript bindings.
   [`docs/calculators-and-analysis-nodes.md`](./docs/calculators-and-analysis-nodes.md).
 - Most feature extraction work lands either in `src/collector/ndarray/`,
   `src/collector/replay_data.rs`, `src/collector/stats_timeline.rs`, or
-  `src/stats/export/`, depending on whether the output is numeric, structured,
-  cumulative-over-time, or report-oriented.
+  `src/stats/` (accumulators and the analysis DAG), depending on whether the
+  output is numeric, structured, cumulative-over-time, or stat-oriented.
 - Replay-player infrastructure work usually belongs in `js/player/`. Stats UI
   and stat-timeline visualization work usually belongs in
   `js/stat-evaluation-player/`.
+- A dribble *flick* is the final dodge touch at the end of a run of `control`
+  touches, and that single touch's launch impulse is delivered over several
+  frames (the car drags the ball through the dodge) — not in the one frame the
+  touch is first detected. So flick detection measures the ball's *peak*
+  velocity change over a short window after the dodge-touch, and gates on real
+  carry evidence (ball moving with the car), rather than a single-frame delta.
+  See `FLICK_IMPULSE_WINDOW_SECONDS` / `FLICK_MAX_CARRY_REL_HORIZONTAL_SPEED` in
+  `src/stats/calculators/flick.rs`.
 
 ## Agent Workspace
 

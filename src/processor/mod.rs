@@ -1,3 +1,28 @@
+//! The replay-walking core: model actor state from raw `boxcars` frames and
+//! track derived gameplay events.
+//!
+//! [`ReplayProcessor`] is the heart of the crate. Construct it from a parsed
+//! [`boxcars::Replay`], then drive a [`Collector`] over it
+//! with [`process`](ReplayProcessor::process) /
+//! [`process_all`](ReplayProcessor::process_all). As it advances through the
+//! network frames it maintains modeled [actor state](crate::actor_state),
+//! resolves player/car/ball relationships, and records derived events such as
+//! touches, boost-pad pickups, dodge refreshes, goals, demolishes, and player
+//! stat changes.
+//!
+//! Collectors observe the processor through the read-only
+//! [`ProcessorView`] interface, which exposes the queries
+//! defined across this module (player lookups, rigid bodies, boost amounts,
+//! etc.).
+//!
+//! # Per-frame updaters
+//!
+//! The processor's frame loop applies a fixed sequence of *updaters* — each an
+//! `impl ReplayProcessor` method block in the `updaters` submodule (boost,
+//! goals, demolishes, camera, player stats, tracking, mappings). They are
+//! invoked in order on every frame; there is no central registry beyond that
+//! call sequence in the frame loop.
+
 use crate::*;
 use boxcars;
 use std::collections::HashMap;
@@ -10,6 +35,11 @@ pub use actor_state::*;
 pub(crate) use boost_pad_resolution::*;
 pub(crate) use replay_keys::*;
 pub use view::*;
+
+/// The discrete `(ball_cam, behind_view, driving)` toggle state tracked per
+/// player to coalesce [`PlayerCameraStateChange`]s. Each is `None` until the
+/// replay first replicates it.
+pub(crate) type PlayerCameraToggleState = (Option<bool>, Option<bool>, Option<bool>);
 
 pub(crate) fn attribute_type_name(attribute: &boxcars::Attribute) -> &'static str {
     match attribute {
@@ -305,6 +335,11 @@ pub struct ReplayProcessor<'a> {
     /// replicate for, used to join the two camera attributes whichever order
     /// they arrive in.
     camera_settings_actor_to_player_actor: HashMap<boxcars::ActorId, boxcars::ActorId>,
+    /// Reverse of [`Self::camera_settings_actor_to_player_actor`]: maps a
+    /// player-controller actor to its camera-settings actor so frame-time
+    /// queries can read the per-frame camera state (ball cam, pitch, yaw)
+    /// replicated on that actor.
+    player_actor_to_camera_settings_actor: HashMap<boxcars::ActorId, boxcars::ActorId>,
     /// Mapping from camera-settings actors to their last replicated preset.
     camera_settings_actor_to_settings: HashMap<boxcars::ActorId, PlayerCameraSettings>,
     /// Mapping from player-controller actors to car actors.
@@ -333,6 +368,13 @@ pub struct ReplayProcessor<'a> {
     pub dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
     current_frame_dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
     dodge_refreshed_counters: HashMap<PlayerId, i32>,
+    /// Coalesced camera/vehicle-toggle changes (ball cam, behind-view, driving)
+    /// paired with the player they belong to, in frame order. Appended only when
+    /// a toggle changes; grouped by player when assembled into `ReplayData`.
+    pub player_camera_events: Vec<(PlayerId, PlayerCameraStateChange)>,
+    /// Last discrete `(ball_cam, behind_view, driving)` state emitted per
+    /// player, used to coalesce [`Self::player_camera_events`].
+    player_camera_state_last: HashMap<PlayerId, PlayerCameraToggleState>,
     /// All goal events observed so far in the replay.
     pub goal_events: Vec<GoalEvent>,
     current_frame_goal_events: Vec<GoalEvent>,
@@ -431,6 +473,7 @@ impl<'a> ReplayProcessor<'a> {
             player_actor_to_loadout: HashMap::new(),
             player_actor_to_camera_settings: HashMap::new(),
             camera_settings_actor_to_player_actor: HashMap::new(),
+            player_actor_to_camera_settings_actor: HashMap::new(),
             camera_settings_actor_to_settings: HashMap::new(),
             car_to_player: HashMap::new(),
             car_to_boost: HashMap::new(),
@@ -446,6 +489,8 @@ impl<'a> ReplayProcessor<'a> {
             dodge_refreshed_events: Vec::new(),
             current_frame_dodge_refreshed_events: Vec::new(),
             dodge_refreshed_counters: HashMap::new(),
+            player_camera_events: Vec::new(),
+            player_camera_state_last: HashMap::new(),
             goal_events: Vec::new(),
             current_frame_goal_events: Vec::new(),
             player_stat_events: Vec::new(),
@@ -642,6 +687,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_pad_events(frame, index)?;
             self.update_touch_events(frame, index)?;
             self.update_dodge_refreshed_events(frame, index)?;
+            self.update_player_camera_events(frame, index)?;
             self.update_goal_events(frame, index)?;
             self.update_player_stat_events(frame, index)?;
             self.update_demolishes(frame, index)?;
@@ -699,6 +745,7 @@ impl<'a> ReplayProcessor<'a> {
             self.update_boost_pad_events(frame, index)?;
             self.update_touch_events(frame, index)?;
             self.update_dodge_refreshed_events(frame, index)?;
+            self.update_player_camera_events(frame, index)?;
             self.update_goal_events(frame, index)?;
             self.update_player_stat_events(frame, index)?;
             self.update_demolishes(frame, index)?;
@@ -729,6 +776,8 @@ impl<'a> ReplayProcessor<'a> {
         self.dodge_refreshed_events = Vec::new();
         self.current_frame_dodge_refreshed_events = Vec::new();
         self.dodge_refreshed_counters = HashMap::new();
+        self.player_camera_events = Vec::new();
+        self.player_camera_state_last = HashMap::new();
         self.goal_events = Vec::new();
         self.current_frame_goal_events = Vec::new();
         self.player_stat_events = Vec::new();

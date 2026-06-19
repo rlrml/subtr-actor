@@ -107,6 +107,7 @@
           pkgs.maturin
           pkgs.zlib
           rustToolchain
+          pkgs.cargo-rdme
           pkgs.curl
           pkgs.leveldb
           pkgs.python311Packages.twine
@@ -169,6 +170,17 @@
           npmRoot = "js/stat-evaluation-player";
           npmDeps = pkgs.importNpmLock { npmRoot = "${src}/js/stat-evaluation-player"; };
           npmConfigHook = pkgs.importNpmLock.npmConfigHook;
+          # Skip lifecycle install scripts. The only one that matters here is
+          # esbuild's postinstall (`node install.js` -> validateBinaryVersion),
+          # which crashes in the sandbox when @rlrml/player is pulled in as a
+          # nested file: dependency (its esbuild bin lands as the native ELF and
+          # gets run via node). esbuild needs no postinstall to work — its
+          # platform package is already materialized from the lock — and the
+          # site build resolves @rlrml/player via Vite source aliases
+          # (../player/src/lib.ts), so the file: dep's prepare/dist is never
+          # needed. `npm run build:site`/`build` still run (ignore-scripts only
+          # suppresses lifecycle + pre/post hooks, not explicit run targets).
+          npmFlags = [ "--ignore-scripts" ];
           preBuild = ''
             rm -rf js/pkg
             mkdir -p js/pkg

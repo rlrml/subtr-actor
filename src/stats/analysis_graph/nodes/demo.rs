@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects demolitions from player frame state and frame events.
 pub struct DemoNode {
     calculator: DemoCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for DemoNode {
 
     fn name(&self) -> &'static str {
         "demo"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::DEMO_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

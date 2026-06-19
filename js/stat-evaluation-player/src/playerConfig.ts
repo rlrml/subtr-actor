@@ -24,7 +24,8 @@ export type SingletonWindowId =
   | "replay-loading"
   | "boost-pickups"
   | "touch-controls"
-  | "shot-visualization";
+  | "shot-visualization"
+  | "missed-events";
 export type ConfigWindowKind = SingletonWindowId | "stats";
 
 export interface ConfigViewportSize {
@@ -71,9 +72,13 @@ export interface PlayerCameraConfig {
   readonly mode?: ReplayCameraViewMode;
   readonly freePreset?: ReplayFreeCameraPreset | null;
   readonly attachedPlayerId?: string | null;
+  /** Forced ball cam (`true`) / car cam (`false`). Ignored when `useReplayBallCam`. */
   readonly ballCam?: boolean;
+  /** Follow the attached player's recorded ball-cam toggle ("player" view). */
+  readonly useReplayBallCam?: boolean;
   readonly usePlayerCameraSettings?: boolean;
   readonly customSettings?: CameraSettings | null;
+  readonly nameplateLiftUu?: number;
 }
 
 export interface PlayerOverlayConfig {
@@ -299,16 +304,20 @@ function normalizeCameraConfig(value: unknown): PlayerCameraConfig {
           : undefined;
   const attachedPlayerId = stringOrNull(value.attachedPlayerId);
   const ballCam = booleanValue(value.ballCam);
+  const useReplayBallCam = booleanValue(value.useReplayBallCam);
   const usePlayerCameraSettings = booleanValue(value.usePlayerCameraSettings);
   const customSettings = normalizeCameraSettings(value.customSettings);
+  const nameplateLiftUu = finiteNumber(value.nameplateLiftUu);
   if (mode !== undefined) config.mode = mode;
   if (freePreset !== undefined) config.freePreset = freePreset;
   if (attachedPlayerId !== undefined) config.attachedPlayerId = attachedPlayerId;
   if (ballCam !== undefined) config.ballCam = ballCam;
+  if (useReplayBallCam !== undefined) config.useReplayBallCam = useReplayBallCam;
   if (usePlayerCameraSettings !== undefined) {
     config.usePlayerCameraSettings = usePlayerCameraSettings;
   }
   if (customSettings !== undefined) config.customSettings = customSettings;
+  if (nameplateLiftUu !== undefined) config.nameplateLiftUu = nameplateLiftUu;
   return config;
 }
 
@@ -441,7 +450,8 @@ function isSingletonWindowId(value: unknown): value is SingletonWindowId {
     value === "mechanics-review" ||
     value === "replay-loading" ||
     value === "boost-pickups" ||
-    value === "touch-controls"
+    value === "touch-controls" ||
+    value === "missed-events"
   );
 }
 

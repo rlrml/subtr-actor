@@ -39,6 +39,7 @@ fn make_event(
             id: format!("{stream}:{frame_id}:{index}"),
             stream: stream.to_owned(),
             label: stats_timeline_event_label(stream),
+            scope: event_stream_scope(stream),
             timing,
             primary_player,
             secondary_player,
@@ -59,7 +60,6 @@ fn event_start_time(event: &Event) -> f32 {
 impl CapturedStatsData<StatsSnapshotFrame> {
     pub(in crate::collector::stats::playback) fn timeline_events(&self) -> Vec<Value> {
         let mut events = self.module_array("core", "timeline");
-        events.extend(self.module_array("demo", "timeline"));
         events.sort_by(|left, right| {
             let left_time = left.get("time").and_then(Value::as_f64).unwrap_or(0.0);
             let right_time = right.get("time").and_then(Value::as_f64).unwrap_or(0.0);
@@ -205,6 +205,25 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 index,
                 span(event.frame, event.end_frame, event.time, event.end_time),
                 EventPayload::BallHalf(event.clone()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ));
+        }
+
+        for (index, event) in self
+            .module_player_events("ball_third", "events", parse_ball_third_event)?
+            .into_iter()
+            .enumerate()
+        {
+            events.push(make_event(
+                "ball_third",
+                index,
+                span(event.frame, event.end_frame, event.time, event.end_time),
+                EventPayload::BallThird(event.clone()),
                 None,
                 None,
                 None,
@@ -1048,6 +1067,25 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 Some(event.initiator_position),
                 None,
                 Some(event.confidence),
+            ));
+        }
+
+        for (index, event) in self
+            .module_player_events("demo", "demolitions", parse_demolition_event)?
+            .into_iter()
+            .enumerate()
+        {
+            events.push(make_event(
+                "demolition",
+                index,
+                moment(event.frame, event.time),
+                EventPayload::Demolition(event.clone()),
+                Some(event.attacker.clone()),
+                Some(event.victim.clone()),
+                event.attacker_is_team_0,
+                event.attacker_position,
+                None,
+                None,
             ));
         }
 

@@ -167,24 +167,24 @@ pub(crate) trait DemoTestProjection {
 impl DemoTestProjection for DemoCalculator {
     fn player_stats(&self) -> &HashMap<PlayerId, DemoPlayerStats> {
         let mut stats = DemoStatsAccumulator::default();
-        for event in self.timeline() {
-            stats.apply_timeline_event(event);
+        for event in self.events() {
+            stats.apply_demolition_event(event);
         }
         leak_test_stats(stats.player_stats().clone())
     }
 
     fn team_zero_stats(&self) -> &DemoTeamStats {
         let mut stats = DemoStatsAccumulator::default();
-        for event in self.timeline() {
-            stats.apply_timeline_event(event);
+        for event in self.events() {
+            stats.apply_demolition_event(event);
         }
         leak_test_stats(stats.team_zero_stats().clone())
     }
 
     fn team_one_stats(&self) -> &DemoTeamStats {
         let mut stats = DemoStatsAccumulator::default();
-        for event in self.timeline() {
-            stats.apply_timeline_event(event);
+        for event in self.events() {
+            stats.apply_demolition_event(event);
         }
         leak_test_stats(stats.team_one_stats().clone())
     }

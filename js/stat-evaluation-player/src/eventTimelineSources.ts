@@ -1,19 +1,13 @@
 import type { ReplayPlayerTrack, ReplayTimelineEvent, ReplayTimelineRange } from "@rlrml/player";
-import {
-  STATS_EVENT_STREAM_COUNT_TYPES,
-  STATS_MECHANIC_EVENT_COUNT_TYPES,
-} from "./eventCountDerivation.ts";
+import { STATS_EVENT_STREAM_COUNT_TYPES } from "./eventCountDerivation.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
 import type { Event } from "./statsTimeline.ts";
 import { statsEventEnvelopes } from "./statsTimeline.ts";
 import {
-  buildMechanicPlaylistEvents,
-  buildMechanicTimelineEvents,
+  EVENT_TYPE_TIMELINE_BUILDERS,
+  EVENT_TYPE_TIMELINE_KINDS,
   formatMechanicKind,
-  getMechanicKinds,
-  isVisibleMechanicKind,
 } from "./timelineMarkers.ts";
-import { buildMechanicTimelineRanges } from "./timelineRanges.ts";
 
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_PREFIXES = ["stats-stream:"] as const;
@@ -43,21 +37,6 @@ const CURATED_STATS_EVENT_STREAM_IDS = new Set<string>([
   "touch",
   "bump",
 ]);
-const SPAN_BASED_STATS_EVENT_STREAM_IDS = new Set<string>([
-  "possession",
-  "ball_half",
-  "territorial_pressure",
-  "controlled_play",
-  "player_activity",
-  "field_third",
-  "field_half",
-  "ball_depth",
-  "depth_role",
-  "ball_proximity",
-  "shadow_defense",
-  "rotation_role",
-  "rush",
-]);
 const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#3b82f6",
   "#06b6d4",
@@ -69,12 +48,16 @@ const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#ec4899",
 ];
 const EVENT_PLAYLIST_NEUTRAL_COLOR = "#d1d9e0";
+const EVENT_STREAM_TEAM_ZERO_COLOR = EVENT_PLAYLIST_PLAYER_COLORS[0]!;
+const EVENT_STREAM_TEAM_ONE_COLOR = EVENT_PLAYLIST_PLAYER_COLORS[4]!;
 
 interface EventWindowSourceDefinition {
   id: string;
   label: string;
   buildEvents(ctx: StatModuleContext): ReplayTimelineEvent[];
 }
+
+type EventColorResolver = (event: Event) => string | null;
 
 export interface EventTimelineSource {
   id: string;
@@ -212,8 +195,86 @@ function formatFieldThird(value: unknown): string | null {
   return label ? `${label.toLowerCase()} third` : null;
 }
 
+function formatBallThird(value: unknown): string | null {
+  if (value === "team_zero_third") return "Blue third";
+  if (value === "team_one_third") return "Orange third";
+  if (value === "neutral_third") return "Neutral third";
+  return titleCaseValue(value);
+}
+
+function formatPossessionState(value: unknown): string | null {
+  if (value === "team_zero") return "Blue";
+  if (value === "team_one") return "Orange";
+  if (value === "neutral") return "Neutral";
+  return titleCaseValue(value);
+}
+
 function payloadRecord(event: Event): Record<string, unknown> {
   return isRecord(event.payload.payload) ? event.payload.payload : {};
+}
+
+function teamColor(isTeamZero: boolean | null | undefined): string | null {
+  if (isTeamZero === true) {
+    return EVENT_STREAM_TEAM_ZERO_COLOR;
+  }
+  if (isTeamZero === false) {
+    return EVENT_STREAM_TEAM_ONE_COLOR;
+  }
+  return null;
+}
+
+function fieldHalfColor(fieldHalf: unknown): string | null {
+  if (fieldHalf === "team_zero_side") {
+    return EVENT_STREAM_TEAM_ZERO_COLOR;
+  }
+  if (fieldHalf === "team_one_side") {
+    return EVENT_STREAM_TEAM_ONE_COLOR;
+  }
+  if (fieldHalf === "neutral") {
+    return EVENT_PLAYLIST_NEUTRAL_COLOR;
+  }
+  return null;
+}
+
+function possessionStateColor(possessionState: unknown): string | null {
+  if (possessionState === "team_zero") {
+    return EVENT_STREAM_TEAM_ZERO_COLOR;
+  }
+  if (possessionState === "team_one") {
+    return EVENT_STREAM_TEAM_ONE_COLOR;
+  }
+  if (possessionState === "neutral") {
+    return EVENT_PLAYLIST_NEUTRAL_COLOR;
+  }
+  return null;
+}
+
+function payloadTeamColor(value: unknown): string | null {
+  return typeof value === "boolean" ? teamColor(value) : null;
+}
+
+const EVENT_STREAM_COLOR_RESOLVERS: Partial<Record<string, EventColorResolver>> = {
+  ball_half(event) {
+    return fieldHalfColor(payloadRecord(event).field_half);
+  },
+  possession(event) {
+    return possessionStateColor(payloadRecord(event).possession_state);
+  },
+  player_possession(event) {
+    return payloadTeamColor(payloadRecord(event).is_team_0);
+  },
+};
+
+function resolveGenericStatsEventColor(
+  streamId: string,
+  event: Event,
+  isTeamZero: boolean | null,
+): string {
+  return (
+    EVENT_STREAM_COLOR_RESOLVERS[streamId]?.(event) ??
+    teamColor(isTeamZero) ??
+    EVENT_PLAYLIST_NEUTRAL_COLOR
+  );
 }
 
 function joinEventDetails(parts: Array<string | null>): string {
@@ -245,6 +306,17 @@ function formatGenericStatsEventLabel({
     return joinEventDetails([state ?? streamLabel, duration]);
   }
 
+  if (event.payload.kind === "ball_third") {
+    const third = formatBallThird(payload.field_third);
+    const state =
+      payload.active === false
+        ? "Ball third inactive"
+        : third
+          ? `Ball in ${third.toLowerCase()}`
+          : null;
+    return joinEventDetails([state ?? streamLabel, duration]);
+  }
+
   if (event.payload.kind === "territorial_pressure") {
     const reason = titleCaseValue(payload.end_reason);
     const main = `${teamLabel ?? ""} territorial pressure`.trim();
@@ -252,7 +324,7 @@ function formatGenericStatsEventLabel({
   }
 
   if (event.payload.kind === "possession") {
-    const state = titleCaseValue(payload.possession_state);
+    const state = formatPossessionState(payload.possession_state);
     const third = formatFieldThird(payload.field_third);
     const main = state ? `${state} possession` : streamLabel;
     return joinEventDetails([main, third, duration]);
@@ -325,6 +397,7 @@ function buildGenericStatsEventTimelineEvents(
     const isTeamZero = event.meta.team_is_team_0 ?? null;
     const teamLabel = isTeamZero == null ? null : isTeamZero ? "Blue" : "Orange";
     const eventId = event.meta.id || `${streamId}:${timing.frame ?? timing.time}:${index}`;
+    const color = resolveGenericStatsEventColor(streamId, event, isTeamZero);
 
     return [
       {
@@ -342,12 +415,7 @@ function buildGenericStatsEventTimelineEvents(
         playerId,
         playerName,
         isTeamZero,
-        color:
-          isTeamZero == null
-            ? EVENT_PLAYLIST_NEUTRAL_COLOR
-            : isTeamZero
-              ? EVENT_PLAYLIST_PLAYER_COLORS[0]
-              : EVENT_PLAYLIST_PLAYER_COLORS[4],
+        color,
       },
     ];
   });
@@ -377,6 +445,7 @@ function buildGenericStatsEventTimelineRanges(
       const teamLabel = isTeamZero == null ? null : isTeamZero ? "Blue" : "Orange";
       const playerId = remoteIdToString(event.meta.primary_player);
       const playerName = playerId ? (playerNames.get(playerId) ?? playerId) : null;
+      const color = resolveGenericStatsEventColor(streamId, event, isTeamZero);
       const eventId =
         event.meta.id ||
         `${streamId}:${timing.startFrame ?? timing.startTime}:${timing.endFrame ?? timing.endTime}:${index}`;
@@ -386,6 +455,19 @@ function buildGenericStatsEventTimelineRanges(
           ? `${teamLabel} ${streamLabel.toLowerCase()}`
           : streamLabel;
 
+      // The event's scope decides how the stream fans out into lanes: a
+      // per-player stream gets one lane per player, a per-team stream one lane
+      // per team, and a match-scoped stream stays a single merged row.
+      let lane = `stats-stream:${streamId}`;
+      let laneLabel = streamLabel;
+      if (event.meta.scope === "player" && playerId) {
+        lane = `stats-stream:${streamId}:player:${playerId}`;
+        laneLabel = playerName ? `${playerName} ${streamLabel.toLowerCase()}` : streamLabel;
+      } else if (event.meta.scope === "team" && isTeamZero != null) {
+        lane = `stats-stream:${streamId}:team:${isTeamZero ? "0" : "1"}`;
+        laneLabel = teamLabel ? `${teamLabel} ${streamLabel.toLowerCase()}` : streamLabel;
+      }
+
       return [
         {
           id: `stats-stream:${eventId}`,
@@ -394,17 +476,12 @@ function buildGenericStatsEventTimelineRanges(
             ctx.replay.frames[timing.startFrame ?? -1]?.time ?? timing.startTime,
             ctx.replay.frames[timing.endFrame ?? -1]?.time ?? timing.endTime,
           ),
-          lane: `stats-stream:${streamId}`,
-          laneLabel: streamLabel,
+          lane,
+          laneLabel,
           label,
           shortLabel: eventStreamShortLabel(streamId),
           isTeamZero,
-          color:
-            isTeamZero == null
-              ? EVENT_PLAYLIST_NEUTRAL_COLOR
-              : isTeamZero
-                ? EVENT_PLAYLIST_PLAYER_COLORS[0]
-                : EVENT_PLAYLIST_PLAYER_COLORS[4],
+          color,
         },
       ];
     })
@@ -429,7 +506,9 @@ function buildGenericStatsEventSources(
       return [];
     }
 
-    const isSpanBased = SPAN_BASED_STATS_EVENT_STREAM_IDS.has(streamId);
+    // Span-vs-moment is a structural fact carried by every envelope's timing,
+    // so derive it from the stream's events instead of a hand-maintained list.
+    const isSpanBased = events.some((event) => event.meta.timing.type === "span");
     const timelineRanges = isSpanBased
       ? buildGenericStatsEventTimelineRanges(ctx, streamId, events)
       : [];
@@ -460,13 +539,10 @@ function buildGenericStatsEventSources(
   });
 }
 
-function getEventTimelineMechanicKinds(ctx: StatModuleContext): string[] {
-  return [
-    ...new Set([
-      ...STATS_MECHANIC_EVENT_COUNT_TYPES.filter(isVisibleMechanicKind),
-      ...getMechanicKinds(ctx.statsTimeline),
-    ]),
-  ].sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
+function getEventTimelineMechanicKinds(): string[] {
+  return [...EVENT_TYPE_TIMELINE_KINDS].sort((left, right) =>
+    formatMechanicKind(left).localeCompare(formatMechanicKind(right)),
+  );
 }
 
 export function getEventTimelineSources({
@@ -558,11 +634,9 @@ export function getEventTimelineSources({
     ...buildGenericStatsEventSources(ctx, activeTimelineEventSourceIds, toggleEventSource),
   );
 
-  for (const kind of getEventTimelineMechanicKinds(ctx)) {
-    const timelineEvents = buildMechanicTimelineEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const playlistEvents = buildMechanicPlaylistEvents(ctx.statsTimeline, ctx.replay, [kind]);
-    const timelineRanges = buildMechanicTimelineRanges(ctx.statsTimeline, ctx.replay, [kind]);
-    const count = timelineEvents.length + timelineRanges.length;
+  for (const kind of getEventTimelineMechanicKinds()) {
+    const timelineEvents = EVENT_TYPE_TIMELINE_BUILDERS[kind]!(ctx.statsTimeline, ctx.replay);
+    const count = timelineEvents.length;
     sources.push({
       id: `mechanic:${kind}`,
       playlistId: `mechanic:${kind}`,
@@ -576,10 +650,7 @@ export function getEventTimelineSources({
         return timelineEvents;
       },
       buildPlaylistEvents() {
-        return playlistEvents;
-      },
-      buildTimelineRanges() {
-        return timelineRanges;
+        return timelineEvents;
       },
       setActive(enabled) {
         setMechanicTimelineKind(kind, enabled);

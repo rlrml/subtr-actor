@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects player-on-player bumps from player frame/events and 50/50 state.
 pub struct BumpNode {
     calculator: BumpCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for BumpNode {
 
     fn name(&self) -> &'static str {
         "bump"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::BUMP_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

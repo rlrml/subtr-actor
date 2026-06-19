@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects ball carries and air dribbles from continuous ball-control sequences.
 pub struct BallCarryNode {
     calculator: BallCarryCalculator,
 }
@@ -33,6 +34,10 @@ impl AnalysisNode for BallCarryNode {
 
     fn name(&self) -> &'static str {
         "ball_carry"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::BALL_CARRY_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> Vec<AnalysisDependency> {

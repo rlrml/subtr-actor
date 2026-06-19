@@ -130,9 +130,8 @@ code wants the calculator's accumulated stats, config, and event lists.
 - Register the node in `src/stats/analysis_graph/mod.rs`.
 - If shared frame-derived state is missing, add that as a dedicated dependency
   node instead of recomputing it inside each stat node.
-- If output wiring changes, update the relevant collector or exporter
-  (`src/stats/timeline/`, `src/collector/stats/`, or
-  `src/stats/export/`).
+- If output wiring changes, update the relevant collector
+  (`src/stats/timeline/` or `src/collector/stats/`).
 
 ## Legacy note
 

@@ -5,6 +5,9 @@ import type { KickoffSpawnPosition } from "./KickoffSpawnPosition.ts";
 import type { KickoffTakerOutcome } from "./KickoffTakerOutcome.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
+/**
+ * Kickoff event for the player who challenged the ball.
+ */
 export type KickoffTakerEvent = { player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number], spawn_position: KickoffSpawnPosition, start_boost: number | null,
 /**
  * Boost remaining at the moment the taker contacts the ball (the
@@ -13,4 +16,47 @@ export type KickoffTakerEvent = { player: RemoteIdTs, is_team_0: boolean, start_
  * the end-of-kickoff sample. Invariant when the taker touches:
  * `start_boost + boost_collected == boost_used + boost_after`.
  */
-boost_after: number | null, time_to_ball: number | null, boost_collected: number, boost_used: number, ball_direction: KickoffBallDirection, first_touch_time: number | null, first_touch_frame: number | null, outcome: KickoffTakerOutcome, approach: KickoffApproach, };
+boost_after: number | null, time_to_ball: number | null, boost_collected: number, boost_used: number, ball_direction: KickoffBallDirection, first_touch_time: number | null, first_touch_frame: number | null,
+/**
+ * Car center position at the taker's first kickoff touch, when the touch
+ * could be matched to a player sample on that frame.
+ */
+contact_player_position: [number, number, number] | null, contact_player_velocity: [number, number, number] | null, contact_car_forward: [number, number, number] | null,
+/**
+ * Ball center in the taker's local hitbox coordinates at contact.
+ */
+contact_local_ball_position: [number, number, number] | null,
+/**
+ * Closest point on the taker's local hitbox to the ball center.
+ */
+contact_local_contact_point: [number, number, number] | null,
+/**
+ * Estimated ball-to-hitbox gap after subtracting the ball collision radius.
+ */
+contact_gap: number | null,
+/**
+ * Team-normalized distance from car center to ball along the attack axis.
+ * Positive means the taker is behind the ball on their own-goal side.
+ */
+contact_behind_ball_depth: number | null,
+/**
+ * Team-normalized left/right offset of car center from the ball.
+ */
+contact_lateral_offset: number | null, contact_lateral_abs_offset: number | null,
+/**
+ * Alignment of taker velocity with the opponent-goal direction (`-1..=1`).
+ */
+contact_velocity_attack_alignment: number | null,
+/**
+ * Alignment of taker velocity with the car-to-ball direction (`-1..=1`).
+ */
+contact_velocity_ball_alignment: number | null,
+/**
+ * Alignment of taker nose direction with the opponent-goal direction.
+ */
+contact_nose_attack_alignment: number | null,
+/**
+ * Alignment of the ball's first-touch exit velocity with the taker's
+ * opponent-goal direction.
+ */
+contact_ball_exit_attack_alignment: number | null, outcome: KickoffTakerOutcome, approach: KickoffApproach, };

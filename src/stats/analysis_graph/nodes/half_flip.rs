@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects half-flips from player frame state during live play.
 pub struct HalfFlipNode {
     calculator: HalfFlipCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for HalfFlipNode {
 
     fn name(&self) -> &'static str {
         "half_flip"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::HALF_FLIP_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

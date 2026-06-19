@@ -1,3 +1,19 @@
+//! Accumulators: plain structs that fold a calculator's per-frame events into
+//! running totals over a replay.
+//!
+//! Unlike calculators and analysis nodes, accumulators share no trait — each is
+//! a data container that holds counts, durations, distances, and confidence
+//! sums for one mechanic or play type. They typically come in a per-player /
+//! per-team / match-wide trio plus a `*StatsAccumulator` that applies events.
+//! Downstream, each accumulator's published values are defined by its
+//! [`StatFieldProvider`] impl in
+//! [`crate::stats::export`].
+//!
+//! Browse the full set in the item list below; representative examples are
+//! [`BoostStats`], [`TouchStats`], [`MovementStats`], [`PositioningStats`],
+//! [`KickoffStats`], [`FiftyFiftyStats`], and [`CorePlayerStats`] /
+//! [`CoreTeamStats`] (core scoreboard).
+
 pub(crate) use std::collections::HashMap;
 
 pub(crate) use serde::{Deserialize, Serialize};
@@ -61,6 +77,8 @@ pub mod powerslide;
 pub use powerslide::*;
 pub mod ball_half;
 pub use ball_half::*;
+pub mod ball_third;
+pub use ball_third::*;
 pub mod rotation;
 pub use rotation::*;
 pub mod rush;

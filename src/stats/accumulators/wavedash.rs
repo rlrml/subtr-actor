@@ -2,6 +2,7 @@ use super::*;
 
 const WAVEDASH_HIGH_CONFIDENCE: f32 = 0.75;
 
+/// Per-player accumulated wavedash stats with confidence.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WavedashStats {
@@ -57,6 +58,7 @@ impl WavedashStats {
     }
 }
 
+/// Accumulates wavedash stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WavedashStatsAccumulator {
     player_stats: HashMap<PlayerId, WavedashStats>,

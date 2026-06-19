@@ -273,6 +273,7 @@ fn event_envelope(
             id: id.to_owned(),
             stream: stream.to_owned(),
             label: stream.replace('_', " "),
+            scope: event_stream_scope(stream),
             timing: EventTiming::Moment { frame, time },
             primary_player,
             secondary_player: None,
@@ -415,6 +416,17 @@ fn bump_event_envelope(event: BumpEvent) -> Event {
     )
 }
 
+fn demolition_event_envelope(event: DemolitionEvent) -> Event {
+    payload_event_envelope(
+        "demolition",
+        event.frame,
+        event.time,
+        event.attacker.clone(),
+        event.attacker_is_team_0.unwrap_or(false),
+        EventPayload::Demolition(event),
+    )
+}
+
 fn fifty_fifty_event_envelope(event: FiftyFiftyEvent) -> Event {
     team_event_envelope(
         "fifty_fifty",
@@ -462,6 +474,19 @@ fn bump_event(frame: usize, time: f32, confidence: f32) -> BumpEvent {
         victim_impulse: 220.0,
         initiator_position: [0.0, 0.0, 0.0],
         victim_position: [100.0, 0.0, 0.0],
+    }
+}
+
+fn demolition_event(frame: usize, time: f32) -> DemolitionEvent {
+    DemolitionEvent {
+        time,
+        frame,
+        attacker: RemoteId::SplitScreen(0),
+        victim: RemoteId::SplitScreen(1),
+        attacker_is_team_0: Some(true),
+        victim_is_team_0: Some(false),
+        attacker_position: None,
+        victim_position: None,
     }
 }
 

@@ -115,6 +115,14 @@ fmt-check:
 clippy:
     {{nix_develop}} cargo clippy --all-targets --all-features -- -D warnings
 
+# Regenerate the README overview section from the src/lib.rs crate docs
+readme:
+    {{nix_develop}} cargo rdme --force --heading-base-level 0
+
+# Check the README overview is in sync with the src/lib.rs crate docs (matches CI)
+check-readme:
+    {{nix_develop}} cargo rdme --check --heading-base-level 0
+
 # ---------------------------------------------------------------------------
 # CI preflight gates
 #
@@ -134,6 +142,7 @@ check-rust:
     {{nix_develop}} cargo fmt --all -- --check
     {{nix_develop}} cargo metadata --locked --format-version 1 > /dev/null
     {{nix_develop}} cargo clippy --all-targets --all-features -- -D warnings
+    {{nix_develop}} cargo rdme --check --heading-base-level 0
 
 # JS/TS style gate (prettier + eslint; mirrors CI "Check JS/TS style")
 check-style:

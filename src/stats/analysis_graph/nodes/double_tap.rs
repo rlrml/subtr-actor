@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects double taps from touches plus backboard-bounce state during live play.
 pub struct DoubleTapNode {
     calculator: DoubleTapCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for DoubleTapNode {
 
     fn name(&self) -> &'static str {
         "double_tap"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::DOUBLE_TAP_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

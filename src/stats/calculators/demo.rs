@@ -2,10 +2,33 @@ use super::*;
 
 const DEMO_REPEAT_FRAME_WINDOW: usize = 8;
 
+/// A single demolition, linking the demoer (`attacker`) to the demoee
+/// (`victim`). Each demolition emits exactly one of these events; the attacker
+/// side contributes a demo inflicted and the victim side a demo taken.
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct DemolitionEvent {
+    pub time: f32,
+    pub frame: usize,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub attacker: PlayerId,
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub victim: PlayerId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attacker_is_team_0: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub victim_is_team_0: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attacker_position: Option<[f32; 3]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub victim_position: Option<[f32; 3]>,
+}
+
+/// Detects demolitions from player frame state and frame events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DemoCalculator {
     player_teams: HashMap<PlayerId, bool>,
-    timeline: EventStream<TimelineEvent>,
+    timeline: EventStream<DemolitionEvent>,
     last_seen_frame: HashMap<(PlayerId, PlayerId), usize>,
     active_pairs: HashSet<(PlayerId, PlayerId)>,
 }
@@ -15,11 +38,11 @@ impl DemoCalculator {
         Self::default()
     }
 
-    pub fn timeline(&self) -> &[TimelineEvent] {
+    pub fn events(&self) -> &[DemolitionEvent] {
         self.timeline.all()
     }
 
-    pub fn new_timeline_events(&self) -> &[TimelineEvent] {
+    pub fn new_events(&self) -> &[DemolitionEvent] {
         self.timeline.new_events()
     }
 
@@ -114,25 +137,16 @@ impl DemoCalculator {
             return;
         }
 
-        let kill_event = TimelineEvent {
+        self.timeline.push(DemolitionEvent {
             time,
-            frame: Some(frame_number),
-            kind: TimelineEventKind::Kill,
-            player_id: Some(attacker.clone()),
-            player_position: attacker_position,
-            is_team_0: self.player_teams.get(attacker).copied(),
-        };
-        self.timeline.push(kill_event);
-
-        let death_event = TimelineEvent {
-            time,
-            frame: Some(frame_number),
-            kind: TimelineEventKind::Death,
-            player_id: Some(victim.clone()),
-            player_position: victim_position,
-            is_team_0: self.player_teams.get(victim).copied(),
-        };
-        self.timeline.push(death_event);
+            frame: frame_number,
+            attacker: attacker.clone(),
+            victim: victim.clone(),
+            attacker_is_team_0: self.player_teams.get(attacker).copied(),
+            victim_is_team_0: self.player_teams.get(victim).copied(),
+            attacker_position,
+            victim_position,
+        });
     }
 }
 

@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects speed-flips from gameplay/ball/player state during live play.
 pub struct SpeedFlipNode {
     calculator: SpeedFlipCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for SpeedFlipNode {
 
     fn name(&self) -> &'static str {
         "speed_flip"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::SPEED_FLIP_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

@@ -26,6 +26,116 @@ pub(super) fn tag_goals_by_height(
     tags
 }
 
+pub(super) fn tag_goals_by_possession_touch_height(
+    goals: &[GoalContextEvent],
+    touch_events: &[TouchClassificationEvent],
+    possession_events: &[PossessionEvent],
+    kind: GoalTagKind,
+    min_ball_z: f32,
+) -> Vec<GoalTagAssignment> {
+    let mut tags = Vec::new();
+    for (goal_index, goal) in goals.iter().enumerate() {
+        let possession_start_frame = scoring_possession_start_frame(goal, possession_events);
+        let Some((event_index, touch)) =
+            highest_possession_touch(goal, touch_events, possession_start_frame, min_ball_z)
+        else {
+            continue;
+        };
+        tags.push(mechanic_goal_tag(
+            GoalTaggingContext { goal_index },
+            kind,
+            1.0,
+            mechanic_goal_performer(goal, &touch.player),
+            mechanic_goal_modifiers(goal, &touch.player),
+            mechanic_goal_evidence(goal, leadup_touch_evidence(touch)),
+            vec![GoalTagEventRef {
+                stream: GoalTagEventStream::Touch,
+                index: event_index,
+            }],
+            Vec::new(),
+        ));
+    }
+    tags
+}
+
+/// First frame of the scoring team's possession that led to the goal: the start
+/// of the contiguous run of scoring-team possession events ending at the goal.
+/// Walking back stops at the previous neutral/opponent possession (the turnover
+/// or loose ball that started this possession), so the window never reaches
+/// across a turnover or the kickoff. Falls back to the scorer's last touch when
+/// no scoring-team possession is recorded, which keeps the finishing touch in
+/// scope.
+fn scoring_possession_start_frame(
+    goal: &GoalContextEvent,
+    possession_events: &[PossessionEvent],
+) -> usize {
+    let scoring_state = if goal.scoring_team_is_team_0 {
+        "team_zero"
+    } else {
+        "team_one"
+    };
+    let is_scoring_possession = |event: &PossessionEvent| event.possession_state == scoring_state;
+
+    let last_scoring_index = possession_events
+        .iter()
+        .enumerate()
+        .filter(|(_, event)| is_scoring_possession(event) && event.frame <= goal.frame)
+        .map(|(index, _)| index)
+        .max();
+
+    match last_scoring_index {
+        Some(last_index) => {
+            let mut start_index = last_index;
+            while start_index > 0 && is_scoring_possession(&possession_events[start_index - 1]) {
+                start_index -= 1;
+            }
+            possession_events[start_index].frame
+        }
+        None => goal
+            .scorer_last_touch
+            .as_ref()
+            .map(|touch| touch.frame)
+            .unwrap_or(goal.frame),
+    }
+}
+
+/// The scoring-team touch within the goal's possession (and at or before the
+/// goal) with the greatest ball height, provided that height meets `min_ball_z`.
+/// Returns the touch's index in `touch_events` alongside the touch.
+fn highest_possession_touch<'a>(
+    goal: &GoalContextEvent,
+    touch_events: &'a [TouchClassificationEvent],
+    possession_start_frame: usize,
+    min_ball_z: f32,
+) -> Option<(usize, &'a TouchClassificationEvent)> {
+    touch_events
+        .iter()
+        .enumerate()
+        .filter(|(_, touch)| possession_touch_matches_goal(touch, goal, possession_start_frame))
+        .filter_map(|(index, touch)| {
+            touch
+                .ball_position
+                .filter(|ball_position| ball_position[2] >= min_ball_z)
+                .map(|ball_position| (index, touch, ball_position[2]))
+        })
+        .max_by(|left, right| {
+            left.2
+                .total_cmp(&right.2)
+                .then_with(|| left.1.frame.cmp(&right.1.frame))
+        })
+        .map(|(index, touch, _)| (index, touch))
+}
+
+fn possession_touch_matches_goal(
+    touch: &TouchClassificationEvent,
+    goal: &GoalContextEvent,
+    possession_start_frame: usize,
+) -> bool {
+    touch.is_team_0 == goal.scoring_team_is_team_0
+        && touch.frame >= possession_start_frame
+        && touch.frame <= goal.frame
+}
+
 pub(super) fn tag_goals_by_attacking_y(
     goals: &[GoalContextEvent],
     kind: GoalTagKind,
@@ -189,14 +299,12 @@ pub(super) fn bump_event_matches_goal(event: &BumpEvent, goal: &GoalContextEvent
         && event.frame <= goal.frame
 }
 
-pub(super) fn demo_event_matches_goal(event: &TimelineEvent, goal: &GoalContextEvent) -> bool {
+pub(super) fn demo_event_matches_goal(event: &DemolitionEvent, goal: &GoalContextEvent) -> bool {
     const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
 
-    event.kind == TimelineEventKind::Kill
-        && event.is_team_0 == Some(goal.scoring_team_is_team_0)
+    event.attacker_is_team_0 == Some(goal.scoring_team_is_team_0)
         && event.time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
-        && event.frame.is_some_and(|frame| frame <= goal.frame)
-        && event.player_id.is_some()
+        && event.frame <= goal.frame
 }
 
 pub(super) fn position_to_vec(position: GoalContextPosition) -> glam::Vec3 {
@@ -225,6 +333,22 @@ pub(super) fn last_touch_evidence(touch: &GoalTouchContext) -> GoalTagEvidence {
         frame: touch.frame,
         player: Some(touch.player.clone()),
         player_position: None,
+    }
+}
+
+pub(super) fn leadup_touch_evidence(touch: &TouchClassificationEvent) -> GoalTagEvidence {
+    GoalTagEvidence {
+        kind: GoalTagEvidenceKind::LeadupTouch,
+        time: touch.time,
+        frame: touch.frame,
+        player: Some(touch.player.clone()),
+        player_position: touch
+            .ball_position
+            .map(|ball_position| GoalContextPosition {
+                x: ball_position[0],
+                y: ball_position[1],
+                z: ball_position[2],
+            }),
     }
 }
 
@@ -322,13 +446,13 @@ pub(super) fn bump_evidence(event: &BumpEvent) -> GoalTagEvidence {
     }
 }
 
-pub(super) fn demo_evidence(event: &TimelineEvent) -> GoalTagEvidence {
+pub(super) fn demo_evidence(event: &DemolitionEvent) -> GoalTagEvidence {
     GoalTagEvidence {
         kind: GoalTagEvidenceKind::Demo,
         time: event.time,
-        frame: event.frame.unwrap_or_default(),
-        player: event.player_id.clone(),
-        player_position: event.player_position.map(|position| GoalContextPosition {
+        frame: event.frame,
+        player: Some(event.attacker.clone()),
+        player_position: event.attacker_position.map(|position| GoalContextPosition {
             x: position[0],
             y: position[1],
             z: position[2],

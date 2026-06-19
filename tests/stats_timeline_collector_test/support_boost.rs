@@ -96,6 +96,7 @@ fn test_event_envelope(stream: &str, index: usize, payload: EventPayload) -> Eve
             id: format!("{stream}:{index}"),
             stream: stream.to_owned(),
             label: stats_timeline_event_label(stream),
+            scope: event_stream_scope(stream),
             timing: EventTiming::Moment {
                 frame: 0,
                 time: 0.0,
@@ -151,6 +152,7 @@ fn default_team_stats_snapshot() -> TeamStatsSnapshot {
         fifty_fifty: FiftyFiftyTeamStats::default(),
         possession: PossessionTeamStats::default(),
         ball_half: BallHalfTeamStats::default(),
+        ball_third: BallThirdTeamStats::default(),
         territorial_pressure: TerritorialPressureTeamStats::default(),
         rotation: RotationTeamStats::default(),
         rush: RushTeamStats::default(),
@@ -228,6 +230,7 @@ fn empty_stats_timeline_config() -> StatsTimelineConfig {
         shadow_defense_min_retreat_speed: 0.0,
         shadow_defense_max_speed_delta: 0.0,
         ball_half_neutral_zone_half_width_y: 0.0,
+        ball_third_boundary_y: 0.0,
         territorial_pressure_neutral_zone_half_width_y: 0.0,
         territorial_pressure_min_establish_seconds: 0.0,
         territorial_pressure_min_establish_third_seconds: 0.0,

@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects musty flicks from ball/player state and touches during live play.
 pub struct MustyFlickNode {
     calculator: MustyFlickCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for MustyFlickNode {
 
     fn name(&self) -> &'static str {
         "musty_flick"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::MUSTY_FLICK_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

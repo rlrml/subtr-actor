@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects wavedashes from player frame state during live play.
 pub struct WavedashNode {
     calculator: WavedashCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for WavedashNode {
 
     fn name(&self) -> &'static str {
         "wavedash"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::WAVEDASH_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

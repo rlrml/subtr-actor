@@ -1,6 +1,7 @@
 import type {
   BallSample,
   CameraSettings,
+  CameraStateChange,
   PlaybackFrame,
   RawDemolishInfo,
   RawGoalEvent,
@@ -159,6 +160,40 @@ function parseBallFrame(frame: RawBallFrame): BallSample {
   };
 }
 
+/**
+ * Replicated throttle/steer arrive as bytes where ~128 is neutral and the
+ * extremes are 0 and 255. Map them to a signed -1..1 unit so renderers can
+ * scale by their own max steer/throttle.
+ */
+function byteToSignedUnit(byte: number | null | undefined): number | null {
+  if (byte == null) return null;
+  return Math.max(-1, Math.min(1, (byte - 128) / 128));
+}
+
+/**
+ * Replicated camera pitch/yaw arrive as bytes encoding a signed rotation
+ * (values above 127 wrap to negative). Map them to radians.
+ */
+function byteToRadians(byte: number | null | undefined): number | null {
+  if (byte == null) return null;
+  const signed = byte > 127 ? byte - 256 : byte;
+  return (signed * Math.PI) / 128;
+}
+
+function tupleToVec3(tuple: [number, number, number] | null | undefined): Vec3 | null {
+  if (!tuple) return null;
+  return { x: tuple[0], y: tuple[1], z: tuple[2] };
+}
+
+const EMPTY_PLAYER_REPLAY_STATE = {
+  cameraPitch: null,
+  cameraYaw: null,
+  throttle: null,
+  steer: null,
+  dodgeImpulse: null,
+  dodgeTorque: null,
+} as const;
+
 function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
   if (frame === "Empty") {
     return {
@@ -176,6 +211,7 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
       jumpActive: false,
       doubleJumpActive: false,
       dodgeActive: false,
+      ...EMPTY_PLAYER_REPLAY_STATE,
     };
   }
 
@@ -187,6 +223,9 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
   const up = rotation
     ? normalizeVector(rotateVectorByQuaternion({ x: 0, y: 0, z: 1 }, rotation))
     : null;
+
+  const camera = frame.Data.camera;
+  const input = frame.Data.input;
 
   return {
     isPresent: true,
@@ -203,6 +242,12 @@ function parsePlayerFrame(frame: RawPlayerFrame): PlayerSample {
     jumpActive: frame.Data.jump_active,
     doubleJumpActive: frame.Data.double_jump_active,
     dodgeActive: frame.Data.dodge_active,
+    cameraPitch: byteToRadians(camera?.pitch),
+    cameraYaw: byteToRadians(camera?.yaw),
+    throttle: byteToSignedUnit(input?.throttle),
+    steer: byteToSignedUnit(input?.steer),
+    dodgeImpulse: tupleToVec3(input?.dodge_impulse),
+    dodgeTorque: tupleToVec3(input?.dodge_torque),
   };
 }
 
@@ -221,6 +266,13 @@ function carriedPlayerSample(sample: PlayerSample): PlayerSample {
     jumpActive: false,
     doubleJumpActive: false,
     dodgeActive: false,
+    // Camera look angles carry forward across a brief gap, but transient
+    // vehicle inputs reset to neutral so wheels/flips don't freeze mid-turn
+    // while the player has no data.
+    throttle: null,
+    steer: null,
+    dodgeImpulse: null,
+    dodgeTorque: null,
   };
 }
 
@@ -673,6 +725,26 @@ async function indexReplayPlayersAsync(
   return { byId, byName };
 }
 
+/**
+ * Maps the per-player coalesced camera-toggle changes (already grouped and
+ * frame-ordered on the Rust side) into a lookup keyed by player id string.
+ */
+function buildCameraEventsByPlayer(raw: RawReplayFramesData): Map<string, CameraStateChange[]> {
+  const byPlayer = new Map<string, CameraStateChange[]>();
+  for (const [player, changes] of raw.player_camera_events ?? []) {
+    byPlayer.set(
+      playerIdToString(player),
+      changes.map((change) => ({
+        frame: change.frame,
+        ballCamActive: change.ball_cam_active,
+        behindViewActive: change.behind_view_active,
+        driving: change.driving,
+      })),
+    );
+  }
+  return byPlayer;
+}
+
 function buildPlayerTracks(
   raw: RawReplayFramesData,
   progressTracker?: NormalizeReplayProgressTracker,
@@ -680,6 +752,7 @@ function buildPlayerTracks(
   const teamZeroNames = new Set(raw.meta.team_zero.map((player) => player.name));
   const teamOneNames = new Set(raw.meta.team_one.map((player) => player.name));
   const replayPlayers = indexReplayPlayers(raw, progressTracker);
+  const cameraEventsByPlayer = buildCameraEventsByPlayer(raw);
   const players: ReplayPlayerTrack[] = [];
   let processedPlayerFrames = 0;
 
@@ -713,6 +786,7 @@ function buildPlayerTracks(
       cameraSettings: extractCameraSettings(replayPlayerInfo),
       hitbox: getReplayHitboxSpec(inferReplayHitboxKind(replayPlayerInfo)),
       frames,
+      cameraEvents: cameraEventsByPlayer.get(playerIdString) ?? [],
     });
   }
 
@@ -730,6 +804,7 @@ async function buildPlayerTracksAsync(
   const teamZeroNames = new Set(raw.meta.team_zero.map((player) => player.name));
   const teamOneNames = new Set(raw.meta.team_one.map((player) => player.name));
   const replayPlayers = await indexReplayPlayersAsync(raw, progressTracker);
+  const cameraEventsByPlayer = buildCameraEventsByPlayer(raw);
   const players: ReplayPlayerTrack[] = [];
   let processedPlayerFrames = 0;
 
@@ -765,6 +840,7 @@ async function buildPlayerTracksAsync(
       cameraSettings: extractCameraSettings(replayPlayerInfo),
       hitbox: getReplayHitboxSpec(inferReplayHitboxKind(replayPlayerInfo)),
       frames,
+      cameraEvents: cameraEventsByPlayer.get(playerIdString) ?? [],
     });
   }
 

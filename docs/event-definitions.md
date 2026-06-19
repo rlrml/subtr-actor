@@ -148,6 +148,34 @@ _None documented._
 
 _None documented._
 
+### Ball Third (`ball_third`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `ball_third` via `BallThirdNode` / `BallThirdCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Boost Pickup (`boost_pickups`)
 
 - Category: `other`
@@ -333,6 +361,34 @@ _None documented._
   - Testing: `untested`
 - Producers:
   - `match_stats` via `MatchStatsNode` / `MatchStatsCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Demolition (`demolition`)
+
+- Category: `other`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `demo` via `DemoNode` / `DemoCalculator`
 
 **Summary**
 
@@ -706,7 +762,7 @@ _None documented._
 
 ### Movement (`movement`)
 
-- Category: `movement`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -1064,7 +1120,6 @@ _None documented._
   - False negative evidence: `not_evaluated`
   - Testing: `untested`
 - Producers:
-  - `demo` via `DemoNode` / `DemoCalculator`
   - `match_stats` via `MatchStatsNode` / `MatchStatsCalculator`
 
 **Summary**
@@ -1255,13 +1310,13 @@ A goal whose scorer last touched the ball while it was high in the air.
 
 **Summary**
 
-A stricter aerial-goal tag for goals scored from a higher last-touch ball height.
+A goal whose scoring possession includes a touch taken from a high ball height, even when the finishing touch itself was lower.
 
 **Approach**
 
-- Inspect each goal context and its scorer-last-touch evidence.
-- Require the last-touch ball height to meet the high-aerial threshold.
-- Allow the regular aerial-goal tag to also apply when both thresholds are met.
+- Scan the scoring team's touches within the possession that led to the goal (back to the last turnover or neutral loose ball).
+- Require at least one such touch to meet the high-aerial ball-height threshold.
+- Tag the goal from the highest qualifying touch, attaching it as leadup-touch evidence.
 
 ### Long-Distance Goal (`long_distance_goal`)
 

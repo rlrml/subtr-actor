@@ -8,11 +8,25 @@ import type {
 import { boostAmountToPercent } from "./boost-units";
 import { findFrameIndexAtTime } from "./replay-data";
 
+/**
+ * Default world-space lift (Unreal units) applied to each car before
+ * projecting its floating name/boost label, so the pill sits above the car
+ * instead of on it. Exposed so consumers can seed UI controls with the same
+ * default the plugin uses.
+ */
+export const DEFAULT_FLOATING_NAMEPLATE_LIFT_UU = 250;
+
 export interface BallchasingOverlayPluginOptions {
   showFloatingNames?: boolean;
   showFloatingBoostBars?: boolean;
   showTeamBoostHud?: boolean;
   showFollowedPlayerHud?: boolean;
+  /**
+   * How far (Unreal units) to lift the floating name/boost pills above each
+   * car. A function is read every frame, so callers can wire it to a live UI
+   * control. Defaults to {@link DEFAULT_FLOATING_NAMEPLATE_LIFT_UU}.
+   */
+  floatingLiftUu?: number | (() => number | null | undefined);
 }
 
 interface PlayerOverlayElements {
@@ -92,12 +106,12 @@ function ensureStyles(): void {
       justify-content: center;
       min-width: 8rem;
       max-width: 14rem;
-      min-height: 1.45rem;
+      min-height: 1.7rem;
       border-radius: 999px;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      background: rgba(6, 11, 17, 0.42);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.42);
+      background: rgba(6, 11, 17, 0.52);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
       backdrop-filter: blur(6px);
       transition:
         border-color 0.12s ease-out,
@@ -146,11 +160,11 @@ function ensureStyles(): void {
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
-      padding: 0.22rem 0.72rem;
+      padding: 0.24rem 0.78rem;
       color: #ffffff;
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
@@ -568,8 +582,22 @@ export function createBallchasingOverlayPlugin(
   let changedContainerPosition = false;
   let originalContainerPosition = "";
   const playerElements = new Map<string, PlayerOverlayElements>();
+  const floatingLiftSource = options.floatingLiftUu;
   const projected = new THREE.Vector3();
-  const floatingOffset = new THREE.Vector3(0, 0, 255);
+  // World-space lift applied to each car before projecting the floating label,
+  // so the name/boost pill sits above the car instead of on it. Recomputed each
+  // frame in beforeRender along the scene's up axis (read from the camera) — the
+  // viewer renders Y-up while @rlrml/player's own scene is Z-up, so we never
+  // hardcode an axis — and scaled by the (optionally live) configured lift.
+  const floatingOffset = new THREE.Vector3();
+
+  function resolveFloatingLiftUu(): number {
+    const raw =
+      typeof floatingLiftSource === "function" ? floatingLiftSource() : floatingLiftSource;
+    return typeof raw === "number" && Number.isFinite(raw)
+      ? raw
+      : DEFAULT_FLOATING_NAMEPLATE_LIFT_UU;
+  }
 
   function syncAttachedPlayer(attachedPlayerId: string | null): void {
     for (const [playerId, elements] of playerElements.entries()) {
@@ -730,7 +758,6 @@ export function createBallchasingOverlayPlugin(
       });
     }
 
-    floatingOffset.set(0, 0, 255 * (context.options.fieldScale ?? 1));
     container.append(root);
     syncAttachedPlayer(context.player.getState().attachedPlayerId);
     syncFollowedHud({ ...context, state: context.player.getState() });
@@ -762,6 +789,13 @@ export function createBallchasingOverlayPlugin(
       if (!root) {
         return;
       }
+
+      // Recompute the lift each frame so a live UI control takes effect
+      // immediately, and so the up axis tracks whichever scene we render in.
+      floatingOffset
+        .copy(context.scene.camera.up)
+        .normalize()
+        .multiplyScalar(resolveFloatingLiftUu() * (context.options.fieldScale ?? 1));
 
       let followedHudUpdated = false;
       for (const [playerIndex, player] of context.players.entries()) {

@@ -1,5 +1,6 @@
 use super::*;
 
+/// Spawn position a player took for a kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -26,6 +27,7 @@ impl KickoffSpawnPosition {
     }
 }
 
+/// The kickoff formation/type.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -76,6 +78,7 @@ impl KickoffType {
     }
 }
 
+/// Direction a player approached the kickoff from.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -126,6 +129,7 @@ impl KickoffDirection {
     }
 }
 
+/// Outcome for the player who took the kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -148,6 +152,7 @@ impl KickoffTakerOutcome {
     }
 }
 
+/// Overall outcome of a kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -170,6 +175,7 @@ impl KickoffOutcome {
     }
 }
 
+/// Banded strength of a kickoff win.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -192,6 +198,7 @@ impl KickoffWinStrengthBand {
     }
 }
 
+/// Possession outcome following a kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -260,6 +267,7 @@ impl KickoffAdvantage {
     }
 }
 
+/// How a player approached the kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -286,6 +294,7 @@ impl KickoffApproach {
     }
 }
 
+/// Behavior of a supporting (non-taking) player on a kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -308,6 +317,7 @@ impl KickoffSupportBehavior {
     }
 }
 
+/// Direction the ball traveled off the kickoff.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
@@ -330,6 +340,7 @@ impl KickoffBallDirection {
     }
 }
 
+/// Kickoff event for the player who challenged the ball.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffTakerEvent {
@@ -351,10 +362,37 @@ pub struct KickoffTakerEvent {
     pub ball_direction: KickoffBallDirection,
     pub first_touch_time: Option<f32>,
     pub first_touch_frame: Option<usize>,
+    /// Car center position at the taker's first kickoff touch, when the touch
+    /// could be matched to a player sample on that frame.
+    pub contact_player_position: Option<[f32; 3]>,
+    pub contact_player_velocity: Option<[f32; 3]>,
+    pub contact_car_forward: Option<[f32; 3]>,
+    /// Ball center in the taker's local hitbox coordinates at contact.
+    pub contact_local_ball_position: Option<[f32; 3]>,
+    /// Closest point on the taker's local hitbox to the ball center.
+    pub contact_local_contact_point: Option<[f32; 3]>,
+    /// Estimated ball-to-hitbox gap after subtracting the ball collision radius.
+    pub contact_gap: Option<f32>,
+    /// Team-normalized distance from car center to ball along the attack axis.
+    /// Positive means the taker is behind the ball on their own-goal side.
+    pub contact_behind_ball_depth: Option<f32>,
+    /// Team-normalized left/right offset of car center from the ball.
+    pub contact_lateral_offset: Option<f32>,
+    pub contact_lateral_abs_offset: Option<f32>,
+    /// Alignment of taker velocity with the opponent-goal direction (`-1..=1`).
+    pub contact_velocity_attack_alignment: Option<f32>,
+    /// Alignment of taker velocity with the car-to-ball direction (`-1..=1`).
+    pub contact_velocity_ball_alignment: Option<f32>,
+    /// Alignment of taker nose direction with the opponent-goal direction.
+    pub contact_nose_attack_alignment: Option<f32>,
+    /// Alignment of the ball's first-touch exit velocity with the taker's
+    /// opponent-goal direction.
+    pub contact_ball_exit_attack_alignment: Option<f32>,
     pub outcome: KickoffTakerOutcome,
     pub approach: KickoffApproach,
 }
 
+/// Kickoff event for a supporting player.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffSupportEvent {
@@ -362,6 +400,12 @@ pub struct KickoffSupportEvent {
     pub player: PlayerId,
     pub is_team_0: bool,
     pub start_position: [f32; 3],
+    /// Horizontal distance (uu) of the support player's spawn from field
+    /// center — i.e. from the ball's kickoff position at the origin. Larger
+    /// values mean the player started further back/wider; a `cheat` support
+    /// closes this gap as the kickoff develops while a back-positioned support
+    /// keeps it.
+    pub start_distance_from_center: f32,
     pub spawn_position: KickoffSpawnPosition,
     pub start_boost: Option<f32>,
     pub boost_after: Option<f32>,
@@ -370,6 +414,7 @@ pub struct KickoffSupportEvent {
     pub support_behavior: KickoffSupportBehavior,
 }
 
+/// A kickoff with its type, outcome, and participant context.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct KickoffEvent {

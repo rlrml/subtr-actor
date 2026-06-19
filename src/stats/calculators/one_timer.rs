@@ -3,7 +3,14 @@ use super::*;
 const ONE_TIMER_MIN_BALL_SPEED: f32 = 1000.0;
 const ONE_TIMER_MIN_GOAL_ALIGNMENT_COSINE: f32 = 0.65;
 const GOAL_CENTER_Y: f32 = 5120.0;
+const GOAL_MOUTH_HEIGHT_Z: f32 = 642.775;
+const GOAL_MOUTH_TRAJECTORY_MARGIN: f32 = BALL_RADIUS_Z * 1.5;
+/// The post-touch trajectory must cross the opponent goal mouth within this many
+/// seconds for the touch to read as a one-timer (i.e. it must actually be on
+/// net, not merely aimed in the goal's general direction).
+const ONE_TIMER_MAX_TIME_TO_GOAL_SECONDS: f32 = 4.0;
 
+/// A first-touch shot taken off an incoming pass without trapping the ball.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct OneTimerEvent {
@@ -27,6 +34,7 @@ pub struct OneTimerEvent {
     pub goal_alignment: f32,
 }
 
+/// Detects one-timers from ball state and upstream pass detection.
 #[derive(Debug, Clone, Default)]
 pub struct OneTimerCalculator {
     events: EventStream<OneTimerEvent>,
@@ -47,6 +55,17 @@ impl OneTimerCalculator {
     }
 
     fn one_timer_event_for_pass(pass: &PassEvent, ball: &BallFrameState) -> Option<OneTimerEvent> {
+        // A one-timer is a direct first-touch redirect of a pass. If the ball
+        // bounced off the backboard between the passer's touch and the
+        // receiver's finish, that is a double tap / backboard play, not a
+        // one-timer, so exclude the backboard pass kinds here.
+        if matches!(
+            pass.pass_kind,
+            PassKind::Backboard | PassKind::FiftyFiftyBackboard
+        ) {
+            return None;
+        }
+
         let ball = ball.sample()?;
         let ball_position = ball.position();
         let ball_velocity = ball.velocity();
@@ -68,6 +87,10 @@ impl OneTimerCalculator {
             return None;
         }
 
+        if !Self::trajectory_on_net(ball_position, ball_velocity, target_y) {
+            return None;
+        }
+
         Some(OneTimerEvent {
             time: pass.time,
             frame: pass.frame,
@@ -84,6 +107,26 @@ impl OneTimerCalculator {
             ball_speed,
             goal_alignment,
         })
+    }
+
+    /// Whether the post-touch ball trajectory, extended in a straight line to
+    /// the opponent goal plane, actually crosses the goal mouth (the shot is "on
+    /// net"). This is stricter than the goal-direction alignment check, which
+    /// only requires the ball to be heading toward the goal's general area.
+    fn trajectory_on_net(position: glam::Vec3, velocity: glam::Vec3, target_goal_y: f32) -> bool {
+        if velocity.y.abs() <= f32::EPSILON {
+            return false;
+        }
+        let time_to_goal_line = (target_goal_y - position.y) / velocity.y;
+        if !time_to_goal_line.is_finite()
+            || !(0.0..=ONE_TIMER_MAX_TIME_TO_GOAL_SECONDS).contains(&time_to_goal_line)
+        {
+            return false;
+        }
+        let projected = position + velocity * time_to_goal_line;
+        projected.x.abs() <= BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X + GOAL_MOUTH_TRAJECTORY_MARGIN
+            && projected.z >= BALL_RADIUS_Z - GOAL_MOUTH_TRAJECTORY_MARGIN
+            && projected.z <= GOAL_MOUTH_HEIGHT_Z + GOAL_MOUTH_TRAJECTORY_MARGIN
     }
 
     fn record_one_timer(&mut self, _frame: &FrameInfo, event: OneTimerEvent) {

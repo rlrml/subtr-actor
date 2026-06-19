@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated powerslide press count and total duration.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PowerslideStats {
@@ -17,6 +18,7 @@ impl PowerslideStats {
     }
 }
 
+/// Accumulates powerslide stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PowerslideStatsAccumulator {
     player_stats: HashMap<PlayerId, PowerslideStats>,

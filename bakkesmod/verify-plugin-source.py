@@ -568,11 +568,14 @@ def main() -> int:
     # Rocket League already provides camera and playback controls in-game, and the
     # plugin does not support a real multi-replay queue. Keep those replay-player
     # surfaces out of the BakkesMod launcher even though the web player retains them.
+    # The missed-event capture window is a post-hoc recall-labeling tool for the web
+    # stats player, so it is likewise web-only and stays out of the live plugin.
     plugin_excluded_web_window_ids = (
         "camera",
         "playback",
         "mechanics-review",
         "replay-loading",
+        "missed-events",
     )
     plugin_expected_web_singleton_window_ids = tuple(
         window_id
@@ -1821,237 +1824,6 @@ def main() -> int:
             plugin_source,
             plugin_only_recording_surface,
             "plugin recording window plugin-only surface",
-            errors,
-        )
-    require_contains(
-        web_player_template_source,
-        '<span class="label">Camera profile</span>',
-        "stats evaluation player camera profile label",
-        errors,
-    )
-    require_contains(
-        plugin_header,
-        "float cameraDistanceScale = 1.0f;",
-        "plugin default camera distance scale mirrors stats evaluation player",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'parseJsonNumberProperty(json, "camera_distance_scale").value_or(cameraDistanceScale)',
-        "legacy camera distance config preserves plugin/web default when unset",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'ImGui::TextDisabled("Camera profile");\n  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);\n  const bool profileDisabled = !hasCameraContext;\n  pushCameraDisabledStyle(profileDisabled);\n  const bool profileOpen = ImGui::BeginCombo("##attached-player", selectedLabel.c_str());',
-        "plugin camera profile selector mirrors web label and hidden control id",
-        errors,
-    )
-    require_contains(
-        web_player_main_source,
-        "attachedPlayer.disabled = !enabled;",
-        "stats evaluation player disables attached player selector with transport",
-        errors,
-    )
-    require_contains(
-        web_player_main_source,
-        'button.disabled = !hasReplay || (mode === "follow" && !canFollow);',
-        "stats evaluation player disables unavailable camera modes",
-        errors,
-    )
-    require_contains(
-        web_player_main_source,
-        "cameraViewOverheadButton.disabled = !hasReplay;",
-        "stats evaluation player disables overhead camera without replay",
-        errors,
-    )
-    require_contains(
-        web_player_main_source,
-        "cameraViewSideButton.disabled = !hasReplay;",
-        "stats evaluation player disables side camera without replay",
-        errors,
-    )
-    require_contains(
-        web_player_styles_source,
-        ".camera-presets {\n"
-        "  display: grid;\n"
-        "  grid-template-columns: repeat(2, minmax(0, 1fr));\n"
-        "  gap: var(--ui-gap-xs);\n"
-        "}",
-        "stats evaluation player camera presets use a two-column grid",
-        errors,
-    )
-    require_contains(
-        web_player_styles_source,
-        '.camera-presets button[data-active="true"] {\n'
-        "  border-color: rgba(142, 197, 255, 0.42);\n"
-        "  background: linear-gradient(180deg, rgba(33, 71, 107, 0.96), rgba(12, 27, 42, 0.98));",
-        "stats evaluation player active camera preset has accented button chrome",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        "const bool hasCameraContext = !sampledPlayers.empty();",
-        "plugin camera derives replay context for disabled controls",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        "const float cameraPresetWidth =\n"
-        "      std::max(96.0f, (ImGui::GetContentRegionAvail().x - cameraPresetGap) * 0.5f);",
-        "plugin camera presets use two-column grid sizing",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        "const bool active = cameraViewMode == mode;",
-        "plugin camera presets track the active button state",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        "ImGui::PushStyleColor(ImGuiCol_Border, ImVec4{0.56f, 0.77f, 1.0f, 0.42f});\n"
-        "      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.13f, 0.28f, 0.42f, 0.96f});",
-        "plugin camera active preset uses web-like accented button chrome",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        "const bool clicked = ImGui::Button(label, ImVec2{cameraPresetWidth, 0.0f});",
-        "plugin camera preset controls use equal-width buttons",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        "ImGui::SameLine(0.0f, cameraPresetGap);",
-        "plugin camera preset grid uses explicit web-like gaps",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'cameraViewButton("Follow##camera-view", 1, !hasCameraContext || selectedPlayer == nullptr)',
-        "plugin disables follow camera without replay player context",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'cameraViewButton("Overhead##camera-view", 2, !hasCameraContext)',
-        "plugin disables preset camera modes without replay context",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'cameraViewButton("Diagonal##camera-view", 3, !hasCameraContext)',
-        "plugin disables side camera mode without replay context",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        "targetPlayer = cameraViewMode == 1 ? sampledPlayerByIndex(cameraSelectedPlayerIndex) : nullptr;\n  const std::string activeCameraLabel =\n      targetPlayer == nullptr",
-        "plugin camera settings availability uses updated camera mode",
-        errors,
-    )
-    require_contains(
-        web_player_template_source,
-        '<dl class="detail-grid">',
-        "stats evaluation player camera detail grid",
-        errors,
-    )
-    require_contains(
-        web_player_main_source,
-        'this.renderEmptyProfile("Free camera");',
-        "stats evaluation player camera detail grid uses dash readouts without an attached camera",
-        errors,
-    )
-    require_contains(
-        web_player_main_source,
-        'elements.cameraFovReadout.textContent = "--";',
-        "stats evaluation player camera empty profile uses dash FOV readout",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'ImGui::Columns(2, "camera-detail-grid", false);',
-        "plugin camera uses web-like detail grid",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'auto attachedCameraMetric = [&](int precision, float value) {\n'
-        "    if (!hasAttachedCamera) {\n"
-        '      return std::string{"--"};\n'
-        "    }\n",
-        "plugin camera detail grid uses dash readouts without an attached camera",
-        errors,
-    )
-    require_contains(
-        web_player_template_source,
-        "<span>Use player camera settings</span>",
-        "stats evaluation player camera player-settings toggle",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'ImGui::Checkbox("Use player camera settings", &nextUsePlayerCameraSettings)',
-        "plugin camera player-settings toggle mirrors web label",
-        errors,
-    )
-    require_contains(
-        web_player_template_source,
-        "<span>Swivel</span>",
-        "stats evaluation player camera swivel label",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'renderCustomSlider("Swivel", cameraCustomSwivelSpeed, 1.0f, 10.0f, "%.1f");',
-        "plugin camera swivel label mirrors web",
-        errors,
-    )
-    require_contains(
-        web_player_template_source,
-        "<span>Transition</span>",
-        "stats evaluation player camera transition label",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'renderCustomSlider(\n        "Transition",\n        cameraCustomTransitionSpeed,\n        0.5f,\n        2.0f,\n        "%.2f");',
-        "plugin camera transition label mirrors web",
-        errors,
-    )
-    require_contains(
-        web_player_template_source,
-        '<input id="ball-cam" type="checkbox" disabled />',
-        "stats evaluation player camera ball-cam toggle",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'renderCustomSlider(\n        "Transition",\n        cameraCustomTransitionSpeed,\n        0.5f,\n        2.0f,\n        "%.2f");\n  }\n\n  bool nextBallCamEnabled = cameraBallCamEnabled;\n  pushCameraDisabledStyle(!hasAttachedCamera);\n  const bool ballCamChanged = ImGui::Checkbox("Ball cam", &nextBallCamEnabled);',
-        "plugin camera ball-cam toggle follows custom settings controls like web",
-        errors,
-    )
-    for plugin_only_camera_surface in (
-        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "CAMERA PROFILE");',
-        'ImGui::BeginCombo("Target", selectedLabel.c_str())',
-        'ImGui::TextColored(ImVec4{0.53f, 0.69f, 0.83f, 1.0f}, "READOUT");',
-        'ImGui::Button("Open player stats")',
-        'ImGui::Checkbox("Custom settings", &nextCustomSettingsEnabled)',
-        'renderCustomSlider("Swivel speed", cameraCustomSwivelSpeed',
-        'renderCustomSlider(\n        "Transition speed",',
-        'ImGui::Text("%.0f", fov);',
-        'ImGui::Text("%.0f", height);',
-        'ImGui::Text("%.1f", pitch);',
-        'ImGui::Text("%.0f", distance);',
-        'ImGui::Text("%.2f", stiffness);',
-        "ImGui::RadioButton(label,",
-        "ImGui::SameLine();\n  if (cameraViewButton(\"Follow##camera-view\"",
-    ):
-        reject_contains(
-            plugin_source,
-            plugin_only_camera_surface,
-            "plugin camera window plugin-only surface",
             errors,
         )
     for boost_filter_label in ("Pad type", "Activity", "Field half", "Player"):
@@ -3410,20 +3182,6 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "activeReplayPlayer.setAttachedPlayer(playerId);\n"
-        "        activeReplayPlayer.setCameraViewMode(\"follow\");\n"
-        "        this.options.clearFreeCameraPreset();",
-        "stats evaluation player follows the reviewed player when activating a clip",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        "cameraSelectedPlayerIndex = current->player_index;\n      cameraSelectedPlayerId = webPlayerIdForIndex(cameraSelectedPlayerIndex);\n      cameraViewMode = 1;\n      cameraFreePreset = -1;",
-        "plugin mechanics review replay follows the reviewed player",
-        errors,
-    )
-    require_contains(
-        web_player_main_source,
         "elements.confirm.disabled = decisionDisabled;",
         "stats evaluation player mechanics review disables unavailable decisions",
         errors,
@@ -3931,12 +3689,6 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        "std::optional<std::string> SubtrActorPlugin::webCameraPlayerIdConfig() const",
-        "nullable web camera attachedPlayerId helper",
-        errors,
-    )
-    require_contains(
-        plugin_source,
         "if (const auto playerId = webPlayerIdForWindowConfig(window))",
         "web stats window config uses nullable playerId helper",
         errors,
@@ -3949,50 +3701,8 @@ def main() -> int:
     )
     require_contains(
         plugin_source,
-        "if (const auto attachedPlayerId = webCameraPlayerIdConfig())",
-        "web camera config uses nullable attachedPlayerId helper",
-        errors,
-    )
-    require_contains(
-        plugin_source,
         "bool jsonPropertyIsNull(const std::string &json, const std::string &propertyName)",
         "JSON null property helper",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'jsonPropertyIsNull(*camera, "customSettings")',
-        "camera customSettings null import uses JSON parser",
-        errors,
-    )
-    require_contains(
-        plugin_header,
-        "int cameraFreePreset = -1;",
-        "camera free preset has nullable native state",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'std::clamp(parseJsonNumberProperty(json, "camera_free_preset").value_or(-1.0), -1.0, 1.0)',
-        "legacy camera free preset import preserves null state",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'jsonPropertyIsNull(*camera, "freePreset")',
-        "web camera freePreset null import uses JSON parser",
-        errors,
-    )
-    require_contains(
-        plugin_source,
-        'cameraFreePreset = -1;',
-        "plain camera modes clear free preset",
-        errors,
-    )
-    reject_contains(
-        plugin_source,
-        'camera->find("\\"customSettings\\":null")',
-        "camera customSettings null import uses exact substring",
         errors,
     )
     require_contains(

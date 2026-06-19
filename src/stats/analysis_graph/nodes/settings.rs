@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Captures replay/match settings from replay metadata.
 pub struct SettingsNode {
     calculator: SettingsCalculator,
 }

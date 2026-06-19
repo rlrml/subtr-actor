@@ -11,6 +11,7 @@ const BUMP_MIN_SCORE_MARGIN: f32 = 175.0;
 const BUMP_REPEAT_FRAME_WINDOW: usize = 10;
 const BUMP_FIFTY_FIFTY_SUPPRESSION_WINDOW_SECONDS: f32 = 0.35;
 
+/// A player-on-player bump with attacker/victim and impact context.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BumpEvent {
@@ -45,6 +46,7 @@ struct DirectionalBumpCandidate {
     initiator_slowdown: f32,
 }
 
+/// Detects player-on-player bumps from player frame state and events.
 #[derive(Debug, Clone, Default)]
 pub struct BumpCalculator {
     events: EventStream<BumpEvent>,

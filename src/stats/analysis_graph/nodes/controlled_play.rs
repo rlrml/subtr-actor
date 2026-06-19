@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects stretches of controlled play from ball/player positions and touches.
 pub struct ControlledPlayNode {
     calculator: ControlledPlayCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for ControlledPlayNode {
 
     fn name(&self) -> &'static str {
         "controlled_play"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::CONTROLLED_PLAY_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> Vec<AnalysisDependency> {

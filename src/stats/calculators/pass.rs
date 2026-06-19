@@ -3,6 +3,7 @@ use super::*;
 const PASS_MAX_DURATION_SECONDS: f32 = 3.5;
 const PASS_MIN_BALL_TRAVEL_DISTANCE: f32 = 500.0;
 
+/// The kind of pass.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -13,6 +14,7 @@ pub enum PassKind {
     FiftyFiftyBackboard,
 }
 
+/// A same-team touch sequence where one player sends the ball to a different teammate.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PassEvent {
@@ -48,6 +50,7 @@ struct PendingPassTouch {
     from_fifty_fifty: bool,
 }
 
+/// Detects passes between teammates.
 #[derive(Debug, Clone, Default)]
 pub struct PassCalculator {
     events: EventStream<PassEvent>,

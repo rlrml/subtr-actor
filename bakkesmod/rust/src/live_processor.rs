@@ -347,6 +347,51 @@ impl ProcessorView for SaLiveProcessorView<'_> {
         Ok(self.player(player_id)?.powerslide_active != 0)
     }
 
+    // The live BakkesMod frame ABI does not (yet) carry replay-driven camera or
+    // vehicle-input state, so report these as unavailable. Collectors treat the
+    // error as "not present" and fall back to a synthesized value.
+    fn get_throttle(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        let _ = self.player(player_id)?;
+        SubtrActorError::new_result(SubtrActorErrorVariant::PropertyNotFoundInState {
+            property: "throttle",
+        })
+    }
+
+    fn get_steer(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        let _ = self.player(player_id)?;
+        SubtrActorError::new_result(SubtrActorErrorVariant::PropertyNotFoundInState {
+            property: "steer",
+        })
+    }
+
+    fn get_dodge_impulse(&self, player_id: &PlayerId) -> SubtrActorResult<(f32, f32, f32)> {
+        let _ = self.player(player_id)?;
+        SubtrActorError::new_result(SubtrActorErrorVariant::PropertyNotFoundInState {
+            property: "dodge impulse",
+        })
+    }
+
+    fn get_dodge_torque(&self, player_id: &PlayerId) -> SubtrActorResult<(f32, f32, f32)> {
+        let _ = self.player(player_id)?;
+        SubtrActorError::new_result(SubtrActorErrorVariant::PropertyNotFoundInState {
+            property: "dodge torque",
+        })
+    }
+
+    fn get_camera_pitch(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        let _ = self.player(player_id)?;
+        SubtrActorError::new_result(SubtrActorErrorVariant::PropertyNotFoundInState {
+            property: "camera pitch",
+        })
+    }
+
+    fn get_camera_yaw(&self, player_id: &PlayerId) -> SubtrActorResult<u8> {
+        let _ = self.player(player_id)?;
+        SubtrActorError::new_result(SubtrActorErrorVariant::PropertyNotFoundInState {
+            property: "camera yaw",
+        })
+    }
+
     fn get_player_match_assists(&self, player_id: &PlayerId) -> SubtrActorResult<i32> {
         let player = self.player(player_id)?;
         (player.has_match_stats != 0)
@@ -435,6 +480,11 @@ impl ProcessorView for SaLiveProcessorView<'_> {
 
     fn dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent] {
         &self.event_history.dodge_refreshed_events
+    }
+
+    // The live BakkesMod path does not derive coalesced camera-toggle changes.
+    fn player_camera_events(&self) -> &[(PlayerId, PlayerCameraStateChange)] {
+        &[]
     }
 
     fn player_stat_events(&self) -> &[PlayerStatEvent] {

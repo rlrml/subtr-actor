@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated backboard-bounce stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BackboardPlayerStats {
@@ -11,12 +12,14 @@ pub struct BackboardPlayerStats {
     pub frames_since_last_backboard: Option<usize>,
 }
 
+/// Per-team accumulated backboard-bounce stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BackboardTeamStats {
     pub count: u32,
 }
 
+/// Accumulates backboard-bounce stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BackboardStatsAccumulator {
     player_stats: HashMap<PlayerId, BackboardPlayerStats>,

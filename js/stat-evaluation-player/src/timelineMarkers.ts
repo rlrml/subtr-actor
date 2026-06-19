@@ -5,13 +5,12 @@ import { buildTouchMarkers, playerIdToString } from "./touchOverlay.ts";
 import type { GoalTag } from "./generated/GoalTag.ts";
 import type { WhiffEvent } from "./generated/WhiffEvent.ts";
 import type { StatsTimeline } from "./statsTimeline.ts";
-import { statsEventEnvelopes, statsEventPayloads } from "./statsTimeline.ts";
+import { statsEventPayloads } from "./statsTimeline.ts";
 import {
   BLUE_TIMELINE_COLOR,
   ORANGE_TIMELINE_COLOR,
   formatMechanicKind,
   isVisibleMechanicKind,
-  mechanicShortLabel,
 } from "./timelinePresentation.ts";
 
 const NEUTRAL_TIMELINE_COLOR = "#d1d9e0";
@@ -75,106 +74,6 @@ function flickMarkerKindLabel(event: { kind?: string; setup_rotation_direction?:
     return `${event.setup_rotation_direction} reverse flick`;
   }
   return "reverse flick";
-}
-
-export function getMechanicKinds(statsTimeline: StatsTimeline | null): string[] {
-  const events = statsTimeline ? statsEventEnvelopes(statsTimeline) : [];
-  return [
-    ...new Set(
-      events
-        .filter((event) => event.payload.kind === "timeline")
-        .map((event) => event.meta.stream)
-        .filter((kind) => isVisibleMechanicKind(kind)),
-    ),
-  ].sort((left, right) => formatMechanicKind(left).localeCompare(formatMechanicKind(right)));
-}
-
-export function mechanicKindToModuleId(kind: string): string {
-  return kind.replaceAll("_", "-");
-}
-
-export function buildMechanicTimelineEvents(
-  statsTimeline: StatsTimeline,
-  replay: ReplayModel,
-  enabledKinds?: Iterable<string>,
-): ReplayTimelineEvent[] {
-  const enabled = enabledKinds ? new Set(enabledKinds) : null;
-  const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
-
-  return statsEventEnvelopes(statsTimeline)
-    .filter(
-      (event) =>
-        isVisibleMechanicKind(event.meta.stream) &&
-        event.payload.kind === "timeline" &&
-        event.meta.timing.type === "moment" &&
-        (!enabled || enabled.has(event.meta.stream)),
-    )
-    .map((event) => {
-      const playerId = event.meta.primary_player ? playerIdToString(event.meta.primary_player) : "";
-      const playerName = playerNames.get(playerId) ?? playerId;
-      const mechanicLabel = formatMechanicKind(event.meta.stream);
-      if (event.meta.timing.type !== "moment") {
-        throw new Error("unreachable non-moment mechanic event");
-      }
-
-      return {
-        id: event.meta.id,
-        time: getReplayFrameTime(replay, event.meta.timing.frame, event.meta.timing.time),
-        frame: event.meta.timing.frame,
-        kind: event.meta.stream,
-        label: `${playerName} ${mechanicLabel.toLowerCase()}`,
-        shortLabel: mechanicShortLabel(event.meta.stream),
-        playerId,
-        playerName,
-        isTeamZero: event.meta.team_is_team_0 ?? false,
-        color: event.meta.team_is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-      };
-    });
-}
-
-export function buildMechanicPlaylistEvents(
-  statsTimeline: StatsTimeline,
-  replay: ReplayModel,
-  enabledKinds?: Iterable<string>,
-): ReplayTimelineEvent[] {
-  const enabled = enabledKinds ? new Set(enabledKinds) : null;
-  const playerNames = new Map(replay.players.map((player) => [player.id, player.name]));
-
-  return statsEventEnvelopes(statsTimeline)
-    .filter(
-      (event) =>
-        isVisibleMechanicKind(event.meta.stream) &&
-        event.payload.kind === "timeline" &&
-        (!enabled || enabled.has(event.meta.stream)),
-    )
-    .map((event) => {
-      const playerId = event.meta.primary_player ? playerIdToString(event.meta.primary_player) : "";
-      const playerName = playerNames.get(playerId) ?? playerId;
-      const mechanicLabel = formatMechanicKind(event.meta.stream);
-      const timing =
-        event.meta.timing.type === "moment"
-          ? {
-              frame: event.meta.timing.frame,
-              time: event.meta.timing.time,
-            }
-          : {
-              frame: event.meta.timing.end_frame,
-              time: event.meta.timing.end_time,
-            };
-
-      return {
-        id: `${event.meta.id}:playlist`,
-        time: getReplayFrameTime(replay, timing.frame, timing.time),
-        frame: timing.frame,
-        kind: event.meta.stream,
-        label: `${playerName} ${mechanicLabel.toLowerCase()}`,
-        shortLabel: mechanicShortLabel(event.meta.stream),
-        playerId,
-        playerName,
-        isTeamZero: event.meta.team_is_team_0 ?? false,
-        color: event.meta.team_is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-      };
-    });
 }
 
 export function getReplayTimelineEventKinds(
@@ -624,30 +523,6 @@ export function buildDodgeResetTimelineEvents(
     });
 }
 
-export function buildBallCarryTimelineEvents(
-  statsTimeline: StatsTimeline,
-  replay: ReplayModel,
-): ReplayTimelineEvent[] {
-  return (statsEventPayloads(statsTimeline, "ball_carry") ?? [])
-    .filter((event) => event.kind === "carry")
-    .map((event, index) => {
-      const playerId = playerIdToString(event.player_id);
-      const playerName = getReplayPlayerName(replay, playerId);
-      return {
-        id: `ball-carry:${event.end_frame}:${playerId}:${index + 1}`,
-        time: getReplayFrameTime(replay, event.end_frame, event.end_time),
-        frame: event.end_frame,
-        kind: "ball-carry",
-        label: `${playerName} ball carry`,
-        shortLabel: "BC",
-        playerId,
-        playerName,
-        isTeamZero: event.is_team_0,
-        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-      };
-    });
-}
-
 export function buildPowerslideTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
@@ -856,108 +731,34 @@ export function buildWhiffTimelineEvents(
   });
 }
 
-export function countEnabledTimelineEvents(
-  activeSourceIds: Iterable<string>,
-  replay: ReplayModel,
-  statsTimeline: StatsTimeline,
-): number {
-  const mechanicModuleIds = new Set(getMechanicKinds(statsTimeline).map(mechanicKindToModuleId));
-  const active = new Set(
-    [...activeSourceIds].filter((sourceId) => !mechanicModuleIds.has(sourceId)),
-  );
-  let count = filterReplayTimelineEvents(replay, active).length;
+/**
+ * Per-kind "Event types" timeline lane builders, keyed by the
+ * {@link EventPayload} discriminant (`event.payload.kind`).
+ *
+ * Every mechanic is a distinct typed payload, so each lane reads its events
+ * directly through `statsEventPayloads(timeline, kind)` via the dedicated
+ * builder below. Kinds that are owned by a stat module's `getTimelineEvents`
+ * (backboard, dodge, wavedash, whiff, powerslide, bump, touch) or a team
+ * module (fifty_fifty, rush) are intentionally absent here so each event kind
+ * surfaces in exactly one lane. `air_dribble` and `flip_reset` exist only as
+ * goal tags (no standalone events), so they are not lanes.
+ */
+export const EVENT_TYPE_TIMELINE_BUILDERS: Record<
+  string,
+  (statsTimeline: StatsTimeline, replay: ReplayModel) => ReplayTimelineEvent[]
+> = {
+  flick: buildFlickTimelineEvents,
+  musty_flick: buildMustyFlickTimelineEvents,
+  ceiling_shot: buildCeilingShotTimelineEvents,
+  wall_aerial: buildWallAerialTimelineEvents,
+  wall_aerial_shot: buildWallAerialShotTimelineEvents,
+  double_tap: buildDoubleTapTimelineEvents,
+  center: buildCenterTimelineEvents,
+  one_timer: buildOneTimerTimelineEvents,
+  pass: buildPassTimelineEvents,
+  half_flip: buildHalfFlipTimelineEvents,
+  half_volley: buildHalfVolleyTimelineEvents,
+  speed_flip: buildSpeedFlipTimelineEvents,
+};
 
-  if (active.has("fifty-fifty")) {
-    count += buildFiftyFiftyTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("musty-flick")) {
-    count += buildMustyFlickTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("flick")) {
-    count += buildFlickTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("backboard")) {
-    count += buildBackboardTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("ceiling-shot")) {
-    count += buildCeilingShotTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("wall-aerial")) {
-    count += buildWallAerialTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("wall-aerial-shot")) {
-    count += buildWallAerialShotTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("double-tap")) {
-    count += buildDoubleTapTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("center")) {
-    count += buildCenterTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("one-timer")) {
-    count += buildOneTimerTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("pass")) {
-    count += buildPassTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("touch")) {
-    count += buildTouchTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("dodge-reset")) {
-    count += buildDodgeResetTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("ball-carry")) {
-    count += buildBallCarryTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("powerslide")) {
-    count += buildPowerslideTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("speed-flip")) {
-    count += buildSpeedFlipTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("dodge")) {
-    count += buildDodgeTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("half-flip")) {
-    count += buildHalfFlipTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("half-volley")) {
-    count += buildHalfVolleyTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("rush")) {
-    count += buildRushTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("wavedash")) {
-    count += buildWavedashTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("whiff")) {
-    count += buildWhiffTimelineEvents(statsTimeline, replay).length;
-  }
-
-  if (active.has("bump")) {
-    count += buildBumpTimelineEvents(statsTimeline, replay).length;
-  }
-
-  return count;
-}
+export const EVENT_TYPE_TIMELINE_KINDS: string[] = Object.keys(EVENT_TYPE_TIMELINE_BUILDERS);

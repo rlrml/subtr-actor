@@ -3,13 +3,14 @@ use super::*;
 const DEFAULT_LEVEL_BALL_DEPTH_MARGIN: f32 = 150.0;
 const DEFAULT_CLOSEST_TO_BALL_SWITCH_MARGIN: f32 = 100.0;
 const DEFAULT_CLOSEST_TO_BALL_SWITCH_MIN_SECONDS: f32 = 0.2;
-const DEFAULT_SHADOW_DEFENSE_MAX_BALL_Y: f32 = BOOST_PAD_CENTER_MID_Y;
+const DEFAULT_SHADOW_DEFENSE_MAX_BALL_Y: f32 = 1024.0;
 const DEFAULT_SHADOW_DEFENSE_MIN_GOAL_SIDE_Y: f32 = 250.0;
 const DEFAULT_SHADOW_DEFENSE_MIN_GAP: f32 = 700.0;
 const DEFAULT_SHADOW_DEFENSE_MAX_GAP: f32 = 3200.0;
 const DEFAULT_SHADOW_DEFENSE_MAX_LATERAL_GAP: f32 = 1300.0;
 const DEFAULT_SHADOW_DEFENSE_MIN_RETREAT_SPEED: f32 = 100.0;
 const DEFAULT_SHADOW_DEFENSE_MAX_SPEED_DELTA: f32 = 900.0;
+const SHADOW_DEFENSE_OWN_GOAL_Y: f32 = 4240.0;
 
 /// Whether the player is participating in the frame: on the field being
 /// tracked, or waiting out a demolition.
@@ -102,6 +103,7 @@ pub enum ShadowDefenseState {
 
 pub type ShadowDefenseEvent = PlayerStateSpan<ShadowDefenseState>;
 
+/// Possession context used in positioning classification.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -158,6 +160,7 @@ impl PositioningSignalSnapshot {
     }
 }
 
+/// Configuration thresholds for positioning classification.
 #[derive(Debug, Clone)]
 pub struct PositioningCalculatorConfig {
     pub most_back_forward_threshold_y: f32,
@@ -290,6 +293,7 @@ struct PlayerFrameFacets {
     possession_state: PositioningPossessionState,
 }
 
+/// Tracks per-player field positioning over time.
 #[derive(Debug, Clone, Default)]
 pub struct PositioningCalculator {
     config: PositioningCalculatorConfig,
@@ -474,7 +478,7 @@ impl PositioningCalculator {
             return None;
         }
 
-        let own_goal = glam::vec2(0.0, -BOOST_PAD_GOAL_LINE_Y);
+        let own_goal = glam::vec2(0.0, -SHADOW_DEFENSE_OWN_GOAL_Y);
         if distance_to_segment_2d(defender, ball, own_goal)
             > self.config.shadow_defense_max_lateral_gap
         {

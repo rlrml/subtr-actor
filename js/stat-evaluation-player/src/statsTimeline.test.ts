@@ -80,9 +80,15 @@ test("stats frame lookup materializes compact scaffold frames from events", () =
   const playerB = { Steam: "player-b" };
   const statsTimeline: StatsTimeline = createStatsTimeline({
     events: {
-      timeline: [
-        { time: 0.5, kind: "Kill", player_id: playerA, is_team_0: true },
-        { time: 0.5, kind: "Death", player_id: playerB, is_team_0: false },
+      demolition: [
+        {
+          time: 0.5,
+          frame: 0,
+          attacker: playerA,
+          victim: playerB,
+          attacker_is_team_0: true,
+          victim_is_team_0: false,
+        },
       ],
     },
     frames: [0, 1].map((frameNumber) => ({

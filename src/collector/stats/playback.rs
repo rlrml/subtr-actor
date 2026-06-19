@@ -198,6 +198,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
         let positioning_defaults = PositioningCalculatorConfig::default();
         let ball_half_config = self.config.get("ball_half").and_then(Value::as_object);
+        let ball_third_config = self.config.get("ball_third").and_then(Value::as_object);
         let territorial_pressure_config = self
             .config
             .get("territorial_pressure")
@@ -297,6 +298,10 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 .and_then(|config| config.get("ball_half_neutral_zone_half_width_y"))
                 .and_then(json_f32)
                 .unwrap_or(BallHalfCalculatorConfig::default().neutral_zone_half_width_y),
+            ball_third_boundary_y: ball_third_config
+                .and_then(|config| config.get("ball_third_boundary_y"))
+                .and_then(json_f32)
+                .unwrap_or(BallThirdCalculatorConfig::default().boundary_y),
             territorial_pressure_neutral_zone_half_width_y: territorial_pressure_config
                 .and_then(|config| config.get("territorial_pressure_neutral_zone_half_width_y"))
                 .and_then(json_f32)
@@ -454,6 +459,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         let positioning_config = self.config.get("positioning").and_then(Value::as_object);
         let positioning_defaults = PositioningCalculatorConfig::default();
         let ball_half_config = self.config.get("ball_half").and_then(Value::as_object);
+        let ball_third_config = self.config.get("ball_third").and_then(Value::as_object);
         let territorial_pressure_config = self
             .config
             .get("territorial_pressure")
@@ -606,6 +612,15 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                     .unwrap_or(
                         BallHalfCalculatorConfig::default().neutral_zone_half_width_y as f64,
                     ),
+            )?,
+        );
+        config.insert(
+            "ball_third_boundary_y".to_owned(),
+            serialize_to_json_value(
+                &ball_third_config
+                    .and_then(|config| config.get("ball_third_boundary_y"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(BallThirdCalculatorConfig::default().boundary_y as f64),
             )?,
         );
         let territorial_pressure_defaults = TerritorialPressureCalculatorConfig::default();

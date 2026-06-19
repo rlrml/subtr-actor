@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects dodges/flip impulses from player frame state (graph node name "dodge").
 pub struct FlipImpulseNode {
     calculator: FlipImpulseCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for FlipImpulseNode {
 
     fn name(&self) -> &'static str {
         "dodge"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::DODGE_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

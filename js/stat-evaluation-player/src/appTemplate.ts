@@ -33,6 +33,7 @@ export function getAppTemplate(): string {
               <button type="button" data-window-toggle="boost-pickups">Boost pickup filters</button>
               <button type="button" data-window-toggle="touch-controls">Touch controls</button>
               <button type="button" data-window-toggle="shot-visualization">Shot chart</button>
+              <button type="button" data-window-toggle="missed-events">Missed events</button>
               <button type="button" data-create-stats-window="player">New player stats</button>
               <button type="button" data-create-stats-window="team">New team stats</button>
               <button type="button" data-create-stats-window="all-players">New all players stats</button>
@@ -188,9 +189,31 @@ export function getAppTemplate(): string {
                 />
               </label>
             </div>
-            <label class="toggle">
-              <input id="ball-cam" type="checkbox" disabled />
-              <span>Ball cam</span>
+            <div class="camera-ball-cam">
+              <span class="label">Ball cam</span>
+              <div
+                class="camera-presets camera-ball-cam-modes"
+                role="group"
+                aria-label="Ball cam mode"
+              >
+                <button id="ball-cam-off" type="button" disabled>Off</button>
+                <button id="ball-cam-on" type="button" disabled>On</button>
+                <button id="ball-cam-player" type="button" disabled>Player</button>
+              </div>
+            </div>
+            <label>
+              <span class="camera-setting-label">
+                <span>Name plate height</span>
+                <strong id="custom-nameplate-lift-readout">250</strong>
+              </span>
+              <input
+                id="custom-nameplate-lift"
+                type="range"
+                min="0"
+                max="700"
+                step="10"
+                value="250"
+              />
             </label>
             <dl class="detail-grid">
               <div>
@@ -343,6 +366,40 @@ export function getAppTemplate(): string {
                 <dt>Type</dt>
                 <dd id="recording-type">WebM</dd>
               </div>
+            </div>
+          </section>
+
+          <section
+            class="floating-window floating-window-missed-events"
+            data-window-id="missed-events"
+            hidden
+            style="--window-x: calc(100vw - 28rem); --window-y: 28rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <h2>Missed events</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="missed-events">
+                Hide
+              </button>
+            </header>
+            <div class="missed-event-body">
+              <div class="missed-event-controls">
+                <label>
+                  <span class="label">Mechanic</span>
+                  <select id="missed-event-mechanic"></select>
+                </label>
+                <button id="missed-event-capture" type="button">Capture (M)</button>
+              </div>
+              <ol id="missed-event-list" class="missed-event-list"></ol>
+              <div class="transport-row">
+                <button id="missed-event-export" type="button">Export JSON</button>
+                <button id="missed-event-upload" type="button">Upload all</button>
+                <button id="missed-event-clear" type="button">Clear</button>
+              </div>
+              <p id="missed-event-status" class="missed-event-status">
+                Press M to capture a missed event at the playhead.
+              </p>
             </div>
           </section>
 

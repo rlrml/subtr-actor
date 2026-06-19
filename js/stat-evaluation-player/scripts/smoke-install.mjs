@@ -146,6 +146,7 @@ async function main() {
         "    closest_to_ball_switch_margin: 0,",
         "    closest_to_ball_switch_min_seconds: 0,",
         "    ball_half_neutral_zone_half_width_y: 0,",
+        "    ball_third_boundary_y: 0,",
         "    territorial_pressure_neutral_zone_half_width_y: 0,",
         "    territorial_pressure_min_establish_seconds: 0,",
         "    territorial_pressure_min_establish_third_seconds: 0,",

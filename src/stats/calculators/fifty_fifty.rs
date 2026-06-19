@@ -6,6 +6,7 @@ pub(crate) const FIFTY_FIFTY_MAX_DURATION_SECONDS: f32 = 1.25;
 pub(crate) const FIFTY_FIFTY_MIN_EXIT_DISTANCE: f32 = 180.0;
 pub(crate) const FIFTY_FIFTY_MIN_EXIT_SPEED: f32 = 220.0;
 
+/// Shared state of in-progress and resolved 50/50 contests.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FiftyFiftyState {
     pub active_event: Option<ActiveFiftyFifty>,
@@ -13,6 +14,7 @@ pub struct FiftyFiftyState {
     pub last_resolved_event: Option<FiftyFiftyEvent>,
 }
 
+/// An in-progress 50/50 contest being tracked.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActiveFiftyFifty {
     pub start_time: f32,
@@ -65,6 +67,7 @@ impl ActiveFiftyFifty {
 #[path = "fifty_fifty_tests.rs"]
 mod tests;
 
+/// A contested ball interaction with touches/pressure from both teams in a short window.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct FiftyFiftyEvent {
@@ -231,6 +234,7 @@ impl FiftyFiftyEvent {
     }
 }
 
+/// Detects 50/50 contests and their outcomes.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FiftyFiftyCalculator {
     events: EventStream<FiftyFiftyEvent>,

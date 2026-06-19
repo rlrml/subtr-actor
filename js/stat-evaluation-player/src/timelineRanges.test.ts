@@ -6,129 +6,13 @@ import type { StatsTimeline } from "./statsTimeline.ts";
 import {
   buildBoostPickupTimelineRanges,
   buildFiftyFiftyTimelineRanges,
-  buildMechanicTimelineRanges,
   buildPossessionTimelineRanges,
   buildPowerslideTimelineRanges,
   buildBallHalfTimelineRanges,
+  buildBallThirdTimelineRanges,
   buildRushTimelineRanges,
 } from "./timelineRanges.ts";
 import { createLegacyStatsTimeline, createStatsTimeline } from "./testStatsTimeline.ts";
-
-test("buildMechanicTimelineRanges emits ranges for visible span mechanics", () => {
-  const replay = {
-    frames: Array.from({ length: 6 }, (_, time) => ({ time })),
-    players: [
-      {
-        id: "Steam:blue-id",
-        name: "Blue",
-      },
-    ],
-  } as ReplayModel;
-  const timeline = createLegacyStatsTimeline({
-    mechanic_events: [
-      {
-        id: "wall_aerial:1:3:0",
-        kind: "wall_aerial",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 1,
-          end_frame: 3,
-          start_time: 1,
-          end_time: 3,
-        },
-        properties: [],
-      },
-      {
-        id: "wall_aerial_shot:2:4:0",
-        kind: "wall_aerial_shot",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 2,
-          end_frame: 4,
-          start_time: 2,
-          end_time: 4,
-        },
-        properties: [],
-      },
-      {
-        id: "pass:2:4:0",
-        kind: "pass",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 2,
-          end_frame: 4,
-          start_time: 2,
-          end_time: 4,
-        },
-        properties: [],
-      },
-      {
-        id: "ball_carry:1:5:0",
-        kind: "ball_carry",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 1,
-          end_frame: 5,
-          start_time: 1,
-          end_time: 5,
-        },
-        properties: [],
-      },
-      {
-        id: "flick:3:5:0",
-        kind: "flick",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "span",
-          start_frame: 3,
-          end_frame: 5,
-          start_time: 3,
-          end_time: 5,
-        },
-        properties: [],
-      },
-      {
-        id: "flip_reset:4:0",
-        kind: "flip_reset",
-        player_id: { Steam: "blue-id" },
-        is_team_0: true,
-        timing: {
-          type: "moment",
-          frame: 4,
-          time: 4,
-        },
-        properties: [],
-      },
-    ],
-  });
-
-  assert.deepEqual(
-    buildMechanicTimelineRanges(timeline, replay, [
-      "wall_aerial",
-      "wall_aerial_shot",
-      "pass",
-      "ball_carry",
-      "flick",
-      "flip_reset",
-    ]).map((range) => range.id),
-    [
-      "ball_carry:1:5:0",
-      "wall_aerial:1:3:0",
-      "pass:2:4:0",
-      "wall_aerial_shot:2:4:0",
-      "flick:3:5:0",
-    ],
-  );
-});
 
 test("buildPossessionTimelineRanges derives merged team and neutral control spans", () => {
   const timeline = {
@@ -431,6 +315,132 @@ test("buildBallHalfTimelineRanges derives spans from compact event timelines", (
       lane: "half-control",
       laneLabel: "Half Control",
       label: "Neutral half control",
+      color: "rgba(209, 217, 224, 0.7)",
+      isTeamZero: null,
+    },
+  ]);
+});
+
+test("buildBallThirdTimelineRanges derives third-control spans from labeled deltas including neutral", () => {
+  const timeline = {
+    replay_meta: {},
+    timeline_events: [],
+    frames: [
+      {
+        frame_number: 1,
+        time: 0.5,
+        dt: 0.5,
+        team_zero: {
+          ball_third: {
+            tracked_time: 0.5,
+            defensive_third_time: 0.5,
+            neutral_third_time: 0,
+            offensive_third_time: 0,
+          },
+        },
+        team_one: {
+          ball_third: {
+            tracked_time: 0.5,
+            defensive_third_time: 0,
+            neutral_third_time: 0,
+            offensive_third_time: 0.5,
+          },
+        },
+        players: [],
+      },
+      {
+        frame_number: 2,
+        time: 1,
+        dt: 0.5,
+        team_zero: {
+          ball_third: {
+            tracked_time: 1,
+            defensive_third_time: 0.5,
+            neutral_third_time: 0.5,
+            offensive_third_time: 0,
+          },
+        },
+        team_one: {
+          ball_third: {
+            tracked_time: 1,
+            defensive_third_time: 0,
+            neutral_third_time: 0.5,
+            offensive_third_time: 0.5,
+          },
+        },
+        players: [],
+      },
+    ],
+  } as StatsTimeline;
+
+  assert.deepEqual(buildBallThirdTimelineRanges(timeline), [
+    {
+      id: "third-control:team_zero_third:0.000",
+      startTime: 0,
+      endTime: 0.5,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Blue third control",
+      color: "#3b82f6",
+      isTeamZero: true,
+    },
+    {
+      id: "third-control:neutral_third:0.500",
+      startTime: 0.5,
+      endTime: 1,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Neutral third control",
+      color: "rgba(209, 217, 224, 0.7)",
+      isTeamZero: null,
+    },
+  ]);
+});
+
+test("buildBallThirdTimelineRanges derives spans from compact event timelines", () => {
+  const timeline = createStatsTimeline({
+    events: {
+      ball_third: [
+        { frame: 1, time: 0.5, active: true, field_third: "team_zero_third" },
+        { frame: 2, time: 1, active: true, field_third: "team_one_third" },
+        { frame: 3, time: 1.5, active: true, field_third: "neutral_third" },
+      ],
+    },
+    frames: [
+      { frame_number: 1, time: 0.5, dt: 0.5, team_zero: {}, team_one: {}, players: [] },
+      { frame_number: 2, time: 1, dt: 0.5, team_zero: {}, team_one: {}, players: [] },
+      { frame_number: 3, time: 1.5, dt: 0.5, team_zero: {}, team_one: {}, players: [] },
+    ],
+  });
+
+  assert.deepEqual(buildBallThirdTimelineRanges(timeline), [
+    {
+      id: "third-control:team_zero_third:0.000",
+      startTime: 0,
+      endTime: 0.5,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Blue third control",
+      color: "#3b82f6",
+      isTeamZero: true,
+    },
+    {
+      id: "third-control:team_one_third:0.500",
+      startTime: 0.5,
+      endTime: 1,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Orange third control",
+      color: "#f59e0b",
+      isTeamZero: false,
+    },
+    {
+      id: "third-control:neutral_third:1.000",
+      startTime: 1,
+      endTime: 1.5,
+      lane: "third-control",
+      laneLabel: "Third Control",
+      label: "Neutral third control",
       color: "rgba(209, 217, 224, 0.7)",
       isTeamZero: null,
     },

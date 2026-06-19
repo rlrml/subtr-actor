@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Holds the materialized per-frame stats snapshot DTO.
 #[derive(Debug, Clone, Default)]
 pub struct StatsTimelineFrameState {
     pub frame: Option<ReplayStatsFrame>,
@@ -53,6 +54,7 @@ impl StatsTimelineFrameNode {
             kickoff: projection.kickoff.stats().for_team(is_team_zero),
             possession: projection.possession.stats().for_team(is_team_zero),
             ball_half: projection.ball_half.stats().for_team(is_team_zero),
+            ball_third: projection.ball_third.stats().for_team(is_team_zero),
             territorial_pressure: projection
                 .territorial_pressure
                 .stats()
@@ -394,8 +396,4 @@ impl AnalysisNode for StatsTimelineFrameNode {
     fn state(&self) -> &Self::State {
         &self.state
     }
-}
-
-pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
-    Box::new(StatsTimelineFrameNode::new())
 }

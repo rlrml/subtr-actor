@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated double-tap stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DoubleTapPlayerStats {
@@ -11,12 +12,14 @@ pub struct DoubleTapPlayerStats {
     pub frames_since_last_double_tap: Option<usize>,
 }
 
+/// Per-team accumulated double-tap stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DoubleTapTeamStats {
     pub count: u32,
 }
 
+/// Accumulates double-tap stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DoubleTapStatsAccumulator {
     player_stats: HashMap<PlayerId, DoubleTapPlayerStats>,

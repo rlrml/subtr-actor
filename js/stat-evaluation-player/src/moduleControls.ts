@@ -36,10 +36,8 @@ export interface ModuleControlsOptions {
   getActiveModules(): readonly StatModule[];
   getActiveCapabilityIds(kind: ModuleCapabilityKind): ReadonlySet<string>;
   getBoostPickupAnimationEnabled(): boolean;
-  getBoostPadOverlayEnabled(): boolean;
   toggleCapability(id: string, kind: ModuleCapabilityKind, enabled: boolean): void;
   toggleBoostPickupAnimation(): void;
-  toggleBoostPadOverlay(): void;
   syncTimelineEvents(): void;
   syncTimelineRanges(): void;
   renderTimelineEventCount(): void;
@@ -88,7 +86,6 @@ export class ModuleControlsController {
     }
 
     inGameVisualizationToggles.push(this.renderBoostPickupAnimationToggle());
-    inGameVisualizationToggles.push(this.renderBoostPadOverlayToggle());
 
     summary.append(
       renderModuleSummaryGroup("Timeline markers", markerToggles),
@@ -132,25 +129,6 @@ export class ModuleControlsController {
 
     const name = document.createElement("span");
     name.textContent = "Boost pickup animation";
-
-    const state = document.createElement("strong");
-    state.textContent = active ? "On" : "Off";
-
-    item.append(name, state);
-    return item;
-  }
-
-  private renderBoostPadOverlayToggle(): HTMLButtonElement {
-    const active = this.options.getBoostPadOverlayEnabled();
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "module-summary-item";
-    item.dataset.active = active ? "true" : "false";
-    item.setAttribute("aria-pressed", active ? "true" : "false");
-    item.addEventListener("click", this.options.toggleBoostPadOverlay);
-
-    const name = document.createElement("span");
-    name.textContent = "Boost pad locations";
 
     const state = document.createElement("strong");
     state.textContent = active ? "On" : "Off";
@@ -281,6 +259,7 @@ function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string
     "powerslide:events": "Powerslide",
     "powerslide:ranges": "Powerslide",
     "ball_half:ranges": "Half control",
+    "ball_third:ranges": "Third control",
     "rush:ranges": "Rush",
     "speed-flip:events": "Speed flip",
     "touch:events": "Touch",

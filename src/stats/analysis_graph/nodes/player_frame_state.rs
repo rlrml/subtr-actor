@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Exposes per-frame per-player state (positions/velocities/boost) from raw frame input.
 pub struct PlayerFrameStateNode {
     state: PlayerFrameState,
 }

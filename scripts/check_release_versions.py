@@ -23,6 +23,13 @@ JS_PACKAGE_LOCK_PATHS = [
     "js/stat-evaluation-player/package-lock.json",
 ]
 
+# READMEs that document the binding's `[dependencies.subtr-actor]` pin in a
+# fenced toml block; kept in sync by sync_release_versions.py.
+README_DEPENDENCY_PATHS = [
+    "js/README.md",
+    "python/PYTHON-README.md",
+]
+
 
 def load_toml(path: str) -> dict:
     return tomllib.loads((ROOT / path).read_text())
@@ -30,6 +37,16 @@ def load_toml(path: str) -> dict:
 
 def load_json(path: str) -> dict:
     return json.loads((ROOT / path).read_text())
+
+
+def load_readme_dependency_version(path: str) -> str | None:
+    text = (ROOT / path).read_text()
+    match = re.search(
+        r'\[dependencies\.subtr-actor\][^\[]*?^version = "([^"]+)"',
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    return match.group(1) if match else None
 
 
 def load_lock_versions() -> dict[str, str]:
@@ -89,6 +106,11 @@ def main() -> int:
         package_lock = load_json(path)
         checks[f"{path} version"] = package_lock["version"]
         checks[f"{path} packages[''].version"] = package_lock["packages"][""]["version"]
+
+    for path in README_DEPENDENCY_PATHS:
+        checks[f"{path} [dependencies.subtr-actor] version"] = (
+            load_readme_dependency_version(path)
+        )
 
     mismatches = [
         f"{name}: expected {expected}, found {value}"

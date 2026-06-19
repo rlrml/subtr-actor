@@ -80,6 +80,38 @@ fn performer(event: &GoalTagAssignment) -> Option<GoalTagPerformer> {
     event.tag.metadata().performer
 }
 
+/// Mirror each goal's scoring touch into the touch event stream so the
+/// high-aerial calculator (which now scans leadup touches) sees the same touch
+/// the older goal-context-only logic used.
+fn touch_from_goal_context(touch: &GoalTouchContext) -> TouchClassificationEvent {
+    TouchClassificationEvent {
+        touch_id: touch.touch_id,
+        time: touch.time,
+        frame: touch.frame,
+        sample_time: touch.time,
+        sample_frame: touch.frame,
+        player: touch.player.clone(),
+        player_position: touch
+            .player_position
+            .map(|position| [position.x, position.y, position.z]),
+        ball_position: touch
+            .ball_position
+            .map(|position| [position.x, position.y, position.z]),
+        is_team_0: touch.is_team_0,
+        kind: "medium_hit".to_owned(),
+        height_band: "ground".to_owned(),
+        surface: "ground".to_owned(),
+        dodge_state: "none".to_owned(),
+        intention: "neutral".to_owned(),
+        first_touch: false,
+        contested: false,
+        role: RoleState::Unknown,
+        play_depth: PlayDepthState::Unknown,
+        ball_speed_change: 0.0,
+        ball_movement: None,
+    }
+}
+
 fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
     let aerial = AerialGoalCalculator::new();
     let high_aerial = HighAerialGoalCalculator::new();
@@ -88,8 +120,18 @@ fn all_goal_tag_events(goals: &[GoalContextEvent]) -> Vec<GoalTagAssignment> {
     let empty_net = EmptyNetGoalCalculator::new();
     let counter_attack = CounterAttackGoalCalculator::new();
     let sustained_pressure = SustainedPressureGoalCalculator::new();
+    let scoring_touches: Vec<TouchClassificationEvent> = goals
+        .iter()
+        .filter_map(|goal| goal.scorer_last_touch.as_ref().map(touch_from_goal_context))
+        .collect();
+    // Give each goal a single scoring-team possession spanning the whole leadup
+    // so the synthesized scoring touch falls inside the goal's possession.
+    let possession_events: Vec<PossessionEvent> = goals
+        .iter()
+        .map(|goal| possession_event(scoring_state(goal.scoring_team_is_team_0), 0, goal.frame))
+        .collect();
     let aerial_events = aerial.tag_goals(goals);
-    let high_aerial_events = high_aerial.tag_goals(goals);
+    let high_aerial_events = high_aerial.tag_goals(goals, &scoring_touches, &possession_events);
     let long_distance_events = long_distance.tag_goals(goals);
     let own_half_events = own_half.tag_goals(goals);
     let empty_net_events = empty_net.tag_goals(goals);
@@ -274,6 +316,7 @@ fn touch_classification_event(
         sample_frame: frame,
         player,
         player_position: Some([0.0, 2200.0, 60.0]),
+        ball_position: None,
         is_team_0: true,
         kind: "medium_hit".to_owned(),
         height_band: "ground".to_owned(),
@@ -308,14 +351,16 @@ fn bump_event(time: f32, frame: usize, initiator: PlayerId, victim: PlayerId) ->
     }
 }
 
-fn demo_event(time: f32, frame: usize, attacker: PlayerId) -> TimelineEvent {
-    TimelineEvent {
+fn demo_event(time: f32, frame: usize, attacker: PlayerId) -> DemolitionEvent {
+    DemolitionEvent {
         time,
-        frame: Some(frame),
-        kind: TimelineEventKind::Kill,
-        player_id: Some(attacker),
-        player_position: Some([10.0, 1200.0, 20.0]),
-        is_team_0: Some(true),
+        frame,
+        attacker,
+        victim: player_id(0),
+        attacker_is_team_0: Some(true),
+        victim_is_team_0: Some(false),
+        attacker_position: Some([10.0, 1200.0, 20.0]),
+        victim_position: None,
     }
 }
 
@@ -346,6 +391,95 @@ fn high_aerial_goal_also_gets_aerial_goal_tag() {
         tag_kinds(&events),
         vec![GoalTagKind::AerialGoal, GoalTagKind::HighAerialGoal]
     );
+}
+
+fn aerial_touch(
+    time: f32,
+    frame: usize,
+    player: PlayerId,
+    is_team_0: bool,
+    ball_z: f32,
+) -> TouchClassificationEvent {
+    TouchClassificationEvent {
+        ball_position: Some([0.0, 1500.0, ball_z]),
+        is_team_0,
+        ..touch_classification_event(time, frame, player, "none")
+    }
+}
+
+fn scoring_state(scoring_team_is_team_0: bool) -> &'static str {
+    if scoring_team_is_team_0 {
+        "team_zero"
+    } else {
+        "team_one"
+    }
+}
+
+fn possession_event(state: &str, frame: usize, end_frame: usize) -> PossessionEvent {
+    PossessionEvent {
+        time: frame as f32,
+        frame,
+        end_time: end_frame as f32,
+        end_frame,
+        active: true,
+        duration: (end_frame - frame) as f32,
+        possession_state: state.to_owned(),
+        player_id: None,
+    }
+}
+
+#[test]
+fn high_aerial_goal_tags_high_touch_earlier_in_the_scoring_possession() {
+    // Low finishing touch, but a teammate took a high-aerial touch earlier in
+    // the same possession.
+    let goal = goal_with_touch(true, position(0.0, 1500.0, 100.0), Vec::new());
+    let touches = vec![
+        aerial_touch(8.0, 80, player_id(2), true, 800.0),
+        aerial_touch(9.5, 95, player_id(1), true, 100.0),
+    ];
+    let possessions = vec![possession_event("team_zero", 70, 100)];
+
+    let events = HighAerialGoalCalculator::new().tag_goals(&[goal], &touches, &possessions);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::HighAerialGoal]);
+    // The high touch was a teammate's, not the scorer's finishing touch.
+    assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Teammate));
+    assert!(
+        events[0]
+            .tag
+            .metadata()
+            .evidence
+            .iter()
+            .any(|evidence| evidence.kind == GoalTagEvidenceKind::LeadupTouch)
+    );
+}
+
+#[test]
+fn high_aerial_goal_ignores_high_touch_from_before_the_possession() {
+    let goal = goal_with_touch(true, position(0.0, 1500.0, 100.0), Vec::new());
+    // High touch, but it happened in an earlier possession the opponent then
+    // took over before the scoring team won the ball back at frame 86.
+    let touches = vec![aerial_touch(2.0, 20, player_id(1), true, 800.0)];
+    let possessions = vec![
+        possession_event("team_one", 25, 85),
+        possession_event("team_zero", 86, 100),
+    ];
+
+    let events = HighAerialGoalCalculator::new().tag_goals(&[goal], &touches, &possessions);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn high_aerial_goal_ignores_defending_team_high_touch() {
+    let goal = goal_with_touch(true, position(0.0, 1500.0, 100.0), Vec::new());
+    // High touch in the possession window, but by the defending team.
+    let touches = vec![aerial_touch(9.0, 90, player_id(5), false, 800.0)];
+    let possessions = vec![possession_event("team_zero", 0, 100)];
+
+    let events = HighAerialGoalCalculator::new().tag_goals(&[goal], &touches, &possessions);
+
+    assert!(events.is_empty());
 }
 
 #[test]
@@ -1095,15 +1229,13 @@ fn demo_goal_marks_by_scorer_when_scorer_gets_demo() {
 }
 
 #[test]
-fn demo_goal_rejects_deaths_opponent_demos_and_stale_demos() {
+fn demo_goal_rejects_opponent_demos_and_stale_demos() {
     let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
-    let mut death = demo_event(9.1, 91, player_id(2));
-    death.kind = TimelineEventKind::Death;
     let mut opponent_demo = demo_event(9.1, 91, player_id(3));
-    opponent_demo.is_team_0 = Some(false);
+    opponent_demo.attacker_is_team_0 = Some(false);
     let stale_demo = demo_event(6.5, 65, player_id(2));
 
-    let events = DemoGoalCalculator::new().tag_goals(&[goal], &[death, opponent_demo, stale_demo]);
+    let events = DemoGoalCalculator::new().tag_goals(&[goal], &[opponent_demo, stale_demo]);
 
     assert!(events.is_empty());
 }

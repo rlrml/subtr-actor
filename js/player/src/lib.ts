@@ -1,20 +1,22 @@
 export {
   createBoostPadsPlugin,
+  capturePlayerImage,
+  capturePlayerImageFromParsed,
+  capturePlayerImages,
+  capturePlayerImagesFromParsed,
   createCameraPlugin,
   createFpsOverlayPlugin,
   createNameTagPlugin,
-  createViewer,
-  createViewer as createPlayer,
-  createViewerFromParsed,
-  createViewerFromParsed as createPlayerFromParsed,
+  createScoredTextPlugin,
+  createPlayer,
+  createPlayerFromParsed,
   fromReplayPlayerPlugin,
   loadReplay,
   parseReplay,
   SubtrActorPlayer,
-  ViewerPlayer,
-  ViewerPlayer as ReplayPlayer,
-} from "./viewer/lib";
-export { getViewerAssetBase, resolveViewerAssetUrl, setViewerAssetBase } from "./viewer/asset-url";
+  ReplayPlayer,
+} from "./player/lib";
+export { getPlayerAssetBase, resolvePlayerAssetUrl, setPlayerAssetBase } from "./player/asset-url";
 export type {
   CameraPlugin,
   CameraPluginMode,
@@ -22,21 +24,27 @@ export type {
   FpsOverlayOptions,
   FpsSample,
   RecordedCameraSettings,
+  ScoredTextOverlayOptions,
   SubtrActorPlayerOptions,
-  ViewerCameraViewMode,
-  ViewerFreeCameraPreset,
-  ViewerOptions,
-  ViewerPlayerInfo,
-  ViewerPlugin,
-  ViewerPluginContext,
-  ViewerPluginDefinition,
-  ViewerPluginFactory,
-  ViewerPluginStateContext,
-  ViewerRenderContext,
-  ViewerSnapshot,
-  ViewerState,
-  ViewerStatePatch,
-} from "./viewer/lib";
+  PlayerImageBallCamMode,
+  PlayerImageCamera,
+  PlayerImageCaptureOptions,
+  PlayerImageCaptureRequest,
+  PlayerImageCaptureResult,
+  PlayerCameraViewMode,
+  PlayerFreeCameraPreset,
+  PlayerOptions,
+  ReplayPlayerInfo,
+  PlayerPlugin,
+  PlayerPluginContext,
+  PlayerPluginDefinition,
+  PlayerPluginFactory,
+  PlayerPluginStateContext,
+  PlayerRenderContext,
+  PlayerSnapshot,
+  PlayerState,
+  PlayerStatePatch,
+} from "./player/lib";
 export {
   BALLCHASING_API_BASE_URL,
   BALLCHASING_BASE_URL,
@@ -49,7 +57,10 @@ export {
   normalizeBallchasingReplayId,
 } from "./ballchasing";
 export type { BallchasingReplayDownloadOptions } from "./ballchasing";
-export { createBallchasingOverlayPlugin } from "./ballchasing-overlay";
+export {
+  createBallchasingOverlayPlugin,
+  DEFAULT_FLOATING_NAMEPLATE_LIFT_UU,
+} from "./ballchasing-overlay";
 export type { BallchasingOverlayPluginOptions } from "./ballchasing-overlay";
 export { BOOST_RAW_MAX, boostAmountToPercent, boostPercentToAmount } from "./boost-units";
 export { createBoostPadOverlayPlugin } from "./boost-pad-overlay";

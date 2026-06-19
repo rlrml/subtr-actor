@@ -5,6 +5,7 @@ import type { PlaybackBound } from "./generated/PlaybackBound";
 import type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
 import type { PlaylistEndMode } from "./generated/PlaylistEndMode";
 import type { ReplayHitboxSpec } from "./hitboxes";
+import type { PlayerOptions } from "./player/types";
 
 export type { PlaybackBound } from "./generated/PlaybackBound";
 export type { PlaylistAdvanceMode } from "./generated/PlaylistAdvanceMode";
@@ -107,6 +108,34 @@ export interface PlayerSample {
   jumpActive: boolean;
   doubleJumpActive: boolean;
   dodgeActive: boolean;
+  /**
+   * Replay-driven continuous camera look angles, in radians, derived from the
+   * replicated bytes. `null`/absent when the replay does not carry them (older
+   * replays, or before the player's camera-settings actor appears). Discrete
+   * camera toggles (ball cam, behind-view) live in {@link ReplayPlayerTrack.cameraEvents}.
+   */
+  cameraPitch?: number | null;
+  cameraYaw?: number | null;
+  /** Throttle input, normalized to -1 (full reverse) .. 1 (full forward). */
+  throttle?: number | null;
+  /** Steer input, normalized to -1 (full left) .. 1 (full right). */
+  steer?: number | null;
+  /** Impulse vector of the most recent dodge (raw replay units). */
+  dodgeImpulse?: Vec3 | null;
+  /** Torque vector of the most recent dodge (raw replay units). */
+  dodgeTorque?: Vec3 | null;
+}
+
+/**
+ * A coalesced change in a player's discrete camera/vehicle toggles, mirroring
+ * the Rust `PlayerCameraStateChange`. Resolve the state at a frame by taking the
+ * last change at or before that frame. `null` fields were never replicated.
+ */
+export interface CameraStateChange {
+  frame: number;
+  ballCamActive: boolean | null;
+  behindViewActive: boolean | null;
+  driving: boolean | null;
 }
 
 export interface ReplayPlayerTrack {
@@ -116,6 +145,12 @@ export interface ReplayPlayerTrack {
   cameraSettings: CameraSettings;
   hitbox: ReplayHitboxSpec;
   frames: PlayerSample[];
+  /**
+   * Coalesced ball-cam / behind-view / driving changes for this player, sorted
+   * by frame. Empty/absent when the replay carries no camera events for the
+   * player.
+   */
+  cameraEvents?: CameraStateChange[];
 }
 
 export type ReplayTimelineEventKind = "goal" | "shot" | "save" | "assist" | "demo" | (string & {});
@@ -411,6 +446,18 @@ export interface ReplayPlayerOptions {
   initialCameraViewMode?: ReplayCameraViewMode;
   initialAttachedPlayerId?: string | null;
   initialBallCamEnabled?: boolean;
+  /**
+   * When following a player, drive ball cam from that player's replicated
+   * ball-cam toggle instead of the manual `ballCamEnabled` flag. Defaults to
+   * `true`. Calling `setBallCamEnabled` turns this off (manual override).
+   */
+  initialUseReplayBallCam?: boolean;
+  /**
+   * Opt-in (default false): rotate the follow camera by the player's replicated
+   * camera yaw/pitch (free-look swivel) instead of locking to car orientation.
+   * Needs per-replay sign tuning; off by default to preserve the synthetic feel.
+   */
+  initialUseReplayCameraLook?: boolean;
   initialBoostMeterEnabled?: boolean;
   initialBoostPickupAnimationEnabled?: boolean;
   initialHitboxWireframesEnabled?: boolean;
@@ -422,7 +469,7 @@ export interface ReplayPlayerOptions {
 }
 
 export interface ReplayPlaylistPlayerOptions
-  extends Omit<ReplayPlayerOptions, "autoplay">, PlaylistPlaybackOptions {
+  extends Omit<PlayerOptions, "autoplay">, PlaylistPlaybackOptions {
   autoplay?: boolean;
   initialItemIndex?: number;
   preloadPolicy?: ReplayPreloadPolicy;
@@ -441,6 +488,14 @@ export interface ReplayPlayerState {
   cameraViewMode: ReplayCameraViewMode;
   attachedPlayerId: string | null;
   ballCamEnabled: boolean;
+  /**
+   * Whether the followed player's replicated ball-cam toggle drives the camera.
+   * Optional so the structurally-compatible `PlayerState` (which has no
+   * such notion) stays assignable to `ReplayPlayerState`.
+   */
+  useReplayBallCam?: boolean;
+  /** Effective ball-cam state actually applied this frame (replay or manual). */
+  effectiveBallCamEnabled?: boolean;
   boostMeterEnabled: boolean;
   boostPickupAnimationEnabled: boolean;
   hitboxWireframesEnabled: boolean;
@@ -495,6 +550,7 @@ export type ReplayPlayerStatePatch = Partial<
     | "cameraViewMode"
     | "attachedPlayerId"
     | "ballCamEnabled"
+    | "useReplayBallCam"
     | "boostMeterEnabled"
     | "boostPickupAnimationEnabled"
     | "hitboxWireframesEnabled"

@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated positioning stats: time in roles/zones and possession distances.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PositioningStats {
@@ -34,6 +35,7 @@ pub struct PositioningStats {
     pub time_in_front_of_ball: f32,
 }
 
+/// Per-team accumulated positioning stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct PositioningTeamStats {

@@ -8,6 +8,24 @@ const HITBOX_OVERLAY_FILL_OPACITY = 0.08;
 const HITBOX_ONLY_FILL_OPACITY = 0.22;
 const HITBOX_OVERLAY_DARKEN = 0.94;
 
+/** A steerable/spinnable wheel on the example car mesh. */
+export interface CarWheel {
+  /** Steering pivot — rotated about local Z (car up) for front-wheel steer. */
+  pivot: THREE.Group;
+  /** Cylinder mesh — spun about its axle for roll. */
+  wheel: THREE.Mesh;
+  isFront: boolean;
+}
+
+/** Effective wheel radius in model (uu) space: geometry radius × inner scale. */
+export const EXAMPLE_CAR_WHEEL_RADIUS_UU = 70 * 0.35;
+
+/** Returns the steerable wheels attached to an example car mesh, if any. */
+export function getCarWheels(mesh: THREE.Object3D): CarWheel[] | undefined {
+  const wheels = (mesh.userData as { wheels?: CarWheel[] }).wheels;
+  return Array.isArray(wheels) ? wheels : undefined;
+}
+
 export interface ReplayScene {
   scene: THREE.Scene;
   replayRoot: THREE.Group;
@@ -569,22 +587,39 @@ function createExampleCarMesh(color: string): THREE.Group {
     color: 0x222222,
     shininess: 48,
   });
-  const makeWheel = (x: number, y: number, z: number, width: number): THREE.Mesh => {
+  // Each wheel is a cylinder inside a steering pivot. The pivot rotates about
+  // its local Z (the car's up axis here) for steering; the cylinder spins about
+  // its own axle. Both are driven per-frame from replay steer + motion in
+  // player.ts. The collected pivots are exposed on the car group's userData.
+  const wheels: CarWheel[] = [];
+  const makeWheel = (
+    x: number,
+    y: number,
+    z: number,
+    width: number,
+    isFront: boolean,
+  ): THREE.Group => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, z);
     const wheel = new THREE.Mesh(new THREE.CylinderGeometry(70, 70, width, 10), wheelMaterial);
-    wheel.rotateZ(Math.PI / 2);
-    wheel.position.set(x, y, z);
+    // Lay the cylinder on its side so the axle runs left-right; spin is layered
+    // on top of this in player.ts.
+    wheel.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
     wheel.castShadow = true;
-    return wheel;
+    pivot.add(wheel);
+    wheels.push({ pivot, wheel, isFront });
+    return pivot;
   };
 
-  inner.add(makeWheel(120, -300, -60, 50));
-  inner.add(makeWheel(-120, -300, -60, 50));
-  inner.add(makeWheel(120, 150, -60, 70));
-  inner.add(makeWheel(-120, 150, -60, 70));
+  inner.add(makeWheel(120, -300, -60, 50, false));
+  inner.add(makeWheel(-120, -300, -60, 50, false));
+  inner.add(makeWheel(120, 150, -60, 70, true));
+  inner.add(makeWheel(-120, 150, -60, 70, true));
   inner.position.set(0, 0, 50);
   inner.rotateZ(Math.PI / 2);
   inner.scale.set(0.35, 0.35, 0.35);
   outer.add(inner);
+  outer.userData.wheels = wheels;
   return outer;
 }
 

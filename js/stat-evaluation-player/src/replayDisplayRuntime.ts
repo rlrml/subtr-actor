@@ -11,7 +11,7 @@ import {
 } from "@rlrml/player";
 import {
   createFpsOverlayPlugin,
-  createViewerFromParsed,
+  createPlayerFromParsed,
   fromReplayPlayerPlugin,
 } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
@@ -68,7 +68,6 @@ export interface ReplayDisplayRuntimeOptions {
   renderMechanicsTimelineControls(): void;
   renderEventPlaylistWindow(): void;
   renderModuleSettings(): void;
-  migrateMechanicBackedTimelineEventSelections(): void;
   syncBoostPadOverlayPlugin(): void;
   setupActiveModules(): void;
   renderSnapshot(state: ReplayPlayerState): void;
@@ -126,7 +125,6 @@ export async function loadReplayBundleForDisplay(
     options.setStatsTimeline(loadedReplay.statsTimeline);
     options.setStatsFrameLookup(loadedReplay.statsFrameLookup);
     options.setStatRegistry(createStatRegistry(null));
-    options.migrateMechanicBackedTimelineEventSelections();
 
     const timelineOverlay = createTimelineOverlayPlugin({
       replayEventsLabel: "Replay",
@@ -139,16 +137,19 @@ export async function loadReplayBundleForDisplay(
     options.setCanvasRecorder(recorder);
     const config = options.getInitialConfig();
 
-    // The viewer implements @rlrml/player's full ReplayPlayer surface; player
+    // The player implements @rlrml/player's full ReplayPlayer surface; player
     // plugins are bridged via fromReplayPlayerPlugin (the original `recorder` /
     // `timelineOverlay` handles share closure state with the wrapped copies, so
     // they keep working for setCanvasRecorder/setTimelineOverlay below).
-    const replayPlayer = createViewerFromParsed(elements.viewport, loadedReplay, {
+    const replayPlayer = createPlayerFromParsed(elements.viewport, loadedReplay, {
       initialPlaybackRate: config?.playback.rate,
       initialCustomCameraSettings: getCustomCameraSettingsFromConfig(config?.camera),
       initialAttachedPlayerId: config?.camera.attachedPlayerId ?? null,
       initialCameraViewMode: config?.camera.mode,
-      initialBallCamEnabled: config?.camera.ballCam ?? false,
+      // Ball cam defaults to "player" (follow the recorded toggle): leave the
+      // initial override unset (null) so the camera plugin tracks the recorded
+      // state. A saved config's forced ball/car cam is applied by
+      // applyConfigToReplayPlayer immediately after construction.
       initialBoostPickupAnimationEnabled: config?.overlays.boostPickupAnimation ?? false,
       initialHitboxWireframesEnabled:
         config?.overlays.hitboxWireframes ?? elements.hitboxWireframes.checked,
@@ -167,7 +168,11 @@ export async function loadReplayBundleForDisplay(
             if (replay) replay.textContent = `${replayFps.toFixed(0)} fps`;
           },
         }),
-        fromReplayPlayerPlugin(createBallchasingOverlayPlugin()),
+        fromReplayPlayerPlugin(
+          createBallchasingOverlayPlugin({
+            floatingLiftUu: () => options.getCameraControlsController()?.nameplateLiftUu,
+          }),
+        ),
         fromReplayPlayerPlugin(
           createBoostPickupAnimationPlugin({
             includePickup: options.includeBoostPickupAnimationPickup,

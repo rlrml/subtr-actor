@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects powerslide usage from player frame state during live play.
 pub struct PowerslideNode {
     calculator: PowerslideCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for PowerslideNode {
 
     fn name(&self) -> &'static str {
         "powerslide"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::POWERSLIDE_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

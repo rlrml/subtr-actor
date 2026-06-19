@@ -52,6 +52,13 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "ball_third",
+    "label": "Ball Third",
+    "category": "positioning",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
     "key": "boost_pickups",
     "label": "Boost Pickup",
     "category": "other",
@@ -107,9 +114,9 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "death",
-    "label": "Death",
-    "category": "core",
+    "key": "demolition",
+    "label": "Demolition",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
@@ -226,16 +233,9 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "kill",
-    "label": "Demolition",
-    "category": "core",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
     "key": "movement",
     "label": "Movement",
-    "category": "movement",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },

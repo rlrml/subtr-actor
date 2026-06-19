@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Accumulates match-level stats and goal contexts; attaches per-goal territorial pressure at finish.
 pub struct MatchStatsNode {
     calculator: MatchStatsCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for MatchStatsNode {
 
     fn name(&self) -> &'static str {
         "match_stats"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::MATCH_STATS_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> Vec<AnalysisDependency> {

@@ -9,6 +9,7 @@ const HALF_VOLLEY_MAX_DODGE_TO_TOUCH_SECONDS: f32 = 0.35;
 const HALF_VOLLEY_MAX_GROUND_TO_DODGE_SECONDS: f32 = 0.45;
 const HALF_VOLLEY_GOAL_CENTER_Y: f32 = 5120.0;
 
+/// Configuration thresholds for half-volley detection.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct HalfVolleyCalculatorConfig {
@@ -25,6 +26,7 @@ impl Default for HalfVolleyCalculatorConfig {
     }
 }
 
+/// A fast touch shortly after the ball bounces off the floor, paired with a recent dodge.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct HalfVolleyEvent {
@@ -61,6 +63,7 @@ struct DodgeStart {
     ground_contact: GroundContact,
 }
 
+/// Detects half-volleys from ball/player state and touches.
 #[derive(Debug, Clone, Default)]
 pub struct HalfVolleyCalculator {
     config: HalfVolleyCalculatorConfig,

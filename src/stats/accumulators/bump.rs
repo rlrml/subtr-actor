@@ -1,6 +1,7 @@
 use super::bump::BumpEvent;
 use super::*;
 
+/// Per-player accumulated bump stats inflicted and taken.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BumpPlayerStats {
@@ -25,6 +26,7 @@ impl BumpPlayerStats {
     }
 }
 
+/// Per-team accumulated bump stats.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BumpTeamStats {
@@ -32,6 +34,7 @@ pub struct BumpTeamStats {
     pub team_bumps_inflicted: u32,
 }
 
+/// Accumulates bump stats over the replay from bump events.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BumpStatsAccumulator {
     player_stats: HashMap<PlayerId, BumpPlayerStats>,

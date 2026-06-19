@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects centering passes from ball state, touches, and frame events during live play.
 pub struct CenterNode {
     calculator: CenterCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for CenterNode {
 
     fn name(&self) -> &'static str {
         "center"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::CENTER_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

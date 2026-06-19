@@ -1,3 +1,28 @@
+//! The output layer: turn a processed replay into structured data, numeric
+//! features, or stat timelines.
+//!
+//! Everything here is built on the [`Collector`] trait — the core extension
+//! point. A collector observes the replay frame by frame (driven by a
+//! [`ReplayProcessor`]) and decides the sampling pace
+//! via the [`TimeAdvance`] it returns. Run one with
+//! [`Collector::process_replay`], or share a single pass across several with
+//! [`ReplayProcessor::process_all`](crate::ReplayProcessor::process_all).
+//!
+//! # Built-in collectors
+//!
+//! - [`ReplayDataCollector`] — a serde-friendly payload of frame data, metadata,
+//!   and derived event streams for JSON export and playback UIs.
+//! - [`NDArrayCollector`] — a dense numeric feature matrix for ML; see the
+//!   [`ndarray`] submodule for the feature-adder system.
+//! - Stats collectors in [`stats`] — graph-backed accumulated stats; see also
+//!   [`crate::stats::timeline`] for cumulative-over-time stat timelines.
+//!
+//! # Wrappers
+//!
+//! - [`FrameRateDecorator`] downsamples any collector to a target FPS.
+//! - [`CallbackCollector`] attaches side-effecting hooks (progress, debugging)
+//!   to a collector.
+
 pub mod callback;
 pub mod decorator;
 pub(crate) mod frame_resolution;

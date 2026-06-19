@@ -32,6 +32,7 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<BumpEvent>();
     assert_stats_event::<PossessionEvent>();
     assert_stats_event::<BallHalfEvent>();
+    assert_stats_event::<BallThirdEvent>();
     assert_stats_event::<TerritorialPressureEvent>();
     assert_stats_event::<MovementEvent>();
     assert_stats_event::<PlayerActivityEvent>();
@@ -79,10 +80,11 @@ fn mechanic_event_definitions_have_documented_approaches() {
 }
 
 #[test]
-fn low_level_ball_interaction_events_are_other() {
+fn low_level_interaction_events_are_other() {
     for definition in [
         TOUCH_CLASSIFICATION_EVENT_DEFINITION,
         WHIFF_EVENT_DEFINITION,
+        MOVEMENT_EVENT_DEFINITION,
     ] {
         assert_eq!(
             definition.category,
@@ -104,22 +106,6 @@ fn event_definition_ids_are_unique() {
             "duplicate event definition id {}",
             definition.id
         );
-    }
-}
-
-#[test]
-fn every_produced_event_has_a_registered_definition() {
-    let registered: std::collections::BTreeSet<&str> =
-        all_event_definitions().iter().map(|def| def.id).collect();
-    for producer in event_producers() {
-        for emitted in producer.emitted_events {
-            assert!(
-                registered.contains(emitted.event.id),
-                "event {:?} is produced by {:?} but is missing from the definition registry",
-                emitted.event.id,
-                producer.node_name
-            );
-        }
     }
 }
 

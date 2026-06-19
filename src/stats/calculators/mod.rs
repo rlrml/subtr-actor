@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::LazyLock;
 
 use boxcars;
 use boxcars::HeaderProp;
@@ -37,6 +36,13 @@ pub use air_dribble::*;
 pub mod ball_carry;
 pub use ball_carry::*;
 pub mod boost;
+pub use crate::boost_pad_locations::standard_soccar_boost_pad_layout;
+pub(crate) use crate::boost_pad_locations::{
+    BOOST_PAD_BACK_CORNER_X, BOOST_PAD_BACK_CORNER_Y, BOOST_PAD_MIDFIELD_TOLERANCE_Y,
+    BOOST_PAD_SIDE_LANE_Y, PadPositionEstimate, STANDARD_PAD_MATCH_RADIUS_BIG,
+    STANDARD_PAD_MATCH_RADIUS_SMALL, STANDARD_SOCCAR_BOOST_PAD_LAYOUT,
+    standard_soccar_boost_pad_position,
+};
 pub use boost::*;
 pub mod bump;
 pub use bump::*;
@@ -98,6 +104,8 @@ pub mod powerslide;
 pub use powerslide::*;
 pub mod ball_half;
 pub use ball_half::*;
+pub mod ball_third;
+pub use ball_third::*;
 pub mod rotation;
 pub use rotation::*;
 pub mod rush;
@@ -164,164 +172,9 @@ const FIELD_ZONE_BOUNDARY_Y: f32 = BOOST_PAD_SIDE_LANE_Y;
 const DEFAULT_MOST_BACK_FORWARD_THRESHOLD_Y: f32 = 236.0;
 const SMALL_PAD_AMOUNT_RAW: f32 = BOOST_MAX_AMOUNT * 12.0 / 100.0;
 const BOOST_FULL_BAND_MIN_RAW: f32 = BOOST_MAX_AMOUNT - 1.0;
-const STANDARD_PAD_MATCH_RADIUS_SMALL: f32 = 450.0;
-const STANDARD_PAD_MATCH_RADIUS_BIG: f32 = 1000.0;
-const BOOST_PAD_MIDFIELD_TOLERANCE_Y: f32 = 128.0;
-const BOOST_PAD_SMALL_Z: f32 = 70.0;
-const BOOST_PAD_BIG_Z: f32 = 73.0;
-const BOOST_PAD_BACK_CORNER_X: f32 = 3072.0;
-const BOOST_PAD_BACK_CORNER_Y: f32 = 4096.0;
-const BOOST_PAD_BACK_LANE_X: f32 = 1792.0;
-const BOOST_PAD_BACK_LANE_Y: f32 = 4184.0;
-const BOOST_PAD_BACK_MID_X: f32 = 940.0;
-const BOOST_PAD_BACK_MID_Y: f32 = 3308.0;
-const BOOST_PAD_CENTER_BACK_Y: f32 = 2816.0;
-const BOOST_PAD_SIDE_WALL_X: f32 = 3584.0;
-const BOOST_PAD_SIDE_WALL_Y: f32 = 2484.0;
-const BOOST_PAD_SIDE_LANE_X: f32 = 1788.0;
-const BOOST_PAD_SIDE_LANE_Y: f32 = 2300.0;
-const BOOST_PAD_FRONT_LANE_X: f32 = 2048.0;
-const BOOST_PAD_FRONT_LANE_Y: f32 = 1036.0;
-const BOOST_PAD_CENTER_X: f32 = 1024.0;
-const BOOST_PAD_CENTER_MID_Y: f32 = 1024.0;
-const BOOST_PAD_GOAL_LINE_Y: f32 = 4240.0;
-
-fn push_pad(
-    pads: &mut Vec<(glam::Vec3, BoostPadSize)>,
-    x: f32,
-    y: f32,
-    z: f32,
-    size: BoostPadSize,
-) {
-    pads.push((glam::Vec3::new(x, y, z), size));
-}
-
-fn push_mirror_x(
-    pads: &mut Vec<(glam::Vec3, BoostPadSize)>,
-    x: f32,
-    y: f32,
-    z: f32,
-    size: BoostPadSize,
-) {
-    push_pad(pads, -x, y, z, size);
-    push_pad(pads, x, y, z, size);
-}
-
-fn push_mirror_y(
-    pads: &mut Vec<(glam::Vec3, BoostPadSize)>,
-    x: f32,
-    y: f32,
-    z: f32,
-    size: BoostPadSize,
-) {
-    push_pad(pads, x, -y, z, size);
-    push_pad(pads, x, y, z, size);
-}
-
-fn push_mirror_xy(
-    pads: &mut Vec<(glam::Vec3, BoostPadSize)>,
-    x: f32,
-    y: f32,
-    z: f32,
-    size: BoostPadSize,
-) {
-    push_mirror_x(pads, x, -y, z, size);
-    push_mirror_x(pads, x, y, z, size);
-}
-
-fn build_standard_soccar_boost_pad_layout() -> Vec<(glam::Vec3, BoostPadSize)> {
-    let mut pads = Vec::with_capacity(34);
-
-    push_mirror_y(
-        &mut pads,
-        0.0,
-        BOOST_PAD_GOAL_LINE_Y,
-        BOOST_PAD_SMALL_Z,
-        BoostPadSize::Small,
-    );
-    push_mirror_xy(
-        &mut pads,
-        BOOST_PAD_BACK_LANE_X,
-        BOOST_PAD_BACK_LANE_Y,
-        BOOST_PAD_SMALL_Z,
-        BoostPadSize::Small,
-    );
-    push_mirror_xy(
-        &mut pads,
-        BOOST_PAD_BACK_CORNER_X,
-        BOOST_PAD_BACK_CORNER_Y,
-        BOOST_PAD_BIG_Z,
-        BoostPadSize::Big,
-    );
-    push_mirror_xy(
-        &mut pads,
-        BOOST_PAD_BACK_MID_X,
-        BOOST_PAD_BACK_MID_Y,
-        BOOST_PAD_SMALL_Z,
-        BoostPadSize::Small,
-    );
-    push_mirror_y(
-        &mut pads,
-        0.0,
-        BOOST_PAD_CENTER_BACK_Y,
-        BOOST_PAD_SMALL_Z,
-        BoostPadSize::Small,
-    );
-    push_mirror_xy(
-        &mut pads,
-        BOOST_PAD_SIDE_WALL_X,
-        BOOST_PAD_SIDE_WALL_Y,
-        BOOST_PAD_SMALL_Z,
-        BoostPadSize::Small,
-    );
-    push_mirror_xy(
-        &mut pads,
-        BOOST_PAD_SIDE_LANE_X,
-        BOOST_PAD_SIDE_LANE_Y,
-        BOOST_PAD_SMALL_Z,
-        BoostPadSize::Small,
-    );
-    push_mirror_xy(
-        &mut pads,
-        BOOST_PAD_FRONT_LANE_X,
-        BOOST_PAD_FRONT_LANE_Y,
-        BOOST_PAD_SMALL_Z,
-        BoostPadSize::Small,
-    );
-    push_mirror_y(
-        &mut pads,
-        0.0,
-        BOOST_PAD_CENTER_MID_Y,
-        BOOST_PAD_SMALL_Z,
-        BoostPadSize::Small,
-    );
-    push_mirror_x(
-        &mut pads,
-        BOOST_PAD_SIDE_WALL_X,
-        0.0,
-        BOOST_PAD_BIG_Z,
-        BoostPadSize::Big,
-    );
-    push_mirror_x(
-        &mut pads,
-        BOOST_PAD_CENTER_X,
-        0.0,
-        BOOST_PAD_SMALL_Z,
-        BoostPadSize::Small,
-    );
-
-    pads
-}
-
-static STANDARD_SOCCAR_BOOST_PAD_LAYOUT: LazyLock<Vec<(glam::Vec3, BoostPadSize)>> =
-    LazyLock::new(build_standard_soccar_boost_pad_layout);
 
 const SOCCAR_CEILING_Z: f32 = 2044.0;
 const CEILING_CONTACT_MAX_GAP: f32 = 90.0;
-
-pub fn standard_soccar_boost_pad_layout() -> &'static [(glam::Vec3, BoostPadSize)] {
-    STANDARD_SOCCAR_BOOST_PAD_LAYOUT.as_slice()
-}
 
 fn normalized_y(is_team_0: bool, position: glam::Vec3) -> f32 {
     if is_team_0 { position.y } else { -position.y }
@@ -355,38 +208,6 @@ fn player_sample_is_touching_surface(player: &PlayerSample) -> bool {
         || PlayerVerticalBand::from_height(position.z).is_grounded()
         || player_is_on_wall(position)
         || player_is_on_ceiling(position)
-}
-
-fn standard_soccar_boost_pad_position(index: usize) -> glam::Vec3 {
-    STANDARD_SOCCAR_BOOST_PAD_LAYOUT[index].0
-}
-
-#[derive(Debug, Clone, Default)]
-struct PadPositionEstimate {
-    observations: Vec<glam::Vec3>,
-}
-
-impl PadPositionEstimate {
-    fn observe(&mut self, position: glam::Vec3) {
-        self.observations.push(position);
-    }
-
-    fn observations(&self) -> &[glam::Vec3] {
-        self.observations.as_slice()
-    }
-
-    fn mean(&self) -> Option<glam::Vec3> {
-        if self.observations.is_empty() {
-            return None;
-        }
-
-        let sum = self
-            .observations
-            .iter()
-            .copied()
-            .fold(glam::Vec3::ZERO, |acc, position| acc + position);
-        Some(sum / self.observations.len() as f32)
-    }
 }
 
 fn header_prop_to_f32(prop: &HeaderProp) -> Option<f32> {

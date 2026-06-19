@@ -4,6 +4,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::{PlayerId, SubtrActorResult};
 
+/// Aggregated per-stat accumulators forming the incremental stats projection.
 #[derive(Debug, Clone, Default)]
 pub struct StatsProjectionState {
     pub core: CoreStatsAccumulator,
@@ -18,6 +19,7 @@ pub struct StatsProjectionState {
     pub kickoff: KickoffStatsAccumulator,
     pub possession: PossessionStatsAccumulator,
     pub ball_half: BallHalfStatsAccumulator,
+    pub ball_third: BallThirdStatsAccumulator,
     pub territorial_pressure: TerritorialPressureStatsAccumulator,
     pub rotation: RotationStatsAccumulator,
     pub rush: RushStatsAccumulator,
@@ -149,6 +151,7 @@ impl IncrementalMovementProjection {
     }
 }
 
+/// Folds every mechanic/state calculator's events into per-frame cumulative stat accumulators.
 #[derive(Debug, Clone, Default)]
 pub struct StatsProjectionNode {
     state: StatsProjectionState,
@@ -157,6 +160,7 @@ pub struct StatsProjectionNode {
     powerslide: PowerslideProjectionState,
     boost_current_amount_consistency: BoostCurrentAmountConsistencyTracker,
     last_powerslide_sample_frame: Option<usize>,
+    last_possession_sample_frame: Option<usize>,
     territorial_pressure_tracked_time: f32,
     previous_live_play: Option<bool>,
 }
@@ -174,8 +178,8 @@ struct StatsProjectionCursors {
     pass: usize,
     fifty_fifty: usize,
     kickoff: usize,
-    possession: usize,
     ball_half: usize,
+    ball_third: usize,
     rush: usize,
     touch: usize,
     whiff: usize,
@@ -380,13 +384,34 @@ impl StatsProjectionNode {
         for event in Self::events_since(&mut self.cursors.kickoff, kickoff.events()) {
             self.state.kickoff.apply_event(event);
         }
+        // Possession's zone cross-tab is a per-frame join: possession events
+        // carry only who-has-the-ball, and the ball's third/half come from the
+        // canonical ball_third / ball_half streams. The accumulator is
+        // cumulative (not rebuilt each frame), so guard against finish()
+        // re-processing the final frame.
         let possession = ctx.get::<PossessionCalculator>()?;
-        let projected_possession_events = possession.projected_events();
-        self.state.possession = PossessionStatsAccumulator::default();
-        for event in projected_possession_events.iter() {
-            self.state.possession.apply_event(event);
+        let ball_third = ctx.get::<BallThirdCalculator>()?;
+        let ball_half_calculator = ctx.get::<BallHalfCalculator>()?;
+        if live_play && self.last_possession_sample_frame != Some(frame.frame_number) {
+            if let Some(possession_event) = possession.current_event().filter(|event| event.active)
+            {
+                let field_third = ball_third
+                    .current_event()
+                    .filter(|event| event.active)
+                    .map(|event| event.field_third.as_str());
+                let field_half = ball_half_calculator
+                    .current_event()
+                    .filter(|event| event.active)
+                    .map(|event| event.field_half.as_str());
+                self.state.possession.apply_frame(
+                    &possession_event.possession_state,
+                    field_third,
+                    field_half,
+                    frame.dt,
+                );
+            }
         }
-        self.cursors.possession = possession.events().len();
+        self.last_possession_sample_frame = Some(frame.frame_number);
         let ball_half = ctx.get::<BallHalfCalculator>()?;
         let projected_ball_half_events = ball_half.projected_events();
         self.state.ball_half = BallHalfStatsAccumulator::default();
@@ -394,6 +419,13 @@ impl StatsProjectionNode {
             self.state.ball_half.apply_event(event);
         }
         self.cursors.ball_half = ball_half.events().len();
+        let ball_third = ctx.get::<BallThirdCalculator>()?;
+        let projected_ball_third_events = ball_third.projected_events();
+        self.state.ball_third = BallThirdStatsAccumulator::default();
+        for event in projected_ball_third_events.iter() {
+            self.state.ball_third.apply_event(event);
+        }
+        self.cursors.ball_third = ball_third.events().len();
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
         if live_play {
             self.territorial_pressure_tracked_time += frame.dt;
@@ -539,8 +571,8 @@ impl StatsProjectionNode {
             self.last_powerslide_sample_frame = Some(frame.frame_number);
         }
         let demo = ctx.get::<DemoCalculator>()?;
-        for event in Self::events_since(&mut self.cursors.demo_timeline, demo.timeline()) {
-            self.state.demo.apply_timeline_event(event);
+        for event in Self::events_since(&mut self.cursors.demo_timeline, demo.events()) {
+            self.state.demo.apply_demolition_event(event);
         }
         let center = ctx.get::<CenterCalculator>()?;
         for event in Self::events_since(&mut self.cursors.center, center.events()) {
@@ -583,6 +615,7 @@ impl AnalysisNode for StatsProjectionNode {
             kickoff_dependency(),
             possession_dependency(),
             ball_half_dependency(),
+            ball_third_dependency(),
             territorial_pressure_dependency(),
             rotation_dependency(),
             rush_dependency(),

@@ -1,13 +1,53 @@
-import type {
-  CameraSettings,
-  ReplayCameraViewMode,
-  ReplayFreeCameraPreset,
-  ReplayPlayerState,
-  ReplayPlayerTrack,
+import {
+  DEFAULT_FLOATING_NAMEPLATE_LIFT_UU,
+  type CameraSettings,
+  type ReplayCameraViewMode,
+  type ReplayFreeCameraPreset,
+  type ReplayPlayerState,
+  type ReplayPlayerTrack,
 } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = ["free", "follow"];
+
+/**
+ * Ball-cam control modes:
+ * - `"off"` / `"on"` force car cam / ball cam.
+ * - `"player"` follows the attached player's recorded ball-cam toggle — their
+ *   true in-game view — and is the default when following a player.
+ */
+export type BallCamMode = "off" | "on" | "player";
+
+/** Map a player state onto a tri-state ball-cam mode for the UI. */
+export function ballCamModeFromState(
+  state: Pick<ReplayPlayerState, "ballCamEnabled" | "useReplayBallCam">,
+): BallCamMode {
+  if (state.useReplayBallCam ?? false) {
+    return "player";
+  }
+  return state.ballCamEnabled ? "on" : "off";
+}
+
+/**
+ * Resolve a persisted camera config to a ball-cam mode. Absent settings (and
+ * legacy configs without `useReplayBallCam`) default to "player" so following a
+ * player uses their recorded view unless a forced ball/car cam was saved.
+ */
+export function ballCamModeFromConfig(camera: {
+  ballCam?: boolean;
+  useReplayBallCam?: boolean;
+}): BallCamMode {
+  if (camera.useReplayBallCam) {
+    return "player";
+  }
+  if (camera.ballCam === true) {
+    return "on";
+  }
+  if (camera.ballCam === false) {
+    return "off";
+  }
+  return "player";
+}
 
 export const DEFAULT_CUSTOM_CAMERA_SETTINGS: Required<CameraSettings> = {
   fov: 110,
@@ -41,7 +81,11 @@ export interface CameraControlsElements {
   readonly customCameraStiffnessReadout: HTMLElement;
   readonly customCameraSwivelSpeedReadout: HTMLElement;
   readonly customCameraTransitionSpeedReadout: HTMLElement;
-  readonly ballCam: HTMLInputElement;
+  readonly ballCamOffButton: HTMLButtonElement;
+  readonly ballCamOnButton: HTMLButtonElement;
+  readonly ballCamPlayerButton: HTMLButtonElement;
+  readonly nameplateLift: HTMLInputElement;
+  readonly nameplateLiftReadout: HTMLElement;
   readonly cameraProfileReadout: HTMLElement;
   readonly cameraFovReadout: HTMLElement;
   readonly cameraHeightReadout: HTMLElement;
@@ -69,8 +113,52 @@ export class CameraControlsController {
     this.lastFreeCameraPreset = value;
   }
 
-  get ballCamChecked(): boolean {
-    return this.options.elements.ballCam.checked;
+  private ballCamModeValue: BallCamMode = "player";
+
+  get ballCamMode(): BallCamMode {
+    return this.ballCamModeValue;
+  }
+
+  /** Convert a tri-state mode to the player's `setBallCamEnabled` argument. */
+  private static ballCamEnabledForMode(mode: BallCamMode): boolean | null {
+    return mode === "player" ? null : mode === "on";
+  }
+
+  private renderBallCamButtons(): void {
+    const { ballCamOffButton, ballCamOnButton, ballCamPlayerButton } = this.options.elements;
+    const buttons: ReadonlyArray<[BallCamMode, HTMLButtonElement]> = [
+      ["off", ballCamOffButton],
+      ["on", ballCamOnButton],
+      ["player", ballCamPlayerButton],
+    ];
+    for (const [mode, button] of buttons) {
+      const isActive = mode === this.ballCamModeValue;
+      button.dataset.active = isActive ? "true" : "false";
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    }
+  }
+
+  /** Apply a ball-cam mode to the player and reflect it in the button group. */
+  private setBallCamMode(mode: BallCamMode): void {
+    this.ballCamModeValue = mode;
+    this.options
+      .getReplayPlayer()
+      ?.setBallCamEnabled(CameraControlsController.ballCamEnabledForMode(mode));
+    this.renderBallCamButtons();
+  }
+
+  /** Current floating name-plate lift (Unreal units) from the slider. */
+  get nameplateLiftUu(): number {
+    const value = Number(this.options.elements.nameplateLift.value);
+    return Number.isFinite(value) ? value : DEFAULT_FLOATING_NAMEPLATE_LIFT_UU;
+  }
+
+  /** Apply a persisted name-plate lift to the slider + readout (config load). */
+  applyNameplateLiftUu(value: number | undefined): void {
+    const { nameplateLift, nameplateLiftReadout } = this.options.elements;
+    const lift = value ?? DEFAULT_FLOATING_NAMEPLATE_LIFT_UU;
+    nameplateLift.value = `${lift}`;
+    nameplateLiftReadout.textContent = formatSetting(lift, "", 0);
   }
 
   installEventListeners(signal: AbortSignal): void {
@@ -119,7 +207,8 @@ export class CameraControlsController {
         replayPlayer?.setAttachedPlayer(attachedPlayerId);
         if (attachedPlayerId) {
           replayPlayer?.setCustomCameraSettings(null);
-          replayPlayer?.setBallCamEnabled(true);
+          // Default to the player's own recorded view when attaching.
+          this.setBallCamMode("player");
         }
         this.lastFreeCameraPreset = null;
         this.options.requestConfigSync();
@@ -144,7 +233,8 @@ export class CameraControlsController {
         replayPlayer?.setCameraViewMode("follow");
         if (replayPlayer?.getState().attachedPlayerId) {
           replayPlayer.setCustomCameraSettings(null);
-          replayPlayer.setBallCamEnabled(true);
+          // Default to the player's own recorded view when following.
+          this.setBallCamMode("player");
         }
         this.lastFreeCameraPreset = null;
         this.options.requestConfigSync();
@@ -172,10 +262,29 @@ export class CameraControlsController {
       { signal },
     );
 
-    elements.ballCam.addEventListener(
-      "change",
+    const ballCamButtons: ReadonlyArray<[BallCamMode, HTMLButtonElement]> = [
+      ["off", elements.ballCamOffButton],
+      ["on", elements.ballCamOnButton],
+      ["player", elements.ballCamPlayerButton],
+    ];
+    for (const [mode, button] of ballCamButtons) {
+      button.addEventListener(
+        "click",
+        () => {
+          this.setBallCamMode(mode);
+          this.options.requestConfigSync();
+        },
+        { signal },
+      );
+    }
+
+    // The ballchasing overlay reads nameplateLiftUu live each frame, so changing
+    // the slider takes effect without touching the player — just refresh the
+    // readout and persist.
+    elements.nameplateLift.addEventListener(
+      "input",
       () => {
-        this.options.getReplayPlayer()?.setBallCamEnabled(elements.ballCam.checked);
+        elements.nameplateLiftReadout.textContent = formatSetting(this.nameplateLiftUu, "", 0);
         this.options.requestConfigSync();
       },
       { signal },
@@ -194,7 +303,8 @@ export class CameraControlsController {
     this.syncCustomCameraSettingControls(
       state.customCameraSettings ?? this.getFallbackCameraSettings(),
     );
-    elements.ballCam.checked = state.ballCamEnabled;
+    this.ballCamModeValue = ballCamModeFromState(state);
+    this.renderBallCamButtons();
     elements.attachedPlayer.value = state.attachedPlayerId ?? "";
     this.syncAvailability(state);
     this.renderProfile(state);
@@ -209,7 +319,10 @@ export class CameraControlsController {
       (state.attachedPlayerId ?? null) !== null;
     this.options.elements.usePlayerCameraSettings.disabled = !hasAttachedCamera;
     this.setCameraSettingControlsEnabled(hasAttachedCamera && state?.customCameraSettings !== null);
-    this.options.elements.ballCam.disabled = !hasAttachedCamera;
+    this.options.elements.ballCamOffButton.disabled = !hasAttachedCamera;
+    this.options.elements.ballCamOnButton.disabled = !hasAttachedCamera;
+    this.options.elements.ballCamPlayerButton.disabled = !hasAttachedCamera;
+    this.renderBallCamButtons();
   }
 
   syncModeButtons(state?: ReplayPlayerState): void {

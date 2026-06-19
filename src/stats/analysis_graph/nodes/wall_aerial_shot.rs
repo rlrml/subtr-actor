@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects wall-aerial shots from player frame state and frame events during live play.
 pub struct WallAerialShotNode {
     calculator: WallAerialShotCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for WallAerialShotNode {
 
     fn name(&self) -> &'static str {
         "wall_aerial_shot"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::WALL_AERIAL_SHOT_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

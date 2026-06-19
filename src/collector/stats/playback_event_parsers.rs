@@ -70,10 +70,6 @@ pub(in crate::collector::stats::playback) fn parse_possession_event(
         duration: json_required_f32(object, "duration")?,
         possession_state: json_required_str(object, "possession_state")?.to_owned(),
         player_id: json_optional_remote_id(object.get("player_id"))?,
-        field_third: match object.get("field_third") {
-            None | Some(Value::Null) => None,
-            Some(_) => Some(json_required_str(object, "field_third")?.to_owned()),
-        },
     })
 }
 
@@ -125,6 +121,23 @@ pub(in crate::collector::stats::playback) fn parse_ball_half_event(
         active: json_required_bool(object, "active")?,
         duration: json_required_f32(object, "duration")?,
         field_half: json_required_str(object, "field_half")?.to_owned(),
+    })
+}
+
+pub(in crate::collector::stats::playback) fn parse_ball_third_event(
+    value: &Value,
+) -> SubtrActorResult<BallThirdEvent> {
+    let object = json_object(value, "ball_third event")?;
+    let time = json_required_f32(object, "time")?;
+    let frame = json_required_usize(object, "frame")?;
+    Ok(BallThirdEvent {
+        time,
+        frame,
+        end_time: json_optional_f32(object.get("end_time"))?.unwrap_or(time),
+        end_frame: json_optional_usize(object.get("end_frame"))?.unwrap_or(frame),
+        active: json_required_bool(object, "active")?,
+        duration: json_required_f32(object, "duration")?,
+        field_third: json_required_str(object, "field_third")?.to_owned(),
     })
 }
 
@@ -263,6 +276,7 @@ pub(in crate::collector::stats::playback) fn parse_touch_stats_event(
         sample_frame: json_optional_usize(object.get("sample_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
         player_position: json_optional_vec3(object.get("player_position"))?,
+        ball_position: json_optional_vec3(object.get("ball_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         kind: json_required_str(object, "kind")?.to_owned(),
         height_band: json_required_str(object, "height_band")?.to_owned(),
@@ -888,6 +902,27 @@ fn parse_kickoff_taker_event(value: &Value) -> SubtrActorResult<KickoffTakerEven
             .unwrap_or_default(),
         first_touch_time: json_optional_f32(object.get("first_touch_time"))?,
         first_touch_frame: json_optional_usize(object.get("first_touch_frame"))?,
+        contact_player_position: json_optional_vec3(object.get("contact_player_position"))?,
+        contact_player_velocity: json_optional_vec3(object.get("contact_player_velocity"))?,
+        contact_car_forward: json_optional_vec3(object.get("contact_car_forward"))?,
+        contact_local_ball_position: json_optional_vec3(object.get("contact_local_ball_position"))?,
+        contact_local_contact_point: json_optional_vec3(object.get("contact_local_contact_point"))?,
+        contact_gap: json_optional_f32(object.get("contact_gap"))?,
+        contact_behind_ball_depth: json_optional_f32(object.get("contact_behind_ball_depth"))?,
+        contact_lateral_offset: json_optional_f32(object.get("contact_lateral_offset"))?,
+        contact_lateral_abs_offset: json_optional_f32(object.get("contact_lateral_abs_offset"))?,
+        contact_velocity_attack_alignment: json_optional_f32(
+            object.get("contact_velocity_attack_alignment"),
+        )?,
+        contact_velocity_ball_alignment: json_optional_f32(
+            object.get("contact_velocity_ball_alignment"),
+        )?,
+        contact_nose_attack_alignment: json_optional_f32(
+            object.get("contact_nose_attack_alignment"),
+        )?,
+        contact_ball_exit_attack_alignment: json_optional_f32(
+            object.get("contact_ball_exit_attack_alignment"),
+        )?,
         outcome: decode_json_value(json_required_value(object, "outcome")?.clone())?,
         approach: object
             .get("approach")
@@ -903,6 +938,8 @@ fn parse_kickoff_support_event(value: &Value) -> SubtrActorResult<KickoffSupport
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         start_position: json_required_vec3(object, "start_position")?,
+        start_distance_from_center: json_optional_f32(object.get("start_distance_from_center"))?
+            .unwrap_or(0.0),
         spawn_position: decode_json_value(json_required_value(object, "spawn_position")?.clone())?,
         start_boost: json_optional_f32(object.get("start_boost"))?,
         boost_after: json_optional_f32(object.get("boost_after"))?,
@@ -1184,6 +1221,22 @@ pub(in crate::collector::stats::playback) fn parse_bump_event(
         victim_impulse: json_required_f32(object, "victim_impulse")?,
         initiator_position: json_required_vec3(object, "initiator_position")?,
         victim_position: json_required_vec3(object, "victim_position")?,
+    })
+}
+
+pub(in crate::collector::stats::playback) fn parse_demolition_event(
+    value: &Value,
+) -> SubtrActorResult<DemolitionEvent> {
+    let object = json_object(value, "demolition event")?;
+    Ok(DemolitionEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        attacker: json_required_remote_id(object, "attacker")?,
+        victim: json_required_remote_id(object, "victim")?,
+        attacker_is_team_0: object.get("attacker_is_team_0").and_then(Value::as_bool),
+        victim_is_team_0: object.get("victim_is_team_0").and_then(Value::as_bool),
+        attacker_position: json_optional_vec3(object.get("attacker_position"))?,
+        victim_position: json_optional_vec3(object.get("victim_position"))?,
     })
 }
 

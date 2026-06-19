@@ -9,6 +9,7 @@ import type {
   MaterializedStatsTimeline,
   TeamStatsSnapshot,
 } from "./statsTimeline.ts";
+import type { EventScope } from "./generated/EventScope.ts";
 import {
   createPlayerStatsSnapshot,
   createTeamStatsSnapshot,
@@ -46,6 +47,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "core_player", stream: "core_player", kind: "core_player" },
   { field: "possession", stream: "possession", kind: "possession" },
   { field: "ball_half", stream: "ball_half", kind: "ball_half" },
+  { field: "ball_third", stream: "ball_third", kind: "ball_third" },
   {
     field: "territorial_pressure",
     stream: "territorial_pressure",
@@ -93,6 +95,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "boost_pickups", stream: "boost_pickups", kind: "boost_pickup" },
   { field: "boost_respawn", stream: "boost_respawn", kind: "respawn" },
   { field: "bump", stream: "bump", kind: "bump" },
+  { field: "demolition", stream: "demolition", kind: "demolition" },
 ];
 
 function legacyBucketEvents(record: Record<string, unknown> | undefined): Event[] {
@@ -108,6 +111,23 @@ function legacyBucketEvents(record: Record<string, unknown> | undefined): Event[
       payloadEvent(stream, kind, event as StatsEventPayload<typeof kind>, index),
     );
   });
+}
+
+function eventStreamScope(stream: string): EventScope {
+  if (stream === "timeline" || stream === "goal_context" || stream === "core_player") {
+    return "match";
+  }
+  if (
+    stream === "possession" ||
+    stream === "ball_half" ||
+    stream === "territorial_pressure" ||
+    stream === "controlled_play" ||
+    stream === "fifty_fifty" ||
+    stream === "rush"
+  ) {
+    return "team";
+  }
+  return "player";
 }
 
 function legacyMechanicEvents(record: Record<string, unknown> | undefined): Event[] {
@@ -127,6 +147,7 @@ function legacyMechanicEvents(record: Record<string, unknown> | undefined): Even
         id: typeof record.id === "string" ? record.id : `${stream}:${index}`,
         stream,
         label: titleCaseStream(stream),
+        scope: eventStreamScope(stream),
         timing,
         primary_player:
           (record.player as Event["meta"]["primary_player"]) ??
@@ -224,6 +245,7 @@ function payloadEvent<K extends StatsEventPayloadKind>(
       id: `${stream}:${frameId}:${index}`,
       stream,
       label: titleCaseStream(stream),
+      scope: eventStreamScope(stream),
       timing,
       primary_player:
         (record.player as Event["meta"]["primary_player"]) ??
@@ -313,6 +335,7 @@ export function createStatsTimeline(
         shadow_defense_min_retreat_speed: 0,
         shadow_defense_max_speed_delta: 0,
         ball_half_neutral_zone_half_width_y: 0,
+        ball_third_boundary_y: 0,
         territorial_pressure_neutral_zone_half_width_y: 0,
         territorial_pressure_min_establish_seconds: 0,
         territorial_pressure_min_establish_third_seconds: 0,

@@ -24,6 +24,14 @@ PACKAGE_LOCK_PATHS = [
     "js/stat-evaluation-player/package-lock.json",
 ]
 
+# READMEs that document the binding's `[dependencies.subtr-actor]` pin in a
+# fenced toml block. These are not touched by cargo/npm tooling, so keep them in
+# sync here (and assert it in check_release_versions.py) or they silently drift.
+README_DEPENDENCY_PATHS = [
+    "js/README.md",
+    "python/PYTHON-README.md",
+]
+
 
 def read_workspace_version() -> str:
     data = tomllib.loads((ROOT / "Cargo.toml").read_text())
@@ -92,6 +100,9 @@ def sync_versions(version: str) -> None:
     set_project_version("python/pyproject.toml", version)
     set_subtr_actor_dependency_version("python/Cargo.toml", version)
     set_subtr_actor_dependency_version("js/Cargo.toml", version)
+
+    for path in README_DEPENDENCY_PATHS:
+        set_subtr_actor_dependency_version(path, version)
 
     for path in PACKAGE_JSON_PATHS:
         update_json_version(path, version)

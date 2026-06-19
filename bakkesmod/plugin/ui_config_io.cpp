@@ -198,39 +198,6 @@ std::string SubtrActorPlugin::uiConfigJson() {
        << (playbackSkipPostGoalTransitions ? "true" : "false")
        << ",\"skipKickoffs\":" << (playbackSkipKickoffs ? "true" : "false")
        << "},\n";
-  file << "  \"camera\": {";
-  file << "\"mode\":\"" << (cameraViewMode == 1 ? "follow" : "free") << "\"";
-  file << ",\"freePreset\":";
-  if (cameraFreePreset == 0 || cameraViewMode == 2) {
-    file << "\"overhead\"";
-  } else if (cameraFreePreset == 1 || cameraViewMode == 3) {
-    file << "\"side\"";
-  } else {
-    file << "null";
-  }
-  file << ",\"attachedPlayerId\":";
-  if (cameraViewMode == 1) {
-    if (const auto attachedPlayerId = webCameraPlayerIdConfig()) {
-      file << "\"" << escapeJsonString(*attachedPlayerId) << "\"";
-    } else {
-      file << "null";
-    }
-  } else {
-    file << "null";
-  }
-  file << ",\"distanceScale\":" << cameraDistanceScale
-       << ",\"ballCam\":" << (cameraBallCamEnabled ? "true" : "false")
-       << ",\"customSettings\":";
-  if (cameraCustomSettingsEnabled) {
-    file << "{\"fov\":" << cameraCustomFov << ",\"height\":" << cameraCustomHeight
-         << ",\"pitch\":" << cameraCustomPitch << ",\"distance\":" << cameraCustomDistance
-         << ",\"stiffness\":" << cameraCustomStiffness
-         << ",\"swivelSpeed\":" << cameraCustomSwivelSpeed
-         << ",\"transitionSpeed\":" << cameraCustomTransitionSpeed << "}";
-  } else {
-    file << "null";
-  }
-  file << "},\n";
   file << "  \"recording\": {\"fps\":" << recordingFps
        << ",\"playbackRate\":" << recordingPlaybackRateFromIndex(recordingPlaybackRateIndex)
        << "},\n";
@@ -283,23 +250,6 @@ std::string SubtrActorPlugin::uiConfigJson() {
        {"field_third", possessionBreakdownThird}});
   file << "}\n";
   file << "  },\n";
-  file << "  \"camera_view_mode\": " << cameraViewMode << ",\n";
-  file << "  \"camera_free_preset\": " << cameraFreePreset << ",\n";
-  file << "  \"camera_selected_player_index\": " << cameraSelectedPlayerIndex << ",\n";
-  file << "  \"camera_selected_player_id\": \"" << escapeJsonString(webCameraPlayerId())
-       << "\",\n";
-  file << "  \"camera_distance_scale\": " << cameraDistanceScale << ",\n";
-  file << "  \"camera_custom_settings_enabled\": "
-       << (cameraCustomSettingsEnabled ? "true" : "false") << ",\n";
-  file << "  \"camera_ball_cam_enabled\": " << (cameraBallCamEnabled ? "true" : "false")
-       << ",\n";
-  file << "  \"camera_custom_fov\": " << cameraCustomFov << ",\n";
-  file << "  \"camera_custom_height\": " << cameraCustomHeight << ",\n";
-  file << "  \"camera_custom_pitch\": " << cameraCustomPitch << ",\n";
-  file << "  \"camera_custom_distance\": " << cameraCustomDistance << ",\n";
-  file << "  \"camera_custom_stiffness\": " << cameraCustomStiffness << ",\n";
-  file << "  \"camera_custom_swivel_speed\": " << cameraCustomSwivelSpeed << ",\n";
-  file << "  \"camera_custom_transition_speed\": " << cameraCustomTransitionSpeed << ",\n";
   file << "  \"recording_fps\": " << recordingFps << ",\n";
   file << "  \"recording_playback_rate_index\": " << recordingPlaybackRateIndex << ",\n";
   file << "  \"touch_controls_mode\": " << touchControlsMode << ",\n";

@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks per-player possession from ball/player/possession/touch state.
 pub struct PlayerPossessionNode {
     calculator: PlayerPossessionCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for PlayerPossessionNode {
 
     fn name(&self) -> &'static str {
         "player_possession"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::PLAYER_POSSESSION_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

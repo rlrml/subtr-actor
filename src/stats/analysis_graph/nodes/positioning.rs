@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks per-player field positioning (thirds/halves/roles/proximity) from frame and possession state.
 pub struct PositioningNode {
     calculator: PositioningCalculator,
 }
@@ -29,6 +30,10 @@ impl AnalysisNode for PositioningNode {
 
     fn name(&self) -> &'static str {
         "positioning"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::POSITIONING_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

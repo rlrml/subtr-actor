@@ -1,5 +1,6 @@
 use super::*;
 
+/// Per-player accumulated whiff stats: counts, confidence, and grounded/aerial/dodge breakdown.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WhiffStats {
@@ -67,6 +68,7 @@ impl WhiffStats {
     }
 }
 
+/// Accumulates whiff stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WhiffStatsAccumulator {
     player_stats: HashMap<PlayerId, WhiffStats>,

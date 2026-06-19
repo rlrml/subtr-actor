@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Detects flip/dodge resets and their outcomes from player, ball, touch, and event state.
 pub struct DodgeResetNode {
     calculator: DodgeResetCalculator,
 }
@@ -25,6 +26,10 @@ impl AnalysisNode for DodgeResetNode {
 
     fn name(&self) -> &'static str {
         "dodge_reset"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::DODGE_RESET_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {

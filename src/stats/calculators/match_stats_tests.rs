@@ -204,6 +204,9 @@ fn goal_context_links_scorer_touch_with_ball_location_and_speeds() {
                     player: Some(scorer.clone()),
                     player_position: None,
                     closest_approach_distance: Some(0.0),
+                    contact_local_ball_position: None,
+                    contact_local_hitbox_point: None,
+                    contact_world_hitbox_point: None,
                     dodge_contact: false,
                 }],
                 ..TouchState::default()
@@ -597,6 +600,34 @@ fn counter_attack_buildup_requires_a_defensive_pressure_signal() {
 }
 
 #[test]
+fn sustained_pressure_buildup_waits_past_kickoff_goal_window() {
+    let mut calculator = MatchStatsCalculator::new();
+    calculator.goal_buildup_samples = (2..=11)
+        .map(|time| buildup_sample(time as f32, FIELD_ZONE_BOUNDARY_Y + 500.0))
+        .collect();
+    calculator.active_kickoff_touch_time = Some(0.0);
+
+    assert_eq!(
+        calculator.classify_goal_buildup(11.8, true),
+        GoalBuildupKind::Other
+    );
+}
+
+#[test]
+fn sustained_pressure_buildup_applies_after_kickoff_goal_window() {
+    let mut calculator = MatchStatsCalculator::new();
+    calculator.goal_buildup_samples = (2..=13)
+        .map(|time| buildup_sample(time as f32, FIELD_ZONE_BOUNDARY_Y + 500.0))
+        .collect();
+    calculator.active_kickoff_touch_time = Some(0.0);
+
+    assert_eq!(
+        calculator.classify_goal_buildup(13.0, true),
+        GoalBuildupKind::SustainedPressure
+    );
+}
+
+#[test]
 fn time_after_kickoff_uses_kickoff_first_touch_not_latest_touch() {
     let scorer = PlayerId::Steam(1);
     let mut calculator = MatchStatsCalculator::new();
@@ -609,6 +640,9 @@ fn time_after_kickoff_uses_kickoff_first_touch_not_latest_touch() {
         player: Some(scorer.clone()),
         player_position: None,
         closest_approach_distance: Some(0.0),
+        contact_local_ball_position: None,
+        contact_local_hitbox_point: None,
+        contact_world_hitbox_point: None,
         dodge_contact: false,
     };
 

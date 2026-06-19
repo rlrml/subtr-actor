@@ -14,6 +14,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "player_possession",
   "possession",
   "ball_half",
+  "ball_third",
   "territorial_pressure",
   "movement",
   "player_activity",
@@ -53,6 +54,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "boost_pickups",
   "boost_respawn",
   "bump",
+  "demolition",
 ] as const;
 
 export const STATS_MECHANIC_EVENT_COUNT_TYPES = [

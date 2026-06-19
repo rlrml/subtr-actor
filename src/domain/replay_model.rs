@@ -1,3 +1,11 @@
+//! Higher-level, serde-friendly game-state model derived from the raw replay.
+//!
+//! These types are the structured shape that collectors (notably
+//! [`ReplayDataCollector`](crate::ReplayDataCollector)) emit for JSON export and
+//! playback UIs — players, frames, rigid bodies, and the derived event streams,
+//! one level up from `boxcars`' raw actor data. Replay-level metadata lives in
+//! [`replay_meta`](crate::replay_meta).
+
 use boxcars::{HeaderProp, RemoteId};
 use serde::Serialize;
 
@@ -271,6 +279,31 @@ pub struct PlayerStatEvent {
     pub shot: Option<ShotEventMetadata>,
 }
 
+/// A coalesced change in a player's discrete camera/vehicle toggles.
+///
+/// Ball cam, behind-view, and the driving flag flip only a handful of times per
+/// match, so rather than storing a value on every [`PlayerFrame`](crate::PlayerFrame) these are
+/// emitted as one change per player whenever any of them flips. Each change
+/// carries the full discrete state from that frame onward, so a consumer
+/// resolves "ball cam at frame N" with a last-change-before-N lookup.
+///
+/// Changes are grouped by player on [`ReplayData`](crate::ReplayData) (so the
+/// player id is stored once, not per change) and ordered by frame within each
+/// player. A field is `None` when the replay never replicated it for that
+/// player; `time` and `is_team_0` are intentionally omitted because both are
+/// derivable from `frame` and the player id.
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PlayerCameraStateChange {
+    pub frame: usize,
+    /// Whether ball cam (secondary camera) is active from this frame onward.
+    pub ball_cam_active: Option<bool>,
+    /// Whether behind-view is active from this frame onward.
+    pub behind_view_active: Option<bool>,
+    /// Whether the car reports the driving flag from this frame onward.
+    pub driving: Option<bool>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchEvent {
@@ -296,6 +329,15 @@ pub struct TouchEvent {
     /// `0.0` means the ball intersects or touches the oriented car hitbox after
     /// subtracting the Rocket League ball collision radius.
     pub closest_approach_distance: Option<f32>,
+    /// Ball center in the car's local hitbox coordinates at the attributed touch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contact_local_ball_position: Option<[f32; 3]>,
+    /// Closest point on the car hitbox to the ball center, in local hitbox coordinates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contact_local_hitbox_point: Option<[f32; 3]>,
+    /// Closest point on the car hitbox to the ball center, in field coordinates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contact_world_hitbox_point: Option<[f32; 3]>,
     pub dodge_contact: bool,
 }
 
@@ -501,7 +543,7 @@ impl ReplaySeason {
         format!("{}{}", self.era.code_prefix(), self.number)
     }
 
-    /// The UTC instant this season went live, from [`SEASON_BOUNDARIES`].
+    /// The UTC instant this season went live, from `SEASON_BOUNDARIES`.
     ///
     /// Always `Some` for a season produced by resolution, since resolved seasons
     /// come from the table; returns `None` only for a hand-constructed
@@ -518,10 +560,10 @@ impl ReplaySeason {
 ///
 /// Stored per season so callers can display or reason about a boundary at finer
 /// than day precision. Season *resolution* still uses only the date (see
-/// [`season_for_date`]): the replay `Date` header is timezone-less local
+/// `season_for_date`): the replay `Date` header is timezone-less local
 /// wall-clock, so its time-of-day cannot be meaningfully compared against a UTC
 /// instant. The time is therefore informational, and rough for older seasons
-/// (see [`SEASON_BOUNDARIES`]).
+/// (see `SEASON_BOUNDARIES`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct SeasonStart {
@@ -572,7 +614,7 @@ impl SeasonStart {
 /// [`SeasonStart::new`] is `const` and the entries already order correctly, so
 /// the table needs no parsing or lazy initialization.
 ///
-/// Resolution itself is day-granular (see [`season_for_date`]): the replay
+/// Resolution itself is day-granular (see `season_for_date`): the replay
 /// `Date` header is local wall-clock with no timezone, so a replay recorded
 /// within a day of a boundary is inherently ambiguous and the stored time-of-day
 /// cannot be compared against it. The time is stored per season purely as data

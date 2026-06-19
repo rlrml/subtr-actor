@@ -2,6 +2,7 @@ use super::*;
 use crate::stats::calculators::*;
 use crate::*;
 
+/// Tracks territorial pressure sessions from ball/possession state during live play.
 pub struct TerritorialPressureNode {
     calculator: TerritorialPressureCalculator,
 }
@@ -22,6 +23,7 @@ impl_analysis_node! {
     node = TerritorialPressureNode,
     state = TerritorialPressureCalculator,
     name = "territorial_pressure",
+    emitted_events = crate::stats::calculators::TERRITORIAL_BALL_HALF_EMITTED_EVENTS,
     dependencies = [
         frame_info_dependency() => FrameInfo,
         ball_frame_state_dependency() => BallFrameState,

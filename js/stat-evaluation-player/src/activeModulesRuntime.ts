@@ -1,15 +1,9 @@
-import {
-  createBoostPadOverlayPlugin,
-  type ReplayTimelineEvent,
-  type TimelineOverlayPlugin,
-} from "@rlrml/player";
-import { fromReplayPlayerPlugin } from "@rlrml/player";
+import type { ReplayTimelineEvent, TimelineOverlayPlugin } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import type { BoostPickupFilterController } from "./boostPickupFilters.ts";
 import type { EventTimelineSource } from "./eventTimelineSources.ts";
 import type { ModuleCapabilityKind } from "./moduleControls.ts";
 import type { StatModule, StatModuleContext } from "./statModules.ts";
-import { getMechanicKinds, mechanicKindToModuleId } from "./timelineMarkers.ts";
 
 export interface ActiveModulesRuntimeOptions {
   readonly modules: readonly StatModule[];
@@ -35,8 +29,6 @@ export class ActiveModulesRuntime {
   private removeRenderHook: (() => void) | null = null;
   private readonly timelineSourceRemovers = new Map<string, () => void>();
   private readonly timelineRangeSourceRemovers = new Map<string, () => void>();
-  private readonly standalonePluginRemovers = new Map<string, () => void>();
-  private boostPadOverlayEnabled = true;
 
   constructor(private readonly options: ActiveModulesRuntimeOptions) {}
 
@@ -69,7 +61,7 @@ export class ActiveModulesRuntime {
   }
 
   getBoostPadOverlayEnabled(): boolean {
-    return this.boostPadOverlayEnabled;
+    return true;
   }
 
   getTimelineEventSourceIds(): string[] {
@@ -104,9 +96,8 @@ export class ActiveModulesRuntime {
     this.activeTimelineEventSourceIds = new Set(timelineEvents);
     this.activeTimelineRangeModuleIds = new Set(timelineRanges);
     this.activeMechanicTimelineKinds = new Set(mechanics);
-    this.migrateMechanicBackedTimelineEventSelections();
     this.activeRenderEffectModuleIds = new Set(renderEffects);
-    this.boostPadOverlayEnabled = boostPads;
+    void boostPads;
   }
 
   reset(): void {
@@ -117,7 +108,6 @@ export class ActiveModulesRuntime {
     this.activeTimelineRangeModuleIds = new Set<string>();
     this.activeMechanicTimelineKinds = new Set<string>();
     this.activeRenderEffectModuleIds = new Set<string>();
-    this.boostPadOverlayEnabled = true;
     this.removeRenderHook = null;
   }
 
@@ -192,16 +182,6 @@ export class ActiveModulesRuntime {
     this.options.requestConfigSync();
   }
 
-  migrateMechanicBackedTimelineEventSelections(): void {
-    const ctx = this.options.getContext();
-    for (const kind of getMechanicKinds(ctx?.statsTimeline ?? null)) {
-      const moduleId = mechanicKindToModuleId(kind);
-      if (this.activeTimelineEventSourceIds.delete(moduleId)) {
-        this.activeMechanicTimelineKinds.add(kind);
-      }
-    }
-  }
-
   clearTimelineEventSources(): void {
     for (const removeSource of this.timelineSourceRemovers.values()) {
       removeSource();
@@ -217,30 +197,16 @@ export class ActiveModulesRuntime {
   }
 
   clearStandalonePlugins(): void {
-    for (const removePlugin of this.standalonePluginRemovers.values()) {
-      removePlugin();
-    }
-    this.standalonePluginRemovers.clear();
+    // Boost pad rendering is baseline player scene content now; no standalone
+    // render plugins are managed by the stats module runtime.
   }
 
   syncBoostPadOverlayPlugin(): void {
-    this.standalonePluginRemovers.get("boost-pad-overlay")?.();
-    this.standalonePluginRemovers.delete("boost-pad-overlay");
-
-    const replayPlayer = this.options.getReplayPlayer();
-    if (!replayPlayer || !this.boostPadOverlayEnabled) {
-      return;
-    }
-
-    this.standalonePluginRemovers.set(
-      "boost-pad-overlay",
-      replayPlayer.addPlugin(fromReplayPlayerPlugin(createBoostPadOverlayPlugin())),
-    );
+    // Kept as a compatibility no-op for existing wiring.
   }
 
   toggleBoostPadOverlay(): void {
-    this.boostPadOverlayEnabled = !this.boostPadOverlayEnabled;
-    this.syncBoostPadOverlayPlugin();
+    // Boost pad locations are always rendered by the player.
     this.options.renderModuleSummary();
     this.options.requestConfigSync();
   }

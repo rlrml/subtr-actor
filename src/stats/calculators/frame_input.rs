@@ -5,6 +5,7 @@ use super::{
     LivePlayState, PlayerFrameState, PlayerSample,
 };
 
+/// Builds the per-frame input fed into the analysis graph from replay state.
 #[derive(Debug, Clone, Default)]
 pub struct ReplayFrameInputBuilder {
     aggregate_events: FrameEventsSampler,
@@ -75,6 +76,7 @@ impl ProcessorEventCursors {
     }
 }
 
+/// The bundled per-frame input consumed by analysis-graph source nodes.
 #[derive(Debug, Clone)]
 pub struct FrameInput {
     frame_info: FrameInfo,

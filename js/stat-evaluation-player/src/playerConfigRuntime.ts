@@ -1,7 +1,12 @@
 import type { CameraSettings } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import { getConfigAdapterSnapshot, type StatsPlayerConfigAdapter } from "./configAdapters.ts";
-import { DEFAULT_CUSTOM_CAMERA_SETTINGS, type CameraControlsController } from "./cameraControls.ts";
+import {
+  DEFAULT_CUSTOM_CAMERA_SETTINGS,
+  ballCamModeFromConfig,
+  ballCamModeFromState,
+  type CameraControlsController,
+} from "./cameraControls.ts";
 import type { RecordingConfig } from "./playerConfig.ts";
 import {
   STATS_PLAYER_CONFIG_VERSION,
@@ -111,13 +116,16 @@ export function getCameraConfigSnapshot({
   cameraControlsController,
 }: CameraConfigSnapshotOptions): PlayerCameraConfig {
   const state = replayPlayer?.getState();
+  const ballCamMode = state ? ballCamModeFromState(state) : cameraControlsController?.ballCamMode;
   return {
     mode: state?.cameraViewMode,
     freePreset: cameraControlsController?.freeCameraPreset ?? null,
     attachedPlayerId: state?.attachedPlayerId,
-    ballCam: state?.ballCamEnabled ?? cameraControlsController?.ballCamChecked,
+    ballCam: ballCamMode === undefined ? undefined : ballCamMode === "on",
+    useReplayBallCam: ballCamMode === undefined ? undefined : ballCamMode === "player",
     usePlayerCameraSettings: state?.customCameraSettings === null,
     customSettings: state?.customCameraSettings,
+    nameplateLiftUu: cameraControlsController?.nameplateLiftUu,
   };
 }
 
@@ -176,7 +184,11 @@ export function getReplayPlayerStatePatchFromConfig(
     customCameraSettings: getCustomCameraSettingsFromConfig(camera),
     cameraViewMode: camera.mode,
     attachedPlayerId: camera.attachedPlayerId,
-    ballCamEnabled: camera.ballCam,
+    // Tri-state ball cam: "player" follows the recorded toggle (useReplayBallCam),
+    // otherwise force ball/car cam. Defaults to "player".
+    ...(ballCamModeFromConfig(camera) === "player"
+      ? { useReplayBallCam: true }
+      : { ballCamEnabled: ballCamModeFromConfig(camera) === "on" }),
     boostPickupAnimationEnabled: config.overlays.boostPickupAnimation,
     hitboxWireframesEnabled: config.overlays.hitboxWireframes,
     hitboxOnlyModeEnabled: config.overlays.hitboxOnlyMode,

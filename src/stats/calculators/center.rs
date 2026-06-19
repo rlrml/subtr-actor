@@ -8,6 +8,7 @@ const CENTER_MAX_END_ABS_X: f32 = 1400.0;
 const CENTER_MIN_START_ATTACKING_Y: f32 = BOOST_PAD_MIDFIELD_TOLERANCE_Y;
 const CENTER_MIN_END_ATTACKING_Y: f32 = FIELD_ZONE_BOUNDARY_Y;
 
+/// A touch moving the ball from a wide position toward the central attacking area.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct CenterEvent {
@@ -38,6 +39,7 @@ struct PendingCenterTouch {
     ball_position: glam::Vec3,
 }
 
+/// Detects centering passes during live play.
 #[derive(Debug, Clone, Default)]
 pub struct CenterCalculator {
     events: EventStream<CenterEvent>,

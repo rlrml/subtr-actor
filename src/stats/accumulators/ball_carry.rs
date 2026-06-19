@@ -12,6 +12,7 @@ pub(crate) fn ball_carry_kind_label(kind: BallCarryKind) -> StatLabel {
     }
 }
 
+/// Accumulated ball-carry stats: counts, times, and distances.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct BallCarryStats {
@@ -80,6 +81,7 @@ impl BallCarryStats {
     }
 }
 
+/// Accumulates ball-carry stats over the replay.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BallCarryStatsAccumulator {
     player_stats: HashMap<PlayerId, BallCarryStats>,
