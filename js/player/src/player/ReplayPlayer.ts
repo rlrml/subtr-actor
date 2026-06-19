@@ -243,6 +243,7 @@ export class ReplayPlayer extends EventTarget {
   private animationFrameId: number | null = null;
   private disposed = false;
   private playing = false;
+  private readyResolved = false;
   private speed: number;
   private loop: boolean;
   private currentTime = 0;
@@ -356,7 +357,9 @@ export class ReplayPlayer extends EventTarget {
         console.warn("[player] arena load failed", e);
       }),
       this.prepareReplayAssets(),
-    ]).then(() => undefined);
+    ]).then(() => {
+      this.markReady();
+    });
 
     this.installResizeHandling();
     for (const definition of options.plugins ?? []) {
@@ -444,7 +447,10 @@ export class ReplayPlayer extends EventTarget {
     }
 
     this.seekInternal(options.currentTime ?? 0);
-    this.ready = this.prepareReplayAssets();
+    this.readyResolved = false;
+    this.ready = this.prepareReplayAssets().then(() => {
+      this.markReady();
+    });
     await this.ready;
 
     this.setupPlugins();
@@ -911,6 +917,14 @@ export class ReplayPlayer extends EventTarget {
       });
   }
 
+  private markReady(): void {
+    this.readyResolved = true;
+    // Playback may have been requested before async assets/effects were ready.
+    // Reset the clock baseline so the first real tick after readiness does not
+    // include the asset-loading delay as elapsed replay time.
+    this.lastTickAt = null;
+  }
+
   private updateReplayGameStates(): void {
     if (!this.replay) {
       this.liveGameState = null;
@@ -1124,7 +1138,7 @@ export class ReplayPlayer extends EventTarget {
 
     let timeChanged = false;
     let dt = 0;
-    if (this.playing) {
+    if (this.playing && this.readyResolved) {
       dt = this.lastTickAt === null ? 0 : Math.min(0.1, (now - this.lastTickAt) / 1000);
       this.lastTickAt = now;
       let next = this.currentTime + dt * this.speed;
@@ -1149,6 +1163,8 @@ export class ReplayPlayer extends EventTarget {
         timeChanged = this.skipPostGoalTransitionIfNeeded() || timeChanged;
         timeChanged = this.skipPastKickoffIfNeeded() || timeChanged;
       }
+    } else if (this.playing) {
+      this.lastTickAt = null;
     }
 
     this.render(dt);
