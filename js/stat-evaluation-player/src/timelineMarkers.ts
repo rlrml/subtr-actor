@@ -523,30 +523,6 @@ export function buildDodgeResetTimelineEvents(
     });
 }
 
-export function buildBallCarryTimelineEvents(
-  statsTimeline: StatsTimeline,
-  replay: ReplayModel,
-): ReplayTimelineEvent[] {
-  return (statsEventPayloads(statsTimeline, "ball_carry") ?? [])
-    .filter((event) => event.kind === "carry")
-    .map((event, index) => {
-      const playerId = playerIdToString(event.player_id);
-      const playerName = getReplayPlayerName(replay, playerId);
-      return {
-        id: `ball-carry:${event.end_frame}:${playerId}:${index + 1}`,
-        time: getReplayFrameTime(replay, event.end_frame, event.end_time),
-        frame: event.end_frame,
-        kind: "ball-carry",
-        label: `${playerName} ball carry`,
-        shortLabel: "BC",
-        playerId,
-        playerName,
-        isTeamZero: event.is_team_0,
-        color: event.is_team_0 ? BLUE_TIMELINE_COLOR : ORANGE_TIMELINE_COLOR,
-      };
-    });
-}
-
 export function buildPowerslideTimelineEvents(
   statsTimeline: StatsTimeline,
   replay: ReplayModel,
@@ -783,7 +759,6 @@ export const EVENT_TYPE_TIMELINE_BUILDERS: Record<
   half_flip: buildHalfFlipTimelineEvents,
   half_volley: buildHalfVolleyTimelineEvents,
   speed_flip: buildSpeedFlipTimelineEvents,
-  ball_carry: buildBallCarryTimelineEvents,
 };
 
 export const EVENT_TYPE_TIMELINE_KINDS: string[] = Object.keys(EVENT_TYPE_TIMELINE_BUILDERS);
