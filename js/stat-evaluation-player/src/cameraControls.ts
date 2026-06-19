@@ -124,6 +124,25 @@ export class CameraControlsController {
     return mode === "player" ? null : mode === "on";
   }
 
+  followPlayerWithReplayCamera(
+    playerId: string,
+    options: { ballCam?: BallCamMode; usePlayerCameraSettings?: boolean } = {},
+  ): void {
+    const replayPlayer = this.options.getReplayPlayer();
+    if (!replayPlayer) {
+      return;
+    }
+
+    replayPlayer.setAttachedPlayer(playerId);
+    replayPlayer.setCameraViewMode("follow");
+    if (options.usePlayerCameraSettings !== false) {
+      replayPlayer.setCustomCameraSettings(null);
+    }
+    this.setBallCamMode(options.ballCam ?? "player");
+    this.lastFreeCameraPreset = null;
+    this.options.requestConfigSync();
+  }
+
   private renderBallCamButtons(): void {
     const { ballCamOffButton, ballCamOnButton, ballCamPlayerButton } = this.options.elements;
     const buttons: ReadonlyArray<[BallCamMode, HTMLButtonElement]> = [

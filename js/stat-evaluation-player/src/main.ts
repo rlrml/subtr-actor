@@ -679,17 +679,18 @@ export function mountStatEvaluationPlayer(
     },
     replayLoads: mechanicsReviewReplayLoadsController,
     getReplayPlayer: () => replayPlayer,
-    clearFreeCameraPreset() {
-      if (cameraControlsController) {
-        cameraControlsController.freeCameraPreset = null;
-      }
-    },
     resetReplayTransitionControls() {
       skipPostGoalTransitions.checked = false;
       skipKickoffs.checked = false;
     },
     activateTimelineSource: activateMechanicsReviewTimelineSource,
     loadReplayBundleForDisplay,
+    applyClipPerspective(options) {
+      cameraControlsController?.followPlayerWithReplayCamera(options.playerId, {
+        ballCam: options.ballCam,
+        usePlayerCameraSettings: options.usePlayerCameraSettings,
+      });
+    },
     showReplayLoadingWindow() {
       windowCommands.showWindow("replay-loading");
     },
