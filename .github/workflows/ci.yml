@@ -16,6 +16,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_HTTP_MULTIPLEXING: "false"
   RUN_FULL_REPLAY_TESTS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_replay_tests) }}
 
 jobs:
@@ -134,7 +135,18 @@ jobs:
         rustup default stable
 
     - name: Build release
-      run: cargo build --release --verbose
+      shell: bash
+      run: |
+        set -euo pipefail
+        for attempt in 1 2 3; do
+          if cargo build --release --verbose; then
+            exit 0
+          fi
+          if [[ "$attempt" == "3" ]]; then
+            exit 1
+          fi
+          sleep $((attempt * 10))
+        done
 
   player-package:
     name: Player package
