@@ -25,6 +25,16 @@ const KICKOFF_APPROACH_MIN_FAKE_MOVE_DISTANCE: f32 = 350.0;
 const KICKOFF_APPROACH_FLIP_MIN_SECONDS_BEFORE_TOUCH: f32 = 0.5;
 const KICKOFF_APPROACH_FRONT_FLIP_FORWARD_COMPONENT: f32 = 0.45;
 const KICKOFF_APPROACH_DIAGONAL_FLIP_SIDE_COMPONENT: f32 = 0.35;
+/// The dodge/flip impulse is delivered over several frames (the car drags
+/// through the dodge), and boxcars often does not re-send the car velocity on
+/// the exact frame the dodge becomes active, so a single-frame velocity delta at
+/// dodge onset is unreliable (it is frequently exactly zero). Decompose the
+/// *peak* velocity change across this short window after the dodge instead.
+const KICKOFF_APPROACH_DODGE_DIRECTION_WINDOW_SECONDS: f32 = 0.20;
+/// Forward acceleration contributed by boost, subtracted across the dodge window
+/// so the recovered dodge direction reflects the flip impulse rather than the
+/// boost the taker is holding through it. Mirrors the speed-flip detector.
+const KICKOFF_APPROACH_BOOST_ACCELERATION_UU_PER_SECOND_SQUARED: f32 = 991.6667;
 const KICKOFF_SUPPORT_CHEAT_MIN_CENTER_PROGRESS: f32 = 400.0;
 const KICKOFF_ADVANTAGE_POSSESSION_MIN_RUN_SECONDS: f32 = 1.25;
 const KICKOFF_PRESSURE_NEUTRAL_ZONE_HALF_WIDTH_Y: f32 = 200.0;
@@ -55,6 +65,15 @@ struct KickoffApproachTrace {
     first_dodge_frame: Option<usize>,
     first_dodge_forward_component: Option<f32>,
     first_dodge_side_component: Option<f32>,
+    /// State for the windowed dodge-direction recovery (see
+    /// `KICKOFF_APPROACH_DODGE_DIRECTION_WINDOW_SECONDS`). Captured at dodge
+    /// onset and consumed for a short window afterward.
+    dodge_direction_baseline_velocity: Option<glam::Vec3>,
+    dodge_onset_forward: Option<glam::Vec3>,
+    dodge_onset_right: Option<glam::Vec3>,
+    dodge_direction_window_deadline: Option<f32>,
+    dodge_direction_boost_compensation: glam::Vec3,
+    best_dodge_direction_delta: f32,
     max_speed: f32,
     min_boost: Option<f32>,
     previous_boost: Option<f32>,
@@ -782,23 +801,63 @@ impl KickoffCalculator {
             trace.max_speed = trace.max_speed.max(speed);
         }
 
-        if player.dodge_active && !trace.previous_dodge_active && trace.first_dodge_time.is_none() {
+        let dodge_rising = player.dodge_active && !trace.previous_dodge_active;
+        let had_first_dodge = trace.first_dodge_time.is_some();
+        if dodge_rising && !had_first_dodge {
             trace.first_dodge_time = Some(frame.time);
             trace.first_dodge_frame = Some(frame.frame_number);
-            if let (Some(previous_velocity), Some(velocity), Some(rigid_body)) = (
-                trace.previous_velocity,
-                player.velocity(),
-                player.rigid_body.as_ref(),
-            ) {
-                let velocity_delta = velocity - previous_velocity;
-                if velocity_delta.length_squared() > f32::EPSILON {
-                    let dodge_direction = velocity_delta.normalize();
-                    let rotation = quat_to_glam(&rigid_body.rotation);
-                    let forward = rotation * glam::Vec3::X;
-                    let right = rotation * glam::Vec3::Y;
-                    trace.first_dodge_forward_component = Some(dodge_direction.dot(forward));
-                    trace.first_dodge_side_component = Some(dodge_direction.dot(right));
+            if let Some(rigid_body) = player.rigid_body.as_ref() {
+                let rotation = quat_to_glam(&rigid_body.rotation);
+                trace.dodge_onset_forward = Some(rotation * glam::Vec3::X);
+                trace.dodge_onset_right = Some(rotation * glam::Vec3::Y);
+                // Baseline is the velocity just before the flip impulse lands.
+                // Prefer the previous frame's velocity; the onset frame itself
+                // often repeats it (boxcars did not re-send it), which is exactly
+                // why the old single-frame delta read zero.
+                trace.dodge_direction_baseline_velocity =
+                    trace.previous_velocity.or_else(|| player.velocity());
+                trace.dodge_direction_window_deadline =
+                    Some(frame.time + KICKOFF_APPROACH_DODGE_DIRECTION_WINDOW_SECONDS);
+            }
+        }
+
+        // A later, separate dodge (e.g. flipping forward into the ball at first
+        // touch) must not overwrite the first dodge's recovered direction, so
+        // close the window as soon as a new dodge begins.
+        if dodge_rising && had_first_dodge {
+            trace.dodge_direction_window_deadline = None;
+        }
+
+        // Recover the dodge direction from the peak velocity change over the
+        // window after onset, decomposed in the car's onset frame, with the
+        // forward boost contribution removed so a boosting taker's flip still
+        // reads as diagonal rather than straight-forward.
+        if let (Some(deadline), Some(baseline), Some(forward), Some(right)) = (
+            trace.dodge_direction_window_deadline,
+            trace.dodge_direction_baseline_velocity,
+            trace.dodge_onset_forward,
+            trace.dodge_onset_right,
+        ) {
+            if frame.time <= deadline {
+                if player.boost_active {
+                    trace.dodge_direction_boost_compensation += forward
+                        * KICKOFF_APPROACH_BOOST_ACCELERATION_UU_PER_SECOND_SQUARED
+                        * frame.dt;
                 }
+                if let Some(velocity) = player.velocity() {
+                    let delta = velocity - baseline - trace.dodge_direction_boost_compensation;
+                    let horizontal = delta.truncate().length();
+                    if horizontal > trace.best_dodge_direction_delta
+                        && delta.length_squared() > f32::EPSILON
+                    {
+                        trace.best_dodge_direction_delta = horizontal;
+                        let direction = delta.normalize();
+                        trace.first_dodge_forward_component = Some(direction.dot(forward));
+                        trace.first_dodge_side_component = Some(direction.dot(right));
+                    }
+                }
+            } else {
+                trace.dodge_direction_window_deadline = None;
             }
         }
 
