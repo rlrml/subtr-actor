@@ -977,6 +977,8 @@ export class ReplayPlayer extends EventTarget {
     // wheels would spin wildly from the position delta.
     this.actorManager.seekAnimations(this.currentTime);
     this.effectsManager.resetBallTrail();
+    this.effectsManager.clearGoalExplosions?.();
+    this.actorManager.resetGoalExplosionPlaybackState();
     this.actorManager.resetWheelTracking();
   }
 
@@ -1151,6 +1153,8 @@ export class ReplayPlayer extends EventTarget {
           // Wrapping is a seek: clear delta-based trackers (see seek()).
           this.actorManager.seekAnimations(0);
           this.effectsManager.resetBallTrail();
+          this.effectsManager.clearGoalExplosions?.();
+          this.actorManager.resetGoalExplosionPlaybackState();
           this.actorManager.resetWheelTracking();
         } else {
           next = end;
