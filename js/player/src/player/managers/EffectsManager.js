@@ -1268,6 +1268,12 @@ class GoalExplosionPool {
     explosion.container.visible = false;
   }
 
+  clearActive() {
+    for (const explosion of this.explosions) {
+      this.resetExplosion(explosion);
+    }
+  }
+
   update(deltaTime) {
     for (const explosion of this.explosions) {
       if (!explosion.active) continue;
@@ -3499,6 +3505,7 @@ export class EffectsManager {
   reset() {
     this.explosions.active.forEach((explosion) => explosion.removeFromScene(this.scene));
     this.explosions.active = [];
+    this.clearGoalExplosions();
 
     // Clear boost trails
     this.boostTrails.forEach((trail) => {
@@ -3551,6 +3558,16 @@ export class EffectsManager {
     if (this.ballTrail) {
       this.ballTrail.reset();
     }
+  }
+
+  clearGoalExplosions() {
+    if (_goalExplosionPool) {
+      _goalExplosionPool.clearActive();
+    }
+    for (const explosion of this.explosions.active) {
+      explosion.removeFromScene(this.scene);
+    }
+    this.explosions.active = [];
   }
 
   createBoostTrail(carMesh, carActorId) {

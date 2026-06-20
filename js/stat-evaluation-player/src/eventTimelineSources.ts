@@ -9,7 +9,11 @@ import {
   formatMechanicKind,
 } from "./timelineMarkers.ts";
 
-const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
+const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set([
+  "module:dodge",
+  "module:touch",
+  "module:powerslide",
+]);
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_PREFIXES = ["stats-stream:"] as const;
 const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#3b82f6",

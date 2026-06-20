@@ -32,6 +32,7 @@ export function getAppTemplate(): string {
               <button type="button" data-window-toggle="replay-loading">Replay loading</button>
               <button type="button" data-window-toggle="boost-pickups">Boost pickup filters</button>
               <button type="button" data-window-toggle="touch-controls">Touch controls</button>
+              <button type="button" data-window-toggle="touch-legend">Touch color legend</button>
               <button type="button" data-window-toggle="shot-visualization">Shot chart</button>
               <button type="button" data-window-toggle="missed-events">Missed events</button>
               <button type="button" data-create-stats-window="player">New player stats</button>
@@ -80,7 +81,7 @@ export function getAppTemplate(): string {
               <button id="camera-view-side" type="button" disabled>Diagonal</button>
             </div>
             <label class="toggle">
-              <input id="auto-cast" type="checkbox" disabled />
+              <input id="camera-view-auto-possession" type="checkbox" disabled />
               <span>Auto Follow</span>
             </label>
             <label class="toggle">
@@ -264,14 +265,37 @@ export function getAppTemplate(): string {
             </header>
             <div class="transport-row">
               <button id="toggle-playback" disabled>Play</button>
-              <select id="playback-rate" disabled>
-                <option value="0.25">0.25x</option>
-                <option value="0.5">0.5x</option>
-                <option value="1" selected>1.0x</option>
-                <option value="1.5">1.5x</option>
-                <option value="2">2.0x</option>
-              </select>
             </div>
+            <label class="playback-rate-control">
+              <span class="playback-rate-header">
+                <span>Speed</span>
+                <strong id="playback-rate-readout">1x</strong>
+              </span>
+              <input
+                id="playback-rate"
+                type="range"
+                min="0.25"
+                max="2"
+                step="0.01"
+                value="1"
+                list="playback-rate-notches"
+                disabled
+              />
+              <datalist id="playback-rate-notches">
+                <option value="0.25"></option>
+                <option value="0.5"></option>
+                <option value="1"></option>
+                <option value="1.5"></option>
+                <option value="2"></option>
+              </datalist>
+              <span class="playback-rate-notches" aria-hidden="true">
+                <span>0.25x</span>
+                <span>0.5x</span>
+                <span>1x</span>
+                <span>1.5x</span>
+                <span>2x</span>
+              </span>
+            </label>
             <label class="toggle">
               <input id="skip-post-goal-transitions" type="checkbox" checked />
               <span>Skip post-goal resets</span>
@@ -314,6 +338,23 @@ export function getAppTemplate(): string {
                 <dd id="replay-fps-readout">–</dd>
               </div>
             </div>
+          </section>
+
+          <section
+            class="floating-window floating-window-touch-legend"
+            data-window-id="touch-legend"
+            hidden
+            style="--window-x: calc(100vw - 25rem); --window-y: 4.25rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <h2>Touch color legend</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="touch-legend">
+                Hide
+              </button>
+            </header>
+            <div id="touch-color-legend-body" class="touch-color-legend-body"></div>
           </section>
 
           <section

@@ -6,12 +6,6 @@ import {
   type ReplayPlayerState,
   type ReplayPlayerTrack,
 } from "@rlrml/player";
-import {
-  autoCastPlayerForState,
-  buildAutoCastCameraSpans,
-  type AutoCastCameraSpan,
-} from "./autoCastCamera.ts";
-import type { StatsTimeline } from "./statsTimeline.ts";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = ["free", "follow"];
@@ -69,9 +63,9 @@ export interface CameraControlsElements {
   readonly attachedPlayer: HTMLSelectElement;
   readonly cameraViewFreeButton: HTMLButtonElement;
   readonly cameraViewFollowButton: HTMLButtonElement;
+  readonly cameraViewAutoPossession: HTMLInputElement;
   readonly cameraViewOverheadButton: HTMLButtonElement;
   readonly cameraViewSideButton: HTMLButtonElement;
-  readonly autoCast: HTMLInputElement;
   readonly usePlayerCameraSettings: HTMLInputElement;
   readonly cameraSettingsControls: HTMLDivElement;
   readonly customCameraFov: HTMLInputElement;
@@ -104,16 +98,12 @@ export interface CameraControlsElements {
 export interface CameraControlsOptions {
   readonly elements: CameraControlsElements;
   getReplayPlayer(): StatsReplayPlayer | null;
-  getStatsTimeline(): StatsTimeline | null;
   requestConfigSync(): void;
+  onAutoPossessionChange?(enabled: boolean): void;
 }
 
 export class CameraControlsController {
   private lastFreeCameraPreset: ReplayFreeCameraPreset | null = null;
-  private autoCastEnabled = false;
-  private autoCastSpans: AutoCastCameraSpan[] = [];
-  private autoCastTimeline: StatsTimeline | null = null;
-  private autoCastApplying = false;
 
   constructor(private readonly options: CameraControlsOptions) {}
 
@@ -131,6 +121,12 @@ export class CameraControlsController {
     return this.ballCamModeValue;
   }
 
+  private autoPossessionEnabledValue = false;
+
+  get autoPossessionEnabled(): boolean {
+    return this.autoPossessionEnabledValue;
+  }
+
   /** Convert a tri-state mode to the player's `setBallCamEnabled` argument. */
   private static ballCamEnabledForMode(mode: BallCamMode): boolean | null {
     return mode === "player" ? null : mode === "on";
@@ -138,14 +134,21 @@ export class CameraControlsController {
 
   followPlayerWithReplayCamera(
     playerId: string,
-    options: { ballCam?: BallCamMode; usePlayerCameraSettings?: boolean } = {},
+    options: {
+      ballCam?: BallCamMode;
+      preserveAutoPossession?: boolean;
+      requestConfigSync?: boolean;
+      usePlayerCameraSettings?: boolean;
+    } = {},
   ): void {
-    this.setAutoCastEnabled(false);
     const replayPlayer = this.options.getReplayPlayer();
     if (!replayPlayer) {
       return;
     }
 
+    if (!options.preserveAutoPossession) {
+      this.setAutoPossessionEnabled(false, { requestConfigSync: false });
+    }
     replayPlayer.setAttachedPlayer(playerId);
     replayPlayer.setCameraViewMode("follow");
     if (options.usePlayerCameraSettings !== false) {
@@ -153,57 +156,27 @@ export class CameraControlsController {
     }
     this.setBallCamMode(options.ballCam ?? "player");
     this.lastFreeCameraPreset = null;
-    this.options.requestConfigSync();
-  }
-
-  syncAutoCast(state: ReplayPlayerState): void {
-    if (!this.autoCastEnabled) {
-      return;
-    }
-
-    const replayPlayer = this.options.getReplayPlayer();
-    const statsTimeline = this.options.getStatsTimeline();
-    if (!replayPlayer || !statsTimeline) {
-      return;
-    }
-
-    if (statsTimeline !== this.autoCastTimeline) {
-      this.autoCastTimeline = statsTimeline;
-      this.autoCastSpans = buildAutoCastCameraSpans(statsTimeline);
-    }
-
-    const playerId = autoCastPlayerForState(this.autoCastSpans, state);
-    if (!playerId || (state.attachedPlayerId === playerId && state.cameraViewMode === "follow")) {
-      return;
-    }
-
-    this.autoCastApplying = true;
-    try {
-      replayPlayer.setAttachedPlayer(playerId);
-      replayPlayer.setCameraViewMode("follow");
-      replayPlayer.setCustomCameraSettings(null);
-      this.setBallCamMode("player");
-      this.lastFreeCameraPreset = null;
-    } finally {
-      this.autoCastApplying = false;
+    if (options.requestConfigSync !== false) {
+      this.options.requestConfigSync();
     }
   }
 
-  private setAutoCastEnabled(enabled: boolean): void {
-    this.autoCastEnabled = enabled;
-    this.options.elements.autoCast.checked = enabled;
-    if (enabled) {
-      this.autoCastTimeline = null;
-      const state = this.options.getReplayPlayer()?.getState();
-      if (state) {
-        this.syncAutoCast(state);
-      }
+  setAutoPossessionEnabled(
+    enabled: boolean,
+    options: { notify?: boolean; requestConfigSync?: boolean } = {},
+  ): void {
+    if (this.autoPossessionEnabledValue === enabled) {
+      this.renderAutoPossessionButton();
+      return;
     }
-  }
 
-  private disableAutoCastForManualControl(): void {
-    if (!this.autoCastApplying) {
-      this.setAutoCastEnabled(false);
+    this.autoPossessionEnabledValue = enabled;
+    this.renderAutoPossessionButton();
+    if (options.notify !== false) {
+      this.options.onAutoPossessionChange?.(enabled);
+    }
+    if (options.requestConfigSync !== false) {
+      this.options.requestConfigSync();
     }
   }
 
@@ -219,6 +192,14 @@ export class CameraControlsController {
       button.dataset.active = isActive ? "true" : "false";
       button.setAttribute("aria-pressed", isActive ? "true" : "false");
     }
+  }
+
+  private renderAutoPossessionButton(): void {
+    this.options.elements.cameraViewAutoPossession.checked = this.autoPossessionEnabledValue;
+  }
+
+  private disableAutoPossessionForManualCameraControl(): void {
+    this.setAutoPossessionEnabled(false, { requestConfigSync: false });
   }
 
   /** Apply a ball-cam mode to the player and reflect it in the button group. */
@@ -285,9 +266,9 @@ export class CameraControlsController {
     elements.attachedPlayer.addEventListener(
       "change",
       () => {
-        this.disableAutoCastForManualControl();
         const replayPlayer = this.options.getReplayPlayer();
         const attachedPlayerId = elements.attachedPlayer.value || null;
+        this.disableAutoPossessionForManualCameraControl();
         replayPlayer?.setAttachedPlayer(attachedPlayerId);
         if (attachedPlayerId) {
           replayPlayer?.setCustomCameraSettings(null);
@@ -303,8 +284,8 @@ export class CameraControlsController {
     elements.cameraViewFreeButton.addEventListener(
       "click",
       () => {
-        this.disableAutoCastForManualControl();
         this.options.getReplayPlayer()?.setCameraViewMode("free");
+        this.disableAutoPossessionForManualCameraControl();
         this.lastFreeCameraPreset = null;
         this.options.requestConfigSync();
       },
@@ -314,8 +295,8 @@ export class CameraControlsController {
     elements.cameraViewFollowButton.addEventListener(
       "click",
       () => {
-        this.disableAutoCastForManualControl();
         const replayPlayer = this.options.getReplayPlayer();
+        this.disableAutoPossessionForManualCameraControl();
         replayPlayer?.setCameraViewMode("follow");
         if (replayPlayer?.getState().attachedPlayerId) {
           replayPlayer.setCustomCameraSettings(null);
@@ -331,8 +312,8 @@ export class CameraControlsController {
     elements.cameraViewOverheadButton.addEventListener(
       "click",
       () => {
-        this.disableAutoCastForManualControl();
         this.options.getReplayPlayer()?.setFreeCameraPreset("overhead");
+        this.disableAutoPossessionForManualCameraControl();
         this.lastFreeCameraPreset = "overhead";
         this.options.requestConfigSync();
       },
@@ -342,8 +323,8 @@ export class CameraControlsController {
     elements.cameraViewSideButton.addEventListener(
       "click",
       () => {
-        this.disableAutoCastForManualControl();
         this.options.getReplayPlayer()?.setFreeCameraPreset("side");
+        this.disableAutoPossessionForManualCameraControl();
         this.lastFreeCameraPreset = "side";
         this.options.requestConfigSync();
       },
@@ -366,14 +347,13 @@ export class CameraControlsController {
       );
     }
 
-    elements.autoCast.addEventListener(
+    elements.cameraViewAutoPossession.addEventListener(
       "change",
       () => {
-        this.setAutoCastEnabled(elements.autoCast.checked);
+        this.setAutoPossessionEnabled(elements.cameraViewAutoPossession.checked);
       },
       { signal },
     );
-
     // The ballchasing overlay reads nameplateLiftUu live each frame, so changing
     // the slider takes effect without touching the player — just refresh the
     // readout and persist.
@@ -389,7 +369,6 @@ export class CameraControlsController {
 
   setTransportEnabled(enabled: boolean, state?: ReplayPlayerState): void {
     this.options.elements.attachedPlayer.disabled = !enabled;
-    this.options.elements.autoCast.disabled = !enabled;
     this.syncModeButtons(enabled ? state : undefined);
   }
 
@@ -436,10 +415,13 @@ export class CameraControlsController {
     }
 
     const { cameraViewOverheadButton, cameraViewSideButton } = this.options.elements;
+    const { cameraViewAutoPossession } = this.options.elements;
     cameraViewOverheadButton.disabled = !hasReplay;
     cameraViewSideButton.disabled = !hasReplay;
+    cameraViewAutoPossession.disabled = !hasReplay;
     cameraViewOverheadButton.dataset.active = "false";
     cameraViewSideButton.dataset.active = "false";
+    this.renderAutoPossessionButton();
     cameraViewOverheadButton.setAttribute("aria-pressed", "false");
     cameraViewSideButton.setAttribute("aria-pressed", "false");
   }
@@ -454,11 +436,6 @@ export class CameraControlsController {
         new Option(`${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`, player.id),
       );
     }
-  }
-
-  resetAutoCastTimeline(): void {
-    this.autoCastTimeline = null;
-    this.autoCastSpans = [];
   }
 
   renderProfile(state?: ReplayPlayerState): void {
