@@ -156,6 +156,7 @@ test("auto possession camera debounces nearest-player fallback switches", () => 
     ],
   } as ReplayModel;
   const followedPlayers: string[] = [];
+  const followOptions: unknown[] = [];
   let attachedPlayerId: string | null = null;
   const replayPlayer = {
     replay,
@@ -170,9 +171,10 @@ test("auto possession camera debounces nearest-player fallback switches", () => 
   };
   const cameraControls = {
     autoPossessionEnabled: true,
-    followPlayerWithReplayCamera(playerId: string) {
+    followPlayerWithReplayCamera(playerId: string, options: unknown) {
       attachedPlayerId = playerId;
       followedPlayers.push(playerId);
+      followOptions.push(options);
     },
   };
   const controller = new AutoPossessionCameraController({
@@ -188,4 +190,12 @@ test("auto possession camera debounces nearest-player fallback switches", () => 
   controller.update({ frameIndex: 4, nextFrameIndex: 4, alpha: 0, currentTime: 1.6 });
 
   assert.deepEqual(followedPlayers, ["Steam:blue-id", "Steam:orange-id"]);
+  assert.deepEqual(
+    followOptions.map((options) =>
+      typeof options === "object" && options !== null
+        ? (options as { usePlayerCameraSettings?: boolean }).usePlayerCameraSettings
+        : null,
+    ),
+    [false, false],
+  );
 });

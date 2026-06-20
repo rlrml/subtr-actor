@@ -230,7 +230,7 @@ export class AutoPossessionCameraController {
       ballCam: "player",
       preserveAutoPossession: true,
       requestConfigSync: false,
-      usePlayerCameraSettings: true,
+      usePlayerCameraSettings: false,
     });
   }
 
