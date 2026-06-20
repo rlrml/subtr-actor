@@ -26,6 +26,38 @@
   flex: 1 1 auto;
 }
 
+.playback-rate-control {
+  display: grid;
+  gap: var(--ui-gap-xs);
+}
+
+.playback-rate-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.playback-rate-header strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.playback-rate-notches {
+  color: var(--ui-muted);
+  display: grid;
+  font-size: 0.72rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  line-height: 1.1;
+  text-align: center;
+}
+
+.playback-rate-notches span:first-child {
+  text-align: left;
+}
+
+.playback-rate-notches span:last-child {
+  text-align: right;
+}
+
 .recording-controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

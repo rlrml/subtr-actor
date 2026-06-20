@@ -264,14 +264,37 @@ export function getAppTemplate(): string {
             </header>
             <div class="transport-row">
               <button id="toggle-playback" disabled>Play</button>
-              <select id="playback-rate" disabled>
-                <option value="0.25">0.25x</option>
-                <option value="0.5">0.5x</option>
-                <option value="1" selected>1.0x</option>
-                <option value="1.5">1.5x</option>
-                <option value="2">2.0x</option>
-              </select>
             </div>
+            <label class="playback-rate-control">
+              <span class="playback-rate-header">
+                <span>Speed</span>
+                <strong id="playback-rate-readout">1x</strong>
+              </span>
+              <input
+                id="playback-rate"
+                type="range"
+                min="0.25"
+                max="2"
+                step="0.01"
+                value="1"
+                list="playback-rate-notches"
+                disabled
+              />
+              <datalist id="playback-rate-notches">
+                <option value="0.25"></option>
+                <option value="0.5"></option>
+                <option value="1"></option>
+                <option value="1.5"></option>
+                <option value="2"></option>
+              </datalist>
+              <span class="playback-rate-notches" aria-hidden="true">
+                <span>0.25x</span>
+                <span>0.5x</span>
+                <span>1x</span>
+                <span>1.5x</span>
+                <span>2x</span>
+              </span>
+            </label>
             <label class="toggle">
               <input id="skip-post-goal-transitions" type="checkbox" checked />
               <span>Skip post-goal resets</span>

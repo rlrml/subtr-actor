@@ -217,7 +217,8 @@ let replayLoadingActive!: HTMLElement;
 let replayLoadingList!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
-let playbackRate!: HTMLSelectElement;
+let playbackRate!: HTMLInputElement;
+let playbackRateReadout!: HTMLElement;
 let timeReadout!: HTMLElement;
 let frameReadout!: HTMLElement;
 let durationReadout!: HTMLElement;
@@ -724,7 +725,7 @@ export function mountStatEvaluationPlayer(
     cueGoalReplay: playbackActions.cueGoalReplay,
   });
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
-  playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
+  playbackRate = mustElement<HTMLInputElement>(root, "#playback-rate");
   cameraControlsController = createCameraControlsController({
     elements: {
       attachedPlayer: mustElement<HTMLSelectElement>(root, "#attached-player"),
@@ -828,6 +829,7 @@ export function mountStatEvaluationPlayer(
   playersReadout = mustElement<HTMLElement>(root, "#players-readout");
   framesReadout = mustElement<HTMLElement>(root, "#frames-readout");
   eventsReadout = mustElement<HTMLElement>(root, "#events-readout");
+  playbackRateReadout = mustElement<HTMLElement>(root, "#playback-rate-readout");
   skipPostGoalTransitions = mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions");
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
   hitboxWireframes = mustElement<HTMLInputElement>(root, "#hitbox-wireframes");
@@ -836,6 +838,7 @@ export function mountStatEvaluationPlayer(
     elements: {
       togglePlayback,
       playbackRate,
+      playbackRateReadout,
       skipPostGoalTransitions,
       skipKickoffs,
       hitboxWireframes,
@@ -886,6 +889,7 @@ export function mountStatEvaluationPlayer(
   configBindings = createPlayerConfigBindings({
     modules: MODULES,
     playbackRate,
+    playbackRateReadout,
     skipPostGoalTransitions,
     skipKickoffs,
     hitboxWireframes,
@@ -991,6 +995,7 @@ export function mountStatEvaluationPlayer(
       fileInput,
       togglePlayback,
       playbackRate,
+      playbackRateReadout,
       skipPostGoalTransitions,
       skipKickoffs,
       hitboxWireframes,
