@@ -1,5 +1,8 @@
 use super::*;
 
+const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
+const GOAL_KICKOFF_BOUNDARY_EPSILON_SECONDS: f32 = 0.05;
+
 pub(super) fn tag_goals_by_height(
     goals: &[GoalContextEvent],
     kind: GoalTagKind,
@@ -58,17 +61,21 @@ pub(super) fn tag_goals_by_possession_touch_height(
     tags
 }
 
-/// First frame of the scoring team's possession that led to the goal: the start
-/// of the contiguous run of scoring-team possession events ending at the goal.
-/// Walking back stops at the previous neutral/opponent possession (the turnover
-/// or loose ball that started this possession), so the window never reaches
-/// across a turnover or the kickoff. Falls back to the scorer's last touch when
-/// no scoring-team possession is recorded, which keeps the finishing touch in
-/// scope.
+/// First frame of the scoring team's possession that led to the goal, anchored
+/// at the scorer's final touch when available. Walking back stops at the
+/// previous neutral/opponent possession, so the window never reaches across a
+/// turnover, kickoff, or prior goal. If the scoring team has no possession span
+/// at the scoring touch, fall back to that touch so stale earlier possessions
+/// stay out of scope.
 fn scoring_possession_start_frame(
     goal: &GoalContextEvent,
     possession_events: &[PossessionEvent],
 ) -> usize {
+    let anchor_frame = goal
+        .scorer_last_touch
+        .as_ref()
+        .map(|touch| touch.frame)
+        .unwrap_or(goal.frame);
     let scoring_state = if goal.scoring_team_is_team_0 {
         "team_zero"
     } else {
@@ -76,14 +83,18 @@ fn scoring_possession_start_frame(
     };
     let is_scoring_possession = |event: &PossessionEvent| event.possession_state == scoring_state;
 
-    let last_scoring_index = possession_events
+    let anchored_scoring_index = possession_events
         .iter()
         .enumerate()
-        .filter(|(_, event)| is_scoring_possession(event) && event.frame <= goal.frame)
+        .filter(|(_, event)| {
+            is_scoring_possession(event)
+                && event.frame <= anchor_frame
+                && event.end_frame >= anchor_frame
+        })
         .map(|(index, _)| index)
         .max();
 
-    match last_scoring_index {
+    match anchored_scoring_index {
         Some(last_index) => {
             let mut start_index = last_index;
             while start_index > 0 && is_scoring_possession(&possession_events[start_index - 1]) {
@@ -91,11 +102,7 @@ fn scoring_possession_start_frame(
             }
             possession_events[start_index].frame
         }
-        None => goal
-            .scorer_last_touch
-            .as_ref()
-            .map(|touch| touch.frame)
-            .unwrap_or(goal.frame),
+        None => anchor_frame,
     }
 }
 
@@ -217,18 +224,14 @@ pub(super) fn point_event_matches_goal<E: GoalMechanicPointEvent>(
     event: &E,
     goal: &GoalContextEvent,
 ) -> bool {
-    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
-
     event.event_team_is_team_0() == goal.scoring_team_is_team_0
-        && event.event_time() <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
+        && event_time_is_in_goal_play(event.event_time(), goal)
         && event.event_frame() <= goal.frame
 }
 
 pub(super) fn pass_event_matches_goal(event: &PassEvent, goal: &GoalContextEvent) -> bool {
-    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
-
     event.is_team_0 == goal.scoring_team_is_team_0
-        && event.time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
+        && event_time_is_in_goal_play(event.time, goal)
         && event.frame <= goal.frame
         && goal.scorer.as_ref() == Some(&event.receiver)
         && goal
@@ -281,30 +284,42 @@ pub(super) fn air_dribble_event_matches_goal(
     event: &BallCarryEvent,
     goal: &GoalContextEvent,
 ) -> bool {
-    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
-
     event.kind == BallCarryKind::AirDribble
         && event.is_team_0 == goal.scoring_team_is_team_0
-        && event.start_time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
-        && event.end_time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
+        && event_time_is_in_goal_play(event.start_time, goal)
+        && event_time_is_in_goal_play(event.end_time, goal)
         && event.end_frame <= goal.frame
 }
 
 pub(super) fn bump_event_matches_goal(event: &BumpEvent, goal: &GoalContextEvent) -> bool {
-    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
-
     !event.is_team_bump
         && event.initiator_is_team_0 == goal.scoring_team_is_team_0
-        && event.time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
+        && event_time_is_in_goal_play(event.time, goal)
         && event.frame <= goal.frame
 }
 
 pub(super) fn demo_event_matches_goal(event: &DemolitionEvent, goal: &GoalContextEvent) -> bool {
-    const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
-
+    // Replay-authored demolition events can land just after the goal context
+    // frame even when the demo belongs to the scoring play.
     event.attacker_is_team_0 == Some(goal.scoring_team_is_team_0)
-        && event.time <= goal.time + MAX_EVENT_AFTER_GOAL_SECONDS
-        && event.frame <= goal.frame
+        && event_time_is_in_goal_play(event.time, goal)
+}
+
+fn event_time_is_in_goal_play(event_time: f32, goal: &GoalContextEvent) -> bool {
+    if event_time > goal.time + MAX_EVENT_AFTER_GOAL_SECONDS {
+        return false;
+    }
+
+    if event_time <= goal.time {
+        if let Some(time_after_kickoff) = goal.time_after_kickoff {
+            let event_to_goal_seconds = goal.time - event_time;
+            if event_to_goal_seconds > time_after_kickoff + GOAL_KICKOFF_BOUNDARY_EPSILON_SECONDS {
+                return false;
+            }
+        }
+    }
+
+    true
 }
 
 pub(super) fn position_to_vec(position: GoalContextPosition) -> glam::Vec3 {

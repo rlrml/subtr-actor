@@ -1,9 +1,13 @@
 import type { ReplayPlayerState } from "@rlrml/player";
 import type { CameraControlsController } from "./cameraControls.ts";
+import { formatPlaybackRate, snapPlaybackRate } from "./playbackRateControl.ts";
 
 export interface PlaybackReadoutElements {
   readonly togglePlayback: HTMLButtonElement;
-  readonly playbackRate: HTMLSelectElement;
+  readonly previousFrame: HTMLButtonElement;
+  readonly nextFrame: HTMLButtonElement;
+  readonly playbackRate: HTMLInputElement;
+  readonly playbackRateReadout: HTMLElement;
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
@@ -17,6 +21,7 @@ export interface PlaybackReadoutElements {
 
 export interface PlaybackReadoutsOptions {
   readonly elements: PlaybackReadoutElements;
+  getFrameCount(): number;
   getCameraControlsController(): CameraControlsController | null;
 }
 
@@ -26,6 +31,8 @@ export class PlaybackReadoutsController {
   setTransportEnabled(enabled: boolean, state?: ReplayPlayerState): void {
     const { elements } = this.options;
     elements.togglePlayback.disabled = !enabled;
+    elements.previousFrame.disabled = !enabled;
+    elements.nextFrame.disabled = !enabled;
     elements.playbackRate.disabled = !enabled;
     elements.skipPostGoalTransitions.disabled = !enabled;
     elements.skipKickoffs.disabled = !enabled;
@@ -41,7 +48,12 @@ export class PlaybackReadoutsController {
     elements.durationReadout.textContent = `${state.duration.toFixed(2)}s`;
     elements.playbackStatusReadout.textContent = state.playing ? "Playing" : "Paused";
     elements.togglePlayback.textContent = state.playing ? "Pause" : "Play";
-    elements.playbackRate.value = `${state.speed}`;
+    const lastFrameIndex = Math.max(0, this.options.getFrameCount() - 1);
+    elements.previousFrame.disabled = state.frameIndex <= 0;
+    elements.nextFrame.disabled = state.frameIndex >= lastFrameIndex;
+    const playbackRate = snapPlaybackRate(state.speed);
+    elements.playbackRate.value = `${playbackRate}`;
+    elements.playbackRateReadout.textContent = formatPlaybackRate(playbackRate);
     this.options.getCameraControlsController()?.syncState(state);
     elements.skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
     elements.skipKickoffs.checked = state.skipKickoffsEnabled;

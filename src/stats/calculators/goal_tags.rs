@@ -24,7 +24,10 @@ const DEFAULT_FLIP_INTO_BALL_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 3.0;
 // Matches `TouchDodgeState::Dodge.as_label_value()` in the touch calculator.
 const FLIP_INTO_BALL_DODGE_STATE_LABEL: &str = "dodge";
 const DEFAULT_BUMP_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
-const DEFAULT_DEMO_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 3.0;
+// Demos can create an open-net chance that takes a few seconds to cash in; the
+// kickoff boundary check in `demo_event_matches_goal` prevents this wider
+// window from reaching into a previous play.
+const DEFAULT_DEMO_GOAL_MAX_EVENT_TO_GOAL_SECONDS: f32 = 5.25;
 const DEFAULT_HALF_VOLLEY_GOAL_MAX_TOUCH_TO_GOAL_SECONDS: f32 = 3.0;
 const DEFAULT_HALF_VOLLEY_GOAL_MIN_GOAL_ALIGNMENT: f32 = 0.55;
 // Kickoff events record the attributed goal as first_touch_time +

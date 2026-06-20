@@ -1,4 +1,5 @@
 import type { SingletonWindowId, StatsWindowKind } from "./playerConfig.ts";
+import { formatPlaybackRate, snapPlaybackRate } from "./playbackRateControl.ts";
 
 export interface MountEventListenerElements {
   readonly root: HTMLElement;
@@ -8,7 +9,10 @@ export interface MountEventListenerElements {
   readonly emptyLoadReplay: HTMLButtonElement;
   readonly fileInput: HTMLInputElement;
   readonly togglePlayback: HTMLButtonElement;
-  readonly playbackRate: HTMLSelectElement;
+  readonly previousFrame: HTMLButtonElement;
+  readonly nextFrame: HTMLButtonElement;
+  readonly playbackRate: HTMLInputElement;
+  readonly playbackRateReadout: HTMLElement;
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
@@ -26,6 +30,7 @@ export interface MountEventListenerOptions {
   createStatsWindow(kind: StatsWindowKind): void;
   loadReplayFile(file: File): Promise<void>;
   togglePlayback(): void;
+  stepFrames(delta: number): void;
   setPlaybackRate(value: number): void;
   setSkipPostGoalTransitionsEnabled(enabled: boolean): void;
   setSkipKickoffsEnabled(enabled: boolean): void;
@@ -44,6 +49,7 @@ export function installMountEventListeners({
   createStatsWindow,
   loadReplayFile,
   togglePlayback,
+  stepFrames,
   setPlaybackRate,
   setSkipPostGoalTransitionsEnabled,
   setSkipKickoffsEnabled,
@@ -123,14 +129,17 @@ export function installMountEventListeners({
   );
 
   elements.togglePlayback.addEventListener("click", togglePlayback, { signal });
+  elements.previousFrame.addEventListener("click", () => stepFrames(-1), { signal });
+  elements.nextFrame.addEventListener("click", () => stepFrames(1), { signal });
 
-  elements.playbackRate.addEventListener(
-    "change",
-    () => {
-      setPlaybackRate(Number(elements.playbackRate.value));
-    },
-    { signal },
-  );
+  const syncPlaybackRate = () => {
+    const rate = snapPlaybackRate(Number(elements.playbackRate.value));
+    elements.playbackRate.value = `${rate}`;
+    elements.playbackRateReadout.textContent = formatPlaybackRate(rate);
+    setPlaybackRate(rate);
+  };
+  elements.playbackRate.addEventListener("input", syncPlaybackRate, { signal });
+  elements.playbackRate.addEventListener("change", syncPlaybackRate, { signal });
 
   elements.skipPostGoalTransitions.addEventListener(
     "change",

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import type { ReplayModel } from "@rlrml/player";
 import type { FlickEvent } from "./generated/FlickEvent.ts";
 import { STATS_EVENT_STREAM_COUNT_TYPES } from "./eventCountDerivation.ts";
-import type { StatModuleContext } from "./statModules.ts";
+import type { StatModule, StatModuleContext } from "./statModules.ts";
 import type { Event } from "./statsTimeline.ts";
 import {
   buildEventPlaylistItems,
@@ -79,13 +79,31 @@ test("event timeline sources include empty canonical stats streams", () => {
 
 test("event playlist filters include empty canonical stats streams", () => {
   const { ctx } = createSourceTestContext();
-  const playlistSources = getEventPlaylistSources(ctx, getTestTimelineSources(ctx));
+  const dodgeModule = {
+    id: "dodge",
+    label: "Dodge",
+    getTimelineEvents: () => [],
+  } satisfies StatModule;
+  const playlistSources = getEventPlaylistSources(
+    ctx,
+    getEventTimelineSources({
+      ctx,
+      modules: [dodgeModule],
+      activeTimelineEventSourceIds: new Set(),
+      activeMechanicTimelineKinds: new Set(),
+      toggleEventSource() {},
+      setMechanicTimelineKind() {},
+    }),
+  );
   const playlistSourceIds = new Set(playlistSources.map((source) => source.id));
+  const selectedSourceIds = getEventPlaylistSelectedSourceIds(playlistSources, null);
 
   assert.ok(playlistSourceIds.has("stats-stream:player_activity"));
   assert.ok(playlistSourceIds.has("stats-stream:backboard"));
   assert.ok(playlistSourceIds.has("stats-stream:territorial_pressure"));
   assert.ok(playlistSourceIds.has("mechanic:speed_flip"));
+  assert.ok(playlistSourceIds.has("module:dodge"));
+  assert.equal(selectedSourceIds.has("module:dodge"), false);
   assert.equal(
     playlistSources.find((source) => source.id === "stats-stream:player_activity")?.events.length,
     0,

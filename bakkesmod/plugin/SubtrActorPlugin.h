@@ -132,6 +132,7 @@ private:
     Team,
     AllPlayers,
     AllTeams,
+    KickoffOverview,
     GoalsOverview,
     AdHoc,
     StatsModule,
@@ -507,7 +508,7 @@ private:
       bool onlyWebActivePanels = false);
   std::array<SingletonWindowControl, 14> singletonWindowControls();
   std::vector<SingletonWindowControl> webSingletonWindowControls();
-  std::array<StatsWindowKindControl, 7> statsWindowKindControls() const;
+  std::array<StatsWindowKindControl, 8> statsWindowKindControls() const;
   void renderSingletonWindowManager();
   void renderStatsWindowManager();
   void focusTopLoadedWindow();

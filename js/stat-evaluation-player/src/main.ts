@@ -12,6 +12,10 @@ import { getAppTemplate } from "./appTemplate.ts";
 import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import { createCameraControlsController, type CameraControlsController } from "./cameraControls.ts";
+import {
+  createAutoPossessionCameraController,
+  type AutoPossessionCameraController,
+} from "./autoPossessionCamera.ts";
 import { createStatModules } from "./statModules.ts";
 import type { StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
@@ -90,6 +94,7 @@ import { createPlaybackActionController } from "./playbackActions.ts";
 import { createPlayerConfigBindings, type PlayerConfigBindings } from "./playerConfigBindings.ts";
 import { createWindowCommandController } from "./windowCommands.ts";
 import { ShotVisualizationController } from "./shotVisualization.ts";
+import { renderTouchColorLegend } from "./touchColorLegend.ts";
 
 const GOAL_WATCH_LEAD_SECONDS = 4;
 const PLAYING_SNAPSHOT_UI_INTERVAL_MS = 100;
@@ -101,6 +106,7 @@ let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: StatsFrameLookup | null = null;
 let unsubscribe: (() => void) | null = null;
 let lastPlayingSnapshotUiUpdateAt = 0;
+let autoPossessionCameraController: AutoPossessionCameraController | null = null;
 
 const boostPickupFilters = createBoostPickupFilterController({
   refreshTimelineRanges() {
@@ -211,7 +217,10 @@ let replayLoadingActive!: HTMLElement;
 let replayLoadingList!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
-let playbackRate!: HTMLSelectElement;
+let previousFrame!: HTMLButtonElement;
+let nextFrame!: HTMLButtonElement;
+let playbackRate!: HTMLInputElement;
+let playbackRateReadout!: HTMLElement;
 let timeReadout!: HTMLElement;
 let frameReadout!: HTMLElement;
 let durationReadout!: HTMLElement;
@@ -515,6 +524,7 @@ async function loadReplayBundleForDisplay(
     getReplayPlayer: () => replayPlayer,
     setReplayPlayer(value) {
       replayPlayer = value;
+      autoPossessionCameraController?.syncSource();
     },
     getUnsubscribe: () => unsubscribe,
     setUnsubscribe(value) {
@@ -531,6 +541,7 @@ async function loadReplayBundleForDisplay(
     },
     setStatsTimeline(value) {
       statsTimeline = value;
+      autoPossessionCameraController?.syncSource();
     },
     setStatsFrameLookup(value) {
       statsFrameLookup = value;
@@ -558,6 +569,7 @@ async function loadReplayBundleForDisplay(
     clearStandalonePlugins,
     clearRenderCaches,
     resetEventPlaylistWindow,
+    renderModuleSummary,
     renderScoreboard,
     renderTimelineEventCount,
     renderMechanicsTimelineControls,
@@ -716,12 +728,15 @@ export function mountStatEvaluationPlayer(
     cueGoalReplay: playbackActions.cueGoalReplay,
   });
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
-  playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
+  previousFrame = mustElement<HTMLButtonElement>(root, "#previous-frame");
+  nextFrame = mustElement<HTMLButtonElement>(root, "#next-frame");
+  playbackRate = mustElement<HTMLInputElement>(root, "#playback-rate");
   cameraControlsController = createCameraControlsController({
     elements: {
       attachedPlayer: mustElement<HTMLSelectElement>(root, "#attached-player"),
       cameraViewFreeButton: mustElement<HTMLButtonElement>(root, "#camera-view-free"),
       cameraViewFollowButton: mustElement<HTMLButtonElement>(root, "#camera-view-follow"),
+      cameraViewAutoPossession: mustElement<HTMLInputElement>(root, "#camera-view-auto-possession"),
       cameraViewOverheadButton: mustElement<HTMLButtonElement>(root, "#camera-view-overhead"),
       cameraViewSideButton: mustElement<HTMLButtonElement>(root, "#camera-view-side"),
       usePlayerCameraSettings: mustElement<HTMLInputElement>(root, "#use-player-camera-settings"),
@@ -769,7 +784,19 @@ export function mountStatEvaluationPlayer(
     },
     getReplayPlayer: () => replayPlayer,
     requestConfigSync: scheduleConfigUrlUpdate,
+    onAutoPossessionChange(enabled) {
+      autoPossessionCameraController?.syncSource();
+      if (enabled) {
+        autoPossessionCameraController?.syncCurrentFrame();
+      }
+    },
   });
+  autoPossessionCameraController = createAutoPossessionCameraController({
+    getReplayPlayer: () => replayPlayer,
+    getStatsTimeline: () => statsTimeline,
+    getCameraControlsController: () => cameraControlsController,
+  });
+  renderTouchColorLegend(mustElement<HTMLElement>(root, "#touch-color-legend-body"), ["team"]);
   moduleControlsController = createModuleControlsController({
     elements: {
       summary: mustElement<HTMLDivElement>(root, "#module-summary"),
@@ -807,6 +834,7 @@ export function mountStatEvaluationPlayer(
   playersReadout = mustElement<HTMLElement>(root, "#players-readout");
   framesReadout = mustElement<HTMLElement>(root, "#frames-readout");
   eventsReadout = mustElement<HTMLElement>(root, "#events-readout");
+  playbackRateReadout = mustElement<HTMLElement>(root, "#playback-rate-readout");
   skipPostGoalTransitions = mustElement<HTMLInputElement>(root, "#skip-post-goal-transitions");
   skipKickoffs = mustElement<HTMLInputElement>(root, "#skip-kickoffs");
   hitboxWireframes = mustElement<HTMLInputElement>(root, "#hitbox-wireframes");
@@ -814,7 +842,10 @@ export function mountStatEvaluationPlayer(
   playbackReadoutsController = createPlaybackReadoutsController({
     elements: {
       togglePlayback,
+      previousFrame,
+      nextFrame,
       playbackRate,
+      playbackRateReadout,
       skipPostGoalTransitions,
       skipKickoffs,
       hitboxWireframes,
@@ -825,6 +856,7 @@ export function mountStatEvaluationPlayer(
       durationReadout,
       playbackStatusReadout,
     },
+    getFrameCount: () => replayPlayer?.replay.frameCount ?? 0,
     getCameraControlsController: () => cameraControlsController,
   });
   recordingWindowController = createRecordingWindowController({
@@ -865,6 +897,7 @@ export function mountStatEvaluationPlayer(
   configBindings = createPlayerConfigBindings({
     modules: MODULES,
     playbackRate,
+    playbackRateReadout,
     skipPostGoalTransitions,
     skipKickoffs,
     hitboxWireframes,
@@ -927,6 +960,8 @@ export function mountStatEvaluationPlayer(
     mechanicsReviewController?.reset();
     mechanicsReviewController = null;
     loadedReplayName = null;
+    autoPossessionCameraController?.reset();
+    autoPossessionCameraController = null;
     cameraControlsController = null;
     recordingWindowController = null;
     moduleControlsController = null;
@@ -967,7 +1002,10 @@ export function mountStatEvaluationPlayer(
       emptyLoadReplay,
       fileInput,
       togglePlayback,
+      previousFrame,
+      nextFrame,
       playbackRate,
+      playbackRateReadout,
       skipPostGoalTransitions,
       skipKickoffs,
       hitboxWireframes,
@@ -992,6 +1030,10 @@ export function mountStatEvaluationPlayer(
     },
     togglePlayback() {
       replayPlayer?.togglePlayback();
+      scheduleConfigUrlUpdate();
+    },
+    stepFrames(delta) {
+      replayPlayer?.stepFrames(delta);
       scheduleConfigUrlUpdate();
     },
     setPlaybackRate(value) {

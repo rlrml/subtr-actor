@@ -255,6 +255,11 @@ export class ActorManager {
     this._ballModelReplaced = false;
   }
 
+  resetGoalExplosionPlaybackState() {
+    this._lastGoalScanTime = null;
+    this._firedGoalTimes.clear();
+  }
+
   setPlayerTeams(teams) {
     this.playerTeams = teams;
   }
@@ -3004,6 +3009,7 @@ export class ActorManager {
 
     const ball = this.actors[this.ballActorId];
     let ballHidden = false;
+    let inGoalExplosionWindow = false;
 
     for (const goal of goalEvents.values()) {
       const goalTime = goal.time;
@@ -3012,6 +3018,7 @@ export class ActorManager {
       // Hide the ball from the goal moment through the explosion lifetime.
       if (currentTime >= goalTime && currentTime <= goalTime + GOAL_BALL_HIDE_DURATION) {
         ballHidden = true;
+        inGoalExplosionWindow = true;
       }
 
       // Fire once, the first time we cross the goal moving forward. A baseline
@@ -3030,6 +3037,9 @@ export class ActorManager {
     if (ball) {
       ball.userData.isHiddenByGoal = ballHidden;
       if (ballHidden) ball.visible = false;
+    }
+    if (!inGoalExplosionWindow) {
+      this.effectsManager.clearGoalExplosions?.();
     }
 
     this._lastGoalScanTime = currentTime;

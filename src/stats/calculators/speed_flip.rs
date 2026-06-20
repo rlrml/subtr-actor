@@ -6,7 +6,6 @@ const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.55;
 const SPEED_FLIP_MAX_GROUND_Z: f32 = 80.0;
 const SPEED_FLIP_KICKOFF_MOTION_SPEED: f32 = 100.0;
 const SPEED_FLIP_MIN_ALIGNMENT: f32 = 0.72;
-const SPEED_FLIP_MAX_DODGE_DELAY_AFTER_GROUND_LEAVE_SECONDS: f32 = 0.20;
 const SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS: f32 = 0.18;
 const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA: f32 = 80.0;
 const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT: f32 = 0.35;
@@ -18,7 +17,6 @@ const SPEED_FLIP_MIN_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.88;
 const SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.95;
 const SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT: f32 = 0.82;
 const SPEED_FLIP_MIN_DIAGONAL_SCORE: f32 = 0.35;
-const SPEED_FLIP_MIN_STRONG_DIAGONAL_SCORE: f32 = 0.75;
 const SPEED_FLIP_MIN_UP_ROTATION_DEGREES: f32 = 90.0;
 const SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES: f32 = 45.0;
 const SPEED_FLIP_MIN_BOOST_ALIGNMENT: f32 = 0.80;
@@ -123,6 +121,7 @@ pub struct SpeedFlipCalculator {
     previous_dodge_active: HashMap<PlayerId, bool>,
     last_ground_contacts: HashMap<PlayerId, f32>,
     kickoff_approach_active_last_frame: bool,
+    kickoff_window_open: bool,
     current_kickoff_start_time: Option<f32>,
 }
 
@@ -139,8 +138,28 @@ impl SpeedFlipCalculator {
         self.events.new_events()
     }
 
-    fn kickoff_approach_active(gameplay: &GameplayState) -> bool {
-        gameplay.ball_has_been_hit == Some(false)
+    /// Whether we are inside a kickoff approach window.
+    ///
+    /// The opening kickoff of a match reports `ball_has_been_hit == None` (not
+    /// `Some(false)`) between the countdown ending and the first touch, so a gate
+    /// of `== Some(false)` alone never fires on it — the speed flip was simply
+    /// never evaluated as a kickoff. (The kickoff stats machinery works around
+    /// the same engine quirk; see `kickoff.rs::observe_movement_start`.) Track
+    /// the approach as an explicit window instead: open it on the countdown (or
+    /// the `Some(false)` signal used by every subsequent kickoff) and hold it
+    /// open through the `None` go→touch window until the ball is actually hit.
+    fn update_kickoff_window(&mut self, gameplay: &GameplayState) -> bool {
+        self.kickoff_window_open =
+            if gameplay.kickoff_countdown_active() || gameplay.ball_has_been_hit == Some(false) {
+                true
+            } else if gameplay.ball_has_been_hit == Some(true) {
+                false
+            } else {
+                // `None` with no countdown: either the opening go→touch window (keep
+                // whatever the countdown opened) or pre-match idle (stays closed).
+                self.kickoff_window_open
+            };
+        self.kickoff_window_open
     }
 
     fn player_by_id<'a>(
@@ -272,7 +291,7 @@ impl SpeedFlipCalculator {
     fn maybe_start_candidate(
         &mut self,
         frame: &FrameInfo,
-        gameplay: &GameplayState,
+        kickoff_approach_active: bool,
         ball: &BallFrameState,
         player: &PlayerSample,
         _live_play_state: &LivePlayState,
@@ -285,7 +304,7 @@ impl SpeedFlipCalculator {
             return;
         }
 
-        let is_kickoff = Self::kickoff_approach_active(gameplay);
+        let is_kickoff = kickoff_approach_active;
         let kickoff_start_time = if is_kickoff {
             let Some(kickoff_start_time) = self.current_kickoff_start_time else {
                 return;
@@ -505,11 +524,18 @@ impl SpeedFlipCalculator {
         if candidate.boost_alignment_sample_count == 0 {
             return None;
         }
-        if candidate.dodge_delay_after_ground_leave_seconds
-            > SPEED_FLIP_MAX_DODGE_DELAY_AFTER_GROUND_LEAVE_SECONDS
-        {
-            return None;
-        }
+        // The defining trait of a speed flip is the *cancel*: the dodge is a
+        // diagonal flip whose nose is levelled back out instead of pitching all
+        // the way over (`max_forward_rotation` stays small). This is what
+        // separates a real speed flip from an ordinary full diagonal flip, which
+        // can score just as high on raw diagonal angular velocity. We do NOT gate
+        // on how long after the jump the dodge fires: real speed flips vary a lot
+        // there (two pros on the same kickoff flipped 0.07s vs 0.22s after
+        // leaving the ground), so a timing ceiling only produces false negatives.
+        // `dodge_delay_after_ground_leave_seconds` is still reported for review.
+        let has_cancelled_diagonal_dodge = candidate.max_forward_rotation_degrees
+            <= SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES
+            && candidate.best_diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
         if candidate.dodge_acceleration_sample_count == 0
             || candidate.best_dodge_forward_delta < SPEED_FLIP_MIN_FORWARD_DODGE_DELTA
             || candidate.best_dodge_delta_alignment < SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT
@@ -533,15 +559,6 @@ impl SpeedFlipCalculator {
         if has_incompatible_meaningful_impulse {
             return None;
         }
-        let weak_impulse_direction_is_usable = candidate.best_estimated_dodge_impulse_magnitude
-            < SPEED_FLIP_MIN_DIRECTIONAL_WEAK_IMPULSE_MAGNITUDE
-            || (candidate.best_estimated_dodge_impulse_forward_component >= 0.0
-                && estimated_dodge_side_component >= SPEED_FLIP_MIN_WEAK_IMPULSE_SIDE_COMPONENT);
-        if !weak_impulse_direction_is_usable {
-            return None;
-        }
-        let has_strong_diagonal_rotation =
-            candidate.best_diagonal_score >= SPEED_FLIP_MIN_STRONG_DIAGONAL_SCORE;
         let has_diagonal_impulse = has_meaningful_impulse
             && candidate.best_estimated_dodge_impulse_forward_component
                 >= SPEED_FLIP_MIN_ESTIMATED_DODGE_FORWARD_COMPONENT
@@ -550,15 +567,25 @@ impl SpeedFlipCalculator {
                 .contains(&estimated_dodge_side_component)
             && estimated_dodge_up_component <= SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT
             && candidate.best_diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
-        // Boost-through speed flips suppress the estimated dodge impulse (the
-        // boost compensation swallows it) and sloppier flips land below the
-        // strong-rotation score, but the flip cancel itself leaves a crisp
-        // signature: the car's up vector sweeps through the dodge rotation
-        // while the nose barely pitches because the cancel levels it out.
-        let has_cancelled_diagonal_dodge = candidate.max_forward_rotation_degrees
-            <= SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES
-            && candidate.best_diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
-        if !(has_strong_diagonal_rotation || has_diagonal_impulse || has_cancelled_diagonal_dodge) {
+        // A weak (sub-`MEANINGFUL`, super-`WEAK`) estimated impulse pointing the
+        // wrong way normally disqualifies a candidate, but on a boost-through
+        // speed flip the boost-compensation overshoot can flip the residual
+        // estimate backward even though the dodge is unmistakably a cancelled
+        // diagonal flip. Only the *cancelled* signature (the nose stays level —
+        // `max_forward_rotation` small) is specific enough to trust over a bad
+        // impulse estimate: a merely high diagonal *score* also fires on an
+        // ordinary forward flip whose nose pitches all the way over, so it is not
+        // sufficient on its own. The meaningful-impulse incompatibility check
+        // above still rejects genuinely wrong strong impulses.
+        let weak_impulse_direction_is_usable = has_cancelled_diagonal_dodge
+            || candidate.best_estimated_dodge_impulse_magnitude
+                < SPEED_FLIP_MIN_DIRECTIONAL_WEAK_IMPULSE_MAGNITUDE
+            || (candidate.best_estimated_dodge_impulse_forward_component >= 0.0
+                && estimated_dodge_side_component >= SPEED_FLIP_MIN_WEAK_IMPULSE_SIDE_COMPONENT);
+        if !weak_impulse_direction_is_usable {
+            return None;
+        }
+        if !(has_diagonal_impulse || has_cancelled_diagonal_dodge) {
             return None;
         }
         let boost_alignment_score =
@@ -658,7 +685,7 @@ impl SpeedFlipCalculator {
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        let kickoff_approach_active = Self::kickoff_approach_active(gameplay);
+        let kickoff_approach_active = self.update_kickoff_window(gameplay);
         if !live_play_state.is_live_play && !kickoff_approach_active {
             self.active_candidates
                 .apply_boundary(Boundary::LivePlayEnded);
@@ -676,7 +703,13 @@ impl SpeedFlipCalculator {
         self.update_ground_contacts(frame, players);
 
         for player in &players.players {
-            self.maybe_start_candidate(frame, gameplay, ball, player, live_play_state);
+            self.maybe_start_candidate(
+                frame,
+                kickoff_approach_active,
+                ball,
+                player,
+                live_play_state,
+            );
         }
 
         for (player_id, candidate) in self.active_candidates.iter_mut() {

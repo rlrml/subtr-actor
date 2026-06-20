@@ -114,7 +114,7 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="event event mechanic a shared event envelope with common metadata and a typed event payload."><td><a href="#event-event">Event</a></td><td><code>event</code></td><td class="summary">A shared event envelope with common metadata and a typed event payload.</td></tr>
 <tr data-search="flick flick mechanic a dodge-powered touch following a short controlled carry setup."><td><a href="#event-flick">Flick</a></td><td><code>flick</code></td><td class="summary">A dodge-powered touch following a short controlled carry setup.</td></tr>
 <tr data-search="flip reset flip_reset mechanic an on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing."><td><a href="#event-flip_reset">Flip Reset</a></td><td><code>flip_reset</code></td><td class="summary">An on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing.</td></tr>
-<tr data-search="half flip half_flip mechanic a dodge sequence that starts while driving backward and reorients the car to move forward."><td><a href="#event-half_flip">Half Flip</a></td><td><code>half_flip</code></td><td class="summary">A dodge sequence that starts while driving backward and reorients the car to move forward.</td></tr>
+<tr data-search="half flip half_flip mechanic a dodge sequence that cancels a flip into an opposite facing direction."><td><a href="#event-half_flip">Half Flip</a></td><td><code>half_flip</code></td><td class="summary">A dodge sequence that cancels a flip into an opposite facing direction.</td></tr>
 <tr data-search="half volley half_volley mechanic a fast touch shortly after the ball bounces off the floor, paired with a recent player dodge."><td><a href="#event-half_volley">Half Volley</a></td><td><code>half_volley</code></td><td class="summary">A fast touch shortly after the ball bounces off the floor, paired with a recent player dodge.</td></tr>
 <tr data-search="one timer one_timer mechanic a fast receiver touch from a completed pass that is immediately directed toward goal."><td><a href="#event-one_timer">One Timer</a></td><td><code>one_timer</code></td><td class="summary">A fast receiver touch from a completed pass that is immediately directed toward goal.</td></tr>
 <tr data-search="pass pass mechanic a same-team touch sequence where one player sends the ball to a different teammate."><td><a href="#event-pass">Pass</a></td><td><code>pass</code></td><td class="summary">A same-team touch sequence where one player sends the ball to a different teammate.</td></tr>
@@ -488,9 +488,9 @@ ul.tight li { margin: .15rem 0; }
 <li><code>flip_reset</code> via <code>DodgeResetNode</code> / <code>DodgeResetCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-half_flip" data-search="half flip half_flip mechanic a dodge sequence that starts while driving backward and reorients the car to move forward.">
+<div class="event" id="event-half_flip" data-search="half flip half_flip mechanic a dodge sequence that cancels a flip into an opposite facing direction.">
 <div class="head"><h3>Half Flip</h3><code class="id">half_flip</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A dodge sequence that starts while driving backward and reorients the car to move forward.</p>
+<p class="summary">A dodge sequence that cancels a flip into an opposite facing direction.</p>
 <div class="section-label">Confidence</div>
 <div class="conf">
 <span class="badge">Approach <b>Unknown</b></span>
@@ -501,9 +501,9 @@ ul.tight li { margin: .15rem 0; }
 </div>
 <div class="section-label">Approach</div>
 <ul class="tight">
-<li>Start candidates on grounded dodge rising edges when the car is moving backward relative to its facing direction.</li>
-<li>Track reorientation during the evaluation window, including forward-vector reversal, alignment with the resulting velocity, and vertical flip evidence.</li>
-<li>Emit when the candidate shows enough reversal, reorientation, flip motion, and speed evidence to clear the confidence threshold.</li>
+<li>Start candidates on low grounded or low-air dodge rising edges.</li>
+<li>Track the car&#39;s forward vector through the evaluation window, including vertical flip evidence and final horizontal facing direction.</li>
+<li>Emit when the candidate has pitched through a flip, reaches and retains roughly opposite facing instead of rotating through a full end-over-end flip, and finishes with a meaningful horizontal facing direction.</li>
 </ul>
 <div class="section-label">Limitations</div>
 <p class="muted">None documented.</p>

@@ -8,6 +8,7 @@ import {
   getLastTouchPlayer,
   getVisibleTouchMarkers,
   touchMarkerColor,
+  touchMarkerRingColors,
   type TouchMarker,
 } from "./touchOverlay.ts";
 import {
@@ -78,6 +79,8 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
             { group: "height_band", value: "ground" },
             { group: "surface", value: "ground" },
             { group: "dodge_state", value: "no_dodge" },
+            { group: "possession", value: "control" },
+            { group: "reception", value: "first_touch" },
           ],
           ball_speed_change: 0,
         },
@@ -130,7 +133,20 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
       playerId: "Steam:blue-id",
       playerName: "Blue",
       kind: "control",
-      intention: null,
+      intention: "control",
+      heightBand: "ground",
+      surface: "ground",
+      dodgeState: "no_dodge",
+      firstTouch: true,
+      contested: false,
+      classifications: [
+        { key: "intention", value: "control", label: "Control", color: 0x000000 },
+        { key: "kind", value: "control", label: "Control", color: 0x000000 },
+        { key: "height_band", value: "ground", label: "Ground", color: 0xa3e635 },
+        { key: "surface", value: "ground", label: "Ground", color: 0x84cc16 },
+        { key: "dodge_state", value: "no_dodge", label: "No Dodge", color: 0x94a3b8 },
+        { key: "first_touch", value: "true", label: "First touch", color: 0xffffff },
+      ],
       position: { x: 100, y: -250, z: 320 },
       endPosition: { x: 100, y: -250, z: 320 },
       totalBallAdvanceDistance: 0,
@@ -325,6 +341,12 @@ test("getVisibleTouchMarkers returns markers inside the decay window", () => {
       playerName: "Blue",
       kind: null,
       intention: null,
+      heightBand: null,
+      surface: null,
+      dodgeState: null,
+      firstTouch: false,
+      contested: false,
+      classifications: [],
       position: { x: 0, y: 0, z: 0 },
       endPosition: { x: 0, y: 0, z: 0 },
       totalBallAdvanceDistance: 0,
@@ -340,6 +362,12 @@ test("getVisibleTouchMarkers returns markers inside the decay window", () => {
       playerName: "Orange",
       kind: null,
       intention: null,
+      heightBand: null,
+      surface: null,
+      dodgeState: null,
+      firstTouch: false,
+      contested: false,
+      classifications: [],
       position: { x: 0, y: 0, z: 0 },
       endPosition: { x: 0, y: 0, z: 0 },
       totalBallAdvanceDistance: 0,
@@ -364,6 +392,19 @@ test("touchMarkerColor selects palettes by color mode with fallbacks", () => {
     playerName: "Orange",
     kind: "hard_hit",
     intention: "shot",
+    heightBand: "high_air",
+    surface: "wall",
+    dodgeState: "dodge",
+    firstTouch: false,
+    contested: true,
+    classifications: [
+      { key: "intention", value: "shot", label: "Shot", color: 0xff00c8 },
+      { key: "kind", value: "hard_hit", label: "Hard Hit", color: 0xff5d6c },
+      { key: "height_band", value: "high_air", label: "High Air", color: 0x818cf8 },
+      { key: "surface", value: "wall", label: "Wall", color: 0xf97316 },
+      { key: "dodge_state", value: "dodge", label: "Dodge", color: 0xe879f9 },
+      { key: "contested", value: "true", label: "Contested", color: 0xef4444 },
+    ],
     position: { x: 0, y: 0, z: 0 },
     endPosition: { x: 0, y: 0, z: 0 },
     totalBallAdvanceDistance: 0,
@@ -373,9 +414,30 @@ test("touchMarkerColor selects palettes by color mode with fallbacks", () => {
 
   assert.equal(touchMarkerColor(marker, "team"), 0xffc15c);
   assert.equal(touchMarkerColor({ ...marker, isTeamZero: true }, "team"), 0x59c3ff);
-  assert.equal(touchMarkerColor(marker, "intention"), 0xff5d6c);
+  assert.equal(touchMarkerColor(marker, "intention"), 0xff00c8);
+  assert.equal(touchMarkerColor({ ...marker, intention: "boom" }, "intention"), 0xf472b6);
   assert.equal(touchMarkerColor(marker, "kind"), 0xff5d6c);
-  assert.equal(touchMarkerColor({ ...marker, kind: "control" }, "kind"), 0x4ade80);
+  assert.equal(touchMarkerColor(marker, "height_band"), 0x818cf8);
+  assert.equal(touchMarkerColor(marker, "surface"), 0xf97316);
+  assert.equal(touchMarkerColor(marker, "dodge_state"), 0xe879f9);
+  assert.equal(touchMarkerColor(marker, "flag"), 0xef4444);
+  assert.deepEqual(touchMarkerRingColors(marker, ["height_band"]), [0x818cf8]);
+  assert.deepEqual(
+    touchMarkerRingColors({ ...marker, isTeamZero: true }, ["team", "kind"]),
+    [0x59c3ff, 0xff5d6c],
+  );
+  assert.deepEqual(touchMarkerRingColors(marker, ["team"]), [0xffc15c]);
+  assert.deepEqual(touchMarkerRingColors(marker, []), [0xffc15c]);
+  assert.equal(touchMarkerColor({ ...marker, kind: "control" }, "kind"), 0x000000);
+  assert.equal(touchMarkerColor({ ...marker, intention: "control" }, "intention"), 0x000000);
   assert.equal(touchMarkerColor({ ...marker, intention: null }, "intention"), 0x9aa5b1);
   assert.equal(touchMarkerColor({ ...marker, kind: "mystery" }, "kind"), 0x9aa5b1);
+  assert.equal(
+    touchMarkerColor({ ...marker, contested: false, firstTouch: true }, "flag"),
+    0xffffff,
+  );
+  assert.equal(
+    touchMarkerColor({ ...marker, contested: false, firstTouch: false }, "flag"),
+    0x9aa5b1,
+  );
 });

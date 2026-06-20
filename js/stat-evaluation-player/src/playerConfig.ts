@@ -8,6 +8,7 @@ export type StatsWindowKind =
   | "team"
   | "all-players"
   | "all-teams"
+  | "kickoff-overview"
   | "goals-overview"
   | "ad-hoc";
 
@@ -24,6 +25,7 @@ export type SingletonWindowId =
   | "replay-loading"
   | "boost-pickups"
   | "touch-controls"
+  | "touch-legend"
   | "shot-visualization"
   | "missed-events";
 export type ConfigWindowKind = SingletonWindowId | "stats";
@@ -77,6 +79,7 @@ export interface PlayerCameraConfig {
   /** Follow the attached player's recorded ball-cam toggle ("player" view). */
   readonly useReplayBallCam?: boolean;
   readonly usePlayerCameraSettings?: boolean;
+  readonly autoPossession?: boolean;
   readonly customSettings?: CameraSettings | null;
   readonly nameplateLiftUu?: number;
 }
@@ -306,6 +309,7 @@ function normalizeCameraConfig(value: unknown): PlayerCameraConfig {
   const ballCam = booleanValue(value.ballCam);
   const useReplayBallCam = booleanValue(value.useReplayBallCam);
   const usePlayerCameraSettings = booleanValue(value.usePlayerCameraSettings);
+  const autoPossession = booleanValue(value.autoPossession);
   const customSettings = normalizeCameraSettings(value.customSettings);
   const nameplateLiftUu = finiteNumber(value.nameplateLiftUu);
   if (mode !== undefined) config.mode = mode;
@@ -316,6 +320,7 @@ function normalizeCameraConfig(value: unknown): PlayerCameraConfig {
   if (usePlayerCameraSettings !== undefined) {
     config.usePlayerCameraSettings = usePlayerCameraSettings;
   }
+  if (autoPossession !== undefined) config.autoPossession = autoPossession;
   if (customSettings !== undefined) config.customSettings = customSettings;
   if (nameplateLiftUu !== undefined) config.nameplateLiftUu = nameplateLiftUu;
   return config;
@@ -451,6 +456,8 @@ function isSingletonWindowId(value: unknown): value is SingletonWindowId {
     value === "replay-loading" ||
     value === "boost-pickups" ||
     value === "touch-controls" ||
+    value === "touch-legend" ||
+    value === "shot-visualization" ||
     value === "missed-events"
   );
 }
@@ -461,6 +468,7 @@ function isStatsWindowKind(value: unknown): value is StatsWindowKind {
     value === "team" ||
     value === "all-players" ||
     value === "all-teams" ||
+    value === "kickoff-overview" ||
     value === "goals-overview" ||
     value === "ad-hoc"
   );

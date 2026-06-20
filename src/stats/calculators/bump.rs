@@ -5,7 +5,6 @@ const BUMP_MAX_CONTACT_GAP: f32 = 35.0;
 const BUMP_CONTACT_GAP_SAMPLES: usize = 8;
 const BUMP_MIN_CLOSING_SPEED: f32 = 420.0;
 const BUMP_MIN_VICTIM_IMPULSE: f32 = 180.0;
-const BUMP_MIN_INITIATOR_SLOWDOWN: f32 = 100.0;
 const BUMP_MIN_DIRECTIONAL_SCORE: f32 = 650.0;
 const BUMP_MIN_SCORE_MARGIN: f32 = 175.0;
 const BUMP_REPEAT_FRAME_WINDOW: usize = 10;
@@ -43,7 +42,6 @@ struct DirectionalBumpCandidate {
     score: f32,
     closing_speed: f32,
     victim_impulse: f32,
-    initiator_slowdown: f32,
 }
 
 /// Detects player-on-player bumps from player frame state and events.
@@ -246,7 +244,6 @@ impl BumpCalculator {
             || candidate.score - reverse_score < BUMP_MIN_SCORE_MARGIN
             || candidate.closing_speed < BUMP_MIN_CLOSING_SPEED
             || candidate.victim_impulse < BUMP_MIN_VICTIM_IMPULSE
-            || candidate.initiator_slowdown < BUMP_MIN_INITIATOR_SLOWDOWN
         {
             return None;
         }
@@ -477,7 +474,6 @@ fn directional_candidate(
         score,
         closing_speed,
         victim_impulse,
-        initiator_slowdown,
     })
 }
 
