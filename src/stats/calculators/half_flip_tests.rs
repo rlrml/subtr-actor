@@ -287,6 +287,74 @@ fn counts_forward_travel_when_facing_reverses() {
 }
 
 #[test]
+fn counts_backward_dodge_without_start_height_filter() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = HalfFlipCalculator::new();
+
+    calculator
+        .update(
+            &frame(1, 1.00),
+            &players(player(
+                1,
+                glam::Vec3::new(-450.0, 0.0, 0.0),
+                0.0,
+                0.0,
+                false,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(2, 1.05),
+            &players(player_at_z(
+                1,
+                PLAYER_GROUND_Z_THRESHOLD + 250.0,
+                glam::Vec3::new(-450.0, 0.0, 0.0),
+                0.0,
+                0.0,
+                true,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(9, 1.40),
+            &players(player_at_z(
+                1,
+                PLAYER_GROUND_Z_THRESHOLD + 320.0,
+                glam::Vec3::new(-450.0, 0.0, 0.0),
+                0.0,
+                std::f32::consts::FRAC_PI_2,
+                true,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(16, 1.75),
+            &players(player_at_z(
+                1,
+                PLAYER_GROUND_Z_THRESHOLD + 280.0,
+                glam::Vec3::new(-450.0, 0.0, 0.0),
+                std::f32::consts::PI,
+                0.0,
+                true,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.count, 1);
+    assert_eq!(calculator.events().len(), 1);
+    assert_eq!(calculator.events()[0].frame, 16);
+    assert!(calculator.events()[0].confidence >= HALF_FLIP_MIN_CONFIDENCE);
+}
+
+#[test]
 fn rejects_dodge_without_facing_reversal() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = HalfFlipCalculator::new();
