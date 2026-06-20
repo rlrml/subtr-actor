@@ -744,13 +744,13 @@ _None documented._
 
 **Summary**
 
-A dodge sequence that starts while driving backward and reorients the car to move forward.
+A dodge sequence that cancels a flip into an opposite facing direction.
 
 **Approach**
 
-- Start candidates on grounded dodge rising edges when the car is moving backward relative to its facing direction.
-- Track reorientation during the evaluation window, including forward-vector reversal, alignment with the resulting velocity, and vertical flip evidence.
-- Emit when the candidate shows enough reversal, reorientation, flip motion, and speed evidence to clear the confidence threshold.
+- Start candidates on low grounded or low-air dodge rising edges.
+- Track the car's forward vector through the evaluation window, including vertical flip evidence and final horizontal facing direction.
+- Emit when the candidate has pitched through a flip, reaches and retains roughly opposite facing instead of rotating through a full end-over-end flip, and finishes with a meaningful horizontal facing direction.
 
 **Limitations**
 
