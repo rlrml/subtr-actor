@@ -129,8 +129,8 @@ test("auto possession camera selects possessed player before closest player fall
   assert.equal(selectAutoPossessionCameraPlayer(replay, spans, 0, 1), "Steam:orange-id");
 });
 
-test("auto possession camera debounces nearest-player fallback switches", () => {
-  const replay = {
+function createFallbackReplay(): ReplayModel {
+  return {
     ballFrames: Array.from({ length: 5 }, () => ({ position: { x: 0, y: 0, z: 0 } })),
     players: [
       {
@@ -155,6 +155,56 @@ test("auto possession camera debounces nearest-player fallback switches", () => 
       },
     ],
   } as ReplayModel;
+}
+
+test("auto possession camera keeps nearest-player fallback fixed after initial attach", () => {
+  const replay = createFallbackReplay();
+  const followedPlayers: string[] = [];
+  let attachedPlayerId: string | null = null;
+  const replayPlayer = {
+    replay,
+    getState() {
+      return {
+        frameIndex: 0,
+        currentTime: 0,
+        cameraViewMode: attachedPlayerId === null ? "free" : "follow",
+        attachedPlayerId,
+      };
+    },
+  };
+  const cameraControls = {
+    autoPossessionEnabled: true,
+    followPlayerWithReplayCamera(playerId: string) {
+      attachedPlayerId = playerId;
+      followedPlayers.push(playerId);
+    },
+  };
+  const controller = new AutoPossessionCameraController({
+    getReplayPlayer: () => replayPlayer as never,
+    getStatsTimeline: () => null,
+    getCameraControlsController: () => cameraControls as never,
+  });
+
+  controller.update({ frameIndex: 0, nextFrameIndex: 0, alpha: 0, currentTime: 0 });
+  controller.update({ frameIndex: 1, nextFrameIndex: 1, alpha: 0, currentTime: 0.7 });
+  controller.update({ frameIndex: 2, nextFrameIndex: 2, alpha: 0, currentTime: 1.1 });
+  controller.update({ frameIndex: 3, nextFrameIndex: 3, alpha: 0, currentTime: 1.3 });
+  controller.update({ frameIndex: 4, nextFrameIndex: 4, alpha: 0, currentTime: 1.6 });
+
+  assert.deepEqual(followedPlayers, ["Steam:blue-id"]);
+});
+
+test("auto possession camera switches after stable possession", () => {
+  const replay = createFallbackReplay();
+  const possessionSpans: AutoPossessionSpan[] = [
+    {
+      playerId: "Steam:orange-id",
+      startFrame: 1,
+      endFrame: 4,
+      startTime: 0.7,
+      endTime: 2,
+    },
+  ];
   const followedPlayers: string[] = [];
   const followOptions: unknown[] = [];
   let attachedPlayerId: string | null = null;
@@ -182,6 +232,7 @@ test("auto possession camera debounces nearest-player fallback switches", () => 
     getStatsTimeline: () => null,
     getCameraControlsController: () => cameraControls as never,
   });
+  (controller as unknown as { spans: AutoPossessionSpan[] }).spans = possessionSpans;
 
   controller.update({ frameIndex: 0, nextFrameIndex: 0, alpha: 0, currentTime: 0 });
   controller.update({ frameIndex: 1, nextFrameIndex: 1, alpha: 0, currentTime: 0.7 });
@@ -198,4 +249,50 @@ test("auto possession camera debounces nearest-player fallback switches", () => 
     ),
     [false, false],
   );
+});
+
+test("auto possession camera uses current followed player as fixed fallback", () => {
+  const replay = {
+    ballFrames: [{ position: { x: 0, y: 0, z: 0 } }],
+    players: [
+      {
+        id: "Steam:blue-id",
+        frames: [{ position: { x: 500, y: 0, z: 0 } }],
+      },
+      {
+        id: "Steam:orange-id",
+        frames: [{ position: { x: 100, y: 0, z: 0 } }],
+      },
+    ],
+  } as ReplayModel;
+  const followedPlayers: string[] = [];
+  let attachedPlayerId: string | null = "Steam:blue-id";
+  const replayPlayer = {
+    replay,
+    getState() {
+      return {
+        frameIndex: 0,
+        currentTime: 0,
+        cameraViewMode: "follow",
+        attachedPlayerId,
+      };
+    },
+  };
+  const cameraControls = {
+    autoPossessionEnabled: true,
+    followPlayerWithReplayCamera(playerId: string) {
+      attachedPlayerId = playerId;
+      followedPlayers.push(playerId);
+    },
+  };
+  const controller = new AutoPossessionCameraController({
+    getReplayPlayer: () => replayPlayer as never,
+    getStatsTimeline: () => null,
+    getCameraControlsController: () => cameraControls as never,
+  });
+
+  controller.update({ frameIndex: 0, nextFrameIndex: 0, alpha: 0, currentTime: 0 });
+
+  assert.deepEqual(followedPlayers, []);
+  assert.equal(attachedPlayerId, "Steam:blue-id");
 });

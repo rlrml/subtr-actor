@@ -28,8 +28,7 @@ type PlayerPossessionEvent = StatsEventPayload<"player_possession">;
 type Position3 = { x: number; y: number; z: number };
 
 const AUTO_CAMERA_MIN_SWITCH_INTERVAL_SECONDS = 1.2;
-const AUTO_CAMERA_POSSESSION_STABILITY_SECONDS = 0.35;
-const AUTO_CAMERA_NEAREST_PLAYER_STABILITY_SECONDS = 0.8;
+const AUTO_CAMERA_POSSESSION_STABILITY_SECONDS = 0.8;
 
 export function buildAutoPossessionCameraSpans(
   statsTimeline: StatsTimeline | null,
@@ -211,6 +210,11 @@ export class AutoPossessionCameraController {
     }
 
     const state = replayPlayer.getState();
+    const currentFollowPlayerId =
+      state.cameraViewMode === "follow" ? (state.attachedPlayerId ?? null) : null;
+    if (this.attachedByAuto === null && currentFollowPlayerId !== null) {
+      this.attachedByAuto = currentFollowPlayerId;
+    }
     if (
       candidate.playerId === this.attachedByAuto &&
       state.cameraViewMode === "follow" &&
@@ -218,7 +222,7 @@ export class AutoPossessionCameraController {
     ) {
       return;
     }
-    if (!this.shouldSwitchToCandidate(candidate, state.attachedPlayerId, info.currentTime)) {
+    if (!this.shouldSwitchToCandidate(candidate, currentFollowPlayerId, info.currentTime)) {
       return;
     }
 
@@ -246,6 +250,9 @@ export class AutoPossessionCameraController {
     if (attachedPlayerId === null || this.attachedByAuto === null) {
       return true;
     }
+    if (candidate.source === "nearest") {
+      return false;
+    }
 
     const candidateChanged =
       this.pendingCandidate === null ||
@@ -257,12 +264,8 @@ export class AutoPossessionCameraController {
       this.pendingCandidateSinceTime = currentTime;
     }
 
-    const requiredStability =
-      candidate.source === "possession"
-        ? AUTO_CAMERA_POSSESSION_STABILITY_SECONDS
-        : AUTO_CAMERA_NEAREST_PLAYER_STABILITY_SECONDS;
     const candidateStableFor = currentTime - this.pendingCandidateSinceTime;
-    if (candidateStableFor < requiredStability) {
+    if (candidateStableFor < AUTO_CAMERA_POSSESSION_STABILITY_SECONDS) {
       return false;
     }
 
