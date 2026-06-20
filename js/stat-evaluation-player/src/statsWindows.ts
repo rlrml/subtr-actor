@@ -736,9 +736,9 @@ export class StatsWindowsController {
       return;
     }
 
-    const kickoffEnvelope = this.getLatestKickoffEvent(timeline, frameIndex);
+    const kickoffEnvelope = this.getClosestKickoffEvent(timeline, frameIndex);
     if (!kickoffEnvelope) {
-      this.appendStatsWindowEmpty(statsWindow, "No completed kickoff yet.");
+      this.appendStatsWindowEmpty(statsWindow, "No kickoff events loaded.");
       return;
     }
     const kickoff = kickoffEnvelope.payload.payload;
@@ -752,7 +752,7 @@ export class StatsWindowsController {
     const title = document.createElement("h3");
     title.textContent = this.formatKickoffTitle(kickoffEnvelope);
     const subtitle = document.createElement("span");
-    subtitle.textContent = `Resolved at ${formatTime(kickoff.end_time)}`;
+    subtitle.textContent = `Nearest kickoff · resolved at ${formatTime(kickoff.end_time)}`;
     titleGroup.append(title, subtitle);
 
     const victor = document.createElement("strong");
@@ -810,22 +810,31 @@ export class StatsWindowsController {
     statsWindow.body.append(section);
   }
 
-  private getLatestKickoffEvent(
+  private getClosestKickoffEvent(
     timeline: StatsTimeline,
     frameIndex: number,
   ): KickoffEnvelope | null {
-    const completed = statsEventEnvelopes(timeline)
-      .filter(
-        (event): event is KickoffEnvelope =>
-          event.payload.kind === "kickoff" && event.payload.payload.end_frame <= frameIndex,
-      )
+    const kickoffs = statsEventEnvelopes(timeline)
+      .filter((event): event is KickoffEnvelope => event.payload.kind === "kickoff")
       .sort((left, right) => {
-        if (left.payload.payload.end_frame !== right.payload.payload.end_frame) {
-          return right.payload.payload.end_frame - left.payload.payload.end_frame;
+        const leftDistance = this.kickoffFrameDistance(left.payload.payload, frameIndex);
+        const rightDistance = this.kickoffFrameDistance(right.payload.payload, frameIndex);
+        if (leftDistance !== rightDistance) {
+          return leftDistance - rightDistance;
         }
-        return right.payload.payload.end_time - left.payload.payload.end_time;
+        return left.payload.payload.start_frame - right.payload.payload.start_frame;
       });
-    return completed[0] ?? null;
+    return kickoffs[0] ?? null;
+  }
+
+  private kickoffFrameDistance(kickoff: KickoffEvent, frameIndex: number): number {
+    if (frameIndex >= kickoff.start_frame && frameIndex <= kickoff.end_frame) {
+      return 0;
+    }
+    return Math.min(
+      Math.abs(frameIndex - kickoff.start_frame),
+      Math.abs(frameIndex - kickoff.end_frame),
+    );
   }
 
   private renderKickoffMetric(labelText: string, valueText: string): HTMLElement {
