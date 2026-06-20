@@ -7,6 +7,8 @@ import type {
   ReplayPlayerTimelineSegment,
 } from "../types";
 
+export const GOAL_EXPLOSION_PROTECTED_SECONDS = 2;
+
 export function clampFrameIndex(replay: ReplayModel, frameIndex: number): number {
   if (replay.frames.length === 0) {
     return 0;
@@ -97,6 +99,18 @@ function isRenderableKickoffFrame(
   return isKickoffFrame(frame, kickoffGameState) && hasRenderableSamples(replay, frameIndex);
 }
 
+function isGoalExplosionProtectedFrame(
+  replay: ReplayModel,
+  frame: ReplayModel["frames"][number],
+): boolean {
+  return replay.timelineEvents.some(
+    (event) =>
+      event.kind === "goal" &&
+      frame.time >= event.time &&
+      frame.time < event.time + GOAL_EXPLOSION_PROTECTED_SECONDS,
+  );
+}
+
 export function isPostGoalTransitionFrame(
   replay: ReplayModel,
   frame: ReplayModel["frames"][number],
@@ -105,6 +119,7 @@ export function isPostGoalTransitionFrame(
   kickoffGameState: number | null,
 ): boolean {
   return (
+    !isGoalExplosionProtectedFrame(replay, frame) &&
     !isLiveGameplayFrame(frame, liveGameState) &&
     !isRenderableKickoffFrame(replay, frame, frameIndex, kickoffGameState)
   );
