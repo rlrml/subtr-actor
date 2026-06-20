@@ -706,7 +706,7 @@ define_stats_event!(
     approach = [
         "Start candidates on low grounded or low-air dodge rising edges.",
         "Track the car's forward vector through the evaluation window, including vertical flip evidence and final horizontal facing direction.",
-        "Emit when the candidate has pitched through a flip and finishes with a meaningful horizontal facing direction roughly opposite the starting direction.",
+        "Emit when the candidate has pitched through a flip, reaches and retains roughly opposite facing instead of rotating through a full end-over-end flip, and finishes with a meaningful horizontal facing direction.",
     ]
 );
 define_stats_event!(

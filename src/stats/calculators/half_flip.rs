@@ -4,6 +4,7 @@ const HALF_FLIP_EVALUATION_SECONDS: f32 = 0.65;
 const HALF_FLIP_MAX_CANDIDATE_SECONDS: f32 = 1.0;
 const HALF_FLIP_MAX_START_Z: f32 = 90.0;
 const HALF_FLIP_MIN_FORWARD_REVERSAL: f32 = 0.75;
+const HALF_FLIP_MIN_POST_REVERSAL_RETAINED_REVERSAL: f32 = 0.45;
 const HALF_FLIP_MIN_FINAL_FORWARD_HORIZONTAL: f32 = 0.55;
 const HALF_FLIP_MIN_FORWARD_VERTICAL: f32 = 0.55;
 const HALF_FLIP_MIN_CONFIDENCE: f32 = 0.55;
@@ -44,6 +45,7 @@ struct ActiveHalfFlipCandidate {
     best_reorientation_alignment: f32,
     best_forward_reversal: f32,
     latest_forward_reversal: f32,
+    min_forward_reversal_after_reaching_opposite: f32,
     latest_forward_horizontal: f32,
     max_forward_vertical: f32,
 }
@@ -143,6 +145,7 @@ impl HalfFlipCalculator {
                 best_reorientation_alignment: 0.0,
                 best_forward_reversal: 0.0,
                 latest_forward_reversal: 0.0,
+                min_forward_reversal_after_reaching_opposite: 1.0,
                 latest_forward_horizontal: start_forward_xy.length(),
                 max_forward_vertical,
             },
@@ -173,6 +176,11 @@ impl HalfFlipCalculator {
                 candidate.best_forward_reversal = candidate
                     .best_forward_reversal
                     .max(candidate.latest_forward_reversal);
+                if candidate.best_forward_reversal >= HALF_FLIP_MIN_FORWARD_REVERSAL {
+                    candidate.min_forward_reversal_after_reaching_opposite = candidate
+                        .min_forward_reversal_after_reaching_opposite
+                        .min(candidate.latest_forward_reversal);
+                }
                 if velocity_direction.length_squared() > f32::EPSILON {
                     candidate.best_reorientation_alignment = candidate
                         .best_reorientation_alignment
@@ -190,6 +198,8 @@ impl HalfFlipCalculator {
         candidate: ActiveHalfFlipCandidate,
     ) -> Option<HalfFlipEvent> {
         if candidate.latest_forward_reversal < HALF_FLIP_MIN_FORWARD_REVERSAL
+            || candidate.min_forward_reversal_after_reaching_opposite
+                < HALF_FLIP_MIN_POST_REVERSAL_RETAINED_REVERSAL
             || candidate.latest_forward_horizontal < HALF_FLIP_MIN_FINAL_FORWARD_HORIZONTAL
             || candidate.max_forward_vertical < HALF_FLIP_MIN_FORWARD_VERTICAL
         {
