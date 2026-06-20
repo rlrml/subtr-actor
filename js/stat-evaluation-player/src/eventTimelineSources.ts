@@ -11,31 +11,6 @@ import {
 
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);
 const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_PREFIXES = ["stats-stream:"] as const;
-const CURATED_STATS_EVENT_STREAM_IDS = new Set<string>([
-  "timeline",
-  "backboard",
-  "ceiling_shot",
-  "wall_aerial",
-  "wall_aerial_shot",
-  "center",
-  "flick",
-  "dodge_reset",
-  "double_tap",
-  "fifty_fifty",
-  "one_timer",
-  "pass",
-  "ball_carry",
-  "rush",
-  "dodge",
-  "speed_flip",
-  "half_flip",
-  "half_volley",
-  "wavedash",
-  "whiff",
-  "powerslide",
-  "touch",
-  "bump",
-]);
 const EVENT_PLAYLIST_PLAYER_COLORS = [
   "#3b82f6",
   "#06b6d4",
@@ -334,6 +309,11 @@ function formatGenericStatsEventLabel({
     return joinEventDetails([prefix, duration]);
   }
 
+  if (event.payload.kind === "ball_carry") {
+    const prefix = playerName ? `${playerName} ${streamLabel.toLowerCase()}` : streamLabel;
+    return joinEventDetails([prefix, duration]);
+  }
+
   if (event.payload.kind === "player_activity") {
     const state = titleCaseValue(payload.state);
     const prefix = playerName ? `${playerName} positioning` : streamLabel;
@@ -496,12 +476,20 @@ function buildGenericStatsEventSources(
   ctx: StatModuleContext,
   activeTimelineEventSourceIds: ReadonlySet<string>,
   toggleEventSource: (id: string, enabled: boolean) => void,
+  specializedStreamIds: ReadonlySet<string>,
 ): EventTimelineSource[] {
-  return STATS_EVENT_STREAM_COUNT_TYPES.flatMap((streamId) => {
+  const streamIds = [
+    ...new Set([
+      ...STATS_EVENT_STREAM_COUNT_TYPES,
+      ...statsEventEnvelopes(ctx.statsTimeline).map((event) => event.meta.stream),
+    ]),
+  ];
+
+  return streamIds.flatMap((streamId) => {
     const events = statsEventEnvelopes(ctx.statsTimeline).filter(
       (event) => event.meta.stream === streamId,
     );
-    if (CURATED_STATS_EVENT_STREAM_IDS.has(streamId) && events.length > 0) {
+    if (specializedStreamIds.has(streamId) && events.length > 0) {
       return [];
     }
 
@@ -536,6 +524,13 @@ function buildGenericStatsEventSources(
       },
     ];
   });
+}
+
+function getSpecializedStatsEventStreamIds(modules: readonly StatModule[]): Set<string> {
+  return new Set([
+    ...modules.filter((module) => module.getTimelineEvents).map((module) => module.id),
+    ...EVENT_TYPE_TIMELINE_KINDS,
+  ]);
 }
 
 function getEventTimelineMechanicKinds(): string[] {
@@ -630,7 +625,12 @@ export function getEventTimelineSources({
   }
 
   sources.push(
-    ...buildGenericStatsEventSources(ctx, activeTimelineEventSourceIds, toggleEventSource),
+    ...buildGenericStatsEventSources(
+      ctx,
+      activeTimelineEventSourceIds,
+      toggleEventSource,
+      getSpecializedStatsEventStreamIds(modules),
+    ),
   );
 
   for (const kind of getEventTimelineMechanicKinds()) {

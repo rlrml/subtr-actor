@@ -263,6 +263,150 @@ test("event playlist sources include generic stats event streams such as positio
   );
 });
 
+test("ball carry events fall back to generic event stream sources", () => {
+  const replay = {
+    frames: Array.from({ length: 13 }, (_, frame) => ({ time: frame })),
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      ball_carry: [
+        {
+          player_id: { Steam: "blue-id" },
+          is_team_0: true,
+          kind: "carry",
+          start_position: [0, 0, 120],
+          end_position: [100, 0, 120],
+          start_frame: 2,
+          end_frame: 8,
+          start_time: 2,
+          end_time: 8,
+          duration: 6,
+          straight_line_distance: 100,
+          path_distance: 120,
+          average_horizontal_gap: 40,
+          average_vertical_gap: 35,
+          average_speed: 800,
+          touch_count: 2,
+          air_touch_count: 0,
+          air_dribble_origin: null,
+        },
+      ],
+    },
+  });
+  const ctx = { replay, statsTimeline } as StatModuleContext;
+  const timelineSources = getTestTimelineSources(ctx);
+  const ballCarrySource = timelineSources.find((source) => source.id === "stats-stream:ball_carry");
+
+  assert.ok(ballCarrySource);
+  assert.equal(ballCarrySource.group, "Event streams");
+  assert.equal(ballCarrySource.label, "Ball Carry");
+  assert.equal(ballCarrySource.count, 1);
+  assert.deepEqual(ballCarrySource.buildTimelineEvents(), []);
+  assert.deepEqual(
+    ballCarrySource.buildTimelineRanges?.().map((range) => range.label),
+    ["Blue ball carry"],
+  );
+
+  const playlistSources = getEventPlaylistSources(ctx, timelineSources);
+  const items = buildEventPlaylistItems({
+    sources: playlistSources,
+    activeSourceIds: new Set(["stats-stream:ball_carry"]),
+    replayPlayers: replay.players,
+  });
+
+  assert.deepEqual(
+    items.map((item) => ({
+      sourceId: item.sourceId,
+      sourceLabel: item.sourceLabel,
+      label: item.event.label,
+      shortLabel: item.event.shortLabel,
+      playerId: item.event.playerId,
+    })),
+    [
+      {
+        sourceId: "stats-stream:ball_carry",
+        sourceLabel: "Ball Carry",
+        label: "Blue ball carry | 6s",
+        shortLabel: "BC",
+        playerId: "Steam:blue-id",
+      },
+    ],
+  );
+});
+
+test("event sources include emitted streams missing from the canonical stream list", () => {
+  const replay = {
+    frames: Array.from({ length: 13 }, (_, frame) => ({ time: frame })),
+    players: [{ id: "Steam:blue-id", name: "Blue" }],
+    timelineEvents: [],
+  } as ReplayModel;
+  const statsTimeline = createStatsTimeline({
+    events: {
+      events: [
+        {
+          meta: {
+            id: "air_dribble:3:9:0",
+            stream: "air_dribble",
+            label: "Air Dribble",
+            scope: "player",
+            timing: {
+              type: "span",
+              start_time: 3,
+              start_frame: 3,
+              end_time: 9,
+              end_frame: 9,
+            },
+            primary_player: { Steam: "blue-id" },
+            secondary_player: undefined,
+            player_position: [100, 0, 300],
+            ball_position: [100, 0, 300],
+            team_is_team_0: true,
+            confidence: undefined,
+            properties: [],
+          },
+          payload: {
+            kind: "ball_carry",
+            payload: {
+              player_id: { Steam: "blue-id" },
+              is_team_0: true,
+              kind: "air_dribble",
+              start_position: [0, 0, 300],
+              end_position: [100, 0, 300],
+              start_frame: 3,
+              end_frame: 9,
+              start_time: 3,
+              end_time: 9,
+              duration: 6,
+              straight_line_distance: 100,
+              path_distance: 140,
+              average_horizontal_gap: 60,
+              average_vertical_gap: 120,
+              average_speed: 900,
+              touch_count: 3,
+              air_touch_count: 3,
+              air_dribble_origin: "ground_to_air",
+            },
+          },
+        } satisfies Event,
+      ],
+    },
+  });
+  const ctx = { replay, statsTimeline } as StatModuleContext;
+  const timelineSources = getTestTimelineSources(ctx);
+  const airDribbleSource = timelineSources.find(
+    (source) => source.id === "stats-stream:air_dribble",
+  );
+
+  assert.ok(airDribbleSource);
+  assert.equal(airDribbleSource.label, "Air Dribble");
+  assert.equal(airDribbleSource.count, 1);
+
+  const playlistSources = getEventPlaylistSources(ctx, timelineSources);
+  assert.ok(playlistSources.some((source) => source.id === "stats-stream:air_dribble"));
+});
+
 test("controlled play timeline source renders spans as timeline ranges", () => {
   const replay = {
     frames: Array.from({ length: 13 }, (_, frame) => ({
