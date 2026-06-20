@@ -128,6 +128,11 @@ export function createPlayerConfigBindings(
       options.hitboxWireframes.checked = config.overlays.hitboxWireframes;
       options.hitboxOnlyMode.checked = config.overlays.hitboxOnlyMode;
       options.getCameraControlsController()?.applyNameplateLiftUu(config.camera.nameplateLiftUu);
+      options
+        .getCameraControlsController()
+        ?.setAutoPossessionEnabled(config.camera.autoPossession ?? false, {
+          requestConfigSync: false,
+        });
       if (config.playback.rate !== undefined) {
         options.playbackRate.value = `${config.playback.rate}`;
       }

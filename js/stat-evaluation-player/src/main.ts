@@ -12,6 +12,10 @@ import { getAppTemplate } from "./appTemplate.ts";
 import { createReplayLoadModal } from "./replayLoadModal.ts";
 import type { ReplayLoadModalController } from "./replayLoadModal.ts";
 import { createCameraControlsController, type CameraControlsController } from "./cameraControls.ts";
+import {
+  createAutoPossessionCameraController,
+  type AutoPossessionCameraController,
+} from "./autoPossessionCamera.ts";
 import { createStatModules } from "./statModules.ts";
 import type { StatModuleContext } from "./statModules.ts";
 import { createBoostPickupFilterController } from "./boostPickupFilters.ts";
@@ -90,6 +94,7 @@ import { createPlaybackActionController } from "./playbackActions.ts";
 import { createPlayerConfigBindings, type PlayerConfigBindings } from "./playerConfigBindings.ts";
 import { createWindowCommandController } from "./windowCommands.ts";
 import { ShotVisualizationController } from "./shotVisualization.ts";
+import { renderTouchColorLegend } from "./touchColorLegend.ts";
 
 const GOAL_WATCH_LEAD_SECONDS = 4;
 const PLAYING_SNAPSHOT_UI_INTERVAL_MS = 100;
@@ -101,6 +106,7 @@ let statsTimeline: StatsTimeline | null = null;
 let statsFrameLookup: StatsFrameLookup | null = null;
 let unsubscribe: (() => void) | null = null;
 let lastPlayingSnapshotUiUpdateAt = 0;
+let autoPossessionCameraController: AutoPossessionCameraController | null = null;
 
 const boostPickupFilters = createBoostPickupFilterController({
   refreshTimelineRanges() {
@@ -515,6 +521,7 @@ async function loadReplayBundleForDisplay(
     getReplayPlayer: () => replayPlayer,
     setReplayPlayer(value) {
       replayPlayer = value;
+      autoPossessionCameraController?.syncSource();
     },
     getUnsubscribe: () => unsubscribe,
     setUnsubscribe(value) {
@@ -531,6 +538,7 @@ async function loadReplayBundleForDisplay(
     },
     setStatsTimeline(value) {
       statsTimeline = value;
+      autoPossessionCameraController?.syncSource();
     },
     setStatsFrameLookup(value) {
       statsFrameLookup = value;
@@ -722,6 +730,7 @@ export function mountStatEvaluationPlayer(
       attachedPlayer: mustElement<HTMLSelectElement>(root, "#attached-player"),
       cameraViewFreeButton: mustElement<HTMLButtonElement>(root, "#camera-view-free"),
       cameraViewFollowButton: mustElement<HTMLButtonElement>(root, "#camera-view-follow"),
+      cameraViewAutoPossession: mustElement<HTMLInputElement>(root, "#camera-view-auto-possession"),
       cameraViewOverheadButton: mustElement<HTMLButtonElement>(root, "#camera-view-overhead"),
       cameraViewSideButton: mustElement<HTMLButtonElement>(root, "#camera-view-side"),
       usePlayerCameraSettings: mustElement<HTMLInputElement>(root, "#use-player-camera-settings"),
@@ -769,7 +778,19 @@ export function mountStatEvaluationPlayer(
     },
     getReplayPlayer: () => replayPlayer,
     requestConfigSync: scheduleConfigUrlUpdate,
+    onAutoPossessionChange(enabled) {
+      autoPossessionCameraController?.syncSource();
+      if (enabled) {
+        autoPossessionCameraController?.syncCurrentFrame();
+      }
+    },
   });
+  autoPossessionCameraController = createAutoPossessionCameraController({
+    getReplayPlayer: () => replayPlayer,
+    getStatsTimeline: () => statsTimeline,
+    getCameraControlsController: () => cameraControlsController,
+  });
+  renderTouchColorLegend(mustElement<HTMLElement>(root, "#touch-color-legend-body"), ["team"]);
   moduleControlsController = createModuleControlsController({
     elements: {
       summary: mustElement<HTMLDivElement>(root, "#module-summary"),
@@ -927,6 +948,8 @@ export function mountStatEvaluationPlayer(
     mechanicsReviewController?.reset();
     mechanicsReviewController = null;
     loadedReplayName = null;
+    autoPossessionCameraController?.reset();
+    autoPossessionCameraController = null;
     cameraControlsController = null;
     recordingWindowController = null;
     moduleControlsController = null;

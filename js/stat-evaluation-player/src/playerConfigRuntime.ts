@@ -124,6 +124,7 @@ export function getCameraConfigSnapshot({
     ballCam: ballCamMode === undefined ? undefined : ballCamMode === "on",
     useReplayBallCam: ballCamMode === undefined ? undefined : ballCamMode === "player",
     usePlayerCameraSettings: state?.customCameraSettings === null,
+    autoPossession: cameraControlsController?.autoPossessionEnabled,
     customSettings: state?.customCameraSettings,
     nameplateLiftUu: cameraControlsController?.nameplateLiftUu,
   };

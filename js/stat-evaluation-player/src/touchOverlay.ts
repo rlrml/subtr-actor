@@ -7,6 +7,7 @@ const STYLE_ID = "subtr-actor-touch-overlay-styles";
 const BLUE_TOUCH_COLOR = 0x59c3ff;
 const ORANGE_TOUCH_COLOR = 0xffc15c;
 const TOUCH_RING_INNER_RADIUS = 120;
+const TOUCH_RING_BAND_GAP = 4;
 const TOUCH_RING_OUTER_RADIUS = 196;
 const TOUCH_RING_HEIGHT = 24;
 const TOUCH_LABEL_HEIGHT = 210;
@@ -16,22 +17,120 @@ const ADVANCEMENT_ARROW_MIN_LENGTH = 48;
 
 export type TouchOverlayMode = "markers" | "advancement";
 
-export type TouchOverlayColorMode = "team" | "intention" | "kind";
+export type TouchOverlayColorMode =
+  | "team"
+  | "intention"
+  | "kind"
+  | "height_band"
+  | "surface"
+  | "dodge_state"
+  | "flag";
 
-const INTENTION_COLORS: Record<string, number> = {
-  shot: 0xff5d6c,
-  save: 0x4ade80,
-  clear: 0xfacc15,
-  pass: 0x22d3ee,
-  challenge: 0xc084fc,
-  control: 0xf1f5f9,
-  neutral: 0x9aa5b1,
-};
+export const TOUCH_OVERLAY_COLOR_MODE_ORDER: TouchOverlayColorMode[] = [
+  "team",
+  "intention",
+  "kind",
+  "height_band",
+  "surface",
+  "dodge_state",
+  "flag",
+];
 
+export interface TouchColorLegendEntry {
+  label: string;
+  color: number;
+}
+
+export interface TouchColorLegendGroup {
+  title: string;
+  entries: TouchColorLegendEntry[];
+}
+
+export interface TouchMarkerClassification {
+  key: string;
+  value: string;
+  label: string;
+  color: number;
+}
+
+export const TOUCH_TEAM_COLOR_LEGEND: TouchColorLegendEntry[] = [
+  { label: "Blue team", color: BLUE_TOUCH_COLOR },
+  { label: "Orange team", color: ORANGE_TOUCH_COLOR },
+];
+
+export const TOUCH_INTENTION_COLOR_LEGEND: TouchColorLegendEntry[] = [
+  { label: "Shot", color: 0xff5d6c },
+  { label: "Save", color: 0x4ade80 },
+  { label: "Clear", color: 0xfacc15 },
+  { label: "Pass", color: 0x22d3ee },
+  { label: "Challenge", color: 0xc084fc },
+  { label: "Control", color: 0x000000 },
+  { label: "Neutral", color: 0x9aa5b1 },
+];
+
+export const TOUCH_KIND_COLOR_LEGEND: TouchColorLegendEntry[] = [
+  { label: "Control", color: 0x000000 },
+  { label: "Medium hit", color: 0xfacc15 },
+  { label: "Hard hit", color: 0xff5d6c },
+];
+
+export const TOUCH_HEIGHT_BAND_COLOR_LEGEND: TouchColorLegendEntry[] = [
+  { label: "Ground", color: 0xa3e635 },
+  { label: "Low air", color: 0x38bdf8 },
+  { label: "High air", color: 0x818cf8 },
+];
+
+export const TOUCH_SURFACE_COLOR_LEGEND: TouchColorLegendEntry[] = [
+  { label: "Ground", color: 0x84cc16 },
+  { label: "Air", color: 0x60a5fa },
+  { label: "Wall", color: 0xf97316 },
+];
+
+export const TOUCH_DODGE_STATE_COLOR_LEGEND: TouchColorLegendEntry[] = [
+  { label: "No dodge", color: 0x94a3b8 },
+  { label: "Dodge", color: 0xe879f9 },
+];
+
+export const TOUCH_FLAG_COLOR_LEGEND: TouchColorLegendEntry[] = [
+  { label: "First touch", color: 0xffffff },
+  { label: "Contested", color: 0xef4444 },
+];
+
+export const TOUCH_COLOR_LEGEND_GROUPS: TouchColorLegendGroup[] = [
+  { title: "Team", entries: TOUCH_TEAM_COLOR_LEGEND },
+  { title: "Intention", entries: TOUCH_INTENTION_COLOR_LEGEND },
+  { title: "Hit strength", entries: TOUCH_KIND_COLOR_LEGEND },
+  { title: "Height", entries: TOUCH_HEIGHT_BAND_COLOR_LEGEND },
+  { title: "Surface", entries: TOUCH_SURFACE_COLOR_LEGEND },
+  { title: "Dodge", entries: TOUCH_DODGE_STATE_COLOR_LEGEND },
+  { title: "Flags", entries: TOUCH_FLAG_COLOR_LEGEND },
+];
+
+function colorRecord(entries: TouchColorLegendEntry[]): Record<string, number> {
+  return Object.fromEntries(
+    entries.map((entry) => [entry.label.toLowerCase().replaceAll(" ", "_"), entry.color]),
+  );
+}
+
+const INTENTION_COLORS = colorRecord(TOUCH_INTENTION_COLOR_LEGEND);
 const KIND_COLORS: Record<string, number> = {
-  control: 0x4ade80,
-  medium_hit: 0xfacc15,
-  hard_hit: 0xff5d6c,
+  ...colorRecord(TOUCH_KIND_COLOR_LEGEND),
+  medium_hit: TOUCH_KIND_COLOR_LEGEND[1]!.color,
+  hard_hit: TOUCH_KIND_COLOR_LEGEND[2]!.color,
+};
+const HEIGHT_BAND_COLORS: Record<string, number> = {
+  ...colorRecord(TOUCH_HEIGHT_BAND_COLOR_LEGEND),
+  low_air: TOUCH_HEIGHT_BAND_COLOR_LEGEND[1]!.color,
+  high_air: TOUCH_HEIGHT_BAND_COLOR_LEGEND[2]!.color,
+};
+const SURFACE_COLORS = colorRecord(TOUCH_SURFACE_COLOR_LEGEND);
+const DODGE_STATE_COLORS: Record<string, number> = {
+  ...colorRecord(TOUCH_DODGE_STATE_COLOR_LEGEND),
+  no_dodge: TOUCH_DODGE_STATE_COLOR_LEGEND[0]!.color,
+};
+const BOOLEAN_CLASSIFICATION_COLORS: Record<string, number> = {
+  first_touch: TOUCH_FLAG_COLOR_LEGEND[0]!.color,
+  contested: TOUCH_FLAG_COLOR_LEGEND[1]!.color,
 };
 
 const UNKNOWN_CLASSIFICATION_COLOR = 0x9aa5b1;
@@ -45,6 +144,12 @@ export interface TouchMarker {
   playerName: string;
   kind: string | null;
   intention: string | null;
+  heightBand: string | null;
+  surface: string | null;
+  dodgeState: string | null;
+  firstTouch: boolean;
+  contested: boolean;
+  classifications: TouchMarkerClassification[];
   position: {
     x: number;
     y: number;
@@ -62,8 +167,9 @@ export interface TouchMarker {
 
 interface TouchMarkerView {
   marker: TouchMarker;
-  ring: THREE.Mesh;
-  material: THREE.MeshBasicMaterial;
+  ring: THREE.Group;
+  ringSegments: THREE.Mesh[];
+  ringColorsKey: string;
   arrow: THREE.ArrowHelper;
   label: HTMLDivElement;
 }
@@ -82,12 +188,43 @@ function positiveDelta(current: number, previous: number): number {
   return Math.max(0, current - previous);
 }
 
+export function isTouchOverlayColorMode(value: unknown): value is TouchOverlayColorMode {
+  return (
+    value === "team" ||
+    value === "intention" ||
+    value === "kind" ||
+    value === "height_band" ||
+    value === "surface" ||
+    value === "dodge_state" ||
+    value === "flag"
+  );
+}
+
+export function normalizeTouchOverlayColorModes(
+  value: TouchOverlayColorMode | readonly TouchOverlayColorMode[] | undefined,
+): TouchOverlayColorMode[] {
+  const rawModes = Array.isArray(value) ? value : value ? [value] : ["team"];
+  const seen = new Set<TouchOverlayColorMode>();
+  const modes: TouchOverlayColorMode[] = [];
+  for (const mode of rawModes) {
+    if (isTouchOverlayColorMode(mode) && !seen.has(mode)) {
+      seen.add(mode);
+      modes.push(mode);
+    }
+  }
+  return modes.length > 0 ? modes : ["team"];
+}
+
+function primaryColorMode(colorModes: readonly TouchOverlayColorMode[]): TouchOverlayColorMode {
+  return colorModes[colorModes.length - 1] ?? "team";
+}
+
 function touchCreditLabel(
   marker: TouchMarker,
   mode: TouchOverlayMode,
-  colorMode: TouchOverlayColorMode,
+  colorModes: readonly TouchOverlayColorMode[],
 ): string {
-  const classification = touchMarkerClassification(marker, colorMode);
+  const classification = touchMarkerClassification(marker, primaryColorMode(colorModes));
   const suffix = classification ? ` · ${classification.replaceAll("_", " ")}` : "";
   if (mode === "markers") {
     return `${marker.playerName}${suffix}`;
@@ -114,7 +251,81 @@ function touchMarkerClassification(
   if (colorMode === "kind") {
     return marker.kind;
   }
+  if (colorMode === "height_band") {
+    return marker.heightBand;
+  }
+  if (colorMode === "surface") {
+    return marker.surface;
+  }
+  if (colorMode === "dodge_state") {
+    return marker.dodgeState;
+  }
+  if (colorMode === "flag") {
+    return marker.contested ? "contested" : marker.firstTouch ? "first_touch" : null;
+  }
   return null;
+}
+
+function formatClassificationValue(value: string): string {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function stringClassification(
+  key: string,
+  value: unknown,
+  colors: Record<string, number>,
+): TouchMarkerClassification | null {
+  if (typeof value !== "string" || value.length === 0) {
+    return null;
+  }
+
+  return {
+    key,
+    value,
+    label: formatClassificationValue(value),
+    color: colors[value] ?? UNKNOWN_CLASSIFICATION_COLOR,
+  };
+}
+
+function booleanClassification(
+  key: string,
+  enabled: unknown,
+  label: string,
+): TouchMarkerClassification | null {
+  if (enabled !== true) {
+    return null;
+  }
+
+  return {
+    key,
+    value: "true",
+    label,
+    color: BOOLEAN_CLASSIFICATION_COLORS[key] ?? UNKNOWN_CLASSIFICATION_COLOR,
+  };
+}
+
+function buildTouchMarkerClassifications(event: {
+  kind?: unknown;
+  intention?: unknown;
+  height_band?: unknown;
+  surface?: unknown;
+  dodge_state?: unknown;
+  first_touch?: unknown;
+  contested?: unknown;
+}): TouchMarkerClassification[] {
+  return [
+    stringClassification("intention", event.intention, INTENTION_COLORS),
+    stringClassification("kind", event.kind, KIND_COLORS),
+    stringClassification("height_band", event.height_band, HEIGHT_BAND_COLORS),
+    stringClassification("surface", event.surface, SURFACE_COLORS),
+    stringClassification("dodge_state", event.dodge_state, DODGE_STATE_COLORS),
+    booleanClassification("first_touch", event.first_touch, "First touch"),
+    booleanClassification("contested", event.contested, "Contested"),
+  ].filter((classification): classification is TouchMarkerClassification => classification != null);
 }
 
 export function touchMarkerColor(marker: TouchMarker, colorMode: TouchOverlayColorMode): number {
@@ -124,7 +335,33 @@ export function touchMarkerColor(marker: TouchMarker, colorMode: TouchOverlayCol
   if (colorMode === "kind") {
     return KIND_COLORS[marker.kind ?? ""] ?? UNKNOWN_CLASSIFICATION_COLOR;
   }
+  if (colorMode === "height_band") {
+    return HEIGHT_BAND_COLORS[marker.heightBand ?? ""] ?? UNKNOWN_CLASSIFICATION_COLOR;
+  }
+  if (colorMode === "surface") {
+    return SURFACE_COLORS[marker.surface ?? ""] ?? UNKNOWN_CLASSIFICATION_COLOR;
+  }
+  if (colorMode === "dodge_state") {
+    return DODGE_STATE_COLORS[marker.dodgeState ?? ""] ?? UNKNOWN_CLASSIFICATION_COLOR;
+  }
+  if (colorMode === "flag") {
+    if (marker.contested) {
+      return BOOLEAN_CLASSIFICATION_COLORS.contested ?? UNKNOWN_CLASSIFICATION_COLOR;
+    }
+    if (marker.firstTouch) {
+      return BOOLEAN_CLASSIFICATION_COLORS.first_touch ?? UNKNOWN_CLASSIFICATION_COLOR;
+    }
+    return UNKNOWN_CLASSIFICATION_COLOR;
+  }
   return marker.isTeamZero ? BLUE_TOUCH_COLOR : ORANGE_TOUCH_COLOR;
+}
+
+export function touchMarkerRingColors(
+  marker: TouchMarker,
+  colorModes: readonly TouchOverlayColorMode[],
+): number[] {
+  const modes = colorModes.length > 0 ? colorModes : (["team"] satisfies TouchOverlayColorMode[]);
+  return modes.map((colorMode) => touchMarkerColor(marker, colorMode));
 }
 
 export function buildTouchMarkers(
@@ -152,6 +389,7 @@ export function buildTouchMarkers(
     const movementEndPosition = movement ? replay.ballFrames[movement.end_frame]?.position : null;
     const endBallPosition = movementEndPosition ?? ballPosition;
     const markerIndex = markers.length;
+    const classifications = buildTouchMarkerClassifications(event);
     markers.push({
       id: `touch-stat:${event.frame}:${playerId}:${markerIndex + 1}`,
       time: replay.frames[event.frame]?.time ?? event.time,
@@ -161,6 +399,12 @@ export function buildTouchMarkers(
       playerName: replay.players.find((player) => player.id === playerId)?.name ?? playerId,
       kind: typeof event.kind === "string" ? event.kind : null,
       intention: typeof event.intention === "string" ? event.intention : null,
+      heightBand: typeof event.height_band === "string" ? event.height_band : null,
+      surface: typeof event.surface === "string" ? event.surface : null,
+      dodgeState: typeof event.dodge_state === "string" ? event.dodge_state : null,
+      firstTouch: event.first_touch === true,
+      contested: event.contested === true,
+      classifications,
       position: {
         x: ballPosition.x,
         y: ballPosition.y,
@@ -211,7 +455,8 @@ function ensureStyles(): void {
 
     .sap-touch-overlay-label {
       position: absolute;
-      min-width: max-content;
+      width: max-content;
+      max-width: min(26rem, calc(100% - 1rem));
       padding: 0.22rem 0.55rem;
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.16);
@@ -224,6 +469,9 @@ function ensureStyles(): void {
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
       backdrop-filter: blur(8px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       will-change: transform, opacity;
     }
 
@@ -293,6 +541,66 @@ function disposeArrow(arrow: THREE.ArrowHelper): void {
   }
 }
 
+function disposeRingSegments(view: TouchMarkerView): void {
+  for (const segment of view.ringSegments) {
+    segment.removeFromParent();
+    segment.geometry.dispose();
+    const materials = Array.isArray(segment.material) ? segment.material : [segment.material];
+    for (const material of materials) {
+      material.dispose();
+    }
+  }
+  view.ringSegments = [];
+  view.ringColorsKey = "";
+}
+
+function createRingSegment(color: number, innerRadius: number, outerRadius: number): THREE.Mesh {
+  const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 48, 1);
+  const material = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.7,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    depthTest: false,
+  });
+  const segment = new THREE.Mesh(geometry, material);
+  segment.rotation.x = -Math.PI / 2;
+  segment.renderOrder = 40;
+  return segment;
+}
+
+function setRingSegments(view: TouchMarkerView, colors: readonly number[]): void {
+  const normalizedColors = colors.length > 0 ? colors : [UNKNOWN_CLASSIFICATION_COLOR];
+  const colorsKey = normalizedColors.join("|");
+  if (view.ringColorsKey === colorsKey) {
+    return;
+  }
+
+  disposeRingSegments(view);
+  const ringCount = normalizedColors.length;
+  const totalGap = TOUCH_RING_BAND_GAP * Math.max(0, ringCount - 1);
+  const bandWidth = (TOUCH_RING_OUTER_RADIUS - TOUCH_RING_INNER_RADIUS - totalGap) / ringCount;
+  const segments = normalizedColors.map((color, index) => {
+    const innerRadius = TOUCH_RING_INNER_RADIUS + index * (bandWidth + TOUCH_RING_BAND_GAP);
+    return createRingSegment(color, innerRadius, innerRadius + bandWidth);
+  });
+  for (const segment of segments) {
+    view.ring.add(segment);
+    view.ringSegments.push(segment);
+  }
+  view.ringColorsKey = colorsKey;
+}
+
+function setRingOpacity(view: TouchMarkerView, opacity: number): void {
+  for (const segment of view.ringSegments) {
+    const materials = Array.isArray(segment.material) ? segment.material : [segment.material];
+    for (const material of materials) {
+      material.opacity = opacity;
+    }
+  }
+}
+
 export class TouchEventOverlay {
   private readonly scene: ReplayScene;
   private readonly container: HTMLElement;
@@ -310,7 +618,7 @@ export class TouchEventOverlay {
   private originalContainerPosition = "";
   private decaySeconds = DEFAULT_DECAY_SECONDS;
   private mode: TouchOverlayMode = "markers";
-  private colorMode: TouchOverlayColorMode = "team";
+  private colorModes: TouchOverlayColorMode[] = ["team"];
 
   constructor(
     scene: ReplayScene,
@@ -321,6 +629,7 @@ export class TouchEventOverlay {
       decaySeconds?: number;
       mode?: TouchOverlayMode;
       colorMode?: TouchOverlayColorMode;
+      colorModes?: TouchOverlayColorMode[];
     },
   ) {
     ensureStyles();
@@ -328,7 +637,7 @@ export class TouchEventOverlay {
     this.container = container;
     this.decaySeconds = Math.max(0.1, options?.decaySeconds ?? DEFAULT_DECAY_SECONDS);
     this.mode = options?.mode ?? "markers";
-    this.colorMode = options?.colorMode ?? "team";
+    this.colorModes = normalizeTouchOverlayColorModes(options?.colorModes ?? options?.colorMode);
     this.labelOffset.set(0, 0, TOUCH_LABEL_HEIGHT);
     this.markers = buildTouchMarkers(statsTimeline, replay);
 
@@ -362,12 +671,16 @@ export class TouchEventOverlay {
     this.mode = mode;
   }
 
-  getColorMode(): TouchOverlayColorMode {
-    return this.colorMode;
+  getColorModes(): TouchOverlayColorMode[] {
+    return [...this.colorModes];
   }
 
   setColorMode(colorMode: TouchOverlayColorMode): void {
-    this.colorMode = colorMode;
+    this.setColorModes([colorMode]);
+  }
+
+  setColorModes(colorModes: readonly TouchOverlayColorMode[]): void {
+    this.colorModes = normalizeTouchOverlayColorModes([...colorModes]);
   }
 
   update(currentTime: number): void {
@@ -379,8 +692,7 @@ export class TouchEventOverlay {
         continue;
       }
       view.ring.removeFromParent();
-      view.ring.geometry.dispose();
-      view.material.dispose();
+      disposeRingSegments(view);
       disposeArrow(view.arrow);
       view.label.remove();
       this.views.delete(id);
@@ -393,9 +705,11 @@ export class TouchEventOverlay {
       const baseOpacity = 0.1 + 0.6 * life;
       const scale = 0.95 + (1 - life) * 0.28;
 
-      const color = touchMarkerColor(marker, this.colorMode);
-      view.material.opacity = baseOpacity;
-      view.material.color.setHex(color);
+      const primaryMode = primaryColorMode(this.colorModes);
+      const color = touchMarkerColor(marker, primaryMode);
+      const ringColors = touchMarkerRingColors(marker, this.colorModes);
+      setRingSegments(view, ringColors);
+      setRingOpacity(view, baseOpacity);
       view.arrow.setColor(color);
       view.ring.position.set(
         marker.position.x,
@@ -403,18 +717,19 @@ export class TouchEventOverlay {
         marker.position.z + TOUCH_RING_HEIGHT,
       );
       view.ring.scale.setScalar(scale);
-      view.label.textContent = touchCreditLabel(marker, this.mode, this.colorMode);
+      view.label.textContent = touchCreditLabel(marker, this.mode, this.colorModes);
       view.label.classList.toggle(
         "sap-touch-overlay-label-advancement",
         this.mode === "advancement",
       );
-      const teamTinted = this.colorMode === "team";
+      const teamTinted = primaryMode === "team";
       view.label.classList.toggle("sap-touch-overlay-label-blue", teamTinted && marker.isTeamZero);
       view.label.classList.toggle(
         "sap-touch-overlay-label-orange",
         teamTinted && !marker.isTeamZero,
       );
       view.label.style.borderColor = teamTinted ? "" : `#${color.toString(16).padStart(6, "0")}cc`;
+      view.label.style.background = teamTinted ? "" : `#${color.toString(16).padStart(6, "0")}66`;
 
       this.updateArrow(view, marker, baseOpacity);
 
@@ -444,8 +759,7 @@ export class TouchEventOverlay {
   dispose(): void {
     for (const view of this.views.values()) {
       view.ring.removeFromParent();
-      view.ring.geometry.dispose();
-      view.material.dispose();
+      disposeRingSegments(view);
       disposeArrow(view.arrow);
       view.label.remove();
     }
@@ -464,19 +778,7 @@ export class TouchEventOverlay {
       return existing;
     }
 
-    const material = new THREE.MeshBasicMaterial({
-      color: marker.isTeamZero ? BLUE_TOUCH_COLOR : ORANGE_TOUCH_COLOR,
-      transparent: true,
-      opacity: 0.7,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      depthTest: false,
-    });
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(TOUCH_RING_INNER_RADIUS, TOUCH_RING_OUTER_RADIUS, 48),
-      material,
-    );
-    ring.rotation.x = -Math.PI / 2;
+    const ring = new THREE.Group();
     ring.renderOrder = 40;
     this.group.add(ring);
 
@@ -506,7 +808,8 @@ export class TouchEventOverlay {
     const view = {
       marker,
       ring,
-      material,
+      ringSegments: [],
+      ringColorsKey: "",
       arrow,
       label,
     };

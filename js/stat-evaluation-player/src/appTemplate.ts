@@ -32,6 +32,7 @@ export function getAppTemplate(): string {
               <button type="button" data-window-toggle="replay-loading">Replay loading</button>
               <button type="button" data-window-toggle="boost-pickups">Boost pickup filters</button>
               <button type="button" data-window-toggle="touch-controls">Touch controls</button>
+              <button type="button" data-window-toggle="touch-legend">Touch color legend</button>
               <button type="button" data-window-toggle="shot-visualization">Shot chart</button>
               <button type="button" data-window-toggle="missed-events">Missed events</button>
               <button type="button" data-create-stats-window="player">New player stats</button>
@@ -78,6 +79,10 @@ export function getAppTemplate(): string {
               </button>
               <button id="camera-view-side" type="button" disabled>Diagonal</button>
             </div>
+            <label class="toggle">
+              <input id="camera-view-auto-possession" type="checkbox" disabled />
+              <span>Auto possession</span>
+            </label>
             <label class="toggle">
               <input id="use-player-camera-settings" type="checkbox" disabled />
               <span>Use player camera settings</span>
@@ -309,6 +314,23 @@ export function getAppTemplate(): string {
                 <dd id="replay-fps-readout">–</dd>
               </div>
             </div>
+          </section>
+
+          <section
+            class="floating-window floating-window-touch-legend"
+            data-window-id="touch-legend"
+            hidden
+            style="--window-x: calc(100vw - 25rem); --window-y: 4.25rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <h2>Touch color legend</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="touch-legend">
+                Hide
+              </button>
+            </header>
+            <div id="touch-color-legend-body" class="touch-color-legend-body"></div>
           </section>
 
           <section
