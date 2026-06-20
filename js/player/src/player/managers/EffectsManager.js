@@ -801,6 +801,10 @@ class SimplifiedExplosionPool {
 
 // Helper to get/create simplified explosion pool
 function getSimplifiedExplosionPool(scene, renderer = null, camera = null) {
+  if (_simplifiedExplosionPool && _simplifiedExplosionPool.scene !== scene) {
+    _simplifiedExplosionPool.dispose?.();
+    _simplifiedExplosionPool = null;
+  }
   if (!_simplifiedExplosionPool) {
     _simplifiedExplosionPool = new SimplifiedExplosionPool(scene, renderer, camera);
   }
@@ -1395,6 +1399,10 @@ class GoalExplosionPool {
 }
 
 function getGoalExplosionPool(scene, renderer = null, camera = null) {
+  if (_goalExplosionPool && _goalExplosionPool.scene !== scene) {
+    _goalExplosionPool.dispose?.();
+    _goalExplosionPool = null;
+  }
   if (!_goalExplosionPool) {
     _goalExplosionPool = new GoalExplosionPool(scene, renderer, camera);
   }
