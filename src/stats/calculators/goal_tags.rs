@@ -1515,7 +1515,7 @@ impl FlipIntoBallGoalCalculator {
         };
         same_touch
             && candidate.is_team_0 == goal.scoring_team_is_team_0
-            && candidate.dodge_state == FLIP_INTO_BALL_DODGE_STATE_LABEL
+            && candidate.has_tag("dodge_state", FLIP_INTO_BALL_DODGE_STATE_LABEL)
     }
 }
 

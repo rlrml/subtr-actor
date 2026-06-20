@@ -771,7 +771,7 @@ impl FlickCalculator {
                 (Some(event_id), Some(touch_id)) => event_id == touch_id,
                 _ => event.player == *touch_player && event.frame == touch_event.frame,
             };
-            same_touch && event.dodge_state == "dodge"
+            same_touch && event.has_tag("dodge_state", "dodge")
         })
     }
 

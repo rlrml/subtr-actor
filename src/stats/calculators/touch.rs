@@ -78,7 +78,32 @@ struct TouchClassification {
     dodge_state: TouchDodgeState,
 }
 
-/// A classified ball touch with strength kind, surface/height context, and an inferred intention.
+/// One classification tag on a touch: a `(group, value)` pair, mirroring the
+/// [`StatLabel`](crate::stats::StatLabel) `(key, value)` model the accumulators
+/// already count by. A touch carries a *set* of these instead of a fixed list
+/// of bespoke fields, so independent classifications coexist (a `boom` action
+/// and an `advance` possession outcome are separate tags, not rivals for one
+/// slot). Within a single-valued group (e.g. `kind`, `surface`, `possession`)
+/// at most one tag is present; flag groups (`contested`) are present or absent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct TouchTag {
+    pub group: String,
+    pub value: String,
+}
+
+impl TouchTag {
+    fn new(group: &str, value: &str) -> Self {
+        Self {
+            group: group.to_owned(),
+            value: value.to_owned(),
+        }
+    }
+}
+
+/// A classified ball touch, carrying its classification as a set of [`TouchTag`]s
+/// (strength kind, surface/height context, action, possession outcome, and a
+/// contested flag) rather than fixed fields.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct TouchClassificationEvent {
@@ -103,15 +128,11 @@ pub struct TouchClassificationEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ball_position: Option<[f32; 3]>,
     pub is_team_0: bool,
-    pub kind: String,
-    pub height_band: String,
-    pub surface: String,
-    pub dodge_state: String,
-    pub intention: String,
+    /// The touch's classification tags (group + value). See [`TouchTag`].
+    /// Groups: `kind`, `height_band`, `surface`, `dodge_state`, `reception`,
+    /// `action`, optional `possession`, and the optional `contested` flag.
     #[serde(default)]
-    pub first_touch: bool,
-    #[serde(default)]
-    pub contested: bool,
+    pub tags: Vec<TouchTag>,
     #[serde(default)]
     pub role: RoleState,
     #[serde(default)]
@@ -119,6 +140,71 @@ pub struct TouchClassificationEvent {
     pub ball_speed_change: f32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ball_movement: Option<TouchBallMovement>,
+}
+
+impl TouchClassificationEvent {
+    /// The always-present classification tags for a touch: `kind`,
+    /// `height_band`, `surface`, `dodge_state`, `reception`, `action`, and the
+    /// optional `contested` flag. The retroactive `possession` tag is added
+    /// later via [`Self::set_tag`], so it is not built here. Shared by the live
+    /// construction path and test fixtures so they cannot drift.
+    pub(crate) fn classification_tags(
+        kind: &str,
+        height_band: &str,
+        surface: &str,
+        dodge_state: &str,
+        action: Option<&str>,
+        first_touch: bool,
+        contested: bool,
+    ) -> Vec<TouchTag> {
+        let mut tags = vec![
+            TouchTag::new("kind", kind),
+            TouchTag::new("height_band", height_band),
+            TouchTag::new("surface", surface),
+            TouchTag::new("dodge_state", dodge_state),
+            TouchTag::new(
+                "reception",
+                if first_touch {
+                    "first_touch"
+                } else {
+                    "continuation"
+                },
+            ),
+        ];
+        if let Some(action) = action {
+            tags.push(TouchTag::new("action", action));
+        }
+        if contested {
+            tags.push(TouchTag::new("contested", "contested"));
+        }
+        tags
+    }
+
+    /// Value of the single-valued tag in `group`, if present.
+    pub fn tag(&self, group: &str) -> Option<&str> {
+        self.tags
+            .iter()
+            .find(|tag| tag.group == group)
+            .map(|tag| tag.value.as_str())
+    }
+
+    /// Whether a tag with this exact group and value is present.
+    pub fn has_tag(&self, group: &str, value: &str) -> bool {
+        self.tags
+            .iter()
+            .any(|tag| tag.group == group && tag.value == value)
+    }
+
+    /// Set (replace or insert) the single-valued tag for `group`. Used by the
+    /// retroactive upgrades (dodge-lag, possession) that revise an
+    /// already-emitted touch.
+    fn set_tag(&mut self, group: &str, value: &str) {
+        if let Some(tag) = self.tags.iter_mut().find(|tag| tag.group == group) {
+            tag.value = value.to_owned();
+        } else {
+            self.tags.push(TouchTag::new(group, value));
+        }
+    }
 }
 
 /// Ball movement produced by a touch.
@@ -228,7 +314,7 @@ impl TouchCalculator {
         let finalized = self.ball_movement.finish();
         self.write_finalized_ball_movement(finalized);
         let resolution = self.control_follow.flush();
-        self.apply_control_resolution(resolution);
+        self.apply_possession_resolution(resolution);
     }
 
     fn finalize_ball_movement_at_boundary(&mut self, boundary: Boundary) {
@@ -404,10 +490,10 @@ impl TouchCalculator {
                     });
             let teammate_positions =
                 Self::teammate_positions(players, player_id, touch_event.team_is_team_0);
-            let control_resolution = self
+            let possession_resolution = self
                 .control_follow
                 .observe_touch(player_id, touch_event.time);
-            self.apply_control_resolution(control_resolution);
+            self.apply_possession_resolution(possession_resolution);
             let resolution = self.intention_classifier.classify(
                 touch_event,
                 player_id,
@@ -419,6 +505,15 @@ impl TouchCalculator {
                     teammate_positions: &teammate_positions,
                     contested,
                 },
+            );
+            let tags = TouchClassificationEvent::classification_tags(
+                classification.kind.as_label_value(),
+                classification.height_band.as_label().value,
+                classification.surface.as_label_value(),
+                classification.dodge_state.as_label_value(),
+                resolution.action.map(TouchAction::as_label_value),
+                resolution.first_touch,
+                resolution.contested,
             );
             let event = TouchClassificationEvent {
                 touch_id: touch_event.touch_id,
@@ -436,13 +531,7 @@ impl TouchCalculator {
                     }),
                 ball_position: ball.position().map(|position| position.to_array()),
                 is_team_0: touch_event.team_is_team_0,
-                kind: classification.kind.as_label_value().to_owned(),
-                height_band: classification.height_band.as_label().value.to_owned(),
-                surface: classification.surface.as_label_value().to_owned(),
-                dodge_state: classification.dodge_state.as_label_value().to_owned(),
-                intention: resolution.intention.as_label_value().to_owned(),
-                first_touch: resolution.first_touch,
-                contested: resolution.contested,
+                tags,
                 role,
                 play_depth,
                 ball_speed_change,
@@ -462,27 +551,32 @@ impl TouchCalculator {
                     touch_time: touch_event.time,
                 });
             }
-            if matches!(
-                resolution.intention,
-                TouchIntention::Pass | TouchIntention::Neutral
-            ) {
+            // Watch the possession outcome for the looser, recoverable touches —
+            // passes, clears, booms, and action-less loose pokes — but not shots
+            // or saves, which are not possession plays.
+            if resolution
+                .action
+                .is_none_or(TouchAction::watches_possession)
+            {
                 self.control_follow
                     .open(touch_index, player_id, touch_event.time);
             }
         }
     }
 
-    /// Apply a closed control-follow window: upgrade the touch's intention to
-    /// control when the toucher stayed with the ball or earned the follow-up.
-    fn apply_control_resolution(&mut self, resolution: Option<ControlResolution>) {
+    /// Apply a closed control-follow window: tag the touch's possession outcome
+    /// (control or advance) when the toucher kept the ball (stayed with it, or
+    /// won the follow-up touch). The action tag is left untouched, so a
+    /// recovered boom stays a boom.
+    fn apply_possession_resolution(&mut self, resolution: Option<PossessionResolution>) {
         let Some(resolution) = resolution else {
             return;
         };
-        if !resolution.control {
+        let Some(possession) = resolution.possession else {
             return;
-        }
+        };
         if let Some(event) = self.events.get_mut(resolution.touch_index) {
-            event.intention = TouchIntention::Control.as_label_value().to_owned();
+            event.set_tag("possession", possession.as_label_value());
         }
     }
 
@@ -509,7 +603,7 @@ impl TouchCalculator {
         });
         for touch_index in resolved {
             if let Some(event) = self.events.get_mut(touch_index) {
-                event.dodge_state = TouchDodgeState::Dodge.as_label_value().to_owned();
+                event.set_tag("dodge_state", TouchDodgeState::Dodge.as_label_value());
             }
         }
     }
@@ -536,7 +630,7 @@ impl TouchCalculator {
             player_sample.and_then(PlayerSample::position),
             player_sample.and_then(PlayerSample::velocity),
         );
-        self.apply_control_resolution(resolution);
+        self.apply_possession_resolution(resolution);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -789,7 +883,7 @@ impl TouchCalculator {
             self.pending_dodge_upgrades.clear();
             self.intention_classifier.reset();
             let resolution = self.control_follow.flush();
-            self.apply_control_resolution(resolution);
+            self.apply_possession_resolution(resolution);
             return Ok(());
         }
         self.intention_classifier

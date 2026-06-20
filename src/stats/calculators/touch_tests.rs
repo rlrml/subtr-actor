@@ -305,7 +305,7 @@ fn touch_event_dodge_contact_flag_counts_as_dodge_hit() {
     let stats = calculator.player_stats().get(&player_id).unwrap();
     assert_eq!(stats.dodge_touch_count(), 1);
     assert_eq!(stats.dodge_hit_count(), 1);
-    assert_eq!(calculator.events()[0].dodge_state, "dodge");
+    assert_eq!(calculator.events()[0].tag("dodge_state"), Some("dodge"));
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn dodge_byte_lagging_one_frame_upgrades_touch_to_dodge() {
             &LivePlayState::active_play(),
         )
         .unwrap();
-    assert_eq!(calculator.events()[0].dodge_state, "no_dodge");
+    assert_eq!(calculator.events()[0].tag("dodge_state"), Some("no_dodge"));
     // One frame later the dodge byte flips on (no new touch this frame).
     calculator
         .update(
@@ -364,7 +364,7 @@ fn dodge_byte_lagging_one_frame_upgrades_touch_to_dodge() {
         )
         .unwrap();
 
-    assert_eq!(calculator.events()[0].dodge_state, "dodge");
+    assert_eq!(calculator.events()[0].tag("dodge_state"), Some("dodge"));
     let stats = calculator.player_stats().get(&player_id).unwrap();
     assert_eq!(stats.dodge_touch_count(), 1);
 }
@@ -423,7 +423,7 @@ fn dodge_byte_outside_tolerance_window_does_not_upgrade_touch() {
             .unwrap();
     }
 
-    assert_eq!(calculator.events()[0].dodge_state, "no_dodge");
+    assert_eq!(calculator.events()[0].tag("dodge_state"), Some("no_dodge"));
 }
 
 #[test]
@@ -957,8 +957,9 @@ fn soft_touch_followed_by_staying_with_ball_upgrades_intention_to_control() {
         )
         .unwrap();
 
-    assert_eq!(calculator.events()[0].intention, "neutral");
-    assert!(calculator.events()[0].first_touch);
+    assert_eq!(calculator.events()[0].tag("action"), None);
+    assert_eq!(calculator.events()[0].tag("possession"), None);
+    assert_eq!(calculator.events()[0].tag("reception"), Some("first_touch"));
 
     // Stay glued to the (stationary) ball until the control-follow window
     // ages out and resolves.
@@ -979,15 +980,16 @@ fn soft_touch_followed_by_staying_with_ball_upgrades_intention_to_control() {
             .unwrap();
     }
 
-    assert_eq!(calculator.events()[0].intention, "control");
+    assert_eq!(calculator.events()[0].tag("possession"), Some("control"));
+    assert_eq!(calculator.events()[0].tag("action"), None);
     let stats = calculator.player_stats().get(&player_id).unwrap();
-    assert_eq!(stats.intention_count("control"), 1);
-    assert_eq!(stats.first_touch_intention_count("control"), 1);
+    assert_eq!(stats.possession_count("control"), 1);
+    assert_eq!(stats.first_touch_possession_count("control"), 1);
     assert_eq!(stats.first_touch_count, 1);
 }
 
 #[test]
-fn touch_where_ball_leaves_the_player_stays_neutral() {
+fn touch_where_ball_leaves_the_player_has_no_action_or_possession() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = TouchCalculator::new();
     let followup_touch_state = TouchState {
@@ -1030,8 +1032,12 @@ fn touch_where_ball_leaves_the_player_stays_neutral() {
             .unwrap();
     }
 
-    assert_eq!(calculator.events()[0].intention, "neutral");
+    // No recognized action and no possession outcome: the touch carries neither
+    // an action nor a possession tag (no "neutral" catch-all), so it contributes
+    // no intention count at all.
+    assert_eq!(calculator.events()[0].tag("action"), None);
+    assert_eq!(calculator.events()[0].tag("possession"), None);
     let stats = calculator.player_stats().get(&player_id).unwrap();
-    assert_eq!(stats.intention_count("control"), 0);
-    assert_eq!(stats.intention_count("neutral"), 1);
+    assert_eq!(stats.possession_count("control"), 0);
+    assert_eq!(stats.touch_count, 1);
 }

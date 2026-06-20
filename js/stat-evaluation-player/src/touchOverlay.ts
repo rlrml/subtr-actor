@@ -18,14 +18,19 @@ export type TouchOverlayMode = "markers" | "advancement";
 
 export type TouchOverlayColorMode = "team" | "intention" | "kind";
 
+// Colors for the back-compat single "intention" (possession outcome if present,
+// else action). Possession outcomes (control/advance) and actions
+// (shot/save/clear/boom/pass) share this space, mirroring the Rust `intention`
+// stat label. A touch with neither has no intention and falls back to the
+// unknown-classification color.
 const INTENTION_COLORS: Record<string, number> = {
   shot: 0xff5d6c,
   save: 0x4ade80,
   clear: 0xfacc15,
+  boom: 0xf472b6,
   pass: 0x22d3ee,
-  challenge: 0xc084fc,
   control: 0xf1f5f9,
-  neutral: 0x9aa5b1,
+  advance: 0xfb923c,
 };
 
 const KIND_COLORS: Record<string, number> = {
@@ -35,6 +40,29 @@ const KIND_COLORS: Record<string, number> = {
 };
 
 const UNKNOWN_CLASSIFICATION_COLOR = 0x9aa5b1;
+
+/** Value of a touch's single-valued classification tag, or null when absent. */
+function touchTagValue(
+  event: { tags?: ReadonlyArray<{ group: string; value: string }> | null },
+  group: string,
+): string | null {
+  const tags = event.tags;
+  if (!Array.isArray(tags)) {
+    return null;
+  }
+  const tag = tags.find((entry) => entry.group === group);
+  return tag ? tag.value : null;
+}
+
+/**
+ * The back-compat single "intention" for a touch: its possession outcome
+ * (control/advance) when present, otherwise its action.
+ */
+function touchIntention(event: {
+  tags?: ReadonlyArray<{ group: string; value: string }> | null;
+}): string | null {
+  return touchTagValue(event, "possession") ?? touchTagValue(event, "action");
+}
 
 export interface TouchMarker {
   id: string;
@@ -159,8 +187,8 @@ export function buildTouchMarkers(
       isTeamZero: event.is_team_0,
       playerId,
       playerName: replay.players.find((player) => player.id === playerId)?.name ?? playerId,
-      kind: typeof event.kind === "string" ? event.kind : null,
-      intention: typeof event.intention === "string" ? event.intention : null,
+      kind: touchTagValue(event, "kind"),
+      intention: touchIntention(event),
       position: {
         x: ballPosition.x,
         y: ballPosition.y,

@@ -166,36 +166,45 @@ function cloneLabeledTouchCounts(
   };
 }
 
+function touchTagValue(event: TouchClassificationEvent, group: string): string | null {
+  return event.tags?.find((tag) => tag.group === group)?.value ?? null;
+}
+
 function applyTouchClassificationEvent(
   accumulator: TouchAccumulator,
   event: TouchClassificationEvent,
   frame: StatsFrame,
 ): void {
+  const kind = touchTagValue(event, "kind") ?? "control";
+  const heightBand = touchTagValue(event, "height_band") ?? "ground";
+  const surface = touchTagValue(event, "surface") ?? "ground";
+  const dodgeState = touchTagValue(event, "dodge_state") ?? "no_dodge";
+
   const stats = accumulator.stats;
   stats.touch_count += 1;
-  if (event.kind === "control") {
+  if (kind === "control") {
     stats.control_touch_count += 1;
-  } else if (event.kind === "medium_hit") {
+  } else if (kind === "medium_hit") {
     stats.medium_hit_count += 1;
-  } else if (event.kind === "hard_hit") {
+  } else if (kind === "hard_hit") {
     stats.hard_hit_count += 1;
   }
 
-  if (event.height_band === "low_air") {
+  if (heightBand === "low_air") {
     stats.aerial_touch_count += 1;
-  } else if (event.height_band === "high_air") {
+  } else if (heightBand === "high_air") {
     stats.aerial_touch_count += 1;
     stats.high_aerial_touch_count += 1;
   }
-  if (event.surface === "wall") {
+  if (surface === "wall") {
     stats.wall_touch_count += 1;
   }
 
   incrementLabeledTouchCount(stats, [
-    { key: "kind", value: event.kind },
-    { key: "height_band", value: event.height_band },
-    { key: "surface", value: event.surface },
-    { key: "dodge_state", value: event.dodge_state },
+    { key: "kind", value: kind },
+    { key: "height_band", value: heightBand },
+    { key: "surface", value: surface },
+    { key: "dodge_state", value: dodgeState },
   ]);
   accumulator.labeledCountsVersion += 1;
   stats.last_touch_time = event.time;

@@ -84,7 +84,9 @@ fn player_possession_spans_are_sane_for_post_eac_doubles_replay() {
         _ => None,
     });
     assert!(
-        touches.iter().any(|touch| touch.first_touch),
+        touches
+            .iter()
+            .any(|touch| touch.tag("reception") == Some("first_touch")),
         "expected at least one first touch in a real match"
     );
     assert!(

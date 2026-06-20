@@ -19,6 +19,12 @@ const STAT_EVENT_MATCH_WINDOW_SECONDS: f32 = 0.75;
 const CLEAR_MAX_ATTACKING_Y: f32 = -GOAL_LINE_Y / 3.0;
 const CLEAR_MIN_BALL_SPEED: f32 = 1300.0;
 const CLEAR_MIN_AWAY_FROM_OWN_GOAL_ALIGNMENT: f32 = 0.2;
+/// A boom is a hard hit sent a long way downfield into space. It only gets
+/// evaluated after shot/clear/pass fail, so the remaining gate is "fast and
+/// pointed toward the opponent half" — distinguishing a deliberate big hit from
+/// a soft loose-ball poke (neutral).
+const BOOM_MIN_BALL_SPEED: f32 = 1500.0;
+const BOOM_MIN_DOWNFIELD_ALIGNMENT: f32 = 0.3;
 const PASS_MIN_BALL_SPEED: f32 = 500.0;
 const PASS_MIN_LEAD_SECONDS: f32 = 0.15;
 const PASS_MAX_LEAD_SECONDS: f32 = 2.5;
@@ -43,47 +49,95 @@ const CONTROL_FOLLOW_MIN_TRACKED_SECONDS: f32 = 0.4;
 /// Fraction of the tracked follow time that must be controlled for the touch
 /// to resolve as control without a follow-up touch.
 const CONTROL_FOLLOW_MIN_CONTROLLED_FRACTION: f32 = 0.7;
+/// In the same-player follow-up path, how far the ball must get from the
+/// toucher at some point in the window for the touch to read as an *advance*
+/// (the ball was played into space and recovered) rather than *control* (the
+/// ball was kept close). Comfortably above [`CONTROL_FOLLOW_MAX_DISTANCE`] so a
+/// brief bobble out of the control radius during a tight dribble still resolves
+/// as control, not advance.
+const ADVANCE_MIN_PEAK_DISTANCE: f32 = 900.0;
 
-/// The primary inferred intention of a ball touch.
+/// What a touch was trying to *do* with the ball, read at contact time.
 ///
-/// Intentions are mutually exclusive; overlaps are resolved by a precedence
-/// ladder (see [`TouchIntentionClassifier::classify`]). Contested and
-/// first-touch context is preserved separately on
-/// [`TouchIntentionResolution`] so no information is lost to the precedence
-/// choice.
+/// This is the touch's action axis: it sits alongside the orthogonal
+/// `possession` axis ([`Possession`], assigned retroactively) and the
+/// `contested` flag, rather than competing with them in one slot. A touch can
+/// therefore be both `Boom` (action) and [`Possession::Advance`] (outcome) — a
+/// dump-in the player chases down stays a boom.
 ///
-/// `Control` is never assigned at touch time: it is an outcome-based upgrade
-/// applied retroactively by [`ControlFollowTracker`] when the toucher stays
-/// with the ball after the touch or earns the follow-up touch.
+/// Actions are mutually exclusive; overlaps are resolved by a precedence ladder
+/// (see [`TouchIntentionClassifier::classify`]). There is no "nothing" action:
+/// a touch with no recognized action simply has no action tag, rather than a
+/// catch-all value. Contested and first-touch context is preserved separately
+/// on [`TouchActionResolution`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TouchIntention {
-    Control,
+pub enum TouchAction {
     Shot,
     Save,
-    Challenge,
     Clear,
+    /// A hard hit sent a long way downfield into space (not toward a teammate,
+    /// not a defensive-third clear, not on goal). Booms count as booms even
+    /// when the hitter recovers them — recovery is recorded on the orthogonal
+    /// [`Possession`] axis.
+    Boom,
     Pass,
-    Neutral,
 }
 
-impl TouchIntention {
+impl TouchAction {
+    pub fn as_label_value(self) -> &'static str {
+        match self {
+            Self::Shot => "shot",
+            Self::Save => "save",
+            Self::Clear => "clear",
+            Self::Boom => "boom",
+            Self::Pass => "pass",
+        }
+    }
+
+    /// Whether a follow window should watch this action for a possession
+    /// outcome. Shots and saves are not possession plays, so a shooter who
+    /// happens to recover their own shot is not credited with control/advance;
+    /// the looser, recoverable actions (pass, clear, boom) are. An action-less
+    /// touch (a loose poke or soft dribble touch) is watched too; callers gate
+    /// on `action.is_none_or(TouchAction::watches_possession)`.
+    pub(crate) fn watches_possession(self) -> bool {
+        matches!(self, Self::Pass | Self::Clear | Self::Boom)
+    }
+}
+
+/// What *happened to possession* after a touch, assigned retroactively by
+/// [`ControlFollowTracker`] once the outcome is known. Orthogonal to
+/// [`TouchAction`]: it answers "did the toucher keep the ball?", independent of
+/// what the touch was trying to do.
+///
+/// - `Control` — the ball is kept close. Either the toucher stays with it
+///   (close and speed-matched) or wins the follow-up touch without the ball
+///   ever leaving the control radius.
+/// - `Advance` — the ball is played into space (it leaves the control radius)
+///   and the same toucher still wins the next touch. The follow-up touch is the
+///   evidence they got to it before anyone else: a self-pass into space they
+///   knew they would win.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Possession {
+    Control,
+    Advance,
+}
+
+impl Possession {
     pub fn as_label_value(self) -> &'static str {
         match self {
             Self::Control => "control",
-            Self::Shot => "shot",
-            Self::Save => "save",
-            Self::Challenge => "challenge",
-            Self::Clear => "clear",
-            Self::Pass => "pass",
-            Self::Neutral => "neutral",
+            Self::Advance => "advance",
         }
     }
 }
 
 /// The resolved touch intention with supporting context.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TouchIntentionResolution {
-    pub intention: TouchIntention,
+pub struct TouchActionResolution {
+    /// The recognized action, or `None` when the touch has no notable action
+    /// (it is described by its other tags — kind, possession, etc. — instead).
+    pub action: Option<TouchAction>,
     pub first_touch: bool,
     pub contested: bool,
 }
@@ -162,48 +216,51 @@ impl TouchIntentionClassifier {
         }
     }
 
-    /// Classify one touch and advance first-touch tracking.
+    /// Classify one touch's action and advance first-touch tracking.
     ///
     /// Touches must be supplied in chronological order. The precedence ladder:
     /// replay-confirmed saves and shots first (game-authoritative), then
-    /// contested challenges, then trajectory-based saves, shots, clears, and
-    /// passes, then neutral. The result is provisional for pass and neutral
-    /// touches: a [`ControlFollowTracker`] window may retroactively upgrade
-    /// them to control once the post-touch outcome is known. The higher rungs
-    /// are never upgraded, so control excludes them by construction.
+    /// trajectory-based saves, shots, clears out of the defensive third, booms
+    /// downfield into space, and passes led toward a teammate. A touch matching
+    /// none of these has no action (`None`) rather than a catch-all value.
+    /// `contested` is not a rung — it is reported on the resolution as an
+    /// independent flag, so a contested touch keeps its real action (a contested
+    /// shot stays a shot). The `possession` axis is likewise independent: a
+    /// [`ControlFollowTracker`] window may later record control/advance on a
+    /// pass/clear/boom or action-less touch without changing its action.
     pub fn classify(
         &mut self,
         touch: &TouchEvent,
         player_id: &PlayerId,
         ctx: &TouchIntentionFrameContext,
-    ) -> TouchIntentionResolution {
+    ) -> TouchActionResolution {
         let first_touch = self.is_first_touch(player_id, touch.time);
         let is_team_0 = touch.team_is_team_0;
 
-        let intention =
+        let action =
             if self.has_matching_stat_event(PlayerStatEventKind::Save, player_id, touch.time) {
-                TouchIntention::Save
+                Some(TouchAction::Save)
             } else if self.has_matching_stat_event(PlayerStatEventKind::Shot, player_id, touch.time)
             {
-                TouchIntention::Shot
-            } else if ctx.contested {
-                TouchIntention::Challenge
+                Some(TouchAction::Shot)
             } else if Self::is_geometric_save(ctx, is_team_0) {
-                TouchIntention::Save
+                Some(TouchAction::Save)
             } else if Self::is_geometric_shot(ctx, is_team_0) {
-                TouchIntention::Shot
+                Some(TouchAction::Shot)
             } else if Self::is_clear(ctx, is_team_0) {
-                TouchIntention::Clear
+                Some(TouchAction::Clear)
             } else if Self::is_pass(ctx) {
-                TouchIntention::Pass
+                Some(TouchAction::Pass)
+            } else if Self::is_boom(ctx, is_team_0) {
+                Some(TouchAction::Boom)
             } else {
-                TouchIntention::Neutral
+                None
             };
 
         self.note_touch(player_id, touch.time, ctx.contested);
 
-        TouchIntentionResolution {
-            intention,
+        TouchActionResolution {
+            action,
             first_touch,
             contested: ctx.contested,
         }
@@ -318,14 +375,31 @@ impl TouchIntentionClassifier {
                 && (position + lead_travel - *teammate).length() <= PASS_RECEIVER_MAX_DISTANCE
         })
     }
+
+    /// A hard hit pointed downfield into space. Evaluated only after shot,
+    /// clear, and pass have been ruled out, so this captures the deliberate
+    /// "boom it forward / dump it in" hit that isn't on goal, isn't a defensive
+    /// clear, and isn't aimed at a teammate.
+    fn is_boom(ctx: &TouchIntentionFrameContext, is_team_0: bool) -> bool {
+        let (Some(position), Some(velocity)) = (ctx.ball_position, ctx.ball_velocity) else {
+            return false;
+        };
+        if velocity.length() < BOOM_MIN_BALL_SPEED {
+            return false;
+        }
+        let opponent_goal_center = glam::Vec3::new(0.0, opponent_goal_line_y(is_team_0), 0.0);
+        let toward_opponent_goal = (opponent_goal_center - position).normalize_or_zero();
+        velocity.normalize_or_zero().dot(toward_opponent_goal) >= BOOM_MIN_DOWNFIELD_ALIGNMENT
+    }
 }
 
 /// Outcome of a closed control-follow window. `touch_index` addresses the
-/// touch event whose intention should be upgraded when `control` is true.
+/// touch event whose `possession` tag should be set; `possession` is the tag to
+/// apply, or `None` when the window resolved without confirming possession.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ControlResolution {
+pub struct PossessionResolution {
     pub touch_index: usize,
-    pub control: bool,
+    pub possession: Option<Possession>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -335,17 +409,40 @@ struct ControlFollowWindow {
     touch_time: f32,
     tracked_seconds: f32,
     controlled_seconds: f32,
+    /// Greatest toucher-to-ball distance seen so far in the window (only frames
+    /// with both positions known count). Distinguishes an advance — the ball
+    /// played into space — from control, where it stays within reach.
+    max_ball_distance: f32,
 }
 
 impl ControlFollowWindow {
     /// Resolve on the stay-close criterion: most of the tracked follow time
     /// had the toucher close to the ball and roughly matching its velocity.
-    fn stay_close_resolution(&self) -> ControlResolution {
-        ControlResolution {
+    /// Stay-close resolutions are always `Control` — the ball never left the
+    /// toucher, so this path never yields an advance.
+    fn stay_close_resolution(&self) -> PossessionResolution {
+        let confirmed = self.tracked_seconds >= CONTROL_FOLLOW_MIN_TRACKED_SECONDS
+            && self.controlled_seconds
+                >= CONTROL_FOLLOW_MIN_CONTROLLED_FRACTION * self.tracked_seconds;
+        PossessionResolution {
             touch_index: self.touch_index,
-            control: self.tracked_seconds >= CONTROL_FOLLOW_MIN_TRACKED_SECONDS
-                && self.controlled_seconds
-                    >= CONTROL_FOLLOW_MIN_CONTROLLED_FRACTION * self.tracked_seconds,
+            possession: confirmed.then_some(Possession::Control),
+        }
+    }
+
+    /// Resolve on a same-player follow-up touch: the toucher won the next touch.
+    /// Whether that reads as control or advance turns on how far the ball got
+    /// from them in between — kept close is control, played into space is an
+    /// advance.
+    fn follow_up_resolution(&self) -> PossessionResolution {
+        let possession = if self.max_ball_distance >= ADVANCE_MIN_PEAK_DISTANCE {
+            Possession::Advance
+        } else {
+            Possession::Control
+        };
+        PossessionResolution {
+            touch_index: self.touch_index,
+            possession: Some(possession),
         }
     }
 }
@@ -371,7 +468,7 @@ impl ControlFollowTracker {
     }
 
     /// Open a follow window for a just-emitted touch event. Only call this for
-    /// touches whose provisional intention is upgradeable to control.
+    /// touches whose action watches the possession axis (pass/neutral/clear/boom).
     pub fn open(&mut self, touch_index: usize, player_id: &PlayerId, time: f32) {
         self.window = Some(ControlFollowWindow {
             touch_index,
@@ -379,21 +476,24 @@ impl ControlFollowTracker {
             touch_time: time,
             tracked_seconds: 0.0,
             controlled_seconds: 0.0,
+            max_ball_distance: 0.0,
         });
     }
 
     /// Resolve any open window against a new touch. A follow-up touch by the
-    /// same player within the window confirms control directly (the touch
-    /// enabled a follow-up); a touch by anyone else, or a late follow-up,
-    /// closes the window on the stay-close criterion.
-    pub fn observe_touch(&mut self, player_id: &PlayerId, time: f32) -> Option<ControlResolution> {
+    /// same player within the window confirms possession directly (the touch
+    /// enabled a follow-up) — control if the ball stayed close, advance if it
+    /// was played into space first; a touch by anyone else, or a late
+    /// follow-up, closes the window on the stay-close criterion.
+    pub fn observe_touch(
+        &mut self,
+        player_id: &PlayerId,
+        time: f32,
+    ) -> Option<PossessionResolution> {
         let window = self.window.take()?;
         if window.player == *player_id && time - window.touch_time <= CONTROL_FOLLOW_WINDOW_SECONDS
         {
-            return Some(ControlResolution {
-                touch_index: window.touch_index,
-                control: true,
-            });
+            return Some(window.follow_up_resolution());
         }
         Some(window.stay_close_resolution())
     }
@@ -408,7 +508,7 @@ impl ControlFollowTracker {
         ball_velocity: Option<glam::Vec3>,
         player_position: Option<glam::Vec3>,
         player_velocity: Option<glam::Vec3>,
-    ) -> Option<ControlResolution> {
+    ) -> Option<PossessionResolution> {
         if self
             .window
             .as_ref()
@@ -419,12 +519,16 @@ impl ControlFollowTracker {
         let window = self.window.as_mut()?;
         let dt = frame.dt.max(0.0);
         window.tracked_seconds += dt;
-        let close = match (ball_position, player_position) {
+        let distance = match (ball_position, player_position) {
             (Some(ball_position), Some(player_position)) => {
-                (ball_position - player_position).length() <= CONTROL_FOLLOW_MAX_DISTANCE
+                Some((ball_position - player_position).length())
             }
-            _ => false,
+            _ => None,
         };
+        if let Some(distance) = distance {
+            window.max_ball_distance = window.max_ball_distance.max(distance);
+        }
+        let close = distance.is_some_and(|distance| distance <= CONTROL_FOLLOW_MAX_DISTANCE);
         let speed_matched = match (ball_velocity, player_velocity) {
             (Some(ball_velocity), Some(player_velocity)) => {
                 (ball_velocity - player_velocity).length() <= CONTROL_FOLLOW_MAX_RELATIVE_SPEED
@@ -439,7 +543,7 @@ impl ControlFollowTracker {
 
     /// Close any open window immediately (live-play boundary or end of
     /// replay) on the stay-close criterion.
-    pub fn flush(&mut self) -> Option<ControlResolution> {
+    pub fn flush(&mut self) -> Option<PossessionResolution> {
         self.window
             .take()
             .map(|window| window.stay_close_resolution())
