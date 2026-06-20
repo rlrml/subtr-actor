@@ -2,6 +2,6 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
 /**
- * A dodge sequence starting while driving backward that reorients the car to move forward.
+ * A dodge sequence that cancels a flip into an opposite facing direction.
  */
 export type HalfFlipEvent = { time: number, frame: number, player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number], end_position: [number, number, number], start_speed: number, end_speed: number, start_backward_alignment: number, best_reorientation_alignment: number, best_forward_reversal: number, max_forward_vertical: number, confidence: number, };

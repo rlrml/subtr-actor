@@ -2,15 +2,14 @@ use super::*;
 
 const HALF_FLIP_EVALUATION_SECONDS: f32 = 0.65;
 const HALF_FLIP_MAX_CANDIDATE_SECONDS: f32 = 1.0;
-const HALF_FLIP_MAX_START_Z: f32 = PLAYER_GROUND_Z_THRESHOLD + 45.0;
-const HALF_FLIP_MIN_START_SPEED: f32 = 250.0;
-const HALF_FLIP_MIN_START_BACKWARD_ALIGNMENT: f32 = 0.55;
-const HALF_FLIP_MIN_REORIENTATION_ALIGNMENT: f32 = 0.60;
-const HALF_FLIP_MIN_FORWARD_REVERSAL: f32 = 0.55;
-const HALF_FLIP_MIN_FORWARD_VERTICAL: f32 = 0.22;
+const HALF_FLIP_MAX_START_Z: f32 = 90.0;
+const HALF_FLIP_MIN_FORWARD_REVERSAL: f32 = 0.75;
+const HALF_FLIP_MIN_POST_REVERSAL_RETAINED_REVERSAL: f32 = 0.45;
+const HALF_FLIP_MIN_FINAL_FORWARD_HORIZONTAL: f32 = 0.55;
+const HALF_FLIP_MIN_FORWARD_VERTICAL: f32 = 0.55;
 const HALF_FLIP_MIN_CONFIDENCE: f32 = 0.55;
 
-/// A dodge sequence starting while driving backward that reorients the car to move forward.
+/// A dodge sequence that cancels a flip into an opposite facing direction.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct HalfFlipEvent {
@@ -45,6 +44,9 @@ struct ActiveHalfFlipCandidate {
     start_backward_alignment: f32,
     best_reorientation_alignment: f32,
     best_forward_reversal: f32,
+    latest_forward_reversal: f32,
+    min_forward_reversal_after_reaching_opposite: f32,
+    latest_forward_horizontal: f32,
     max_forward_vertical: f32,
 }
 
@@ -116,18 +118,12 @@ impl HalfFlipCalculator {
 
         let velocity_xy = Self::horizontal_velocity(player).unwrap_or(glam::Vec2::ZERO);
         let start_speed = velocity_xy.length();
-        if start_speed < HALF_FLIP_MIN_START_SPEED {
-            return;
-        }
 
         let Some(start_forward_xy) = Self::forward_xy(player) else {
             return;
         };
         let velocity_direction = velocity_xy.normalize_or_zero();
         let start_backward_alignment = -start_forward_xy.dot(velocity_direction);
-        if start_backward_alignment < HALF_FLIP_MIN_START_BACKWARD_ALIGNMENT {
-            return;
-        }
 
         let max_forward_vertical =
             Self::forward_vector(player).map_or(0.0, |forward| forward.z.abs());
@@ -148,6 +144,9 @@ impl HalfFlipCalculator {
                 start_backward_alignment,
                 best_reorientation_alignment: 0.0,
                 best_forward_reversal: 0.0,
+                latest_forward_reversal: 0.0,
+                min_forward_reversal_after_reaching_opposite: 1.0,
+                latest_forward_horizontal: start_forward_xy.length(),
                 max_forward_vertical,
             },
         );
@@ -168,11 +167,20 @@ impl HalfFlipCalculator {
 
         if let Some(forward) = Self::forward_vector(player) {
             candidate.max_forward_vertical = candidate.max_forward_vertical.max(forward.z.abs());
-            let forward_xy = forward.truncate().normalize_or_zero();
-            if forward_xy.length_squared() > f32::EPSILON {
+            let forward_xy_raw = forward.truncate();
+            candidate.latest_forward_horizontal = forward_xy_raw.length();
+            if candidate.latest_forward_horizontal >= HALF_FLIP_MIN_FINAL_FORWARD_HORIZONTAL {
+                let forward_xy = forward_xy_raw.normalize_or_zero();
+                candidate.latest_forward_reversal =
+                    (-candidate.start_forward_xy.dot(forward_xy)).clamp(-1.0, 1.0);
                 candidate.best_forward_reversal = candidate
                     .best_forward_reversal
-                    .max((-candidate.start_forward_xy.dot(forward_xy)).clamp(-1.0, 1.0));
+                    .max(candidate.latest_forward_reversal);
+                if candidate.best_forward_reversal >= HALF_FLIP_MIN_FORWARD_REVERSAL {
+                    candidate.min_forward_reversal_after_reaching_opposite = candidate
+                        .min_forward_reversal_after_reaching_opposite
+                        .min(candidate.latest_forward_reversal);
+                }
                 if velocity_direction.length_squared() > f32::EPSILON {
                     candidate.best_reorientation_alignment = candidate
                         .best_reorientation_alignment
@@ -189,25 +197,17 @@ impl HalfFlipCalculator {
         player_id: &PlayerId,
         candidate: ActiveHalfFlipCandidate,
     ) -> Option<HalfFlipEvent> {
-        if candidate.best_reorientation_alignment < HALF_FLIP_MIN_REORIENTATION_ALIGNMENT
-            || candidate.best_forward_reversal < HALF_FLIP_MIN_FORWARD_REVERSAL
+        if candidate.latest_forward_reversal < HALF_FLIP_MIN_FORWARD_REVERSAL
+            || candidate.min_forward_reversal_after_reaching_opposite
+                < HALF_FLIP_MIN_POST_REVERSAL_RETAINED_REVERSAL
+            || candidate.latest_forward_horizontal < HALF_FLIP_MIN_FINAL_FORWARD_HORIZONTAL
             || candidate.max_forward_vertical < HALF_FLIP_MIN_FORWARD_VERTICAL
         {
             return None;
         }
 
-        let backward_score = Self::normalize_score(
-            candidate.start_backward_alignment,
-            HALF_FLIP_MIN_START_BACKWARD_ALIGNMENT,
-            0.95,
-        );
-        let reorientation_score = Self::normalize_score(
-            candidate.best_reorientation_alignment,
-            HALF_FLIP_MIN_REORIENTATION_ALIGNMENT,
-            0.98,
-        );
         let reversal_score = Self::normalize_score(
-            candidate.best_forward_reversal,
+            candidate.latest_forward_reversal,
             HALF_FLIP_MIN_FORWARD_REVERSAL,
             0.98,
         );
@@ -216,14 +216,7 @@ impl HalfFlipCalculator {
             HALF_FLIP_MIN_FORWARD_VERTICAL,
             0.85,
         );
-        let speed_score = Self::normalize_score(candidate.end_speed, 900.0, 1800.0).max(
-            Self::normalize_score(candidate.end_speed - candidate.start_speed, 100.0, 700.0) * 0.7,
-        );
-        let confidence = 0.25 * backward_score
-            + 0.30 * reorientation_score
-            + 0.25 * reversal_score
-            + 0.10 * flip_score
-            + 0.10 * speed_score;
+        let confidence = 0.75 * reversal_score + 0.25 * flip_score;
 
         if confidence < HALF_FLIP_MIN_CONFIDENCE {
             return None;

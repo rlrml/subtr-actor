@@ -39,6 +39,7 @@ export function getAppTemplate(): string {
               <button type="button" data-create-stats-window="team">New team stats</button>
               <button type="button" data-create-stats-window="all-players">New all players stats</button>
               <button type="button" data-create-stats-window="all-teams">New all teams stats</button>
+              <button type="button" data-create-stats-window="kickoff-overview">New kickoff details</button>
               <button type="button" data-create-stats-window="goals-overview">New goal labels</button>
               <button type="button" data-create-stats-window="ad-hoc">New ad hoc stats</button>
             </section>

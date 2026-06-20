@@ -8,6 +8,7 @@ export type StatsWindowKind =
   | "team"
   | "all-players"
   | "all-teams"
+  | "kickoff-overview"
   | "goals-overview"
   | "ad-hoc";
 
@@ -467,6 +468,7 @@ function isStatsWindowKind(value: unknown): value is StatsWindowKind {
     value === "team" ||
     value === "all-players" ||
     value === "all-teams" ||
+    value === "kickoff-overview" ||
     value === "goals-overview" ||
     value === "ad-hoc"
   );

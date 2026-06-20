@@ -477,3 +477,176 @@
   background: rgba(101, 214, 173, 0.18);
   color: #d7ffef;
 }
+
+.stats-window:has(.kickoff-overview) {
+  width: min(34rem, calc(100vw - 1.6rem));
+}
+
+.kickoff-overview {
+  display: grid;
+  gap: var(--ui-gap-md);
+  width: 100%;
+  min-width: 0;
+}
+
+.kickoff-overview-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ui-gap-md);
+  align-items: start;
+  padding-bottom: 0.52rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.kickoff-overview-hero h3 {
+  margin: 0;
+  color: #edf5fa;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.kickoff-overview-hero span {
+  display: block;
+  margin-top: 0.12rem;
+  color: #9eb4c6;
+  font-size: 0.72rem;
+}
+
+.kickoff-overview-victor {
+  max-width: 9rem;
+  padding: 0.2rem 0.46rem;
+  border-radius: var(--ui-radius-sm);
+  background: rgba(132, 149, 168, 0.18);
+  color: #d8e5ee;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.kickoff-overview-victor.team-blue,
+.kickoff-overview-victor.team-orange {
+  background: var(--team-soft);
+  color: color-mix(in srgb, var(--team-accent) 72%, #ffffff);
+}
+
+.kickoff-overview-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ui-gap-sm);
+}
+
+.kickoff-metric {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+  padding: 0.46rem 0.52rem;
+  border-radius: var(--ui-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.kickoff-metric span,
+.kickoff-detail-row span {
+  color: #89a4ba;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kickoff-metric strong {
+  min-width: 0;
+  color: #edf5fa;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.kickoff-detail-grid {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.kickoff-detail-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 1fr) auto;
+  gap: var(--ui-gap-sm);
+  align-items: baseline;
+  min-height: 1.38rem;
+  font-size: 0.78rem;
+}
+
+.kickoff-detail-row strong {
+  color: #edf5fa;
+  font-variant-numeric: tabular-nums;
+}
+
+.kickoff-strategy-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ui-gap-sm);
+}
+
+.kickoff-strategy-team {
+  display: grid;
+  gap: 0.34rem;
+  min-width: 0;
+  padding: 0.54rem 0.58rem;
+  border-radius: var(--ui-radius-md);
+  border: 1px solid color-mix(in srgb, var(--team-accent) 26%, transparent);
+  background:
+    linear-gradient(180deg, var(--team-soft), rgba(255, 255, 255, 0.025)), rgba(255, 255, 255, 0.03);
+}
+
+.kickoff-strategy-team h4 {
+  margin: 0;
+  color: color-mix(in srgb, var(--team-accent) 62%, #edf5fa);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kickoff-strategy-line {
+  margin: 0;
+  color: #edf5fa;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.kickoff-support-list {
+  display: grid;
+  gap: 0.22rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kickoff-support-list li {
+  color: #afc4d4;
+  font-size: 0.74rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 46rem) {
+  .kickoff-overview-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .kickoff-overview-summary,
+  .kickoff-detail-grid,
+  .kickoff-strategy-list {
+    grid-template-columns: 1fr;
+  }
+
+  .kickoff-overview-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .kickoff-overview-victor {
+    justify-self: start;
+  }
+}
