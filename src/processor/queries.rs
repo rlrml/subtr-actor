@@ -568,12 +568,12 @@ impl<'a> ReplayProcessor<'a> {
     /// Counts currently in-game players per team from live actor state.
     pub fn current_in_game_team_player_counts(&self) -> [usize; 2] {
         let mut counts = [0, 0];
-        let Ok(player_actor_ids) = self.get_actor_ids_by_type(PLAYER_TYPE) else {
+        let Ok(player_actor_ids) = self.get_player_type_actor_ids() else {
             return counts;
         };
         let mut seen_players = std::collections::HashSet::new();
 
-        for actor_id in player_actor_ids {
+        for actor_id in &player_actor_ids {
             let Ok(player_id) = self.get_player_id_from_actor_id(actor_id) else {
                 continue;
             };

@@ -14,7 +14,7 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<()> {
         let kickoff_phase_active = self.kickoff_phase_active();
         let kickoff_phase_started = kickoff_phase_active && !self.kickoff_phase_active_last_frame;
-        let cached = self.cached_object_ids;
+        let cached = &self.cached_object_ids;
         let boost_type_object_id = self.required_cached_object_id(cached.boost_type, BOOST_TYPE)?;
         let boost_replicated_object_id = cached.boost_replicated;
         let boost_amount_object_id = cached.boost_amount;
