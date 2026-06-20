@@ -1,4 +1,5 @@
 import type { SingletonWindowId, StatsWindowKind } from "./playerConfig.ts";
+import { formatPlaybackRate, snapPlaybackRate } from "./playbackRateControl.ts";
 
 export interface MountEventListenerElements {
   readonly root: HTMLElement;
@@ -8,7 +9,8 @@ export interface MountEventListenerElements {
   readonly emptyLoadReplay: HTMLButtonElement;
   readonly fileInput: HTMLInputElement;
   readonly togglePlayback: HTMLButtonElement;
-  readonly playbackRate: HTMLSelectElement;
+  readonly playbackRate: HTMLInputElement;
+  readonly playbackRateReadout: HTMLElement;
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
@@ -124,13 +126,14 @@ export function installMountEventListeners({
 
   elements.togglePlayback.addEventListener("click", togglePlayback, { signal });
 
-  elements.playbackRate.addEventListener(
-    "change",
-    () => {
-      setPlaybackRate(Number(elements.playbackRate.value));
-    },
-    { signal },
-  );
+  const syncPlaybackRate = () => {
+    const rate = snapPlaybackRate(Number(elements.playbackRate.value));
+    elements.playbackRate.value = `${rate}`;
+    elements.playbackRateReadout.textContent = formatPlaybackRate(rate);
+    setPlaybackRate(rate);
+  };
+  elements.playbackRate.addEventListener("input", syncPlaybackRate, { signal });
+  elements.playbackRate.addEventListener("change", syncPlaybackRate, { signal });
 
   elements.skipPostGoalTransitions.addEventListener(
     "change",

@@ -18,6 +18,7 @@ import {
   getStatsPlayerConfigSnapshot,
 } from "./playerConfigRuntime.ts";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
+import { formatPlaybackRate, snapPlaybackRate } from "./playbackRateControl.ts";
 
 export interface PlayerConfigBindings {
   setApplyingConfig(value: boolean): void;
@@ -28,7 +29,8 @@ export interface PlayerConfigBindings {
 
 export interface PlayerConfigBindingsOptions {
   readonly modules: readonly StatModule[];
-  readonly playbackRate: HTMLSelectElement;
+  readonly playbackRate: HTMLInputElement;
+  readonly playbackRateReadout: HTMLElement;
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
@@ -128,8 +130,15 @@ export function createPlayerConfigBindings(
       options.hitboxWireframes.checked = config.overlays.hitboxWireframes;
       options.hitboxOnlyMode.checked = config.overlays.hitboxOnlyMode;
       options.getCameraControlsController()?.applyNameplateLiftUu(config.camera.nameplateLiftUu);
+      options
+        .getCameraControlsController()
+        ?.setAutoPossessionEnabled(config.camera.autoPossession ?? false, {
+          requestConfigSync: false,
+        });
       if (config.playback.rate !== undefined) {
-        options.playbackRate.value = `${config.playback.rate}`;
+        const playbackRate = snapPlaybackRate(config.playback.rate);
+        options.playbackRate.value = `${playbackRate}`;
+        options.playbackRateReadout.textContent = formatPlaybackRate(playbackRate);
       }
       options.getRecordingWindowController()?.applyConfig(config.recording);
       applyModuleConfigSnapshot(config.moduleConfigs);

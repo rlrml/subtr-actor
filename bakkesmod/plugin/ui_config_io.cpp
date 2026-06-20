@@ -388,7 +388,7 @@ std::string SubtrActorPlugin::uiConfigJson() {
   file << "  ],\n";
   file << "  \"statsWindows\": [\n";
   bool wroteWebStatsWindow = false;
-  const std::array<StatsWindowKindControl, 7> statsWindowKinds = statsWindowKindControls();
+  const std::array<StatsWindowKindControl, 8> statsWindowKinds = statsWindowKindControls();
   for (size_t i = 0; i < uiStatsWindows.size(); i += 1) {
     const UiStatsWindow &window = uiStatsWindows[i];
     const auto kind = std::find_if(

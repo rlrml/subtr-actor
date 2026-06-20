@@ -18,10 +18,11 @@ import {
   type StatsWindowConfig,
 } from "./playerConfig.ts";
 import type { StatModule } from "./statModules.ts";
+import { snapPlaybackRate } from "./playbackRateControl.ts";
 
 export interface PlaybackConfigSnapshotOptions {
   replayPlayer: StatsReplayPlayer | null;
-  playbackRate: HTMLSelectElement;
+  playbackRate: HTMLInputElement;
   skipPostGoalTransitions: HTMLInputElement;
   skipKickoffs: HTMLInputElement;
 }
@@ -103,7 +104,7 @@ export function getPlaybackConfigSnapshot({
   return {
     currentTime: state?.currentTime,
     playing: state?.playing,
-    rate: state?.speed ?? Number(playbackRate?.value ?? 1),
+    rate: state?.speed ?? snapPlaybackRate(Number(playbackRate?.value ?? 1)),
     skipPostGoalTransitions: replayPlayer
       ? state?.skipPostGoalTransitionsEnabled
       : skipPostGoalTransitions.checked,
@@ -124,6 +125,7 @@ export function getCameraConfigSnapshot({
     ballCam: ballCamMode === undefined ? undefined : ballCamMode === "on",
     useReplayBallCam: ballCamMode === undefined ? undefined : ballCamMode === "player",
     usePlayerCameraSettings: state?.customCameraSettings === null,
+    autoPossession: cameraControlsController?.autoPossessionEnabled,
     customSettings: state?.customCameraSettings,
     nameplateLiftUu: cameraControlsController?.nameplateLiftUu,
   };
