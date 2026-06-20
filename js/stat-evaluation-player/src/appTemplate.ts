@@ -265,6 +265,12 @@ export function getAppTemplate(): string {
             </header>
             <div class="transport-row">
               <button id="toggle-playback" disabled>Play</button>
+              <button id="previous-frame" type="button" title="Previous frame" disabled>
+                Frame -1
+              </button>
+              <button id="next-frame" type="button" title="Next frame" disabled>
+                Frame +1
+              </button>
             </div>
             <label class="playback-rate-control">
               <span class="playback-rate-header">
@@ -379,6 +385,8 @@ export function getAppTemplate(): string {
               <label>
                 <span class="label">Playback rate</span>
                 <select id="recording-playback-rate">
+                  <option value="0.1">0.1x</option>
+                  <option value="0.25">0.25x</option>
                   <option value="0.5">0.5x</option>
                   <option value="1" selected>1.0x</option>
                   <option value="1.5">1.5x</option>
