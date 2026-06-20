@@ -74,7 +74,7 @@ void SubtrActorPlugin::resetStatsWindowPlacement(UiStatsWindow &window, size_t s
   scheduleUiConfigAutosave();
 }
 
-std::array<SubtrActorPlugin::StatsWindowKindControl, 7>
+std::array<SubtrActorPlugin::StatsWindowKindControl, 8>
 SubtrActorPlugin::statsWindowKindControls() const {
   return {{
       {UiStatsWindowKind::Player,
@@ -113,6 +113,15 @@ SubtrActorPlugin::statsWindowKindControls() const {
        true,
        true,
        false},
+      {UiStatsWindowKind::KickoffOverview,
+       "kickoff-overview",
+       "Kickoff details",
+       "New kickoff details",
+       UI_STAT_SCOPE_EVENT,
+       false,
+       false,
+       true,
+       true},
       {UiStatsWindowKind::GoalsOverview,
        "goals-overview",
        "Goal labels",
@@ -259,6 +268,9 @@ void SubtrActorPlugin::initializeStatsWindowEntries(UiStatsWindow &window) {
         {"team:possession.possession_time", ""},
         {"team:boost.amount_used", ""},
         {"recent_events", ""}};
+    break;
+  case UiStatsWindowKind::KickoffOverview:
+    window.entries.clear();
     break;
   case UiStatsWindowKind::GoalsOverview:
     window.entries.clear();

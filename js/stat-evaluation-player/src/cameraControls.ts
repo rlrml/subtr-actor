@@ -63,6 +63,7 @@ export interface CameraControlsElements {
   readonly attachedPlayer: HTMLSelectElement;
   readonly cameraViewFreeButton: HTMLButtonElement;
   readonly cameraViewFollowButton: HTMLButtonElement;
+  readonly cameraViewAutoPossession: HTMLInputElement;
   readonly cameraViewOverheadButton: HTMLButtonElement;
   readonly cameraViewSideButton: HTMLButtonElement;
   readonly usePlayerCameraSettings: HTMLInputElement;
@@ -98,6 +99,7 @@ export interface CameraControlsOptions {
   readonly elements: CameraControlsElements;
   getReplayPlayer(): StatsReplayPlayer | null;
   requestConfigSync(): void;
+  onAutoPossessionChange?(enabled: boolean): void;
 }
 
 export class CameraControlsController {
@@ -119,6 +121,12 @@ export class CameraControlsController {
     return this.ballCamModeValue;
   }
 
+  private autoPossessionEnabledValue = false;
+
+  get autoPossessionEnabled(): boolean {
+    return this.autoPossessionEnabledValue;
+  }
+
   /** Convert a tri-state mode to the player's `setBallCamEnabled` argument. */
   private static ballCamEnabledForMode(mode: BallCamMode): boolean | null {
     return mode === "player" ? null : mode === "on";
@@ -126,13 +134,21 @@ export class CameraControlsController {
 
   followPlayerWithReplayCamera(
     playerId: string,
-    options: { ballCam?: BallCamMode; usePlayerCameraSettings?: boolean } = {},
+    options: {
+      ballCam?: BallCamMode;
+      preserveAutoPossession?: boolean;
+      requestConfigSync?: boolean;
+      usePlayerCameraSettings?: boolean;
+    } = {},
   ): void {
     const replayPlayer = this.options.getReplayPlayer();
     if (!replayPlayer) {
       return;
     }
 
+    if (!options.preserveAutoPossession) {
+      this.setAutoPossessionEnabled(false, { requestConfigSync: false });
+    }
     replayPlayer.setAttachedPlayer(playerId);
     replayPlayer.setCameraViewMode("follow");
     if (options.usePlayerCameraSettings !== false) {
@@ -140,7 +156,28 @@ export class CameraControlsController {
     }
     this.setBallCamMode(options.ballCam ?? "player");
     this.lastFreeCameraPreset = null;
-    this.options.requestConfigSync();
+    if (options.requestConfigSync !== false) {
+      this.options.requestConfigSync();
+    }
+  }
+
+  setAutoPossessionEnabled(
+    enabled: boolean,
+    options: { notify?: boolean; requestConfigSync?: boolean } = {},
+  ): void {
+    if (this.autoPossessionEnabledValue === enabled) {
+      this.renderAutoPossessionButton();
+      return;
+    }
+
+    this.autoPossessionEnabledValue = enabled;
+    this.renderAutoPossessionButton();
+    if (options.notify !== false) {
+      this.options.onAutoPossessionChange?.(enabled);
+    }
+    if (options.requestConfigSync !== false) {
+      this.options.requestConfigSync();
+    }
   }
 
   private renderBallCamButtons(): void {
@@ -155,6 +192,14 @@ export class CameraControlsController {
       button.dataset.active = isActive ? "true" : "false";
       button.setAttribute("aria-pressed", isActive ? "true" : "false");
     }
+  }
+
+  private renderAutoPossessionButton(): void {
+    this.options.elements.cameraViewAutoPossession.checked = this.autoPossessionEnabledValue;
+  }
+
+  private disableAutoPossessionForManualCameraControl(): void {
+    this.setAutoPossessionEnabled(false, { requestConfigSync: false });
   }
 
   /** Apply a ball-cam mode to the player and reflect it in the button group. */
@@ -223,6 +268,7 @@ export class CameraControlsController {
       () => {
         const replayPlayer = this.options.getReplayPlayer();
         const attachedPlayerId = elements.attachedPlayer.value || null;
+        this.disableAutoPossessionForManualCameraControl();
         replayPlayer?.setAttachedPlayer(attachedPlayerId);
         if (attachedPlayerId) {
           replayPlayer?.setCustomCameraSettings(null);
@@ -239,6 +285,7 @@ export class CameraControlsController {
       "click",
       () => {
         this.options.getReplayPlayer()?.setCameraViewMode("free");
+        this.disableAutoPossessionForManualCameraControl();
         this.lastFreeCameraPreset = null;
         this.options.requestConfigSync();
       },
@@ -249,6 +296,7 @@ export class CameraControlsController {
       "click",
       () => {
         const replayPlayer = this.options.getReplayPlayer();
+        this.disableAutoPossessionForManualCameraControl();
         replayPlayer?.setCameraViewMode("follow");
         if (replayPlayer?.getState().attachedPlayerId) {
           replayPlayer.setCustomCameraSettings(null);
@@ -265,6 +313,7 @@ export class CameraControlsController {
       "click",
       () => {
         this.options.getReplayPlayer()?.setFreeCameraPreset("overhead");
+        this.disableAutoPossessionForManualCameraControl();
         this.lastFreeCameraPreset = "overhead";
         this.options.requestConfigSync();
       },
@@ -275,6 +324,7 @@ export class CameraControlsController {
       "click",
       () => {
         this.options.getReplayPlayer()?.setFreeCameraPreset("side");
+        this.disableAutoPossessionForManualCameraControl();
         this.lastFreeCameraPreset = "side";
         this.options.requestConfigSync();
       },
@@ -296,6 +346,14 @@ export class CameraControlsController {
         { signal },
       );
     }
+
+    elements.cameraViewAutoPossession.addEventListener(
+      "change",
+      () => {
+        this.setAutoPossessionEnabled(elements.cameraViewAutoPossession.checked);
+      },
+      { signal },
+    );
 
     // The ballchasing overlay reads nameplateLiftUu live each frame, so changing
     // the slider takes effect without touching the player — just refresh the
@@ -358,10 +416,13 @@ export class CameraControlsController {
     }
 
     const { cameraViewOverheadButton, cameraViewSideButton } = this.options.elements;
+    const { cameraViewAutoPossession } = this.options.elements;
     cameraViewOverheadButton.disabled = !hasReplay;
     cameraViewSideButton.disabled = !hasReplay;
+    cameraViewAutoPossession.disabled = !hasReplay;
     cameraViewOverheadButton.dataset.active = "false";
     cameraViewSideButton.dataset.active = "false";
+    this.renderAutoPossessionButton();
     cameraViewOverheadButton.setAttribute("aria-pressed", "false");
     cameraViewSideButton.setAttribute("aria-pressed", "false");
   }

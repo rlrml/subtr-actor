@@ -575,6 +575,7 @@ def main() -> int:
         "playback",
         "mechanics-review",
         "replay-loading",
+        "touch-legend",
         "missed-events",
     )
     plugin_expected_web_singleton_window_ids = tuple(
@@ -1544,8 +1545,8 @@ def main() -> int:
     )
     require_contains(
         web_player_template_source,
-        '<select id="playback-rate" disabled>',
-        "stats evaluation player playback rate select",
+        'id="playback-rate"\n                type="range"',
+        "stats evaluation player playback rate slider",
         errors,
     )
     require_contains(
@@ -2400,8 +2401,12 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        'const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set(["module:touch", "module:powerslide"]);',
-        "stats evaluation player defaults touch and powerslide out of playlist",
+        'const DEFAULT_UNSELECTED_EVENT_PLAYLIST_SOURCE_IDS = new Set([\n'
+        '  "module:dodge",\n'
+        '  "module:touch",\n'
+        '  "module:powerslide",\n'
+        "]);",
+        "stats evaluation player defaults dodge, touch, and powerslide out of playlist",
         errors,
     )
     require_contains(
