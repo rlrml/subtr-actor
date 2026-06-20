@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import type { ReplayModel } from "@rlrml/player";
 import {
+  AutoPossessionCameraController,
   buildAutoPossessionCameraSpans,
   selectAutoPossessionCameraPlayer,
   type AutoPossessionSpan,
@@ -126,4 +127,65 @@ test("auto possession camera selects possessed player before closest player fall
 
   assert.equal(selectAutoPossessionCameraPlayer(replay, spans, 0, 0.25), "Steam:blue-id");
   assert.equal(selectAutoPossessionCameraPlayer(replay, spans, 0, 1), "Steam:orange-id");
+});
+
+test("auto possession camera debounces nearest-player fallback switches", () => {
+  const replay = {
+    ballFrames: Array.from({ length: 5 }, () => ({ position: { x: 0, y: 0, z: 0 } })),
+    players: [
+      {
+        id: "Steam:blue-id",
+        frames: [
+          { position: { x: 100, y: 0, z: 0 } },
+          { position: { x: 500, y: 0, z: 0 } },
+          { position: { x: 500, y: 0, z: 0 } },
+          { position: { x: 500, y: 0, z: 0 } },
+          { position: { x: 500, y: 0, z: 0 } },
+        ],
+      },
+      {
+        id: "Steam:orange-id",
+        frames: [
+          { position: { x: 500, y: 0, z: 0 } },
+          { position: { x: 100, y: 0, z: 0 } },
+          { position: { x: 100, y: 0, z: 0 } },
+          { position: { x: 100, y: 0, z: 0 } },
+          { position: { x: 100, y: 0, z: 0 } },
+        ],
+      },
+    ],
+  } as ReplayModel;
+  const followedPlayers: string[] = [];
+  let attachedPlayerId: string | null = null;
+  const replayPlayer = {
+    replay,
+    getState() {
+      return {
+        frameIndex: 0,
+        currentTime: 0,
+        cameraViewMode: attachedPlayerId === null ? "free" : "follow",
+        attachedPlayerId,
+      };
+    },
+  };
+  const cameraControls = {
+    autoPossessionEnabled: true,
+    followPlayerWithReplayCamera(playerId: string) {
+      attachedPlayerId = playerId;
+      followedPlayers.push(playerId);
+    },
+  };
+  const controller = new AutoPossessionCameraController({
+    getReplayPlayer: () => replayPlayer as never,
+    getStatsTimeline: () => null,
+    getCameraControlsController: () => cameraControls as never,
+  });
+
+  controller.update({ frameIndex: 0, nextFrameIndex: 0, alpha: 0, currentTime: 0 });
+  controller.update({ frameIndex: 1, nextFrameIndex: 1, alpha: 0, currentTime: 0.7 });
+  controller.update({ frameIndex: 2, nextFrameIndex: 2, alpha: 0, currentTime: 1.1 });
+  controller.update({ frameIndex: 3, nextFrameIndex: 3, alpha: 0, currentTime: 1.3 });
+  controller.update({ frameIndex: 4, nextFrameIndex: 4, alpha: 0, currentTime: 1.6 });
+
+  assert.deepEqual(followedPlayers, ["Steam:blue-id", "Steam:orange-id"]);
 });
