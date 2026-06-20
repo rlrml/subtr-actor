@@ -7,9 +7,13 @@ import {
   projectReplayTimeToTimeline,
   projectTimelineTimeToReplay,
 } from "../src/player-internals/timeline";
+import { getPostGoalTransitionSkipTargetTime } from "../src/player-helpers";
 import type { ReplayModel } from "../src/types";
 
-function replayWithGameStates(gameStates: number[]): ReplayModel {
+function replayWithGameStates(
+  gameStates: number[],
+  timelineEvents: ReplayModel["timelineEvents"] = [],
+): ReplayModel {
   return {
     frameCount: gameStates.length,
     duration: Math.max(0, gameStates.length - 1),
@@ -28,7 +32,7 @@ function replayWithGameStates(gameStates: number[]): ReplayModel {
     boostPads: [],
     players: [],
     tickMarks: [],
-    timelineEvents: [],
+    timelineEvents,
     teamZeroNames: [],
     teamOneNames: [],
   };
@@ -70,4 +74,27 @@ test("timeline projection identifies skipped ranges without compacting them", ()
     seekTime: 4,
     hiddenBySkip: true,
   });
+});
+
+test("post-goal skip preserves the goal explosion window", () => {
+  const replay = replayWithGameStates(
+    [0, 0, 1, 1, 1, 1, 0, 0],
+    [
+      {
+        kind: "goal",
+        time: 2,
+        frame: 2,
+        playerId: null,
+        playerName: null,
+        isTeamZero: true,
+      },
+    ],
+  );
+
+  assert.deepEqual(computeTimelineSegments(replay, true, false, 0, null), [
+    { startTime: 4, endTime: 6 },
+  ]);
+  assert.equal(getPostGoalTransitionSkipTargetTime(replay, 2, 0, null), null);
+  assert.equal(getPostGoalTransitionSkipTargetTime(replay, 3, 0, null), null);
+  assert.equal(getPostGoalTransitionSkipTargetTime(replay, 4, 0, null), 6);
 });
