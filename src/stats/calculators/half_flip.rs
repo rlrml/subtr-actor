@@ -2,7 +2,6 @@ use super::*;
 
 const HALF_FLIP_EVALUATION_SECONDS: f32 = 0.65;
 const HALF_FLIP_MAX_CANDIDATE_SECONDS: f32 = 1.0;
-const HALF_FLIP_MAX_START_Z: f32 = 90.0;
 const HALF_FLIP_MIN_FORWARD_REVERSAL: f32 = 0.75;
 const HALF_FLIP_MIN_POST_REVERSAL_RETAINED_REVERSAL: f32 = 0.45;
 const HALF_FLIP_MIN_FINAL_FORWARD_HORIZONTAL: f32 = 0.55;
@@ -112,9 +111,6 @@ impl HalfFlipCalculator {
         let Some(position) = player.position() else {
             return;
         };
-        if position.z > HALF_FLIP_MAX_START_Z {
-            return;
-        }
 
         let velocity_xy = Self::horizontal_velocity(player).unwrap_or(glam::Vec2::ZERO);
         let start_speed = velocity_xy.length();
