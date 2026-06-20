@@ -126,12 +126,32 @@ fn candidate_event_rejects_sideways_dodge_acceleration() {
 }
 
 #[test]
-fn candidate_event_rejects_late_airborne_dodge() {
+fn candidate_event_accepts_speed_flip_regardless_of_dodge_delay_after_ground_leave() {
+    // There is intentionally no ceiling on how long after leaving the ground the
+    // dodge fires: real speed flips vary widely there. A clean cancelled flip is
+    // accepted even with a long ground-leave-to-dodge delay.
     let player_id = boxcars::RemoteId::Steam(1);
-    let mut late_airborne_candidate = strong_candidate(2);
-    late_airborne_candidate.dodge_delay_after_ground_leave_seconds = 0.216;
+    let mut late_dodge_candidate = strong_candidate(2);
+    late_dodge_candidate.dodge_delay_after_ground_leave_seconds = 0.50;
 
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, late_airborne_candidate).is_none());
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, late_dodge_candidate).is_some());
+}
+
+#[test]
+fn candidate_event_rejects_noncancelled_full_diagonal_flip() {
+    // A full diagonal flip (the nose pitches all the way over) can score just as
+    // high on raw diagonal angular velocity as a speed flip, but it is not one.
+    // Without the cancel (small `max_forward_rotation`) and without a clean
+    // diagonal impulse, it must be rejected.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut full_flip_candidate = strong_candidate(2);
+    full_flip_candidate.best_diagonal_score = 0.93;
+    full_flip_candidate.max_forward_rotation_degrees = 115.0;
+    // Impulse direction is diagonal-ish but not in the tight `has_diagonal_impulse`
+    // side-component band, so the cancel is the only thing that could accept it.
+    full_flip_candidate.best_estimated_dodge_impulse_side_component = 0.70;
+
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, full_flip_candidate).is_none());
 }
 
 #[test]
@@ -169,15 +189,38 @@ fn candidate_event_rejects_vertical_dominant_wavedash_like_impulse() {
 }
 
 #[test]
-fn candidate_event_rejects_directional_weak_impulse_without_forward_or_side_component() {
+fn candidate_event_rejects_directional_weak_impulse_without_diagonal_rotation() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut weak_backward_candidate = strong_candidate(2);
     weak_backward_candidate.best_estimated_dodge_impulse_magnitude = 43.0;
     weak_backward_candidate.best_estimated_dodge_impulse_forward_component = -0.48;
     weak_backward_candidate.best_estimated_dodge_impulse_side_component = 0.0;
     weak_backward_candidate.best_estimated_dodge_impulse_up_component = -0.88;
+    // No diagonal-rotation signature to fall back on, so the weak backward
+    // impulse has nothing to vouch for it and the candidate is rejected.
+    weak_backward_candidate.best_diagonal_score = 0.2;
+    weak_backward_candidate.max_forward_rotation_degrees = 60.0;
 
     assert!(SpeedFlipCalculator::candidate_event(&player_id, weak_backward_candidate).is_none());
+}
+
+#[test]
+fn candidate_event_accepts_cancelled_dodge_despite_corrupted_weak_impulse() {
+    // Boost-through speed flips have their estimated dodge impulse swallowed by
+    // the boost compensation, leaving a weak (sub-`MEANINGFUL`) residual that can
+    // even point backward. When the rotation signature is an unambiguous
+    // cancelled diagonal dodge, the impulse-direction heuristic must not veto it.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut boost_through_candidate = strong_candidate(2);
+    boost_through_candidate.best_estimated_dodge_impulse_magnitude = 43.0;
+    boost_through_candidate.best_estimated_dodge_impulse_forward_component = -0.48;
+    boost_through_candidate.best_estimated_dodge_impulse_side_component = 0.0;
+    boost_through_candidate.best_estimated_dodge_impulse_up_component = -0.88;
+    // Crisp cancelled diagonal dodge: strong diagonal spin, nose barely pitches.
+    boost_through_candidate.best_diagonal_score = 1.0;
+    boost_through_candidate.max_forward_rotation_degrees = 12.0;
+
+    assert!(SpeedFlipCalculator::candidate_event(&player_id, boost_through_candidate).is_some());
 }
 
 #[test]
