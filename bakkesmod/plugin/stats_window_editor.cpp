@@ -594,6 +594,8 @@ void SubtrActorPlugin::renderStatsWindowEntries(UiStatsWindow &window) {
     }
     renderAllTeamsStatsTable(window);
     break;
+  case UiStatsWindowKind::KickoffOverview:
+    break;
   case UiStatsWindowKind::GoalsOverview:
     break;
   case UiStatsWindowKind::AdHoc:
