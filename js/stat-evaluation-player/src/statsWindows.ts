@@ -8,8 +8,13 @@ import type {
 import { getStatDefinitionSearchMatches } from "./statSearch.ts";
 import type { StatDefinition, StatScopeKind } from "./statRegistry.ts";
 import { getTeamClass } from "./statModules.ts";
-import { getStatsFrameForReplayFrame, statsEventPayloads } from "./statsTimeline.ts";
+import {
+  getStatsFrameForReplayFrame,
+  statsEventEnvelopes,
+  statsEventPayloads,
+} from "./statsTimeline.ts";
 import type {
+  Event,
   PlayerStatsSnapshot,
   StatsFrame,
   StatsFrameLookup,
@@ -18,12 +23,17 @@ import type {
 } from "./statsTimeline.ts";
 import { formatGoalTagPerformer, formatMechanicKind } from "./timelineMarkers.ts";
 import { playerIdToString } from "./touchOverlay.ts";
+import type { KickoffEvent } from "./generated/KickoffEvent.ts";
+import type { KickoffSupportEvent } from "./generated/KickoffSupportEvent.ts";
+import type { KickoffTakerEvent } from "./generated/KickoffTakerEvent.ts";
 
 interface SelectedStatEntry {
   key: string;
   statId: string;
   targetId?: string;
 }
+
+type KickoffEnvelope = Event & { payload: { kind: "kickoff"; payload: KickoffEvent } };
 
 interface StatsWindowState {
   readonly id: string;
@@ -272,6 +282,8 @@ export class StatsWindowsController {
         return "All players stats";
       case "all-teams":
         return "All teams stats";
+      case "kickoff-overview":
+        return "Kickoff details";
       case "goals-overview":
         return "Goal labels";
       case "ad-hoc":
@@ -284,7 +296,7 @@ export class StatsWindowsController {
   }
 
   private hasStatsWindowStatPicker(kind: StatsWindowKind): boolean {
-    return kind !== "goals-overview";
+    return kind !== "goals-overview" && kind !== "kickoff-overview";
   }
 
   private getStatsWindowAllowedScope(kind: StatsWindowKind): StatScopeKind | null {
@@ -295,6 +307,8 @@ export class StatsWindowsController {
       case "team":
       case "all-teams":
         return "team";
+      case "kickoff-overview":
+        return null;
       case "goals-overview":
         return null;
       case "ad-hoc":
@@ -565,6 +579,10 @@ export class StatsWindowsController {
       this.renderGoalLabelsOverview(statsWindow);
       return;
     }
+    if (statsWindow.kind === "kickoff-overview") {
+      this.renderKickoffOverview(statsWindow, frameIndex);
+      return;
+    }
 
     const allowedScope = this.getStatsWindowAllowedScope(statsWindow.kind);
     const entries = statsWindow.entries
@@ -708,6 +726,298 @@ export class StatsWindowsController {
       list.append(item);
     }
     statsWindow.body.append(list);
+  }
+
+  private renderKickoffOverview(statsWindow: StatsWindowState, frameIndex: number): void {
+    const timeline = this.options.getStatsTimeline();
+    const replay = this.options.getReplayPlayer()?.replay ?? null;
+    if (!timeline || !replay) {
+      this.appendStatsWindowEmpty(statsWindow, "Load a replay to show kickoff details.");
+      return;
+    }
+
+    const kickoffEnvelope = this.getLatestKickoffEvent(timeline, frameIndex);
+    if (!kickoffEnvelope) {
+      this.appendStatsWindowEmpty(statsWindow, "No completed kickoff yet.");
+      return;
+    }
+    const kickoff = kickoffEnvelope.payload.payload;
+
+    const section = document.createElement("section");
+    section.className = "kickoff-overview";
+
+    const hero = document.createElement("header");
+    hero.className = "kickoff-overview-hero";
+    const titleGroup = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = this.formatKickoffTitle(kickoffEnvelope);
+    const subtitle = document.createElement("span");
+    subtitle.textContent = `Resolved at ${formatTime(kickoff.end_time)}`;
+    titleGroup.append(title, subtitle);
+
+    const victor = document.createElement("strong");
+    const victorTeamClass = this.teamClassFromNullable(kickoff.winning_team_is_team_0);
+    victor.className = "kickoff-overview-victor";
+    if (victorTeamClass) {
+      victor.classList.add(victorTeamClass);
+    }
+    victor.textContent = this.formatOutcome(kickoff);
+    hero.append(titleGroup, victor);
+
+    const summary = document.createElement("div");
+    summary.className = "kickoff-overview-summary";
+    summary.append(
+      this.renderKickoffMetric(
+        "Win strength",
+        `${this.formatNullableNumber(kickoff.win_strength, 2)} · ${this.formatKickoffLabelValue(
+          "kickoff_win_strength",
+          kickoff.win_strength_band,
+        )}`,
+      ),
+      this.renderKickoffMetric("First touch", this.formatFirstTouch(kickoff)),
+      this.renderKickoffMetric("Advantage", this.formatAdvantage(kickoff)),
+      this.renderKickoffMetric("Contested", this.formatContested(kickoff)),
+    );
+
+    const times = document.createElement("div");
+    times.className = "kickoff-detail-grid";
+    times.append(
+      this.renderKickoffDetail("Kickoff start", formatTime(kickoff.start_time)),
+      this.renderKickoffDetail("Movement start", formatTime(kickoff.movement_start_time)),
+      this.renderKickoffDetail(
+        "Live action",
+        kickoff.live_action_start_time === null ? "--" : formatTime(kickoff.live_action_start_time),
+      ),
+      this.renderKickoffDetail(
+        "First touch",
+        kickoff.first_touch_time === null ? "--" : formatTime(kickoff.first_touch_time),
+      ),
+      this.renderKickoffDetail("Resolution", formatTime(kickoff.end_time)),
+      this.renderKickoffDetail(
+        "After first touch",
+        this.formatSeconds(kickoff.advantage_seconds_after_first_touch),
+      ),
+    );
+
+    const strategy = document.createElement("div");
+    strategy.className = "kickoff-strategy-list";
+    strategy.append(
+      this.renderKickoffTeamStrategy("Blue", kickoff.team_zero_taker, kickoff.team_zero_non_takers),
+      this.renderKickoffTeamStrategy("Orange", kickoff.team_one_taker, kickoff.team_one_non_takers),
+    );
+
+    section.append(hero, summary, times, strategy);
+    statsWindow.body.append(section);
+  }
+
+  private getLatestKickoffEvent(
+    timeline: StatsTimeline,
+    frameIndex: number,
+  ): KickoffEnvelope | null {
+    const completed = statsEventEnvelopes(timeline)
+      .filter(
+        (event): event is KickoffEnvelope =>
+          event.payload.kind === "kickoff" && event.payload.payload.end_frame <= frameIndex,
+      )
+      .sort((left, right) => {
+        if (left.payload.payload.end_frame !== right.payload.payload.end_frame) {
+          return right.payload.payload.end_frame - left.payload.payload.end_frame;
+        }
+        return right.payload.payload.end_time - left.payload.payload.end_time;
+      });
+    return completed[0] ?? null;
+  }
+
+  private renderKickoffMetric(labelText: string, valueText: string): HTMLElement {
+    const metric = document.createElement("div");
+    metric.className = "kickoff-metric";
+    const label = document.createElement("span");
+    label.textContent = labelText;
+    const value = document.createElement("strong");
+    value.textContent = valueText;
+    metric.append(label, value);
+    return metric;
+  }
+
+  private renderKickoffDetail(labelText: string, valueText: string): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "kickoff-detail-row";
+    const label = document.createElement("span");
+    label.textContent = labelText;
+    const value = document.createElement("strong");
+    value.textContent = valueText;
+    row.append(label, value);
+    return row;
+  }
+
+  private renderKickoffTeamStrategy(
+    teamLabel: string,
+    taker: KickoffTakerEvent | null,
+    supports: readonly KickoffSupportEvent[],
+  ): HTMLElement {
+    const section = document.createElement("section");
+    section.className = `kickoff-strategy-team ${teamLabel === "Blue" ? "team-blue" : "team-orange"}`;
+
+    const heading = document.createElement("h4");
+    heading.textContent = teamLabel;
+    section.append(heading);
+
+    const takerRow = document.createElement("p");
+    takerRow.className = "kickoff-strategy-line";
+    takerRow.textContent = taker
+      ? `${this.getPlayerName(taker.player)}: ${this.formatKickoffLabelValue(
+          "kickoff_approach",
+          taker.approach,
+        )} from ${this.formatKickoffLabelValue("kickoff_spawn", taker.spawn_position)} (${this.formatKickoffLabelValue(
+          "taker_outcome",
+          taker.outcome,
+        )}, ${this.formatSeconds(taker.time_to_ball)})`
+      : "No taker detected";
+    section.append(takerRow);
+
+    if (supports.length > 0) {
+      const supportList = document.createElement("ul");
+      supportList.className = "kickoff-support-list";
+      for (const support of supports) {
+        const item = document.createElement("li");
+        item.textContent = `${this.getPlayerName(support.player)}: ${this.formatKickoffLabelValue(
+          "support_behavior",
+          support.support_behavior,
+        )} from ${this.formatKickoffLabelValue("kickoff_spawn", support.spawn_position)}`;
+        supportList.append(item);
+      }
+      section.append(supportList);
+    }
+
+    return section;
+  }
+
+  private formatOutcome(kickoff: KickoffEvent): string {
+    if (kickoff.winning_team_is_team_0 === true) {
+      return "Blue wins";
+    }
+    if (kickoff.winning_team_is_team_0 === false) {
+      return "Orange wins";
+    }
+    if (kickoff.outcome === "neutral") {
+      return "Neutral";
+    }
+    return "Unknown";
+  }
+
+  private formatFirstTouch(kickoff: KickoffEvent): string {
+    if (!kickoff.first_touch_player) {
+      return "--";
+    }
+    const team =
+      kickoff.first_touch_team_is_team_0 === true
+        ? "Blue"
+        : kickoff.first_touch_team_is_team_0 === false
+          ? "Orange"
+          : "Unknown";
+    const time = kickoff.first_touch_time === null ? "--" : formatTime(kickoff.first_touch_time);
+    return `${team} · ${this.getPlayerName(kickoff.first_touch_player)} · ${time}`;
+  }
+
+  private formatAdvantage(kickoff: KickoffEvent): string {
+    if (kickoff.advantage === "no_advantage") {
+      return "No advantage";
+    }
+    const team =
+      kickoff.advantage_team_is_team_0 === true
+        ? "Blue"
+        : kickoff.advantage_team_is_team_0 === false
+          ? "Orange"
+          : "Unknown";
+    const kind = kickoff.advantage.replace(/^team_(zero|one)_/, "");
+    const player = kickoff.advantage_player
+      ? ` · ${this.getPlayerName(kickoff.advantage_player)}`
+      : "";
+    const time = kickoff.advantage_time === null ? "" : ` · ${formatTime(kickoff.advantage_time)}`;
+    return `${team} ${this.formatKickoffLabelValue("kickoff_advantage", kind)}${player}${time}`;
+  }
+
+  private formatContested(kickoff: KickoffEvent): string {
+    if (kickoff.kickoff_possession_outcome === "contested") {
+      return "Yes";
+    }
+    if (kickoff.kickoff_possession_team_is_team_0 === true) {
+      return `No · Blue ${this.formatPossessionOutcome(kickoff.kickoff_possession_outcome)}`;
+    }
+    if (kickoff.kickoff_possession_team_is_team_0 === false) {
+      return `No · Orange ${this.formatPossessionOutcome(kickoff.kickoff_possession_outcome)}`;
+    }
+    return `No · ${this.formatPossessionOutcome(kickoff.kickoff_possession_outcome)}`;
+  }
+
+  private formatPossessionOutcome(outcome: KickoffEvent["kickoff_possession_outcome"]): string {
+    if (outcome.endsWith("_advantage")) {
+      return "advantage";
+    }
+    if (outcome.endsWith("_possession")) {
+      return "possession";
+    }
+    return this.formatKickoffLabelValue("kickoff_possession_outcome", outcome);
+  }
+
+  private formatKickoffType(value: string): string {
+    return this.formatKickoffLabelValue("kickoff_type", value);
+  }
+
+  private formatKickoffTitle(kickoffEnvelope: KickoffEnvelope): string {
+    const kickoff = kickoffEnvelope.payload.payload;
+    const direction = this.formatKickoffDirection(kickoff.kickoff_direction);
+    const detail = [this.formatKickoffType(kickoff.kickoff_type), direction]
+      .filter(Boolean)
+      .join(" ");
+    return [kickoffEnvelope.meta.label, detail].filter(Boolean).join(" · ");
+  }
+
+  private formatKickoffDirection(value: string): string {
+    return value === "unknown"
+      ? ""
+      : `(${this.formatKickoffLabelValue("kickoff_direction", value)})`;
+  }
+
+  private formatNullableNumber(value: number | null, digits: number): string {
+    return value === null || !Number.isFinite(value) ? "--" : value.toFixed(digits);
+  }
+
+  private formatSeconds(value: number | null): string {
+    return value === null || !Number.isFinite(value) ? "--" : `${value.toFixed(2)}s`;
+  }
+
+  private formatLabel(value: string): string {
+    return value
+      .replace(/^team_zero_/, "blue_")
+      .replace(/^team_one_/, "orange_")
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  private formatKickoffLabelValue(labelKey: string, value: string): string {
+    const normalizedValue = value.replace(/^team_zero_/, "blue_").replace(/^team_one_/, "orange_");
+    if (labelKey === "kickoff_advantage") {
+      return this.formatLabel(normalizedValue.replace(/^blue_/, "").replace(/^orange_/, ""));
+    }
+    if (labelKey === "kickoff_possession_outcome") {
+      return this.formatLabel(
+        normalizedValue.replace(/^blue_/, "Blue ").replace(/^orange_/, "Orange "),
+      );
+    }
+    return this.formatLabel(normalizedValue);
+  }
+
+  private teamClassFromNullable(isTeamZero: boolean | null): string | null {
+    return isTeamZero === null ? null : getTeamClass(isTeamZero);
+  }
+
+  private getPlayerName(playerId: Record<string, unknown>): string {
+    const playerIdString = playerIdToString(playerId);
+    return (
+      this.options.getReplayPlayer()?.replay.players.find((player) => player.id === playerIdString)
+        ?.name ?? playerIdString
+    );
   }
 
   private appendStatsWindowEmpty(statsWindow: StatsWindowState, message: string): void {
