@@ -64,6 +64,7 @@ export interface ReplayDisplayRuntimeOptions {
   clearStandalonePlugins(): void;
   clearRenderCaches(): void;
   resetEventPlaylistWindow(): void;
+  renderModuleSummary(): void;
   renderScoreboard(frameIndex?: number): void;
   renderTimelineEventCount(): void;
   renderMechanicsTimelineControls(): void;
@@ -114,6 +115,7 @@ function clearDisplayedReplay(
   options.clearStandalonePlugins();
   options.clearRenderCaches();
   options.resetEventPlaylistWindow();
+  options.renderModuleSummary();
   options.renderScoreboard();
   options.renderTimelineEventCount();
   options.renderMechanicsTimelineControls();
@@ -178,6 +180,7 @@ export async function loadReplayBundleForDisplay(
       options.setLoadedReplayName(source.name);
       elements.playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
       elements.framesReadout.textContent = `${replay.frameCount}`;
+      options.renderModuleSummary();
       options.renderTimelineEventCount();
       options.renderMechanicsTimelineControls();
       options.resetEventPlaylistWindow();
@@ -287,6 +290,7 @@ export async function loadReplayBundleForDisplay(
     options.setLoadedReplayName(source.name);
     elements.playersReadout.textContent = replay.players.map((player) => player.name).join(", ");
     elements.framesReadout.textContent = `${replay.frameCount}`;
+    options.renderModuleSummary();
     options.renderTimelineEventCount();
     options.renderMechanicsTimelineControls();
     options.resetEventPlaylistWindow();

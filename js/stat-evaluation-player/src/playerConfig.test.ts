@@ -110,6 +110,20 @@ const CONFIG: StatsPlayerConfig = {
         { statId: "team.core.goals", targetId: "blue" },
       ],
     },
+    {
+      id: "stats-2",
+      kind: "kickoff-overview",
+      placement: {
+        x: 760,
+        y: 120,
+        viewport: { width: 1920, height: 1080 },
+        zIndex: 41,
+        visible: true,
+      },
+      playerId: null,
+      team: null,
+      entries: [],
+    },
   ],
   moduleConfigs: {
     boost: {
