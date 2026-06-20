@@ -2,6 +2,7 @@ import * as THREE from "three";
 import CameraControlsModule from "camera-controls";
 
 const CameraControls = CameraControlsModule.default ?? CameraControlsModule;
+const FOLLOW_TARGET_HANDOFF_SECONDS = 0.55;
 
 // Install CameraControls with THREE
 CameraControls.install({ THREE });
@@ -73,6 +74,7 @@ export class CameraManager {
 
     // Track previous state for yaw initialization
     this.lastIsBallCam = null;
+    this.targetHandoff = null;
 
     // Store current interpolated camera state
     this.currentCamPos = null;
@@ -287,6 +289,24 @@ export class CameraManager {
     // Reset ball cam angle when changing target car
     if (this.targetCar !== carMesh) {
       this.currentBallCamAngle = null;
+      if (this.targetCar && carMesh) {
+        this.targetHandoff = {
+          elapsed: 0,
+          duration: FOLLOW_TARGET_HANDOFF_SECONDS,
+          startPosition: this.camera.position.clone(),
+          startQuaternion: this.camera.quaternion.clone(),
+        };
+
+        const carToCamera = new THREE.Vector3().subVectors(this.camera.position, carMesh.position);
+        carToCamera.y = 0;
+        if (carToCamera.length() > 0.01) {
+          carToCamera.normalize();
+          this.smoothedCarYaw = Math.atan2(-carToCamera.x, -carToCamera.z);
+        }
+        if (this.lastCarPos) {
+          this.lastCarPos.copy(carMesh.position);
+        }
+      }
     }
     this.targetCar = carMesh;
   }
@@ -613,6 +633,19 @@ export class CameraManager {
       this._tempQuatBallCam,
       alpha,
     );
+
+    if (this.targetHandoff) {
+      this.targetHandoff.elapsed += delta;
+      const handoffT = Math.min(1, this.targetHandoff.elapsed / this.targetHandoff.duration);
+      const handoffAlpha = handoffT * handoffT * (3 - 2 * handoffT);
+      const targetPos = finalPos.clone();
+      const targetQuat = finalQuat.clone();
+      finalPos.lerpVectors(this.targetHandoff.startPosition, targetPos, handoffAlpha);
+      finalQuat.slerpQuaternions(this.targetHandoff.startQuaternion, targetQuat, handoffAlpha);
+      if (handoffT >= 1) {
+        this.targetHandoff = null;
+      }
+    }
 
     // Match Ballcam: apply the blended pose directly. The car/ball meshes have
     // already been interpolated for this render tick, so another camera low-pass

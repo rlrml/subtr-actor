@@ -82,7 +82,7 @@ export function getAppTemplate(): string {
             </div>
             <label class="toggle">
               <input id="camera-view-auto-possession" type="checkbox" disabled />
-              <span>Auto possession</span>
+              <span>Auto Follow</span>
             </label>
             <label class="toggle">
               <input id="use-player-camera-settings" type="checkbox" disabled />

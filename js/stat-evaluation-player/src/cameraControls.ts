@@ -354,7 +354,6 @@ export class CameraControlsController {
       },
       { signal },
     );
-
     // The ballchasing overlay reads nameplateLiftUu live each frame, so changing
     // the slider takes effect without touching the player — just refresh the
     // readout and persist.
