@@ -13,6 +13,7 @@ pub(crate) static GAME_TYPE: &str = "Archetypes.GameEvent.GameEvent_Soccar";
 pub(crate) static JUMP_TYPE: &str = "Archetypes.CarComponents.CarComponent_Jump";
 pub(crate) static PLAYER_REPLICATION_KEY: &str = "Engine.Pawn:PlayerReplicationInfo";
 pub(crate) static PLAYER_TYPE: &str = "TAGame.Default__PRI_TA";
+pub(crate) static PLAYER_TYPE_PREFIX: &str = "TAGame.Default__PRI";
 
 pub(crate) static BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount";
 pub(crate) static BOOST_REPLICATED_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoost";
@@ -77,3 +78,7 @@ pub(crate) static VEHICLE_KEY: &str = "TAGame.CarComponent_TA:Vehicle";
 pub(crate) static EMPTY_ACTOR_IDS: [boxcars::ActorId; 0] = [];
 
 pub(crate) static MAX_DEMOLISH_KNOWN_FRAMES_PASSED: usize = 150;
+
+pub(crate) fn is_player_type_object_name(name: &str) -> bool {
+    name.starts_with(PLAYER_TYPE_PREFIX) && name.ends_with("_TA")
+}

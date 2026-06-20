@@ -167,6 +167,12 @@ const GAME_TYPE_FIXTURES: &[GameTypeFixture] = &[
         match_type_class: Some("TAGame.MatchType_PublicRanked_TA"),
     },
     GameTypeFixture {
+        path: "assets/replay-format-2026-06-19-v868-32-net11-dropshot-breakout.replay",
+        game_type: ReplayGameType::Ranked,
+        playlist_id: Some(29),
+        match_type_class: Some("TAGame.MatchType_PublicRanked_TA"),
+    },
+    GameTypeFixture {
         path: "assets/rlcs-2025-worlds-grand-final-flcn-nrg-g5.replay",
         game_type: ReplayGameType::Private,
         playlist_id: Some(6),

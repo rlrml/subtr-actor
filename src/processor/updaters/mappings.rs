@@ -24,9 +24,7 @@ fn synthetic_bot_player_id(actor_id: boxcars::ActorId) -> PlayerId {
 
 impl<'a> ReplayProcessor<'a> {
     fn mapping_update_context(&self) -> SubtrActorResult<MappingUpdateContext> {
-        let cached = self.cached_object_ids;
-        let player_type_object_id =
-            self.required_cached_object_id(cached.player_type, PLAYER_TYPE)?;
+        let cached = &self.cached_object_ids;
         let car_type_object_id = self.required_cached_object_id(cached.car_type, CAR_TYPE)?;
         let boost_type_object_id = self.required_cached_object_id(cached.boost_type, BOOST_TYPE)?;
         let dodge_type_object_id = self.required_cached_object_id(cached.dodge_type, DODGE_TYPE)?;
@@ -41,9 +39,7 @@ impl<'a> ReplayProcessor<'a> {
         let vehicle_object_id = self.required_cached_object_id(cached.vehicle, VEHICLE_KEY)?;
 
         Ok(MappingUpdateContext {
-            player_type_actor_ids: self
-                .get_actor_ids_by_object_id(&player_type_object_id)
-                .to_vec(),
+            player_type_actor_ids: self.get_player_type_actor_ids()?,
             car_type_actor_ids: self
                 .get_actor_ids_by_object_id(&car_type_object_id)
                 .to_vec(),

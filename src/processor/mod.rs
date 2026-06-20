@@ -200,9 +200,9 @@ fn use_update_actor<T>(id: boxcars::ActorId, _: T) -> boxcars::ActorId {
     id
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 struct CachedObjectIds {
-    player_type: Option<boxcars::ObjectId>,
+    player_types: Vec<boxcars::ObjectId>,
     car_type: Option<boxcars::ObjectId>,
     boost_type: Option<boxcars::ObjectId>,
     dodge_type: Option<boxcars::ObjectId>,
@@ -232,8 +232,13 @@ struct CachedObjectIds {
 impl CachedObjectIds {
     fn from_name_map(name_to_object_id: &HashMap<String, boxcars::ObjectId>) -> Self {
         let cached = |name| name_to_object_id.get(name).copied();
+        let mut player_types = name_to_object_id
+            .iter()
+            .filter_map(|(name, object_id)| is_player_type_object_name(name).then_some(*object_id))
+            .collect::<Vec<_>>();
+        player_types.sort_by_key(|object_id| object_id.0);
         Self {
-            player_type: cached(PLAYER_TYPE),
+            player_types,
             car_type: cached(CAR_TYPE),
             boost_type: cached(BOOST_TYPE),
             dodge_type: cached(DODGE_TYPE),
@@ -642,6 +647,21 @@ impl<'a> ReplayProcessor<'a> {
     ) -> SubtrActorResult<boxcars::ObjectId> {
         object_id
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::ObjectIdNotFound { name }))
+    }
+
+    pub(crate) fn get_player_type_actor_ids(&self) -> SubtrActorResult<Vec<boxcars::ActorId>> {
+        if self.cached_object_ids.player_types.is_empty() {
+            return SubtrActorError::new_result(SubtrActorErrorVariant::ObjectIdNotFound {
+                name: PLAYER_TYPE,
+            });
+        }
+
+        Ok(self
+            .cached_object_ids
+            .player_types
+            .iter()
+            .flat_map(|object_id| self.get_actor_ids_by_object_id(object_id).iter().copied())
+            .collect())
     }
 
     /// [`Self::process`] takes a [`Collector`] as an argument and iterates over
