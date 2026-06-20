@@ -393,7 +393,7 @@ test("touchMarkerColor selects palettes by color mode with fallbacks", () => {
     firstTouch: false,
     contested: true,
     classifications: [
-      { key: "intention", value: "shot", label: "Shot", color: 0xff5d6c },
+      { key: "intention", value: "shot", label: "Shot", color: 0xff00c8 },
       { key: "kind", value: "hard_hit", label: "Hard Hit", color: 0xff5d6c },
       { key: "height_band", value: "high_air", label: "High Air", color: 0x818cf8 },
       { key: "surface", value: "wall", label: "Wall", color: 0xf97316 },
@@ -409,7 +409,8 @@ test("touchMarkerColor selects palettes by color mode with fallbacks", () => {
 
   assert.equal(touchMarkerColor(marker, "team"), 0xffc15c);
   assert.equal(touchMarkerColor({ ...marker, isTeamZero: true }, "team"), 0x59c3ff);
-  assert.equal(touchMarkerColor(marker, "intention"), 0xff5d6c);
+  assert.equal(touchMarkerColor(marker, "intention"), 0xff00c8);
+  assert.equal(touchMarkerColor({ ...marker, intention: "challenge" }, "intention"), 0xff1744);
   assert.equal(touchMarkerColor(marker, "kind"), 0xff5d6c);
   assert.equal(touchMarkerColor(marker, "height_band"), 0x818cf8);
   assert.equal(touchMarkerColor(marker, "surface"), 0xf97316);

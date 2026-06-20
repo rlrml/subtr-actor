@@ -59,11 +59,11 @@ export const TOUCH_TEAM_COLOR_LEGEND: TouchColorLegendEntry[] = [
 ];
 
 export const TOUCH_INTENTION_COLOR_LEGEND: TouchColorLegendEntry[] = [
-  { label: "Shot", color: 0xff5d6c },
-  { label: "Save", color: 0x4ade80 },
-  { label: "Clear", color: 0xfacc15 },
-  { label: "Pass", color: 0x22d3ee },
-  { label: "Challenge", color: 0xc084fc },
+  { label: "Shot", color: 0xff00c8 },
+  { label: "Save", color: 0x00e676 },
+  { label: "Clear", color: 0xffd000 },
+  { label: "Pass", color: 0x00b7ff },
+  { label: "Challenge", color: 0xff1744 },
   { label: "Control", color: 0x000000 },
   { label: "Neutral", color: 0x9aa5b1 },
 ];
