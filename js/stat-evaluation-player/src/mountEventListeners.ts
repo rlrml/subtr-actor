@@ -8,6 +8,8 @@ export interface MountEventListenerElements {
   readonly emptyLoadReplay: HTMLButtonElement;
   readonly fileInput: HTMLInputElement;
   readonly togglePlayback: HTMLButtonElement;
+  readonly previousFrame: HTMLButtonElement;
+  readonly nextFrame: HTMLButtonElement;
   readonly playbackRate: HTMLSelectElement;
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
@@ -26,6 +28,7 @@ export interface MountEventListenerOptions {
   createStatsWindow(kind: StatsWindowKind): void;
   loadReplayFile(file: File): Promise<void>;
   togglePlayback(): void;
+  stepFrames(delta: number): void;
   setPlaybackRate(value: number): void;
   setSkipPostGoalTransitionsEnabled(enabled: boolean): void;
   setSkipKickoffsEnabled(enabled: boolean): void;
@@ -44,6 +47,7 @@ export function installMountEventListeners({
   createStatsWindow,
   loadReplayFile,
   togglePlayback,
+  stepFrames,
   setPlaybackRate,
   setSkipPostGoalTransitionsEnabled,
   setSkipKickoffsEnabled,
@@ -123,6 +127,8 @@ export function installMountEventListeners({
   );
 
   elements.togglePlayback.addEventListener("click", togglePlayback, { signal });
+  elements.previousFrame.addEventListener("click", () => stepFrames(-1), { signal });
+  elements.nextFrame.addEventListener("click", () => stepFrames(1), { signal });
 
   elements.playbackRate.addEventListener(
     "change",

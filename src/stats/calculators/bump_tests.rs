@@ -201,8 +201,10 @@ fn bump_detector_requires_clear_victim_impulse() {
 }
 
 #[test]
-fn bump_detector_requires_initiator_slowdown() {
+fn bump_detector_credits_clear_victim_impulse_without_sampled_initiator_slowdown() {
     let mut calculator = BumpCalculator::new();
+    let initiator_id = boxcars::RemoteId::Steam(1);
+    let victim_id = boxcars::RemoteId::Steam(2);
 
     calculator
         .update(
@@ -248,8 +250,12 @@ fn bump_detector_requires_initiator_slowdown() {
         )
         .unwrap();
 
-    assert!(calculator.events().is_empty());
-    assert!(calculator.player_stats().is_empty());
+    assert_eq!(calculator.events().len(), 1);
+    let event = &calculator.events()[0];
+    assert_eq!(event.initiator, initiator_id);
+    assert_eq!(event.victim, victim_id);
+    assert!(event.victim_impulse >= BUMP_MIN_VICTIM_IMPULSE);
+    assert!(event.closing_speed >= BUMP_MIN_CLOSING_SPEED);
 }
 
 #[test]

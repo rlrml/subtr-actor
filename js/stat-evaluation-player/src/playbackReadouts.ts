@@ -3,6 +3,8 @@ import type { CameraControlsController } from "./cameraControls.ts";
 
 export interface PlaybackReadoutElements {
   readonly togglePlayback: HTMLButtonElement;
+  readonly previousFrame: HTMLButtonElement;
+  readonly nextFrame: HTMLButtonElement;
   readonly playbackRate: HTMLSelectElement;
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
@@ -17,6 +19,7 @@ export interface PlaybackReadoutElements {
 
 export interface PlaybackReadoutsOptions {
   readonly elements: PlaybackReadoutElements;
+  getFrameCount(): number;
   getCameraControlsController(): CameraControlsController | null;
 }
 
@@ -26,6 +29,8 @@ export class PlaybackReadoutsController {
   setTransportEnabled(enabled: boolean, state?: ReplayPlayerState): void {
     const { elements } = this.options;
     elements.togglePlayback.disabled = !enabled;
+    elements.previousFrame.disabled = !enabled;
+    elements.nextFrame.disabled = !enabled;
     elements.playbackRate.disabled = !enabled;
     elements.skipPostGoalTransitions.disabled = !enabled;
     elements.skipKickoffs.disabled = !enabled;
@@ -41,6 +46,9 @@ export class PlaybackReadoutsController {
     elements.durationReadout.textContent = `${state.duration.toFixed(2)}s`;
     elements.playbackStatusReadout.textContent = state.playing ? "Playing" : "Paused";
     elements.togglePlayback.textContent = state.playing ? "Pause" : "Play";
+    const lastFrameIndex = Math.max(0, this.options.getFrameCount() - 1);
+    elements.previousFrame.disabled = state.frameIndex <= 0;
+    elements.nextFrame.disabled = state.frameIndex >= lastFrameIndex;
     elements.playbackRate.value = `${state.speed}`;
     this.options.getCameraControlsController()?.syncState(state);
     elements.skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;

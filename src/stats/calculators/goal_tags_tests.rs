@@ -467,6 +467,28 @@ fn high_aerial_goal_ignores_high_touch_from_before_the_possession() {
 }
 
 #[test]
+fn high_aerial_goal_ignores_high_touch_when_scoring_possession_does_not_reach_goal() {
+    let goal = goal_with_touch(true, position(0.0, 1500.0, 100.0), Vec::new());
+    // The scoring team had a high touch in an earlier possession, but the
+    // possession state at the scorer's final touch belongs to the opponent.
+    // This can happen around kickoff/goal transitions; the high touch must not
+    // leak into the later goal tag.
+    let touches = vec![
+        aerial_touch(2.0, 20, player_id(1), true, 800.0),
+        aerial_touch(9.5, 95, player_id(1), true, 100.0),
+    ];
+    let possessions = vec![
+        possession_event("team_zero", 10, 30),
+        possession_event("team_one", 40, 95),
+        possession_event("neutral", 96, 100),
+    ];
+
+    let events = HighAerialGoalCalculator::new().tag_goals(&[goal], &touches, &possessions);
+
+    assert!(events.is_empty());
+}
+
+#[test]
 fn high_aerial_goal_ignores_defending_team_high_touch() {
     let goal = goal_with_touch(true, position(0.0, 1500.0, 100.0), Vec::new());
     // High touch in the possession window, but by the defending team.
@@ -1225,11 +1247,47 @@ fn demo_goal_marks_by_scorer_when_scorer_gets_demo() {
 }
 
 #[test]
+fn demo_goal_accepts_demo_that_replay_reports_just_after_goal() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let events =
+        DemoGoalCalculator::new().tag_goals(&[goal], &[demo_event(10.03, 101, player_id(2))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::DemoGoal]);
+}
+
+#[test]
+fn demo_goal_rejects_demo_after_post_goal_tolerance() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let events =
+        DemoGoalCalculator::new().tag_goals(&[goal], &[demo_event(10.06, 102, player_id(2))]);
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn demo_goal_accepts_five_second_open_net_demo_in_same_play() {
+    let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    let events =
+        DemoGoalCalculator::new().tag_goals(&[goal], &[demo_event(4.99, 50, player_id(2))]);
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::DemoGoal]);
+}
+
+#[test]
+fn demo_goal_rejects_demo_before_current_kickoff() {
+    let mut goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
+    goal.time_after_kickoff = Some(2.0);
+    let events = DemoGoalCalculator::new().tag_goals(&[goal], &[demo_event(7.9, 79, player_id(2))]);
+
+    assert!(events.is_empty());
+}
+
+#[test]
 fn demo_goal_rejects_opponent_demos_and_stale_demos() {
     let goal = goal_with_touch(true, position(0.0, 2300.0, 120.0), Vec::new());
     let mut opponent_demo = demo_event(9.1, 91, player_id(3));
     opponent_demo.attacker_is_team_0 = Some(false);
-    let stale_demo = demo_event(6.5, 65, player_id(2));
+    let stale_demo = demo_event(4.0, 40, player_id(2));
 
     let events = DemoGoalCalculator::new().tag_goals(&[goal], &[opponent_demo, stale_demo]);
 

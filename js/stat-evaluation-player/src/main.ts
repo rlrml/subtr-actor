@@ -211,6 +211,8 @@ let replayLoadingActive!: HTMLElement;
 let replayLoadingList!: HTMLDivElement;
 let statsWindowLayer!: HTMLDivElement;
 let togglePlayback!: HTMLButtonElement;
+let previousFrame!: HTMLButtonElement;
+let nextFrame!: HTMLButtonElement;
 let playbackRate!: HTMLSelectElement;
 let timeReadout!: HTMLElement;
 let frameReadout!: HTMLElement;
@@ -717,6 +719,8 @@ export function mountStatEvaluationPlayer(
     cueGoalReplay: playbackActions.cueGoalReplay,
   });
   togglePlayback = mustElement<HTMLButtonElement>(root, "#toggle-playback");
+  previousFrame = mustElement<HTMLButtonElement>(root, "#previous-frame");
+  nextFrame = mustElement<HTMLButtonElement>(root, "#next-frame");
   playbackRate = mustElement<HTMLSelectElement>(root, "#playback-rate");
   cameraControlsController = createCameraControlsController({
     elements: {
@@ -815,6 +819,8 @@ export function mountStatEvaluationPlayer(
   playbackReadoutsController = createPlaybackReadoutsController({
     elements: {
       togglePlayback,
+      previousFrame,
+      nextFrame,
       playbackRate,
       skipPostGoalTransitions,
       skipKickoffs,
@@ -826,6 +832,7 @@ export function mountStatEvaluationPlayer(
       durationReadout,
       playbackStatusReadout,
     },
+    getFrameCount: () => replayPlayer?.replay.frameCount ?? 0,
     getCameraControlsController: () => cameraControlsController,
   });
   recordingWindowController = createRecordingWindowController({
@@ -968,6 +975,8 @@ export function mountStatEvaluationPlayer(
       emptyLoadReplay,
       fileInput,
       togglePlayback,
+      previousFrame,
+      nextFrame,
       playbackRate,
       skipPostGoalTransitions,
       skipKickoffs,
@@ -993,6 +1002,10 @@ export function mountStatEvaluationPlayer(
     },
     togglePlayback() {
       replayPlayer?.togglePlayback();
+      scheduleConfigUrlUpdate();
+    },
+    stepFrames(delta) {
+      replayPlayer?.stepFrames(delta);
       scheduleConfigUrlUpdate();
     },
     setPlaybackRate(value) {
