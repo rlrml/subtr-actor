@@ -6,6 +6,12 @@ import {
   type ReplayPlayerState,
   type ReplayPlayerTrack,
 } from "@rlrml/player";
+import {
+  autoCastPlayerForState,
+  buildAutoCastCameraSpans,
+  type AutoCastCameraSpan,
+} from "./autoCastCamera.ts";
+import type { StatsTimeline } from "./statsTimeline.ts";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 
 const CAMERA_VIEW_MODES: ReplayCameraViewMode[] = ["free", "follow"];
@@ -65,6 +71,7 @@ export interface CameraControlsElements {
   readonly cameraViewFollowButton: HTMLButtonElement;
   readonly cameraViewOverheadButton: HTMLButtonElement;
   readonly cameraViewSideButton: HTMLButtonElement;
+  readonly autoCast: HTMLInputElement;
   readonly usePlayerCameraSettings: HTMLInputElement;
   readonly cameraSettingsControls: HTMLDivElement;
   readonly customCameraFov: HTMLInputElement;
@@ -97,11 +104,16 @@ export interface CameraControlsElements {
 export interface CameraControlsOptions {
   readonly elements: CameraControlsElements;
   getReplayPlayer(): StatsReplayPlayer | null;
+  getStatsTimeline(): StatsTimeline | null;
   requestConfigSync(): void;
 }
 
 export class CameraControlsController {
   private lastFreeCameraPreset: ReplayFreeCameraPreset | null = null;
+  private autoCastEnabled = false;
+  private autoCastSpans: AutoCastCameraSpan[] = [];
+  private autoCastTimeline: StatsTimeline | null = null;
+  private autoCastApplying = false;
 
   constructor(private readonly options: CameraControlsOptions) {}
 
@@ -128,6 +140,7 @@ export class CameraControlsController {
     playerId: string,
     options: { ballCam?: BallCamMode; usePlayerCameraSettings?: boolean } = {},
   ): void {
+    this.setAutoCastEnabled(false);
     const replayPlayer = this.options.getReplayPlayer();
     if (!replayPlayer) {
       return;
@@ -141,6 +154,57 @@ export class CameraControlsController {
     this.setBallCamMode(options.ballCam ?? "player");
     this.lastFreeCameraPreset = null;
     this.options.requestConfigSync();
+  }
+
+  syncAutoCast(state: ReplayPlayerState): void {
+    if (!this.autoCastEnabled) {
+      return;
+    }
+
+    const replayPlayer = this.options.getReplayPlayer();
+    const statsTimeline = this.options.getStatsTimeline();
+    if (!replayPlayer || !statsTimeline) {
+      return;
+    }
+
+    if (statsTimeline !== this.autoCastTimeline) {
+      this.autoCastTimeline = statsTimeline;
+      this.autoCastSpans = buildAutoCastCameraSpans(statsTimeline);
+    }
+
+    const playerId = autoCastPlayerForState(this.autoCastSpans, state);
+    if (!playerId || (state.attachedPlayerId === playerId && state.cameraViewMode === "follow")) {
+      return;
+    }
+
+    this.autoCastApplying = true;
+    try {
+      replayPlayer.setAttachedPlayer(playerId);
+      replayPlayer.setCameraViewMode("follow");
+      replayPlayer.setCustomCameraSettings(null);
+      this.setBallCamMode("player");
+      this.lastFreeCameraPreset = null;
+    } finally {
+      this.autoCastApplying = false;
+    }
+  }
+
+  private setAutoCastEnabled(enabled: boolean): void {
+    this.autoCastEnabled = enabled;
+    this.options.elements.autoCast.checked = enabled;
+    if (enabled) {
+      this.autoCastTimeline = null;
+      const state = this.options.getReplayPlayer()?.getState();
+      if (state) {
+        this.syncAutoCast(state);
+      }
+    }
+  }
+
+  private disableAutoCastForManualControl(): void {
+    if (!this.autoCastApplying) {
+      this.setAutoCastEnabled(false);
+    }
   }
 
   private renderBallCamButtons(): void {
@@ -221,6 +285,7 @@ export class CameraControlsController {
     elements.attachedPlayer.addEventListener(
       "change",
       () => {
+        this.disableAutoCastForManualControl();
         const replayPlayer = this.options.getReplayPlayer();
         const attachedPlayerId = elements.attachedPlayer.value || null;
         replayPlayer?.setAttachedPlayer(attachedPlayerId);
@@ -238,6 +303,7 @@ export class CameraControlsController {
     elements.cameraViewFreeButton.addEventListener(
       "click",
       () => {
+        this.disableAutoCastForManualControl();
         this.options.getReplayPlayer()?.setCameraViewMode("free");
         this.lastFreeCameraPreset = null;
         this.options.requestConfigSync();
@@ -248,6 +314,7 @@ export class CameraControlsController {
     elements.cameraViewFollowButton.addEventListener(
       "click",
       () => {
+        this.disableAutoCastForManualControl();
         const replayPlayer = this.options.getReplayPlayer();
         replayPlayer?.setCameraViewMode("follow");
         if (replayPlayer?.getState().attachedPlayerId) {
@@ -264,6 +331,7 @@ export class CameraControlsController {
     elements.cameraViewOverheadButton.addEventListener(
       "click",
       () => {
+        this.disableAutoCastForManualControl();
         this.options.getReplayPlayer()?.setFreeCameraPreset("overhead");
         this.lastFreeCameraPreset = "overhead";
         this.options.requestConfigSync();
@@ -274,6 +342,7 @@ export class CameraControlsController {
     elements.cameraViewSideButton.addEventListener(
       "click",
       () => {
+        this.disableAutoCastForManualControl();
         this.options.getReplayPlayer()?.setFreeCameraPreset("side");
         this.lastFreeCameraPreset = "side";
         this.options.requestConfigSync();
@@ -297,6 +366,14 @@ export class CameraControlsController {
       );
     }
 
+    elements.autoCast.addEventListener(
+      "change",
+      () => {
+        this.setAutoCastEnabled(elements.autoCast.checked);
+      },
+      { signal },
+    );
+
     // The ballchasing overlay reads nameplateLiftUu live each frame, so changing
     // the slider takes effect without touching the player — just refresh the
     // readout and persist.
@@ -312,6 +389,7 @@ export class CameraControlsController {
 
   setTransportEnabled(enabled: boolean, state?: ReplayPlayerState): void {
     this.options.elements.attachedPlayer.disabled = !enabled;
+    this.options.elements.autoCast.disabled = !enabled;
     this.syncModeButtons(enabled ? state : undefined);
   }
 
@@ -376,6 +454,11 @@ export class CameraControlsController {
         new Option(`${player.name} (${player.isTeamZero ? "Blue" : "Orange"})`, player.id),
       );
     }
+  }
+
+  resetAutoCastTimeline(): void {
+    this.autoCastTimeline = null;
+    this.autoCastSpans = [];
   }
 
   renderProfile(state?: ReplayPlayerState): void {

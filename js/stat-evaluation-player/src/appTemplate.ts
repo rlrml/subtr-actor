@@ -80,6 +80,10 @@ export function getAppTemplate(): string {
               <button id="camera-view-side" type="button" disabled>Diagonal</button>
             </div>
             <label class="toggle">
+              <input id="auto-cast" type="checkbox" disabled />
+              <span>Auto Follow</span>
+            </label>
+            <label class="toggle">
               <input id="use-player-camera-settings" type="checkbox" disabled />
               <span>Use player camera settings</span>
             </label>

@@ -464,6 +464,8 @@ function renderSnapshot(state: ReplayPlayerState): void {
     return;
   }
 
+  cameraControlsController?.syncAutoCast(state);
+
   const now = performance.now();
   if (state.playing && now - lastPlayingSnapshotUiUpdateAt < PLAYING_SNAPSHOT_UI_INTERVAL_MS) {
     return;
@@ -725,6 +727,7 @@ export function mountStatEvaluationPlayer(
       cameraViewFollowButton: mustElement<HTMLButtonElement>(root, "#camera-view-follow"),
       cameraViewOverheadButton: mustElement<HTMLButtonElement>(root, "#camera-view-overhead"),
       cameraViewSideButton: mustElement<HTMLButtonElement>(root, "#camera-view-side"),
+      autoCast: mustElement<HTMLInputElement>(root, "#auto-cast"),
       usePlayerCameraSettings: mustElement<HTMLInputElement>(root, "#use-player-camera-settings"),
       cameraSettingsControls: mustElement<HTMLDivElement>(root, "#camera-settings-controls"),
       customCameraFov: mustElement<HTMLInputElement>(root, "#custom-camera-fov"),
@@ -769,6 +772,7 @@ export function mountStatEvaluationPlayer(
       cameraStiffnessReadout: mustElement<HTMLElement>(root, "#camera-stiffness-readout"),
     },
     getReplayPlayer: () => replayPlayer,
+    getStatsTimeline: () => statsTimeline,
     requestConfigSync: scheduleConfigUrlUpdate,
   });
   moduleControlsController = createModuleControlsController({
@@ -928,6 +932,7 @@ export function mountStatEvaluationPlayer(
     mechanicsReviewController?.reset();
     mechanicsReviewController = null;
     loadedReplayName = null;
+    cameraControlsController?.resetAutoCastTimeline();
     cameraControlsController = null;
     recordingWindowController = null;
     moduleControlsController = null;
