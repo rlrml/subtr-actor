@@ -558,6 +558,7 @@ async function loadReplayBundleForDisplay(
     clearStandalonePlugins,
     clearRenderCaches,
     resetEventPlaylistWindow,
+    renderModuleSummary,
     renderScoreboard,
     renderTimelineEventCount,
     renderMechanicsTimelineControls,
