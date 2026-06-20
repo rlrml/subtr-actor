@@ -46,6 +46,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "timeline", stream: "timeline", kind: "timeline" },
   { field: "core_player", stream: "core_player", kind: "core_player" },
   { field: "possession", stream: "possession", kind: "possession" },
+  { field: "player_possession", stream: "player_possession", kind: "player_possession" },
   { field: "ball_half", stream: "ball_half", kind: "ball_half" },
   { field: "ball_third", stream: "ball_third", kind: "ball_third" },
   {
@@ -396,6 +397,7 @@ export function createStatsTimeline(
 export function createLegacyStatsTimeline(
   overrides: DeepPartial<MaterializedStatsTimeline> & {
     timeline_events?: PayloadList<"timeline">;
+    player_possession?: PayloadList<"player_possession">;
     backboard_events?: PayloadList<"backboard">;
     ceiling_shot_events?: PayloadList<"ceiling_shot">;
     wall_aerial_events?: PayloadList<"wall_aerial">;
@@ -437,6 +439,9 @@ export function createLegacyStatsTimeline(
     ...legacyMechanicEvents(overrides as Record<string, unknown> | undefined),
     ...(overrides.timeline_events ?? []).map((event, index) =>
       payloadEvent("timeline", "timeline", event, index),
+    ),
+    ...(overrides.player_possession ?? []).map((event, index) =>
+      payloadEvent("player_possession", "player_possession", event, index),
     ),
     ...(overrides.backboard_events ?? []).map((event, index) =>
       payloadEvent("backboard", "backboard", event, index),

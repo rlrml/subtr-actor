@@ -478,10 +478,15 @@
   color: #d7ffef;
 }
 
+.stats-window:has(.kickoff-overview) {
+  width: min(34rem, calc(100vw - 1.6rem));
+}
+
 .kickoff-overview {
   display: grid;
   gap: var(--ui-gap-md);
-  min-width: min(38rem, 84vw);
+  width: 100%;
+  min-width: 0;
 }
 
 .kickoff-overview-hero {
@@ -526,7 +531,7 @@
 
 .kickoff-overview-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--ui-gap-sm);
 }
 
@@ -577,7 +582,7 @@
 
 .kickoff-strategy-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(15rem, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--ui-gap-sm);
 }
 
@@ -624,8 +629,15 @@
   overflow-wrap: anywhere;
 }
 
+@media (min-width: 46rem) {
+  .kickoff-overview-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
   .kickoff-overview-summary,
+  .kickoff-detail-grid,
   .kickoff-strategy-list {
     grid-template-columns: 1fr;
   }

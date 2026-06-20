@@ -1,11 +1,13 @@
 import type { ReplayPlayerState } from "@rlrml/player";
 import type { CameraControlsController } from "./cameraControls.ts";
+import { formatPlaybackRate, snapPlaybackRate } from "./playbackRateControl.ts";
 
 export interface PlaybackReadoutElements {
   readonly togglePlayback: HTMLButtonElement;
   readonly previousFrame: HTMLButtonElement;
   readonly nextFrame: HTMLButtonElement;
-  readonly playbackRate: HTMLSelectElement;
+  readonly playbackRate: HTMLInputElement;
+  readonly playbackRateReadout: HTMLElement;
   readonly skipPostGoalTransitions: HTMLInputElement;
   readonly skipKickoffs: HTMLInputElement;
   readonly hitboxWireframes: HTMLInputElement;
@@ -49,7 +51,9 @@ export class PlaybackReadoutsController {
     const lastFrameIndex = Math.max(0, this.options.getFrameCount() - 1);
     elements.previousFrame.disabled = state.frameIndex <= 0;
     elements.nextFrame.disabled = state.frameIndex >= lastFrameIndex;
-    elements.playbackRate.value = `${state.speed}`;
+    const playbackRate = snapPlaybackRate(state.speed);
+    elements.playbackRate.value = `${playbackRate}`;
+    elements.playbackRateReadout.textContent = formatPlaybackRate(playbackRate);
     this.options.getCameraControlsController()?.syncState(state);
     elements.skipPostGoalTransitions.checked = state.skipPostGoalTransitionsEnabled;
     elements.skipKickoffs.checked = state.skipKickoffsEnabled;
