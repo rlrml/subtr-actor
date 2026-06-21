@@ -34,12 +34,13 @@ fn make_event(
             ..
         } => format!("{start_frame}:{end_frame}"),
     };
+    let scope = payload.scope();
     Event {
         meta: EventMeta {
             id: format!("{stream}:{frame_id}:{index}"),
             stream: stream.to_owned(),
             label: stats_timeline_event_label(stream),
-            scope: event_stream_scope(stream),
+            scope,
             timing,
             primary_player,
             secondary_player,

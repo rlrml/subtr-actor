@@ -229,27 +229,6 @@ pub fn stats_timeline_event_label(stream: &str) -> String {
     label.to_owned()
 }
 
-/// The entity scope for an event stream. Player-attributed streams are the
-/// common case, so they are the default; team- and match-scoped streams are
-/// enumerated explicitly. This is the authoritative source for how a client
-/// fans a stream out into per-entity lanes.
-pub fn event_stream_scope(stream: &str) -> EventScope {
-    match stream {
-        // Whole-match rows: scoreboard/goal annotations that are not split per
-        // entity on the timeline.
-        "timeline" | "goal_context" | "core_player" => EventScope::Match,
-        // Per-team control/contest streams.
-        "possession"
-        | "ball_half"
-        | "territorial_pressure"
-        | "controlled_play"
-        | "fifty_fifty"
-        | "rush" => EventScope::Team,
-        // Everything else is attributed to a primary player.
-        _ => EventScope::Player,
-    }
-}
-
 fn title_case_event_stream(stream: &str) -> String {
     stream
         .split('_')
@@ -324,16 +303,24 @@ pub struct EventProperty {
 
 /// Which entity an event belongs to, so a client can spawn one timeline lane
 /// per relevant entity (per team, per player) instead of merging everything
-/// onto a single row. Especially useful for span streams.
+/// onto a single row. Especially useful for span streams, where merging would
+/// pile overlapping spans from different entities onto one lane.
+///
+/// Fan-out is opt-in: `Match` is the default and `Team`/`Player` are declared
+/// per event type via `EventDefinition::scope` (the `scope =` modifier on
+/// `define_stats_event!`). See `EventPayload::scope`, which reads that
+/// declaration to populate [`EventMeta::scope`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum EventScope {
-    /// One lane for the whole match (e.g. goals, goal context).
+    /// One shared lane for the whole match — the default, un-fanned row
+    /// (e.g. goals, goal context, timeline annotations).
     Match,
     /// One lane per team (e.g. possession, ball-half control).
     Team,
-    /// One lane per player (e.g. per-player mechanics and activity spans).
+    /// One lane per player (e.g. per-player positioning spans, mechanics, and
+    /// activity spans). The opt-in that prevents overlapping per-player spans.
     Player,
 }
 
