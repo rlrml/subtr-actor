@@ -268,12 +268,13 @@ fn event_envelope(
     team_is_team_0: Option<bool>,
     payload: EventPayload,
 ) -> Event {
+    let scope = payload.scope();
     Event {
         meta: EventMeta {
             id: id.to_owned(),
             stream: stream.to_owned(),
             label: stream.replace('_', " "),
-            scope: event_stream_scope(stream),
+            scope,
             timing: EventTiming::Moment { frame, time },
             primary_player,
             secondary_player: None,

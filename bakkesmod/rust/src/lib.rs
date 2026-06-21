@@ -33,7 +33,7 @@ use subtr_actor::{
     WhiffEvent, boost_amount_to_percent, builtin_analysis_node_json,
     builtin_stats_graph_snapshot_json, builtin_stats_module_config_json,
     builtin_stats_module_frame_json, builtin_stats_module_json, builtin_stats_module_names,
-    car_hitbox_for_body_id, default_car_hitbox, default_stats_timeline_config, event_stream_scope,
+    car_hitbox_for_body_id, default_car_hitbox, default_stats_timeline_config,
     geometry::apply_velocities_to_rigid_body,
     hitbox_family_for_body_id,
     stats::analysis_graph::{
