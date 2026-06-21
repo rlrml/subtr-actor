@@ -452,6 +452,14 @@ impl ControlFollowTracker {
 /// the ball is actually headed; we wait for the trajectory to settle.
 const SHOT_PROJECTION_MIN_FREE_FLIGHT_SECONDS: f32 = 0.06;
 
+/// When a new touch ends free flight, samples within this many seconds of that
+/// touch are ignored. The incoming touch's impulse can start moving the ball a
+/// frame or two before its touch marker is detected (the same replication lag
+/// as the dodge byte), so the very last free-flight samples may already be
+/// contaminated by the next touch. Resolving from a few frames earlier keeps
+/// the read on the ball's own settled trajectory.
+const SHOT_PROJECTION_NEXT_TOUCH_GUARD_SECONDS: f32 = 0.12;
+
 /// Outcome of a closed shot-projection window. `touch_index` addresses the
 /// touch event to upgrade to a shot when `is_shot` is true.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -472,25 +480,62 @@ struct ShotProjectionWindow {
     touch_index: usize,
     is_team_0: bool,
     touch_time: f32,
-    last_sample: Option<ShotProjectionSample>,
+    /// Recent free-flight samples, oldest first. Bounded to the look-back the
+    /// next-touch guard needs, so it never grows with window length.
+    samples: VecDeque<ShotProjectionSample>,
 }
 
 impl ShotProjectionWindow {
-    /// Resolve from the most recent free-flight sample — i.e. the last moment
-    /// before the next touch ended the ball's free flight. That settled sample
-    /// is a far more reliable read of "was this headed in?" than the touch
-    /// frame, which is sampled before the impulse has finished landing.
-    fn resolution(&self) -> ShotProjectionResolution {
-        let is_shot = self.last_sample.is_some_and(|sample| {
-            sample.time - self.touch_time >= SHOT_PROJECTION_MIN_FREE_FLIGHT_SECONDS
-                && sample.velocity.length() >= SHOT_MIN_BALL_SPEED
-                && trajectory_crosses_goal_mouth(
-                    sample.position,
-                    sample.velocity,
-                    opponent_goal_line_y(self.is_team_0),
-                    SHOT_MAX_TIME_TO_GOAL_SECONDS,
-                )
-        });
+    fn record(&mut self, sample: ShotProjectionSample) {
+        // Retain enough history to look back past the next-touch guard, plus a
+        // small margin, and no more.
+        let cutoff = sample.time - (SHOT_PROJECTION_NEXT_TOUCH_GUARD_SECONDS + 0.1);
+        self.samples.push_back(sample);
+        while self
+            .samples
+            .front()
+            .is_some_and(|oldest| oldest.time < cutoff)
+        {
+            self.samples.pop_front();
+        }
+    }
+
+    fn is_shot_from(&self, sample: &ShotProjectionSample) -> bool {
+        sample.time - self.touch_time >= SHOT_PROJECTION_MIN_FREE_FLIGHT_SECONDS
+            && sample.velocity.length() >= SHOT_MIN_BALL_SPEED
+            && trajectory_crosses_goal_mouth(
+                sample.position,
+                sample.velocity,
+                opponent_goal_line_y(self.is_team_0),
+                SHOT_MAX_TIME_TO_GOAL_SECONDS,
+            )
+    }
+
+    /// Resolve from the most recent sample. Used when free flight ends at a
+    /// boundary (goal / stoppage / end of replay): nothing perturbs the ball, so
+    /// the last sample is the cleanest read of where it was headed.
+    fn resolution_latest(&self) -> ShotProjectionResolution {
+        let is_shot = self
+            .samples
+            .back()
+            .is_some_and(|sample| self.is_shot_from(sample));
+        ShotProjectionResolution {
+            touch_index: self.touch_index,
+            is_shot,
+        }
+    }
+
+    /// Resolve from the most recent sample at least the guard interval before
+    /// `close_time`. Used when a new touch ends free flight, so the read sits on
+    /// the ball's own trajectory rather than the next touch's incoming impulse.
+    fn resolution_before(&self, close_time: f32) -> ShotProjectionResolution {
+        let limit = close_time - SHOT_PROJECTION_NEXT_TOUCH_GUARD_SECONDS;
+        let is_shot = self
+            .samples
+            .iter()
+            .rev()
+            .find(|sample| sample.time <= limit)
+            .is_some_and(|sample| self.is_shot_from(sample));
         ShotProjectionResolution {
             touch_index: self.touch_index,
             is_shot,
@@ -499,10 +544,10 @@ impl ShotProjectionWindow {
 }
 
 /// Watches the ball's free flight after a touch and decides, from the settled
-/// trajectory just before the next touch, whether the touch sent the ball
-/// goalward — recovering shots whose touch-frame velocity had not yet finished
-/// updating. Resolutions are applied retroactively to the already-emitted touch
-/// event, mirroring [`ControlFollowTracker`].
+/// trajectory before the next touch, whether the touch sent the ball goalward —
+/// recovering shots whose touch-frame velocity had not yet finished updating.
+/// Resolutions are applied retroactively to the already-emitted touch event,
+/// mirroring [`ControlFollowTracker`].
 ///
 /// At most one window is open at a time: any new touch closes the previous
 /// window.
@@ -518,14 +563,17 @@ impl ShotProjectionTracker {
             touch_index,
             is_team_0,
             touch_time: time,
-            last_sample: None,
+            samples: VecDeque::new(),
         });
     }
 
-    /// Close the open window because a new touch ended free flight, resolving it
-    /// from the last sample observed before this touch.
-    pub fn observe_touch(&mut self) -> Option<ShotProjectionResolution> {
-        self.window.take().map(|window| window.resolution())
+    /// Close the open window because a new touch at `next_touch_time` ended free
+    /// flight, resolving it from a sample taken a guard interval before that
+    /// touch so the next touch's pre-detection impulse can't skew the read.
+    pub fn observe_touch(&mut self, next_touch_time: f32) -> Option<ShotProjectionResolution> {
+        self.window
+            .take()
+            .map(|window| window.resolution_before(next_touch_time))
     }
 
     /// Record this frame's free-flight ball sample, or resolve the window once
@@ -541,11 +589,11 @@ impl ShotProjectionTracker {
             .as_ref()
             .is_some_and(|window| frame.time - window.touch_time > SHOT_MAX_TIME_TO_GOAL_SECONDS)
         {
-            return self.flush();
+            return self.window.take().map(|window| window.resolution_latest());
         }
         let window = self.window.as_mut()?;
         if let (Some(position), Some(velocity)) = (ball_position, ball_velocity) {
-            window.last_sample = Some(ShotProjectionSample {
+            window.record(ShotProjectionSample {
                 position,
                 velocity,
                 time: frame.time,
@@ -556,7 +604,7 @@ impl ShotProjectionTracker {
 
     /// Close any open window immediately (live-play boundary or end of replay).
     pub fn flush(&mut self) -> Option<ShotProjectionResolution> {
-        self.window.take().map(|window| window.resolution())
+        self.window.take().map(|window| window.resolution_latest())
     }
 }
 

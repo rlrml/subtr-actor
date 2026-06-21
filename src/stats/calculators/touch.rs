@@ -441,8 +441,8 @@ impl TouchCalculator {
                 .observe_touch(player_id, touch_event.time);
             self.apply_control_resolution(control_resolution);
             // This new touch ends the previous touch's free flight; resolve its
-            // shot projection from the settled trajectory just before now.
-            let shot_resolution = self.shot_projection.observe_touch();
+            // shot projection from the settled trajectory shortly before now.
+            let shot_resolution = self.shot_projection.observe_touch(touch_event.time);
             self.apply_shot_projection_resolution(shot_resolution);
             let resolution = self.intention_classifier.classify(
                 touch_event,
