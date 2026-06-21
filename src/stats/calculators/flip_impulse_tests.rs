@@ -75,9 +75,12 @@ fn emits_forward_left_impulse_from_velocity_delta() {
             &live_play,
         )
         .unwrap();
+    // The dodge now resolves at the longer rotation window; force completion.
+    calculator.finalize_parts(&frame(16, 1.30, 0.10));
 
     let event = calculator.events().first().expect("expected event");
     assert_eq!(event.frame, 10);
+    // resolved_* still mark the impulse window's end, not the rotation window.
     assert_eq!(event.resolved_frame, 12);
     let dodge_impulse = event
         .dodge_impulse
@@ -106,6 +109,12 @@ fn subtracts_forward_boost_compensation() {
         boost_compensation: glam::Vec3::new(100.0, 0.0, 0.0),
         sample_count: 2,
         boost_sample_count: 1,
+        onset_local_angular_velocity: glam::Vec3::ZERO,
+        min_forward_z: 0.0,
+        max_forward_deviation_degrees: 0.0,
+        max_up_deviation_degrees: 0.0,
+        min_up_z: 1.0,
+        rotation_sample_count: 0,
     };
 
     let event = FlipImpulseCalculator::candidate_event(&boxcars::RemoteId::Steam(1), candidate);
@@ -135,6 +144,12 @@ fn subtracts_forward_boost_compensation() {
         boost_compensation: glam::Vec3::ZERO,
         sample_count: 2,
         boost_sample_count: 0,
+        onset_local_angular_velocity: glam::Vec3::ZERO,
+        min_forward_z: 0.0,
+        max_forward_deviation_degrees: 0.0,
+        max_up_deviation_degrees: 0.0,
+        min_up_z: 1.0,
+        rotation_sample_count: 0,
     };
     let uncompensated = FlipImpulseCalculator::candidate_event(
         &boxcars::RemoteId::Steam(1),
