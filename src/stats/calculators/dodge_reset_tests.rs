@@ -318,6 +318,100 @@ fn dodge_touch_after_on_ball_reset_confirms_flip_reset() {
 }
 
 #[test]
+fn dodge_byte_lagging_conversion_touch_still_confirms_flip_reset() {
+    // Mirrors a fast flip-into-ball finish (e.g. the goal-9 case): the
+    // conversion touch is sampled a frame before the dodge component's active
+    // byte replicates. The reset must still confirm once the dodge appears
+    // within `FLIP_RESET_DODGE_TOUCH_LAG_TOLERANCE_SECONDS`, even though the
+    // touch alone is under the minimum reset-to-touch delay.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    update_live(
+        &mut calculator,
+        &frame_info(1.0, 10),
+        &players(player_id.clone(), false),
+        &FrameEventsState {
+            dodge_refreshed_events: vec![reset_event(player_id.clone())],
+            ..FrameEventsState::default()
+        },
+        &TouchState::default(),
+    );
+    // Conversion touch lands while the dodge byte is still off.
+    update_live(
+        &mut calculator,
+        &frame_info(1.1, 11),
+        &players(player_id.clone(), false),
+        &FrameEventsState::default(),
+        &touch_state(vec![touch_event(player_id.clone(), 1.1, 11)]),
+    );
+    // Dodge byte flips on a frame later, within the lag tolerance.
+    update_live(
+        &mut calculator,
+        &frame_info(1.15, 12),
+        &players(player_id.clone(), true),
+        &FrameEventsState::default(),
+        &TouchState::default(),
+    );
+
+    let event = calculator
+        .confirmed_flip_reset_events()
+        .first()
+        .expect("lagging dodge byte should still confirm the flip reset");
+    assert_eq!(event.player, player_id);
+    assert_eq!(event.reset_frame, 10);
+    assert_eq!(event.frame, 11);
+    // Latency stays measured to the conversion touch.
+    assert!((event.time_since_reset - 0.1).abs() < 1e-5);
+
+    let reset = calculator
+        .events()
+        .iter()
+        .find(|event| event.frame == 10)
+        .expect("on-ball dodge reset event should be emitted");
+    assert!(reset.used);
+    assert_eq!(reset.outcome, Some(FlipResetOutcome::Used));
+}
+
+#[test]
+fn dodge_byte_after_lag_window_does_not_confirm_flip_reset() {
+    // A touch and a much later dodge are not a conversion: the dodge appears
+    // well past the lag tolerance with no fresh dodge-active touch, so the reset
+    // stays unconfirmed.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    update_live(
+        &mut calculator,
+        &frame_info(1.0, 10),
+        &players(player_id.clone(), false),
+        &FrameEventsState {
+            dodge_refreshed_events: vec![reset_event(player_id.clone())],
+            ..FrameEventsState::default()
+        },
+        &TouchState::default(),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.1, 11),
+        &players(player_id.clone(), false),
+        &FrameEventsState::default(),
+        &touch_state(vec![touch_event(player_id.clone(), 1.1, 11)]),
+    );
+    // Dodge byte only appears 0.3s after the touch, beyond the lag tolerance,
+    // and no new touch lands while dodging.
+    update_live(
+        &mut calculator,
+        &frame_info(1.4, 14),
+        &players(player_id, true),
+        &FrameEventsState::default(),
+        &TouchState::default(),
+    );
+
+    assert!(calculator.confirmed_flip_reset_events().is_empty());
+}
+
+#[test]
 fn landing_resolves_pending_flip_reset_as_unused() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = DodgeResetCalculator::new();
