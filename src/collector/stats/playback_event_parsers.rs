@@ -1099,7 +1099,6 @@ pub(in crate::collector::stats::playback) fn parse_speed_flip_event(
         resolved_frame: json_optional_usize(object.get("resolved_frame"))?.unwrap_or(frame),
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        time_since_kickoff_start: json_required_f32(object, "time_since_kickoff_start")?,
         start_position: json_required_vec3(object, "start_position")?,
         end_position: json_required_vec3(object, "end_position")?,
         start_speed: json_required_f32(object, "start_speed")?,

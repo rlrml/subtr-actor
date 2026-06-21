@@ -40,8 +40,6 @@ fn player(velocity: glam::Vec3, dodge_active: bool) -> PlayerSample {
 fn strong_candidate(boost_alignment_sample_count: u32) -> ActiveSpeedFlipCandidate {
     ActiveSpeedFlipCandidate {
         is_team_0: true,
-        is_kickoff: false,
-        kickoff_start_time: None,
         start_time: 1.0,
         start_frame: 10,
         start_position: [0.0, 0.0, 17.0],
@@ -272,7 +270,6 @@ fn update_candidate_tracks_early_forward_diagonal_dodge_impulse() {
     SpeedFlipCalculator::update_candidate(
         &mut candidate,
         &frame,
-        &BallFrameState::default(),
         &PlayerSample {
             boost_active: true,
             ..player(glam::Vec3::new(1200.0, 120.0, 0.0), true)
@@ -291,58 +288,9 @@ fn update_candidate_tracks_early_forward_diagonal_dodge_impulse() {
 }
 
 #[test]
-fn kickoff_approach_waits_for_player_motion_even_when_not_live_play() {
-    let mut calculator = SpeedFlipCalculator::default();
-    let frame = FrameInfo {
-        frame_number: 1,
-        time: 0.5,
-        dt: 0.1,
-        seconds_remaining: None,
-    };
-    let gameplay = GameplayState {
-        ball_has_been_hit: Some(false),
-        ..Default::default()
-    };
-
-    calculator
-        .update_parts(
-            &frame,
-            &gameplay,
-            &BallFrameState::default(),
-            &PlayerFrameState::default(),
-            &LivePlayState::default(),
-        )
-        .unwrap();
-
-    assert!(calculator.kickoff_approach_active_last_frame);
-    assert_eq!(calculator.current_kickoff_start_time, None);
-
-    let motion_frame = FrameInfo {
-        frame_number: 2,
-        time: 0.6,
-        dt: 0.1,
-        seconds_remaining: None,
-    };
-    calculator
-        .update_parts(
-            &motion_frame,
-            &gameplay,
-            &BallFrameState::default(),
-            &PlayerFrameState {
-                players: vec![player(glam::Vec3::new(150.0, 0.0, 0.0), false)],
-            },
-            &LivePlayState::default(),
-        )
-        .unwrap();
-
-    assert_eq!(
-        calculator.current_kickoff_start_time,
-        Some(motion_frame.time)
-    );
-}
-
-#[test]
-fn kickoff_candidate_can_start_above_supersonic_threshold() {
+fn arms_a_candidate_during_player_motion_even_when_not_live_play() {
+    // A kickoff approach is not "live play" but does count toward player motion;
+    // the detector must run then (it is otherwise context-free about kickoffs).
     let mut calculator = SpeedFlipCalculator::default();
     let frame = FrameInfo {
         frame_number: 10,
@@ -350,25 +298,19 @@ fn kickoff_candidate_can_start_above_supersonic_threshold() {
         dt: 0.1,
         seconds_remaining: None,
     };
-    let gameplay = GameplayState {
-        ball_has_been_hit: Some(false),
-        ..Default::default()
-    };
-    let player = PlayerSample {
+    let dodging = PlayerSample {
         boost_active: true,
         ..player(glam::Vec3::new(1900.0, 0.0, 0.0), true)
     };
-    let player_id = player.player_id.clone();
+    let player_id = dodging.player_id.clone();
 
     calculator
         .update_parts(
             &frame,
-            &gameplay,
-            &BallFrameState::default(),
             &PlayerFrameState {
-                players: vec![player],
+                players: vec![dodging],
             },
-            &LivePlayState::default(),
+            &LivePlayState::new(GameplayPhase::KickoffWaitingForTouch),
         )
         .unwrap();
 

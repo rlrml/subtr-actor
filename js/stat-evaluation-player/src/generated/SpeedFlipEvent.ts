@@ -2,6 +2,9 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
 /**
- * A ground-started diagonal dodge/cancel acceleration pattern, primarily for kickoff speed flips.
+ * A ground-started diagonal dodge/cancel that air-rolls flat — a speed flip,
+ * wherever it happens. This detector is context-free: kickoff attribution
+ * (which kickoff, and the timing within it) is the kickoff system's job, which
+ * already consumes these events by player + time.
  */
-export type SpeedFlipEvent = { time: number, frame: number, resolved_time: number, resolved_frame: number, player: RemoteIdTs, is_team_0: boolean, time_since_kickoff_start: number, start_position: [number, number, number], end_position: [number, number, number], start_speed: number, max_speed: number, best_alignment: number, initial_boost_alignment: number, best_boost_alignment: number, boost_alignment_sample_count: number, dodge_delay_after_ground_leave_seconds: number, diagonal_score: number, estimated_dodge_impulse_magnitude: number, estimated_dodge_impulse_forward_component: number, estimated_dodge_impulse_side_component: number, estimated_dodge_impulse_up_component: number, cancel_score: number, speed_score: number, confidence: number, };
+export type SpeedFlipEvent = { time: number, frame: number, resolved_time: number, resolved_frame: number, player: RemoteIdTs, is_team_0: boolean, start_position: [number, number, number], end_position: [number, number, number], start_speed: number, max_speed: number, best_alignment: number, initial_boost_alignment: number, best_boost_alignment: number, boost_alignment_sample_count: number, dodge_delay_after_ground_leave_seconds: number, diagonal_score: number, estimated_dodge_impulse_magnitude: number, estimated_dodge_impulse_forward_component: number, estimated_dodge_impulse_side_component: number, estimated_dodge_impulse_up_component: number, cancel_score: number, speed_score: number, confidence: number, };
