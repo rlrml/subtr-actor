@@ -446,6 +446,120 @@ impl ControlFollowTracker {
     }
 }
 
+/// A free-flight sample must be at least this far past the touch before its
+/// projection is trusted. The dodge/flick impulse is delivered over several
+/// frames, so the touch frame itself is the *least* reliable sample of where
+/// the ball is actually headed; we wait for the trajectory to settle.
+const SHOT_PROJECTION_MIN_FREE_FLIGHT_SECONDS: f32 = 0.06;
+
+/// Outcome of a closed shot-projection window. `touch_index` addresses the
+/// touch event to upgrade to a shot when `is_shot` is true.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShotProjectionResolution {
+    pub touch_index: usize,
+    pub is_shot: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ShotProjectionSample {
+    position: glam::Vec3,
+    velocity: glam::Vec3,
+    time: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct ShotProjectionWindow {
+    touch_index: usize,
+    is_team_0: bool,
+    touch_time: f32,
+    last_sample: Option<ShotProjectionSample>,
+}
+
+impl ShotProjectionWindow {
+    /// Resolve from the most recent free-flight sample — i.e. the last moment
+    /// before the next touch ended the ball's free flight. That settled sample
+    /// is a far more reliable read of "was this headed in?" than the touch
+    /// frame, which is sampled before the impulse has finished landing.
+    fn resolution(&self) -> ShotProjectionResolution {
+        let is_shot = self.last_sample.is_some_and(|sample| {
+            sample.time - self.touch_time >= SHOT_PROJECTION_MIN_FREE_FLIGHT_SECONDS
+                && sample.velocity.length() >= SHOT_MIN_BALL_SPEED
+                && trajectory_crosses_goal_mouth(
+                    sample.position,
+                    sample.velocity,
+                    opponent_goal_line_y(self.is_team_0),
+                    SHOT_MAX_TIME_TO_GOAL_SECONDS,
+                )
+        });
+        ShotProjectionResolution {
+            touch_index: self.touch_index,
+            is_shot,
+        }
+    }
+}
+
+/// Watches the ball's free flight after a touch and decides, from the settled
+/// trajectory just before the next touch, whether the touch sent the ball
+/// goalward — recovering shots whose touch-frame velocity had not yet finished
+/// updating. Resolutions are applied retroactively to the already-emitted touch
+/// event, mirroring [`ControlFollowTracker`].
+///
+/// At most one window is open at a time: any new touch closes the previous
+/// window.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ShotProjectionTracker {
+    window: Option<ShotProjectionWindow>,
+}
+
+impl ShotProjectionTracker {
+    /// Open a projection window for a just-emitted touch event.
+    pub fn open(&mut self, touch_index: usize, is_team_0: bool, time: f32) {
+        self.window = Some(ShotProjectionWindow {
+            touch_index,
+            is_team_0,
+            touch_time: time,
+            last_sample: None,
+        });
+    }
+
+    /// Close the open window because a new touch ended free flight, resolving it
+    /// from the last sample observed before this touch.
+    pub fn observe_touch(&mut self) -> Option<ShotProjectionResolution> {
+        self.window.take().map(|window| window.resolution())
+    }
+
+    /// Record this frame's free-flight ball sample, or resolve the window once
+    /// it ages past the shot time-to-goal horizon.
+    pub fn advance(
+        &mut self,
+        frame: &FrameInfo,
+        ball_position: Option<glam::Vec3>,
+        ball_velocity: Option<glam::Vec3>,
+    ) -> Option<ShotProjectionResolution> {
+        if self
+            .window
+            .as_ref()
+            .is_some_and(|window| frame.time - window.touch_time > SHOT_MAX_TIME_TO_GOAL_SECONDS)
+        {
+            return self.flush();
+        }
+        let window = self.window.as_mut()?;
+        if let (Some(position), Some(velocity)) = (ball_position, ball_velocity) {
+            window.last_sample = Some(ShotProjectionSample {
+                position,
+                velocity,
+                time: frame.time,
+            });
+        }
+        None
+    }
+
+    /// Close any open window immediately (live-play boundary or end of replay).
+    pub fn flush(&mut self) -> Option<ShotProjectionResolution> {
+        self.window.take().map(|window| window.resolution())
+    }
+}
+
 /// True when an active 50/50 lists this player as one of its contestants.
 pub(crate) fn fifty_fifty_involves_player(
     active: &ActiveFiftyFifty,
