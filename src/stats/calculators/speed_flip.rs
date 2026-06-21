@@ -1,23 +1,20 @@
 use super::*;
 
 const SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS: f32 = 1.1;
-const SPEED_FLIP_EVALUATION_SECONDS: f32 = 0.32;
-const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.55;
+const SPEED_FLIP_EVALUATION_SECONDS: f32 = 0.50;
+const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.70;
 const SPEED_FLIP_MAX_GROUND_Z: f32 = 80.0;
 const SPEED_FLIP_KICKOFF_MOTION_SPEED: f32 = 100.0;
 const SPEED_FLIP_MIN_ALIGNMENT: f32 = 0.72;
 const SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS: f32 = 0.18;
-const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA: f32 = 80.0;
-const SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT: f32 = 0.35;
-const SPEED_FLIP_MIN_ESTIMATED_DODGE_IMPULSE_MAGNITUDE: f32 = 90.0;
-const SPEED_FLIP_MIN_DIRECTIONAL_WEAK_IMPULSE_MAGNITUDE: f32 = 20.0;
-const SPEED_FLIP_MIN_ESTIMATED_DODGE_FORWARD_COMPONENT: f32 = 0.35;
-const SPEED_FLIP_MIN_WEAK_IMPULSE_SIDE_COMPONENT: f32 = 0.10;
-const SPEED_FLIP_MIN_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.88;
-const SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT: f32 = 0.95;
-const SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT: f32 = 0.82;
 const SPEED_FLIP_MIN_DIAGONAL_SCORE: f32 = 0.35;
 const SPEED_FLIP_MIN_UP_ROTATION_DEGREES: f32 = 90.0;
+/// A speed flip's air-roll inverts the car but recovers before it goes fully over
+/// — the up-vector sweeps past horizontal but stops short of a full end-over-end
+/// flip. Confounders (full barrel rolls / uncancelled flips) carry all the way to
+/// ~180°. Measured over the extended evaluation window so the roll plays out.
+/// Tuned on the labelled speed-flip / confounder fixtures (≈170° is the knee).
+const SPEED_FLIP_MAX_UP_ROTATION_DEGREES: f32 = 170.0;
 const SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES: f32 = 45.0;
 const SPEED_FLIP_MIN_BOOST_ALIGNMENT: f32 = 0.80;
 const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
@@ -536,56 +533,20 @@ impl SpeedFlipCalculator {
         let has_cancelled_diagonal_dodge = candidate.max_forward_rotation_degrees
             <= SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES
             && candidate.best_diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
-        if candidate.dodge_acceleration_sample_count == 0
-            || candidate.best_dodge_forward_delta < SPEED_FLIP_MIN_FORWARD_DODGE_DELTA
-            || candidate.best_dodge_delta_alignment < SPEED_FLIP_MIN_FORWARD_DODGE_DELTA_ALIGNMENT
+        // Inverts (≥ MIN) but does not go fully end-over-end (≤ MAX): the
+        // air-roll signature of a speed flip, vs a full barrel roll / flip.
+        if candidate.max_up_rotation_degrees < SPEED_FLIP_MIN_UP_ROTATION_DEGREES
+            || candidate.max_up_rotation_degrees > SPEED_FLIP_MAX_UP_ROTATION_DEGREES
         {
             return None;
         }
-        if candidate.max_up_rotation_degrees < SPEED_FLIP_MIN_UP_ROTATION_DEGREES {
-            return None;
-        }
-        let estimated_dodge_side_component =
-            candidate.best_estimated_dodge_impulse_side_component.abs();
-        let estimated_dodge_up_component =
-            candidate.best_estimated_dodge_impulse_up_component.abs();
-        let has_meaningful_impulse = candidate.best_estimated_dodge_impulse_magnitude
-            >= SPEED_FLIP_MIN_ESTIMATED_DODGE_IMPULSE_MAGNITUDE;
-        let has_incompatible_meaningful_impulse = has_meaningful_impulse
-            && (candidate.best_estimated_dodge_impulse_forward_component
-                < SPEED_FLIP_MIN_ESTIMATED_DODGE_FORWARD_COMPONENT
-                || estimated_dodge_side_component > SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT
-                || estimated_dodge_up_component > SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT);
-        if has_incompatible_meaningful_impulse {
-            return None;
-        }
-        let has_diagonal_impulse = has_meaningful_impulse
-            && candidate.best_estimated_dodge_impulse_forward_component
-                >= SPEED_FLIP_MIN_ESTIMATED_DODGE_FORWARD_COMPONENT
-            && (SPEED_FLIP_MIN_ESTIMATED_DODGE_SIDE_COMPONENT
-                ..=SPEED_FLIP_MAX_ESTIMATED_DODGE_SIDE_COMPONENT)
-                .contains(&estimated_dodge_side_component)
-            && estimated_dodge_up_component <= SPEED_FLIP_MAX_ESTIMATED_DODGE_UP_COMPONENT
-            && candidate.best_diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
-        // A weak (sub-`MEANINGFUL`, super-`WEAK`) estimated impulse pointing the
-        // wrong way normally disqualifies a candidate, but on a boost-through
-        // speed flip the boost-compensation overshoot can flip the residual
-        // estimate backward even though the dodge is unmistakably a cancelled
-        // diagonal flip. Only the *cancelled* signature (the nose stays level —
-        // `max_forward_rotation` small) is specific enough to trust over a bad
-        // impulse estimate: a merely high diagonal *score* also fires on an
-        // ordinary forward flip whose nose pitches all the way over, so it is not
-        // sufficient on its own. The meaningful-impulse incompatibility check
-        // above still rejects genuinely wrong strong impulses.
-        let weak_impulse_direction_is_usable = has_cancelled_diagonal_dodge
-            || candidate.best_estimated_dodge_impulse_magnitude
-                < SPEED_FLIP_MIN_DIRECTIONAL_WEAK_IMPULSE_MAGNITUDE
-            || (candidate.best_estimated_dodge_impulse_forward_component >= 0.0
-                && estimated_dodge_side_component >= SPEED_FLIP_MIN_WEAK_IMPULSE_SIDE_COMPONENT);
-        if !weak_impulse_direction_is_usable {
-            return None;
-        }
-        if !(has_diagonal_impulse || has_cancelled_diagonal_dodge) {
+        // Detection is rotation-only. The velocity-impulse estimate is corrupted
+        // by boost compensation — on real speed flips it frequently reads
+        // *backward* (the all-speed-flip recall fixture has the detector miss
+        // every flip when gated on it), so any gate on the impulse direction
+        // destroys recall. The cancelled diagonal-dodge signature carries
+        // detection; the impulse is kept on the event as reported metadata only.
+        if !has_cancelled_diagonal_dodge {
             return None;
         }
         let boost_alignment_score =
@@ -603,7 +564,7 @@ impl SpeedFlipCalculator {
         if candidate.best_boost_alignment < SPEED_FLIP_MIN_BOOST_ALIGNMENT {
             return None;
         }
-        if cancel_score < 0.35 || confidence < SPEED_FLIP_MIN_CONFIDENCE {
+        if confidence < SPEED_FLIP_MIN_CONFIDENCE {
             return None;
         }
 
