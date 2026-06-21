@@ -13,6 +13,16 @@ const AERIAL_TOUCH_MIN_PLAYER_Z: f32 = AIR_DRIBBLE_MIN_PLAYER_Z;
 /// such touches be recognized as dodge contacts after the fact.
 const DODGE_LAG_TOLERANCE_SECONDS: f32 = 0.12;
 
+/// How long after a touch a replay-reported shot/save stat event may land and
+/// still be attributed to that touch. The counter increment routinely
+/// replicates a fraction of a second after the touch that caused it.
+const STAT_EVENT_OUTCOME_WINDOW_SECONDS: f32 = 0.75;
+
+/// How long before a goal the scoring touch may have happened and still be
+/// attributed as the shot. Covers slow rollers and screened shots while
+/// rejecting a stale cross-play touch by the same player.
+const GOAL_SHOT_ATTRIBUTION_WINDOW_SECONDS: f32 = 10.0;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TouchKind {
     Control,
@@ -201,7 +211,27 @@ pub struct TouchCalculator {
     pending_dodge_upgrades: Vec<PendingDodgeUpgrade>,
     intention_classifier: TouchIntentionClassifier,
     control_follow: ControlFollowTracker,
+    shot_projection: ShotProjectionTracker,
 }
+
+/// Precedence of a touch intention in the single `intention` slot. Retroactive
+/// upgrades may only raise this rank, never lower it, so an outcome-confirmed
+/// shot/save is never clobbered by a later weaker read and vice versa. Mirrors
+/// the at-touch precedence ladder in [`TouchIntentionClassifier::classify`].
+fn intention_rank(value: &str) -> u8 {
+    match value {
+        "neutral" => 0,
+        "pass" => 1,
+        "control" => 2,
+        "clear" => 3,
+        "challenge" => 4,
+        "shot" => 5,
+        "save" => 6,
+        _ => 0,
+    }
+}
+
+const CHALLENGE_RANK: u8 = 4;
 
 impl TouchCalculator {
     pub fn new() -> Self {
@@ -229,6 +259,8 @@ impl TouchCalculator {
         self.write_finalized_ball_movement(finalized);
         let resolution = self.control_follow.flush();
         self.apply_control_resolution(resolution);
+        let shot_resolution = self.shot_projection.flush();
+        self.apply_shot_projection_resolution(shot_resolution);
     }
 
     fn finalize_ball_movement_at_boundary(&mut self, boundary: Boundary) {
@@ -408,6 +440,10 @@ impl TouchCalculator {
                 .control_follow
                 .observe_touch(player_id, touch_event.time);
             self.apply_control_resolution(control_resolution);
+            // This new touch ends the previous touch's free flight; resolve its
+            // shot projection from the settled trajectory just before now.
+            let shot_resolution = self.shot_projection.observe_touch();
+            self.apply_shot_projection_resolution(shot_resolution);
             let resolution = self.intention_classifier.classify(
                 touch_event,
                 player_id,
@@ -469,6 +505,11 @@ impl TouchCalculator {
                 self.control_follow
                     .open(touch_index, player_id, touch_event.time);
             }
+            // Every touch is a potential shot whose touch-frame trajectory was
+            // sampled before the impulse finished landing; watch its free flight
+            // and upgrade from the settled trajectory if it turns out goalward.
+            self.shot_projection
+                .open(touch_index, touch_event.team_is_team_0, touch_event.time);
         }
     }
 
@@ -481,8 +522,94 @@ impl TouchCalculator {
         if !resolution.control {
             return;
         }
+        self.raise_intention(resolution.touch_index, TouchIntention::Control);
+    }
+
+    /// Apply a closed shot-projection window: a settled free-flight trajectory
+    /// that crosses the opponent goal mouth upgrades the touch to a shot. Only
+    /// promotes open-play touches (below the contested rung), so it never
+    /// rewrites a contested challenge or an outcome-confirmed shot/save.
+    fn apply_shot_projection_resolution(&mut self, resolution: Option<ShotProjectionResolution>) {
+        let Some(resolution) = resolution else {
+            return;
+        };
+        if !resolution.is_shot {
+            return;
+        }
         if let Some(event) = self.events.get_mut(resolution.touch_index) {
-            event.intention = TouchIntention::Control.as_label_value().to_owned();
+            if intention_rank(&event.intention) < CHALLENGE_RANK {
+                event.intention = TouchIntention::Shot.as_label_value().to_owned();
+            }
+        }
+    }
+
+    /// Raise a touch's intention to `target` only when `target` outranks the
+    /// current label, so retroactive upgrades never downgrade a touch.
+    fn raise_intention(&mut self, touch_index: usize, target: TouchIntention) {
+        if let Some(event) = self.events.get_mut(touch_index) {
+            let target = target.as_label_value();
+            if intention_rank(target) > intention_rank(&event.intention) {
+                event.intention = target.to_owned();
+            }
+        }
+    }
+
+    /// Promote the toucher's most recent touch to `target` from an
+    /// outcome-authoritative signal (a replay shot/save stat event, or a scored
+    /// goal), matching by player within `window` of `signal_time`.
+    fn confirm_outcome_action(
+        &mut self,
+        player: &PlayerId,
+        signal_time: f32,
+        window: f32,
+        target: TouchIntention,
+    ) {
+        let Some(&touch_index) = self.active_touch_index_by_player.get(player) else {
+            return;
+        };
+        let Some(event) = self.events.get(touch_index) else {
+            return;
+        };
+        if signal_time < event.time || signal_time - event.time > window {
+            return;
+        }
+        self.raise_intention(touch_index, target);
+    }
+
+    /// Upgrade the scorer's most recent touch to a shot for each goal observed
+    /// this frame. The touch that scores is a shot regardless of what its
+    /// at-touch trajectory projection read.
+    fn confirm_goal_shots(&mut self, events_state: &FrameEventsState) {
+        for goal in &events_state.goal_events {
+            let Some(scorer) = goal.player.as_ref() else {
+                continue;
+            };
+            self.confirm_outcome_action(
+                scorer,
+                goal.time,
+                GOAL_SHOT_ATTRIBUTION_WINDOW_SECONDS,
+                TouchIntention::Shot,
+            );
+        }
+    }
+
+    /// Attach replay-reported shot/save stat events that land *after* the touch
+    /// they describe. The classifier matches stat events that precede the touch;
+    /// this covers the common case where the counter increment replicates a
+    /// fraction of a second after the touch (so the touch was already emitted).
+    fn confirm_stat_event_actions(&mut self, events_state: &FrameEventsState) {
+        for stat in &events_state.player_stat_events {
+            let target = match stat.kind {
+                PlayerStatEventKind::Shot => TouchIntention::Shot,
+                PlayerStatEventKind::Save => TouchIntention::Save,
+                PlayerStatEventKind::Assist => continue,
+            };
+            self.confirm_outcome_action(
+                &stat.player,
+                stat.time,
+                STAT_EVENT_OUTCOME_WINDOW_SECONDS,
+                target,
+            );
         }
     }
 
@@ -537,6 +664,15 @@ impl TouchCalculator {
             player_sample.and_then(PlayerSample::velocity),
         );
         self.apply_control_resolution(resolution);
+    }
+
+    /// Feed this frame's free-flight ball sample to any open shot-projection
+    /// window and apply its resolution once it ages out.
+    fn advance_shot_projection(&mut self, frame: &FrameInfo, ball: &BallFrameState) {
+        let resolution = self
+            .shot_projection
+            .advance(frame, ball.position(), ball.velocity());
+        self.apply_shot_projection_resolution(resolution);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -781,6 +917,10 @@ impl TouchCalculator {
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
+        // A scored goal makes the scorer's most recent touch a shot regardless
+        // of trajectory. Resolve it before any live-play boundary reset, since
+        // the goal frame is often the frame play stops.
+        self.confirm_goal_shots(events_state);
         if !live_play_state.is_live_play {
             self.finalize_ball_movement_at_boundary(Boundary::LivePlayEnded);
             self.previous_ball_velocity = ball.velocity();
@@ -790,6 +930,8 @@ impl TouchCalculator {
             self.intention_classifier.reset();
             let resolution = self.control_follow.flush();
             self.apply_control_resolution(resolution);
+            let shot_resolution = self.shot_projection.flush();
+            self.apply_shot_projection_resolution(shot_resolution);
             return Ok(());
         }
         self.intention_classifier
@@ -803,8 +945,12 @@ impl TouchCalculator {
             &touch_state.touch_events,
             fifty_fifty_state,
         );
+        // Replay shot/save stat events that land after their touch (the common
+        // case) are attached here; the classifier handles ones that precede it.
+        self.confirm_stat_event_actions(events_state);
         self.advance_dodge_upgrades(frame, players);
         self.advance_control_follow(frame, ball, players);
+        self.advance_shot_projection(frame, ball);
         self.credit_ball_movement(
             frame,
             ball,

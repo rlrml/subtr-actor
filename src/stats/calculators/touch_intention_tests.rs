@@ -498,3 +498,58 @@ fn window_cut_short_does_not_confirm_control() {
     let resolution = tracker.flush().unwrap();
     assert!(!resolution.control);
 }
+
+#[test]
+fn shot_projection_confirms_shot_from_settled_goalward_sample() {
+    // is_team_0 touches default to attacking +y; a settled free-flight sample
+    // headed hard into the opponent mouth resolves as a shot.
+    let mut tracker = ShotProjectionTracker::default();
+    tracker.open(0, true, 1.0);
+
+    assert!(
+        tracker
+            .advance(
+                &frame_at(1.1),
+                Some(glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z)),
+                Some(glam::Vec3::new(0.0, 2500.0, 0.0)),
+            )
+            .is_none()
+    );
+
+    let resolution = tracker.observe_touch().unwrap();
+    assert_eq!(resolution.touch_index, 0);
+    assert!(resolution.is_shot);
+}
+
+#[test]
+fn shot_projection_ignores_sample_too_soon_after_touch() {
+    // A sample within the settle window is the unreliable just-touched frame and
+    // must not by itself confirm a shot.
+    let mut tracker = ShotProjectionTracker::default();
+    tracker.open(0, true, 1.0);
+
+    tracker.advance(
+        &frame_at(1.02),
+        Some(glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z)),
+        Some(glam::Vec3::new(0.0, 2500.0, 0.0)),
+    );
+
+    let resolution = tracker.observe_touch().unwrap();
+    assert!(!resolution.is_shot);
+}
+
+#[test]
+fn shot_projection_does_not_confirm_off_target_free_flight() {
+    let mut tracker = ShotProjectionTracker::default();
+    tracker.open(0, true, 1.0);
+
+    // Settled, fast, but sailing well over the crossbar.
+    tracker.advance(
+        &frame_at(1.1),
+        Some(glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z)),
+        Some(glam::Vec3::new(0.0, 2500.0, 2000.0)),
+    );
+
+    let resolution = tracker.flush().unwrap();
+    assert!(!resolution.is_shot);
+}
