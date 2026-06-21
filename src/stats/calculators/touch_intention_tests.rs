@@ -142,6 +142,48 @@ fn fast_touch_toward_goal_mouth_classifies_as_shot() {
 }
 
 #[test]
+fn upward_arced_shot_into_net_classifies_as_shot() {
+    // A shot hit hard with significant upward velocity: a straight-line
+    // projection sails it well over the crossbar (z ~1500), but gravity arcs it
+    // back down into the goal mouth (z ~160). This mirrors a dribble-flick that
+    // scores along an obvious arc, which used to read as Neutral.
+    let player_id = player(1);
+    let mut classifier = TouchIntentionClassifier::default();
+
+    let resolution = classifier.classify(
+        &touch_at(&player_id, 1.0),
+        &player_id,
+        &TouchIntentionFrameContext {
+            ball_position: Some(glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z)),
+            ball_velocity: Some(glam::Vec3::new(0.0, 2500.0, 700.0)),
+            ..neutral_ctx()
+        },
+    );
+
+    assert_eq!(resolution.intention, TouchIntention::Shot);
+}
+
+#[test]
+fn shot_sailing_over_the_crossbar_is_not_a_shot() {
+    // Even with gravity, a ball rocketing upward is still well above the
+    // crossbar when it reaches the goal line, so it must not read as a shot.
+    let player_id = player(1);
+    let mut classifier = TouchIntentionClassifier::default();
+
+    let resolution = classifier.classify(
+        &touch_at(&player_id, 1.0),
+        &player_id,
+        &TouchIntentionFrameContext {
+            ball_position: Some(glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z)),
+            ball_velocity: Some(glam::Vec3::new(0.0, 2500.0, 2000.0)),
+            ..neutral_ctx()
+        },
+    );
+
+    assert_eq!(resolution.intention, TouchIntention::Neutral);
+}
+
+#[test]
 fn touch_wide_of_goal_mouth_is_not_a_shot() {
     let player_id = player(1);
     let mut classifier = TouchIntentionClassifier::default();

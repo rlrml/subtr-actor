@@ -468,11 +468,16 @@ fn opponent_goal_line_y(is_team_0: bool) -> f32 {
     -own_goal_line_y(is_team_0)
 }
 
-/// Returns true when a straight-line projection of the trajectory crosses the
-/// goal line at `target_goal_y` inside the goal mouth (with a ball-radius
-/// margin) within `max_seconds`. Gravity, bounces, and later touches are
-/// deliberately ignored, matching the other goal-mouth projections in this
-/// crate.
+/// Returns true when a ballistic projection of the trajectory crosses the goal
+/// line at `target_goal_y` inside the goal mouth (with a ball-radius margin)
+/// within `max_seconds`.
+///
+/// The horizontal (x/y) path is a straight line — gravity is purely vertical,
+/// so it does not change when the ball reaches the goal line nor its lateral
+/// position there. The vertical (z) path applies constant gravity, so a shot
+/// hit upward that arcs back down into the net is read correctly instead of
+/// being projected straight over the crossbar. Wall bounces and later touches
+/// are still deliberately ignored.
 fn trajectory_crosses_goal_mouth(
     position: glam::Vec3,
     velocity: glam::Vec3,
@@ -486,10 +491,17 @@ fn trajectory_crosses_goal_mouth(
     if !time_to_goal_line.is_finite() || !(0.0..=max_seconds).contains(&time_to_goal_line) {
         return false;
     }
-    let projected = position + velocity * time_to_goal_line;
-    projected.x.abs() <= BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X + GOAL_MOUTH_TRAJECTORY_MARGIN
-        && projected.z >= BALL_RADIUS_Z - GOAL_MOUTH_TRAJECTORY_MARGIN
-        && projected.z <= GOAL_MOUTH_HEIGHT_Z + GOAL_MOUTH_TRAJECTORY_MARGIN
+    let projected_x = position.x + velocity.x * time_to_goal_line;
+    let projected_z = position.z
+        + velocity.z * time_to_goal_line
+        + 0.5
+            * crate::util::ballistics::STANDARD_BALL_GRAVITY_Z
+            * time_to_goal_line
+            * time_to_goal_line;
+    projected_x.abs() <= BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X + GOAL_MOUTH_TRAJECTORY_MARGIN
+        && (BALL_RADIUS_Z - GOAL_MOUTH_TRAJECTORY_MARGIN
+            ..=GOAL_MOUTH_HEIGHT_Z + GOAL_MOUTH_TRAJECTORY_MARGIN)
+            .contains(&projected_z)
 }
 
 #[cfg(test)]
