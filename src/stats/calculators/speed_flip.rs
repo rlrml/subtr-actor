@@ -1,10 +1,8 @@
 use super::*;
 
-const SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS: f32 = 1.1;
 const SPEED_FLIP_EVALUATION_SECONDS: f32 = 0.50;
 const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.70;
 const SPEED_FLIP_MAX_GROUND_Z: f32 = 80.0;
-const SPEED_FLIP_KICKOFF_MOTION_SPEED: f32 = 100.0;
 const SPEED_FLIP_MIN_ALIGNMENT: f32 = 0.72;
 const SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS: f32 = 0.18;
 const SPEED_FLIP_MIN_DIAGONAL_SCORE: f32 = 0.35;
@@ -20,7 +18,10 @@ const SPEED_FLIP_MIN_BOOST_ALIGNMENT: f32 = 0.80;
 const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
 const BOOST_ACCELERATION_UU_PER_SECOND_SQUARED: f32 = 991.6667;
 
-/// A ground-started diagonal dodge/cancel acceleration pattern, primarily for kickoff speed flips.
+/// A ground-started diagonal dodge/cancel that air-rolls flat — a speed flip,
+/// wherever it happens. This detector is context-free: kickoff attribution
+/// (which kickoff, and the timing within it) is the kickoff system's job, which
+/// already consumes these events by player + time.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct SpeedFlipEvent {
@@ -31,7 +32,6 @@ pub struct SpeedFlipEvent {
     #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
-    pub time_since_kickoff_start: f32,
     pub start_position: [f32; 3],
     pub end_position: [f32; 3],
     pub start_speed: f32,
@@ -62,8 +62,6 @@ pub struct SpeedFlipEvent {
 #[derive(Debug, Clone, PartialEq)]
 struct ActiveSpeedFlipCandidate {
     is_team_0: bool,
-    is_kickoff: bool,
-    kickoff_start_time: Option<f32>,
     start_time: f32,
     start_frame: usize,
     start_position: [f32; 3],
@@ -117,9 +115,6 @@ pub struct SpeedFlipCalculator {
     active_candidates: KeyedInFlightLedger<PlayerId, ActiveSpeedFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     last_ground_contacts: HashMap<PlayerId, f32>,
-    kickoff_approach_active_last_frame: bool,
-    kickoff_window_open: bool,
-    current_kickoff_start_time: Option<f32>,
 }
 
 impl SpeedFlipCalculator {
@@ -133,30 +128,6 @@ impl SpeedFlipCalculator {
 
     pub fn new_events(&self) -> &[SpeedFlipEvent] {
         self.events.new_events()
-    }
-
-    /// Whether we are inside a kickoff approach window.
-    ///
-    /// The opening kickoff of a match reports `ball_has_been_hit == None` (not
-    /// `Some(false)`) between the countdown ending and the first touch, so a gate
-    /// of `== Some(false)` alone never fires on it — the speed flip was simply
-    /// never evaluated as a kickoff. (The kickoff stats machinery works around
-    /// the same engine quirk; see `kickoff.rs::observe_movement_start`.) Track
-    /// the approach as an explicit window instead: open it on the countdown (or
-    /// the `Some(false)` signal used by every subsequent kickoff) and hold it
-    /// open through the `None` go→touch window until the ball is actually hit.
-    fn update_kickoff_window(&mut self, gameplay: &GameplayState) -> bool {
-        self.kickoff_window_open =
-            if gameplay.kickoff_countdown_active() || gameplay.ball_has_been_hit == Some(false) {
-                true
-            } else if gameplay.ball_has_been_hit == Some(true) {
-                false
-            } else {
-                // `None` with no countdown: either the opening go→touch window (keep
-                // whatever the countdown opened) or pre-match idle (stays closed).
-                self.kickoff_window_open
-            };
-        self.kickoff_window_open
     }
 
     fn player_by_id<'a>(
@@ -243,11 +214,7 @@ impl SpeedFlipCalculator {
             .retain(|_, ground_contact_time| frame.time - *ground_contact_time <= 2.0);
     }
 
-    fn candidate_alignment(
-        _ball: &BallFrameState,
-        player: &PlayerSample,
-        _is_kickoff: bool,
-    ) -> Option<f32> {
+    fn candidate_alignment(player: &PlayerSample) -> Option<f32> {
         Self::forward_speed_alignment(player)
     }
 
@@ -255,44 +222,7 @@ impl SpeedFlipCalculator {
         self.events.push(event);
     }
 
-    fn reset_kickoff_state(&mut self) {
-        self.active_candidates.clear();
-        self.current_kickoff_start_time = None;
-    }
-
-    fn kickoff_motion_started(players: &PlayerFrameState) -> bool {
-        players.players.iter().any(|player| {
-            player.dodge_active
-                || player
-                    .speed()
-                    .is_some_and(|speed| speed >= SPEED_FLIP_KICKOFF_MOTION_SPEED)
-        })
-    }
-
-    fn update_kickoff_start_time(
-        &mut self,
-        frame: &FrameInfo,
-        kickoff_approach_active: bool,
-        players: &PlayerFrameState,
-    ) {
-        if !kickoff_approach_active {
-            self.current_kickoff_start_time = None;
-            return;
-        }
-
-        if self.current_kickoff_start_time.is_none() && Self::kickoff_motion_started(players) {
-            self.current_kickoff_start_time = Some(frame.time);
-        }
-    }
-
-    fn maybe_start_candidate(
-        &mut self,
-        frame: &FrameInfo,
-        kickoff_approach_active: bool,
-        ball: &BallFrameState,
-        player: &PlayerSample,
-        _live_play_state: &LivePlayState,
-    ) {
+    fn maybe_start_candidate(&mut self, frame: &FrameInfo, player: &PlayerSample) {
         let was_dodge_active = self
             .previous_dodge_active
             .insert(player.player_id.clone(), player.dodge_active)
@@ -300,19 +230,6 @@ impl SpeedFlipCalculator {
         if !player.dodge_active || was_dodge_active {
             return;
         }
-
-        let is_kickoff = kickoff_approach_active;
-        let kickoff_start_time = if is_kickoff {
-            let Some(kickoff_start_time) = self.current_kickoff_start_time else {
-                return;
-            };
-            if frame.time - kickoff_start_time > SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS {
-                return;
-            }
-            Some(kickoff_start_time)
-        } else {
-            None
-        };
 
         let Some(rigid_body) = player.rigid_body.as_ref() else {
             return;
@@ -325,7 +242,7 @@ impl SpeedFlipCalculator {
         }
 
         let start_speed = player.speed().unwrap_or(0.0);
-        let Some(best_alignment) = Self::candidate_alignment(ball, player, is_kickoff) else {
+        let Some(best_alignment) = Self::candidate_alignment(player) else {
             return;
         };
         if best_alignment < SPEED_FLIP_MIN_ALIGNMENT {
@@ -359,8 +276,6 @@ impl SpeedFlipCalculator {
             player.player_id.clone(),
             ActiveSpeedFlipCandidate {
                 is_team_0: player.is_team_0,
-                is_kickoff,
-                kickoff_start_time,
                 start_time: frame.time,
                 start_frame: frame.frame_number,
                 start_position: player_position.to_array(),
@@ -400,7 +315,6 @@ impl SpeedFlipCalculator {
     fn update_candidate(
         candidate: &mut ActiveSpeedFlipCandidate,
         frame: &FrameInfo,
-        ball: &BallFrameState,
         player: &PlayerSample,
     ) {
         let Some(rigid_body) = player.rigid_body.as_ref() else {
@@ -411,7 +325,7 @@ impl SpeedFlipCalculator {
             candidate.end_position = player_position.to_array();
         }
         candidate.max_speed = candidate.max_speed.max(player.speed().unwrap_or(0.0));
-        if let Some(alignment) = Self::candidate_alignment(ball, player, candidate.is_kickoff) {
+        if let Some(alignment) = Self::candidate_alignment(player) {
             candidate.best_alignment = candidate.best_alignment.max(alignment);
         }
         if let Some(boost_alignment) = Self::boost_alignment(player) {
@@ -499,15 +413,6 @@ impl SpeedFlipCalculator {
         player_id: &PlayerId,
         candidate: ActiveSpeedFlipCandidate,
     ) -> Option<SpeedFlipEvent> {
-        let time_since_kickoff_start = candidate
-            .kickoff_start_time
-            .map(|kickoff_start_time| (candidate.start_time - kickoff_start_time).max(0.0))
-            .unwrap_or(0.0);
-        let timeliness_score = if candidate.is_kickoff {
-            1.0 - Self::normalize_score(time_since_kickoff_start, 0.55, 1.1)
-        } else {
-            1.0
-        };
         let cancel_recovery = candidate.latest_forward_z - candidate.min_forward_z;
         let level_recovery_score =
             1.0 - Self::normalize_score(candidate.latest_forward_z.abs(), 0.05, 0.55);
@@ -551,12 +456,11 @@ impl SpeedFlipCalculator {
         }
         let boost_alignment_score =
             Self::normalize_score(candidate.best_boost_alignment, 0.82, 0.99);
-        let confidence = 0.30 * candidate.best_diagonal_score
+        let confidence = 0.35 * candidate.best_diagonal_score
             + 0.30 * cancel_score
             + 0.15 * speed_score
             + 0.15 * alignment_score
-            + 0.05 * boost_alignment_score
-            + 0.05 * timeliness_score;
+            + 0.05 * boost_alignment_score;
 
         // Mid-flip the car is yawed off its velocity axis, so raw alignment of
         // a boost-through speed flip tops out around ~0.82 inside the short
@@ -575,7 +479,6 @@ impl SpeedFlipCalculator {
             resolved_frame: candidate.latest_frame,
             player: player_id.clone(),
             is_team_0: candidate.is_team_0,
-            time_since_kickoff_start,
             start_position: candidate.start_position,
             end_position: candidate.end_position,
             start_speed: candidate.start_speed,
@@ -640,44 +543,31 @@ impl SpeedFlipCalculator {
     pub fn update_parts(
         &mut self,
         frame: &FrameInfo,
-        gameplay: &GameplayState,
-        ball: &BallFrameState,
         players: &PlayerFrameState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        let kickoff_approach_active = self.update_kickoff_window(gameplay);
-        if !live_play_state.is_live_play && !kickoff_approach_active {
+        // Detect during any phase where players are actively moving — open play
+        // *and* kickoff approaches (which are not "live play" but still count).
+        // The detector itself stays kickoff-agnostic.
+        if !live_play_state.counts_toward_player_motion() {
             self.active_candidates
                 .apply_boundary(Boundary::LivePlayEnded);
-            self.current_kickoff_start_time = None;
-            self.kickoff_approach_active_last_frame = false;
             self.last_ground_contacts.clear();
             return Ok(());
         }
 
-        if kickoff_approach_active && !self.kickoff_approach_active_last_frame {
-            self.reset_kickoff_state();
-        }
-
-        self.update_kickoff_start_time(frame, kickoff_approach_active, players);
         self.update_ground_contacts(frame, players);
 
         for player in &players.players {
-            self.maybe_start_candidate(
-                frame,
-                kickoff_approach_active,
-                ball,
-                player,
-                live_play_state,
-            );
+            self.maybe_start_candidate(frame, player);
         }
 
         for (player_id, candidate) in self.active_candidates.iter_mut() {
             let Some(player) = Self::player_by_id(players, player_id) else {
                 continue;
             };
-            Self::update_candidate(candidate, frame, ball, player);
+            Self::update_candidate(candidate, frame, player);
         }
 
         self.finalize_candidates(frame, false);
@@ -686,11 +576,6 @@ impl SpeedFlipCalculator {
             frame.time - candidate.start_time <= SPEED_FLIP_MAX_CANDIDATE_SECONDS
         });
 
-        if !kickoff_approach_active {
-            self.current_kickoff_start_time = None;
-        }
-
-        self.kickoff_approach_active_last_frame = kickoff_approach_active;
         Ok(())
     }
 

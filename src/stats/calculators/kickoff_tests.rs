@@ -160,7 +160,6 @@ fn speed_flip_event(player: PlayerId, is_team_0: bool, time: f32, frame: usize) 
         resolved_frame: frame + 3,
         player,
         is_team_0,
-        time_since_kickoff_start: time,
         start_position: [0.0, 0.0, 0.0],
         end_position: [0.0, 0.0, 0.0],
         start_speed: 900.0,

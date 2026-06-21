@@ -17,7 +17,6 @@ test("mechanic event derivation can populate compacted half-flip and wavedash st
           resolved_frame: 35,
           player: playerId,
           is_team_0: true,
-          time_since_kickoff_start: 0.1,
           start_position: [0, 0, 0],
           end_position: [1, 0, 0],
           start_speed: 900,

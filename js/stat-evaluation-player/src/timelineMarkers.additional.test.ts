@@ -171,7 +171,6 @@ test("buildSpeedFlipTimelineEvents maps serialized speed flips to timeline marke
         frame: 1,
         player: { Steam: "blue-id" },
         is_team_0: true,
-        time_since_kickoff_start: 0.4,
         start_position: [0, 0, 0],
         end_position: [100, 0, 0],
         start_speed: 1200,
