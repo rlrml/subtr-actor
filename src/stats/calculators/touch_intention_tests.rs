@@ -499,6 +499,13 @@ fn window_cut_short_does_not_confirm_control() {
     assert!(!resolution.control);
 }
 
+fn goalward_sample() -> (glam::Vec3, glam::Vec3) {
+    (
+        glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z),
+        glam::Vec3::new(0.0, 2500.0, 0.0),
+    )
+}
+
 #[test]
 fn shot_projection_confirms_shot_from_settled_goalward_sample() {
     // is_team_0 touches default to attacking +y; a settled free-flight sample
@@ -506,18 +513,44 @@ fn shot_projection_confirms_shot_from_settled_goalward_sample() {
     let mut tracker = ShotProjectionTracker::default();
     tracker.open(0, true, 1.0);
 
-    assert!(
-        tracker
-            .advance(
-                &frame_at(1.1),
-                Some(glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z)),
-                Some(glam::Vec3::new(0.0, 2500.0, 0.0)),
-            )
-            .is_none()
+    let (position, velocity) = goalward_sample();
+    for time in [1.1, 1.2, 1.3] {
+        assert!(
+            tracker
+                .advance(&frame_at(time), Some(position), Some(velocity))
+                .is_none()
+        );
+    }
+
+    // Next touch at 1.45; the guard ignores the last 0.12s, landing on the
+    // 1.3 sample, which is still cleanly goalward.
+    let resolution = tracker.observe_touch(1.45).unwrap();
+    assert_eq!(resolution.touch_index, 0);
+    assert!(resolution.is_shot);
+}
+
+#[test]
+fn shot_projection_guard_skips_next_touch_contaminated_samples() {
+    // Real free flight is goalward, but the frame right before the next touch is
+    // already being dragged off by that touch's incoming impulse. The guard must
+    // resolve from the earlier clean samples and still read a shot.
+    let mut tracker = ShotProjectionTracker::default();
+    tracker.open(0, true, 1.0);
+
+    let (position, velocity) = goalward_sample();
+    for time in [1.1, 1.2] {
+        tracker.advance(&frame_at(time), Some(position), Some(velocity));
+    }
+    // Contaminated last frame: ball yanked sideways/backward by the next touch.
+    tracker.advance(
+        &frame_at(1.3),
+        Some(glam::Vec3::new(0.0, 4200.0, BALL_RADIUS_Z)),
+        Some(glam::Vec3::new(3000.0, -1500.0, 0.0)),
     );
 
-    let resolution = tracker.observe_touch().unwrap();
-    assert_eq!(resolution.touch_index, 0);
+    // Next touch at 1.32: without the guard this would read the 1.3 sample and
+    // miss the shot; the guard falls back to the 1.2 sample.
+    let resolution = tracker.observe_touch(1.32).unwrap();
     assert!(resolution.is_shot);
 }
 
@@ -528,13 +561,10 @@ fn shot_projection_ignores_sample_too_soon_after_touch() {
     let mut tracker = ShotProjectionTracker::default();
     tracker.open(0, true, 1.0);
 
-    tracker.advance(
-        &frame_at(1.02),
-        Some(glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z)),
-        Some(glam::Vec3::new(0.0, 2500.0, 0.0)),
-    );
+    let (position, velocity) = goalward_sample();
+    tracker.advance(&frame_at(1.02), Some(position), Some(velocity));
 
-    let resolution = tracker.observe_touch().unwrap();
+    let resolution = tracker.observe_touch(1.2).unwrap();
     assert!(!resolution.is_shot);
 }
 
