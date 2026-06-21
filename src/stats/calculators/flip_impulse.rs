@@ -1,7 +1,13 @@
 use super::*;
 
 const FLIP_IMPULSE_EVALUATION_SECONDS: f32 = 0.18;
-const FLIP_IMPULSE_MAX_CANDIDATE_SECONDS: f32 = 0.35;
+/// The orientation trajectory (the cancel and inversion signals) plays out over
+/// a longer horizon than the velocity impulse, so the candidate is held — and
+/// the dodge event resolved — at this window while the impulse itself is still
+/// measured over the short evaluation window above. `resolved_time`/`frame`
+/// continue to mark the impulse window's end, not this one.
+const FLIP_ROTATION_WINDOW_SECONDS: f32 = 0.45;
+const FLIP_IMPULSE_MAX_CANDIDATE_SECONDS: f32 = 0.6;
 const FLIP_IMPULSE_MIN_DELTA: f32 = 10.0;
 const FLIP_IMPULSE_STRONG_DELTA: f32 = 280.0;
 const BOOST_ACCELERATION_UU_PER_SECOND_SQUARED: f32 = 991.6667;
@@ -30,7 +36,45 @@ pub struct DodgeImpulse {
     pub confidence: f32,
 }
 
-/// A dodge-start event, optionally carrying an estimated dodge impulse.
+/// Orientation-trajectory features of a dodge, measured from the car's rotation
+/// over a window after onset — independent of the (noisy) velocity impulse.
+///
+/// These are the signals we actually classify a dodge on:
+/// - **forwardness** — the onset flip rotation: pitch (about the right axis)
+///   means a forward/back dodge, roll (about the forward axis) means a side
+///   dodge. Plus `min_forward_z`, how far the nose pitched down.
+/// - **cancel** — `max_forward_deviation_degrees`: how far the nose swung from
+///   where it pointed at onset. Small = the nose was held forward (a speed
+///   flip's cancel); large = the flip pitched the nose all the way over (a
+///   front/diagonal flip). Roll-invariant, so a side roll does not inflate it.
+/// - **inversion** — `max_up_deviation_degrees` / `min_up_z`: did the car roll
+///   past horizontal / go upside down (a flip's air-roll), or stay upright (a
+///   wavedash).
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct DodgeRotation {
+    /// Body-frame angular velocity at dodge onset (the commanded flip): pitch is
+    /// rotation about the right axis, roll about the forward axis, yaw about up.
+    /// Signs are raw; the labeled corpus fixes their interpretation.
+    pub onset_pitch_rate: f32,
+    pub onset_roll_rate: f32,
+    pub onset_yaw_rate: f32,
+    /// Lowest world-z reached by the nose (forward vector): 0 = level, negative =
+    /// the nose pitched down. A forward dodge dips it; a side dodge barely does.
+    pub min_forward_z: f32,
+    /// Max angle (deg) the nose swung from its onset direction over the window.
+    pub max_forward_deviation_degrees: f32,
+    /// Max angle (deg) the up-vector swung from its onset direction over the
+    /// window (roll / inversion magnitude).
+    pub max_up_deviation_degrees: f32,
+    /// Lowest world-z reached by the up-vector: 1 = upright, 0 = on its side,
+    /// negative = (at least partly) inverted.
+    pub min_up_z: f32,
+    pub sample_count: u32,
+}
+
+/// A dodge-start event, optionally carrying an estimated dodge impulse and the
+/// orientation trajectory of the dodge.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct DodgeEvent {
@@ -42,6 +86,8 @@ pub struct DodgeEvent {
     pub player: PlayerId,
     pub is_team_0: bool,
     pub dodge_impulse: Option<DodgeImpulse>,
+    #[serde(default)]
+    pub dodge_rotation: Option<DodgeRotation>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -61,6 +107,12 @@ struct ActiveFlipImpulseCandidate {
     boost_compensation: glam::Vec3,
     sample_count: u32,
     boost_sample_count: u32,
+    onset_local_angular_velocity: glam::Vec3,
+    min_forward_z: f32,
+    max_forward_deviation_degrees: f32,
+    max_up_deviation_degrees: f32,
+    min_up_z: f32,
+    rotation_sample_count: u32,
 }
 
 impl InFlightItem for ActiveFlipImpulseCandidate {
@@ -164,6 +216,14 @@ impl FlipImpulseCalculator {
         };
 
         let rotation = quat_to_glam(&rigid_body.rotation);
+        let local_forward = rotation * glam::Vec3::X;
+        let local_up = rotation * glam::Vec3::Z;
+        let onset_local_angular_velocity = rigid_body
+            .angular_velocity
+            .as_ref()
+            .map(vec_to_glam)
+            .map(|angular_velocity| rotation.inverse() * angular_velocity)
+            .unwrap_or(glam::Vec3::ZERO);
         self.active_candidates.arm(
             player.player_id.clone(),
             ActiveFlipImpulseCandidate {
@@ -176,12 +236,18 @@ impl FlipImpulseCalculator {
                 end_position: position,
                 start_velocity: velocity,
                 end_velocity: velocity,
-                local_forward: rotation * glam::Vec3::X,
+                local_forward,
                 local_right: rotation * glam::Vec3::Y,
-                local_up: rotation * glam::Vec3::Z,
+                local_up,
                 boost_compensation: glam::Vec3::ZERO,
                 sample_count: 0,
                 boost_sample_count: 0,
+                onset_local_angular_velocity,
+                min_forward_z: local_forward.z,
+                max_forward_deviation_degrees: 0.0,
+                max_up_deviation_degrees: 0.0,
+                min_up_z: local_up.z,
+                rotation_sample_count: 0,
             },
         );
     }
@@ -191,28 +257,50 @@ impl FlipImpulseCalculator {
         frame: &FrameInfo,
         player: &PlayerSample,
     ) {
-        if frame.time <= candidate.start_time
-            || frame.time - candidate.start_time > FLIP_IMPULSE_EVALUATION_SECONDS
-        {
+        let elapsed = frame.time - candidate.start_time;
+        if elapsed <= 0.0 {
             return;
         }
 
-        if let Some(position) = player.position() {
-            candidate.end_position = position;
-        }
-        if let Some(velocity) = player.velocity() {
-            candidate.end_velocity = velocity;
-            candidate.sample_count += 1;
+        // Velocity-impulse window (short): measured over the evaluation window,
+        // and `resolved_time`/`frame` mark its end.
+        if elapsed <= FLIP_IMPULSE_EVALUATION_SECONDS {
+            if let Some(position) = player.position() {
+                candidate.end_position = position;
+            }
+            if let Some(velocity) = player.velocity() {
+                candidate.end_velocity = velocity;
+                candidate.sample_count += 1;
+            }
+
+            if player.boost_active {
+                candidate.boost_sample_count += 1;
+                candidate.boost_compensation +=
+                    candidate.local_forward * BOOST_ACCELERATION_UU_PER_SECOND_SQUARED * frame.dt;
+            }
+
+            candidate.latest_time = frame.time;
+            candidate.latest_frame = frame.frame_number;
         }
 
-        if player.boost_active {
-            candidate.boost_sample_count += 1;
-            candidate.boost_compensation +=
-                candidate.local_forward * BOOST_ACCELERATION_UU_PER_SECOND_SQUARED * frame.dt;
+        // Orientation-trajectory window (longer): the nose/up vectors relative to
+        // their onset orientation, used for the cancel and inversion signals.
+        if elapsed <= FLIP_ROTATION_WINDOW_SECONDS {
+            if let Some(rigid_body) = player.rigid_body.as_ref() {
+                let rotation = quat_to_glam(&rigid_body.rotation);
+                let forward = rotation * glam::Vec3::X;
+                let up = rotation * glam::Vec3::Z;
+                candidate.min_forward_z = candidate.min_forward_z.min(forward.z);
+                candidate.max_forward_deviation_degrees = candidate
+                    .max_forward_deviation_degrees
+                    .max(candidate.local_forward.angle_between(forward).to_degrees());
+                candidate.max_up_deviation_degrees = candidate
+                    .max_up_deviation_degrees
+                    .max(candidate.local_up.angle_between(up).to_degrees());
+                candidate.min_up_z = candidate.min_up_z.min(up.z);
+                candidate.rotation_sample_count += 1;
+            }
         }
-
-        candidate.latest_time = frame.time;
-        candidate.latest_frame = frame.frame_number;
     }
 
     fn candidate_event(player_id: &PlayerId, candidate: ActiveFlipImpulseCandidate) -> DodgeEvent {
@@ -266,6 +354,17 @@ impl FlipImpulseCalculator {
                 }
             });
 
+        let dodge_rotation = (candidate.rotation_sample_count > 0).then_some(DodgeRotation {
+            onset_pitch_rate: candidate.onset_local_angular_velocity.y,
+            onset_roll_rate: candidate.onset_local_angular_velocity.x,
+            onset_yaw_rate: candidate.onset_local_angular_velocity.z,
+            min_forward_z: candidate.min_forward_z,
+            max_forward_deviation_degrees: candidate.max_forward_deviation_degrees,
+            max_up_deviation_degrees: candidate.max_up_deviation_degrees,
+            min_up_z: candidate.min_up_z,
+            sample_count: candidate.rotation_sample_count,
+        });
+
         DodgeEvent {
             time: candidate.start_time,
             frame: candidate.start_frame,
@@ -274,6 +373,7 @@ impl FlipImpulseCalculator {
             player: player_id.clone(),
             is_team_0: candidate.is_team_0,
             dodge_impulse,
+            dodge_rotation,
         }
     }
 
@@ -282,7 +382,7 @@ impl FlipImpulseCalculator {
 
         for (player_id, candidate) in self.active_candidates.iter() {
             let duration = frame.time - candidate.start_time;
-            if force_all || duration >= FLIP_IMPULSE_EVALUATION_SECONDS {
+            if force_all || duration >= FLIP_ROTATION_WINDOW_SECONDS {
                 finished_candidates.push((
                     candidate.start_time,
                     candidate.start_frame,
