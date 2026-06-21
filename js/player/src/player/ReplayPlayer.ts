@@ -265,6 +265,8 @@ export class ReplayPlayer extends EventTarget {
   private hitboxOnlyModeEnabledValue: boolean;
   /** Lazily built player-name → hitbox-family map (roster is static). */
   private hitboxTypeByName: Map<string, string> | null = null;
+  /** Lazily built player-name → team-index map (roster is static). */
+  private hitboxTeamByName: Map<string, number> | null = null;
   /** True while hitbox wireframes are showing (cheap per-frame early-out). */
   private hitboxesActive = false;
   private skipPostGoalTransitionsEnabledValue: boolean;
@@ -427,6 +429,7 @@ export class ReplayPlayer extends EventTarget {
     this.timelineSegmentsCacheKey = null;
     this.timelineSegmentsCache = [];
     this.hitboxTypeByName = null;
+    this.hitboxTeamByName = null;
     this.hitboxesActive = false;
     this.freeCameraTransition = null;
 
@@ -1307,10 +1310,16 @@ export class ReplayPlayer extends EventTarget {
         this.adapter.getAllPlayers().map((entity) => [entity.name, entity.hitboxType]),
       );
     }
+    if (!this.hitboxTeamByName) {
+      this.hitboxTeamByName = new Map(
+        this.adapter.getAllPlayers().map((entity) => [entity.name, entity.team]),
+      );
+    }
     this.hitboxManager.updateHitboxes(
       am.actors,
       am.playerNameToCarActorId,
       (name: string) => this.hitboxTypeByName?.get(name) ?? "Octane",
+      (name: string) => this.hitboxTeamByName?.get(name) ?? null,
     );
     if (this.hitboxOnlyModeEnabledValue) {
       for (const carActorId of Object.values(am.playerNameToCarActorId)) {

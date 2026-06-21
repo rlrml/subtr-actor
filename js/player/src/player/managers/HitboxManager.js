@@ -1,16 +1,17 @@
 /**
- * HitboxManager - Manages car hitbox wireframe visualization
+ * HitboxManager - Manages car hitbox visualization
  *
  * Features:
- * - Creates wireframe boxes for each hitbox type (Octane, Dominus, Plank, Breakout, Hybrid, Merc)
- * - Updates wireframe positions/rotations to match car transforms
- * - Color coding by hitbox type
+ * - Creates solid, team-colored boxes for each hitbox type (Octane, Dominus,
+ *   Plank, Breakout, Hybrid, Merc)
+ * - Updates positions/rotations to match car transforms
+ * - Falls back to hitbox-family colors when a car has no team
  */
 
 import * as THREE from "three";
 import { HITBOX_DIMENSIONS } from "../data/hitboxes.js";
 
-// Color coding by hitbox type
+// Color coding by hitbox type (fallback when team is unknown)
 const HITBOX_COLORS = {
   Octane: 0x00ffff, // Cyan
   Dominus: 0xff8800, // Orange
@@ -19,6 +20,27 @@ const HITBOX_COLORS = {
   Hybrid: 0x8800ff, // Purple
   Merc: 0xffff00, // Yellow
 };
+
+// Team colors mirror the scene's nameplate/body colors (scene.ts):
+//   team 0 = blue, team 1 = orange
+const TEAM_COLORS = {
+  0: 0x57a8ff, // Blue
+  1: 0xff9c40, // Orange
+};
+
+/**
+ * Resolve the color used for a hitbox: team color when available, otherwise
+ * the per-family fallback.
+ * @param {string} hitboxType
+ * @param {number|null|undefined} team
+ * @returns {number}
+ */
+function resolveHitboxColor(hitboxType, team) {
+  if (team === 0 || team === 1) {
+    return TEAM_COLORS[team];
+  }
+  return HITBOX_COLORS[hitboxType] || HITBOX_COLORS.Octane;
+}
 
 export class HitboxManager {
   /**
@@ -44,13 +66,14 @@ export class HitboxManager {
   }
 
   /**
-   * Create a wireframe hitbox mesh for a specific hitbox type
+   * Create a solid, team-colored hitbox mesh for a specific hitbox type
    * @param {string} hitboxType - One of: Octane, Dominus, Plank, Breakout, Hybrid, Merc
-   * @returns {THREE.Group} - Group containing wireframe box and center pivot sphere
+   * @param {number|null|undefined} team - Team index (0 or 1) for coloring
+   * @returns {THREE.Group} - Group containing the solid box, edge outline, and center pivot sphere
    */
-  createHitboxWireframe(hitboxType) {
+  createHitboxWireframe(hitboxType, team) {
     const dims = HITBOX_DIMENSIONS[hitboxType] || HITBOX_DIMENSIONS.Octane;
-    const color = HITBOX_COLORS[hitboxType] || HITBOX_COLORS.Octane;
+    const color = resolveHitboxColor(hitboxType, team);
 
     // Dimensions in Unreal Units
     const length = dims.length;
@@ -82,21 +105,37 @@ export class HitboxManager {
     // So: length = X (front-back), height = Y, width = Z (left-right)
     const boxGeometry = new THREE.BoxGeometry(length, height, width);
 
-    // Use EdgesGeometry to only show the 12 edges of the box (no diagonals)
-    const edgesGeometry = new THREE.EdgesGeometry(boxGeometry);
+    // Solid, team-colored fill. Semi-transparent so cars/ball behind stay
+    // readable, and depthWrite off so overlapping hitboxes blend cleanly.
+    // depthTest: false keeps the hitbox visible through geometry (like in-game).
+    const fillMaterial = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.35,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const fill = new THREE.Mesh(boxGeometry, fillMaterial);
+    fill.frustumCulled = false;
+    fill.renderOrder = 1;
+    fill.position.set(offsetX, offsetY, 0);
+    group.add(fill);
 
-    // Create line segments with glow effect
-    // depthTest: false ensures hitbox is always visible (like in-game)
+    // Use EdgesGeometry to outline the 12 edges of the box (no diagonals),
+    // giving the solid box a crisp, in-game-style border.
+    const edgesGeometry = new THREE.EdgesGeometry(boxGeometry);
     const material = new THREE.LineBasicMaterial({
       color: color,
       linewidth: 2,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.9,
       depthTest: false,
     });
 
     const wireframe = new THREE.LineSegments(edgesGeometry, material);
     wireframe.frustumCulled = false;
+    wireframe.renderOrder = 2;
 
     // Apply hitbox offset from pivot point
     // X = forward, Y = up, Z = lateral (0)
@@ -122,6 +161,7 @@ export class HitboxManager {
 
     // Store metadata in userData
     group.userData.hitboxType = hitboxType;
+    group.userData.team = team ?? null;
 
     // Disable frustum culling on group
     group.frustumCulled = false;
@@ -133,26 +173,31 @@ export class HitboxManager {
    * Add or update a hitbox for a car
    * @param {string} carActorId - The car's actor ID
    * @param {string} hitboxType - The hitbox type
+   * @param {number|null|undefined} team - Team index (0 or 1) for coloring
    */
-  addHitbox(carActorId, hitboxType) {
-    // Remove existing hitbox if different type
+  addHitbox(carActorId, hitboxType, team) {
+    const normalizedTeam = team === 0 || team === 1 ? team : null;
+
+    // Remove existing hitbox if type or team changed
     if (this.hitboxes.has(carActorId)) {
       const existing = this.hitboxes.get(carActorId);
-      if (existing.hitboxType === hitboxType) {
-        return; // Already correct type
+      if (existing.hitboxType === hitboxType && existing.team === normalizedTeam) {
+        return; // Already correct type and team
       }
-      // Remove old hitbox
+      // Remove old hitbox (group with multiple children)
       this.scene.remove(existing.mesh);
-      existing.mesh.geometry.dispose();
-      existing.mesh.material.dispose();
+      existing.mesh.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
     }
 
     // Create new hitbox
-    const mesh = this.createHitboxWireframe(hitboxType);
+    const mesh = this.createHitboxWireframe(hitboxType, normalizedTeam);
     mesh.visible = this.enabled;
 
     this.scene.add(mesh);
-    this.hitboxes.set(carActorId, { mesh, hitboxType });
+    this.hitboxes.set(carActorId, { mesh, hitboxType, team: normalizedTeam });
   }
 
   /**
@@ -177,8 +222,9 @@ export class HitboxManager {
    * @param {Object} actors - Map of actor ID to actor mesh
    * @param {Object} playerNameToCarActorId - Map of player name to car actor ID
    * @param {Function} getHitboxType - Function that returns hitbox type for a player name
+   * @param {Function} [getTeam] - Function that returns team index (0/1) for a player name
    */
-  updateHitboxes(actors, playerNameToCarActorId, getHitboxType) {
+  updateHitboxes(actors, playerNameToCarActorId, getHitboxType, getTeam) {
     if (!this.enabled) return;
 
     // Update each car's hitbox
@@ -186,13 +232,12 @@ export class HitboxManager {
       const carMesh = actors[carActorId];
       if (!carMesh || !carMesh.userData.isCar) continue;
 
-      // Get hitbox type for this player
+      // Get hitbox type and team for this player
       const hitboxType = getHitboxType ? getHitboxType(playerName) : "Octane";
+      const team = getTeam ? getTeam(playerName) : null;
 
-      // Ensure hitbox exists
-      if (!this.hitboxes.has(carActorId)) {
-        this.addHitbox(carActorId, hitboxType);
-      }
+      // Ensure hitbox exists with the right type/team
+      this.addHitbox(carActorId, hitboxType, team);
 
       const { mesh: hitboxMesh } = this.hitboxes.get(carActorId);
 
