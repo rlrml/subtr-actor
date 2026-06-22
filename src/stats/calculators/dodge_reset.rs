@@ -9,12 +9,13 @@ const FLIP_RESET_MIN_DODGE_TOUCH_DELAY_SECONDS: f32 = 0.05;
 const FLIP_RESET_MAX_DODGE_TOUCH_DELAY_SECONDS: f32 = 2.0;
 const FLIP_RESET_GROUNDED_Z: f32 = 80.0;
 /// How long after a conversion touch the dodge component's active byte may take
-/// to replicate. Mirrors `DODGE_LAG_TOLERANCE_SECONDS` in the touch classifier:
-/// the ball-hit and the dodge activation routinely land on adjacent frames, so a
-/// flip-reset conversion touch can be sampled on the frame *before* the dodge
-/// flag flips on. We keep the touch around for this brief window so the dodge,
-/// once it appears, still confirms the reset retroactively.
-const FLIP_RESET_DODGE_TOUCH_LAG_TOLERANCE_SECONDS: f32 = 0.12;
+/// to replicate. The ball-hit and the dodge activation routinely land on adjacent
+/// frames, so a flip-reset conversion touch can be sampled on the frame *before*
+/// the dodge flag flips on. We keep the touch around for this brief window so the
+/// dodge, once it appears, still confirms the reset retroactively. Shared with the
+/// touch classifier and flick detector via
+/// [`DODGE_ACTIVE_BYTE_LAG_TOLERANCE_SECONDS`].
+const FLIP_RESET_DODGE_TOUCH_LAG_TOLERANCE_SECONDS: f32 = DODGE_ACTIVE_BYTE_LAG_TOLERANCE_SECONDS;
 
 /// How a flip reset (an on-ball dodge reset) was ultimately resolved.
 ///

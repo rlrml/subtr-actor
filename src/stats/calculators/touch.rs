@@ -6,12 +6,13 @@ const AERIAL_TOUCH_MIN_PLAYER_Z: f32 = AIR_DRIBBLE_MIN_PLAYER_Z;
 
 /// How long after a touch we keep watching the toucher's dodge component before
 /// giving up on associating a flip with it. The `CarComponent_Dodge`
-/// `ReplicatedActive` byte routinely replicates a frame or two *after* the
-/// ball-hit it produced (the hit and the dodge-activation land on adjacent
-/// frames), so a flip-into-ball contact can be sampled on the one frame where
-/// the dodge flag has not yet flipped on. Re-checking for a brief window lets
-/// such touches be recognized as dodge contacts after the fact.
-const DODGE_LAG_TOLERANCE_SECONDS: f32 = 0.12;
+/// `ReplicatedActive` byte routinely replicates *after* the ball-hit it produced
+/// (the hit and the dodge-activation land on adjacent frames), so a flip-into-ball
+/// contact can be sampled on the one frame where the dodge flag has not yet
+/// flipped on. Re-checking for a brief window lets such touches be recognized as
+/// dodge contacts after the fact. Shared with the flick detector and flip-reset
+/// confirmation via [`DODGE_ACTIVE_BYTE_LAG_TOLERANCE_SECONDS`].
+const DODGE_LAG_TOLERANCE_SECONDS: f32 = DODGE_ACTIVE_BYTE_LAG_TOLERANCE_SECONDS;
 
 /// How long after a touch a replay-reported shot/save stat event may land and
 /// still be attributed to that touch. The counter increment routinely

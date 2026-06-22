@@ -153,6 +153,16 @@ pub(crate) fn sequential_touch_events(touch_events: &[TouchEvent]) -> Vec<&Touch
 #[path = "ordering_tests.rs"]
 mod ordering_tests;
 
+/// How long after a ball-hit the `CarComponent_Dodge` `ReplicatedActive` byte
+/// may take to replicate. The hit and the dodge activation that produced it
+/// routinely land on adjacent frames, but the lag is not always "a frame or
+/// two": on lower-FPS / downsampled replays a flick contact has been observed
+/// to precede its dodge byte by ~0.23s (≈5 sampled frames). Detectors that pair
+/// a touch with the dodge that powered it (touch dodge-upgrades, flip-reset
+/// confirmation, flick detection) all key off this same physical quantity, so
+/// they share this single tolerance rather than each guessing their own.
+pub(crate) const DODGE_ACTIVE_BYTE_LAG_TOLERANCE_SECONDS: f32 = 0.25;
+
 const SUPERSONIC_SPEED_THRESHOLD: f32 = 2200.0;
 const BOOST_SPEED_THRESHOLD: f32 = 1410.0;
 const POWERSLIDE_MAX_Z_THRESHOLD: f32 = 40.0;
