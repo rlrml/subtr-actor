@@ -145,6 +145,48 @@ fn fast_touch_toward_goal_mouth_classifies_as_shot() {
 }
 
 #[test]
+fn upward_arced_shot_into_net_classifies_as_shot() {
+    // A shot hit hard with significant upward velocity: a straight-line
+    // projection sails it well over the crossbar (z ~1500), but gravity arcs it
+    // back down into the goal mouth (z ~160). This mirrors a dribble-flick that
+    // scores along an obvious arc, which used to read as no action.
+    let player_id = player(1);
+    let mut classifier = TouchIntentionClassifier::default();
+
+    let resolution = classifier.classify(
+        &touch_at(&player_id, 1.0),
+        &player_id,
+        &TouchIntentionFrameContext {
+            ball_position: Some(glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z)),
+            ball_velocity: Some(glam::Vec3::new(0.0, 2500.0, 700.0)),
+            ..neutral_ctx()
+        },
+    );
+
+    assert_eq!(resolution.action, Some(TouchAction::Shot));
+}
+
+#[test]
+fn shot_sailing_over_the_crossbar_is_not_a_shot() {
+    // Even with gravity, a ball rocketing upward is still well above the
+    // crossbar when it reaches the goal line, so it must not read as a shot.
+    let player_id = player(1);
+    let mut classifier = TouchIntentionClassifier::default();
+
+    let resolution = classifier.classify(
+        &touch_at(&player_id, 1.0),
+        &player_id,
+        &TouchIntentionFrameContext {
+            ball_position: Some(glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z)),
+            ball_velocity: Some(glam::Vec3::new(0.0, 2500.0, 2000.0)),
+            ..neutral_ctx()
+        },
+    );
+
+    assert_ne!(resolution.action, Some(TouchAction::Shot));
+}
+
+#[test]
 fn fast_touch_wide_of_goal_mouth_is_a_boom_not_a_shot() {
     // A hard hit pointed downfield but wide of the goal mouth is not a shot; it
     // reads as a boom (a big hit into space), not a fall-through neutral.
@@ -527,4 +569,89 @@ fn window_cut_short_does_not_confirm_control() {
 
     let resolution = tracker.flush().unwrap();
     assert!(resolution.possession.is_none());
+}
+
+fn goalward_sample() -> (glam::Vec3, glam::Vec3) {
+    (
+        glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z),
+        glam::Vec3::new(0.0, 2500.0, 0.0),
+    )
+}
+
+#[test]
+fn shot_projection_confirms_shot_from_settled_goalward_sample() {
+    // is_team_0 touches default to attacking +y; a settled free-flight sample
+    // headed hard into the opponent mouth resolves as a shot.
+    let mut tracker = ShotProjectionTracker::default();
+    tracker.open(0, true, 1.0);
+
+    let (position, velocity) = goalward_sample();
+    for time in [1.1, 1.2, 1.3] {
+        assert!(
+            tracker
+                .advance(&frame_at(time), Some(position), Some(velocity))
+                .is_none()
+        );
+    }
+
+    // Next touch at 1.45; the guard ignores the last 0.12s, landing on the
+    // 1.3 sample, which is still cleanly goalward.
+    let resolution = tracker.observe_touch(1.45).unwrap();
+    assert_eq!(resolution.touch_index, 0);
+    assert!(resolution.is_shot);
+}
+
+#[test]
+fn shot_projection_guard_skips_next_touch_contaminated_samples() {
+    // Real free flight is goalward, but the frame right before the next touch is
+    // already being dragged off by that touch's incoming impulse. The guard must
+    // resolve from the earlier clean samples and still read a shot.
+    let mut tracker = ShotProjectionTracker::default();
+    tracker.open(0, true, 1.0);
+
+    let (position, velocity) = goalward_sample();
+    for time in [1.1, 1.2] {
+        tracker.advance(&frame_at(time), Some(position), Some(velocity));
+    }
+    // Contaminated last frame: ball yanked sideways/backward by the next touch.
+    tracker.advance(
+        &frame_at(1.3),
+        Some(glam::Vec3::new(0.0, 4200.0, BALL_RADIUS_Z)),
+        Some(glam::Vec3::new(3000.0, -1500.0, 0.0)),
+    );
+
+    // Next touch at 1.32: without the guard this would read the 1.3 sample and
+    // miss the shot; the guard falls back to the 1.2 sample.
+    let resolution = tracker.observe_touch(1.32).unwrap();
+    assert!(resolution.is_shot);
+}
+
+#[test]
+fn shot_projection_ignores_sample_too_soon_after_touch() {
+    // A sample within the settle window is the unreliable just-touched frame and
+    // must not by itself confirm a shot.
+    let mut tracker = ShotProjectionTracker::default();
+    tracker.open(0, true, 1.0);
+
+    let (position, velocity) = goalward_sample();
+    tracker.advance(&frame_at(1.02), Some(position), Some(velocity));
+
+    let resolution = tracker.observe_touch(1.2).unwrap();
+    assert!(!resolution.is_shot);
+}
+
+#[test]
+fn shot_projection_does_not_confirm_off_target_free_flight() {
+    let mut tracker = ShotProjectionTracker::default();
+    tracker.open(0, true, 1.0);
+
+    // Settled, fast, but sailing well over the crossbar.
+    tracker.advance(
+        &frame_at(1.1),
+        Some(glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z)),
+        Some(glam::Vec3::new(0.0, 2500.0, 2000.0)),
+    );
+
+    let resolution = tracker.flush().unwrap();
+    assert!(!resolution.is_shot);
 }

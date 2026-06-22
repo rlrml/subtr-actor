@@ -550,6 +550,168 @@ impl ControlFollowTracker {
     }
 }
 
+/// A free-flight sample must be at least this far past the touch before its
+/// projection is trusted. The dodge/flick impulse is delivered over several
+/// frames, so the touch frame itself is the *least* reliable sample of where
+/// the ball is actually headed; we wait for the trajectory to settle.
+const SHOT_PROJECTION_MIN_FREE_FLIGHT_SECONDS: f32 = 0.06;
+
+/// When a new touch ends free flight, samples within this many seconds of that
+/// touch are ignored. The incoming touch's impulse can start moving the ball a
+/// frame or two before its touch marker is detected (the same replication lag
+/// as the dodge byte), so the very last free-flight samples may already be
+/// contaminated by the next touch. Resolving from a few frames earlier keeps
+/// the read on the ball's own settled trajectory.
+const SHOT_PROJECTION_NEXT_TOUCH_GUARD_SECONDS: f32 = 0.12;
+
+/// Outcome of a closed shot-projection window. `touch_index` addresses the
+/// touch event to upgrade to a shot when `is_shot` is true.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShotProjectionResolution {
+    pub touch_index: usize,
+    pub is_shot: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ShotProjectionSample {
+    position: glam::Vec3,
+    velocity: glam::Vec3,
+    time: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct ShotProjectionWindow {
+    touch_index: usize,
+    is_team_0: bool,
+    touch_time: f32,
+    /// Recent free-flight samples, oldest first. Bounded to the look-back the
+    /// next-touch guard needs, so it never grows with window length.
+    samples: VecDeque<ShotProjectionSample>,
+}
+
+impl ShotProjectionWindow {
+    fn record(&mut self, sample: ShotProjectionSample) {
+        // Retain enough history to look back past the next-touch guard, plus a
+        // small margin, and no more.
+        let cutoff = sample.time - (SHOT_PROJECTION_NEXT_TOUCH_GUARD_SECONDS + 0.1);
+        self.samples.push_back(sample);
+        while self
+            .samples
+            .front()
+            .is_some_and(|oldest| oldest.time < cutoff)
+        {
+            self.samples.pop_front();
+        }
+    }
+
+    fn is_shot_from(&self, sample: &ShotProjectionSample) -> bool {
+        sample.time - self.touch_time >= SHOT_PROJECTION_MIN_FREE_FLIGHT_SECONDS
+            && sample.velocity.length() >= SHOT_MIN_BALL_SPEED
+            && trajectory_crosses_goal_mouth(
+                sample.position,
+                sample.velocity,
+                opponent_goal_line_y(self.is_team_0),
+                SHOT_MAX_TIME_TO_GOAL_SECONDS,
+            )
+    }
+
+    /// Resolve from the most recent sample. Used when free flight ends at a
+    /// boundary (goal / stoppage / end of replay): nothing perturbs the ball, so
+    /// the last sample is the cleanest read of where it was headed.
+    fn resolution_latest(&self) -> ShotProjectionResolution {
+        let is_shot = self
+            .samples
+            .back()
+            .is_some_and(|sample| self.is_shot_from(sample));
+        ShotProjectionResolution {
+            touch_index: self.touch_index,
+            is_shot,
+        }
+    }
+
+    /// Resolve from the most recent sample at least the guard interval before
+    /// `close_time`. Used when a new touch ends free flight, so the read sits on
+    /// the ball's own trajectory rather than the next touch's incoming impulse.
+    fn resolution_before(&self, close_time: f32) -> ShotProjectionResolution {
+        let limit = close_time - SHOT_PROJECTION_NEXT_TOUCH_GUARD_SECONDS;
+        let is_shot = self
+            .samples
+            .iter()
+            .rev()
+            .find(|sample| sample.time <= limit)
+            .is_some_and(|sample| self.is_shot_from(sample));
+        ShotProjectionResolution {
+            touch_index: self.touch_index,
+            is_shot,
+        }
+    }
+}
+
+/// Watches the ball's free flight after a touch and decides, from the settled
+/// trajectory before the next touch, whether the touch sent the ball goalward —
+/// recovering shots whose touch-frame velocity had not yet finished updating.
+/// Resolutions are applied retroactively to the already-emitted touch event,
+/// mirroring [`ControlFollowTracker`].
+///
+/// At most one window is open at a time: any new touch closes the previous
+/// window.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ShotProjectionTracker {
+    window: Option<ShotProjectionWindow>,
+}
+
+impl ShotProjectionTracker {
+    /// Open a projection window for a just-emitted touch event.
+    pub fn open(&mut self, touch_index: usize, is_team_0: bool, time: f32) {
+        self.window = Some(ShotProjectionWindow {
+            touch_index,
+            is_team_0,
+            touch_time: time,
+            samples: VecDeque::new(),
+        });
+    }
+
+    /// Close the open window because a new touch at `next_touch_time` ended free
+    /// flight, resolving it from a sample taken a guard interval before that
+    /// touch so the next touch's pre-detection impulse can't skew the read.
+    pub fn observe_touch(&mut self, next_touch_time: f32) -> Option<ShotProjectionResolution> {
+        self.window
+            .take()
+            .map(|window| window.resolution_before(next_touch_time))
+    }
+
+    /// Record this frame's free-flight ball sample, or resolve the window once
+    /// it ages past the shot time-to-goal horizon.
+    pub fn advance(
+        &mut self,
+        frame: &FrameInfo,
+        ball_position: Option<glam::Vec3>,
+        ball_velocity: Option<glam::Vec3>,
+    ) -> Option<ShotProjectionResolution> {
+        if self
+            .window
+            .as_ref()
+            .is_some_and(|window| frame.time - window.touch_time > SHOT_MAX_TIME_TO_GOAL_SECONDS)
+        {
+            return self.window.take().map(|window| window.resolution_latest());
+        }
+        let window = self.window.as_mut()?;
+        if let (Some(position), Some(velocity)) = (ball_position, ball_velocity) {
+            window.record(ShotProjectionSample {
+                position,
+                velocity,
+                time: frame.time,
+            });
+        }
+        None
+    }
+
+    /// Close any open window immediately (live-play boundary or end of replay).
+    pub fn flush(&mut self) -> Option<ShotProjectionResolution> {
+        self.window.take().map(|window| window.resolution_latest())
+    }
+}
+
 /// True when an active 50/50 lists this player as one of its contestants.
 pub(crate) fn fifty_fifty_involves_player(
     active: &ActiveFiftyFifty,
@@ -572,11 +734,16 @@ fn opponent_goal_line_y(is_team_0: bool) -> f32 {
     -own_goal_line_y(is_team_0)
 }
 
-/// Returns true when a straight-line projection of the trajectory crosses the
-/// goal line at `target_goal_y` inside the goal mouth (with a ball-radius
-/// margin) within `max_seconds`. Gravity, bounces, and later touches are
-/// deliberately ignored, matching the other goal-mouth projections in this
-/// crate.
+/// Returns true when a ballistic projection of the trajectory crosses the goal
+/// line at `target_goal_y` inside the goal mouth (with a ball-radius margin)
+/// within `max_seconds`.
+///
+/// The horizontal (x/y) path is a straight line — gravity is purely vertical,
+/// so it does not change when the ball reaches the goal line nor its lateral
+/// position there. The vertical (z) path applies constant gravity, so a shot
+/// hit upward that arcs back down into the net is read correctly instead of
+/// being projected straight over the crossbar. Wall bounces and later touches
+/// are still deliberately ignored.
 fn trajectory_crosses_goal_mouth(
     position: glam::Vec3,
     velocity: glam::Vec3,
@@ -590,10 +757,17 @@ fn trajectory_crosses_goal_mouth(
     if !time_to_goal_line.is_finite() || !(0.0..=max_seconds).contains(&time_to_goal_line) {
         return false;
     }
-    let projected = position + velocity * time_to_goal_line;
-    projected.x.abs() <= BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X + GOAL_MOUTH_TRAJECTORY_MARGIN
-        && projected.z >= BALL_RADIUS_Z - GOAL_MOUTH_TRAJECTORY_MARGIN
-        && projected.z <= GOAL_MOUTH_HEIGHT_Z + GOAL_MOUTH_TRAJECTORY_MARGIN
+    let projected_x = position.x + velocity.x * time_to_goal_line;
+    let projected_z = position.z
+        + velocity.z * time_to_goal_line
+        + 0.5
+            * crate::util::ballistics::STANDARD_BALL_GRAVITY_Z
+            * time_to_goal_line
+            * time_to_goal_line;
+    projected_x.abs() <= BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X + GOAL_MOUTH_TRAJECTORY_MARGIN
+        && (BALL_RADIUS_Z - GOAL_MOUTH_TRAJECTORY_MARGIN
+            ..=GOAL_MOUTH_HEIGHT_Z + GOAL_MOUTH_TRAJECTORY_MARGIN)
+            .contains(&projected_z)
 }
 
 #[cfg(test)]

@@ -3,6 +3,12 @@
 /**
  * Which entity an event belongs to, so a client can spawn one timeline lane
  * per relevant entity (per team, per player) instead of merging everything
- * onto a single row. Especially useful for span streams.
+ * onto a single row. Especially useful for span streams, where merging would
+ * pile overlapping spans from different entities onto one lane.
+ *
+ * Fan-out is opt-in: `Match` is the default and `Team`/`Player` are declared
+ * per event type via `EventDefinition::scope` (the `scope =` modifier on
+ * `define_stats_event!`). See `EventPayload::scope`, which reads that
+ * declaration to populate [`EventMeta::scope`].
  */
 export type EventScope = "match" | "team" | "player";

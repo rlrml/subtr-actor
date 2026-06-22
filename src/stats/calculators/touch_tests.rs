@@ -1041,3 +1041,191 @@ fn touch_where_ball_leaves_the_player_has_no_action_or_possession() {
     assert_eq!(stats.possession_count("control"), 0);
     assert_eq!(stats.touch_count, 1);
 }
+
+/// Drives one live-play frame through the calculator with the given ball,
+/// touch, and frame-events state, holding the toucher parked away from the ball.
+#[allow(clippy::too_many_arguments)]
+fn update_frame(
+    calculator: &mut TouchCalculator,
+    player_id: &PlayerId,
+    frame_number: usize,
+    ball: &BallFrameState,
+    touch_state: &TouchState,
+    events_state: &FrameEventsState,
+) {
+    calculator
+        .update(
+            &frame(frame_number),
+            ball,
+            &player_frame_state(player_id, glam::Vec3::new(0.0, -2000.0, 17.0)),
+            &vertical_state(player_id, 17.0),
+            &RotationCalculator::default(),
+            touch_state,
+            &possession(player_id, true),
+            &FiftyFiftyState::default(),
+            events_state,
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+}
+
+fn goal_events_state(player_id: &PlayerId, time: f32, frame_number: usize) -> FrameEventsState {
+    FrameEventsState {
+        goal_events: vec![GoalEvent {
+            time,
+            frame: frame_number,
+            scoring_team_is_team_0: true,
+            player: Some(player_id.clone()),
+            player_position: None,
+            team_zero_score: None,
+            team_one_score: None,
+        }],
+        ..FrameEventsState::default()
+    }
+}
+
+fn stat_events_state(
+    player_id: &PlayerId,
+    time: f32,
+    frame_number: usize,
+    kind: PlayerStatEventKind,
+) -> FrameEventsState {
+    FrameEventsState {
+        player_stat_events: vec![PlayerStatEvent {
+            time,
+            frame: frame_number,
+            player: player_id.clone(),
+            player_position: None,
+            is_team_0: true,
+            kind,
+            shot: None,
+        }],
+        ..FrameEventsState::default()
+    }
+}
+
+#[test]
+fn settled_free_flight_trajectory_upgrades_touch_to_shot() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+
+    // Touch frame: ball not yet moving goalward, so it reads as a non-shot.
+    update_frame(
+        &mut calculator,
+        &player_id,
+        1,
+        &ball(0.0, 0.0),
+        &touch_state(1, &player_id),
+        &FrameEventsState::default(),
+    );
+    assert_eq!(calculator.events()[0].tag("action"), None);
+
+    // Free flight: the settled trajectory is screaming into the opponent mouth.
+    let goalward = ball_with_position_and_velocity(
+        glam::Vec3::new(0.0, 4000.0, BALL_RADIUS_Z),
+        glam::Vec3::new(0.0, 2500.0, 0.0),
+    );
+    for frame_number in 2..=4 {
+        update_frame(
+            &mut calculator,
+            &player_id,
+            frame_number,
+            &goalward,
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        );
+    }
+    calculator.finish();
+
+    assert_eq!(calculator.events()[0].tag("action"), Some("shot"));
+}
+
+#[test]
+fn scored_goal_upgrades_scorers_last_touch_to_shot() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+
+    // A soft non-shot touch that nonetheless ends up in the net.
+    update_frame(
+        &mut calculator,
+        &player_id,
+        1,
+        &ball(0.0, 0.0),
+        &touch_state(1, &player_id),
+        &FrameEventsState::default(),
+    );
+    assert_eq!(calculator.events()[0].tag("action"), None);
+
+    update_frame(
+        &mut calculator,
+        &player_id,
+        5,
+        &ball(0.0, 0.0),
+        &TouchState::default(),
+        &goal_events_state(&player_id, 0.5, 5),
+    );
+
+    assert_eq!(calculator.events()[0].tag("action"), Some("shot"));
+}
+
+#[test]
+fn replay_shot_stat_after_touch_upgrades_touch_to_shot() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+
+    update_frame(
+        &mut calculator,
+        &player_id,
+        1,
+        &ball(0.0, 0.0),
+        &touch_state(1, &player_id),
+        &FrameEventsState::default(),
+    );
+    assert_eq!(calculator.events()[0].tag("action"), None);
+
+    // The replay shot counter increments a few frames after the touch.
+    update_frame(
+        &mut calculator,
+        &player_id,
+        5,
+        &ball(0.0, 0.0),
+        &TouchState::default(),
+        &stat_events_state(&player_id, 0.5, 5, PlayerStatEventKind::Shot),
+    );
+
+    assert_eq!(calculator.events()[0].tag("action"), Some("shot"));
+}
+
+#[test]
+fn off_target_free_flight_leaves_touch_unchanged() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = TouchCalculator::new();
+
+    update_frame(
+        &mut calculator,
+        &player_id,
+        1,
+        &ball(0.0, 0.0),
+        &touch_state(1, &player_id),
+        &FrameEventsState::default(),
+    );
+
+    // Fast and settled, but flying away from the opponent goal.
+    let away = ball_with_position_and_velocity(
+        glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z),
+        glam::Vec3::new(0.0, -2500.0, 0.0),
+    );
+    for frame_number in 2..=4 {
+        update_frame(
+            &mut calculator,
+            &player_id,
+            frame_number,
+            &away,
+            &TouchState::default(),
+            &FrameEventsState::default(),
+        );
+    }
+    calculator.finish();
+
+    assert_ne!(calculator.events()[0].tag("action"), Some("shot"));
+}

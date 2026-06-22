@@ -91,12 +91,13 @@ fn timeline_payloads_by_stream<T: Clone>(
 }
 
 fn test_event_envelope(stream: &str, index: usize, payload: EventPayload) -> Event {
+    let scope = payload.scope();
     Event {
         meta: EventMeta {
             id: format!("{stream}:{index}"),
             stream: stream.to_owned(),
             label: stats_timeline_event_label(stream),
-            scope: event_stream_scope(stream),
+            scope,
             timing: EventTiming::Moment {
                 frame: 0,
                 time: 0.0,

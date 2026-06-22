@@ -99,3 +99,12 @@ fixtures include replay files and source ids but not API stats JSON.
   - replay id: `54272940-8859-4ee8-a37b-ca49328dbce7`
   - title: `2026-04-28.21.17 hashir Private Win`
   - playlist: `private`
+
+Mechanic regression fixtures are pinned on small clips by tests under
+`tests/clip_*.rs`.
+
+- `calemacar-flip-reset-goal-9-2026-06-21`
+  - rocket-sense replay id: `019ee9cb-40a1-7c30-9a2e-a846172dd869`
+  - CaleMaCar's 9th goal: an on-ball flip reset converted by a flip-into-ball
+    finish where the conversion touch is sampled a frame before the dodge byte
+    replicates. Used by `tests/clip_flip_reset_test.rs`.

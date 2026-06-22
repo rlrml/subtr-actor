@@ -199,6 +199,20 @@ fn parse_dodge_impulse(value: &Value) -> SubtrActorResult<DodgeImpulse> {
     parse_dodge_impulse_from_object(json_object(value, "dodge impulse")?)
 }
 
+fn parse_dodge_rotation(value: &Value) -> SubtrActorResult<DodgeRotation> {
+    let object = json_object(value, "dodge rotation")?;
+    Ok(DodgeRotation {
+        onset_pitch_rate: json_required_f32(object, "onset_pitch_rate")?,
+        onset_roll_rate: json_required_f32(object, "onset_roll_rate")?,
+        onset_yaw_rate: json_required_f32(object, "onset_yaw_rate")?,
+        min_forward_z: json_required_f32(object, "min_forward_z")?,
+        max_forward_deviation_degrees: json_required_f32(object, "max_forward_deviation_degrees")?,
+        max_up_deviation_degrees: json_required_f32(object, "max_up_deviation_degrees")?,
+        min_up_z: json_required_f32(object, "min_up_z")?,
+        sample_count: json_required_u32(object, "sample_count")?,
+    })
+}
+
 pub(in crate::collector::stats::playback) fn parse_dodge_event(
     value: &Value,
 ) -> SubtrActorResult<DodgeEvent> {
@@ -207,6 +221,10 @@ pub(in crate::collector::stats::playback) fn parse_dodge_event(
         Some(Value::Null) | None if !object.contains_key("estimated_impulse_delta") => None,
         Some(Value::Null) | None => Some(parse_dodge_impulse_from_object(object)?),
         Some(value) => Some(parse_dodge_impulse(value)?),
+    };
+    let dodge_rotation = match object.get("dodge_rotation") {
+        Some(Value::Null) | None => None,
+        Some(value) => Some(parse_dodge_rotation(value)?),
     };
 
     Ok(DodgeEvent {
@@ -217,6 +235,7 @@ pub(in crate::collector::stats::playback) fn parse_dodge_event(
         player: json_required_remote_id(object, "player")?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         dodge_impulse,
+        dodge_rotation,
     })
 }
 

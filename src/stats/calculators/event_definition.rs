@@ -17,7 +17,7 @@ use super::{
     TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
     WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
-use crate::stats::timeline::Event;
+use crate::stats::timeline::{Event, EventPayload, EventScope};
 
 /// Static, English-language metadata for a stat event type.
 ///
@@ -29,6 +29,12 @@ pub struct EventDefinition {
     pub id: &'static str,
     pub label: &'static str,
     pub category: EventCategory,
+    /// How a timeline client fans this event's stream out into lanes. `Match`
+    /// (the default) keeps everything on one shared row; `Team`/`Player` are the
+    /// opt-in exceptions that split into one lane per team or per player. Declared
+    /// here so fan-out travels with the event type rather than a side table; the
+    /// shipped `EventMeta.scope` reads from this via [`EventPayload::scope`].
+    pub scope: EventScope,
     pub confidence: DetectionConfidence,
     pub summary: &'static str,
     pub approach: &'static [&'static str],
@@ -58,6 +64,77 @@ impl EventDefinition {
         let mut def = self;
         def.variants = variants;
         def
+    }
+
+    /// Set how this event's stream fans out into timeline lanes. Named to double
+    /// as a `define_stats_event!` modifier (`scope = EventScope::Player`). The
+    /// default is [`EventScope::Match`] (single shared row); declare `Player` or
+    /// `Team` to opt a stream into per-entity lanes.
+    pub const fn scope(self, scope: EventScope) -> Self {
+        let mut def = self;
+        def.scope = scope;
+        def
+    }
+}
+
+impl EventPayload {
+    /// The lane fan-out scope for this event, taken from the payload type's
+    /// declared [`EventDefinition::scope`]. This is the single authoritative
+    /// source for the `EventMeta.scope` shipped on every timeline event, so the
+    /// `scope =` declared next to each `define_stats_event!` is what reaches the
+    /// client. The match is exhaustive on purpose: a newly added payload variant
+    /// will not compile until its scope is declared here.
+    pub fn scope(&self) -> EventScope {
+        match self {
+            Self::Timeline(_) => TimelineEvent::DEFINITION.scope,
+            Self::CorePlayer(_) => CorePlayerScoreboardEvent::DEFINITION.scope,
+            Self::Possession(_) => PossessionEvent::DEFINITION.scope,
+            Self::PlayerPossession(_) => PlayerPossessionEvent::DEFINITION.scope,
+            Self::BallHalf(_) => BallHalfEvent::DEFINITION.scope,
+            Self::BallThird(_) => BallThirdEvent::DEFINITION.scope,
+            Self::TerritorialPressure(_) => TerritorialPressureEvent::DEFINITION.scope,
+            Self::Movement(_) => MovementEvent::DEFINITION.scope,
+            Self::PlayerActivity(_) => PlayerActivityEvent::DEFINITION.scope,
+            Self::FieldThird(_) => FieldThirdEvent::DEFINITION.scope,
+            Self::FieldHalf(_) => FieldHalfEvent::DEFINITION.scope,
+            Self::BallDepth(_) => BallDepthEvent::DEFINITION.scope,
+            Self::DepthRole(_) => DepthRoleEvent::DEFINITION.scope,
+            Self::BallProximity(_) => BallProximityEvent::DEFINITION.scope,
+            // ShadowDefenseEvent has no `define_stats_event!` definition; it is a
+            // per-player positioning span like its sibling positioning streams.
+            Self::ShadowDefense(_) => EventScope::Player,
+            Self::RotationRole(_) => RotationRoleEvent::DEFINITION.scope,
+            Self::FirstManChange(_) => FirstManChangeEvent::DEFINITION.scope,
+            Self::GoalContext(_) => GOAL_CONTEXT_EVENT_DEFINITION.scope,
+            Self::Backboard(_) => BackboardBounceEvent::DEFINITION.scope,
+            Self::CeilingShot(_) => CeilingShotEvent::DEFINITION.scope,
+            Self::WallAerial(_) => WallAerialEvent::DEFINITION.scope,
+            Self::WallAerialShot(_) => WallAerialShotEvent::DEFINITION.scope,
+            Self::Center(_) => CenterEvent::DEFINITION.scope,
+            Self::Flick(_) => FlickEvent::DEFINITION.scope,
+            Self::DodgeReset(_) => DodgeResetEvent::DEFINITION.scope,
+            Self::FlipReset(_) => FlipResetEvent::DEFINITION.scope,
+            Self::DoubleTap(_) => DoubleTapEvent::DEFINITION.scope,
+            Self::FiftyFifty(_) => FiftyFiftyEvent::DEFINITION.scope,
+            Self::Kickoff(_) => KICKOFF_EVENT_DEFINITION.scope,
+            Self::OneTimer(_) => OneTimerEvent::DEFINITION.scope,
+            Self::Pass(_) => PassEvent::DEFINITION.scope,
+            Self::BallCarry(_) => BallCarryEvent::DEFINITION.scope,
+            Self::ControlledPlay(_) => ControlledPlayEvent::DEFINITION.scope,
+            Self::Rush(_) => RushEvent::DEFINITION.scope,
+            Self::Dodge(_) => DodgeEvent::DEFINITION.scope,
+            Self::SpeedFlip(_) => SpeedFlipEvent::DEFINITION.scope,
+            Self::HalfFlip(_) => HalfFlipEvent::DEFINITION.scope,
+            Self::HalfVolley(_) => HalfVolleyEvent::DEFINITION.scope,
+            Self::Wavedash(_) => WavedashEvent::DEFINITION.scope,
+            Self::Whiff(_) => WhiffEvent::DEFINITION.scope,
+            Self::Powerslide(_) => PowerslideEvent::DEFINITION.scope,
+            Self::Touch(_) => TouchClassificationEvent::DEFINITION.scope,
+            Self::BoostPickup(_) => BoostPickupEvent::DEFINITION.scope,
+            Self::Respawn(_) => RespawnEvent::DEFINITION.scope,
+            Self::Bump(_) => BumpEvent::DEFINITION.scope,
+            Self::Demolition(_) => DemolitionEvent::DEFINITION.scope,
+        }
     }
 }
 
@@ -186,6 +263,9 @@ pub const fn event_definition(
         id,
         label,
         category,
+        // Fan-out is opt-in: streams stay on one shared row unless a definition
+        // declares `Player`/`Team` via the `scope =` modifier.
+        scope: EventScope::Match,
         confidence: UNKNOWN_DETECTION_CONFIDENCE,
         summary,
         approach,
@@ -360,6 +440,10 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = {json};\n
     }
 }
 
+#[cfg(test)]
+#[path = "event_definition_scope_tests.rs"]
+mod scope_tests;
+
 /// Register an already-declared `EventDefinition` const into the
 /// [`EVENT_DEFINITIONS`] catalog. Used for payload-less rows (core scoreboard
 /// stats, goal context, expansion fallbacks) that have no [`StatsEvent`] type.
@@ -448,7 +532,7 @@ pub const SHOT_EVENT_DEFINITION: EventDefinition =
 register_stats_event_definition!(SHOT_EVENT_DEFINITION);
 
 pub const KICKOFF_EVENT_DEFINITION: EventDefinition =
-    pending_event_definition("kickoff", "Kickoff", EventCategory::Core);
+    pending_event_definition("kickoff", "Kickoff", EventCategory::Core).scope(EventScope::Player);
 register_stats_event_definition!(KICKOFF_EVENT_DEFINITION);
 
 pub const GOAL_CONTEXT_EVENT_DEFINITION: EventDefinition =
@@ -494,7 +578,8 @@ define_stats_event!(
         "Track the last touch during live play and attribute a later backboard rebound to that touch when it occurs within the configured attribution window.",
         "Require the ball to be high, near the backboard face, moving toward the backboard before the rebound, and moving away after the rebound.",
         "Ignore frames with a simultaneous touch so the rebound is not confused with a player-ball contact.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     CeilingShotEvent,
@@ -507,7 +592,8 @@ define_stats_event!(
         "Record recent ceiling contacts when the car is near the ceiling and oriented roof-first against it.",
         "Match a later touch by the same player within the ceiling-contact window after the player has separated from the ceiling.",
         "Score the candidate from contact timing, height, separation, forward alignment, approach speed, ball impulse, and ceiling-contact alignment.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     WallAerialEvent,
@@ -520,7 +606,8 @@ define_stats_event!(
         "Track wall-control sequences where the last toucher keeps the ball close while positioned on a side or back wall.",
         "Arm a wall-aerial candidate when the player leaves the wall soon after a qualifying wall-control setup.",
         "Emit on a later aerial touch by the same player when the player and ball are high enough, the setup/takeoff windows hold, and the confidence score clears the threshold.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     WallAerialShotEvent,
@@ -533,7 +620,8 @@ define_stats_event!(
         "Track recent wall contact for each player and arm a candidate when the player leaves the wall while still above the ground threshold.",
         "Match a subsequent shot stat event by that player within the takeoff-to-shot window.",
         "Require the shot touch to occur off the wall with sufficient player and ball height, then score confidence from timing, height, goal alignment, and ball speed.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     CenterEvent,
@@ -546,7 +634,8 @@ define_stats_event!(
         "Start a pending center from a live-play touch, unless that player immediately has a shot or goal event.",
         "Watch the ball for a short window after the touch and require meaningful travel from a wide x-position toward a more central x-position in the attacking half.",
         "Clear the candidate when it ages out, loses attribution, or becomes a shot/goal by the same player instead of a center.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     FlickEvent,
@@ -560,7 +649,8 @@ define_stats_event!(
         "Measure signed horizontal setup rotation so reverse flicks can be labeled as left or right based on the direction the car rotated before the flick.",
         "Record dodge starts that happen immediately after, or during, a qualifying setup.",
         "Emit on a same-player touch shortly after the dodge when the ball impulse is large and directed away from the player, with confidence from setup duration, timing, impulse, and separation.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     DodgeResetEvent,
@@ -574,7 +664,8 @@ define_stats_event!(
         "Classify the refresh as on-ball (a flip reset) when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.",
         "Keep on-ball resets pending in an in-flight ledger; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` with its reset-to-use latency.",
         "Resolve every pending reset into an outcome: used, landed, superseded by a newer reset, expired, or cut off by a goal, live play ending, or the replay ending.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     DoubleTapEvent,
@@ -587,7 +678,8 @@ define_stats_event!(
         "Arm a pending double tap from a backboard-bounce event attributed to the player who sent the ball to the backboard.",
         "Require the same player and team to touch the ball again during live play within the follow-up window.",
         "Accept the follow-up only when the post-touch straight-line ball trajectory projects into or close to the opponent goal mouth.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     OneTimerEvent,
@@ -601,7 +693,8 @@ define_stats_event!(
         "Consume newly completed pass events on the frame they are recorded.",
         "Require the current ball speed after the receiver's touch to exceed the one-timer speed threshold.",
         "Require the post-touch ball velocity to align with the opponent goal center direction.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     PassEvent,
@@ -614,7 +707,8 @@ define_stats_event!(
         "Track the last attributed touch in live play and compare it to each new touch.",
         "Emit when a different teammate touches the ball within the pass window after the ball has traveled far enough.",
         "Classify the pass as direct, backboard, fifty-fifty, or fifty-fifty backboard using intervening backboard-bounce and fifty-fifty state.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     BallCarryEvent,
@@ -628,7 +722,8 @@ define_stats_event!(
         "Use continuous ball-control tracking to build player-owned sequences while live play is active.",
         "Sample grounded carries from close horizontal/vertical ball gaps over the car, excluding wall contact.",
         "Sample air dribbles with the air-dribble policy, then emit completed sequences that meet the duration and validity rules for their carry kind.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     ControlledPlayEvent,
@@ -642,7 +737,8 @@ define_stats_event!(
         "Start a player-owned candidate from an attributed touch during live play.",
         "Require at least two distinct touches by the same player with at least one second between the first and last touch.",
         "Require sustained proximity to the ball and finish the candidate when another player touches, live play ends, or the touch chain times out.",
-    ]
+    ],
+    scope = EventScope::Team
 );
 define_stats_event!(
     FiftyFiftyEvent,
@@ -655,7 +751,8 @@ define_stats_event!(
         "Start an active 50/50 when a frame contains touches from both teams, including kickoff-specific tracking.",
         "Continue the contest for short follow-up touch windows while either involved team remains in contact.",
         "Resolve after a delay once ball movement, possession state, or max duration gives a winner, possession outcome, or neutral result.",
-    ]
+    ],
+    scope = EventScope::Team
 );
 define_stats_event!(
     RushEvent,
@@ -668,7 +765,8 @@ define_stats_event!(
         "Start from a possession change when the ball is still in the new attacking team's defensive half.",
         "Count non-demoed attackers near or ahead of the ball and defenders between the ball and their own goal.",
         "Emit once the new attacking team retains possession long enough with at least two attackers and at least one defender in the rush shape.",
-    ]
+    ],
+    scope = EventScope::Team
 );
 define_stats_event!(
     DodgeEvent,
@@ -681,7 +779,8 @@ define_stats_event!(
         "Start on the replay's dodge-active rising edge for each player.",
         "Sample the player's velocity change over the early dodge window and subtract an approximate forward boost contribution when boost is active.",
         "Store the impulse estimate as dodge_impulse, including car-local direction classification plus raw and compensated world-space vectors for visualization and downstream mechanic detectors.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     SpeedFlipEvent,
@@ -694,7 +793,8 @@ define_stats_event!(
         "Start candidates on dodge rising edges while the player is grounded, moving in the car's forward direction, and, for kickoff cases, within the kickoff-start window.",
         "Track speed, forward alignment, boost alignment, diagonal angular-velocity balance, and early forward acceleration during a short evaluation window.",
         "Emit when the combined diagonal, cancel, speed, and alignment confidence score clears the speed-flip threshold before the candidate expires.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     HalfFlipEvent,
@@ -707,7 +807,8 @@ define_stats_event!(
         "Start candidates on low grounded or low-air dodge rising edges.",
         "Track the car's forward vector through the evaluation window, including vertical flip evidence and final horizontal facing direction.",
         "Emit when the candidate has pitched through a flip, reaches and retains roughly opposite facing instead of rotating through a full end-over-end flip, and finishes with a meaningful horizontal facing direction.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     HalfVolleyEvent,
@@ -720,7 +821,8 @@ define_stats_event!(
         "Detect floor bounces from ball height and vertical velocity reversal when no touch occurs on the bounce frame.",
         "Track each player's recent ground contact and dodge start.",
         "Emit on a same-player touch shortly after the floor bounce and dodge when the post-touch ball speed clears the configured threshold.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     WavedashEvent,
@@ -733,7 +835,8 @@ define_stats_event!(
         "Start candidates on dodge rising edges from a low but airborne height.",
         "Watch for a landing within the wavedash window while the car is sufficiently upright.",
         "Score confidence from dodge-to-landing timing, starting height, speed gain or landing speed, and landing uprightness.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     WhiffEvent,
@@ -746,7 +849,8 @@ define_stats_event!(
         "Start candidates when a player gets within hitbox distance of the ball while moving or dodging toward it with sufficient alignment and closing speed.",
         "Track the closest approach while the candidate remains near the ball.",
         "Resolve as a whiff when the player exits the candidate window without touching, or as beaten-to-ball when an opponent touches first.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     PowerslideEvent,
@@ -759,7 +863,8 @@ define_stats_event!(
         "Read each player's powerslide-active input/state on every frame.",
         "Treat powerslide as effective only while the player is close enough to the ground.",
         "Emit when a player's effective powerslide state changes between active and inactive.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     TouchClassificationEvent,
@@ -771,11 +876,13 @@ define_stats_event!(
     approach = [
         "Carry classification as a set of (group, value) tags rather than rivalrous fields, so independent reads coexist: a boom that the hitter recovers is tagged both action=boom and possession=advance.",
         "Tag strength kind (control, medium hit, hard hit) from the ball speed change, plus surface, height band, and dodge context for the touching player at contact time.",
-        "Resolve a single mutually-exclusive action by precedence: replay-confirmed saves and shots first, then geometric save/shot trajectory projections, then clears out of the defensive third, then booms hit hard downfield into space, then passes led toward a teammate. A touch matching none of these has no action tag at all, rather than a catch-all value.",
+        "Resolve a single mutually-exclusive action by precedence: replay-confirmed saves and shots first, then geometric save/shot trajectory projections, then clears out of the defensive third, then passes led toward a teammate, then booms hit hard downfield into space. A touch matching none of these has no action tag at all, rather than a catch-all value.",
+        "Retroactively raise the action to shot/save by outcome when stronger evidence arrives after the touch: a scored goal (the scorer's touch), a replay shot/save stat event that lands after the touch, or a settled post-touch trajectory that crosses the goal mouth. Upgrades only ever raise the action, never downgrade it.",
         "Tag a touch contested independently of its action (a contested shot stays a shot and is also flagged contested), rather than collapsing contests into the action.",
         "Retroactively add a possession tag by outcome on pass/clear/boom and action-less touches: control when the toucher stays close to the ball while matching its velocity for most of a short follow window or wins the follow-up touch with the ball kept near, advance when they win the follow-up touch after playing the ball clear into space.",
         "Tag a touch's reception as a first touch when it starts a new reception: the previous global touch was by a different player or far enough in the past.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     BoostPickupEvent,
@@ -784,35 +891,40 @@ define_stats_event!(
     "Boost Pickup",
     EventCategory::Other,
     hidden = true,
-    variants = BOOST_PICKUP_VARIANTS
+    variants = BOOST_PICKUP_VARIANTS,
+    scope = EventScope::Player
 );
 define_stats_event!(
     RespawnEvent,
     BOOST_RESPAWN_EVENT_DEFINITION,
     "boost_respawn",
     "Respawn",
-    EventCategory::Other
+    EventCategory::Other,
+    scope = EventScope::Player
 );
 define_stats_event!(
     BumpEvent,
     BUMP_EVENT_DEFINITION,
     "bump",
     "Bump",
-    EventCategory::Other
+    EventCategory::Other,
+    scope = EventScope::Player
 );
 define_stats_event!(
     DemolitionEvent,
     DEMOLITION_EVENT_DEFINITION,
     "demolition",
     "Demolition",
-    EventCategory::Other
+    EventCategory::Other,
+    scope = EventScope::Player
 );
 define_stats_event!(
     PossessionEvent,
     POSSESSION_EVENT_DEFINITION,
     "possession",
     "Possession",
-    EventCategory::Other
+    EventCategory::Other,
+    scope = EventScope::Team
 );
 define_stats_event!(
     PlayerPossessionEvent,
@@ -825,91 +937,104 @@ define_stats_event!(
         "Follow the shared possession tracker's controlling player and open a span when a player establishes control.",
         "Bridge contested or pending-turnover interruptions shorter than the merge gap when the same player re-establishes control, excluding the gap from possessed duration.",
         "Accumulate distinct touches (with aerial/wall classification), signed ball travel toward the opponent goal, and per-frame carry/air-dribble samples while the span is active.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     BallHalfEvent,
     PRESSURE_EVENT_DEFINITION,
     "ball_half",
     "Ball Half",
-    EventCategory::Other
+    EventCategory::Other,
+    scope = EventScope::Team
 );
 define_stats_event!(
     TerritorialPressureEvent,
     TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     "territorial_pressure",
     "Territorial Pressure",
-    EventCategory::Other
+    EventCategory::Other,
+    scope = EventScope::Team
 );
 define_stats_event!(
     MovementEvent,
     MOVEMENT_EVENT_DEFINITION,
     "movement",
     "Movement",
-    EventCategory::Other
+    EventCategory::Other,
+    scope = EventScope::Player
 );
 define_stats_event!(
     PlayerActivityEvent,
     PLAYER_ACTIVITY_EVENT_DEFINITION,
     "player_activity",
     "Player Activity",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    scope = EventScope::Player
 );
 define_stats_event!(
     FieldThirdEvent,
     FIELD_THIRD_EVENT_DEFINITION,
     "field_third",
     "Field Third",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    scope = EventScope::Player
 );
 define_stats_event!(
     FieldHalfEvent,
     FIELD_HALF_EVENT_DEFINITION,
     "field_half",
     "Field Half",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    scope = EventScope::Player
 );
 define_stats_event!(
     BallDepthEvent,
     BALL_DEPTH_EVENT_DEFINITION,
     "ball_depth",
     "Ball Depth",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    scope = EventScope::Player
 );
 define_stats_event!(
     BallThirdEvent,
     BALL_THIRD_EVENT_DEFINITION,
     "ball_third",
     "Ball Third",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    scope = EventScope::Player
 );
 define_stats_event!(
     DepthRoleEvent,
     DEPTH_ROLE_EVENT_DEFINITION,
     "depth_role",
     "Depth Role",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    scope = EventScope::Player
 );
 define_stats_event!(
     BallProximityEvent,
     BALL_PROXIMITY_EVENT_DEFINITION,
     "ball_proximity",
     "Ball Proximity",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    scope = EventScope::Player
 );
 define_stats_event!(
     RotationRoleEvent,
     ROTATION_ROLE_EVENT_DEFINITION,
     "rotation_role",
     "Rotation Role",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    scope = EventScope::Player
 );
 define_stats_event!(
     FirstManChangeEvent,
     FIRST_MAN_CHANGE_EVENT_DEFINITION,
     "first_man_change",
     "First-Man Change",
-    EventCategory::Positioning
+    EventCategory::Positioning,
+    scope = EventScope::Player
 );
 define_stats_event!(
     FlipResetEvent,
@@ -922,7 +1047,8 @@ define_stats_event!(
         "Consume on-ball dodge refreshes detected from replay state as pending flip-reset candidates.",
         "Require a later dodge start by the same player while the reset is still pending.",
         "Confirm only when that player touches the ball while dodge-active before landing and within the reset-to-touch window.",
-    ]
+    ],
+    scope = EventScope::Player
 );
 define_stats_event!(
     Event,
