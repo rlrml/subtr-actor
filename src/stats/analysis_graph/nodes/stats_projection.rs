@@ -161,8 +161,23 @@ pub struct StatsProjectionNode {
     boost_current_amount_consistency: BoostCurrentAmountConsistencyTracker,
     last_powerslide_sample_frame: Option<usize>,
     last_possession_sample_frame: Option<usize>,
+    /// Live frames awaiting a possession label. Backdated loss means a frame's
+    /// owning team is only known once a later touch (or timeout) resolves it, so
+    /// these are accumulated when the resolver finalizes the segment that covers
+    /// them — not eagerly on the live frame itself.
+    possession_frame_buffer: Vec<PossessionFrameSample>,
     territorial_pressure_tracked_time: f32,
     previous_live_play: Option<bool>,
+}
+
+/// A buffered live frame's possession-zone sample, held until the resolver
+/// decides which team (if any) owned the frame.
+#[derive(Debug, Clone, Default)]
+struct PossessionFrameSample {
+    frame: usize,
+    dt: f32,
+    field_third: Option<String>,
+    field_half: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -202,6 +217,42 @@ struct StatsProjectionCursors {
 impl StatsProjectionNode {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Fold buffered possession frames up to (and including) `end_frame` into the
+    /// stats under `label`, the team the resolver assigned them.
+    fn drain_possession_buffer_through(&mut self, end_frame: usize, label: &str) {
+        let mut drained = 0;
+        while drained < self.possession_frame_buffer.len() {
+            if self.possession_frame_buffer[drained].frame > end_frame {
+                break;
+            }
+            let (dt, field_third, field_half) = {
+                let sample = &self.possession_frame_buffer[drained];
+                (
+                    sample.dt,
+                    sample.field_third.clone(),
+                    sample.field_half.clone(),
+                )
+            };
+            self.state.possession.apply_frame(
+                label,
+                field_third.as_deref(),
+                field_half.as_deref(),
+                dt,
+            );
+            drained += 1;
+        }
+        self.possession_frame_buffer.drain(0..drained);
+    }
+
+    /// Flush any still-unresolved possession frames as neutral. The trailing
+    /// open segment never got a follow-up, so on the model its time is neutral.
+    fn flush_possession_buffer_as_neutral(&mut self) {
+        if self.possession_frame_buffer.is_empty() {
+            return;
+        }
+        self.drain_possession_buffer_through(usize::MAX, "neutral");
     }
 
     fn begin_sample(&mut self, frame: &FrameInfo, live_play: bool) {
@@ -387,29 +438,35 @@ impl StatsProjectionNode {
         // canonical ball_third / ball_half streams. The accumulator is
         // cumulative (not rebuilt each frame), so guard against finish()
         // re-processing the final frame.
+        //
+        // Backdated loss means a live frame's owning team is not known when the
+        // frame is processed: a possession's tail only becomes that team's credit
+        // once they re-touch, and goes neutral otherwise. So buffer each live
+        // frame's zone sample and only fold it into the stats when the resolver
+        // finalizes the segment that covers it.
         let possession = ctx.get::<PossessionCalculator>()?;
         let ball_third = ctx.get::<BallThirdCalculator>()?;
         let ball_half_calculator = ctx.get::<BallHalfCalculator>()?;
         if live_play && self.last_possession_sample_frame != Some(frame.frame_number) {
-            if let Some(possession_event) = possession.current_event().filter(|event| event.active)
-            {
-                let field_third = ball_third
-                    .current_event()
-                    .filter(|event| event.active)
-                    .map(|event| event.field_third.as_str());
-                let field_half = ball_half_calculator
-                    .current_event()
-                    .filter(|event| event.active)
-                    .map(|event| event.field_half.as_str());
-                self.state.possession.apply_frame(
-                    &possession_event.possession_state,
-                    field_third,
-                    field_half,
-                    frame.dt,
-                );
-            }
+            let field_third = ball_third
+                .current_event()
+                .filter(|event| event.active)
+                .map(|event| event.field_third.clone());
+            let field_half = ball_half_calculator
+                .current_event()
+                .filter(|event| event.active)
+                .map(|event| event.field_half.clone());
+            self.possession_frame_buffer.push(PossessionFrameSample {
+                frame: frame.frame_number,
+                dt: frame.dt,
+                field_third,
+                field_half,
+            });
         }
         self.last_possession_sample_frame = Some(frame.frame_number);
+        for segment in possession.new_resolved() {
+            self.drain_possession_buffer_through(segment.end_frame, segment.label.as_label_value());
+        }
         let ball_half = ctx.get::<BallHalfCalculator>()?;
         let projected_ball_half_events = ball_half.projected_events();
         self.state.ball_half = BallHalfStatsAccumulator::default();
@@ -643,6 +700,7 @@ impl AnalysisNode for StatsProjectionNode {
 
     fn finish(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
         self.project_frame(ctx)?;
+        self.flush_possession_buffer_as_neutral();
         self.warn_for_unresolved_boost_current_amount_drift();
         Ok(())
     }

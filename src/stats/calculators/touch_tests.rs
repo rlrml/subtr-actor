@@ -44,6 +44,7 @@ fn possession(player_id: &PlayerId, is_team_0: bool) -> PossessionState {
         current_team_is_team_0: Some(is_team_0),
         active_player_before_sample: Some(player_id.clone()),
         current_player: Some(player_id.clone()),
+        ..Default::default()
     }
 }
 

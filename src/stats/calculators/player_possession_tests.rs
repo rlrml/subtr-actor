@@ -70,6 +70,7 @@ fn possession(player: Option<u64>, team_is_team_0: Option<bool>) -> PossessionSt
         current_team_is_team_0: team_is_team_0,
         active_player_before_sample: player.map(player_id),
         current_player: player.map(player_id),
+        ..Default::default()
     }
 }
 
