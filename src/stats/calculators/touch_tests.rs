@@ -404,9 +404,15 @@ fn dodge_byte_outside_tolerance_window_does_not_upgrade_touch() {
             &LivePlayState::active_play(),
         )
         .unwrap();
-    // Dodge stays inactive through frame 2, then activates at frame 3 — by which
-    // point the touch (t=0.1) is 0.2s old, past the tolerance window.
-    for (frame_number, dodge_active) in [(2usize, false), (3usize, true)] {
+    // Dodge stays inactive until frame 5, by which point the touch (t=0.1) is
+    // 0.4s old — comfortably past DODGE_LAG_TOLERANCE_SECONDS (0.25s), so the
+    // dodge is a separate maneuver and the touch's pending upgrade has aged out.
+    for (frame_number, dodge_active) in [
+        (2usize, false),
+        (3usize, false),
+        (4usize, false),
+        (5usize, true),
+    ] {
         calculator
             .update(
                 &frame(frame_number),

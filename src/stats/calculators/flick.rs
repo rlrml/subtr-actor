@@ -13,12 +13,21 @@ const BALL_GRAVITY_Z: f32 = -650.0;
 const FLICK_IMPULSE_WINDOW_SECONDS: f32 = 0.15;
 
 const FLICK_MAX_DODGE_TO_TOUCH_SECONDS: f32 = 0.32;
-/// How far *before* the dodge transition the flick contact may register. The
-/// ball can start accelerating a frame or two before the dodge-active byte
-/// flips, so the touch that the pending flick anchors to sometimes precedes the
-/// recorded dodge start. Allow a small negative `time_since_dodge` rather than
-/// rejecting these as "touch before dodge".
-const FLICK_DODGE_LEAD_TOLERANCE_SECONDS: f32 = 0.12;
+/// How far *before* the recorded dodge transition the flick contact may register.
+/// The ball can start accelerating well before the dodge-active byte flips — the
+/// launch touch has been observed up to ~0.23s ahead of the byte on downsampled
+/// replays — so the touch that the pending flick anchors to sometimes precedes
+/// the recorded dodge start. Allow a negative `time_since_dodge` down to the
+/// shared dodge-byte lag tolerance rather than rejecting these as "touch before
+/// dodge". See [`DODGE_ACTIVE_BYTE_LAG_TOLERANCE_SECONDS`].
+const FLICK_DODGE_LEAD_TOLERANCE_SECONDS: f32 = DODGE_ACTIVE_BYTE_LAG_TOLERANCE_SECONDS;
+/// How long a pending flick is kept alive waiting to be confirmed. Impulse is
+/// only *measured* over [`FLICK_IMPULSE_WINDOW_SECONDS`], but the entry must
+/// outlive that window so a dodge byte that replicates late (see
+/// [`FLICK_DODGE_LEAD_TOLERANCE_SECONDS`]) can still attach to the launch touch
+/// and emit the flick. Must be at least the impulse window.
+const FLICK_PENDING_RETENTION_SECONDS: f32 = FLICK_DODGE_LEAD_TOLERANCE_SECONDS;
+const _: () = assert!(FLICK_PENDING_RETENTION_SECONDS >= FLICK_IMPULSE_WINDOW_SECONDS);
 const FLICK_MAX_CONTROL_TO_DODGE_SECONDS: f32 = 0.08;
 const FLICK_MAX_SETUP_STALE_SECONDS: f32 = 0.35;
 /// How long a control setup survives without a fresh control observation before
@@ -253,6 +262,10 @@ pub struct FlickCalculator {
     pending_flicks: Vec<PendingFlick>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     previous_ball_velocity: Option<glam::Vec3>,
+    /// Frame of the dodge start behind the most recent flick emitted for each
+    /// player, used to enforce one flick per dodge. Frame numbers are monotonic,
+    /// so a stored frame never collides with a later dodge.
+    last_emitted_dodge_frame: HashMap<PlayerId, usize>,
 }
 
 impl FlickCalculator {
@@ -859,17 +872,22 @@ impl FlickCalculator {
         let mut emitted = Vec::new();
         pending.retain_mut(|flick| {
             let elapsed = (frame.time - flick.touch_event.time).max(0.0);
-            if elapsed > FLICK_IMPULSE_WINDOW_SECONDS {
+            if elapsed > FLICK_PENDING_RETENTION_SECONDS {
                 return false;
             }
 
-            if let Some(velocity) = current_velocity {
-                let impulse =
-                    Self::gravity_compensated_impulse(velocity, flick.pre_velocity, elapsed);
-                let magnitude = impulse.length();
-                if magnitude > flick.peak_magnitude {
-                    flick.peak_magnitude = magnitude;
-                    flick.peak_impulse = impulse;
+            // Measure the impulse only over the (shorter) impulse window; the
+            // entry is kept alive past it purely so a late-replicating dodge byte
+            // can still confirm the launch touch.
+            if elapsed <= FLICK_IMPULSE_WINDOW_SECONDS {
+                if let Some(velocity) = current_velocity {
+                    let impulse =
+                        Self::gravity_compensated_impulse(velocity, flick.pre_velocity, elapsed);
+                    let magnitude = impulse.length();
+                    if magnitude > flick.peak_magnitude {
+                        flick.peak_magnitude = magnitude;
+                        flick.peak_impulse = impulse;
+                    }
                 }
             }
 
@@ -897,6 +915,22 @@ impl FlickCalculator {
                 return true;
             };
 
+            // One flick per dodge. Extending the pending window so a late dodge
+            // byte can confirm an earlier launch touch means several touches that
+            // bracket a single dodge (a pre-dodge carry contact and the launch)
+            // can each resolve against the same dodge start. Drop any candidate
+            // for a dodge that already produced a flick — whether emitted on an
+            // earlier frame or earlier in this same frame's batch — so the first
+            // qualifying touch wins and the dodge is not double-counted.
+            let already_emitted = self.last_emitted_dodge_frame.get(&flick.player.player_id)
+                == Some(&dodge_start.frame)
+                || emitted.iter().any(|event: &FlickEvent| {
+                    event.player == flick.player.player_id && event.dodge_frame == dodge_start.frame
+                });
+            if already_emitted {
+                return false;
+            }
+
             if let Some(event) = self.candidate_event(
                 &flick.ball,
                 &flick.player,
@@ -911,6 +945,8 @@ impl FlickCalculator {
         });
         self.pending_flicks = pending;
         for event in emitted {
+            self.last_emitted_dodge_frame
+                .insert(event.player.clone(), event.dodge_frame);
             self.apply_event(frame, event);
         }
     }
@@ -951,6 +987,7 @@ impl FlickCalculator {
         self.recent_dodge_starts.clear();
         self.pending_flicks.clear();
         self.previous_dodge_active.clear();
+        self.last_emitted_dodge_frame.clear();
         self.previous_ball_velocity = ball.velocity();
     }
 
