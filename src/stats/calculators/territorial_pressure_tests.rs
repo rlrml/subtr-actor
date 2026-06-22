@@ -43,6 +43,7 @@ fn possession(team_is_team_0: Option<bool>) -> PossessionState {
         current_team_is_team_0: team_is_team_0,
         active_player_before_sample: None,
         current_player: None,
+        ..Default::default()
     }
 }
 
