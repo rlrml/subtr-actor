@@ -74,13 +74,14 @@ test("buildTouchMarkers derives markers from touch stats and ball frames", () =>
           sample_frame: 1,
           player: { Steam: "blue-id" },
           is_team_0: true,
-          kind: "control",
-          height_band: "ground",
-          surface: "ground",
-          dodge_state: "no_dodge",
-          intention: "control",
-          first_touch: true,
-          contested: false,
+          tags: [
+            { group: "kind", value: "control" },
+            { group: "height_band", value: "ground" },
+            { group: "surface", value: "ground" },
+            { group: "dodge_state", value: "no_dodge" },
+            { group: "possession", value: "control" },
+            { group: "reception", value: "first_touch" },
+          ],
           ball_speed_change: 0,
         },
       ],
@@ -181,10 +182,12 @@ test("buildTouchMarkers assigns credited ball movement to the active touch marke
           sample_frame: 0,
           player: { Steam: "blue-id" },
           is_team_0: true,
-          kind: "control",
-          height_band: "ground",
-          surface: "ground",
-          dodge_state: "no_dodge",
+          tags: [
+            { group: "kind", value: "control" },
+            { group: "height_band", value: "ground" },
+            { group: "surface", value: "ground" },
+            { group: "dodge_state", value: "no_dodge" },
+          ],
           ball_speed_change: 0,
           ball_movement: {
             start_time: 1,
@@ -292,10 +295,12 @@ test("buildTouchMarkers uses normalized replay frame time instead of raw stats t
           sample_frame: 1,
           player: { Steam: "blue-id" },
           is_team_0: true,
-          kind: "control",
-          height_band: "ground",
-          surface: "ground",
-          dodge_state: "no_dodge",
+          tags: [
+            { group: "kind", value: "control" },
+            { group: "height_band", value: "ground" },
+            { group: "surface", value: "ground" },
+            { group: "dodge_state", value: "no_dodge" },
+          ],
           ball_speed_change: 0,
         },
       ],
@@ -410,7 +415,7 @@ test("touchMarkerColor selects palettes by color mode with fallbacks", () => {
   assert.equal(touchMarkerColor(marker, "team"), 0xffc15c);
   assert.equal(touchMarkerColor({ ...marker, isTeamZero: true }, "team"), 0x59c3ff);
   assert.equal(touchMarkerColor(marker, "intention"), 0xff00c8);
-  assert.equal(touchMarkerColor({ ...marker, intention: "challenge" }, "intention"), 0xff1744);
+  assert.equal(touchMarkerColor({ ...marker, intention: "boom" }, "intention"), 0xf472b6);
   assert.equal(touchMarkerColor(marker, "kind"), 0xff5d6c);
   assert.equal(touchMarkerColor(marker, "height_band"), 0x818cf8);
   assert.equal(touchMarkerColor(marker, "surface"), 0xf97316);

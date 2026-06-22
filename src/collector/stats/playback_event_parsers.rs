@@ -314,17 +314,12 @@ pub(in crate::collector::stats::playback) fn parse_touch_stats_event(
         player_position: json_optional_vec3(object.get("player_position"))?,
         ball_position: json_optional_vec3(object.get("ball_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
-        kind: json_required_str(object, "kind")?.to_owned(),
-        height_band: json_required_str(object, "height_band")?.to_owned(),
-        surface: json_required_str(object, "surface")?.to_owned(),
-        dodge_state: json_required_str(object, "dodge_state")?.to_owned(),
-        intention: object
-            .get("intention")
-            .and_then(Value::as_str)
-            .unwrap_or("neutral")
-            .to_owned(),
-        first_touch: json_optional_bool(object.get("first_touch")).unwrap_or(false),
-        contested: json_optional_bool(object.get("contested")).unwrap_or(false),
+        tags: object
+            .get("tags")
+            .filter(|value| !value.is_null())
+            .map(|value| decode_json_value(value.clone()))
+            .transpose()?
+            .unwrap_or_default(),
         role: object
             .get("role")
             .filter(|value| !value.is_null())

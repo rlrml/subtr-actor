@@ -32,10 +32,12 @@ test("touch event derivation uses sample frame for accumulation and touch frame 
           sample_frame: 12,
           player: bluePlayer,
           is_team_0: true,
-          kind: "hard_hit",
-          height_band: "high_air",
-          surface: "wall",
-          dodge_state: "dodge",
+          tags: [
+            { group: "kind", value: "hard_hit" },
+            { group: "height_band", value: "high_air" },
+            { group: "surface", value: "wall" },
+            { group: "dodge_state", value: "dodge" },
+          ],
           ball_speed_change: 950,
           ball_movement: {
             start_time: 1.2,

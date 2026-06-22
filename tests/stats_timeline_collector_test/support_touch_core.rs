@@ -143,13 +143,17 @@ fn apply_touch_stats_event_for_derivation(
     frame: &ReplayStatsFrame,
 ) {
     stats.touch_count += 1;
-    match event.kind.as_str() {
+    let kind = event.tag("kind").unwrap_or("control");
+    let height_band = event.tag("height_band").unwrap_or("ground");
+    let surface = event.tag("surface").unwrap_or("ground");
+    let dodge_state = event.tag("dodge_state").unwrap_or("no_dodge");
+    match kind {
         "control" => stats.control_touch_count += 1,
         "medium_hit" => stats.medium_hit_count += 1,
         "hard_hit" => stats.hard_hit_count += 1,
         value => panic!("unexpected touch kind {value}"),
     }
-    match event.height_band.as_str() {
+    match height_band {
         "ground" => {}
         "low_air" => stats.aerial_touch_count += 1,
         "high_air" => {
@@ -158,16 +162,16 @@ fn apply_touch_stats_event_for_derivation(
         }
         value => panic!("unexpected touch height band {value}"),
     }
-    match event.surface.as_str() {
+    match surface {
         "wall" => stats.wall_touch_count += 1,
         "ground" | "air" => {}
         value => panic!("unexpected touch surface {value}"),
     }
     stats.labeled_touch_counts.increment([
-        touch_label_for_derivation("kind", &event.kind),
-        touch_label_for_derivation("height_band", &event.height_band),
-        touch_label_for_derivation("surface", &event.surface),
-        touch_label_for_derivation("dodge_state", &event.dodge_state),
+        touch_label_for_derivation("kind", kind),
+        touch_label_for_derivation("height_band", height_band),
+        touch_label_for_derivation("surface", surface),
+        touch_label_for_derivation("dodge_state", dodge_state),
     ]);
     stats.last_touch_time = Some(event.time);
     stats.last_touch_frame = Some(event.frame);

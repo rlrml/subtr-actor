@@ -137,7 +137,7 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="possession possession other definition pending."><td><a href="#event-possession">Possession</a></td><td><code>possession</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="rush rush other a quick possession transition where the attacking team has numbers moving out of its defensive half."><td><a href="#event-rush">Rush</a></td><td><code>rush</code></td><td class="summary">A quick possession transition where the attacking team has numbers moving out of its defensive half.</td></tr>
 <tr data-search="territorial pressure territorial_pressure other definition pending."><td><a href="#event-territorial_pressure">Territorial Pressure</a></td><td><code>territorial_pressure</code></td><td class="summary">Definition pending.</td></tr>
-<tr data-search="touch touch other a classified ball touch with strength kind, surface/height context, and an inferred intention."><td><a href="#event-touch">Touch</a></td><td><code>touch</code></td><td class="summary">A classified ball touch with strength kind, surface/height context, and an inferred intention.</td></tr>
+<tr data-search="touch touch other a classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag."><td><a href="#event-touch">Touch</a></td><td><code>touch</code></td><td class="summary">A classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.</td></tr>
 <tr data-search="whiff whiff other a committed attempt near the ball that does not result in that player touching it."><td><a href="#event-whiff">Whiff</a></td><td><code>whiff</code></td><td class="summary">A committed attempt near the ball that does not result in that player touching it.</td></tr>
 </tbody></table></div>
 <div class="cat-group" data-group><div class="cat-head">Positioning</div>
@@ -978,9 +978,9 @@ ul.tight li { margin: .15rem 0; }
 <li><code>territorial_pressure</code> via <code>TerritorialPressureNode</code> / <code>TerritorialPressureCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-touch" data-search="touch touch other a classified ball touch with strength kind, surface/height context, and an inferred intention.">
+<div class="event" id="event-touch" data-search="touch touch other a classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.">
 <div class="head"><h3>Touch</h3><code class="id">touch</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A classified ball touch with strength kind, surface/height context, and an inferred intention.</p>
+<p class="summary">A classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.</p>
 <div class="section-label">Confidence</div>
 <div class="conf">
 <span class="badge">Approach <b>Unknown</b></span>
@@ -991,11 +991,13 @@ ul.tight li { margin: .15rem 0; }
 </div>
 <div class="section-label">Approach</div>
 <ul class="tight">
-<li>Classify each touch&#39;s strength kind (control, medium hit, hard hit) from the ball speed change it produces.</li>
-<li>Record surface, height band, and dodge context for the touching player at contact time.</li>
-<li>Resolve a single mutually-exclusive intention by precedence: replay-confirmed saves and shots first, then contested challenges, then geometric save/shot trajectory projections, then clears out of the defensive third, then passes led toward a teammate, falling back to neutral.</li>
-<li>Retroactively upgrade pass/neutral touches to a control intention by outcome: the toucher stayed close to the ball while matching its velocity for most of a short follow window, or earned the follow-up touch themselves.</li>
-<li>Mark a touch as a first touch when it starts a new reception: the previous global touch was by a different player or far enough in the past.</li>
+<li>Carry classification as a set of (group, value) tags rather than rivalrous fields, so independent reads coexist: a boom that the hitter recovers is tagged both action=boom and possession=advance.</li>
+<li>Tag strength kind (control, medium hit, hard hit) from the ball speed change, plus surface, height band, and dodge context for the touching player at contact time.</li>
+<li>Resolve a single mutually-exclusive action by precedence: replay-confirmed saves and shots first, then geometric save/shot trajectory projections, then clears out of the defensive third, then passes led toward a teammate, then booms hit hard downfield into space. A touch matching none of these has no action tag at all, rather than a catch-all value.</li>
+<li>Retroactively raise the action to shot/save by outcome when stronger evidence arrives after the touch: a scored goal (the scorer&#39;s touch), a replay shot/save stat event that lands after the touch, or a settled post-touch trajectory that crosses the goal mouth. Upgrades only ever raise the action, never downgrade it.</li>
+<li>Tag a touch contested independently of its action (a contested shot stays a shot and is also flagged contested), rather than collapsing contests into the action.</li>
+<li>Retroactively add a possession tag by outcome on pass/clear/boom and action-less touches: control when the toucher stays close to the ball while matching its velocity for most of a short follow window or wins the follow-up touch with the ball kept near, advance when they win the follow-up touch after playing the ball clear into space.</li>
+<li>Tag a touch&#39;s reception as a first touch when it starts a new reception: the previous global touch was by a different player or far enough in the past.</li>
 </ul>
 <div class="section-label">Limitations</div>
 <p class="muted">None documented.</p>

@@ -58,14 +58,17 @@ export const TOUCH_TEAM_COLOR_LEGEND: TouchColorLegendEntry[] = [
   { label: "Orange team", color: ORANGE_TOUCH_COLOR },
 ];
 
+// The back-compat single "intention" combines the possession outcome
+// (control/advance) and the dominant action (shot/save/clear/boom/pass) into one
+// color space, mirroring the Rust `intention` stat label.
 export const TOUCH_INTENTION_COLOR_LEGEND: TouchColorLegendEntry[] = [
   { label: "Shot", color: 0xff00c8 },
   { label: "Save", color: 0x00e676 },
   { label: "Clear", color: 0xffd000 },
+  { label: "Boom", color: 0xf472b6 },
   { label: "Pass", color: 0x00b7ff },
-  { label: "Challenge", color: 0xff1744 },
   { label: "Control", color: 0x000000 },
-  { label: "Neutral", color: 0x9aa5b1 },
+  { label: "Advance", color: 0xfb923c },
 ];
 
 export const TOUCH_KIND_COLOR_LEGEND: TouchColorLegendEntry[] = [
@@ -134,6 +137,29 @@ const BOOLEAN_CLASSIFICATION_COLORS: Record<string, number> = {
 };
 
 const UNKNOWN_CLASSIFICATION_COLOR = 0x9aa5b1;
+
+/** Value of a touch's single-valued classification tag, or null when absent. */
+function touchTagValue(
+  event: { tags?: ReadonlyArray<{ group: string; value: string }> | null },
+  group: string,
+): string | null {
+  const tags = event.tags;
+  if (!Array.isArray(tags)) {
+    return null;
+  }
+  const tag = tags.find((entry) => entry.group === group);
+  return tag ? tag.value : null;
+}
+
+/**
+ * The back-compat single "intention" for a touch: its possession outcome
+ * (control/advance) when present, otherwise its action.
+ */
+function touchIntention(event: {
+  tags?: ReadonlyArray<{ group: string; value: string }> | null;
+}): string | null {
+  return touchTagValue(event, "possession") ?? touchTagValue(event, "action");
+}
 
 export interface TouchMarker {
   id: string;
@@ -309,22 +335,18 @@ function booleanClassification(
 }
 
 function buildTouchMarkerClassifications(event: {
-  kind?: unknown;
-  intention?: unknown;
-  height_band?: unknown;
-  surface?: unknown;
-  dodge_state?: unknown;
-  first_touch?: unknown;
-  contested?: unknown;
+  tags?: ReadonlyArray<{ group: string; value: string }> | null;
 }): TouchMarkerClassification[] {
+  const firstTouch = touchTagValue(event, "reception") === "first_touch";
+  const contested = touchTagValue(event, "contested") != null;
   return [
-    stringClassification("intention", event.intention, INTENTION_COLORS),
-    stringClassification("kind", event.kind, KIND_COLORS),
-    stringClassification("height_band", event.height_band, HEIGHT_BAND_COLORS),
-    stringClassification("surface", event.surface, SURFACE_COLORS),
-    stringClassification("dodge_state", event.dodge_state, DODGE_STATE_COLORS),
-    booleanClassification("first_touch", event.first_touch, "First touch"),
-    booleanClassification("contested", event.contested, "Contested"),
+    stringClassification("intention", touchIntention(event), INTENTION_COLORS),
+    stringClassification("kind", touchTagValue(event, "kind"), KIND_COLORS),
+    stringClassification("height_band", touchTagValue(event, "height_band"), HEIGHT_BAND_COLORS),
+    stringClassification("surface", touchTagValue(event, "surface"), SURFACE_COLORS),
+    stringClassification("dodge_state", touchTagValue(event, "dodge_state"), DODGE_STATE_COLORS),
+    booleanClassification("first_touch", firstTouch, "First touch"),
+    booleanClassification("contested", contested, "Contested"),
   ].filter((classification): classification is TouchMarkerClassification => classification != null);
 }
 
@@ -397,13 +419,13 @@ export function buildTouchMarkers(
       isTeamZero: event.is_team_0,
       playerId,
       playerName: replay.players.find((player) => player.id === playerId)?.name ?? playerId,
-      kind: typeof event.kind === "string" ? event.kind : null,
-      intention: typeof event.intention === "string" ? event.intention : null,
-      heightBand: typeof event.height_band === "string" ? event.height_band : null,
-      surface: typeof event.surface === "string" ? event.surface : null,
-      dodgeState: typeof event.dodge_state === "string" ? event.dodge_state : null,
-      firstTouch: event.first_touch === true,
-      contested: event.contested === true,
+      kind: touchTagValue(event, "kind"),
+      intention: touchIntention(event),
+      heightBand: touchTagValue(event, "height_band"),
+      surface: touchTagValue(event, "surface"),
+      dodgeState: touchTagValue(event, "dodge_state"),
+      firstTouch: touchTagValue(event, "reception") === "first_touch",
+      contested: touchTagValue(event, "contested") != null,
       classifications,
       position: {
         x: ballPosition.x,

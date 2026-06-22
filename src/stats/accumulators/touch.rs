@@ -3,15 +3,13 @@ use super::*;
 const TOUCH_KIND_LABEL_VALUES: [&str; 3] = ["control", "medium_hit", "hard_hit"];
 const TOUCH_SURFACE_LABEL_VALUES: [&str; 3] = ["ground", "air", "wall"];
 const TOUCH_DODGE_STATE_LABEL_VALUES: [&str; 2] = ["no_dodge", "dodge"];
-const TOUCH_INTENTION_LABEL_VALUES: [&str; 7] = [
-    "control",
-    "shot",
-    "save",
-    "challenge",
-    "clear",
-    "pass",
-    "neutral",
-];
+// Action and possession are independent tag axes, counted separately rather
+// than collapsed into one slot. A touch contributes to an axis only when it
+// carries that tag: no action tag (a loose poke) → no action count; no
+// possession outcome → no possession count. There is no "neutral" catch-all,
+// and contested is its own tag, not folded in here.
+const TOUCH_ACTION_LABEL_VALUES: [&str; 5] = ["shot", "save", "clear", "boom", "pass"];
+const TOUCH_POSSESSION_LABEL_VALUES: [&str; 2] = ["control", "advance"];
 const TOUCH_RECEPTION_LABEL_VALUES: [&str; 2] = ["first_touch", "continuation"];
 
 fn touch_kind_label(value: &str) -> StatLabel {
@@ -45,16 +43,25 @@ fn touch_dodge_state_label(value: &str) -> StatLabel {
     }
 }
 
-fn touch_intention_label(value: &str) -> StatLabel {
-    match value {
-        "control" => StatLabel::new("intention", "control"),
-        "shot" => StatLabel::new("intention", "shot"),
-        "save" => StatLabel::new("intention", "save"),
-        "challenge" => StatLabel::new("intention", "challenge"),
-        "clear" => StatLabel::new("intention", "clear"),
-        "pass" => StatLabel::new("intention", "pass"),
-        _ => StatLabel::new("intention", "neutral"),
-    }
+fn touch_action_label(value: &str) -> Option<StatLabel> {
+    let label = match value {
+        "shot" => StatLabel::new("action", "shot"),
+        "save" => StatLabel::new("action", "save"),
+        "clear" => StatLabel::new("action", "clear"),
+        "boom" => StatLabel::new("action", "boom"),
+        "pass" => StatLabel::new("action", "pass"),
+        _ => return None,
+    };
+    Some(label)
+}
+
+fn touch_possession_label(value: &str) -> Option<StatLabel> {
+    let label = match value {
+        "control" => StatLabel::new("possession", "control"),
+        "advance" => StatLabel::new("possession", "advance"),
+        _ => return None,
+    };
+    Some(label)
 }
 
 fn touch_reception_label(first_touch: bool) -> StatLabel {
@@ -99,7 +106,9 @@ pub struct TouchStats {
     #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
     pub labeled_touch_counts: LabeledCounts,
     #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
-    pub labeled_intention_counts: LabeledCounts,
+    pub labeled_action_counts: LabeledCounts,
+    #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
+    pub labeled_possession_counts: LabeledCounts,
     #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
     pub touch_counts_by_role: LabeledCounts,
     #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
@@ -133,32 +142,54 @@ impl TouchStats {
         ])
     }
 
-    pub fn intention_count(&self, intention: &str) -> u32 {
-        self.labeled_intention_counts
-            .count_matching(&[touch_intention_label(intention)])
+    pub fn action_count(&self, action: &str) -> u32 {
+        let Some(label) = touch_action_label(action) else {
+            return 0;
+        };
+        self.labeled_action_counts.count_matching(&[label])
     }
 
-    pub fn first_touch_intention_count(&self, intention: &str) -> u32 {
-        self.labeled_intention_counts.count_matching(&[
-            touch_intention_label(intention),
-            touch_reception_label(true),
-        ])
+    pub fn first_touch_action_count(&self, action: &str) -> u32 {
+        let Some(label) = touch_action_label(action) else {
+            return 0;
+        };
+        self.labeled_action_counts
+            .count_matching(&[label, touch_reception_label(true)])
     }
 
-    pub fn complete_labeled_intention_counts(&self) -> LabeledCounts {
-        let mut entries: Vec<_> = TOUCH_INTENTION_LABEL_VALUES
-            .into_iter()
-            .flat_map(|intention| {
+    pub fn possession_count(&self, possession: &str) -> u32 {
+        let Some(label) = touch_possession_label(possession) else {
+            return 0;
+        };
+        self.labeled_possession_counts.count_matching(&[label])
+    }
+
+    pub fn first_touch_possession_count(&self, possession: &str) -> u32 {
+        let Some(label) = touch_possession_label(possession) else {
+            return 0;
+        };
+        self.labeled_possession_counts
+            .count_matching(&[label, touch_reception_label(true)])
+    }
+
+    fn complete_labeled_counts(
+        source: &LabeledCounts,
+        key: &'static str,
+        values: &[&'static str],
+    ) -> LabeledCounts {
+        let mut entries: Vec<_> = values
+            .iter()
+            .flat_map(|&value| {
                 TOUCH_RECEPTION_LABEL_VALUES
                     .into_iter()
                     .map(move |reception| {
                         let mut labels = vec![
-                            StatLabel::new("intention", intention),
+                            StatLabel::new(key, value),
                             StatLabel::new("reception", reception),
                         ];
                         labels.sort();
                         LabeledCountEntry {
-                            count: self.labeled_intention_counts.count_exact(&labels),
+                            count: source.count_exact(&labels),
                             labels,
                         }
                     })
@@ -168,6 +199,22 @@ impl TouchStats {
         entries.sort_by(|left, right| left.labels.cmp(&right.labels));
 
         LabeledCounts { entries }
+    }
+
+    pub fn complete_labeled_action_counts(&self) -> LabeledCounts {
+        Self::complete_labeled_counts(
+            &self.labeled_action_counts,
+            "action",
+            &TOUCH_ACTION_LABEL_VALUES,
+        )
+    }
+
+    pub fn complete_labeled_possession_counts(&self) -> LabeledCounts {
+        Self::complete_labeled_counts(
+            &self.labeled_possession_counts,
+            "possession",
+            &TOUCH_POSSESSION_LABEL_VALUES,
+        )
     }
 
     pub fn touch_count_with_role(&self, role: RoleState) -> u32 {
@@ -264,7 +311,8 @@ impl TouchStats {
 
     pub fn with_complete_labeled_touch_counts(mut self) -> Self {
         self.labeled_touch_counts = self.complete_labeled_touch_counts();
-        self.labeled_intention_counts = self.complete_labeled_intention_counts();
+        self.labeled_action_counts = self.complete_labeled_action_counts();
+        self.labeled_possession_counts = self.complete_labeled_possession_counts();
         self
     }
 }
@@ -298,9 +346,23 @@ impl TouchStatsAccumulator {
     }
 
     pub fn apply_touch_event(&mut self, event: &TouchClassificationEvent, frame: &FrameInfo) {
+        // The event now carries classification as a tag set; read the
+        // single-valued groups back out, defaulting to the same fallbacks the
+        // old flat fields used. The `intention` stat label preserves the
+        // each single-valued group back out, defaulting to the same fallbacks
+        // the old flat fields used. Action and possession are counted on their
+        // own axes — a touch contributes to each only when it carries that tag.
+        let kind = event.tag("kind").unwrap_or("control");
+        let height_band = event.tag("height_band").unwrap_or("ground");
+        let surface = event.tag("surface").unwrap_or("ground");
+        let dodge_state = event.tag("dodge_state").unwrap_or("no_dodge");
+        let action = event.tag("action");
+        let possession = event.tag("possession");
+        let first_touch = event.tag("reception") == Some("first_touch");
+
         let stats = self.player_stats.entry(event.player.clone()).or_default();
         stats.touch_count += 1;
-        match event.height_band.as_str() {
+        match height_band {
             "low_air" => stats.aerial_touch_count += 1,
             "high_air" => {
                 stats.aerial_touch_count += 1;
@@ -308,28 +370,34 @@ impl TouchStatsAccumulator {
             }
             _ => {}
         }
-        match event.kind.as_str() {
+        match kind {
             "control" => stats.control_touch_count += 1,
             "medium_hit" => stats.medium_hit_count += 1,
             "hard_hit" => stats.hard_hit_count += 1,
             _ => {}
         }
-        if event.surface == "wall" {
+        if surface == "wall" {
             stats.wall_touch_count += 1;
         }
         stats.labeled_touch_counts.increment([
-            touch_kind_label(&event.kind),
-            touch_height_band_label(&event.height_band),
-            touch_surface_label(&event.surface),
-            touch_dodge_state_label(&event.dodge_state),
+            touch_kind_label(kind),
+            touch_height_band_label(height_band),
+            touch_surface_label(surface),
+            touch_dodge_state_label(dodge_state),
         ]);
-        if event.first_touch {
+        if first_touch {
             stats.first_touch_count += 1;
         }
-        stats.labeled_intention_counts.increment([
-            touch_intention_label(&event.intention),
-            touch_reception_label(event.first_touch),
-        ]);
+        if let Some(label) = action.and_then(touch_action_label) {
+            stats
+                .labeled_action_counts
+                .increment([label, touch_reception_label(first_touch)]);
+        }
+        if let Some(label) = possession.and_then(touch_possession_label) {
+            stats
+                .labeled_possession_counts
+                .increment([label, touch_reception_label(first_touch)]);
+        }
         stats
             .touch_counts_by_role
             .increment([event.role.as_label()]);

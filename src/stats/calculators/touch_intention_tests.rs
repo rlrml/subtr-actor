@@ -70,7 +70,7 @@ fn replay_reported_save_outranks_contested_challenge() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Save);
+    assert_eq!(resolution.action, Some(TouchAction::Save));
     assert!(resolution.contested);
 }
 
@@ -86,7 +86,7 @@ fn stat_event_for_other_player_does_not_match() {
 
     let resolution = classifier.classify(&touch_at(&toucher, 10.0), &toucher, &neutral_ctx());
 
-    assert_eq!(resolution.intention, TouchIntention::Neutral);
+    assert_eq!(resolution.action, None);
 }
 
 #[test]
@@ -100,11 +100,14 @@ fn stat_event_outside_match_window_does_not_match() {
 
     let resolution = classifier.classify(&touch_at(&player_id, 11.0), &player_id, &neutral_ctx());
 
-    assert_eq!(resolution.intention, TouchIntention::Neutral);
+    assert_eq!(resolution.action, None);
 }
 
 #[test]
-fn contested_touch_outranks_geometric_shot() {
+fn contested_touch_keeps_its_geometric_action() {
+    // Contested is an independent flag, not an action: a contested touch that is
+    // also a geometric shot stays a shot and is additionally marked contested,
+    // so neither piece of information is lost.
     let player_id = player(1);
     let mut classifier = TouchIntentionClassifier::default();
 
@@ -119,7 +122,7 @@ fn contested_touch_outranks_geometric_shot() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Challenge);
+    assert_eq!(resolution.action, Some(TouchAction::Shot));
     assert!(resolution.contested);
 }
 
@@ -138,7 +141,7 @@ fn fast_touch_toward_goal_mouth_classifies_as_shot() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Shot);
+    assert_eq!(resolution.action, Some(TouchAction::Shot));
 }
 
 #[test]
@@ -146,7 +149,7 @@ fn upward_arced_shot_into_net_classifies_as_shot() {
     // A shot hit hard with significant upward velocity: a straight-line
     // projection sails it well over the crossbar (z ~1500), but gravity arcs it
     // back down into the goal mouth (z ~160). This mirrors a dribble-flick that
-    // scores along an obvious arc, which used to read as Neutral.
+    // scores along an obvious arc, which used to read as no action.
     let player_id = player(1);
     let mut classifier = TouchIntentionClassifier::default();
 
@@ -160,7 +163,7 @@ fn upward_arced_shot_into_net_classifies_as_shot() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Shot);
+    assert_eq!(resolution.action, Some(TouchAction::Shot));
 }
 
 #[test]
@@ -180,11 +183,13 @@ fn shot_sailing_over_the_crossbar_is_not_a_shot() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Neutral);
+    assert_ne!(resolution.action, Some(TouchAction::Shot));
 }
 
 #[test]
-fn touch_wide_of_goal_mouth_is_not_a_shot() {
+fn fast_touch_wide_of_goal_mouth_is_a_boom_not_a_shot() {
+    // A hard hit pointed downfield but wide of the goal mouth is not a shot; it
+    // reads as a boom (a big hit into space), not a fall-through neutral.
     let player_id = player(1);
     let mut classifier = TouchIntentionClassifier::default();
 
@@ -198,7 +203,7 @@ fn touch_wide_of_goal_mouth_is_not_a_shot() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Neutral);
+    assert_eq!(resolution.action, Some(TouchAction::Boom));
 }
 
 #[test]
@@ -216,7 +221,7 @@ fn slow_roll_toward_goal_is_not_a_shot() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Neutral);
+    assert_eq!(resolution.action, None);
 }
 
 #[test]
@@ -236,7 +241,7 @@ fn redirect_of_ball_headed_into_own_goal_is_a_save() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Save);
+    assert_eq!(resolution.action, Some(TouchAction::Save));
 }
 
 #[test]
@@ -254,7 +259,7 @@ fn fast_touch_out_of_defensive_third_is_a_clear() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Clear);
+    assert_eq!(resolution.action, Some(TouchAction::Clear));
 }
 
 #[test]
@@ -272,7 +277,45 @@ fn slow_touch_in_defensive_third_is_not_a_clear() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Neutral);
+    assert_eq!(resolution.action, None);
+}
+
+#[test]
+fn hard_hit_downfield_into_space_is_a_boom() {
+    // Midfield, no teammate to receive, not on goal, not a defensive clear: a
+    // fast hit pointed at the opponent half reads as a boom.
+    let player_id = player(1);
+    let mut classifier = TouchIntentionClassifier::default();
+
+    let resolution = classifier.classify(
+        &touch_at(&player_id, 1.0),
+        &player_id,
+        &TouchIntentionFrameContext {
+            ball_position: Some(glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z)),
+            ball_velocity: Some(glam::Vec3::new(0.0, 2000.0, 0.0)),
+            ..neutral_ctx()
+        },
+    );
+
+    assert_eq!(resolution.action, Some(TouchAction::Boom));
+}
+
+#[test]
+fn soft_touch_downfield_is_not_a_boom() {
+    let player_id = player(1);
+    let mut classifier = TouchIntentionClassifier::default();
+
+    let resolution = classifier.classify(
+        &touch_at(&player_id, 1.0),
+        &player_id,
+        &TouchIntentionFrameContext {
+            ball_position: Some(glam::Vec3::new(0.0, 0.0, BALL_RADIUS_Z)),
+            ball_velocity: Some(glam::Vec3::new(0.0, 800.0, 0.0)),
+            ..neutral_ctx()
+        },
+    );
+
+    assert_eq!(resolution.action, None);
 }
 
 #[test]
@@ -291,7 +334,7 @@ fn touch_leading_a_teammate_is_a_pass() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Pass);
+    assert_eq!(resolution.action, Some(TouchAction::Pass));
 }
 
 #[test]
@@ -310,7 +353,7 @@ fn touch_away_from_teammates_is_not_a_pass() {
         },
     );
 
-    assert_eq!(resolution.intention, TouchIntention::Neutral);
+    assert_eq!(resolution.action, None);
 }
 
 #[test]
@@ -356,7 +399,7 @@ fn contested_interruption_does_not_break_a_reception() {
     };
     let challenge = classifier.classify(&touch_at(&challenger, 1.5), &challenger, &contested_ctx);
     assert!(challenge.first_touch);
-    assert_eq!(challenge.intention, TouchIntention::Challenge);
+    assert!(challenge.contested);
 
     let recovery = classifier.classify(&touch_at(&dribbler, 2.0), &dribbler, &neutral_ctx());
     assert!(!recovery.first_touch);
@@ -405,9 +448,38 @@ fn follow_up_touch_by_same_player_confirms_control() {
 
     assert_eq!(
         resolution,
-        ControlResolution {
+        PossessionResolution {
             touch_index: 0,
-            control: true,
+            possession: Some(Possession::Control),
+        }
+    );
+}
+
+#[test]
+fn follow_up_after_ball_played_into_space_resolves_as_advance() {
+    let player_id = player(1);
+    let mut tracker = ControlFollowTracker::default();
+    tracker.open(0, &player_id, 0.0);
+
+    // The ball is knocked well clear of the toucher across the window before
+    // they win it back: peak gap exceeds the advance threshold.
+    for step in 1..=8 {
+        let time = step as f32 * 0.1;
+        tracker.advance(
+            &frame_at(time),
+            Some(glam::Vec3::new(0.0, time * 2000.0, BALL_RADIUS_Z)),
+            Some(glam::Vec3::new(0.0, 2000.0, 0.0)),
+            Some(glam::Vec3::ZERO),
+            Some(glam::Vec3::ZERO),
+        );
+    }
+
+    let resolution = tracker.observe_touch(&player_id, 0.9).unwrap();
+    assert_eq!(
+        resolution,
+        PossessionResolution {
+            touch_index: 0,
+            possession: Some(Possession::Advance),
         }
     );
 }
@@ -420,7 +492,7 @@ fn late_follow_up_touch_does_not_confirm_control() {
 
     let resolution = tracker.observe_touch(&player_id, 3.0).unwrap();
 
-    assert!(!resolution.control);
+    assert!(resolution.possession.is_none());
 }
 
 #[test]
@@ -446,9 +518,9 @@ fn staying_close_and_speed_matched_resolves_control_on_timeout() {
         .unwrap();
     assert_eq!(
         resolution,
-        ControlResolution {
+        PossessionResolution {
             touch_index: 0,
-            control: true,
+            possession: Some(Possession::Control),
         }
     );
 }
@@ -474,9 +546,9 @@ fn ball_leaving_the_player_resolves_as_not_control() {
     let resolution = tracker.observe_touch(&stealer, 0.6).unwrap();
     assert_eq!(
         resolution,
-        ControlResolution {
+        PossessionResolution {
             touch_index: 0,
-            control: false,
+            possession: None,
         }
     );
 }
@@ -496,7 +568,7 @@ fn window_cut_short_does_not_confirm_control() {
     );
 
     let resolution = tracker.flush().unwrap();
-    assert!(!resolution.control);
+    assert!(resolution.possession.is_none());
 }
 
 fn goalward_sample() -> (glam::Vec3, glam::Vec3) {

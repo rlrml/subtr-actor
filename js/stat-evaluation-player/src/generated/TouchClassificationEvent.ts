@@ -3,9 +3,12 @@ import type { PlayDepthState } from "./PlayDepthState.ts";
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 import type { RoleState } from "./RoleState.ts";
 import type { TouchBallMovement } from "./TouchBallMovement.ts";
+import type { TouchTag } from "./TouchTag.ts";
 
 /**
- * A classified ball touch with strength kind, surface/height context, and an inferred intention.
+ * A classified ball touch, carrying its classification as a set of [`TouchTag`]s
+ * (strength kind, surface/height context, action, possession outcome, and a
+ * contested flag) rather than fixed fields.
  */
 export type TouchClassificationEvent = {
 /**
@@ -13,4 +16,10 @@ export type TouchClassificationEvent = {
  * classification was derived from. Join on this instead of player + frame.
  * `None` only for data serialized before touch ids existed.
  */
-touch_id?: number, time: number, frame: number, sample_time: number, sample_frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, ball_position?: [number, number, number] | null, is_team_0: boolean, kind: string, height_band: string, surface: string, dodge_state: string, intention: string, first_touch: boolean, contested: boolean, role: RoleState, play_depth: PlayDepthState, ball_speed_change: number, ball_movement?: TouchBallMovement | null, };
+touch_id?: number, time: number, frame: number, sample_time: number, sample_frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, ball_position?: [number, number, number] | null, is_team_0: boolean,
+/**
+ * The touch's classification tags (group + value). See [`TouchTag`].
+ * Groups: `kind`, `height_band`, `surface`, `dodge_state`, `reception`,
+ * `action`, optional `possession`, and the optional `contested` flag.
+ */
+tags: Array<TouchTag>, role: RoleState, play_depth: PlayDepthState, ball_speed_change: number, ball_movement?: TouchBallMovement | null, };

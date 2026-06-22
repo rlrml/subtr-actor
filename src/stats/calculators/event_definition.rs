@@ -872,13 +872,15 @@ define_stats_event!(
     "touch",
     "Touch",
     EventCategory::Other,
-    summary = "A classified ball touch with strength kind, surface/height context, and an inferred intention.",
+    summary = "A classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.",
     approach = [
-        "Classify each touch's strength kind (control, medium hit, hard hit) from the ball speed change it produces.",
-        "Record surface, height band, and dodge context for the touching player at contact time.",
-        "Resolve a single mutually-exclusive intention by precedence: replay-confirmed saves and shots first, then contested challenges, then geometric save/shot trajectory projections, then clears out of the defensive third, then passes led toward a teammate, falling back to neutral.",
-        "Retroactively upgrade pass/neutral touches to a control intention by outcome: the toucher stayed close to the ball while matching its velocity for most of a short follow window, or earned the follow-up touch themselves.",
-        "Mark a touch as a first touch when it starts a new reception: the previous global touch was by a different player or far enough in the past.",
+        "Carry classification as a set of (group, value) tags rather than rivalrous fields, so independent reads coexist: a boom that the hitter recovers is tagged both action=boom and possession=advance.",
+        "Tag strength kind (control, medium hit, hard hit) from the ball speed change, plus surface, height band, and dodge context for the touching player at contact time.",
+        "Resolve a single mutually-exclusive action by precedence: replay-confirmed saves and shots first, then geometric save/shot trajectory projections, then clears out of the defensive third, then passes led toward a teammate, then booms hit hard downfield into space. A touch matching none of these has no action tag at all, rather than a catch-all value.",
+        "Retroactively raise the action to shot/save by outcome when stronger evidence arrives after the touch: a scored goal (the scorer's touch), a replay shot/save stat event that lands after the touch, or a settled post-touch trajectory that crosses the goal mouth. Upgrades only ever raise the action, never downgrade it.",
+        "Tag a touch contested independently of its action (a contested shot stays a shot and is also flagged contested), rather than collapsing contests into the action.",
+        "Retroactively add a possession tag by outcome on pass/clear/boom and action-less touches: control when the toucher stays close to the ball while matching its velocity for most of a short follow window or wins the follow-up touch with the ball kept near, advance when they win the follow-up touch after playing the ball clear into space.",
+        "Tag a touch's reception as a first touch when it starts a new reception: the previous global touch was by a different player or far enough in the past.",
     ],
     scope = EventScope::Player
 );
