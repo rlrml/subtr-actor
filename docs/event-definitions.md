@@ -1541,3 +1541,4 @@ A goal flowing directly from the kickoff exchange.
 - Require the goal to land within the kickoff-goal timing window of the first touch.
 - Reject goals where the conceding team settled possession or the play reset through the scoring team's own half.
 - Attach goal-context evidence so the tag appears with the goal label.
+
