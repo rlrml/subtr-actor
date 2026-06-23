@@ -96,10 +96,17 @@ ul.tight li { margin: .15rem 0; }
 <p class="subtitle">Generated from static Rust metadata — do not edit by hand. <span class="count">44 events</span></p>
 <input id="search" class="search" type="search" placeholder="Filter events by name, id, category, or summary…" autocomplete="off">
 <h2 id="contents">Contents</h2>
+<div class="cat-group" data-group><div class="cat-head">Basic</div>
+<table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
+<tr data-search="demolition demolition basic definition pending."><td><a href="#event-demolition">Demolition</a></td><td><code>demolition</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="dodge dodge basic a dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable."><td><a href="#event-dodge">Dodge</a></td><td><code>dodge</code></td><td class="summary">A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.</td></tr>
+<tr data-search="dodge reset dodge_reset basic a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch."><td><a href="#event-dodge_reset">Dodge Reset</a></td><td><code>dodge_reset</code></td><td class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</td></tr>
+<tr data-search="powerslide powerslide basic a state-change event for effective grounded powerslide use."><td><a href="#event-powerslide">Powerslide</a></td><td><code>powerslide</code></td><td class="summary">A state-change event for effective grounded powerslide use.</td></tr>
+<tr data-search="touch touch basic a classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag."><td><a href="#event-touch">Touch</a></td><td><code>touch</code></td><td class="summary">A classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.</td></tr>
+</tbody></table></div>
 <div class="cat-group" data-group><div class="cat-head">Core</div>
 <table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
 <tr data-search="core player scoreboard core_player_scoreboard core definition pending."><td><a href="#event-core_player_scoreboard">Core Player Scoreboard</a></td><td><code>core_player_scoreboard</code></td><td class="summary">Definition pending.</td></tr>
-<tr data-search="dodge reset dodge_reset core a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch."><td><a href="#event-dodge_reset">Dodge Reset</a></td><td><code>dodge_reset</code></td><td class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</td></tr>
 <tr data-search="replay timeline event timeline core definition pending."><td><a href="#event-timeline">Replay Timeline Event</a></td><td><code>timeline</code></td><td class="summary">Definition pending.</td></tr>
 </tbody></table></div>
 <div class="cat-group" data-group><div class="cat-head">Mechanic</div>
@@ -109,7 +116,6 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="ceiling shot ceiling_shot mechanic a shot touch shortly after the player contacts the ceiling and drops back toward the ball."><td><a href="#event-ceiling_shot">Ceiling Shot</a></td><td><code>ceiling_shot</code></td><td class="summary">A shot touch shortly after the player contacts the ceiling and drops back toward the ball.</td></tr>
 <tr data-search="center center mechanic a touch that moves the ball from a wide attacking position toward the central attacking area."><td><a href="#event-center">Center</a></td><td><code>center</code></td><td class="summary">A touch that moves the ball from a wide attacking position toward the central attacking area.</td></tr>
 <tr data-search="controlled play controlled_play mechanic a same-player possession episode with multiple touches and sustained close-ball time."><td><a href="#event-controlled_play">Controlled Play</a></td><td><code>controlled_play</code></td><td class="summary">A same-player possession episode with multiple touches and sustained close-ball time.</td></tr>
-<tr data-search="dodge dodge mechanic a dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable."><td><a href="#event-dodge">Dodge</a></td><td><code>dodge</code></td><td class="summary">A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.</td></tr>
 <tr data-search="double tap double_tap mechanic a same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory."><td><a href="#event-double_tap">Double Tap</a></td><td><code>double_tap</code></td><td class="summary">A same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.</td></tr>
 <tr data-search="event event mechanic a shared event envelope with common metadata and a typed event payload."><td><a href="#event-event">Event</a></td><td><code>event</code></td><td class="summary">A shared event envelope with common metadata and a typed event payload.</td></tr>
 <tr data-search="flick flick mechanic a dodge-powered touch following a short controlled carry setup."><td><a href="#event-flick">Flick</a></td><td><code>flick</code></td><td class="summary">A dodge-powered touch following a short controlled carry setup.</td></tr>
@@ -118,7 +124,6 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="half volley half_volley mechanic a fast touch shortly after the ball bounces off the floor, paired with a recent player dodge."><td><a href="#event-half_volley">Half Volley</a></td><td><code>half_volley</code></td><td class="summary">A fast touch shortly after the ball bounces off the floor, paired with a recent player dodge.</td></tr>
 <tr data-search="one timer one_timer mechanic a fast receiver touch from a completed pass that is immediately directed toward goal."><td><a href="#event-one_timer">One Timer</a></td><td><code>one_timer</code></td><td class="summary">A fast receiver touch from a completed pass that is immediately directed toward goal.</td></tr>
 <tr data-search="pass pass mechanic a same-team touch sequence where one player sends the ball to a different teammate."><td><a href="#event-pass">Pass</a></td><td><code>pass</code></td><td class="summary">A same-team touch sequence where one player sends the ball to a different teammate.</td></tr>
-<tr data-search="powerslide powerslide mechanic a state-change event for effective grounded powerslide use."><td><a href="#event-powerslide">Powerslide</a></td><td><code>powerslide</code></td><td class="summary">A state-change event for effective grounded powerslide use.</td></tr>
 <tr data-search="speed flip speed_flip mechanic a ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips."><td><a href="#event-speed_flip">Speed Flip</a></td><td><code>speed_flip</code></td><td class="summary">A ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.</td></tr>
 <tr data-search="wall aerial wall_aerial mechanic an aerial play that starts from controlled ball movement on a side or back wall."><td><a href="#event-wall_aerial">Wall Aerial</a></td><td><code>wall_aerial</code></td><td class="summary">An aerial play that starts from controlled ball movement on a side or back wall.</td></tr>
 <tr data-search="wall aerial shot wall_aerial_shot mechanic a shot credited to a player shortly after taking off from a wall."><td><a href="#event-wall_aerial_shot">Wall Aerial Shot</a></td><td><code>wall_aerial_shot</code></td><td class="summary">A shot credited to a player shortly after taking off from a wall.</td></tr>
@@ -130,14 +135,12 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="boost pickup boost_pickups other definition pending."><td><a href="#event-boost_pickups">Boost Pickup</a></td><td><code>boost_pickups</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="respawn boost_respawn other definition pending."><td><a href="#event-boost_respawn">Respawn</a></td><td><code>boost_respawn</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="bump bump other definition pending."><td><a href="#event-bump">Bump</a></td><td><code>bump</code></td><td class="summary">Definition pending.</td></tr>
-<tr data-search="demolition demolition other definition pending."><td><a href="#event-demolition">Demolition</a></td><td><code>demolition</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="50/50 fifty_fifty other a contested ball interaction involving touches or pressure from both teams in a short window."><td><a href="#event-fifty_fifty">50/50</a></td><td><code>fifty_fifty</code></td><td class="summary">A contested ball interaction involving touches or pressure from both teams in a short window.</td></tr>
 <tr data-search="movement movement other definition pending."><td><a href="#event-movement">Movement</a></td><td><code>movement</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="player possession player_possession other a contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity."><td><a href="#event-player_possession">Player Possession</a></td><td><code>player_possession</code></td><td class="summary">A contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity.</td></tr>
 <tr data-search="possession possession other definition pending."><td><a href="#event-possession">Possession</a></td><td><code>possession</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="rush rush other a quick possession transition where the attacking team has numbers moving out of its defensive half."><td><a href="#event-rush">Rush</a></td><td><code>rush</code></td><td class="summary">A quick possession transition where the attacking team has numbers moving out of its defensive half.</td></tr>
 <tr data-search="territorial pressure territorial_pressure other definition pending."><td><a href="#event-territorial_pressure">Territorial Pressure</a></td><td><code>territorial_pressure</code></td><td class="summary">Definition pending.</td></tr>
-<tr data-search="touch touch other a classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag."><td><a href="#event-touch">Touch</a></td><td><code>touch</code></td><td class="summary">A classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.</td></tr>
 <tr data-search="whiff whiff other a committed attempt near the ball that does not result in that player touching it."><td><a href="#event-whiff">Whiff</a></td><td><code>whiff</code></td><td class="summary">A committed attempt near the ball that does not result in that player touching it.</td></tr>
 </tbody></table></div>
 <div class="cat-group" data-group><div class="cat-head">Positioning</div>
@@ -153,9 +156,9 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="rotation role rotation_role positioning definition pending."><td><a href="#event-rotation_role">Rotation Role</a></td><td><code>rotation_role</code></td><td class="summary">Definition pending.</td></tr>
 </tbody></table></div>
 <h2 id="events">Events</h2>
-<div class="cat-group" data-group><div class="cat-head">Core</div>
-<div class="event" id="event-core_player_scoreboard" data-search="core player scoreboard core_player_scoreboard core definition pending.">
-<div class="head"><h3>Core Player Scoreboard</h3><code class="id">core_player_scoreboard</code><span class="badge">Core</span><span class="badge">hidden from review</span><a class="toplink" href="#contents">top ↑</a></div>
+<div class="cat-group" data-group><div class="cat-head">Basic</div>
+<div class="event" id="event-demolition" data-search="demolition demolition basic definition pending.">
+<div class="head"><h3>Demolition</h3><code class="id">demolition</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
 <p class="summary">Definition pending.</p>
 <div class="section-label">Confidence</div>
 <div class="conf">
@@ -173,11 +176,37 @@ ul.tight li { margin: .15rem 0; }
 <p class="muted">None documented.</p>
 <div class="section-label">Producers</div>
 <ul class="tight producers">
-<li><code>match_stats</code> via <code>MatchStatsNode</code> / <code>MatchStatsCalculator</code></li>
+<li><code>demo</code> via <code>DemoNode</code> / <code>DemoCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-dodge_reset" data-search="dodge reset dodge_reset core a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.">
-<div class="head"><h3>Dodge Reset</h3><code class="id">dodge_reset</code><span class="badge">Core</span><a class="toplink" href="#contents">top ↑</a></div>
+<div class="event" id="event-dodge" data-search="dodge dodge basic a dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.">
+<div class="head"><h3>Dodge</h3><code class="id">dodge</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start on the replay&#39;s dodge-active rising edge for each player.</li>
+<li>Sample the player&#39;s velocity change over the early dodge window and subtract an approximate forward boost contribution when boost is active.</li>
+<li>Store the impulse estimate as dodge_impulse, including car-local direction classification plus raw and compensated world-space vectors for visualization and downstream mechanic detectors.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>dodge</code> via <code>FlipImpulseNode</code> / <code>FlipImpulseCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-dodge_reset" data-search="dodge reset dodge_reset basic a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.">
+<div class="head"><h3>Dodge Reset</h3><code class="id">dodge_reset</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
 <p class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</p>
 <div class="section-label">Confidence</div>
 <div class="conf">
@@ -201,6 +230,86 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>dodge_reset</code> via <code>DodgeResetNode</code> / <code>DodgeResetCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-powerslide" data-search="powerslide powerslide basic a state-change event for effective grounded powerslide use.">
+<div class="head"><h3>Powerslide</h3><code class="id">powerslide</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A state-change event for effective grounded powerslide use.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Read each player&#39;s powerslide-active input/state on every frame.</li>
+<li>Treat powerslide as effective only while the player is close enough to the ground.</li>
+<li>Emit when a player&#39;s effective powerslide state changes between active and inactive.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>powerslide</code> via <code>PowerslideNode</code> / <code>PowerslideCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-touch" data-search="touch touch basic a classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.">
+<div class="head"><h3>Touch</h3><code class="id">touch</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Carry classification as a set of (group, value) tags rather than rivalrous fields, so independent reads coexist: a boom that the hitter recovers is tagged both action=boom and possession=advance.</li>
+<li>Tag strength kind (control, medium hit, hard hit) from the ball speed change, plus surface, height band, and dodge context for the touching player at contact time.</li>
+<li>Resolve a single mutually-exclusive action by precedence: replay-confirmed saves and shots first, then geometric save/shot trajectory projections, then clears out of the defensive third, then passes led toward a teammate, then booms hit hard downfield into space. A touch matching none of these has no action tag at all, rather than a catch-all value.</li>
+<li>Retroactively raise the action to shot/save by outcome when stronger evidence arrives after the touch: a scored goal (the scorer&#39;s touch), a replay shot/save stat event that lands after the touch, or a settled post-touch trajectory that crosses the goal mouth. Upgrades only ever raise the action, never downgrade it.</li>
+<li>Tag a touch contested independently of its action (a contested shot stays a shot and is also flagged contested), rather than collapsing contests into the action.</li>
+<li>Retroactively add a possession tag by outcome on pass/clear/boom and action-less touches: control when the toucher stays close to the ball while matching its velocity for most of a short follow window or wins the follow-up touch with the ball kept near, advance when they win the follow-up touch after playing the ball clear into space.</li>
+<li>Tag a touch&#39;s reception as a first touch when it starts a new reception: the previous global touch was by a different player or far enough in the past.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>touch</code> via <code>TouchNode</code> / <code>TouchCalculator</code></li>
+</ul>
+</div>
+</div>
+<div class="cat-group" data-group><div class="cat-head">Core</div>
+<div class="event" id="event-core_player_scoreboard" data-search="core player scoreboard core_player_scoreboard core definition pending.">
+<div class="head"><h3>Core Player Scoreboard</h3><code class="id">core_player_scoreboard</code><span class="badge">Core</span><span class="badge">hidden from review</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">Definition pending.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>match_stats</code> via <code>MatchStatsNode</code> / <code>MatchStatsCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-timeline" data-search="replay timeline event timeline core definition pending.">
@@ -355,32 +464,6 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>controlled_play</code> via <code>ControlledPlayNode</code> / <code>ControlledPlayCalculator</code></li>
-</ul>
-</div>
-<div class="event" id="event-dodge" data-search="dodge dodge mechanic a dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.">
-<div class="head"><h3>Dodge</h3><code class="id">dodge</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Start on the replay&#39;s dodge-active rising edge for each player.</li>
-<li>Sample the player&#39;s velocity change over the early dodge window and subtract an approximate forward boost contribution when boost is active.</li>
-<li>Store the impulse estimate as dodge_impulse, including car-local direction classification plus raw and compensated world-space vectors for visualization and downstream mechanic detectors.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>dodge</code> via <code>FlipImpulseNode</code> / <code>FlipImpulseCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-double_tap" data-search="double tap double_tap mechanic a same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.">
@@ -592,32 +675,6 @@ ul.tight li { margin: .15rem 0; }
 <li><code>pass</code> via <code>PassNode</code> / <code>PassCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-powerslide" data-search="powerslide powerslide mechanic a state-change event for effective grounded powerslide use.">
-<div class="head"><h3>Powerslide</h3><code class="id">powerslide</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A state-change event for effective grounded powerslide use.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Read each player&#39;s powerslide-active input/state on every frame.</li>
-<li>Treat powerslide as effective only while the player is close enough to the ground.</li>
-<li>Emit when a player&#39;s effective powerslide state changes between active and inactive.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>powerslide</code> via <code>PowerslideNode</code> / <code>PowerslideCalculator</code></li>
-</ul>
-</div>
 <div class="event" id="event-speed_flip" data-search="speed flip speed_flip mechanic a ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.">
 <div class="head"><h3>Speed Flip</h3><code class="id">speed_flip</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
 <p class="summary">A ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.</p>
@@ -812,28 +869,6 @@ ul.tight li { margin: .15rem 0; }
 <li><code>bump</code> via <code>BumpNode</code> / <code>BumpCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-demolition" data-search="demolition demolition other definition pending.">
-<div class="head"><h3>Demolition</h3><code class="id">demolition</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">Definition pending.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>demo</code> via <code>DemoNode</code> / <code>DemoCalculator</code></li>
-</ul>
-</div>
 <div class="event" id="event-fifty_fifty" data-search="50/50 fifty_fifty other a contested ball interaction involving touches or pressure from both teams in a short window.">
 <div class="head"><h3>50/50</h3><code class="id">fifty_fifty</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
 <p class="summary">A contested ball interaction involving touches or pressure from both teams in a short window.</p>
@@ -976,36 +1011,6 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>territorial_pressure</code> via <code>TerritorialPressureNode</code> / <code>TerritorialPressureCalculator</code></li>
-</ul>
-</div>
-<div class="event" id="event-touch" data-search="touch touch other a classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.">
-<div class="head"><h3>Touch</h3><code class="id">touch</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Carry classification as a set of (group, value) tags rather than rivalrous fields, so independent reads coexist: a boom that the hitter recovers is tagged both action=boom and possession=advance.</li>
-<li>Tag strength kind (control, medium hit, hard hit) from the ball speed change, plus surface, height band, and dodge context for the touching player at contact time.</li>
-<li>Resolve a single mutually-exclusive action by precedence: replay-confirmed saves and shots first, then geometric save/shot trajectory projections, then clears out of the defensive third, then passes led toward a teammate, then booms hit hard downfield into space. A touch matching none of these has no action tag at all, rather than a catch-all value.</li>
-<li>Retroactively raise the action to shot/save by outcome when stronger evidence arrives after the touch: a scored goal (the scorer&#39;s touch), a replay shot/save stat event that lands after the touch, or a settled post-touch trajectory that crosses the goal mouth. Upgrades only ever raise the action, never downgrade it.</li>
-<li>Tag a touch contested independently of its action (a contested shot stays a shot and is also flagged contested), rather than collapsing contests into the action.</li>
-<li>Retroactively add a possession tag by outcome on pass/clear/boom and action-less touches: control when the toucher stays close to the ball while matching its velocity for most of a short follow window or wins the follow-up touch with the ball kept near, advance when they win the follow-up touch after playing the ball clear into space.</li>
-<li>Tag a touch&#39;s reception as a first touch when it starts a new reception: the previous global touch was by a different player or far enough in the past.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>touch</code> via <code>TouchNode</code> / <code>TouchCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-whiff" data-search="whiff whiff other a committed attempt near the ball that does not result in that player touching it.">

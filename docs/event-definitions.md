@@ -380,7 +380,7 @@ _None documented._
 
 ### Demolition (`demolition`)
 
-- Category: `other`
+- Category: `basic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -436,7 +436,7 @@ _None documented._
 
 ### Dodge (`dodge`)
 
-- Category: `mechanic`
+- Category: `basic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -466,7 +466,7 @@ _None documented._
 
 ### Dodge Reset (`dodge_reset`)
 
-- Category: `core`
+- Category: `basic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -966,7 +966,7 @@ _None documented._
 
 ### Powerslide (`powerslide`)
 
-- Category: `mechanic`
+- Category: `basic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -1140,7 +1140,7 @@ _None documented._
 
 ### Touch (`touch`)
 
-- Category: `other`
+- Category: `basic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`

@@ -163,6 +163,7 @@ impl EventVariant {
 #[serde(rename_all = "snake_case")]
 pub enum EventCategory {
     Core,
+    Basic,
     Mechanic,
     Positioning,
     Annotation,
@@ -657,7 +658,7 @@ define_stats_event!(
     DODGE_RESET_EVENT_DEFINITION,
     "dodge_reset",
     "Dodge Reset",
-    EventCategory::Core,
+    EventCategory::Basic,
     summary = "A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.",
     approach = [
         "Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.",
@@ -773,7 +774,7 @@ define_stats_event!(
     DODGE_EVENT_DEFINITION,
     "dodge",
     "Dodge",
-    EventCategory::Mechanic,
+    EventCategory::Basic,
     summary = "A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.",
     approach = [
         "Start on the replay's dodge-active rising edge for each player.",
@@ -857,7 +858,7 @@ define_stats_event!(
     POWERSLIDE_EVENT_DEFINITION,
     "powerslide",
     "Powerslide",
-    EventCategory::Mechanic,
+    EventCategory::Basic,
     summary = "A state-change event for effective grounded powerslide use.",
     approach = [
         "Read each player's powerslide-active input/state on every frame.",
@@ -871,7 +872,7 @@ define_stats_event!(
     TOUCH_CLASSIFICATION_EVENT_DEFINITION,
     "touch",
     "Touch",
-    EventCategory::Other,
+    EventCategory::Basic,
     summary = "A classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.",
     approach = [
         "Carry classification as a set of (group, value) tags rather than rivalrous fields, so independent reads coexist: a boom that the hitter recovers is tagged both action=boom and possession=advance.",
@@ -915,7 +916,7 @@ define_stats_event!(
     DEMOLITION_EVENT_DEFINITION,
     "demolition",
     "Demolition",
-    EventCategory::Other,
+    EventCategory::Basic,
     scope = EventScope::Player
 );
 define_stats_event!(

@@ -79,15 +79,17 @@ fn mechanic_event_definitions_have_documented_approaches() {
 }
 
 #[test]
-fn low_level_interaction_events_are_other() {
+fn basic_event_definitions_cover_foundational_interactions() {
     for definition in [
+        DODGE_RESET_EVENT_DEFINITION,
+        DODGE_EVENT_DEFINITION,
+        POWERSLIDE_EVENT_DEFINITION,
         TOUCH_CLASSIFICATION_EVENT_DEFINITION,
-        WHIFF_EVENT_DEFINITION,
-        MOVEMENT_EVENT_DEFINITION,
+        DEMOLITION_EVENT_DEFINITION,
     ] {
         assert_eq!(
             definition.category,
-            EventCategory::Other,
+            EventCategory::Basic,
             "{}",
             definition.id
         );

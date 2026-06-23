@@ -116,7 +116,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "demolition",
     "label": "Demolition",
-    "category": "other",
+    "category": "basic",
     "hidden_from_review": false,
     "variants": []
   },
@@ -130,14 +130,14 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "dodge",
     "label": "Dodge",
-    "category": "mechanic",
+    "category": "basic",
     "hidden_from_review": false,
     "variants": []
   },
   {
     "key": "dodge_reset",
     "label": "Dodge Reset",
-    "category": "core",
+    "category": "basic",
     "hidden_from_review": false,
     "variants": []
   },
@@ -277,7 +277,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "powerslide",
     "label": "Powerslide",
-    "category": "mechanic",
+    "category": "basic",
     "hidden_from_review": false,
     "variants": []
   },
@@ -333,7 +333,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "touch",
     "label": "Touch",
-    "category": "other",
+    "category": "basic",
     "hidden_from_review": false,
     "variants": []
   },
