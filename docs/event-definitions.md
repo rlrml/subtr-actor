@@ -466,7 +466,7 @@ _None documented._
 
 ### Dodge Reset (`dodge_reset`)
 
-- Category: `mechanic`
+- Category: `core`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`

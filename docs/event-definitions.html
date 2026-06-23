@@ -99,6 +99,7 @@ ul.tight li { margin: .15rem 0; }
 <div class="cat-group" data-group><div class="cat-head">Core</div>
 <table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
 <tr data-search="core player scoreboard core_player_scoreboard core definition pending."><td><a href="#event-core_player_scoreboard">Core Player Scoreboard</a></td><td><code>core_player_scoreboard</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="dodge reset dodge_reset core a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch."><td><a href="#event-dodge_reset">Dodge Reset</a></td><td><code>dodge_reset</code></td><td class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</td></tr>
 <tr data-search="replay timeline event timeline core definition pending."><td><a href="#event-timeline">Replay Timeline Event</a></td><td><code>timeline</code></td><td class="summary">Definition pending.</td></tr>
 </tbody></table></div>
 <div class="cat-group" data-group><div class="cat-head">Mechanic</div>
@@ -109,7 +110,6 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="center center mechanic a touch that moves the ball from a wide attacking position toward the central attacking area."><td><a href="#event-center">Center</a></td><td><code>center</code></td><td class="summary">A touch that moves the ball from a wide attacking position toward the central attacking area.</td></tr>
 <tr data-search="controlled play controlled_play mechanic a same-player possession episode with multiple touches and sustained close-ball time."><td><a href="#event-controlled_play">Controlled Play</a></td><td><code>controlled_play</code></td><td class="summary">A same-player possession episode with multiple touches and sustained close-ball time.</td></tr>
 <tr data-search="dodge dodge mechanic a dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable."><td><a href="#event-dodge">Dodge</a></td><td><code>dodge</code></td><td class="summary">A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.</td></tr>
-<tr data-search="dodge reset dodge_reset mechanic a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch."><td><a href="#event-dodge_reset">Dodge Reset</a></td><td><code>dodge_reset</code></td><td class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</td></tr>
 <tr data-search="double tap double_tap mechanic a same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory."><td><a href="#event-double_tap">Double Tap</a></td><td><code>double_tap</code></td><td class="summary">A same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.</td></tr>
 <tr data-search="event event mechanic a shared event envelope with common metadata and a typed event payload."><td><a href="#event-event">Event</a></td><td><code>event</code></td><td class="summary">A shared event envelope with common metadata and a typed event payload.</td></tr>
 <tr data-search="flick flick mechanic a dodge-powered touch following a short controlled carry setup."><td><a href="#event-flick">Flick</a></td><td><code>flick</code></td><td class="summary">A dodge-powered touch following a short controlled carry setup.</td></tr>
@@ -174,6 +174,33 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>match_stats</code> via <code>MatchStatsNode</code> / <code>MatchStatsCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-dodge_reset" data-search="dodge reset dodge_reset core a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.">
+<div class="head"><h3>Dodge Reset</h3><code class="id">dodge_reset</code><span class="badge">Core</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.</li>
+<li>Classify the refresh as on-ball (a flip reset) when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.</li>
+<li>Keep on-ball resets pending in an in-flight ledger; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` with its reset-to-use latency.</li>
+<li>Resolve every pending reset into an outcome: used, landed, superseded by a newer reset, expired, or cut off by a goal, live play ending, or the replay ending.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>dodge_reset</code> via <code>DodgeResetNode</code> / <code>DodgeResetCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-timeline" data-search="replay timeline event timeline core definition pending.">
@@ -354,33 +381,6 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>dodge</code> via <code>FlipImpulseNode</code> / <code>FlipImpulseCalculator</code></li>
-</ul>
-</div>
-<div class="event" id="event-dodge_reset" data-search="dodge reset dodge_reset mechanic a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.">
-<div class="head"><h3>Dodge Reset</h3><code class="id">dodge_reset</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.</li>
-<li>Classify the refresh as on-ball (a flip reset) when the player and ball are both airborne enough, close together, and the ball is positioned under the car in local space.</li>
-<li>Keep on-ball resets pending in an in-flight ledger; if the player dodges into the ball within the reset-to-touch window, mark the originating reset event `used` with its reset-to-use latency.</li>
-<li>Resolve every pending reset into an outcome: used, landed, superseded by a newer reset, expired, or cut off by a goal, live play ending, or the replay ending.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>dodge_reset</code> via <code>DodgeResetNode</code> / <code>DodgeResetCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-double_tap" data-search="double tap double_tap mechanic a same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.">
