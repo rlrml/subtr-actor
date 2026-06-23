@@ -98,9 +98,13 @@ ul.tight li { margin: .15rem 0; }
 <h2 id="contents">Contents</h2>
 <div class="cat-group" data-group><div class="cat-head">Basic</div>
 <table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
+<tr data-search="backboard hit backboard_bounce basic a ball rebound off the opponent backboard attributed to the player who sent the ball there."><td><a href="#event-backboard_bounce">Backboard Hit</a></td><td><code>backboard_bounce</code></td><td class="summary">A ball rebound off the opponent backboard attributed to the player who sent the ball there.</td></tr>
+<tr data-search="center center basic a touch that moves the ball from a wide attacking position toward the central attacking area."><td><a href="#event-center">Center</a></td><td><code>center</code></td><td class="summary">A touch that moves the ball from a wide attacking position toward the central attacking area.</td></tr>
 <tr data-search="demolition demolition basic definition pending."><td><a href="#event-demolition">Demolition</a></td><td><code>demolition</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="dodge dodge basic a dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable."><td><a href="#event-dodge">Dodge</a></td><td><code>dodge</code></td><td class="summary">A dodge-start event, optionally carrying a rough estimated dodge impulse when the velocity change is measurable.</td></tr>
 <tr data-search="dodge reset dodge_reset basic a frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch."><td><a href="#event-dodge_reset">Dodge Reset</a></td><td><code>dodge_reset</code></td><td class="summary">A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.</td></tr>
+<tr data-search="event event basic a shared event envelope with common metadata and a typed event payload."><td><a href="#event-event">Event</a></td><td><code>event</code></td><td class="summary">A shared event envelope with common metadata and a typed event payload.</td></tr>
+<tr data-search="pass pass basic a same-team touch sequence where one player sends the ball to a different teammate."><td><a href="#event-pass">Pass</a></td><td><code>pass</code></td><td class="summary">A same-team touch sequence where one player sends the ball to a different teammate.</td></tr>
 <tr data-search="powerslide powerslide basic a state-change event for effective grounded powerslide use."><td><a href="#event-powerslide">Powerslide</a></td><td><code>powerslide</code></td><td class="summary">A state-change event for effective grounded powerslide use.</td></tr>
 <tr data-search="touch touch basic a classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag."><td><a href="#event-touch">Touch</a></td><td><code>touch</code></td><td class="summary">A classified ball touch carrying a set of independent tags: strength, surface/height context, action, and an outcome-based possession tag.</td></tr>
 </tbody></table></div>
@@ -111,19 +115,14 @@ ul.tight li { margin: .15rem 0; }
 </tbody></table></div>
 <div class="cat-group" data-group><div class="cat-head">Mechanic</div>
 <table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
-<tr data-search="backboard bounce backboard_bounce mechanic a ball rebound off the opponent backboard attributed to the player who sent the ball there."><td><a href="#event-backboard_bounce">Backboard Bounce</a></td><td><code>backboard_bounce</code></td><td class="summary">A ball rebound off the opponent backboard attributed to the player who sent the ball there.</td></tr>
 <tr data-search="ball carry ball_carry mechanic a sustained player-ball control sequence, covering grounded carries and air dribbles."><td><a href="#event-ball_carry">Ball Carry</a></td><td><code>ball_carry</code></td><td class="summary">A sustained player-ball control sequence, covering grounded carries and air dribbles.</td></tr>
 <tr data-search="ceiling shot ceiling_shot mechanic a shot touch shortly after the player contacts the ceiling and drops back toward the ball."><td><a href="#event-ceiling_shot">Ceiling Shot</a></td><td><code>ceiling_shot</code></td><td class="summary">A shot touch shortly after the player contacts the ceiling and drops back toward the ball.</td></tr>
-<tr data-search="center center mechanic a touch that moves the ball from a wide attacking position toward the central attacking area."><td><a href="#event-center">Center</a></td><td><code>center</code></td><td class="summary">A touch that moves the ball from a wide attacking position toward the central attacking area.</td></tr>
-<tr data-search="controlled play controlled_play mechanic a same-player possession episode with multiple touches and sustained close-ball time."><td><a href="#event-controlled_play">Controlled Play</a></td><td><code>controlled_play</code></td><td class="summary">A same-player possession episode with multiple touches and sustained close-ball time.</td></tr>
 <tr data-search="double tap double_tap mechanic a same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory."><td><a href="#event-double_tap">Double Tap</a></td><td><code>double_tap</code></td><td class="summary">A same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.</td></tr>
-<tr data-search="event event mechanic a shared event envelope with common metadata and a typed event payload."><td><a href="#event-event">Event</a></td><td><code>event</code></td><td class="summary">A shared event envelope with common metadata and a typed event payload.</td></tr>
 <tr data-search="flick flick mechanic a dodge-powered touch following a short controlled carry setup."><td><a href="#event-flick">Flick</a></td><td><code>flick</code></td><td class="summary">A dodge-powered touch following a short controlled carry setup.</td></tr>
 <tr data-search="flip reset flip_reset mechanic an on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing."><td><a href="#event-flip_reset">Flip Reset</a></td><td><code>flip_reset</code></td><td class="summary">An on-ball dodge refresh that is confirmed when the player uses the gained dodge and touches the ball again before landing.</td></tr>
 <tr data-search="half flip half_flip mechanic a dodge sequence that cancels a flip into an opposite facing direction."><td><a href="#event-half_flip">Half Flip</a></td><td><code>half_flip</code></td><td class="summary">A dodge sequence that cancels a flip into an opposite facing direction.</td></tr>
 <tr data-search="half volley half_volley mechanic a fast touch shortly after the ball bounces off the floor, paired with a recent player dodge."><td><a href="#event-half_volley">Half Volley</a></td><td><code>half_volley</code></td><td class="summary">A fast touch shortly after the ball bounces off the floor, paired with a recent player dodge.</td></tr>
 <tr data-search="one timer one_timer mechanic a fast receiver touch from a completed pass that is immediately directed toward goal."><td><a href="#event-one_timer">One Timer</a></td><td><code>one_timer</code></td><td class="summary">A fast receiver touch from a completed pass that is immediately directed toward goal.</td></tr>
-<tr data-search="pass pass mechanic a same-team touch sequence where one player sends the ball to a different teammate."><td><a href="#event-pass">Pass</a></td><td><code>pass</code></td><td class="summary">A same-team touch sequence where one player sends the ball to a different teammate.</td></tr>
 <tr data-search="speed flip speed_flip mechanic a ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips."><td><a href="#event-speed_flip">Speed Flip</a></td><td><code>speed_flip</code></td><td class="summary">A ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.</td></tr>
 <tr data-search="wall aerial wall_aerial mechanic an aerial play that starts from controlled ball movement on a side or back wall."><td><a href="#event-wall_aerial">Wall Aerial</a></td><td><code>wall_aerial</code></td><td class="summary">An aerial play that starts from controlled ball movement on a side or back wall.</td></tr>
 <tr data-search="wall aerial shot wall_aerial_shot mechanic a shot credited to a player shortly after taking off from a wall."><td><a href="#event-wall_aerial_shot">Wall Aerial Shot</a></td><td><code>wall_aerial_shot</code></td><td class="summary">A shot credited to a player shortly after taking off from a wall.</td></tr>
@@ -135,6 +134,7 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="boost pickup boost_pickups other definition pending."><td><a href="#event-boost_pickups">Boost Pickup</a></td><td><code>boost_pickups</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="respawn boost_respawn other definition pending."><td><a href="#event-boost_respawn">Respawn</a></td><td><code>boost_respawn</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="bump bump other definition pending."><td><a href="#event-bump">Bump</a></td><td><code>bump</code></td><td class="summary">Definition pending.</td></tr>
+<tr data-search="controlled play controlled_play other a same-player possession episode with multiple touches and sustained close-ball time."><td><a href="#event-controlled_play">Controlled Play</a></td><td><code>controlled_play</code></td><td class="summary">A same-player possession episode with multiple touches and sustained close-ball time.</td></tr>
 <tr data-search="50/50 fifty_fifty other a contested ball interaction involving touches or pressure from both teams in a short window."><td><a href="#event-fifty_fifty">50/50</a></td><td><code>fifty_fifty</code></td><td class="summary">A contested ball interaction involving touches or pressure from both teams in a short window.</td></tr>
 <tr data-search="movement movement other definition pending."><td><a href="#event-movement">Movement</a></td><td><code>movement</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="player possession player_possession other a contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity."><td><a href="#event-player_possession">Player Possession</a></td><td><code>player_possession</code></td><td class="summary">A contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity.</td></tr>
@@ -157,6 +157,58 @@ ul.tight li { margin: .15rem 0; }
 </tbody></table></div>
 <h2 id="events">Events</h2>
 <div class="cat-group" data-group><div class="cat-head">Basic</div>
+<div class="event" id="event-backboard_bounce" data-search="backboard hit backboard_bounce basic a ball rebound off the opponent backboard attributed to the player who sent the ball there.">
+<div class="head"><h3>Backboard Hit</h3><code class="id">backboard_bounce</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A ball rebound off the opponent backboard attributed to the player who sent the ball there.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Track the last touch during live play and attribute a later backboard rebound to that touch when it occurs within the configured attribution window.</li>
+<li>Require the ball to be high, near the backboard face, moving toward the backboard before the rebound, and moving away after the rebound.</li>
+<li>Ignore frames with a simultaneous touch so the rebound is not confused with a player-ball contact.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>backboard_bounce_state</code> via <code>BackboardBounceStateNode</code> / <code>BackboardBounceCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-center" data-search="center center basic a touch that moves the ball from a wide attacking position toward the central attacking area.">
+<div class="head"><h3>Center</h3><code class="id">center</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A touch that moves the ball from a wide attacking position toward the central attacking area.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start a pending center from a live-play touch, unless that player immediately has a shot or goal event.</li>
+<li>Watch the ball for a short window after the touch and require meaningful travel from a wide x-position toward a more central x-position in the attacking half.</li>
+<li>Clear the candidate when it ages out, loses attribution, or becomes a shot/goal by the same player instead of a center.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>center</code> via <code>CenterNode</code> / <code>CenterCalculator</code></li>
+</ul>
+</div>
 <div class="event" id="event-demolition" data-search="demolition demolition basic definition pending.">
 <div class="head"><h3>Demolition</h3><code class="id">demolition</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
 <p class="summary">Definition pending.</p>
@@ -230,6 +282,58 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>dodge_reset</code> via <code>DodgeResetNode</code> / <code>DodgeResetCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-event" data-search="event event basic a shared event envelope with common metadata and a typed event payload.">
+<div class="head"><h3>Event</h3><code class="id">event</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A shared event envelope with common metadata and a typed event payload.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Collect completed events from the analysis graph at finish time.</li>
+<li>Wrap each typed event payload with common timing, participant, team, position, confidence, and stream metadata.</li>
+<li>Serialize timeline events as a single heterogeneous event list for playback and analysis consumers.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>stats_timeline_events</code> via <code>StatsTimelineEventsNode</code> / <code>StatsTimelineEventsState</code></li>
+</ul>
+</div>
+<div class="event" id="event-pass" data-search="pass pass basic a same-team touch sequence where one player sends the ball to a different teammate.">
+<div class="head"><h3>Pass</h3><code class="id">pass</code><span class="badge">Basic</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A same-team touch sequence where one player sends the ball to a different teammate.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Track the last attributed touch in live play and compare it to each new touch.</li>
+<li>Emit when a different teammate touches the ball within the pass window after the ball has traveled far enough.</li>
+<li>Classify the pass as direct, backboard, fifty-fifty, or fifty-fifty backboard using intervening backboard-bounce and fifty-fifty state.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>pass</code> via <code>PassNode</code> / <code>PassCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-powerslide" data-search="powerslide powerslide basic a state-change event for effective grounded powerslide use.">
@@ -336,32 +440,6 @@ ul.tight li { margin: .15rem 0; }
 </div>
 </div>
 <div class="cat-group" data-group><div class="cat-head">Mechanic</div>
-<div class="event" id="event-backboard_bounce" data-search="backboard bounce backboard_bounce mechanic a ball rebound off the opponent backboard attributed to the player who sent the ball there.">
-<div class="head"><h3>Backboard Bounce</h3><code class="id">backboard_bounce</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A ball rebound off the opponent backboard attributed to the player who sent the ball there.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Track the last touch during live play and attribute a later backboard rebound to that touch when it occurs within the configured attribution window.</li>
-<li>Require the ball to be high, near the backboard face, moving toward the backboard before the rebound, and moving away after the rebound.</li>
-<li>Ignore frames with a simultaneous touch so the rebound is not confused with a player-ball contact.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>backboard_bounce_state</code> via <code>BackboardBounceStateNode</code> / <code>BackboardBounceCalculator</code></li>
-</ul>
-</div>
 <div class="event" id="event-ball_carry" data-search="ball carry ball_carry mechanic a sustained player-ball control sequence, covering grounded carries and air dribbles.">
 <div class="head"><h3>Ball Carry</h3><code class="id">ball_carry</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
 <p class="summary">A sustained player-ball control sequence, covering grounded carries and air dribbles.</p>
@@ -414,58 +492,6 @@ ul.tight li { margin: .15rem 0; }
 <li><code>ceiling_shot</code> via <code>CeilingShotNode</code> / <code>CeilingShotCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-center" data-search="center center mechanic a touch that moves the ball from a wide attacking position toward the central attacking area.">
-<div class="head"><h3>Center</h3><code class="id">center</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A touch that moves the ball from a wide attacking position toward the central attacking area.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Start a pending center from a live-play touch, unless that player immediately has a shot or goal event.</li>
-<li>Watch the ball for a short window after the touch and require meaningful travel from a wide x-position toward a more central x-position in the attacking half.</li>
-<li>Clear the candidate when it ages out, loses attribution, or becomes a shot/goal by the same player instead of a center.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>center</code> via <code>CenterNode</code> / <code>CenterCalculator</code></li>
-</ul>
-</div>
-<div class="event" id="event-controlled_play" data-search="controlled play controlled_play mechanic a same-player possession episode with multiple touches and sustained close-ball time.">
-<div class="head"><h3>Controlled Play</h3><code class="id">controlled_play</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A same-player possession episode with multiple touches and sustained close-ball time.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Start a player-owned candidate from an attributed touch during live play.</li>
-<li>Require at least two distinct touches by the same player with at least one second between the first and last touch.</li>
-<li>Require sustained proximity to the ball and finish the candidate when another player touches, live play ends, or the touch chain times out.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>controlled_play</code> via <code>ControlledPlayNode</code> / <code>ControlledPlayCalculator</code></li>
-</ul>
-</div>
 <div class="event" id="event-double_tap" data-search="double tap double_tap mechanic a same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.">
 <div class="head"><h3>Double Tap</h3><code class="id">double_tap</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
 <p class="summary">A same-player follow-up touch after an attributed backboard bounce that creates a shot-like trajectory.</p>
@@ -490,32 +516,6 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>double_tap</code> via <code>DoubleTapNode</code> / <code>DoubleTapCalculator</code></li>
-</ul>
-</div>
-<div class="event" id="event-event" data-search="event event mechanic a shared event envelope with common metadata and a typed event payload.">
-<div class="head"><h3>Event</h3><code class="id">event</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A shared event envelope with common metadata and a typed event payload.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Collect completed events from the analysis graph at finish time.</li>
-<li>Wrap each typed event payload with common timing, participant, team, position, confidence, and stream metadata.</li>
-<li>Serialize timeline events as a single heterogeneous event list for playback and analysis consumers.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>stats_timeline_events</code> via <code>StatsTimelineEventsNode</code> / <code>StatsTimelineEventsState</code></li>
 </ul>
 </div>
 <div class="event" id="event-flick" data-search="flick flick mechanic a dodge-powered touch following a short controlled carry setup.">
@@ -647,32 +647,6 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>one_timer</code> via <code>OneTimerNode</code> / <code>OneTimerCalculator</code></li>
-</ul>
-</div>
-<div class="event" id="event-pass" data-search="pass pass mechanic a same-team touch sequence where one player sends the ball to a different teammate.">
-<div class="head"><h3>Pass</h3><code class="id">pass</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A same-team touch sequence where one player sends the ball to a different teammate.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Track the last attributed touch in live play and compare it to each new touch.</li>
-<li>Emit when a different teammate touches the ball within the pass window after the ball has traveled far enough.</li>
-<li>Classify the pass as direct, backboard, fifty-fifty, or fifty-fifty backboard using intervening backboard-bounce and fifty-fifty state.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>pass</code> via <code>PassNode</code> / <code>PassCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-speed_flip" data-search="speed flip speed_flip mechanic a ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.">
@@ -867,6 +841,32 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>bump</code> via <code>BumpNode</code> / <code>BumpCalculator</code></li>
+</ul>
+</div>
+<div class="event" id="event-controlled_play" data-search="controlled play controlled_play other a same-player possession episode with multiple touches and sustained close-ball time.">
+<div class="head"><h3>Controlled Play</h3><code class="id">controlled_play</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
+<p class="summary">A same-player possession episode with multiple touches and sustained close-ball time.</p>
+<div class="section-label">Confidence</div>
+<div class="conf">
+<span class="badge">Approach <b>Unknown</b></span>
+<span class="badge">True positive <b>Not Evaluated</b></span>
+<span class="badge">False positive <b>Not Evaluated</b></span>
+<span class="badge">False negative <b>Not Evaluated</b></span>
+<span class="badge">Testing <b>Untested</b></span>
+</div>
+<div class="section-label">Approach</div>
+<ul class="tight">
+<li>Start a player-owned candidate from an attributed touch during live play.</li>
+<li>Require at least two distinct touches by the same player with at least one second between the first and last touch.</li>
+<li>Require sustained proximity to the ball and finish the candidate when another player touches, live play ends, or the touch chain times out.</li>
+</ul>
+<div class="section-label">Limitations</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Known issues</div>
+<p class="muted">None documented.</p>
+<div class="section-label">Producers</div>
+<ul class="tight producers">
+<li><code>controlled_play</code> via <code>ControlledPlayNode</code> / <code>ControlledPlayCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-fifty_fifty" data-search="50/50 fifty_fifty other a contested ball interaction involving touches or pressure from both teams in a short window.">

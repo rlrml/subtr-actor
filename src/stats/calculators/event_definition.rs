@@ -572,8 +572,8 @@ define_stats_event!(
     BackboardBounceEvent,
     BACKBOARD_BOUNCE_EVENT_DEFINITION,
     "backboard_bounce",
-    "Backboard Bounce",
-    EventCategory::Mechanic,
+    "Backboard Hit",
+    EventCategory::Basic,
     summary = "A ball rebound off the opponent backboard attributed to the player who sent the ball there.",
     approach = [
         "Track the last touch during live play and attribute a later backboard rebound to that touch when it occurs within the configured attribution window.",
@@ -629,7 +629,7 @@ define_stats_event!(
     CENTER_EVENT_DEFINITION,
     "center",
     "Center",
-    EventCategory::Mechanic,
+    EventCategory::Basic,
     summary = "A touch that moves the ball from a wide attacking position toward the central attacking area.",
     approach = [
         "Start a pending center from a live-play touch, unless that player immediately has a shot or goal event.",
@@ -702,7 +702,7 @@ define_stats_event!(
     PASS_EVENT_DEFINITION,
     "pass",
     "Pass",
-    EventCategory::Mechanic,
+    EventCategory::Basic,
     summary = "A same-team touch sequence where one player sends the ball to a different teammate.",
     approach = [
         "Track the last attributed touch in live play and compare it to each new touch.",
@@ -731,7 +731,7 @@ define_stats_event!(
     CONTROLLED_PLAY_EVENT_DEFINITION,
     "controlled_play",
     "Controlled Play",
-    EventCategory::Mechanic,
+    EventCategory::Other,
     summary =
         "A same-player possession episode with multiple touches and sustained close-ball time.",
     approach = [
@@ -1056,7 +1056,7 @@ define_stats_event!(
     TIMELINE_ENVELOPE_EVENT_DEFINITION,
     "event",
     "Event",
-    EventCategory::Mechanic,
+    EventCategory::Basic,
     summary = "A shared event envelope with common metadata and a typed event payload.",
     approach = [
         "Collect completed events from the analysis graph at finish time.",

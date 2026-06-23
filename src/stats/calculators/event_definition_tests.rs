@@ -81,8 +81,12 @@ fn mechanic_event_definitions_have_documented_approaches() {
 #[test]
 fn basic_event_definitions_cover_foundational_interactions() {
     for definition in [
+        BACKBOARD_BOUNCE_EVENT_DEFINITION,
+        CENTER_EVENT_DEFINITION,
         DODGE_RESET_EVENT_DEFINITION,
         DODGE_EVENT_DEFINITION,
+        TIMELINE_ENVELOPE_EVENT_DEFINITION,
+        PASS_EVENT_DEFINITION,
         POWERSLIDE_EVENT_DEFINITION,
         TOUCH_CLASSIFICATION_EVENT_DEFINITION,
         DEMOLITION_EVENT_DEFINITION,
@@ -94,6 +98,17 @@ fn basic_event_definitions_cover_foundational_interactions() {
             definition.id
         );
     }
+}
+
+#[test]
+fn other_event_definitions_cover_stateful_team_play() {
+    let definition = CONTROLLED_PLAY_EVENT_DEFINITION;
+    assert_eq!(
+        definition.category,
+        EventCategory::Other,
+        "{}",
+        definition.id
+    );
 }
 
 #[test]
