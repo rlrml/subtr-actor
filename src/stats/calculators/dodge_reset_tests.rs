@@ -270,6 +270,52 @@ fn underside_touch_can_seed_flip_reset_when_counter_is_absent() {
 }
 
 #[test]
+fn underside_touch_does_not_seed_flip_reset_when_counter_is_available() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    update_live(
+        &mut calculator,
+        &frame_info(1.0, 10),
+        &players(player_id.clone(), false),
+        &FrameEventsState {
+            dodge_refreshed_counter_available: true,
+            ..FrameEventsState::default()
+        },
+        &touch_state(vec![underside_touch_event(player_id.clone(), 1.0, 10)]),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.5, 15),
+        &players(player_id.clone(), true),
+        &FrameEventsState {
+            dodge_refreshed_counter_available: true,
+            ..FrameEventsState::default()
+        },
+        &TouchState::default(),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.6, 16),
+        &players(player_id, true),
+        &FrameEventsState {
+            dodge_refreshed_counter_available: true,
+            ..FrameEventsState::default()
+        },
+        &touch_state(vec![touch_event(boxcars::RemoteId::Steam(1), 1.6, 16)]),
+    );
+
+    assert!(
+        calculator.confirmed_flip_reset_events().is_empty(),
+        "authoritative counter-capable replays should not use geometry fallback"
+    );
+    assert!(
+        calculator.events().is_empty(),
+        "no fallback dodge-reset event should be emitted when counter signal exists"
+    );
+}
+
+#[test]
 fn raw_replay_touch_after_reset_does_not_confirm_without_attributed_touch_state() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = DodgeResetCalculator::new();

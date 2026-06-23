@@ -482,6 +482,10 @@ impl ProcessorView for SaLiveProcessorView<'_> {
         &self.event_history.dodge_refreshed_events
     }
 
+    fn dodge_refreshed_counter_available(&self) -> bool {
+        false
+    }
+
     // The live BakkesMod path does not derive coalesced camera-toggle changes.
     fn player_camera_events(&self) -> &[(PlayerId, PlayerCameraStateChange)] {
         &[]

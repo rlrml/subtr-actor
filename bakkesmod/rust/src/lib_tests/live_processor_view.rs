@@ -214,6 +214,7 @@ fn live_processor_view_satisfies_processor_surface_from_live_frame() {
         demo_events,
         boost_pad_events,
         touch_events,
+        dodge_refreshed_counter_available: false,
         dodge_refreshed_events,
         player_stat_events,
         goal_events,

@@ -606,7 +606,9 @@ impl DodgeResetCalculator {
         }
         self.update_pending_reset_dodges(players, frame.time);
         for touch_event in chronological_touch_events(&touch_state.touch_events) {
-            self.arm_fallback_on_ball_reset(touch_event);
+            if !events.dodge_refreshed_counter_available {
+                self.arm_fallback_on_ball_reset(touch_event);
+            }
             self.process_touch_for_flip_reset(players, touch_event);
         }
         Ok(())
