@@ -201,7 +201,7 @@ pub fn stats_timeline_event_label(stream: &str) -> String {
         "controlled_play" => "Controlled play",
         "ceiling_shot" => "Ceiling shot",
         "wall_aerial" => "Wall aerial",
-        "wall_aerial_shot" => "Wall aerial shot",
+        "wall_aerial_shot" => "Wall shot",
         "center" => "Center",
         "dodge_reset" => "Dodge reset",
         "flip_reset" => "Flip reset",

@@ -614,7 +614,7 @@ define_stats_event!(
     WallAerialShotEvent,
     WALL_AERIAL_SHOT_EVENT_DEFINITION,
     "wall_aerial_shot",
-    "Wall Aerial Shot",
+    "Wall Shot",
     EventCategory::Mechanic,
     summary = "A shot credited to a player shortly after taking off from a wall.",
     approach = [

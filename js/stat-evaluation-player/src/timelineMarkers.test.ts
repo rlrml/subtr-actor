@@ -217,7 +217,7 @@ test("buildWallAerialTimelineEvents maps serialized wall aerial events to timeli
   ]);
 });
 
-test("buildWallAerialShotTimelineEvents maps serialized wall aerial shot events to timeline markers", () => {
+test("buildWallAerialShotTimelineEvents maps serialized wall shot events to timeline markers", () => {
   const replay = {
     frames: [{ time: 0 }, { time: 1.5 }, { time: 2.25 }],
     players: [
@@ -258,7 +258,7 @@ test("buildWallAerialShotTimelineEvents maps serialized wall aerial shot events 
       time: 2.25,
       frame: 2,
       kind: "wall-aerial-shot",
-      label: "Blue wall aerial shot 74% | side wall",
+      label: "Blue wall shot 74% | side wall",
       shortLabel: "WS",
       playerId: "Steam:blue-id",
       playerName: "Blue",

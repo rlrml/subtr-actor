@@ -247,7 +247,7 @@ export function buildWallAerialShotTimelineEvents(
       time: eventTime,
       frame: event.frame,
       kind: "wall-aerial-shot",
-      label: `${playerName} wall aerial shot ${qualityPercent}% | ${wallLabel} wall`,
+      label: `${playerName} wall shot ${qualityPercent}% | ${wallLabel} wall`,
       shortLabel: "WS",
       playerId,
       playerName,

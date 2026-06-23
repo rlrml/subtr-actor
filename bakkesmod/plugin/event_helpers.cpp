@@ -176,7 +176,7 @@ std::string mechanicLabel(SaMechanicKind kind) {
   case SaMechanicKindWallAerial:
     return "Wall aerial";
   case SaMechanicKindWallAerialShot:
-    return "Wall aerial shot";
+    return "Wall shot";
   case SaMechanicKindWavedash:
     return "Wavedash";
   case SaMechanicKindWhiff:

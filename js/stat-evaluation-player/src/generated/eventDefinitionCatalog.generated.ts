@@ -346,7 +346,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   },
   {
     "key": "wall_aerial_shot",
-    "label": "Wall Aerial Shot",
+    "label": "Wall Shot",
     "category": "mechanic",
     "hidden_from_review": false,
     "variants": []
