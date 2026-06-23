@@ -293,6 +293,7 @@ impl FrameInput {
             demo_events: processor.current_frame_demolish_events().to_vec(),
             boost_pad_events: processor.current_frame_boost_pad_events().to_vec(),
             touch_events: processor.current_frame_touch_events().to_vec(),
+            dodge_refreshed_counter_available: processor.dodge_refreshed_counter_available(),
             dodge_refreshed_events: processor.current_frame_dodge_refreshed_events().to_vec(),
             player_stat_events: processor.current_frame_player_stat_events().to_vec(),
             goal_events: processor.current_frame_goal_events().to_vec(),
@@ -309,6 +310,7 @@ impl FrameInput {
             boost_pad_events: processor.boost_pad_events()[event_cursors.boost_pad_event_count..]
                 .to_vec(),
             touch_events: processor.touch_events()[event_cursors.touch_event_count..].to_vec(),
+            dodge_refreshed_counter_available: processor.dodge_refreshed_counter_available(),
             dodge_refreshed_events: processor.dodge_refreshed_events()
                 [event_cursors.dodge_refreshed_event_count..]
                 .to_vec(),

@@ -123,6 +123,11 @@ pub struct FrameEventsState {
     pub demo_events: Vec<DemolishInfo>,
     pub boost_pad_events: Vec<BoostPadEvent>,
     pub touch_events: Vec<TouchEvent>,
+    /// Whether the replay exposes the authoritative refreshed-dodge counter.
+    ///
+    /// When this is present, flip-reset detection should prefer counter-derived
+    /// dodge refreshes and avoid geometry fallback candidates.
+    pub dodge_refreshed_counter_available: bool,
     pub dodge_refreshed_events: Vec<DodgeRefreshedEvent>,
     pub player_stat_events: Vec<PlayerStatEvent>,
     pub goal_events: Vec<GoalEvent>,

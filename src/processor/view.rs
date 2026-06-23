@@ -82,6 +82,7 @@ pub trait ProcessorView {
     fn boost_pad_events(&self) -> &[BoostPadEvent];
     fn touch_events(&self) -> &[TouchEvent];
     fn dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent];
+    fn dodge_refreshed_counter_available(&self) -> bool;
     fn player_camera_events(&self) -> &[(PlayerId, PlayerCameraStateChange)];
     fn player_stat_events(&self) -> &[PlayerStatEvent];
     fn goal_events(&self) -> &[GoalEvent];
@@ -317,6 +318,10 @@ impl ProcessorView for ReplayProcessor<'_> {
 
     fn dodge_refreshed_events(&self) -> &[DodgeRefreshedEvent] {
         &self.dodge_refreshed_events
+    }
+
+    fn dodge_refreshed_counter_available(&self) -> bool {
+        self.cached_object_ids.dodges_refreshed_counter.is_some()
     }
 
     fn player_camera_events(&self) -> &[(PlayerId, PlayerCameraStateChange)] {
