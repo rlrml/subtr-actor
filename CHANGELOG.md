@@ -4,6 +4,48 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v1.1.0 - 2026-06-23
+
+### Stats & event model
+
+- Add richer dodge, speed-flip, flip-reset, kickoff, touch-contact, ball-third,
+  boost-pad-zone, shot-projection, shadow-defense, and possession metrics across
+  the stats timeline.
+- Improve flick, half-flip, kickoff support, one-timer, high-aerial goal-tag,
+  shot/save, post-kickoff goal, fifty-fifty, demolition, boost-pickup, and
+  flip-reset detection accuracy with additional replay-backed regressions.
+- Introduce Rust-authoritative event scope and lane fan-out metadata so
+  stats-player timelines derive lanes from typed event payloads and timing.
+
+### Replay player & stats-player UI
+
+- Replace the player package with the high-fidelity viewer, including captured
+  replay camera/vehicle playback, goal explosions, follow/possession cameras,
+  player ball-cam mode, team boost HUDs, touch classification rings, improved
+  boost/nameplate visuals, and mobile-friendly bottom-docked stat windows.
+- Add stats-player tools for emitted-event discovery, missed-event capture,
+  kickoff overview, BakkesMod kickoff config mirroring, static player image
+  capture, and solid hitbox rendering.
+- Fix player asset paths, goal-explosion lifecycle, replay player swaps,
+  interpolation across demos/kickoffs, Pages builds, and small-viewport HUD
+  layout.
+
+### Python / JS bindings & API
+
+- Regenerate TypeScript bindings and event-definition documentation for the new
+  timeline events, categories, generated stat definitions, and propagated Rust
+  doc comments.
+- Keep JavaScript, Python, README, package-lock, and Cargo release metadata in
+  sync at `1.1.0`.
+
+### CI / release / tooling
+
+- Add the `just check` preflight gate, README generation checks, package
+  version-sync checks, JS Pages/Nix fixes, release-build cargo fetch hardening,
+  and a replay-directory parse-sweep harness.
+- Modernize README and crate docs, add a static event-definition reference page,
+  and document flick launch impulse handling.
+
 ## v1.0.2 - 2026-06-13
 
 ### JavaScript packages
