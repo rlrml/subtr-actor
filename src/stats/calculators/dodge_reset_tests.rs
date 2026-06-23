@@ -101,6 +101,18 @@ fn touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
     }
 }
 
+fn underside_touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
+    TouchEvent {
+        player_position: Some(boxcars::Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 500.0,
+        }),
+        contact_local_ball_position: Some([0.0, 0.0, -80.0]),
+        ..touch_event(player, time, frame)
+    }
+}
+
 fn raw_team_touch_event(time: f32, frame: usize) -> TouchEvent {
     TouchEvent {
         touch_id: None,
@@ -210,6 +222,51 @@ fn touch_after_reset_requires_dodge_to_confirm_flip_reset() {
     );
 
     assert!(calculator.confirmed_flip_reset_events().is_empty());
+}
+
+#[test]
+fn underside_touch_can_seed_flip_reset_when_counter_is_absent() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    update_live(
+        &mut calculator,
+        &frame_info(1.0, 10),
+        &players(player_id.clone(), false),
+        &FrameEventsState::default(),
+        &touch_state(vec![underside_touch_event(player_id.clone(), 1.0, 10)]),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.5, 15),
+        &players(player_id.clone(), true),
+        &FrameEventsState::default(),
+        &TouchState::default(),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.6, 16),
+        &players(player_id.clone(), true),
+        &FrameEventsState::default(),
+        &touch_state(vec![touch_event(player_id.clone(), 1.6, 16)]),
+    );
+
+    let event = calculator
+        .confirmed_flip_reset_events()
+        .first()
+        .expect("underside touch should seed a pending flip reset");
+    assert_eq!(event.player, player_id);
+    assert_eq!(event.reset_frame, 10);
+    assert_eq!(event.frame, 16);
+
+    let reset = calculator
+        .events()
+        .iter()
+        .find(|event| event.frame == 10)
+        .expect("fallback on-ball reset event should be emitted");
+    assert!(reset.on_ball);
+    assert!(reset.used);
+    assert_eq!(reset.outcome, Some(FlipResetOutcome::Used));
 }
 
 #[test]
