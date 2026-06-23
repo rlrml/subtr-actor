@@ -4,9 +4,9 @@ Generated from static Rust metadata. Do not edit by hand.
 
 ## Events
 
-### Backboard Bounce (`backboard_bounce`)
+### Backboard Hit (`backboard_bounce`)
 
-- Category: `mechanic`
+- Category: `basic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -292,7 +292,7 @@ _None documented._
 
 ### Center (`center`)
 
-- Category: `mechanic`
+- Category: `basic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -322,7 +322,7 @@ _None documented._
 
 ### Controlled Play (`controlled_play`)
 
-- Category: `mechanic`
+- Category: `other`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -527,7 +527,7 @@ _None documented._
 
 ### Event (`event`)
 
-- Category: `mechanic`
+- Category: `basic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`
@@ -850,7 +850,7 @@ _None documented._
 
 ### Pass (`pass`)
 
-- Category: `mechanic`
+- Category: `basic`
 - Confidence:
   - Approach: `unknown`
   - True positive evidence: `not_evaluated`

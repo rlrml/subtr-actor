@@ -18,8 +18,8 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   },
   {
     "key": "backboard_bounce",
-    "label": "Backboard Bounce",
-    "category": "mechanic",
+    "label": "Backboard Hit",
+    "category": "basic",
     "hidden_from_review": false,
     "variants": []
   },
@@ -95,14 +95,14 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "center",
     "label": "Center",
-    "category": "mechanic",
+    "category": "basic",
     "hidden_from_review": false,
     "variants": []
   },
   {
     "key": "controlled_play",
     "label": "Controlled Play",
-    "category": "mechanic",
+    "category": "other",
     "hidden_from_review": false,
     "variants": []
   },
@@ -151,7 +151,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "event",
     "label": "Event",
-    "category": "mechanic",
+    "category": "basic",
     "hidden_from_review": false,
     "variants": []
   },
@@ -249,7 +249,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "pass",
     "label": "Pass",
-    "category": "mechanic",
+    "category": "basic",
     "hidden_from_review": false,
     "variants": []
   },
