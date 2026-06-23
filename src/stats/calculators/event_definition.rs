@@ -657,7 +657,7 @@ define_stats_event!(
     DODGE_RESET_EVENT_DEFINITION,
     "dodge_reset",
     "Dodge Reset",
-    EventCategory::Mechanic,
+    EventCategory::Core,
     summary = "A frame-level dodge refresh observed from replay state, marked as occurring on the ball (a flip reset) and as used when later converted by a dodge-powered touch.",
     approach = [
         "Consume dodge-refreshed replay events and preserve the player, team, frame, time, and counter value.",

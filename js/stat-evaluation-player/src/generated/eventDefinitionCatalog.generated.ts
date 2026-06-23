@@ -137,7 +137,7 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
   {
     "key": "dodge_reset",
     "label": "Dodge Reset",
-    "category": "mechanic",
+    "category": "core",
     "hidden_from_review": false,
     "variants": []
   },
