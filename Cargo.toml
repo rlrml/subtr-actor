@@ -28,6 +28,9 @@ include = [
     "/Cargo.toml",
     "/Cargo.lock",
     "/README.md",
+    "/docs/calculators-and-analysis-nodes.md",
+    "/docs/replay-format-evolution.md",
+    "/docs/stat-confidence.md",
     "/src/**",
 ]
 
