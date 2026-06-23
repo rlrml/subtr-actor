@@ -17,6 +17,8 @@ use subtr_actor::{
 };
 
 const FLIP_RESET_GOAL_REPLAY: &str = "assets/calemacar-flip-reset-goal-9-2026-06-21.replay";
+const SQUISHY_FLIP_RESET_MISS_REPLAY: &str =
+    "assets/squishy-ranked-doubles-flip-reset-miss-2026-03-01.replay";
 
 // Source-replay frames: the on-ball reset lands at 6520 and the converting
 // flip-into-ball touch at 6521; the goal is scored at frame 6555. The tail must
@@ -69,5 +71,29 @@ fn clip_tags_calemacar_ninth_goal_as_flip_reset() {
             .iter()
             .any(|tag| tag.kind() == GoalTagKind::FlipResetGoal)),
         "expected the goal inside the clip to be tagged as a flip reset; got {goal_context:#?}"
+    );
+}
+
+#[test]
+fn squishy_last_goal_is_tagged_as_flip_reset() {
+    let replay = common::parse_replay(SQUISHY_FLIP_RESET_MISS_REPLAY);
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
+        .expect("stats timeline should build for Squishy flip-reset replay");
+
+    let goal_context = common::event_payloads(&timeline, |payload| match payload {
+        EventPayload::GoalContext(event) => Some(event),
+        _ => None,
+    });
+    let last_goal = goal_context
+        .last()
+        .expect("expected at least one goal context event");
+
+    assert!(
+        last_goal
+            .tags
+            .iter()
+            .any(|tag| tag.kind() == GoalTagKind::FlipResetGoal),
+        "expected the last goal to be tagged as a flip reset; got {last_goal:#?}"
     );
 }

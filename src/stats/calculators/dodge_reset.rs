@@ -8,6 +8,10 @@ use super::*;
 const FLIP_RESET_MIN_DODGE_TOUCH_DELAY_SECONDS: f32 = 0.05;
 const FLIP_RESET_MAX_DODGE_TOUCH_DELAY_SECONDS: f32 = 2.0;
 const FLIP_RESET_GROUNDED_Z: f32 = 80.0;
+const FALLBACK_RESET_MIN_PLAYER_HEIGHT: f32 = 95.0;
+const FALLBACK_RESET_MAX_LOCAL_VERTICAL_OFFSET: f32 = 10.0;
+const FALLBACK_RESET_MAX_LOCAL_FORWARD_OFFSET: f32 = 240.0;
+const FALLBACK_RESET_MAX_LOCAL_LATERAL_OFFSET: f32 = 240.0;
 /// How long after a conversion touch the dodge component's active byte may take
 /// to replicate. The ball-hit and the dodge activation routinely land on adjacent
 /// frames, so a flip-reset conversion touch can be sampled on the frame *before*
@@ -343,6 +347,75 @@ impl DodgeResetCalculator {
         self.recent_confirmable_touch.remove(player_id);
     }
 
+    fn fallback_on_ball_reset(touch_event: &TouchEvent) -> bool {
+        if touch_event.player.is_none() || touch_event.dodge_contact {
+            return false;
+        }
+        if touch_event
+            .closest_approach_distance
+            .is_none_or(|gap| gap > TouchCandidateScoring::DEFAULT.relaxed_contact_gap_threshold)
+        {
+            return false;
+        }
+        if touch_event
+            .player_position
+            .is_none_or(|position| position.z < FALLBACK_RESET_MIN_PLAYER_HEIGHT)
+        {
+            return false;
+        }
+        let Some(local_ball_position) = touch_event.contact_local_ball_position else {
+            return false;
+        };
+
+        local_ball_position[0].abs() <= FALLBACK_RESET_MAX_LOCAL_FORWARD_OFFSET
+            && local_ball_position[1].abs() <= FALLBACK_RESET_MAX_LOCAL_LATERAL_OFFSET
+            && local_ball_position[2] <= FALLBACK_RESET_MAX_LOCAL_VERTICAL_OFFSET
+    }
+
+    fn arm_fallback_on_ball_reset(&mut self, touch_event: &TouchEvent) {
+        let Some(player_id) = touch_event.player.as_ref() else {
+            return;
+        };
+        if self.pending_on_ball_resets.contains(player_id) {
+            return;
+        }
+        if !Self::fallback_on_ball_reset(touch_event) {
+            return;
+        }
+
+        let reset_event = DodgeRefreshedEvent {
+            time: touch_event.time,
+            frame: touch_event.frame,
+            player: player_id.clone(),
+            player_position: touch_event
+                .player_position
+                .map(|position| vec_to_glam(&position).to_array()),
+            is_team_0: touch_event.team_is_team_0,
+            counter_value: 0,
+        };
+        let event_index = self.events.all().len();
+        self.pending_on_ball_resets.arm(
+            player_id.clone(),
+            PendingOnBallReset {
+                reset: reset_event.clone(),
+                event_index,
+            },
+        );
+        self.clear_pending_reset_tracking(player_id);
+        self.events.push(DodgeResetEvent {
+            time: reset_event.time,
+            frame: reset_event.frame,
+            player: reset_event.player,
+            player_position: reset_event.player_position,
+            is_team_0: reset_event.is_team_0,
+            counter_value: reset_event.counter_value,
+            on_ball: true,
+            used: false,
+            outcome: None,
+            time_to_use: None,
+        });
+    }
+
     /// Track dodge rising edges for players with a pending reset. When a dodge
     /// starts we record its onset, then try to confirm against a conversion
     /// touch that arrived a frame or two earlier (the dodge byte lagging the
@@ -533,6 +606,7 @@ impl DodgeResetCalculator {
         }
         self.update_pending_reset_dodges(players, frame.time);
         for touch_event in chronological_touch_events(&touch_state.touch_events) {
+            self.arm_fallback_on_ball_reset(touch_event);
             self.process_touch_for_flip_reset(players, touch_event);
         }
         Ok(())
