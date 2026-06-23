@@ -146,5 +146,64 @@ jobs:
       - name: Install uv
         run: python -m pip install --upgrade uv
 
+      - name: Remove already-published PyPI files
+        id: pypi_existing
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import unquote, urlparse
+          from urllib.request import urlopen
+
+          class LinkParser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.hrefs = []
+
+              def handle_starttag(self, tag, attrs):
+                  if tag != "a":
+                      return
+                  attrs_dict = dict(attrs)
+                  href = attrs_dict.get("href")
+                  if href:
+                      self.hrefs.append(href)
+
+          parser = LinkParser()
+          with urlopen("https://pypi.org/simple/subtr-actor-py/", timeout=30) as response:
+              parser.feed(response.read().decode("utf-8", errors="replace"))
+
+          published = {
+              Path(unquote(urlparse(href).path)).name
+              for href in parser.hrefs
+          }
+
+          remaining = []
+          for artifact in Path("dist").iterdir():
+              if not artifact.is_file():
+                  continue
+              if artifact.name in published:
+                  print(f"Skipping already-published PyPI artifact: {artifact.name}")
+                  artifact.unlink()
+              else:
+                  remaining.append(artifact)
+
+          if remaining:
+              print("Remaining PyPI artifacts:")
+              for artifact in remaining:
+                  print(f"- {artifact.name}")
+          else:
+              print("All PyPI artifacts are already published.")
+          PY
+
+          if compgen -G "dist/*" > /dev/null; then
+            echo "has_files=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to PyPI
-        run: uv publish --trusted-publishing automatic --check-url https://pypi.org/simple/ dist/*
+        if: steps.pypi_existing.outputs.has_files == 'true'
+        run: uv publish --trusted-publishing automatic dist/*
