@@ -398,6 +398,10 @@ function createExampleSoccarField(scale: number): {
   return { stadium, wallPanels };
 }
 
+export function createExampleSoccarStadium(scale: number): THREE.Group {
+  return createExampleSoccarField(scale).stadium;
+}
+
 function createHitboxOverlay(hitbox: ReplayHitboxSpec, lineColor: string): THREE.Group {
   const transform = getReplayHitboxOverlayTransform(hitbox);
   const overlayColor = getHitboxOverlayColor(lineColor);
