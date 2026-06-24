@@ -136,6 +136,16 @@ export {
 // Pure render-context math, exported so other players can synthesize a
 // `ReplayPlayerRenderContext` with identical interpolation semantics.
 export { interpolatePosition } from "./player-internals/spatial";
+export { createStaticReplayScene, createStaticReplaySceneFromParsed } from "./static-scene";
+export type {
+  StaticReplayScene,
+  StaticReplayPlayerSceneOptions,
+  StaticReplaySceneOptions,
+  StaticSceneHeatmapOptions,
+  StaticScenePoint,
+  StaticScenePointLayerOptions,
+  StaticSceneVec3,
+} from "./static-scene";
 export type {
   NormalizeReplayDataAsyncOptions,
   NormalizeReplayDataOptions,
