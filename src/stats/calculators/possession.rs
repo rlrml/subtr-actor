@@ -23,7 +23,7 @@ pub(crate) enum PossessionLabel {
 }
 
 impl PossessionLabel {
-    fn team(team_is_team_0: bool) -> Self {
+    pub(crate) fn team(team_is_team_0: bool) -> Self {
         if team_is_team_0 {
             Self::TeamZero
         } else {

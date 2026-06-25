@@ -10,13 +10,13 @@ use crate::stats::calculators::{
     FlipIntoBallGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo,
     GameplayState, HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
     HighAerialGoalCalculator, KickoffCalculator, KickoffGoalCalculator, LivePlayState,
-    LongDistanceGoalCalculator, MatchStatsCalculator, MovementCalculator, OneTimerCalculator,
-    OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator,
-    PlayerFrameState, PlayerPossessionCalculator, PlayerVerticalState, PositioningCalculator,
-    PossessionCalculator, PossessionState, PowerslideCalculator, RotationCalculator,
-    RushCalculator, SpeedFlipCalculator, SustainedPressureGoalCalculator,
-    TerritorialPressureCalculator, TouchCalculator, TouchState, WallAerialCalculator,
-    WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
+    LongDistanceGoalCalculator, LoosePossessionCalculator, MatchStatsCalculator,
+    MovementCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
+    PassCalculator, PassingGoalCalculator, PlayerFrameState, PlayerPossessionCalculator,
+    PlayerVerticalState, PositioningCalculator, PossessionCalculator, PossessionState,
+    PowerslideCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
+    SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchCalculator, TouchState,
+    WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod backboard;
@@ -46,6 +46,7 @@ pub(crate) mod half_flip;
 pub(crate) mod half_volley;
 pub(crate) mod kickoff;
 pub(crate) mod live_play;
+pub(crate) mod loose_possession;
 pub(crate) mod match_stats;
 pub(crate) mod movement;
 pub(crate) mod one_timer;
@@ -132,6 +133,8 @@ pub use half_volley::HalfVolleyNode;
 pub use kickoff::KickoffNode;
 #[allow(unused_imports)]
 pub use live_play::LivePlayNode;
+#[allow(unused_imports)]
+pub use loose_possession::LoosePossessionNode;
 #[allow(unused_imports)]
 pub use match_stats::MatchStatsNode;
 #[allow(unused_imports)]
@@ -365,6 +368,10 @@ pub(crate) fn possession_dependency() -> AnalysisDependency {
 
 pub(crate) fn player_possession_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<PlayerPossessionCalculator>(player_possession::boxed_default)
+}
+
+pub(crate) fn loose_possession_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<LoosePossessionCalculator>(loose_possession::boxed_default)
 }
 
 pub(crate) fn ball_half_dependency() -> AnalysisDependency {
