@@ -14,7 +14,7 @@ import {
 } from "./timelineRanges.ts";
 import { createLegacyStatsTimeline, createStatsTimeline } from "./testStatsTimeline.ts";
 
-test("buildPossessionTimelineRanges derives merged team and neutral control spans", () => {
+test("buildPossessionTimelineRanges draws only active team spans, leaving gaps for neutral", () => {
   const timeline = {
     replay_meta: {},
     timeline_events: [],
@@ -122,16 +122,6 @@ test("buildPossessionTimelineRanges derives merged team and neutral control span
       isTeamZero: true,
     },
     {
-      id: "possession:neutral:2.000",
-      startTime: 2,
-      endTime: 3,
-      lane: "possession",
-      laneLabel: "Possession",
-      label: "Neutral possession",
-      color: "rgba(209, 217, 224, 0.7)",
-      isTeamZero: null,
-    },
-    {
       id: "possession:team_one:3.000",
       startTime: 3,
       endTime: 4,
@@ -181,16 +171,6 @@ test("buildPossessionTimelineRanges derives spans from compact event timelines",
       label: "Blue possession",
       color: "rgba(59, 130, 246, 0.88)",
       isTeamZero: true,
-    },
-    {
-      id: "possession:neutral:2.000",
-      startTime: 2,
-      endTime: 3,
-      lane: "possession",
-      laneLabel: "Possession",
-      label: "Neutral possession",
-      color: "rgba(209, 217, 224, 0.7)",
-      isTeamZero: null,
     },
   ]);
 });
