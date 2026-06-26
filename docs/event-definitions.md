@@ -790,6 +790,36 @@ _None documented._
 
 _None documented._
 
+### Loose Possession (`loose_possession`)
+
+- Category: `other`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `loose_possession` via `LoosePossessionNode` / `LoosePossessionCalculator`
+
+**Summary**
+
+A team-possession span under the loose definition: the last team to touch owns the ball until the opponent takes it away.
+
+**Approach**
+
+- Track the last team to touch the ball, keeping possession through loose balls, teammate passes, and repelled 50-50 challenges.
+- Transfer possession only when the opponent demonstrably wins the ball, backdating the boundary to the opponent's takeover touch so there is no neutral gap.
+- Credit neutral only before the first touch of a live stretch or during a contested scramble off a neutral ball.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Movement (`movement`)
 
 - Category: `other`
