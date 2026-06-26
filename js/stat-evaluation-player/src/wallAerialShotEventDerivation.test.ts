@@ -16,7 +16,7 @@ test("wall-aerial-shot event derivation can populate compacted player stats", ()
           frame: 20,
           player: bluePlayer,
           is_team_0: true,
-          wall: "side",
+          wall: "right",
           wall_contact_time: 1,
           wall_contact_frame: 10,
           takeoff_time: 1.4,

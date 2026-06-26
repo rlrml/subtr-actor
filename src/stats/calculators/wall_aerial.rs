@@ -13,52 +13,153 @@ pub(crate) const WALL_AERIAL_MIN_TOUCH_BALL_Z: f32 = 400.0;
 const WALL_AERIAL_REFERENCE_BALL_SPEED_CHANGE: f32 = 80.0;
 pub(crate) const WALL_AERIAL_HIGH_CONFIDENCE: f32 = 0.78;
 
-/// Which wall an aerial play started from.
+/// Minimum horizontal magnitude of the car's up (roof) vector before we trust
+/// it as a wall surface normal. Below this the car is roughly upright (on the
+/// floor or tumbling in the air) and we fall back to field position.
+const WALL_AERIAL_MIN_WALL_NORMAL_HORIZONTAL: f32 = 0.5;
+/// Ratio of the smaller to the larger attack-relative axis above which a wall
+/// takeoff is treated as a (diagonal) corner. `tan(22.5°)` splits each quadrant
+/// into three equal 45° sectors across the eight [`WallAerialWall`] directions.
+const WALL_AERIAL_CORNER_AXIS_RATIO: f32 = 0.4142136;
+
+/// Which wall a player took off from, relative to their attack direction.
+///
+/// `Front`/`Back` are the end walls (the opponent's net side vs. the player's
+/// own net side); `Left`/`Right` are the side walls; the `*Left`/`*Right`
+/// variants are the rounded corners where a side wall meets an end wall.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum WallAerialWall {
-    Side,
+    Left,
+    Right,
+    Front,
     Back,
+    FrontLeft,
+    FrontRight,
+    BackLeft,
+    BackRight,
 }
 
 impl WallAerialWall {
     pub fn as_label_value(self) -> &'static str {
         match self {
-            Self::Side => "side",
+            Self::Left => "left",
+            Self::Right => "right",
+            Self::Front => "front",
             Self::Back => "back",
+            Self::FrontLeft => "front_left",
+            Self::FrontRight => "front_right",
+            Self::BackLeft => "back_left",
+            Self::BackRight => "back_right",
         }
     }
 }
 
-pub(crate) fn wall_aerial_wall_for_position(position: glam::Vec3) -> Option<WallAerialWall> {
+/// Coarse wall surface used internally to keep setup/continuity tracking stable
+/// while the player slides along a wall. The attack-relative [`WallAerialWall`]
+/// is computed separately at the moment of the recorded takeoff.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WallSurface {
+    Side,
+    Back,
+}
+
+pub(crate) fn wall_aerial_wall_for_position(position: glam::Vec3) -> Option<WallSurface> {
     if position.z < WALL_CONTACT_MIN_PLAYER_Z {
         return None;
     }
     if position.y.abs() >= BACK_WALL_CONTACT_ABS_Y
         && position.x.abs() > BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X
     {
-        return Some(WallAerialWall::Back);
+        return Some(WallSurface::Back);
     }
     if position.x.abs() >= SIDE_WALL_CONTACT_ABS_X {
-        return Some(WallAerialWall::Side);
+        return Some(WallSurface::Side);
     }
     None
 }
 
-fn wall_aerial_setup_wall_for_position(position: glam::Vec3) -> Option<WallAerialWall> {
+fn wall_aerial_setup_wall_for_position(position: glam::Vec3) -> Option<WallSurface> {
     if position.z < WALL_CONTACT_MIN_PLAYER_Z {
         return None;
     }
     if position.y.abs() >= WALL_AERIAL_SETUP_BACK_WALL_START_ABS_Y
         && position.x.abs() > BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X
     {
-        return Some(WallAerialWall::Back);
+        return Some(WallSurface::Back);
     }
     if position.x.abs() >= WALL_AERIAL_SETUP_SIDE_WALL_START_ABS_X {
-        return Some(WallAerialWall::Side);
+        return Some(WallSurface::Side);
     }
     None
+}
+
+/// The car's up (roof) vector, i.e. the surface normal of whatever it is resting
+/// on. On a wall this points away from the wall toward the field interior.
+pub(crate) fn player_up_vector(player: &PlayerSample) -> Option<glam::Vec3> {
+    let rigid_body = player.rigid_body.as_ref()?;
+    Some(quat_to_glam(&rigid_body.rotation) * glam::Vec3::Z)
+}
+
+/// Classify which wall (relative to the player's attack direction) a takeoff
+/// came from. Prefers the car's surface normal (its roof points away from the
+/// wall it is driving on), falling back to field position when orientation is
+/// unavailable or too upright to read a wall from.
+pub(crate) fn wall_aerial_wall_classification(
+    is_team_0: bool,
+    position: glam::Vec3,
+    up: Option<glam::Vec3>,
+) -> WallAerialWall {
+    if let Some(up) = up {
+        let horizontal = glam::vec2(up.x, up.y);
+        if horizontal.length() >= WALL_AERIAL_MIN_WALL_NORMAL_HORIZONTAL {
+            // The wall lies opposite the roof direction.
+            return wall_aerial_wall_from_axes(is_team_0, -horizontal.x, -horizontal.y);
+        }
+    }
+    // Fallback: scale each axis by its wall reach so the comparison reflects how
+    // close the car is to the side wall vs. the end wall.
+    wall_aerial_wall_from_axes(
+        is_team_0,
+        position.x / SIDE_WALL_CONTACT_ABS_X,
+        position.y / BACK_WALL_CONTACT_ABS_Y,
+    )
+}
+
+/// Map a horizontal direction toward the wall (any positive scale) into an
+/// attack-relative [`WallAerialWall`]. `x`/`y` are field-axis components; they
+/// are normalized for team so `+x` is the player's right and `+y` points at the
+/// opponent's (front) end wall.
+fn wall_aerial_wall_from_axes(is_team_0: bool, x: f32, y: f32) -> WallAerialWall {
+    let right = if is_team_0 { x } else { -x };
+    let front = if is_team_0 { y } else { -y };
+    let abs_right = right.abs();
+    let abs_front = front.abs();
+    let dominant = abs_right.max(abs_front);
+    if dominant <= f32::EPSILON {
+        return WallAerialWall::Back;
+    }
+    let toward_right = right >= 0.0;
+    let toward_front = front >= 0.0;
+    if abs_right.min(abs_front) / dominant >= WALL_AERIAL_CORNER_AXIS_RATIO {
+        match (toward_front, toward_right) {
+            (true, true) => WallAerialWall::FrontRight,
+            (true, false) => WallAerialWall::FrontLeft,
+            (false, true) => WallAerialWall::BackRight,
+            (false, false) => WallAerialWall::BackLeft,
+        }
+    } else if abs_right >= abs_front {
+        if toward_right {
+            WallAerialWall::Right
+        } else {
+            WallAerialWall::Left
+        }
+    } else if toward_front {
+        WallAerialWall::Front
+    } else {
+        WallAerialWall::Back
+    }
 }
 
 pub(crate) fn wall_aerial_normalize_score(value: f32, min_value: f32, max_value: f32) -> f32 {
@@ -119,14 +220,14 @@ pub struct WallAerialEvent {
 struct WallControl {
     player_position: glam::Vec3,
     ball_position: glam::Vec3,
-    wall: WallAerialWall,
+    wall: WallSurface,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 struct ActiveWallControl {
     player: PlayerId,
     is_team_0: bool,
-    wall: WallAerialWall,
+    wall: WallSurface,
     start_time: f32,
     start_frame: usize,
     last_time: f32,
@@ -140,7 +241,7 @@ struct ActiveWallControl {
 struct RecentWallContact {
     player: PlayerId,
     is_team_0: bool,
-    wall: WallAerialWall,
+    wall_direction: WallAerialWall,
     time: f32,
     frame: usize,
     position: glam::Vec3,
@@ -158,7 +259,7 @@ struct CompletedWallSetup {
 struct ArmedWallAerial {
     player: PlayerId,
     is_team_0: bool,
-    wall: WallAerialWall,
+    wall_direction: WallAerialWall,
     wall_contact_time: f32,
     wall_contact_frame: usize,
     wall_contact_position: glam::Vec3,
@@ -278,8 +379,7 @@ impl WallAerialCalculator {
             let Some(position) = player.position() else {
                 continue;
             };
-            let setup_wall = wall_aerial_setup_wall_for_position(position);
-            if let Some(wall) = setup_wall {
+            if wall_aerial_setup_wall_for_position(position).is_some() {
                 let controlled_setup = self
                     .active_wall_controls
                     .get(&player.player_id)
@@ -289,12 +389,17 @@ impl WallAerialCalculator {
                             .get(&player.player_id)
                             .and_then(|contact| contact.controlled_setup.clone())
                     });
+                let wall_direction = wall_aerial_wall_classification(
+                    player.is_team_0,
+                    position,
+                    player_up_vector(player),
+                );
                 self.recent_wall_contacts.insert(
                     player.player_id.clone(),
                     RecentWallContact {
                         player: player.player_id.clone(),
                         is_team_0: player.is_team_0,
-                        wall,
+                        wall_direction,
                         time: frame.time,
                         frame: frame.frame_number,
                         position,
@@ -335,7 +440,7 @@ impl WallAerialCalculator {
                 ArmedWallAerial {
                     player: contact.player,
                     is_team_0: contact.is_team_0,
-                    wall: contact.wall,
+                    wall_direction: contact.wall_direction,
                     wall_contact_time: contact.time,
                     wall_contact_frame: contact.frame,
                     wall_contact_position: contact.position,
@@ -447,7 +552,7 @@ impl WallAerialCalculator {
             sample_frame: touch.frame,
             player: player_id.clone(),
             is_team_0: touch.team_is_team_0,
-            wall: armed.wall,
+            wall: armed.wall_direction,
             wall_contact_time: armed.wall_contact_time,
             wall_contact_frame: armed.wall_contact_frame,
             takeoff_time: armed.takeoff_time,

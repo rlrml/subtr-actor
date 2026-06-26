@@ -124,7 +124,7 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="half volley half_volley mechanic a fast touch shortly after the ball bounces off the floor, paired with a recent player dodge."><td><a href="#event-half_volley">Half Volley</a></td><td><code>half_volley</code></td><td class="summary">A fast touch shortly after the ball bounces off the floor, paired with a recent player dodge.</td></tr>
 <tr data-search="one timer one_timer mechanic a fast receiver touch from a completed pass that is immediately directed toward goal."><td><a href="#event-one_timer">One Timer</a></td><td><code>one_timer</code></td><td class="summary">A fast receiver touch from a completed pass that is immediately directed toward goal.</td></tr>
 <tr data-search="speed flip speed_flip mechanic a ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips."><td><a href="#event-speed_flip">Speed Flip</a></td><td><code>speed_flip</code></td><td class="summary">A ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.</td></tr>
-<tr data-search="wall aerial wall_aerial mechanic an aerial play that starts from controlled ball movement on a side or back wall."><td><a href="#event-wall_aerial">Wall Aerial</a></td><td><code>wall_aerial</code></td><td class="summary">An aerial play that starts from controlled ball movement on a side or back wall.</td></tr>
+<tr data-search="wall aerial wall_aerial mechanic an aerial play that starts from controlled ball movement on a side, end, or corner wall."><td><a href="#event-wall_aerial">Wall Aerial</a></td><td><code>wall_aerial</code></td><td class="summary">An aerial play that starts from controlled ball movement on a side, end, or corner wall.</td></tr>
 <tr data-search="wall shot wall_aerial_shot mechanic a shot credited to a player shortly after taking off from a wall."><td><a href="#event-wall_aerial_shot">Wall Shot</a></td><td><code>wall_aerial_shot</code></td><td class="summary">A shot credited to a player shortly after taking off from a wall.</td></tr>
 <tr data-search="wavedash wavedash mechanic a low airborne dodge that lands quickly and converts the dodge into ground speed."><td><a href="#event-wavedash">Wavedash</a></td><td><code>wavedash</code></td><td class="summary">A low airborne dodge that lands quickly and converts the dodge into ground speed.</td></tr>
 </tbody></table></div>
@@ -677,9 +677,9 @@ ul.tight li { margin: .15rem 0; }
 <li><code>speed_flip</code> via <code>SpeedFlipNode</code> / <code>SpeedFlipCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-wall_aerial" data-search="wall aerial wall_aerial mechanic an aerial play that starts from controlled ball movement on a side or back wall.">
+<div class="event" id="event-wall_aerial" data-search="wall aerial wall_aerial mechanic an aerial play that starts from controlled ball movement on a side, end, or corner wall.">
 <div class="head"><h3>Wall Aerial</h3><code class="id">wall_aerial</code><span class="badge">Mechanic</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">An aerial play that starts from controlled ball movement on a side or back wall.</p>
+<p class="summary">An aerial play that starts from controlled ball movement on a side, end, or corner wall.</p>
 <div class="section-label">Confidence</div>
 <div class="conf">
 <span class="badge">Approach <b>Unknown</b></span>
@@ -690,8 +690,9 @@ ul.tight li { margin: .15rem 0; }
 </div>
 <div class="section-label">Approach</div>
 <ul class="tight">
-<li>Track wall-control sequences where the last toucher keeps the ball close while positioned on a side or back wall.</li>
+<li>Track wall-control sequences where the last toucher keeps the ball close while positioned on a side or end wall.</li>
 <li>Arm a wall-aerial candidate when the player leaves the wall soon after a qualifying wall-control setup.</li>
+<li>Classify the takeoff wall relative to the player&#39;s attack direction (left/right side, front/back end, or a corner) from the car&#39;s surface normal at the last wall contact.</li>
 <li>Emit on a later aerial touch by the same player when the player and ball are high enough, the setup/takeoff windows hold, and the confidence score clears the threshold.</li>
 </ul>
 <div class="section-label">Limitations</div>
@@ -717,6 +718,7 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Approach</div>
 <ul class="tight">
 <li>Track recent wall contact for each player and arm a candidate when the player leaves the wall while still above the ground threshold.</li>
+<li>Classify the takeoff wall relative to the player&#39;s attack direction (left/right side, front/back end, or a corner) from the car&#39;s surface normal at the last wall contact.</li>
 <li>Match a subsequent shot stat event by that player within the takeoff-to-shot window.</li>
 <li>Require the shot touch to occur off the wall with sufficient player and ball height, then score confidence from timing, height, goal alignment, and ball speed.</li>
 </ul>

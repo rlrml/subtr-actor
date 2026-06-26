@@ -108,7 +108,7 @@ fn records_wall_aerial_shot_without_requiring_prior_control() {
 
     let event = calculator.events().first().expect("wall aerial shot event");
     assert_eq!(event.player, player.clone());
-    assert_eq!(event.wall, WallAerialWall::Side);
+    assert_eq!(event.wall, WallAerialWall::Right);
 
     let stats = calculator.player_stats().get(&player).unwrap();
     assert_eq!(stats.count, 1);
