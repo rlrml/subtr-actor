@@ -64,6 +64,15 @@ fn players_at(position: glam::Vec3) -> PlayerFrameState {
     }
 }
 
+fn players_with(team_zero: glam::Vec3, team_one: glam::Vec3) -> PlayerFrameState {
+    PlayerFrameState {
+        players: vec![
+            player_sample(1, true, team_zero),
+            player_sample(2, false, team_one),
+        ],
+    }
+}
+
 fn possession(player: Option<u64>, team_is_team_0: Option<bool>) -> PossessionState {
     PossessionState {
         active_team_before_sample: team_is_team_0,
@@ -131,7 +140,9 @@ fn emits_single_enriched_span_for_continuous_possession() {
     for step in 0..8 {
         let time = step as f32 * DT;
         let ball = ball_at(step as f32 * 100.0, 1000.0);
-        let touches = if step == 0 {
+        // Two distinct touches so the span qualifies as possession; they are
+        // grounded and well clear of the carry gap, so enrichment is unchanged.
+        let touches = if step == 0 || step == 4 {
             vec![touch(step, time, 1, glam::Vec3::new(0.0, 0.0, 17.0))]
         } else {
             vec![]
@@ -153,7 +164,7 @@ fn emits_single_enriched_span_for_continuous_possession() {
     let event = &events[0];
     assert_eq!(event.player_id, player_id(1));
     assert!(event.is_team_0);
-    assert_eq!(event.touch_count, 1);
+    assert_eq!(event.touch_count, 2);
     assert_eq!(event.aerial_touch_count, 0);
     assert_eq!(event.wall_touch_count, 0);
     assert!((event.duration - 8.0 * DT).abs() < 1e-4);
@@ -171,7 +182,19 @@ fn merges_spans_across_a_short_neutral_gap() {
     let owned = possession(Some(1), Some(true));
     let neutral = possession(None, None);
 
+    // One touch before the gap and one after: the merged span has the two
+    // distinct touches it needs to qualify as possession.
     for step in 0..4 {
+        let touches = if step == 0 {
+            vec![touch(
+                step,
+                step as f32 * DT,
+                1,
+                glam::Vec3::new(0.0, 0.0, 17.0),
+            )]
+        } else {
+            vec![]
+        };
         update(
             &mut calculator,
             step,
@@ -179,7 +202,7 @@ fn merges_spans_across_a_short_neutral_gap() {
             &ball,
             &players,
             &owned,
-            vec![],
+            touches,
         );
     }
     // Contested window shorter than the merge gap.
@@ -195,6 +218,16 @@ fn merges_spans_across_a_short_neutral_gap() {
         );
     }
     for step in 8..12 {
+        let touches = if step == 8 {
+            vec![touch(
+                step,
+                step as f32 * DT,
+                1,
+                glam::Vec3::new(0.0, 0.0, 17.0),
+            )]
+        } else {
+            vec![]
+        };
         update(
             &mut calculator,
             step,
@@ -202,7 +235,7 @@ fn merges_spans_across_a_short_neutral_gap() {
             &ball,
             &players,
             &owned,
-            vec![],
+            touches,
         );
     }
     calculator.finish();
@@ -219,10 +252,25 @@ fn merges_spans_across_a_short_neutral_gap() {
 #[test]
 fn turnover_to_another_player_splits_spans() {
     let mut calculator = PlayerPossessionCalculator::new();
-    let players = players_at(glam::Vec3::new(0.0, 0.0, 17.0));
+    // Both players sit next to the ball so the loose-distance bound never
+    // demotes whoever currently holds it.
+    let players = players_with(
+        glam::Vec3::new(0.0, 0.0, 17.0),
+        glam::Vec3::new(0.0, 0.0, 17.0),
+    );
     let ball = ball_at(0.0, 1000.0);
 
     for step in 0..4 {
+        let touches = if step == 0 || step == 2 {
+            vec![touch(
+                step,
+                step as f32 * DT,
+                1,
+                glam::Vec3::new(0.0, 0.0, 17.0),
+            )]
+        } else {
+            vec![]
+        };
         update(
             &mut calculator,
             step,
@@ -230,10 +278,20 @@ fn turnover_to_another_player_splits_spans() {
             &ball,
             &players,
             &possession(Some(1), Some(true)),
-            vec![],
+            touches,
         );
     }
     for step in 4..8 {
+        let touches = if step == 4 || step == 6 {
+            vec![touch(
+                step,
+                step as f32 * DT,
+                2,
+                glam::Vec3::new(0.0, 0.0, 17.0),
+            )]
+        } else {
+            vec![]
+        };
         update(
             &mut calculator,
             step,
@@ -241,7 +299,7 @@ fn turnover_to_another_player_splits_spans() {
             &ball,
             &players,
             &possession(Some(2), Some(false)),
-            vec![],
+            touches,
         );
     }
     calculator.finish();
@@ -263,6 +321,16 @@ fn expired_gap_finalizes_the_suspended_span() {
     let neutral = possession(None, None);
 
     for step in 0..4 {
+        let touches = if step == 0 || step == 2 {
+            vec![touch(
+                step,
+                step as f32 * DT,
+                1,
+                glam::Vec3::new(0.0, 0.0, 17.0),
+            )]
+        } else {
+            vec![]
+        };
         update(
             &mut calculator,
             step,
@@ -270,7 +338,7 @@ fn expired_gap_finalizes_the_suspended_span() {
             &ball,
             &players,
             &owned,
-            vec![],
+            touches,
         );
     }
     // Neutral stretch much longer than the merge gap.
@@ -286,6 +354,16 @@ fn expired_gap_finalizes_the_suspended_span() {
         );
     }
     for step in 20..24 {
+        let touches = if step == 20 || step == 22 {
+            vec![touch(
+                step,
+                step as f32 * DT,
+                1,
+                glam::Vec3::new(0.0, 0.0, 17.0),
+            )]
+        } else {
+            vec![]
+        };
         update(
             &mut calculator,
             step,
@@ -293,7 +371,7 @@ fn expired_gap_finalizes_the_suspended_span() {
             &ball,
             &players,
             &owned,
-            vec![],
+            touches,
         );
     }
     calculator.finish();
@@ -315,6 +393,16 @@ fn accumulates_carry_time_when_ball_rides_the_player() {
     let ball = ball_at(0.0, 120.0);
 
     for step in 0..8 {
+        let touches = if step == 0 || step == 4 {
+            vec![touch(
+                step,
+                step as f32 * DT,
+                1,
+                glam::Vec3::new(0.0, 0.0, 17.0),
+            )]
+        } else {
+            vec![]
+        };
         update(
             &mut calculator,
             step,
@@ -322,7 +410,7 @@ fn accumulates_carry_time_when_ball_rides_the_player() {
             &ball,
             &players,
             &state,
-            vec![],
+            touches,
         );
     }
     calculator.finish();
@@ -376,7 +464,10 @@ fn labels_sustained_control_using_controlled_play_criteria() {
 }
 
 #[test]
-fn single_touch_span_is_not_sustained_control() {
+fn single_touch_span_is_dropped() {
+    // A lone touch the player never follows up on — the canonical kickoff poke
+    // that stayed "possession" only because nobody else touched until the
+    // opponent did — is not possession and must not be emitted at all.
     let mut calculator = PlayerPossessionCalculator::new();
     let players = players_at(glam::Vec3::new(0.0, 0.0, 17.0));
     let ball = ball_at(0.0, 1000.0);
@@ -401,12 +492,56 @@ fn single_touch_span_is_not_sustained_control() {
     }
     calculator.finish();
 
+    assert!(
+        calculator.events().is_empty(),
+        "a single-touch span never qualifies as possession"
+    );
+}
+
+#[test]
+fn ball_drifting_far_ends_the_span_without_crediting_the_drift() {
+    // The holder makes two real touches, then the ball rockets away and they
+    // never play it again. The far frames must not be credited, and once the
+    // drift outlasts the merge gap the span finalizes on its own. `current_player`
+    // stays sticky on the holder throughout — only the loose-distance bound ends
+    // the span.
+    let mut calculator = PlayerPossessionCalculator::new();
+    let players = players_at(glam::Vec3::new(0.0, 0.0, 17.0));
+    let state = possession(Some(1), Some(true));
+
+    for step in 0..4 {
+        let time = step as f32 * DT;
+        let ball = ball_at(0.0, 200.0);
+        let touches = if step == 0 || step == 2 {
+            vec![touch(step, time, 1, glam::Vec3::new(0.0, 0.0, 17.0))]
+        } else {
+            vec![]
+        };
+        update(
+            &mut calculator,
+            step,
+            time,
+            &ball,
+            &players,
+            &state,
+            touches,
+        );
+    }
+    // Ball well beyond the loose-distance bound; the player stays put.
+    for step in 4..20 {
+        let time = step as f32 * DT;
+        let ball = ball_at(6000.0, 1000.0);
+        update(&mut calculator, step, time, &ball, &players, &state, vec![]);
+    }
+    calculator.finish();
+
     let events = calculator.events();
     assert_eq!(events.len(), 1);
-    assert!(
-        !events[0].sustained_control,
-        "a single touch never qualifies as controlled play"
-    );
+    let event = &events[0];
+    assert_eq!(event.touch_count, 2);
+    // Only the near frames (0..=3) are credited; the drift is excluded.
+    assert_eq!(event.end_frame, 3);
+    assert!((event.duration - 4.0 * DT).abs() < 1e-4);
 }
 
 #[test]

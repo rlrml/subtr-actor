@@ -7,6 +7,20 @@ const PLAYER_POSSESSION_MERGE_GAP_SECONDS: f32 = 2.0;
 /// Minimum spacing between touches for them to count as distinct touches
 /// within a possession span (mirrors the controlled-play touch chaining).
 const DISTINCT_TOUCH_GAP_SECONDS: f32 = 0.12;
+/// Distinct touches a player must make for a span to count as possession at
+/// all. A single glancing contact — a kickoff poke the player never follows up
+/// on, say — is not possession, even though that player stayed the last to
+/// touch until an opponent took over. Consecutive touches are the primary
+/// possession signal; proximity is only a loose sanity bound (see
+/// `MAX_POSSESSION_BALL_DISTANCE`).
+const MIN_POSSESSION_TOUCHES: u32 = 2;
+/// A generous ceiling on how far the ball may drift from the holder before the
+/// span is treated as loose. Deliberately far looser than the controlled-play
+/// close radius (`controlled_play::CLOSE_DISTANCE_3D`, 700uu): proximity is not
+/// a primary signal, but once the ball is clearly gone the holder no longer
+/// has it, so the span suspends (and eventually expires) instead of riding the
+/// last touch until an opponent finally intervenes.
+const MAX_POSSESSION_BALL_DISTANCE: f32 = 2500.0;
 
 /// A contiguous single-player possession span, merged across field-third
 /// changes and brief contested interruptions, enriched with the touch, ball
@@ -262,6 +276,13 @@ impl PlayerPossessionCalculator {
     }
 
     fn finalize(&mut self, span: ActivePlayerPossession) {
+        // Possession requires the holder to have actually played the ball more
+        // than once. A span finalizes only when an opponent takes over or the
+        // ball is lost, so this is the retroactive "there was never really any
+        // possession here" check: a lone touch is dropped, never emitted.
+        if span.touch_count < MIN_POSSESSION_TOUCHES {
+            return;
+        }
         self.events.push(span.into_event());
     }
 
@@ -293,6 +314,31 @@ impl PlayerPossessionCalculator {
         })
     }
 
+    /// Demotes the touch-based holder to "no holder" when the ball has drifted
+    /// far from them. Possession is touch-led, so proximity is deliberately
+    /// loose — but once the ball is well out of reach the holder no longer has
+    /// it. Returning `None` makes the open span suspend (resumable if the same
+    /// player gets back to it within the merge gap) rather than ride the last
+    /// touch until an opponent finally intervenes.
+    fn holder_within_reach(
+        current_player: Option<PlayerId>,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+    ) -> Option<PlayerId> {
+        let player_id = current_player?;
+        let within = match (
+            ball.position(),
+            players.player(&player_id).and_then(PlayerSample::position),
+        ) {
+            (Some(ball_position), Some(player_position)) => {
+                player_position.distance(ball_position) <= MAX_POSSESSION_BALL_DISTANCE
+            }
+            // Missing geometry: trust the touch-based holder rather than guess.
+            _ => true,
+        };
+        within.then_some(player_id)
+    }
+
     fn carry_sample_kind(
         player_id: &PlayerId,
         ball: &BallFrameState,
@@ -322,7 +368,8 @@ impl PlayerPossessionCalculator {
 
         self.expire_suspended(frame.time);
 
-        let current_player = possession_state.current_player.clone();
+        let current_player =
+            Self::holder_within_reach(possession_state.current_player.clone(), ball, players);
         let field_third = Self::field_third(ball);
 
         if let Some(active) = self.active.as_ref() {
