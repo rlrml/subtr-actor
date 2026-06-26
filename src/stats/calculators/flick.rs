@@ -84,6 +84,32 @@ const FLICK_MIN_IMPULSE_AWAY_ALIGNMENT: f32 = 0.15;
 /// "reverse 45s" (back ≈ 0.5-0.7, heavily side) without reaching into the
 /// forward population. (Was 0.35, which sliced into the backflip cluster.)
 const REVERSE_FLICK_MIN_BACKWARD: f32 = 0.25;
+/// A reverse flick must also actually *rotate the car onto its side/back* — a
+/// plain backflip (end-over-end, no roll) is a different mechanic. Gated on
+/// `|underside_rotation|`. Calibrated from the `reverse-flick-vs-backflip`
+/// controlled replay (reviewed ground truth: no pre-goal dodge is a reverse
+/// flick, every post-goal dodge is): the pre-goal backflips sit at
+/// `|rotation| ≈ 0.00-0.13`, the post-goal reverse flicks at `≥ 0.27`. `0.2`
+/// separates them with margin.
+const REVERSE_FLICK_MIN_UNDERSIDE_ROTATION: f32 = 0.2;
+/// A reverse flick drives the ball *forward*, not backward — the dodge is
+/// backward but the carried ball is thrown out ahead of the car. Gated on
+/// `launch_forward_alignment` (horizontal launch direction vs travel heading).
+/// A mild `0.4` keeps every reviewed reverse flick (all launched `≥ 0.82`) while
+/// rejecting backward pops; the precise discriminator is the verticality gate
+/// below.
+const REVERSE_FLICK_MIN_LAUNCH_FORWARD: f32 = 0.4;
+/// The defining tell of a reverse flick vs a plain backflip "flick": a reverse
+/// flick sends the ball *forward and flat*, while a backflip pops it nearly
+/// straight up. Gated on the launch impulse's vertical fraction
+/// (`impulse.z / |impulse|` = sin of the launch elevation). In the
+/// `reverse-flick-vs-backflip` controlled replay (reviewed ground truth) this
+/// separates the two cleanly with a wide margin: the reviewed reverse flicks
+/// launched at vertical fraction `0.30-0.43` (elevation 17-26°), every reviewed
+/// non-reverse pop at `0.82-0.99` (elevation 55-82°). `0.6` (elevation ~37°)
+/// sits in the gap. This is what excludes the ~57s pre-goal vertical pop that
+/// the forward/rotation gates alone let through.
+const REVERSE_FLICK_MAX_LAUNCH_VERTICAL_FRACTION: f32 = 0.6;
 /// A side flick's dodge is dominated by its sideways (roll) component.
 const SIDE_FLICK_MIN_SIDE: f32 = 0.6;
 /// A forward flick's dodge is sufficiently forward (front flip).
@@ -224,6 +250,27 @@ pub struct FlickEvent {
     /// direction this recovers the dodge direction relative to the run's motion.
     /// 0 when the car's speed or horizontal facing is too small to be meaningful.
     pub travel_offset_radians: f32,
+    /// How forward the ball was launched: the ball's gravity-compensated launch
+    /// impulse (horizontal) dotted with the run's travel heading at the touch,
+    /// in the range -1 to 1. A high value means the ball was sent forward along
+    /// the run (a real reverse or forward flick); a low or negative value means
+    /// it was sent backward or sideways (e.g. a plain backflip, not a reverse
+    /// flick). 0 when the speed or launch is degenerate.
+    pub launch_forward_alignment: f32,
+    /// How vertical the launch was: the fraction of the gravity-compensated launch
+    /// impulse that points up (`impulse.z / |impulse|` = sin of the launch
+    /// elevation). A reverse flick sends the ball forward and flat, so this is low
+    /// (around 0.3-0.45); a plain backflip "flick" pops the ball nearly straight
+    /// up, so this is high (above 0.8). This is the primary signal separating the
+    /// two; gates the reverse classification.
+    pub launch_vertical_fraction: f32,
+    /// How far the car has rotated onto its side/back at the touch (its underside
+    /// turned away from straight down): signed, positive when rolled to the car's
+    /// right and negative to its left, magnitude about sin(roll angle) so values
+    /// near 1 mean fully on its side. A reverse flick rolls the car (unlike a
+    /// plain backflip); gates the reverse classification together with
+    /// `launch_forward_alignment`.
+    pub underside_rotation: f32,
     pub confidence: f32,
 }
 
@@ -490,9 +537,19 @@ impl FlickCalculator {
     ///
     /// Because the axis is a unit vector in that plane,
     /// `dodge_forward_back² + dodge_side² ≈ 1`. A reverse flick is a sufficiently
-    /// backward dodge; a side flick is sideways-dominant; a forward flick is
-    /// forward. Returns `(kind, direction, dodge_forward_back, dodge_side)`.
-    fn classify_dodge(dodge_torque: Option<glam::Vec3>) -> (FlickKind, FlickDirection, f32, f32) {
+    /// backward dodge that *also* rolled the car onto its side and launched the
+    /// ball forward (so a plain backflip — which does neither — is not a reverse
+    /// flick, see [`REVERSE_FLICK_MIN_LAUNCH_FORWARD`],
+    /// [`REVERSE_FLICK_MAX_LAUNCH_VERTICAL_FRACTION`], and
+    /// [`REVERSE_FLICK_MIN_UNDERSIDE_ROTATION`]); a side flick is
+    /// sideways-dominant; a forward flick is forward. Returns
+    /// `(kind, direction, dodge_forward_back, dodge_side)`.
+    fn classify_dodge(
+        dodge_torque: Option<glam::Vec3>,
+        launch_forward: f32,
+        launch_vertical_fraction: f32,
+        underside_rotation: f32,
+    ) -> (FlickKind, FlickDirection, f32, f32) {
         let Some(torque) = dodge_torque else {
             return (FlickKind::Other, FlickDirection::Center, 0.0, 0.0);
         };
@@ -518,7 +575,11 @@ impl FlickCalculator {
             FlickDirection::Center
         };
 
-        let kind = if dodge_forward_back <= -REVERSE_FLICK_MIN_BACKWARD {
+        let kind = if dodge_forward_back <= -REVERSE_FLICK_MIN_BACKWARD
+            && launch_forward >= REVERSE_FLICK_MIN_LAUNCH_FORWARD
+            && launch_vertical_fraction <= REVERSE_FLICK_MAX_LAUNCH_VERTICAL_FRACTION
+            && underside_rotation.abs() >= REVERSE_FLICK_MIN_UNDERSIDE_ROTATION
+        {
             FlickKind::Reverse
         } else if dodge_side.abs() >= SIDE_FLICK_MIN_SIDE {
             FlickKind::Side
@@ -758,8 +819,6 @@ impl FlickCalculator {
             ball.position() - player_position,
             ball_impulse,
         );
-        let (kind, direction, dodge_forward_back, dodge_side) =
-            Self::classify_dodge(dodge_start.dodge_torque);
         // How far the car was turned off its line of travel at the launch touch
         // (x/y plane): signed angle from the car's facing to its velocity
         // heading. + = velocity is to the car's left of where it points.
@@ -777,6 +836,42 @@ impl FlickCalculator {
                 }
             })
             .unwrap_or(0.0);
+        // How forward the ball was launched, along the run's travel heading
+        // (x/y). Distinguishes a reverse flick (ball thrown forward) from a plain
+        // backflip (ball not thrown forward); gates the reverse classification.
+        let launch_forward_alignment = player
+            .velocity()
+            .map(|velocity| {
+                let launch = ball_impulse.truncate();
+                let heading = velocity.truncate();
+                if launch.length() > f32::EPSILON && heading.length() > 50.0 {
+                    launch.normalize().dot(heading.normalize())
+                } else {
+                    0.0
+                }
+            })
+            .unwrap_or(0.0);
+        // How vertical the launch was: the fraction of the launch impulse that is
+        // upward (sin of the launch elevation). A reverse flick sends the ball
+        // forward and flat (low); a plain backflip pops it up (high).
+        let launch_vertical_fraction = {
+            let mag = ball_impulse.length();
+            if mag > f32::EPSILON {
+                ball_impulse.z / mag
+            } else {
+                0.0
+            }
+        };
+        // How far the car has rotated onto its side/back at the touch: + = rolled
+        // to its right (right axis dips below horizontal), magnitude ~sin(roll).
+        // Distinguishes a reverse flick (car rolled) from a plain backflip.
+        let underside_rotation = -(player_rotation * glam::Vec3::Y).z;
+        let (kind, direction, dodge_forward_back, dodge_side) = Self::classify_dodge(
+            dodge_start.dodge_torque,
+            launch_forward_alignment,
+            launch_vertical_fraction,
+            underside_rotation,
+        );
         let setup = &dodge_start.setup;
         let timing_score =
             1.0 - (time_since_dodge / FLICK_MAX_DODGE_TO_TOUCH_SECONDS).clamp(0.0, 1.0);
@@ -836,6 +931,9 @@ impl FlickCalculator {
             dodge_side,
             dodge_torque: dodge_start.dodge_torque.map(|torque| torque.to_array()),
             travel_offset_radians,
+            launch_forward_alignment,
+            launch_vertical_fraction,
+            underside_rotation,
             confidence,
         })
     }

@@ -181,6 +181,9 @@ fn flick_event(time: f32, frame: usize, player: PlayerId) -> FlickEvent {
         dodge_side: 0.0,
         dodge_torque: None,
         travel_offset_radians: 0.0,
+        launch_forward_alignment: 0.0,
+        launch_vertical_fraction: 0.0,
+        underside_rotation: 0.0,
         confidence: 0.82,
     }
 }
