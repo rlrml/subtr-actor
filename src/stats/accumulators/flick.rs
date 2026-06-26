@@ -51,7 +51,7 @@ impl FlickStats {
         self.labeled_event_counts.increment([
             confidence_band_label(event.confidence >= FLICK_HIGH_CONFIDENCE),
             flick_kind_label(&event.kind),
-            flick_setup_rotation_direction_label(&event.setup_rotation_direction),
+            flick_direction_label(&event.direction),
         ]);
         self.sync_legacy_counts();
         self.last_flick_time = Some(event.time);
@@ -72,7 +72,7 @@ impl FlickStats {
             &[
                 &CONFIDENCE_BAND_LABELS,
                 &FLICK_KIND_LABELS,
-                &FLICK_SETUP_ROTATION_DIRECTION_LABELS,
+                &FLICK_DIRECTION_LABELS,
             ],
             &self.labeled_event_counts,
         )

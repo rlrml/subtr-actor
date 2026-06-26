@@ -1824,10 +1824,10 @@ impl GoalMechanicPointEvent for FlickEvent {
             key: "kind".to_owned(),
             value: self.kind.clone(),
         }];
-        if self.setup_rotation_direction != FlickSetupRotationDirection::Unknown.as_label_value() {
+        if self.direction != FlickDirection::Center.as_label_value() {
             details.push(GoalTagDetail {
-                key: "setup_rotation_direction".to_owned(),
-                value: self.setup_rotation_direction.clone(),
+                key: "direction".to_owned(),
+                value: self.direction.clone(),
             });
         }
         details

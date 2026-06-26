@@ -236,6 +236,7 @@ pub(in crate::collector::stats::playback) fn parse_dodge_event(
         is_team_0: json_required_bool(object, "is_team_0")?,
         dodge_impulse,
         dodge_rotation,
+        dodge_torque: json_optional_vec3(object.get("dodge_torque"))?,
     })
 }
 
@@ -390,20 +391,17 @@ pub(in crate::collector::stats::playback) fn parse_flick_event(
             .and_then(Value::as_str)
             .unwrap_or("other")
             .to_owned(),
+        direction: object
+            .get("direction")
+            .and_then(Value::as_str)
+            .unwrap_or("center")
+            .to_owned(),
         local_ball_position: json_optional_vec3(object.get("local_ball_position"))?
             .unwrap_or([0.0, 0.0, 0.0]),
         local_ball_impulse: json_optional_vec3(object.get("local_ball_impulse"))?
             .unwrap_or([0.0, 0.0, 0.0]),
-        backflip_pitch_rate: json_optional_f32(object.get("backflip_pitch_rate"))?.unwrap_or(0.0),
-        rotation_under_ball_degrees: json_optional_f32(object.get("rotation_under_ball_degrees"))?
-            .unwrap_or(0.0),
-        setup_rotation_degrees: json_optional_f32(object.get("setup_rotation_degrees"))?
-            .unwrap_or(0.0),
-        setup_rotation_direction: object
-            .get("setup_rotation_direction")
-            .and_then(Value::as_str)
-            .unwrap_or("unknown")
-            .to_owned(),
+        dodge_forward_back: json_optional_f32(object.get("dodge_forward_back"))?.unwrap_or(0.0),
+        dodge_side: json_optional_f32(object.get("dodge_side"))?.unwrap_or(0.0),
         confidence: json_required_f32(object, "confidence")?,
     })
 }

@@ -66,14 +66,14 @@ function getReplayFrameTime(
   return replay.frames[frame ?? -1]?.time ?? fallbackTime;
 }
 
-function flickMarkerKindLabel(event: { kind?: string; setup_rotation_direction?: string }): string {
-  if (event.kind !== "reverse") {
+function flickMarkerKindLabel(event: { kind?: string; direction?: string }): string {
+  const kind = event.kind;
+  if (kind !== "forward" && kind !== "reverse" && kind !== "side") {
     return "flick";
   }
-  if (event.setup_rotation_direction === "left" || event.setup_rotation_direction === "right") {
-    return `${event.setup_rotation_direction} reverse flick`;
-  }
-  return "reverse flick";
+  const direction =
+    event.direction === "left" || event.direction === "right" ? `${event.direction} ` : "";
+  return `${direction}${kind} flick`;
 }
 
 export function getReplayTimelineEventKinds(

@@ -107,12 +107,12 @@ function countWithConfidenceLabel(stats: FlickStatsWithLabels, value: "standard"
   );
 }
 
-function flickKindLabelValue(value: unknown): "other" | "reverse" {
-  return value === "reverse" ? value : "other";
+function flickKindLabelValue(value: unknown): "other" | "forward" | "reverse" | "side" {
+  return value === "forward" || value === "reverse" || value === "side" ? value : "other";
 }
 
-function setupRotationDirectionLabelValue(value: unknown): "unknown" | "left" | "right" {
-  return value === "left" || value === "right" ? value : "unknown";
+function flickDirectionLabelValue(value: unknown): "center" | "left" | "right" {
+  return value === "left" || value === "right" ? value : "center";
 }
 
 function totalLabeledCount(stats: FlickStatsWithLabels): number {
@@ -157,8 +157,8 @@ function applyFlickEvent(
       value: flickKindLabelValue(event.kind),
     },
     {
-      key: "setup_rotation_direction",
-      value: setupRotationDirectionLabelValue(event.setup_rotation_direction),
+      key: "direction",
+      value: flickDirectionLabelValue(event.direction),
     },
   ]);
   stats.count = totalLabeledCount(stats);

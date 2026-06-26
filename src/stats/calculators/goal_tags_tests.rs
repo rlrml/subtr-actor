@@ -174,12 +174,11 @@ fn flick_event(time: f32, frame: usize, player: PlayerId) -> FlickEvent {
         impulse_away_alignment: 0.8,
         vertical_impulse: 0.0,
         kind: "other".to_owned(),
+        direction: "center".to_owned(),
         local_ball_position: [60.0, 0.0, 95.0],
         local_ball_impulse: [0.0, 600.0, 0.0],
-        backflip_pitch_rate: 0.0,
-        rotation_under_ball_degrees: 0.0,
-        setup_rotation_degrees: 0.0,
-        setup_rotation_direction: "unknown".to_owned(),
+        dodge_forward_back: 0.0,
+        dodge_side: 0.0,
         confidence: 0.82,
     }
 }
@@ -788,7 +787,7 @@ fn flick_goal_carries_flick_kind_details() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
     let mut reverse_flick = flick_event(9.3, 93, player_id(1));
     reverse_flick.kind = "reverse".to_owned();
-    reverse_flick.setup_rotation_direction = "left".to_owned();
+    reverse_flick.direction = "left".to_owned();
 
     let events = FlickGoalCalculator::new().tag_goals(&[goal], &[reverse_flick]);
 
@@ -802,12 +801,12 @@ fn flick_goal_carries_flick_kind_details() {
     assert!(
         details
             .iter()
-            .any(|detail| detail.key == "setup_rotation_direction" && detail.value == "left")
+            .any(|detail| detail.key == "direction" && detail.value == "left")
     );
 }
 
 #[test]
-fn flick_goal_omits_unknown_setup_rotation_direction_detail() {
+fn flick_goal_omits_center_direction_detail() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
     let events =
         FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(9.3, 93, player_id(1))]);
@@ -819,11 +818,7 @@ fn flick_goal_omits_unknown_setup_rotation_direction_detail() {
             .iter()
             .any(|detail| detail.key == "kind" && detail.value == "other")
     );
-    assert!(
-        !details
-            .iter()
-            .any(|detail| detail.key == "setup_rotation_direction")
-    );
+    assert!(!details.iter().any(|detail| detail.key == "direction"));
 }
 
 #[test]
