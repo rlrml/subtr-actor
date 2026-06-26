@@ -1217,6 +1217,9 @@ pub fn builtin_analysis_node_json(
             player_vertical_state_json(graph_state::<PlayerVerticalState>(graph, node_name)?)
         }
         "settings" => settings_json(graph_state::<SettingsCalculator>(graph, node_name)?),
+        "loose_possession" => serialize_to_json_value(&EventsExport {
+            events: graph_state::<LoosePossessionCalculator>(graph, node_name)?.events(),
+        })?,
         module_name if builtin_stats_module_names().contains(&module_name) => {
             builtin_module_json(module_name, graph)?
         }

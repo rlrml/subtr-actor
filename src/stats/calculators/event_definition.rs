@@ -11,11 +11,11 @@ use super::{
     BallThirdEvent, BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent,
     ControlledPlayEvent, CorePlayerScoreboardEvent, DemolitionEvent, DepthRoleEvent, DodgeEvent,
     DodgeResetEvent, DoubleTapEvent, FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent,
-    FirstManChangeEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent, MovementEvent,
-    OneTimerEvent, PassEvent, PlayerActivityEvent, PlayerPossessionEvent, PossessionEvent,
-    PowerslideEvent, RespawnEvent, RotationRoleEvent, RushEvent, SpeedFlipEvent,
-    TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent, WallAerialEvent,
-    WallAerialShotEvent, WavedashEvent, WhiffEvent,
+    FirstManChangeEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent,
+    LoosePossessionEvent, MovementEvent, OneTimerEvent, PassEvent, PlayerActivityEvent,
+    PlayerPossessionEvent, PossessionEvent, PowerslideEvent, RespawnEvent, RotationRoleEvent,
+    RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent,
+    WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
 use crate::stats::timeline::{Event, EventPayload, EventScope};
 
@@ -89,6 +89,7 @@ impl EventPayload {
             Self::Timeline(_) => TimelineEvent::DEFINITION.scope,
             Self::CorePlayer(_) => CorePlayerScoreboardEvent::DEFINITION.scope,
             Self::Possession(_) => PossessionEvent::DEFINITION.scope,
+            Self::LoosePossession(_) => LoosePossessionEvent::DEFINITION.scope,
             Self::PlayerPossession(_) => PlayerPossessionEvent::DEFINITION.scope,
             Self::BallHalf(_) => BallHalfEvent::DEFINITION.scope,
             Self::BallThird(_) => BallThirdEvent::DEFINITION.scope,
@@ -928,6 +929,20 @@ define_stats_event!(
     scope = EventScope::Team
 );
 define_stats_event!(
+    LoosePossessionEvent,
+    LOOSE_POSSESSION_EVENT_DEFINITION,
+    "loose_possession",
+    "Loose Possession",
+    EventCategory::Other,
+    summary = "A team-possession span under the loose definition: the last team to touch owns the ball until the opponent takes it away.",
+    approach = [
+        "Track the last team to touch the ball, keeping possession through loose balls, teammate passes, and repelled 50-50 challenges.",
+        "Transfer possession only when the opponent demonstrably wins the ball, backdating the boundary to the opponent's takeover touch so there is no neutral gap.",
+        "Credit neutral only before the first touch of a live stretch or during a contested scramble off a neutral ball.",
+    ],
+    scope = EventScope::Team
+);
+define_stats_event!(
     PlayerPossessionEvent,
     PLAYER_POSSESSION_EVENT_DEFINITION,
     "player_possession",
@@ -1288,6 +1303,13 @@ pub(crate) const PLAYER_POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_
     "player_possession",
     "PlayerPossessionNode",
     "PlayerPossessionCalculator",
+)];
+
+pub(crate) const LOOSE_POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &LOOSE_POSSESSION_EVENT_DEFINITION,
+    "loose_possession",
+    "LoosePossessionNode",
+    "LoosePossessionCalculator",
 )];
 
 pub(crate) const BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
