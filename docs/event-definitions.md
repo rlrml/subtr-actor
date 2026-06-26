@@ -688,8 +688,9 @@ A dodge-powered touch following a short controlled carry setup.
 **Approach**
 
 - Track controlled setup windows where the current controlling player keeps the ball close above the car within local-position and gap thresholds.
-- Measure signed horizontal setup rotation so reverse flicks can be labeled as left or right based on the direction the car rotated before the flick.
-- Record dodge starts that happen immediately after, or during, a qualifying setup.
+- Record dodge starts that happen immediately after, or during, a qualifying setup, capturing the dodge torque (the flip axis) and the run's travel direction.
+- Classify the flick kind from the dodge direction: decompose the dodge torque in the travel frame into forward/back and side components, labeling a backflip that still launches the ball forward as a reverse flick, a sideways-dominant dodge as a side flick, and a forward dodge as a forward flick.
+- Tag handedness left/right from the ball's lateral deflection relative to travel.
 - Emit on a same-player touch shortly after the dodge when the ball impulse is large and directed away from the player, with confidence from setup duration, timing, impulse, and separation.
 
 **Limitations**

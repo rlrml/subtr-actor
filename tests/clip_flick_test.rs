@@ -48,6 +48,13 @@ fn flicks_near(flicks: &[&FlickEvent], dodge_time: f32) -> usize {
         .count()
 }
 
+fn flick_kind_near(flicks: &[&FlickEvent], dodge_time: f32) -> Option<String> {
+    flicks
+        .iter()
+        .find(|flick| (flick.dodge_time - dodge_time).abs() < 0.15)
+        .map(|flick| flick.kind.clone())
+}
+
 #[test]
 fn clip_detects_all_three_flicks_in_calemacar_dribble() {
     let timeline = clip_timeline(SEQUENCE_START_FRAME, SEQUENCE_END_FRAME);
@@ -79,5 +86,35 @@ fn clip_detects_all_three_flicks_in_calemacar_dribble() {
         1,
         "expected exactly one flick for the third dodge (~{THIRD_FLICK_DODGE_TIME}s); \
          got {flicks:#?}"
+    );
+}
+
+#[test]
+fn clip_classifies_flick_kinds_from_dodge_direction() {
+    // The three flicks span the dodge-direction taxonomy, validated against the
+    // reviewed replay: the first is a forward-diagonal flick, the middle a pure
+    // backflip reverse flick, and the third a side flick. See the dodge-torque
+    // travel-frame decomposition in `FlickCalculator::classify_dodge`.
+    let timeline = clip_timeline(SEQUENCE_START_FRAME, SEQUENCE_END_FRAME);
+    let flicks: Vec<&FlickEvent> =
+        common::event_payloads_by_stream(&timeline, "flick", |payload| match payload {
+            EventPayload::Flick(event) => Some(event),
+            _ => None,
+        });
+
+    assert_eq!(
+        flick_kind_near(&flicks, FIRST_FLICK_DODGE_TIME).as_deref(),
+        Some("forward"),
+        "first dodge (~{FIRST_FLICK_DODGE_TIME}s) is a forward flick; got {flicks:#?}"
+    );
+    assert_eq!(
+        flick_kind_near(&flicks, MISSED_FLICK_DODGE_TIME).as_deref(),
+        Some("reverse"),
+        "middle dodge (~{MISSED_FLICK_DODGE_TIME}s) is a reverse flick; got {flicks:#?}"
+    );
+    assert_eq!(
+        flick_kind_near(&flicks, THIRD_FLICK_DODGE_TIME).as_deref(),
+        Some("side"),
+        "third dodge (~{THIRD_FLICK_DODGE_TIME}s) is a side flick; got {flicks:#?}"
     );
 }

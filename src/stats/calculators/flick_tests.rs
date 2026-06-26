@@ -51,6 +51,7 @@ fn player_with_yaw_and_angular_velocity(
         last_boost_amount: None,
         boost_active: false,
         dodge_active,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
         match_assists: None,
@@ -58,11 +59,6 @@ fn player_with_yaw_and_angular_velocity(
         match_shots: None,
         match_score: None,
     }
-}
-
-fn ball_at_local(yaw: f32, local_position: glam::Vec3, velocity: glam::Vec3) -> BallFrameState {
-    let rotation = glam::Quat::from_rotation_z(yaw);
-    ball(rotation * local_position, velocity)
 }
 
 fn ball(position: glam::Vec3, velocity: glam::Vec3) -> BallFrameState {
@@ -86,20 +82,6 @@ fn players(dodge_active: bool) -> PlayerFrameState {
     }
 }
 
-fn players_with_yaw_and_angular_velocity(
-    dodge_active: bool,
-    yaw: f32,
-    local_angular_velocity: glam::Vec3,
-) -> PlayerFrameState {
-    PlayerFrameState {
-        players: vec![player_with_yaw_and_angular_velocity(
-            dodge_active,
-            yaw,
-            local_angular_velocity,
-        )],
-    }
-}
-
 /// A single team-zero car with an explicit linear velocity, for exercising the
 /// carry gate (ball-tracks-car) against a moving car.
 fn moving_players(dodge_active: bool, velocity: glam::Vec3) -> PlayerFrameState {
@@ -117,6 +99,7 @@ fn moving_players(dodge_active: bool, velocity: glam::Vec3) -> PlayerFrameState 
             last_boost_amount: None,
             boost_active: false,
             dodge_active,
+            dodge_torque: None,
             powerslide_active: false,
             match_goals: None,
             match_assists: None,
@@ -142,6 +125,104 @@ fn live_play() -> LivePlayState {
         ..LivePlayState::default()
     }
 }
+
+/// Horizontal run velocity shared by the car and the carried ball through a
+/// flick setup, giving the dodge a well-defined travel direction (+x). The
+/// dodge-direction classification decomposes `dodge_torque` against this.
+const FLICK_CARRY_VELOCITY: glam::Vec3 = glam::Vec3::new(1000.0, 0.0, 0.0);
+
+fn flick_player(dodge_active: bool, dodge_torque: Option<glam::Vec3>) -> PlayerSample {
+    PlayerSample {
+        player_id: boxcars::RemoteId::Steam(1),
+        is_team_0: true,
+        hitbox: default_car_hitbox(),
+        rigid_body: Some(rigid_body(
+            glam::Vec3::new(0.0, 0.0, 17.0),
+            FLICK_CARRY_VELOCITY,
+            glam::Vec3::new(0.0, 5.0, 0.0),
+        )),
+        boost_amount: None,
+        last_boost_amount: None,
+        boost_active: false,
+        dodge_active,
+        dodge_torque,
+        powerslide_active: false,
+        match_goals: None,
+        match_assists: None,
+        match_saves: None,
+        match_shots: None,
+        match_score: None,
+    }
+}
+
+fn flick_players(dodge_active: bool, dodge_torque: Option<glam::Vec3>) -> PlayerFrameState {
+    PlayerFrameState {
+        players: vec![flick_player(dodge_active, dodge_torque)],
+    }
+}
+
+/// Run a carry-then-dodge flick: three setup frames carrying the ball on the
+/// hood at [`FLICK_CARRY_VELOCITY`], with the dodge transition (carrying
+/// `dodge_torque`, a world-frame flip axis) on the third frame, then a launch
+/// touch whose gravity-compensated ball impulse is `launch_impulse` (added to
+/// the carry velocity). Returns the resolved calculator.
+fn run_flick_scenario(dodge_torque: glam::Vec3, launch_impulse: glam::Vec3) -> FlickCalculator {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = FlickCalculator::new();
+    let live_play = live_play();
+
+    for (frame_number, time) in [(1, 0.1), (2, 0.2), (3, 0.3)] {
+        let dodging = frame_number == 3;
+        calculator
+            .update(
+                &frame(frame_number, time),
+                &ball(glam::Vec3::new(60.0, 0.0, 112.0), FLICK_CARRY_VELOCITY),
+                &flick_players(dodging, dodging.then_some(dodge_torque)),
+                &touch_state(Vec::new()),
+                &TouchCalculator::new(),
+                &live_play,
+            )
+            .unwrap();
+    }
+
+    calculator
+        .update(
+            &frame(4, 0.4),
+            &ball(
+                glam::Vec3::new(180.0, 0.0, 160.0),
+                FLICK_CARRY_VELOCITY + launch_impulse,
+            ),
+            &flick_players(true, Some(dodge_torque)),
+            &touch_state(vec![TouchEvent {
+                touch_id: None,
+                time: 0.4,
+                frame: 4,
+                team_is_team_0: true,
+                player: Some(player_id.clone()),
+                player_position: None,
+                closest_approach_distance: Some(0.0),
+                contact_local_ball_position: None,
+                contact_local_hitbox_point: None,
+                contact_world_hitbox_point: None,
+                dodge_contact: false,
+            }]),
+            &TouchCalculator::new(),
+            &live_play,
+        )
+        .unwrap();
+    calculator
+}
+
+// Travel direction is +x, so the right-of-travel basis is r = (0, -1). A forward
+// dodge has torque . r > 0 (torque -y); a backflip has torque . r < 0 (torque
+// +y); a side dodge's torque lies along travel (±x).
+const FORWARD_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(0.0, -2.6, 0.0);
+const BACKFLIP_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(0.0, 2.6, 0.0);
+const SIDE_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(2.6, 0.0, 0.0);
+// Diagonal backflips: torque +y is backflip (fb<0), torque ±x is the side/roll
+// component that decides handedness (+x = right of +x travel).
+const REVERSE_RIGHT_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(1.84, 1.84, 0.0);
+const REVERSE_LEFT_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(-1.84, 1.84, 0.0);
 
 #[test]
 fn counts_controlled_dodge_touch_with_large_ball_impulse() {
@@ -388,69 +469,37 @@ fn rejects_late_dodge_touch_with_only_single_frame_setup() {
 }
 
 #[test]
-fn labels_reverse_flicks_with_backflip_pitch_forward_impulse_and_rotation_under_ball() {
+fn labels_forward_flick_from_forward_dodge() {
     let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = FlickCalculator::new();
-    let live_play = live_play();
-    let final_yaw = 0.35;
+    let calculator = run_flick_scenario(FORWARD_DODGE_TORQUE, glam::Vec3::new(1350.0, 0.0, 520.0));
 
-    for (frame_number, time, yaw) in [(1, 0.1, 0.0), (2, 0.2, 0.18), (3, 0.3, final_yaw)] {
-        calculator
-            .update(
-                &frame(frame_number, time),
-                &ball_at_local(yaw, glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
-                &players_with_yaw_and_angular_velocity(
-                    frame_number == 3,
-                    yaw,
-                    glam::Vec3::new(0.0, 0.0, 0.0),
-                ),
-                &touch_state(Vec::new()),
-                &TouchCalculator::new(),
-                &live_play,
-            )
-            .unwrap();
-    }
+    let event = calculator.events().first().unwrap();
+    assert_eq!(event.kind, "forward");
+    assert_eq!(event.direction, "center");
+    assert!(event.dodge_forward_back > 0.0);
 
-    let rotation_at_dodge = glam::Quat::from_rotation_z(final_yaw);
-    let forward_impulse = rotation_at_dodge * glam::Vec3::new(1350.0, 0.0, 520.0);
-    calculator
-        .update(
-            &frame(4, 0.4),
-            &ball_at_local(
-                final_yaw,
-                glam::Vec3::new(180.0, 0.0, 160.0),
-                forward_impulse,
-            ),
-            &players_with_yaw_and_angular_velocity(
-                true,
-                final_yaw,
-                glam::Vec3::new(0.0, -5.0, 0.0),
-            ),
-            &touch_state(vec![TouchEvent {
-                touch_id: None,
-                time: 0.4,
-                frame: 4,
-                team_is_team_0: true,
-                player: Some(player_id.clone()),
-                player_position: None,
-                closest_approach_distance: Some(0.0),
-                contact_local_ball_position: None,
-                contact_local_hitbox_point: None,
-                contact_world_hitbox_point: None,
-                dodge_contact: false,
-            }]),
-            &TouchCalculator::new(),
-            &live_play,
-        )
-        .unwrap();
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(
+        stats.event_count_with_labels(&[StatLabel::new("kind", "forward")]),
+        1
+    );
+    assert_eq!(
+        stats.event_count_with_labels(&[StatLabel::new("kind", "reverse")]),
+        0
+    );
+}
+
+#[test]
+fn labels_reverse_flick_from_backflip_dodge() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    // A pure backflip (dodge straight back) is the defining reverse flick. No
+    // sideways dodge component, so it is center.
+    let calculator = run_flick_scenario(BACKFLIP_DODGE_TORQUE, glam::Vec3::new(1350.0, 0.0, 520.0));
 
     let event = calculator.events().first().unwrap();
     assert_eq!(event.kind, "reverse");
-    assert_eq!(event.setup_rotation_direction, "right");
-    assert!(event.setup_rotation_degrees > 0.0);
-    assert!(event.backflip_pitch_rate >= REVERSE_FLICK_MIN_BACKFLIP_PITCH_RATE);
-    assert!(event.local_ball_impulse[0] >= REVERSE_FLICK_MIN_FORWARD_IMPULSE);
-    assert!(event.rotation_under_ball_degrees >= REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES);
+    assert_eq!(event.direction, "center");
+    assert!(event.dodge_forward_back <= -REVERSE_FLICK_MIN_BACKWARD);
 
     let stats = calculator.player_stats().get(&player_id).unwrap();
     assert_eq!(
@@ -458,150 +507,88 @@ fn labels_reverse_flicks_with_backflip_pitch_forward_impulse_and_rotation_under_
         1
     );
     assert_eq!(
-        stats.event_count_with_labels(&[StatLabel::new("setup_rotation_direction", "right")]),
+        stats.event_count_with_labels(&[StatLabel::new("direction", "center")]),
         1
-    );
-    assert_eq!(
-        stats.event_count_with_labels(&[StatLabel::new("kind", "other")]),
-        0
     );
 }
 
 #[test]
-fn labels_left_reverse_flicks_from_negative_setup_rotation() {
+fn labels_right_reverse_flick_from_rightward_dodge() {
     let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = FlickCalculator::new();
-    let live_play = live_play();
-    let final_yaw = -0.35;
-
-    for (frame_number, time, yaw) in [(1, 0.1, 0.0), (2, 0.2, -0.18), (3, 0.3, final_yaw)] {
-        calculator
-            .update(
-                &frame(frame_number, time),
-                &ball_at_local(yaw, glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
-                &players_with_yaw_and_angular_velocity(
-                    frame_number == 3,
-                    yaw,
-                    glam::Vec3::new(0.0, 0.0, 0.0),
-                ),
-                &touch_state(Vec::new()),
-                &TouchCalculator::new(),
-                &live_play,
-            )
-            .unwrap();
-    }
-
-    let rotation_at_dodge = glam::Quat::from_rotation_z(final_yaw);
-    let forward_impulse = rotation_at_dodge * glam::Vec3::new(1350.0, 0.0, 520.0);
-    calculator
-        .update(
-            &frame(4, 0.4),
-            &ball_at_local(
-                final_yaw,
-                glam::Vec3::new(180.0, 0.0, 160.0),
-                forward_impulse,
-            ),
-            &players_with_yaw_and_angular_velocity(
-                true,
-                final_yaw,
-                glam::Vec3::new(0.0, -5.0, 0.0),
-            ),
-            &touch_state(vec![TouchEvent {
-                touch_id: None,
-                time: 0.4,
-                frame: 4,
-                team_is_team_0: true,
-                player: Some(player_id.clone()),
-                player_position: None,
-                closest_approach_distance: Some(0.0),
-                contact_local_ball_position: None,
-                contact_local_hitbox_point: None,
-                contact_world_hitbox_point: None,
-                dodge_contact: false,
-            }]),
-            &TouchCalculator::new(),
-            &live_play,
-        )
-        .unwrap();
+    // A reverse 45 to the right: the dodge is back + right (roll component), so
+    // handedness comes from the dodge's own side, not where the ball ends up.
+    let calculator = run_flick_scenario(
+        REVERSE_RIGHT_DODGE_TORQUE,
+        glam::Vec3::new(1350.0, 0.0, 520.0),
+    );
 
     let event = calculator.events().first().unwrap();
     assert_eq!(event.kind, "reverse");
-    assert_eq!(event.setup_rotation_direction, "left");
-    assert!(event.setup_rotation_degrees < 0.0);
+    assert_eq!(event.direction, "right");
+    assert!(event.dodge_side > 0.0);
 
     let stats = calculator.player_stats().get(&player_id).unwrap();
     assert_eq!(
         stats.event_count_with_labels(&[
             StatLabel::new("kind", "reverse"),
-            StatLabel::new("setup_rotation_direction", "left"),
+            StatLabel::new("direction", "right"),
         ]),
         1
     );
 }
 
 #[test]
-fn frontflip_pitch_forward_impulse_is_not_labeled_reverse() {
+fn labels_left_reverse_flick_from_leftward_dodge() {
     let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = FlickCalculator::new();
-    let live_play = live_play();
-    let final_yaw = 0.35;
-
-    for (frame_number, time, yaw) in [(1, 0.1, 0.0), (2, 0.2, 0.18), (3, 0.3, final_yaw)] {
-        calculator
-            .update(
-                &frame(frame_number, time),
-                &ball_at_local(yaw, glam::Vec3::new(60.0, 0.0, 112.0), glam::Vec3::ZERO),
-                &players_with_yaw_and_angular_velocity(
-                    frame_number == 3,
-                    yaw,
-                    glam::Vec3::new(0.0, 0.0, 0.0),
-                ),
-                &touch_state(Vec::new()),
-                &TouchCalculator::new(),
-                &live_play,
-            )
-            .unwrap();
-    }
-
-    let rotation_at_dodge = glam::Quat::from_rotation_z(final_yaw);
-    let forward_impulse = rotation_at_dodge * glam::Vec3::new(1350.0, 0.0, 520.0);
-    calculator
-        .update(
-            &frame(4, 0.4),
-            &ball_at_local(
-                final_yaw,
-                glam::Vec3::new(180.0, 0.0, 160.0),
-                forward_impulse,
-            ),
-            &players_with_yaw_and_angular_velocity(true, final_yaw, glam::Vec3::new(0.0, 5.0, 0.0)),
-            &touch_state(vec![TouchEvent {
-                touch_id: None,
-                time: 0.4,
-                frame: 4,
-                team_is_team_0: true,
-                player: Some(player_id.clone()),
-                player_position: None,
-                closest_approach_distance: Some(0.0),
-                contact_local_ball_position: None,
-                contact_local_hitbox_point: None,
-                contact_world_hitbox_point: None,
-                dodge_contact: false,
-            }]),
-            &TouchCalculator::new(),
-            &live_play,
-        )
-        .unwrap();
+    let calculator = run_flick_scenario(
+        REVERSE_LEFT_DODGE_TORQUE,
+        glam::Vec3::new(1350.0, 0.0, 520.0),
+    );
 
     let event = calculator.events().first().unwrap();
-    assert_eq!(event.kind, "other");
+    assert_eq!(event.kind, "reverse");
+    assert_eq!(event.direction, "left");
+    assert!(event.dodge_side < 0.0);
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
     assert_eq!(
-        calculator
-            .player_stats()
-            .get(&player_id)
-            .unwrap()
-            .event_count_with_labels(&[StatLabel::new("kind", "reverse")]),
+        stats.event_count_with_labels(&[
+            StatLabel::new("kind", "reverse"),
+            StatLabel::new("direction", "left"),
+        ]),
+        1
+    );
+}
+
+#[test]
+fn labels_side_flick_from_side_dodge() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    // A sideways (roll) dodge whose torque lies along travel: a side flick, not a
+    // reverse one even though the ball still goes forward.
+    let calculator = run_flick_scenario(SIDE_DODGE_TORQUE, glam::Vec3::new(1350.0, 0.0, 520.0));
+
+    let event = calculator.events().first().unwrap();
+    assert_eq!(event.kind, "side");
+    assert!(event.dodge_side.abs() >= SIDE_FLICK_MIN_SIDE);
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(
+        stats.event_count_with_labels(&[StatLabel::new("kind", "side")]),
+        1
+    );
+    assert_eq!(
+        stats.event_count_with_labels(&[StatLabel::new("kind", "reverse")]),
         0
     );
+}
+
+#[test]
+fn forward_dodge_is_not_labeled_reverse() {
+    // A forward dodge launching the ball forward is a forward flick, never a
+    // reverse one — the dodge direction, not the ball going forward, decides.
+    let calculator = run_flick_scenario(FORWARD_DODGE_TORQUE, glam::Vec3::new(1350.0, 0.0, 520.0));
+    let event = calculator.events().first().unwrap();
+    assert_ne!(event.kind, "reverse");
 }
 
 #[test]

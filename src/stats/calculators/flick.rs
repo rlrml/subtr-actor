@@ -60,42 +60,85 @@ const FLICK_MAX_LOCAL_X_BEHIND: f32 = 95.0;
 const FLICK_MAX_LOCAL_X_FRONT: f32 = 210.0;
 const FLICK_MAX_LOCAL_Y: f32 = 170.0;
 const FLICK_MIN_IMPULSE_AWAY_ALIGNMENT: f32 = 0.15;
-const REVERSE_FLICK_MIN_BACKFLIP_PITCH_RATE: f32 = 2.5;
-const REVERSE_FLICK_MIN_FORWARD_IMPULSE: f32 = 450.0;
-const REVERSE_FLICK_MIN_FORWARD_IMPULSE_ALIGNMENT: f32 = 0.55;
-const REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES: f32 = 15.0;
 
-/// The kind of flick detected.
+/// Minimum horizontal travel speed (uu/s) at the dodge for the dodge direction
+/// to be meaningful. Below this the car has no clear heading to measure the
+/// dodge's forward/back vs side split against, so the flick stays `Other`.
+const FLICK_MIN_TRAVEL_SPEED: f32 = 150.0;
+/// A flick's kind is read purely from the dodge's rotation — the `dodge_torque`
+/// axis (equivalently the angular momentum the dodge imparts, since that is the
+/// torque integrated over the dodge) — decomposed in the travel frame into
+/// `dodge_forward_back` (>0 forward dodge, <0 backflip) and `dodge_side` (signed
+/// left/right). Because the torque axis is a unit vector in that plane,
+/// `dodge_forward_back² + dodge_side² ≈ 1`. No linear ball impulse enters the
+/// classification.
+///
+/// The travel frame (torque vs the car's velocity heading), rather than the car
+/// body frame, is what makes forward/back vs side separable: on real dribble
+/// flicks the car's heading often differs from its facing, and a body-frame
+/// decomposition collapses forward and side dodges together.
+///
+/// Reverse flick: the dodge is sufficiently *backward* (a backflip).
+/// `REVERSE_FLICK_MIN_BACKWARD` clears both the pure 90 (back ≈ 1.0) and the 45
+/// reverse (back ≈ 0.7) while excluding a mostly-side dodge (back ≈ 0.3).
+const REVERSE_FLICK_MIN_BACKWARD: f32 = 0.35;
+/// A side flick's dodge is dominated by its sideways (roll) component.
+const SIDE_FLICK_MIN_SIDE: f32 = 0.6;
+/// A forward flick's dodge is sufficiently forward (front flip).
+const FORWARD_FLICK_MIN_FORWARD: f32 = 0.35;
+/// Minimum |dodge_side| (the dodge's sideways/roll component) to tag a flick's
+/// handedness left/right; below it the flick is `center` (e.g. a pure 90).
+const FLICK_DIRECTION_MIN_SIDE: f32 = 0.25;
+/// Maps the signed `dodge_side` component (torque · right-of-travel basis
+/// `r = (h.y, -h.x)`) to the human-facing right/left labels. Flip this sign if
+/// replay review shows the labels inverted — the dodge-direction handedness has
+/// not yet been visually confirmed against footage.
+const FLICK_DODGE_SIDE_RIGHT_SIGN: f32 = 1.0;
+
+/// The kind of flick detected, from the dodge direction (see
+/// [`REVERSE_FLICK_MIN_BACKWARD`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlickKind {
+    /// No clear dodge direction (e.g. missing torque/travel data), or a dodge
+    /// that is neither clearly forward, backward, nor sideways.
     Other,
+    /// A front-flip flick: the dodge is forward.
+    Forward,
+    /// A reverse flick: the dodge is a backflip yet the ball goes forward.
     Reverse,
+    /// A side flick: the dodge is dominated by its sideways component.
+    Side,
 }
 
-/// Rotation direction of the car during the flick setup.
+/// The handedness of a flick, from the ball's lateral deflection relative to the
+/// run's travel direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FlickSetupRotationDirection {
-    Unknown,
+pub enum FlickDirection {
+    Center,
     Left,
     Right,
 }
 
-pub(crate) const FLICK_KIND_LABELS: [StatLabel; 2] = [
+pub(crate) const FLICK_KIND_LABELS: [StatLabel; 4] = [
     StatLabel::new("kind", "other"),
+    StatLabel::new("kind", "forward"),
     StatLabel::new("kind", "reverse"),
+    StatLabel::new("kind", "side"),
 ];
 
-pub(crate) const FLICK_SETUP_ROTATION_DIRECTION_LABELS: [StatLabel; 3] = [
-    StatLabel::new("setup_rotation_direction", "unknown"),
-    StatLabel::new("setup_rotation_direction", "left"),
-    StatLabel::new("setup_rotation_direction", "right"),
+pub(crate) const FLICK_DIRECTION_LABELS: [StatLabel; 3] = [
+    StatLabel::new("direction", "center"),
+    StatLabel::new("direction", "left"),
+    StatLabel::new("direction", "right"),
 ];
 
 impl FlickKind {
     pub fn as_label_value(self) -> &'static str {
         match self {
             Self::Other => "other",
+            Self::Forward => "forward",
             Self::Reverse => "reverse",
+            Self::Side => "side",
         }
     }
 
@@ -104,10 +147,10 @@ impl FlickKind {
     }
 }
 
-impl FlickSetupRotationDirection {
+impl FlickDirection {
     pub fn as_label_value(self) -> &'static str {
         match self {
-            Self::Unknown => "unknown",
+            Self::Center => "center",
             Self::Left => "left",
             Self::Right => "right",
         }
@@ -116,16 +159,18 @@ impl FlickSetupRotationDirection {
 
 pub(crate) fn flick_kind_label(value: &str) -> StatLabel {
     match value {
+        "forward" => StatLabel::new("kind", "forward"),
         "reverse" => StatLabel::new("kind", "reverse"),
+        "side" => StatLabel::new("kind", "side"),
         _ => StatLabel::new("kind", "other"),
     }
 }
 
-pub(crate) fn flick_setup_rotation_direction_label(value: &str) -> StatLabel {
+pub(crate) fn flick_direction_label(value: &str) -> StatLabel {
     match value {
-        "left" => StatLabel::new("setup_rotation_direction", "left"),
-        "right" => StatLabel::new("setup_rotation_direction", "right"),
-        _ => StatLabel::new("setup_rotation_direction", "unknown"),
+        "left" => StatLabel::new("direction", "left"),
+        "right" => StatLabel::new("direction", "right"),
+        _ => StatLabel::new("direction", "center"),
     }
 }
 
@@ -156,12 +201,14 @@ pub struct FlickEvent {
     pub impulse_away_alignment: f32,
     pub vertical_impulse: f32,
     pub kind: String,
+    pub direction: String,
     pub local_ball_position: [f32; 3],
     pub local_ball_impulse: [f32; 3],
-    pub backflip_pitch_rate: f32,
-    pub rotation_under_ball_degrees: f32,
-    pub setup_rotation_degrees: f32,
-    pub setup_rotation_direction: String,
+    /// Dodge direction in the travel frame: >0 forward dodge, <0 backflip.
+    pub dodge_forward_back: f32,
+    /// Dodge direction in the travel frame: signed sideways (roll) component
+    /// (the handedness source).
+    pub dodge_side: f32,
     pub confidence: f32,
 }
 
@@ -185,9 +232,6 @@ struct ActiveFlickSetup {
     horizontal_gap_integral: f32,
     vertical_gap_integral: f32,
     touch_count: u32,
-    start_forward: Option<glam::Vec3>,
-    max_horizontal_rotation_degrees: f32,
-    signed_horizontal_rotation_degrees: f32,
     /// Smallest ball-vs-car horizontal speed difference seen during a *non-dodge*
     /// frame of the setup, or `f32::INFINITY` if none. See
     /// [`FLICK_MAX_CARRY_REL_HORIZONTAL_SPEED`].
@@ -209,8 +253,6 @@ struct FlickSetupSummary {
     average_horizontal_gap: f32,
     average_vertical_gap: f32,
     touch_count: u32,
-    rotation_under_ball_degrees: f32,
-    setup_rotation_degrees: f32,
     min_relative_horizontal_speed: f32,
     observed_velocity: bool,
 }
@@ -221,6 +263,12 @@ struct RecentDodgeStart {
     frame: usize,
     setup: FlickSetupSummary,
     rotation_at_dodge: Option<glam::Quat>,
+    /// World-frame dodge torque (the flip axis) captured at the dodge, used to
+    /// read the dodge direction. `None` when the input did not replicate it.
+    dodge_torque: Option<glam::Vec3>,
+    /// Horizontal travel direction (the run heading) at the dodge, the frame the
+    /// dodge direction and the ball's forward deflection are measured against.
+    travel_direction: Option<glam::Vec3>,
 }
 
 /// A touch that looks like it could be a flick, kept alive for a short window so
@@ -377,8 +425,6 @@ impl FlickCalculator {
                 / setup.duration.max(f32::EPSILON),
             average_vertical_gap: setup.vertical_gap_integral / setup.duration.max(f32::EPSILON),
             touch_count: setup.touch_count,
-            rotation_under_ball_degrees: setup.max_horizontal_rotation_degrees,
-            setup_rotation_degrees: setup.signed_horizontal_rotation_degrees,
             min_relative_horizontal_speed: setup.min_relative_horizontal_speed,
             observed_velocity: setup.observed_velocity,
         }
@@ -400,62 +446,75 @@ impl FlickCalculator {
         setup.duration >= FLICK_MIN_SETUP_SECONDS
     }
 
-    fn classify_kind(
+    /// Ball-relative geometry of the touch, in the dodge reference frame. Returns
+    /// `(local_ball_position, local_ball_impulse)`.
+    fn local_ball_geometry(
         player_rotation: glam::Quat,
-        player_angular_velocity: glam::Vec3,
         rotation_at_dodge: Option<glam::Quat>,
-        rotation_under_ball_degrees: f32,
         relative_ball_position: glam::Vec3,
         ball_impulse: glam::Vec3,
-    ) -> (FlickKind, glam::Vec3, glam::Vec3, f32) {
+    ) -> (glam::Vec3, glam::Vec3) {
         let local_ball_position = player_rotation.inverse() * relative_ball_position;
         let impulse_reference_rotation = rotation_at_dodge.unwrap_or(player_rotation);
         let local_ball_impulse = impulse_reference_rotation.inverse() * ball_impulse;
-        let local_angular_velocity = player_rotation.inverse() * player_angular_velocity;
-        let backflip_pitch_rate = (-local_angular_velocity.y).max(0.0);
-        let forward_impulse_alignment = ball_impulse
-            .normalize_or_zero()
-            .dot(impulse_reference_rotation * glam::Vec3::X);
-        let kind = if backflip_pitch_rate >= REVERSE_FLICK_MIN_BACKFLIP_PITCH_RATE
-            && local_ball_impulse.x >= REVERSE_FLICK_MIN_FORWARD_IMPULSE
-            && forward_impulse_alignment >= REVERSE_FLICK_MIN_FORWARD_IMPULSE_ALIGNMENT
-            && rotation_under_ball_degrees >= REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES
+        (local_ball_position, local_ball_impulse)
+    }
+
+    /// Classify the flick purely from the dodge's rotation — no ball impulse.
+    ///
+    /// The `dodge_torque` axis (world horizontal; equivalently the angular
+    /// momentum the dodge imparts) is decomposed in the travel frame defined by
+    /// `travel_direction` (the run heading `h`, with right-of-travel
+    /// `r = (h.y, -h.x)`):
+    /// - `dodge_forward_back = t · r` — >0 forward dodge, <0 backflip,
+    /// - `dodge_side = t · h` — signed sideways (roll) component.
+    ///
+    /// A reverse flick is a sufficiently backward dodge; a side flick is a
+    /// sideways-dominant dodge; a forward flick is a forward dodge. Handedness is
+    /// the sign of the dodge's own side component. Returns
+    /// `(kind, direction, dodge_forward_back, dodge_side)`.
+    fn classify_dodge(
+        dodge_torque: Option<glam::Vec3>,
+        travel_direction: Option<glam::Vec3>,
+    ) -> (FlickKind, FlickDirection, f32, f32) {
+        let (Some(torque), Some(travel)) = (dodge_torque, travel_direction) else {
+            return (FlickKind::Other, FlickDirection::Center, 0.0, 0.0);
+        };
+        let heading = travel.truncate();
+        let torque_horizontal = torque.truncate();
+        if heading.length() < FLICK_MIN_TRAVEL_SPEED
+            || torque_horizontal.length_squared() <= f32::EPSILON
         {
+            return (FlickKind::Other, FlickDirection::Center, 0.0, 0.0);
+        }
+
+        let h = heading.normalize();
+        let t = torque_horizontal.normalize();
+        // Right-of-travel basis vector (see FLICK_DODGE_SIDE_RIGHT_SIGN).
+        let r = glam::Vec2::new(h.y, -h.x);
+        let dodge_forward_back = t.dot(r);
+        let dodge_side = t.dot(h);
+        let handed_side = dodge_side * FLICK_DODGE_SIDE_RIGHT_SIGN;
+
+        let direction = if handed_side >= FLICK_DIRECTION_MIN_SIDE {
+            FlickDirection::Right
+        } else if handed_side <= -FLICK_DIRECTION_MIN_SIDE {
+            FlickDirection::Left
+        } else {
+            FlickDirection::Center
+        };
+
+        let kind = if dodge_forward_back <= -REVERSE_FLICK_MIN_BACKWARD {
             FlickKind::Reverse
+        } else if dodge_side.abs() >= SIDE_FLICK_MIN_SIDE {
+            FlickKind::Side
+        } else if dodge_forward_back >= FORWARD_FLICK_MIN_FORWARD {
+            FlickKind::Forward
         } else {
             FlickKind::Other
         };
 
-        (
-            kind,
-            local_ball_position,
-            local_ball_impulse,
-            backflip_pitch_rate,
-        )
-    }
-
-    fn signed_horizontal_rotation_degrees(
-        start_forward: Option<glam::Vec3>,
-        current_forward: Option<glam::Vec3>,
-    ) -> Option<f32> {
-        let start = start_forward?.truncate().normalize_or_zero();
-        let current = current_forward?.truncate().normalize_or_zero();
-        if start.length_squared() <= f32::EPSILON || current.length_squared() <= f32::EPSILON {
-            return None;
-        }
-
-        let cross_z = start.x * current.y - start.y * current.x;
-        Some(cross_z.atan2(start.dot(current)).to_degrees())
-    }
-
-    fn setup_rotation_direction(signed_degrees: f32) -> FlickSetupRotationDirection {
-        if signed_degrees.abs() < REVERSE_FLICK_MIN_ROTATION_UNDER_BALL_DEGREES {
-            FlickSetupRotationDirection::Unknown
-        } else if signed_degrees > 0.0 {
-            FlickSetupRotationDirection::Right
-        } else {
-            FlickSetupRotationDirection::Left
-        }
+        (kind, direction, dodge_forward_back, dodge_side)
     }
 
     fn store_recent_setup(&mut self, player_id: PlayerId, setup: FlickSetupSummary) {
@@ -509,10 +568,6 @@ impl FlickCalculator {
                 continue;
             };
             observed_players.insert(player.player_id.clone());
-            let current_forward = player
-                .rigid_body
-                .as_ref()
-                .map(|rigid_body| quat_to_glam(&rigid_body.rotation) * glam::Vec3::X);
             let setup = self
                 .active_setups
                 .entry(player.player_id.clone())
@@ -526,9 +581,6 @@ impl FlickCalculator {
                     horizontal_gap_integral: observation.horizontal_gap * frame.dt.max(0.0),
                     vertical_gap_integral: observation.vertical_gap * frame.dt.max(0.0),
                     touch_count: 0,
-                    start_forward: current_forward,
-                    max_horizontal_rotation_degrees: 0.0,
-                    signed_horizontal_rotation_degrees: 0.0,
                     min_relative_horizontal_speed: f32::INFINITY,
                     observed_velocity: false,
                 });
@@ -559,15 +611,6 @@ impl FlickCalculator {
                 setup.duration += frame.dt.max(0.0);
                 setup.horizontal_gap_integral += observation.horizontal_gap * frame.dt.max(0.0);
                 setup.vertical_gap_integral += observation.vertical_gap * frame.dt.max(0.0);
-                if let Some(signed_degrees) =
-                    Self::signed_horizontal_rotation_degrees(setup.start_forward, current_forward)
-                {
-                    let degrees = signed_degrees.abs();
-                    if degrees > setup.max_horizontal_rotation_degrees {
-                        setup.max_horizontal_rotation_degrees = degrees;
-                        setup.signed_horizontal_rotation_degrees = signed_degrees;
-                    }
-                }
             }
         }
 
@@ -624,16 +667,30 @@ impl FlickCalculator {
 
             self.recent_dodge_starts.insert(
                 player.player_id.clone(),
-                RecentDodgeStart {
-                    time: frame.time,
-                    frame: frame.frame_number,
-                    setup,
-                    rotation_at_dodge: player
-                        .rigid_body
-                        .as_ref()
-                        .map(|rigid_body| quat_to_glam(&rigid_body.rotation)),
-                },
+                Self::dodge_start(frame.time, frame.frame_number, setup, player),
             );
+        }
+    }
+
+    /// Build a [`RecentDodgeStart`] from the player's state at the dodge,
+    /// snapshotting the dodge reference rotation, the world-frame dodge torque,
+    /// and the horizontal travel direction the dodge is measured against.
+    fn dodge_start(
+        time: f32,
+        frame: usize,
+        setup: FlickSetupSummary,
+        player: &PlayerSample,
+    ) -> RecentDodgeStart {
+        RecentDodgeStart {
+            time,
+            frame,
+            setup,
+            rotation_at_dodge: player
+                .rigid_body
+                .as_ref()
+                .map(|rigid_body| quat_to_glam(&rigid_body.rotation)),
+            dodge_torque: player.dodge_torque,
+            travel_direction: player.velocity(),
         }
     }
 
@@ -682,22 +739,15 @@ impl FlickCalculator {
 
         let vertical_impulse = ball_impulse.z.max(0.0);
         let player_rotation = quat_to_glam(&player_rigid_body.rotation);
-        let player_angular_velocity = player_rigid_body
-            .angular_velocity
-            .as_ref()
-            .map(vec_to_glam)
-            .unwrap_or(glam::Vec3::ZERO);
-        let (kind, local_ball_position, local_ball_impulse, backflip_pitch_rate) =
-            Self::classify_kind(
-                player_rotation,
-                player_angular_velocity,
-                dodge_start.rotation_at_dodge,
-                dodge_start.setup.rotation_under_ball_degrees,
-                ball.position() - player_position,
-                ball_impulse,
-            );
+        let (local_ball_position, local_ball_impulse) = Self::local_ball_geometry(
+            player_rotation,
+            dodge_start.rotation_at_dodge,
+            ball.position() - player_position,
+            ball_impulse,
+        );
+        let (kind, direction, dodge_forward_back, dodge_side) =
+            Self::classify_dodge(dodge_start.dodge_torque, dodge_start.travel_direction);
         let setup = &dodge_start.setup;
-        let setup_rotation_direction = Self::setup_rotation_direction(setup.setup_rotation_degrees);
         let timing_score =
             1.0 - (time_since_dodge / FLICK_MAX_DODGE_TO_TOUCH_SECONDS).clamp(0.0, 1.0);
         let setup_duration_score =
@@ -749,12 +799,11 @@ impl FlickCalculator {
             impulse_away_alignment,
             vertical_impulse,
             kind: kind.as_label_value().to_owned(),
+            direction: direction.as_label_value().to_owned(),
             local_ball_position: local_ball_position.to_array(),
             local_ball_impulse: local_ball_impulse.to_array(),
-            backflip_pitch_rate,
-            rotation_under_ball_degrees: setup.rotation_under_ball_degrees,
-            setup_rotation_degrees: setup.setup_rotation_degrees,
-            setup_rotation_direction: setup_rotation_direction.as_label_value().to_owned(),
+            dodge_forward_back,
+            dodge_side,
             confidence,
         })
     }
@@ -800,15 +849,12 @@ impl FlickCalculator {
         if !Self::setup_shows_carry(&setup) {
             return None;
         }
-        Some(RecentDodgeStart {
-            time: touch_event.time,
-            frame: touch_event.frame,
+        Some(Self::dodge_start(
+            touch_event.time,
+            touch_event.frame,
             setup,
-            rotation_at_dodge: player
-                .rigid_body
-                .as_ref()
-                .map(|rigid_body| quat_to_glam(&rigid_body.rotation)),
-        })
+            player,
+        ))
     }
 
     /// Open (or refresh) a pending flick for a touch by a player who has a
