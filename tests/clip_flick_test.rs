@@ -91,15 +91,16 @@ fn clip_detects_all_three_flicks_in_calemacar_dribble() {
 
 #[test]
 fn clip_classifies_flick_kinds_from_dodge_direction() {
-    // All three dodges in this sequence are *side*-dominant in the car-relative
-    // dodge torque (|x| ≈ 2.4-2.5 vs |y| ≈ 0.5-0.9), so they classify as side
-    // flicks. Their handedness (the first to the right, the next two to the left)
-    // is independently corroborated by the dodge-impulse direction. The earlier
+    // All three dodges are read from the car-relative dodge torque (the old
     // "forward/reverse/side" labels here were an artifact of the buggy
-    // travel-frame decomposition (it treated the car-relative torque as a world
-    // vector); see `FlickCalculator::classify_dodge`. Forward/reverse/side
-    // discrimination itself is covered by the synthetic unit tests in
-    // `flick_tests.rs`.
+    // travel-frame decomposition; see `FlickCalculator::classify_dodge`):
+    //   ~225.96s  tq=(-2.40, 0.86) -> fb=+0.34, side -> side, right
+    //   ~230.52s  tq=( 2.46,-0.73) -> fb=-0.28 (<=-0.25) -> reverse, left
+    //   ~235.90s  tq=( 2.53,-0.52) -> fb=-0.20 (in the valley) -> side, left
+    // The middle one's backflip lean clears REVERSE_FLICK_MIN_BACKWARD (0.25,
+    // the valley edge calibrated from Mawkzy's flick corpus); handedness is
+    // corroborated by the independent dodge-impulse direction. Forward/reverse/
+    // side discrimination itself is covered by the synthetic unit tests.
     let timeline = clip_timeline(SEQUENCE_START_FRAME, SEQUENCE_END_FRAME);
     let flicks: Vec<&FlickEvent> =
         common::event_payloads_by_stream(&timeline, "flick", |payload| match payload {
@@ -107,16 +108,16 @@ fn clip_classifies_flick_kinds_from_dodge_direction() {
             _ => None,
         });
 
-    for (label, dodge_time, direction) in [
-        ("first", FIRST_FLICK_DODGE_TIME, "right"),
-        ("middle", MISSED_FLICK_DODGE_TIME, "left"),
-        ("third", THIRD_FLICK_DODGE_TIME, "left"),
+    for (label, dodge_time, kind, direction) in [
+        ("first", FIRST_FLICK_DODGE_TIME, "side", "right"),
+        ("middle", MISSED_FLICK_DODGE_TIME, "reverse", "left"),
+        ("third", THIRD_FLICK_DODGE_TIME, "side", "left"),
     ] {
         let flick = flick_near(&flicks, dodge_time)
             .unwrap_or_else(|| panic!("{label} dodge (~{dodge_time}s) missing; got {flicks:#?}"));
         assert_eq!(
-            flick.kind, "side",
-            "{label} dodge (~{dodge_time}s) is side-dominant; got {flick:#?}"
+            flick.kind, kind,
+            "{label} dodge (~{dodge_time}s) kind; got {flick:#?}"
         );
         assert_eq!(
             flick.direction, direction,

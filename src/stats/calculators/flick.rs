@@ -74,10 +74,16 @@ const FLICK_MIN_IMPULSE_AWAY_ALIGNMENT: f32 = 0.15;
 /// against the world velocity heading — which was a frame error that made the
 /// classification depend on the car's world facing.)
 ///
-/// Reverse flick: the dodge is sufficiently *backward* (a backflip).
-/// `REVERSE_FLICK_MIN_BACKWARD` clears both the pure 90 (back ≈ 1.0) and the 45
-/// reverse (back ≈ 0.7) while excluding a mostly-side dodge (back ≈ 0.3).
-const REVERSE_FLICK_MIN_BACKWARD: f32 = 0.35;
+/// Reverse flick: the dodge is sufficiently *backward* (a backflip), i.e.
+/// `dodge_forward_back <= -REVERSE_FLICK_MIN_BACKWARD`. Calibrated from a pro
+/// corpus (Mawkzy's 98 flicks across 42 rocket-sense replays): his
+/// `dodge_forward_back` is bimodal — a backflip cluster from ≈-1.0 up to ≈-0.25,
+/// then a sparse valley (only ~6 of 98 in -0.25..+0.1), then a forward cluster
+/// above +0.1. `0.25` sits at the top edge of the backflip cluster / start of
+/// the valley, so it captures pure backflips (back ≈ 1.0) and back-diagonal
+/// "reverse 45s" (back ≈ 0.5-0.7, heavily side) without reaching into the
+/// forward population. (Was 0.35, which sliced into the backflip cluster.)
+const REVERSE_FLICK_MIN_BACKWARD: f32 = 0.25;
 /// A side flick's dodge is dominated by its sideways (roll) component.
 const SIDE_FLICK_MIN_SIDE: f32 = 0.6;
 /// A forward flick's dodge is sufficiently forward (front flip).
@@ -206,6 +212,18 @@ pub struct FlickEvent {
     /// Dodge direction (car-relative): signed sideways component (+right, -left;
     /// the handedness source).
     pub dodge_side: f32,
+    /// Raw car-relative dodge torque (the flip's rotation axis) `[x, y, z]`:
+    /// `y` = forward/back, `x` = left/right, `z` ≈ 0 (nonzero only when the car
+    /// is tilted). `dodge_forward_back`/`dodge_side` are its normalized 2D
+    /// projection; this is the full raw signal. `None` on inputs that don't
+    /// replicate dodge torque (e.g. the BakkesMod live path).
+    pub dodge_torque: Option<[f32; 3]>,
+    /// Signed horizontal angle (radians) from the car's facing to its velocity
+    /// heading at the launch touch (projected to the x/y plane) — how far the
+    /// car was turned off its line of travel. With the car-relative dodge
+    /// direction this recovers the dodge direction relative to the run's motion.
+    /// 0 when the car's speed or horizontal facing is too small to be meaningful.
+    pub travel_offset_radians: f32,
     pub confidence: f32,
 }
 
@@ -742,6 +760,23 @@ impl FlickCalculator {
         );
         let (kind, direction, dodge_forward_back, dodge_side) =
             Self::classify_dodge(dodge_start.dodge_torque);
+        // How far the car was turned off its line of travel at the launch touch
+        // (x/y plane): signed angle from the car's facing to its velocity
+        // heading. + = velocity is to the car's left of where it points.
+        let travel_offset_radians = player
+            .velocity()
+            .map(|velocity| {
+                let forward = (player_rotation * glam::Vec3::X).truncate();
+                let heading = velocity.truncate();
+                if forward.length() > 0.3 && heading.length() > 50.0 {
+                    let forward = forward.normalize();
+                    let heading = heading.normalize();
+                    (forward.x * heading.y - forward.y * heading.x).atan2(forward.dot(heading))
+                } else {
+                    0.0
+                }
+            })
+            .unwrap_or(0.0);
         let setup = &dodge_start.setup;
         let timing_score =
             1.0 - (time_since_dodge / FLICK_MAX_DODGE_TO_TOUCH_SECONDS).clamp(0.0, 1.0);
@@ -799,6 +834,8 @@ impl FlickCalculator {
             local_ball_impulse: local_ball_impulse.to_array(),
             dodge_forward_back,
             dodge_side,
+            dodge_torque: dodge_start.dodge_torque.map(|torque| torque.to_array()),
+            travel_offset_radians,
             confidence,
         })
     }
