@@ -179,18 +179,9 @@ function buildPossessionTimelineRangesFromEvents(
         color: "rgba(245, 158, 11, 0.88)",
         isTeamZero: false,
       };
-    } else if (active && possessionState === "neutral") {
-      nextRange = {
-        id: `possession:neutral:${startTime.toFixed(3)}`,
-        startTime,
-        endTime,
-        lane: "possession",
-        laneLabel: "Possession",
-        label: "Neutral possession",
-        color: "rgba(209, 217, 224, 0.7)",
-        isTeamZero: null,
-      };
     }
+    // Neutral (and non-live / inactive) stretches draw nothing: the lane only
+    // shows spans where a team actively has possession, leaving gaps elsewhere.
 
     mergeRange(ranges, nextRange);
     previousFrame = frame;
@@ -264,18 +255,9 @@ export function buildPossessionTimelineRanges(
         color: "rgba(245, 158, 11, 0.88)",
         isTeamZero: false,
       };
-    } else if (deltaNeutral > DELTA_EPSILON) {
-      nextRange = {
-        id: `possession:neutral:${startTime.toFixed(3)}`,
-        startTime,
-        endTime,
-        lane: "possession",
-        laneLabel: "Possession",
-        label: "Neutral possession",
-        color: "rgba(209, 217, 224, 0.7)",
-        isTeamZero: null,
-      };
     }
+    // Neutral stretches draw nothing: only spans where a team actively has
+    // possession render, leaving gaps elsewhere.
 
     mergeRange(ranges, nextRange);
     previousFrame = frame;
