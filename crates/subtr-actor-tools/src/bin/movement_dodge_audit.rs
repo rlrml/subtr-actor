@@ -56,7 +56,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     println!(
-        "idx\tclock\tabs_time\tframe\tplayer\tteam\tz\tspeed\tdspeed\timpulse_mag\tfwd\tright\tup\tdir_label\tconf\tonset_pitch\tonset_roll\tmin_fwd_z\tmax_fwd_dev\tmax_up_dev\tmin_up_z\tcurrent\ttrue_label"
+        "idx\tclock\tabs_time\tframe\tplayer\tteam\tz\tspeed\tdspeed\timpulse_mag\tfwd\tright\tup\tdir_label\tconf\tonset_pitch\tonset_roll\tmin_fwd_z\tmax_fwd_dev\tmax_up_dev\tmin_up_z\ttq_x\ttq_y\ttq_hmag\tcurrent\ttrue_label"
     );
     let mut idx = 0;
     for dodge in &dodges {
@@ -98,8 +98,12 @@ fn main() -> anyhow::Result<()> {
                 ),
                 None => (None, None, None, None, None, None),
             };
+        let (tq_x, tq_y, tq_hmag) = match dodge.dodge_torque {
+            Some([x, y, _]) => (Some(x), Some(y), Some((x * x + y * y).sqrt())),
+            None => (None, None, None),
+        };
         println!(
-            "{idx}\t{clock}\t{:.3}\t{}\t{}\t{}\t{}\t{:.0}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{idx}\t{clock}\t{:.3}\t{}\t{}\t{}\t{}\t{:.0}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             dodge.time,
             dodge.frame,
             player_name(&names, &dodge.player),
@@ -119,6 +123,9 @@ fn main() -> anyhow::Result<()> {
             opt(max_fwd_dev, 1),
             opt(max_up_dev, 1),
             opt(min_up_z, 3),
+            opt(tq_x, 2),
+            opt(tq_y, 2),
+            opt(tq_hmag, 2),
             if is_speed_flip(dodge) {
                 "SPEED_FLIP"
             } else {

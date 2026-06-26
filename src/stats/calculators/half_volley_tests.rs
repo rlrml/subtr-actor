@@ -40,6 +40,7 @@ fn player(player_id: PlayerId, z: f32, dodge_active: bool) -> PlayerSample {
         last_boost_amount: None,
         boost_active: false,
         dodge_active,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
         match_assists: None,

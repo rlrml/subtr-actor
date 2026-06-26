@@ -40,6 +40,7 @@ fn player(player_id: PlayerId, is_team_0: bool, position: glam::Vec3) -> PlayerS
         last_boost_amount: None,
         boost_active: false,
         dodge_active: false,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
         match_assists: None,

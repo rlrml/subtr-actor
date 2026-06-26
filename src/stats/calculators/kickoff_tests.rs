@@ -46,6 +46,7 @@ fn player_with_velocity_and_rotation(
         last_boost_amount: None,
         boost_active: false,
         dodge_active: false,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
         match_assists: None,

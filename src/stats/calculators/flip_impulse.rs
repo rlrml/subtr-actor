@@ -88,6 +88,14 @@ pub struct DodgeEvent {
     pub dodge_impulse: Option<DodgeImpulse>,
     #[serde(default)]
     pub dodge_rotation: Option<DodgeRotation>,
+    /// Replicated dodge torque (`TAGame.CarComponent_Dodge_TA:DodgeTorque`) read
+    /// straight off the dodge component at onset — the flip's world-frame rotation
+    /// axis (a horizontal vector; world-z ≈ 0). Unlike `dodge_rotation`'s onset
+    /// angular velocity (sampled a frame late and contaminated by any ongoing car
+    /// rotation), this is the exact commanded flip direction. `None` on inputs
+    /// that do not replicate it (e.g. the BakkesMod live path).
+    #[serde(default)]
+    pub dodge_torque: Option<[f32; 3]>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -113,6 +121,8 @@ struct ActiveFlipImpulseCandidate {
     max_up_deviation_degrees: f32,
     min_up_z: f32,
     rotation_sample_count: u32,
+    /// Replicated world-frame dodge torque captured at onset. See [`DodgeEvent`].
+    dodge_torque: Option<glam::Vec3>,
 }
 
 impl InFlightItem for ActiveFlipImpulseCandidate {
@@ -248,6 +258,7 @@ impl FlipImpulseCalculator {
                 max_up_deviation_degrees: 0.0,
                 min_up_z: local_up.z,
                 rotation_sample_count: 0,
+                dodge_torque: player.dodge_torque,
             },
         );
     }
@@ -374,6 +385,7 @@ impl FlipImpulseCalculator {
             is_team_0: candidate.is_team_0,
             dodge_impulse,
             dodge_rotation,
+            dodge_torque: candidate.dodge_torque.map(|torque| torque.to_array()),
         }
     }
 

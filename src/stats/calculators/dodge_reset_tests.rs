@@ -25,6 +25,7 @@ fn player_at_height(player_id: PlayerId, dodge_active: bool, height: f32) -> Pla
         last_boost_amount: None,
         boost_active: false,
         dodge_active,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
         match_assists: None,
