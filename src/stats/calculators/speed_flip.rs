@@ -89,6 +89,11 @@ struct ActiveSpeedFlipCandidate {
     best_estimated_dodge_impulse_side_component: f32,
     best_estimated_dodge_impulse_up_component: f32,
     dodge_acceleration_sample_count: u32,
+    /// Replicated dodge torque (car-relative flip axis) captured at the dodge,
+    /// `None` on inputs that do not replicate it. Preferred over
+    /// `best_diagonal_score` (the onset-angular-velocity fallback) for the
+    /// diagonal-dodge signal — see [`SpeedFlipCalculator::diagonal_score_from_torque`].
+    dodge_torque: Option<glam::Vec3>,
     best_diagonal_score: f32,
     max_forward_rotation_degrees: f32,
     max_up_rotation_degrees: f32,
@@ -193,6 +198,35 @@ impl SpeedFlipCalculator {
         let balance_score = Self::normalize_score(balance, 0.18, 0.65);
 
         (pitch_score * side_score).sqrt() * (0.75 + 0.25 * balance_score)
+    }
+
+    /// Diagonal-dodge score from the replicated dodge torque — the car-relative
+    /// flip axis, where `y` is the forward/back (pitch) component and `x` the
+    /// side (roll) component. A speed flip is a *forward-diagonal* dodge, so this
+    /// rewards a torque that is both forward (`y > 0`) and sideways (`|x|`),
+    /// peaking at a 45° forward-diagonal and falling to 0 for a pure-forward
+    /// dodge, a pure-side flip, or a backflip (`y <= 0`).
+    ///
+    /// This is the clean replacement for [`diagonal_score`], which reads the
+    /// onset *angular velocity*: the dodge-active byte lags the real flip by an
+    /// inconsistent amount, so the angular velocity at detection is contaminated
+    /// by how far the car has already rotated (and any air-roll). The dodge
+    /// torque is the exact commanded direction, set once at the dodge and
+    /// car-relative, so it needs no frame-timing luck. Used when available;
+    /// inputs that do not replicate dodge torque fall back to [`diagonal_score`].
+    fn diagonal_score_from_torque(torque: glam::Vec3) -> f32 {
+        let forward = torque.y;
+        let side = torque.x.abs();
+        if forward <= 0.0 {
+            return 0.0;
+        }
+        let magnitude = glam::Vec2::new(forward, side).length();
+        if magnitude <= f32::EPSILON {
+            return 0.0;
+        }
+        // forward * side / magnitude^2 peaks at 0.5 (a perfect 45° diagonal);
+        // scale so a clean forward-diagonal dodge scores ~1.0.
+        (2.0 * forward * side / (magnitude * magnitude)).clamp(0.0, 1.0)
     }
 
     fn forward_speed_alignment(player: &PlayerSample) -> Option<f32> {
@@ -386,6 +420,7 @@ impl SpeedFlipCalculator {
                 best_estimated_dodge_impulse_side_component: 0.0,
                 best_estimated_dodge_impulse_up_component: 1.0,
                 dodge_acceleration_sample_count: 0,
+                dodge_torque: player.dodge_torque,
                 best_diagonal_score,
                 max_forward_rotation_degrees: 0.0,
                 max_up_rotation_degrees: 0.0,
@@ -530,9 +565,15 @@ impl SpeedFlipCalculator {
         // there (two pros on the same kickoff flipped 0.07s vs 0.22s after
         // leaving the ground), so a timing ceiling only produces false negatives.
         // `dodge_delay_after_ground_leave_seconds` is still reported for review.
+        // Prefer the clean dodge-torque direction; fall back to the onset
+        // angular velocity only when the input does not replicate dodge torque.
+        let diagonal_score = candidate
+            .dodge_torque
+            .map(Self::diagonal_score_from_torque)
+            .unwrap_or(candidate.best_diagonal_score);
         let has_cancelled_diagonal_dodge = candidate.max_forward_rotation_degrees
             <= SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES
-            && candidate.best_diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
+            && diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
         // Inverts (≥ MIN) but does not go fully end-over-end (≤ MAX): the
         // air-roll signature of a speed flip, vs a full barrel roll / flip.
         if candidate.max_up_rotation_degrees < SPEED_FLIP_MIN_UP_ROTATION_DEGREES
@@ -551,7 +592,7 @@ impl SpeedFlipCalculator {
         }
         let boost_alignment_score =
             Self::normalize_score(candidate.best_boost_alignment, 0.82, 0.99);
-        let confidence = 0.30 * candidate.best_diagonal_score
+        let confidence = 0.30 * diagonal_score
             + 0.30 * cancel_score
             + 0.15 * speed_score
             + 0.15 * alignment_score
@@ -588,7 +629,7 @@ impl SpeedFlipCalculator {
             boost_alignment_sample_count: candidate.boost_alignment_sample_count,
             dodge_delay_after_ground_leave_seconds: candidate
                 .dodge_delay_after_ground_leave_seconds,
-            diagonal_score: candidate.best_diagonal_score,
+            diagonal_score,
             estimated_dodge_impulse_magnitude: candidate.best_estimated_dodge_impulse_magnitude,
             estimated_dodge_impulse_forward_component: candidate
                 .best_estimated_dodge_impulse_forward_component,

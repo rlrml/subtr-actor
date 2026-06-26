@@ -68,6 +68,7 @@ fn strong_candidate(boost_alignment_sample_count: u32) -> ActiveSpeedFlipCandida
         best_estimated_dodge_impulse_side_component: 0.42,
         best_estimated_dodge_impulse_up_component: 0.08,
         dodge_acceleration_sample_count: 2,
+        dodge_torque: None,
         best_diagonal_score: 1.0,
         max_forward_rotation_degrees: 24.0,
         max_up_rotation_degrees: 120.0,
@@ -374,4 +375,20 @@ fn kickoff_candidate_can_start_above_supersonic_threshold() {
         .unwrap();
 
     assert!(calculator.active_candidates.contains(&player_id));
+}
+
+#[test]
+fn diagonal_score_from_torque_rewards_forward_diagonal_dodges() {
+    // Dodge torque is the car-relative flip axis: y = forward/back, x = side.
+    let score = SpeedFlipCalculator::diagonal_score_from_torque;
+    // A 45° forward-diagonal dodge (the speed-flip input) scores ~1.0.
+    assert!(score(glam::Vec3::new(1.84, 1.84, 0.0)) > 0.99);
+    // A real recall-drill speed flip (forward-biased diagonal) still scores high.
+    assert!(score(glam::Vec3::new(1.5, 1.85, 0.0)) > 0.9);
+    // A pure forward dodge (no diagonal) and a pure side flip score ~0.
+    assert!(score(glam::Vec3::new(0.0, 2.6, 0.0)) < 0.05);
+    assert_eq!(score(glam::Vec3::new(2.6, 0.0, 0.0)), 0.0);
+    // A backflip (y <= 0) is never a speed flip.
+    assert_eq!(score(glam::Vec3::new(0.0, -2.6, 0.0)), 0.0);
+    assert_eq!(score(glam::Vec3::new(1.84, -1.84, 0.0)), 0.0);
 }
