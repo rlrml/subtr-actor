@@ -357,7 +357,6 @@ pub enum EventPayload {
     Timeline(TimelineEvent),
     CorePlayer(CorePlayerScoreboardEvent),
     Possession(PossessionEvent),
-    LoosePossession(LoosePossessionEvent),
     PlayerPossession(PlayerPossessionEvent),
     BallHalf(BallHalfEvent),
     BallThird(BallThirdEvent),

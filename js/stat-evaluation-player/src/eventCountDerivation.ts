@@ -13,7 +13,6 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "core_player",
   "player_possession",
   "possession",
-  "loose_possession",
   "ball_half",
   "ball_third",
   "territorial_pressure",

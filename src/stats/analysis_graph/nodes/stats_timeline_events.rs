@@ -74,7 +74,6 @@ impl StatsTimelineEventsNode {
             kickoff_dependency(),
             possession_dependency(),
             player_possession_dependency(),
-            loose_possession_dependency(),
             ball_half_dependency(),
             ball_third_dependency(),
             territorial_pressure_dependency(),
@@ -123,7 +122,6 @@ impl StatsTimelineEventsNode {
         let match_stats = ctx.get::<MatchStatsCalculator>()?;
         let possession = ctx.get::<PossessionCalculator>()?;
         let player_possession = ctx.get::<PlayerPossessionCalculator>()?;
-        let loose_possession = ctx.get::<LoosePossessionCalculator>()?;
         let ball_half = ctx.get::<BallHalfCalculator>()?;
         let ball_third = ctx.get::<BallThirdCalculator>()?;
         let territorial_pressure = ctx.get::<TerritorialPressureCalculator>()?;
@@ -208,7 +206,6 @@ impl StatsTimelineEventsNode {
                 match_stats,
                 possession,
                 player_possession,
-                loose_possession,
                 ball_half,
                 ball_third,
                 territorial_pressure,
@@ -349,7 +346,6 @@ fn build_replay_events(
     match_stats: &MatchStatsCalculator,
     possession: &PossessionCalculator,
     player_possession: &PlayerPossessionCalculator,
-    loose_possession: &LoosePossessionCalculator,
     ball_half: &BallHalfCalculator,
     ball_third: &BallThirdCalculator,
     territorial_pressure: &TerritorialPressureCalculator,
@@ -422,21 +418,6 @@ fn build_replay_events(
             index,
             span(event.frame, event.end_frame, event.time, event.end_time),
             EventPayload::Possession(event.clone()),
-            event.player_id.clone(),
-            None,
-            None,
-            None,
-            None,
-            None,
-        ));
-    }
-
-    for (index, event) in loose_possession.events().iter().enumerate() {
-        events.push(make_event(
-            "loose_possession",
-            index,
-            span(event.frame, event.end_frame, event.time, event.end_time),
-            EventPayload::LoosePossession(event.clone()),
             event.player_id.clone(),
             None,
             None,

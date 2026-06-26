@@ -94,8 +94,6 @@ pub mod player_vertical_state;
 pub use player_vertical_state::*;
 pub mod player_possession;
 pub use player_possession::*;
-pub mod loose_possession;
-pub use loose_possession::*;
 pub mod possession;
 pub use possession::*;
 pub mod possession_state;

@@ -127,7 +127,6 @@ builtin_analysis_nodes! {
     FiftyFiftyStateNode,
     KickoffNode,
     PlayerPossessionNode,
-    LoosePossessionNode,
     PossessionNode,
     PossessionStateNode,
     BallHalfNode,

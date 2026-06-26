@@ -233,13 +233,6 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
-    "key": "loose_possession",
-    "label": "Loose Possession",
-    "category": "other",
-    "hidden_from_review": false,
-    "variants": []
-  },
-  {
     "key": "movement",
     "label": "Movement",
     "category": "other",

@@ -93,7 +93,7 @@ ul.tight li { margin: .15rem 0; }
 <body>
 <div class="wrap">
 <h1>Stat &amp; Event Definitions</h1>
-<p class="subtitle">Generated from static Rust metadata — do not edit by hand. <span class="count">45 events</span></p>
+<p class="subtitle">Generated from static Rust metadata — do not edit by hand. <span class="count">44 events</span></p>
 <input id="search" class="search" type="search" placeholder="Filter events by name, id, category, or summary…" autocomplete="off">
 <h2 id="contents">Contents</h2>
 <div class="cat-group" data-group><div class="cat-head">Basic</div>
@@ -136,7 +136,6 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="bump bump other definition pending."><td><a href="#event-bump">Bump</a></td><td><code>bump</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="controlled play controlled_play other a same-player possession episode with multiple touches and sustained close-ball time."><td><a href="#event-controlled_play">Controlled Play</a></td><td><code>controlled_play</code></td><td class="summary">A same-player possession episode with multiple touches and sustained close-ball time.</td></tr>
 <tr data-search="50/50 fifty_fifty other a contested ball interaction involving touches or pressure from both teams in a short window."><td><a href="#event-fifty_fifty">50/50</a></td><td><code>fifty_fifty</code></td><td class="summary">A contested ball interaction involving touches or pressure from both teams in a short window.</td></tr>
-<tr data-search="loose possession loose_possession other a team-possession span under the loose definition: the last team to touch owns the ball until the opponent takes it away."><td><a href="#event-loose_possession">Loose Possession</a></td><td><code>loose_possession</code></td><td class="summary">A team-possession span under the loose definition: the last team to touch owns the ball until the opponent takes it away.</td></tr>
 <tr data-search="movement movement other definition pending."><td><a href="#event-movement">Movement</a></td><td><code>movement</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="player possession player_possession other a contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity."><td><a href="#event-player_possession">Player Possession</a></td><td><code>player_possession</code></td><td class="summary">A contiguous single-player possession span enriched with touch, ball-progress, and sustained-control activity.</td></tr>
 <tr data-search="possession possession other definition pending."><td><a href="#event-possession">Possession</a></td><td><code>possession</code></td><td class="summary">Definition pending.</td></tr>
@@ -894,32 +893,6 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Producers</div>
 <ul class="tight producers">
 <li><code>fifty_fifty</code> via <code>FiftyFiftyNode</code> / <code>FiftyFiftyCalculator</code></li>
-</ul>
-</div>
-<div class="event" id="event-loose_possession" data-search="loose possession loose_possession other a team-possession span under the loose definition: the last team to touch owns the ball until the opponent takes it away.">
-<div class="head"><h3>Loose Possession</h3><code class="id">loose_possession</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A team-possession span under the loose definition: the last team to touch owns the ball until the opponent takes it away.</p>
-<div class="section-label">Confidence</div>
-<div class="conf">
-<span class="badge">Approach <b>Unknown</b></span>
-<span class="badge">True positive <b>Not Evaluated</b></span>
-<span class="badge">False positive <b>Not Evaluated</b></span>
-<span class="badge">False negative <b>Not Evaluated</b></span>
-<span class="badge">Testing <b>Untested</b></span>
-</div>
-<div class="section-label">Approach</div>
-<ul class="tight">
-<li>Track the last team to touch the ball, keeping possession through loose balls, teammate passes, and repelled 50-50 challenges.</li>
-<li>Transfer possession only when the opponent demonstrably wins the ball, backdating the boundary to the opponent&#39;s takeover touch so there is no neutral gap.</li>
-<li>Credit neutral only before the first touch of a live stretch or during a contested scramble off a neutral ball.</li>
-</ul>
-<div class="section-label">Limitations</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Known issues</div>
-<p class="muted">None documented.</p>
-<div class="section-label">Producers</div>
-<ul class="tight producers">
-<li><code>loose_possession</code> via <code>LoosePossessionNode</code> / <code>LoosePossessionCalculator</code></li>
 </ul>
 </div>
 <div class="event" id="event-movement" data-search="movement movement other definition pending.">
