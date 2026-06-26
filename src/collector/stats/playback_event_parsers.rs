@@ -236,6 +236,7 @@ pub(in crate::collector::stats::playback) fn parse_dodge_event(
         is_team_0: json_required_bool(object, "is_team_0")?,
         dodge_impulse,
         dodge_rotation,
+        dodge_torque: json_optional_vec3(object.get("dodge_torque"))?,
     })
 }
 
