@@ -6,11 +6,11 @@ import type { RemoteIdTs } from "./RemoteIdTs.ts";
  */
 export type FlickEvent = { time: number, frame: number, sample_time: number, sample_frame: number, player: RemoteIdTs, player_position?: [number, number, number] | null, is_team_0: boolean, dodge_time: number, dodge_frame: number, time_since_dodge: number, setup_start_time: number, setup_start_frame: number, setup_duration: number, setup_touch_count: number, average_horizontal_gap: number, average_vertical_gap: number, ball_speed_change: number, ball_impulse: [number, number, number], impulse_away_alignment: number, vertical_impulse: number, kind: string, direction: string, local_ball_position: [number, number, number], local_ball_impulse: [number, number, number],
 /**
- * Dodge direction in the travel frame: >0 forward dodge, <0 backflip.
+ * Dodge direction (car-relative): >0 forward dodge, <0 backflip.
  */
 dodge_forward_back: number,
 /**
- * Dodge direction in the travel frame: signed sideways (roll) component
- * (the handedness source).
+ * Dodge direction (car-relative): signed sideways component (+right, -left;
+ * the handedness source).
  */
 dodge_side: number, confidence: number, };

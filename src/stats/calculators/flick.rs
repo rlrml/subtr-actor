@@ -61,22 +61,18 @@ const FLICK_MAX_LOCAL_X_FRONT: f32 = 210.0;
 const FLICK_MAX_LOCAL_Y: f32 = 170.0;
 const FLICK_MIN_IMPULSE_AWAY_ALIGNMENT: f32 = 0.15;
 
-/// Minimum horizontal travel speed (uu/s) at the dodge for the dodge direction
-/// to be meaningful. Below this the car has no clear heading to measure the
-/// dodge's forward/back vs side split against, so the flick stays `Other`.
-const FLICK_MIN_TRAVEL_SPEED: f32 = 150.0;
 /// A flick's kind is read purely from the dodge's rotation — the `dodge_torque`
-/// axis (equivalently the angular momentum the dodge imparts, since that is the
-/// torque integrated over the dodge) — decomposed in the travel frame into
-/// `dodge_forward_back` (>0 forward dodge, <0 backflip) and `dodge_side` (signed
-/// left/right). Because the torque axis is a unit vector in that plane,
-/// `dodge_forward_back² + dodge_side² ≈ 1`. No linear ball impulse enters the
-/// classification.
+/// axis, which is **car-relative** (the flip's rotation axis in the car's body
+/// frame, decoded from controlled flips): its `y` component is
+/// `dodge_forward_back` (>0 forward dodge, <0 backflip) and its `x` component is
+/// `dodge_side` (signed left/right). Because the axis is a unit vector in that
+/// plane, `dodge_forward_back² + dodge_side² ≈ 1`. No linear ball impulse, and
+/// no velocity/heading, enter the classification.
 ///
-/// The travel frame (torque vs the car's velocity heading), rather than the car
-/// body frame, is what makes forward/back vs side separable: on real dribble
-/// flicks the car's heading often differs from its facing, and a body-frame
-/// decomposition collapses forward and side dodges together.
+/// The components are read **directly** off the car-relative torque. (An earlier
+/// version decomposed it in a travel frame — dotting this car-relative vector
+/// against the world velocity heading — which was a frame error that made the
+/// classification depend on the car's world facing.)
 ///
 /// Reverse flick: the dodge is sufficiently *backward* (a backflip).
 /// `REVERSE_FLICK_MIN_BACKWARD` clears both the pure 90 (back ≈ 1.0) and the 45
@@ -89,29 +85,30 @@ const FORWARD_FLICK_MIN_FORWARD: f32 = 0.35;
 /// Minimum |dodge_side| (the dodge's sideways/roll component) to tag a flick's
 /// handedness left/right; below it the flick is `center` (e.g. a pure 90).
 const FLICK_DIRECTION_MIN_SIDE: f32 = 0.25;
-/// Maps the signed `dodge_side` component (torque · right-of-travel basis
-/// `r = (h.y, -h.x)`) to the human-facing right/left labels. Flip this sign if
-/// replay review shows the labels inverted — the dodge-direction handedness has
-/// not yet been visually confirmed against footage.
+/// Maps the signed `dodge_side` (already `= -torque.x`, so + means right) to the
+/// right/left labels. Handedness was calibrated from the controlled-flip replay
+/// (left runs read `torque.x > 0`, right runs `< 0`); flip this sign if visual
+/// review shows it inverted — that replay's run order is the only ground truth so
+/// far, not yet visually pinned.
 const FLICK_DODGE_SIDE_RIGHT_SIGN: f32 = 1.0;
 
 /// The kind of flick detected, from the dodge direction (see
 /// [`REVERSE_FLICK_MIN_BACKWARD`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlickKind {
-    /// No clear dodge direction (e.g. missing torque/travel data), or a dodge
-    /// that is neither clearly forward, backward, nor sideways.
+    /// No clear dodge direction (e.g. missing dodge torque), or a dodge that is
+    /// neither clearly forward, backward, nor sideways.
     Other,
     /// A front-flip flick: the dodge is forward.
     Forward,
-    /// A reverse flick: the dodge is a backflip yet the ball goes forward.
+    /// A reverse flick: the dodge is a backflip.
     Reverse,
     /// A side flick: the dodge is dominated by its sideways component.
     Side,
 }
 
-/// The handedness of a flick, from the ball's lateral deflection relative to the
-/// run's travel direction.
+/// The handedness of a flick, from the dodge's own sideways component
+/// (`dodge_side`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlickDirection {
     Center,
@@ -204,10 +201,10 @@ pub struct FlickEvent {
     pub direction: String,
     pub local_ball_position: [f32; 3],
     pub local_ball_impulse: [f32; 3],
-    /// Dodge direction in the travel frame: >0 forward dodge, <0 backflip.
+    /// Dodge direction (car-relative): >0 forward dodge, <0 backflip.
     pub dodge_forward_back: f32,
-    /// Dodge direction in the travel frame: signed sideways (roll) component
-    /// (the handedness source).
+    /// Dodge direction (car-relative): signed sideways component (+right, -left;
+    /// the handedness source).
     pub dodge_side: f32,
     pub confidence: f32,
 }
@@ -263,12 +260,10 @@ struct RecentDodgeStart {
     frame: usize,
     setup: FlickSetupSummary,
     rotation_at_dodge: Option<glam::Quat>,
-    /// World-frame dodge torque (the flip axis) captured at the dodge, used to
-    /// read the dodge direction. `None` when the input did not replicate it.
+    /// Car-relative dodge torque (the flip's rotation axis) captured at the
+    /// dodge: `y` = forward/back, `x` = left/right. `None` when the input did not
+    /// replicate it. This is read directly — no travel/world frame needed.
     dodge_torque: Option<glam::Vec3>,
-    /// Horizontal travel direction (the run heading) at the dodge, the frame the
-    /// dodge direction and the ball's forward deflection are measured against.
-    travel_direction: Option<glam::Vec3>,
 }
 
 /// A touch that looks like it could be a flick, kept alive for a short window so
@@ -460,40 +455,41 @@ impl FlickCalculator {
         (local_ball_position, local_ball_impulse)
     }
 
-    /// Classify the flick purely from the dodge's rotation — no ball impulse.
+    /// Classify the flick from the dodge's rotation axis — no ball impulse.
     ///
-    /// The `dodge_torque` axis (world horizontal; equivalently the angular
-    /// momentum the dodge imparts) is decomposed in the travel frame defined by
-    /// `travel_direction` (the run heading `h`, with right-of-travel
-    /// `r = (h.y, -h.x)`):
-    /// - `dodge_forward_back = t · r` — >0 forward dodge, <0 backflip,
-    /// - `dodge_side = t · h` — signed sideways (roll) component.
+    /// `dodge_torque` is the flip's rotation axis in the **car's body frame**
+    /// (decoded from controlled cancel-free flips, align 0.998 against the
+    /// observed spin axis). Its two horizontal components map straight to the
+    /// dodge the player input — no world/travel frame, because the torque is
+    /// already car-relative:
+    /// - `y` = `dodge_forward_back` (>0 forward dodge, <0 backflip),
+    /// - `-x` = `dodge_side` (signed; +right, -left, see
+    ///   [`FLICK_DODGE_SIDE_RIGHT_SIGN`]).
     ///
-    /// A reverse flick is a sufficiently backward dodge; a side flick is a
-    /// sideways-dominant dodge; a forward flick is a forward dodge. Handedness is
-    /// the sign of the dodge's own side component. Returns
-    /// `(kind, direction, dodge_forward_back, dodge_side)`.
-    fn classify_dodge(
-        dodge_torque: Option<glam::Vec3>,
-        travel_direction: Option<glam::Vec3>,
-    ) -> (FlickKind, FlickDirection, f32, f32) {
-        let (Some(torque), Some(travel)) = (dodge_torque, travel_direction) else {
+    /// (The earlier travel-frame decomposition — dotting this car-relative vector
+    /// against the world velocity heading — was a frame error that made the
+    /// result depend on which way the car faced in the world.)
+    ///
+    /// Because the axis is a unit vector in that plane,
+    /// `dodge_forward_back² + dodge_side² ≈ 1`. A reverse flick is a sufficiently
+    /// backward dodge; a side flick is sideways-dominant; a forward flick is
+    /// forward. Returns `(kind, direction, dodge_forward_back, dodge_side)`.
+    fn classify_dodge(dodge_torque: Option<glam::Vec3>) -> (FlickKind, FlickDirection, f32, f32) {
+        let Some(torque) = dodge_torque else {
             return (FlickKind::Other, FlickDirection::Center, 0.0, 0.0);
         };
-        let heading = travel.truncate();
         let torque_horizontal = torque.truncate();
-        if heading.length() < FLICK_MIN_TRAVEL_SPEED
-            || torque_horizontal.length_squared() <= f32::EPSILON
-        {
+        if torque_horizontal.length_squared() <= f32::EPSILON {
             return (FlickKind::Other, FlickDirection::Center, 0.0, 0.0);
         }
 
-        let h = heading.normalize();
         let t = torque_horizontal.normalize();
-        // Right-of-travel basis vector (see FLICK_DODGE_SIDE_RIGHT_SIGN).
-        let r = glam::Vec2::new(h.y, -h.x);
-        let dodge_forward_back = t.dot(r);
-        let dodge_side = t.dot(h);
+        // Car-relative axis: `y` is forward/back (+forward), `x` is the side the
+        // car dodged toward (+left, -right, from the controlled-flip replay).
+        // `dodge_side` negates `x` so that, like the rest of the codebase, a
+        // positive value means *right*.
+        let dodge_forward_back = t.y;
+        let dodge_side = -t.x;
         let handed_side = dodge_side * FLICK_DODGE_SIDE_RIGHT_SIGN;
 
         let direction = if handed_side >= FLICK_DIRECTION_MIN_SIDE {
@@ -690,7 +686,6 @@ impl FlickCalculator {
                 .as_ref()
                 .map(|rigid_body| quat_to_glam(&rigid_body.rotation)),
             dodge_torque: player.dodge_torque,
-            travel_direction: player.velocity(),
         }
     }
 
@@ -746,7 +741,7 @@ impl FlickCalculator {
             ball_impulse,
         );
         let (kind, direction, dodge_forward_back, dodge_side) =
-            Self::classify_dodge(dodge_start.dodge_torque, dodge_start.travel_direction);
+            Self::classify_dodge(dodge_start.dodge_torque);
         let setup = &dodge_start.setup;
         let timing_score =
             1.0 - (time_since_dodge / FLICK_MAX_DODGE_TO_TOUCH_SECONDS).clamp(0.0, 1.0);
