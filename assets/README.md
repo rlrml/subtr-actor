@@ -108,3 +108,10 @@ Mechanic regression fixtures are pinned on small clips by tests under
   - CaleMaCar's 9th goal: an on-ball flip reset converted by a flip-into-ball
     finish where the conversion touch is sampled a frame before the dodge byte
     replicates. Used by `tests/clip_flip_reset_test.rs`.
+- `wall-aerial-false-positive-2026-06-26`
+  - rocket-sense replay id: `019f0306-1375-77f2-ad5f-30247f56ee3e`
+  - title: `2026-06-26.01.15 colonelpanic8 Ranked Doubles Win`
+  - The reported wall-aerial false positive: its first detected "wall aerial"
+    was a normal aerial launched from the floor *near* the side wall (the car
+    was never on the wall). Whole-replay ground truth for
+    `tests/wall_aerial_fixture_test.rs`.

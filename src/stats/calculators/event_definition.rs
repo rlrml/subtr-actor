@@ -603,13 +603,12 @@ define_stats_event!(
     "wall_aerial",
     "Wall Aerial",
     EventCategory::Mechanic,
-    summary =
-        "An aerial play that starts from controlled ball movement on a side, end, or corner wall.",
+    summary = "An aerial launched off a side, end, or corner wall, whether or not the player is carrying the ball.",
     approach = [
-        "Track wall-control sequences where the last toucher keeps the ball close while positioned on a side or end wall.",
-        "Arm a wall-aerial candidate when the player leaves the wall soon after a qualifying wall-control setup.",
+        "Track how long each player rides the wall surface (a side or end wall), regardless of whether they have the ball.",
+        "Arm a wall-aerial candidate when a player who rode the wall long enough leaves it while airborne.",
         "Classify the takeoff wall relative to the player's attack direction (left/right side, front/back end, or a corner) from the car's surface normal at the last wall contact.",
-        "Emit on a later aerial touch by the same player when the player and ball are high enough, the setup/takeoff windows hold, and the confidence score clears the threshold.",
+        "Emit on a later aerial touch by the same player while the player and ball are high enough and the takeoff-to-touch window holds.",
     ],
     scope = EventScope::Player
 );

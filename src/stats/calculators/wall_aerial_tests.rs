@@ -154,7 +154,7 @@ fn records_controlled_wall_aerial_play_after_wall_carry_setup() {
     let event = calculator.events().first().expect("wall aerial event");
     assert_eq!(event.player, player.clone());
     assert_eq!(event.wall, WallAerialWall::Right);
-    assert!(event.setup_duration >= WALL_AERIAL_MIN_CONTROL_DURATION);
+    assert!(event.setup_duration >= WALL_AERIAL_MIN_WALL_CONTACT_DURATION);
 
     let stats = calculator.player_stats().get(&player).unwrap();
     assert_eq!(stats.count, 1);
@@ -438,7 +438,7 @@ fn preserves_completed_wall_setup_while_sliding_off_wall() {
         .first()
         .expect("wall aerial event after wall slide");
     assert_eq!(event.player, player.clone());
-    assert!(event.setup_duration >= WALL_AERIAL_MIN_CONTROL_DURATION);
+    assert!(event.setup_duration >= WALL_AERIAL_MIN_WALL_CONTACT_DURATION);
 }
 
 #[test]
@@ -587,6 +587,68 @@ fn rejects_wall_aerial_play_without_wall_control_setup() {
             ),
             &players(glam::Vec3::new(3250.0, 0.0, 350.0)),
             &touch_state_with_touch(2, 0.2),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    assert!(calculator.player_stats().get(&player).is_none());
+    assert!(calculator.events().is_empty());
+}
+
+#[test]
+fn rejects_aerial_that_starts_near_wall_but_never_on_it() {
+    // A normal aerial that launches from the floor *near* the side wall: the car
+    // passes through the near-wall band (|x| in 3200..3600) but is never on the
+    // wall surface (|x| >= 3600), then aerials up and away to the ball. This is
+    // the reported false positive — it must not be detected as a wall aerial.
+    let player = boxcars::RemoteId::Steam(1);
+    let mut calculator = WallAerialCalculator::new();
+
+    calculator
+        .update(
+            &frame(1, 0.0),
+            &ball(
+                glam::Vec3::new(3380.0, 0.0, 330.0),
+                glam::Vec3::new(0.0, 0.0, 0.0),
+            ),
+            &players(glam::Vec3::new(3490.0, 0.0, 250.0)),
+            &controlled_touch_state(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(2, 0.4),
+            &ball(
+                glam::Vec3::new(3360.0, 0.0, 340.0),
+                glam::Vec3::new(0.0, 0.0, 0.0),
+            ),
+            &players(glam::Vec3::new(3470.0, 0.0, 270.0)),
+            &controlled_touch_state(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(3, 0.6),
+            &ball(
+                glam::Vec3::new(3300.0, 0.0, 430.0),
+                glam::Vec3::new(0.0, 0.0, 0.0),
+            ),
+            &players(glam::Vec3::new(3350.0, 0.0, 320.0)),
+            &controlled_touch_state(),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(4, 0.8),
+            &ball(
+                glam::Vec3::new(3200.0, 0.0, 480.0),
+                glam::Vec3::new(0.0, 700.0, 80.0),
+            ),
+            &players(glam::Vec3::new(3250.0, 0.0, 350.0)),
+            &touch_state_with_touch(4, 0.8),
             &LivePlayState::active_play(),
         )
         .unwrap();
