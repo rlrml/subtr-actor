@@ -48,11 +48,11 @@ fn flicks_near(flicks: &[&FlickEvent], dodge_time: f32) -> usize {
         .count()
 }
 
-fn flick_kind_near(flicks: &[&FlickEvent], dodge_time: f32) -> Option<String> {
+fn flick_near<'a>(flicks: &[&'a FlickEvent], dodge_time: f32) -> Option<&'a FlickEvent> {
     flicks
         .iter()
         .find(|flick| (flick.dodge_time - dodge_time).abs() < 0.15)
-        .map(|flick| flick.kind.clone())
+        .copied()
 }
 
 #[test]
@@ -91,10 +91,15 @@ fn clip_detects_all_three_flicks_in_calemacar_dribble() {
 
 #[test]
 fn clip_classifies_flick_kinds_from_dodge_direction() {
-    // The three flicks span the dodge-direction taxonomy, validated against the
-    // reviewed replay: the first is a forward-diagonal flick, the middle a pure
-    // backflip reverse flick, and the third a side flick. See the dodge-torque
-    // travel-frame decomposition in `FlickCalculator::classify_dodge`.
+    // All three dodges in this sequence are *side*-dominant in the car-relative
+    // dodge torque (|x| ≈ 2.4-2.5 vs |y| ≈ 0.5-0.9), so they classify as side
+    // flicks. Their handedness (the first to the right, the next two to the left)
+    // is independently corroborated by the dodge-impulse direction. The earlier
+    // "forward/reverse/side" labels here were an artifact of the buggy
+    // travel-frame decomposition (it treated the car-relative torque as a world
+    // vector); see `FlickCalculator::classify_dodge`. Forward/reverse/side
+    // discrimination itself is covered by the synthetic unit tests in
+    // `flick_tests.rs`.
     let timeline = clip_timeline(SEQUENCE_START_FRAME, SEQUENCE_END_FRAME);
     let flicks: Vec<&FlickEvent> =
         common::event_payloads_by_stream(&timeline, "flick", |payload| match payload {
@@ -102,19 +107,20 @@ fn clip_classifies_flick_kinds_from_dodge_direction() {
             _ => None,
         });
 
-    assert_eq!(
-        flick_kind_near(&flicks, FIRST_FLICK_DODGE_TIME).as_deref(),
-        Some("forward"),
-        "first dodge (~{FIRST_FLICK_DODGE_TIME}s) is a forward flick; got {flicks:#?}"
-    );
-    assert_eq!(
-        flick_kind_near(&flicks, MISSED_FLICK_DODGE_TIME).as_deref(),
-        Some("reverse"),
-        "middle dodge (~{MISSED_FLICK_DODGE_TIME}s) is a reverse flick; got {flicks:#?}"
-    );
-    assert_eq!(
-        flick_kind_near(&flicks, THIRD_FLICK_DODGE_TIME).as_deref(),
-        Some("side"),
-        "third dodge (~{THIRD_FLICK_DODGE_TIME}s) is a side flick; got {flicks:#?}"
-    );
+    for (label, dodge_time, direction) in [
+        ("first", FIRST_FLICK_DODGE_TIME, "right"),
+        ("middle", MISSED_FLICK_DODGE_TIME, "left"),
+        ("third", THIRD_FLICK_DODGE_TIME, "left"),
+    ] {
+        let flick = flick_near(&flicks, dodge_time)
+            .unwrap_or_else(|| panic!("{label} dodge (~{dodge_time}s) missing; got {flicks:#?}"));
+        assert_eq!(
+            flick.kind, "side",
+            "{label} dodge (~{dodge_time}s) is side-dominant; got {flick:#?}"
+        );
+        assert_eq!(
+            flick.direction, direction,
+            "{label} dodge (~{dodge_time}s) handedness; got {flick:#?}"
+        );
+    }
 }

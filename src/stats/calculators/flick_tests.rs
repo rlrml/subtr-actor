@@ -127,8 +127,8 @@ fn live_play() -> LivePlayState {
 }
 
 /// Horizontal run velocity shared by the car and the carried ball through a
-/// flick setup, giving the dodge a well-defined travel direction (+x). The
-/// dodge-direction classification decomposes `dodge_torque` against this.
+/// flick setup, so the carry gate (ball tracks the car) is satisfied. The dodge
+/// direction is read from the car-relative `dodge_torque`, not from this.
 const FLICK_CARRY_VELOCITY: glam::Vec3 = glam::Vec3::new(1000.0, 0.0, 0.0);
 
 fn flick_player(dodge_active: bool, dodge_torque: Option<glam::Vec3>) -> PlayerSample {
@@ -213,16 +213,16 @@ fn run_flick_scenario(dodge_torque: glam::Vec3, launch_impulse: glam::Vec3) -> F
     calculator
 }
 
-// Travel direction is +x, so the right-of-travel basis is r = (0, -1). A forward
-// dodge has torque . r > 0 (torque -y); a backflip has torque . r < 0 (torque
-// +y); a side dodge's torque lies along travel (±x).
-const FORWARD_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(0.0, -2.6, 0.0);
-const BACKFLIP_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(0.0, 2.6, 0.0);
+// dodge_torque is the car-relative flip axis: y = forward/back (+forward,
+// -backflip), x = left/right (+left, -right). The classifier reads these
+// components directly (no travel frame); `dodge_side = -x`, so +dodge_side = right.
+const FORWARD_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(0.0, 2.6, 0.0);
+const BACKFLIP_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(0.0, -2.6, 0.0);
 const SIDE_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(2.6, 0.0, 0.0);
-// Diagonal backflips: torque +y is backflip (fb<0), torque ±x is the side/roll
-// component that decides handedness (+x = right of +x travel).
-const REVERSE_RIGHT_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(1.84, 1.84, 0.0);
-const REVERSE_LEFT_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(-1.84, 1.84, 0.0);
+// Diagonal backflips: y < 0 is the backflip (fb < 0); x is the side/roll
+// component that decides handedness (x < 0 = right, since dodge_side = -x).
+const REVERSE_RIGHT_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(-1.84, -1.84, 0.0);
+const REVERSE_LEFT_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(1.84, -1.84, 0.0);
 
 #[test]
 fn counts_controlled_dodge_touch_with_large_ball_impulse() {
