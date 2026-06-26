@@ -29,4 +29,31 @@ dodge_torque: [number, number, number] | null,
  * direction this recovers the dodge direction relative to the run's motion.
  * 0 when the car's speed or horizontal facing is too small to be meaningful.
  */
-travel_offset_radians: number, confidence: number, };
+travel_offset_radians: number,
+/**
+ * How forward the ball was launched: the ball's gravity-compensated launch
+ * impulse (horizontal) dotted with the run's travel heading at the touch,
+ * in the range -1 to 1. A high value means the ball was sent forward along
+ * the run (a real reverse or forward flick); a low or negative value means
+ * it was sent backward or sideways (e.g. a plain backflip, not a reverse
+ * flick). 0 when the speed or launch is degenerate.
+ */
+launch_forward_alignment: number,
+/**
+ * How vertical the launch was: the fraction of the gravity-compensated launch
+ * impulse that points up (`impulse.z / |impulse|` = sin of the launch
+ * elevation). A reverse flick sends the ball forward and flat, so this is low
+ * (around 0.3-0.45); a plain backflip "flick" pops the ball nearly straight
+ * up, so this is high (above 0.8). This is the primary signal separating the
+ * two; gates the reverse classification.
+ */
+launch_vertical_fraction: number,
+/**
+ * How far the car has rotated onto its side/back at the touch (its underside
+ * turned away from straight down): signed, positive when rolled to the car's
+ * right and negative to its left, magnitude about sin(roll angle) so values
+ * near 1 mean fully on its side. A reverse flick rolls the car (unlike a
+ * plain backflip); gates the reverse classification together with
+ * `launch_forward_alignment`.
+ */
+underside_rotation: number, confidence: number, };

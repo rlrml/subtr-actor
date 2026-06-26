@@ -161,12 +161,60 @@ fn flick_players(dodge_active: bool, dodge_torque: Option<glam::Vec3>) -> Player
     }
 }
 
+/// A flick player rolled onto its side by `roll` radians about its forward axis,
+/// for the launch-touch frame of a reverse flick (a reverse flick rolls the car;
+/// a plain backflip does not). `underside_rotation` reads about `-sin(roll)`.
+fn rolled_flick_players(
+    dodge_active: bool,
+    dodge_torque: Option<glam::Vec3>,
+    roll: f32,
+) -> PlayerFrameState {
+    let rotation = glam::Quat::from_rotation_x(roll);
+    let local_angular_velocity = glam::Vec3::new(0.0, 5.0, 0.0);
+    PlayerFrameState {
+        players: vec![PlayerSample {
+            player_id: boxcars::RemoteId::Steam(1),
+            is_team_0: true,
+            hitbox: default_car_hitbox(),
+            rigid_body: Some(boxcars::RigidBody {
+                sleeping: false,
+                location: glam_to_vec(&glam::Vec3::new(0.0, 0.0, 17.0)),
+                rotation: glam_to_quat(&rotation),
+                linear_velocity: Some(glam_to_vec(&FLICK_CARRY_VELOCITY)),
+                angular_velocity: Some(glam_to_vec(&(rotation * local_angular_velocity))),
+            }),
+            boost_amount: None,
+            last_boost_amount: None,
+            boost_active: false,
+            dodge_active,
+            dodge_torque,
+            powerslide_active: false,
+            match_goals: None,
+            match_assists: None,
+            match_saves: None,
+            match_shots: None,
+            match_score: None,
+        }],
+    }
+}
+
 /// Run a carry-then-dodge flick: three setup frames carrying the ball on the
 /// hood at [`FLICK_CARRY_VELOCITY`], with the dodge transition (carrying
 /// `dodge_torque`, a world-frame flip axis) on the third frame, then a launch
 /// touch whose gravity-compensated ball impulse is `launch_impulse` (added to
 /// the carry velocity). Returns the resolved calculator.
 fn run_flick_scenario(dodge_torque: glam::Vec3, launch_impulse: glam::Vec3) -> FlickCalculator {
+    run_flick_scenario_with_roll(dodge_torque, launch_impulse, 0.0)
+}
+
+/// Like [`run_flick_scenario`] but rolls the car by `roll` radians on the launch
+/// frame (the setup frames stay upright so the carry gate is unaffected). Reverse
+/// flicks roll the car; the gate requires `|underside_rotation| >= 0.2`.
+fn run_flick_scenario_with_roll(
+    dodge_torque: glam::Vec3,
+    launch_impulse: glam::Vec3,
+    roll: f32,
+) -> FlickCalculator {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = FlickCalculator::new();
     let live_play = live_play();
@@ -192,7 +240,7 @@ fn run_flick_scenario(dodge_torque: glam::Vec3, launch_impulse: glam::Vec3) -> F
                 glam::Vec3::new(180.0, 0.0, 160.0),
                 FLICK_CARRY_VELOCITY + launch_impulse,
             ),
-            &flick_players(true, Some(dodge_torque)),
+            &rolled_flick_players(true, Some(dodge_torque), roll),
             &touch_state(vec![TouchEvent {
                 touch_id: None,
                 time: 0.4,
@@ -223,6 +271,16 @@ const SIDE_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(2.6, 0.0, 0.0);
 // component that decides handedness (x < 0 = right, since dodge_side = -x).
 const REVERSE_RIGHT_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(-1.84, -1.84, 0.0);
 const REVERSE_LEFT_DODGE_TORQUE: glam::Vec3 = glam::Vec3::new(1.84, -1.84, 0.0);
+
+// A reverse flick rolls the car onto its side; the classifier requires
+// `|underside_rotation| >= 0.2` (here sin(0.5) ~= 0.48 clears it).
+const REVERSE_FLICK_ROLL: f32 = 0.5;
+// A forward-and-flat launch: the ball is sent ahead of the car and low, like a
+// real reverse flick. vfrac = 520 / |(1350, 0, 520)| ~= 0.36, under the 0.6 cap.
+const FLAT_FORWARD_LAUNCH: glam::Vec3 = glam::Vec3::new(1350.0, 0.0, 520.0);
+// A near-vertical pop, like a plain backflip "flick": the ball goes up, not out.
+// vfrac = 1400 / |(300, 0, 1400)| ~= 0.98, well over the 0.6 cap.
+const VERTICAL_POP_LAUNCH: glam::Vec3 = glam::Vec3::new(300.0, 0.0, 1400.0);
 
 #[test]
 fn counts_controlled_dodge_touch_with_large_ball_impulse() {
@@ -492,9 +550,13 @@ fn labels_forward_flick_from_forward_dodge() {
 #[test]
 fn labels_reverse_flick_from_backflip_dodge() {
     let player_id = boxcars::RemoteId::Steam(1);
-    // A pure backflip (dodge straight back) is the defining reverse flick. No
-    // sideways dodge component, so it is center.
-    let calculator = run_flick_scenario(BACKFLIP_DODGE_TORQUE, glam::Vec3::new(1350.0, 0.0, 520.0));
+    // A backward dodge that rolls the car and sends the ball forward and flat is
+    // a reverse flick. No sideways dodge component, so it is center.
+    let calculator = run_flick_scenario_with_roll(
+        BACKFLIP_DODGE_TORQUE,
+        FLAT_FORWARD_LAUNCH,
+        REVERSE_FLICK_ROLL,
+    );
 
     let event = calculator.events().first().unwrap();
     assert_eq!(event.kind, "reverse");
@@ -513,13 +575,38 @@ fn labels_reverse_flick_from_backflip_dodge() {
 }
 
 #[test]
+fn plain_backflip_without_roll_is_not_reverse() {
+    // The same backward dodge, but the car never rolls onto its side — a plain
+    // backflip, not a reverse flick. The underside-rotation gate rejects it.
+    let calculator = run_flick_scenario(BACKFLIP_DODGE_TORQUE, FLAT_FORWARD_LAUNCH);
+    let event = calculator.events().first().unwrap();
+    assert_ne!(event.kind, "reverse");
+}
+
+#[test]
+fn vertical_backflip_pop_is_not_reverse() {
+    // A rolled backward dodge that pops the ball nearly straight up (not forward
+    // and flat) is a backflip "flick", not a reverse flick: the verticality gate
+    // rejects it even though the dodge and roll look reverse-like.
+    let calculator = run_flick_scenario_with_roll(
+        BACKFLIP_DODGE_TORQUE,
+        VERTICAL_POP_LAUNCH,
+        REVERSE_FLICK_ROLL,
+    );
+    let event = calculator.events().first().unwrap();
+    assert!(event.launch_vertical_fraction > REVERSE_FLICK_MAX_LAUNCH_VERTICAL_FRACTION);
+    assert_ne!(event.kind, "reverse");
+}
+
+#[test]
 fn labels_right_reverse_flick_from_rightward_dodge() {
     let player_id = boxcars::RemoteId::Steam(1);
     // A reverse 45 to the right: the dodge is back + right (roll component), so
     // handedness comes from the dodge's own side, not where the ball ends up.
-    let calculator = run_flick_scenario(
+    let calculator = run_flick_scenario_with_roll(
         REVERSE_RIGHT_DODGE_TORQUE,
-        glam::Vec3::new(1350.0, 0.0, 520.0),
+        FLAT_FORWARD_LAUNCH,
+        REVERSE_FLICK_ROLL,
     );
 
     let event = calculator.events().first().unwrap();
@@ -540,9 +627,10 @@ fn labels_right_reverse_flick_from_rightward_dodge() {
 #[test]
 fn labels_left_reverse_flick_from_leftward_dodge() {
     let player_id = boxcars::RemoteId::Steam(1);
-    let calculator = run_flick_scenario(
+    let calculator = run_flick_scenario_with_roll(
         REVERSE_LEFT_DODGE_TORQUE,
-        glam::Vec3::new(1350.0, 0.0, 520.0),
+        FLAT_FORWARD_LAUNCH,
+        REVERSE_FLICK_ROLL,
     );
 
     let event = calculator.events().first().unwrap();
