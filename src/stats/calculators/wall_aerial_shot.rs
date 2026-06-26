@@ -1,6 +1,6 @@
 use super::wall_aerial::{
-    WALL_AERIAL_MIN_TOUCH_BALL_Z, WALL_AERIAL_MIN_TOUCH_PLAYER_Z, wall_aerial_normalize_score,
-    wall_aerial_wall_for_position,
+    WALL_AERIAL_MIN_TOUCH_BALL_Z, WALL_AERIAL_MIN_TOUCH_PLAYER_Z, player_up_vector,
+    wall_aerial_normalize_score, wall_aerial_wall_classification, wall_aerial_wall_for_position,
 };
 use super::*;
 
@@ -36,7 +36,7 @@ pub struct WallAerialShotEvent {
 struct RecentWallContact {
     player: PlayerId,
     is_team_0: bool,
-    wall: WallAerialWall,
+    wall_direction: WallAerialWall,
     time: f32,
     frame: usize,
     position: glam::Vec3,
@@ -46,7 +46,7 @@ struct RecentWallContact {
 struct ArmedWallAerialShot {
     player: PlayerId,
     is_team_0: bool,
-    wall: WallAerialWall,
+    wall_direction: WallAerialWall,
     wall_contact_time: f32,
     wall_contact_frame: usize,
     wall_contact_position: glam::Vec3,
@@ -87,13 +87,18 @@ impl WallAerialShotCalculator {
                 continue;
             }
 
-            if let Some(wall) = wall_aerial_wall_for_position(position) {
+            if wall_aerial_wall_for_position(position).is_some() {
+                let wall_direction = wall_aerial_wall_classification(
+                    player.is_team_0,
+                    position,
+                    player_up_vector(player),
+                );
                 self.recent_wall_contacts.insert(
                     player.player_id.clone(),
                     RecentWallContact {
                         player: player.player_id.clone(),
                         is_team_0: player.is_team_0,
-                        wall,
+                        wall_direction,
                         time: frame.time,
                         frame: frame.frame_number,
                         position,
@@ -122,7 +127,7 @@ impl WallAerialShotCalculator {
                 ArmedWallAerialShot {
                     player: contact.player,
                     is_team_0: contact.is_team_0,
-                    wall: contact.wall,
+                    wall_direction: contact.wall_direction,
                     wall_contact_time: contact.time,
                     wall_contact_frame: contact.frame,
                     wall_contact_position: contact.position,
@@ -202,7 +207,7 @@ impl WallAerialShotCalculator {
             frame: event.frame,
             player: event.player.clone(),
             is_team_0: event.is_team_0,
-            wall: armed.wall,
+            wall: armed.wall_direction,
             wall_contact_time: armed.wall_contact_time,
             wall_contact_frame: armed.wall_contact_frame,
             takeoff_time: armed.takeoff_time,

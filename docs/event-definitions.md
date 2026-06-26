@@ -1216,12 +1216,13 @@ _None documented._
 
 **Summary**
 
-An aerial play that starts from controlled ball movement on a side or back wall.
+An aerial play that starts from controlled ball movement on a side, end, or corner wall.
 
 **Approach**
 
-- Track wall-control sequences where the last toucher keeps the ball close while positioned on a side or back wall.
+- Track wall-control sequences where the last toucher keeps the ball close while positioned on a side or end wall.
 - Arm a wall-aerial candidate when the player leaves the wall soon after a qualifying wall-control setup.
+- Classify the takeoff wall relative to the player's attack direction (left/right side, front/back end, or a corner) from the car's surface normal at the last wall contact.
 - Emit on a later aerial touch by the same player when the player and ball are high enough, the setup/takeoff windows hold, and the confidence score clears the threshold.
 
 **Limitations**
@@ -1251,6 +1252,7 @@ A shot credited to a player shortly after taking off from a wall.
 **Approach**
 
 - Track recent wall contact for each player and arm a candidate when the player leaves the wall while still above the ground threshold.
+- Classify the takeoff wall relative to the player's attack direction (left/right side, front/back end, or a corner) from the car's surface normal at the last wall contact.
 - Match a subsequent shot stat event by that player within the takeoff-to-shot window.
 - Require the shot touch to occur off the wall with sufficient player and ball height, then score confidence from timing, height, goal alignment, and ball speed.
 
