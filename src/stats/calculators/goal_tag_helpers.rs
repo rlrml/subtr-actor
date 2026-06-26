@@ -97,7 +97,16 @@ fn scoring_possession_start_frame(
     match anchored_scoring_index {
         Some(last_index) => {
             let mut start_index = last_index;
-            while start_index > 0 && is_scoring_possession(&possession_events[start_index - 1]) {
+            // Walk back through directly-adjacent scoring-team spans. Possession
+            // events are now sparse (neutral/loose stretches are gaps, not
+            // events), so adjacency in the array no longer implies adjacency in
+            // time: stop when a frame gap separates two same-team spans, since
+            // that gap was a neutral loss the window must not reach across.
+            while start_index > 0
+                && is_scoring_possession(&possession_events[start_index - 1])
+                && possession_events[start_index - 1].end_frame
+                    >= possession_events[start_index].frame
+            {
                 start_index -= 1;
             }
             possession_events[start_index].frame

@@ -822,21 +822,23 @@ mod tests;
 /// Builds the team-possession event stream from the backdating resolver's
 /// finalized segments.
 ///
-/// Finalized [`ResolvedPossession`] segments (active spans) are emitted as
-/// `PossessionEvent`s as soon as the resolver decides them; non-live stretches
-/// are emitted as coalesced inactive markers so the stream stays contiguous.
-/// The in-progress open segment is exposed via [`Self::current_event`] /
+/// Only stretches a team actually possesses become events: finalized team
+/// [`ResolvedPossession`] segments are emitted as `PossessionEvent`s as soon as
+/// the resolver decides them, while neutral / loose-ball stretches and non-live
+/// time are gaps (no event). The full segment list, neutral included, is still
+/// surfaced via [`Self::new_resolved`] so the stats projection credits neutral
+/// time. The in-progress open team span is exposed via [`Self::current_event`] /
 /// [`Self::projected_events`] for display and goal tagging.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PossessionCalculator {
     events: EventStream<PossessionEvent>,
     /// Segments finalized this frame, surfaced for the stats projection's
-    /// deferred per-frame accumulation.
+    /// deferred per-frame accumulation. Includes neutral segments — the stats
+    /// credit neutral time even though it is never emitted as an event.
     new_resolved: Vec<ResolvedPossession>,
-    /// The current open (unresolved) segment rendered up to the latest frame.
+    /// The current open (unresolved) team span rendered up to the latest frame,
+    /// or `None` when neutral / non-live. Only team possession is exposed.
     open_event: Option<PossessionEvent>,
-    /// Coalesced inactive (non-live) marker awaiting flush.
-    inactive_pending: Option<PossessionEvent>,
 }
 
 impl PossessionCalculator {
@@ -852,15 +854,12 @@ impl PossessionCalculator {
         self.events.new_events()
     }
 
-    /// All committed events plus the in-progress open/inactive span. Used by
-    /// goal tagging to walk the possession that led to a goal.
+    /// All committed team-possession events plus the in-progress open span. Used
+    /// by goal tagging to walk the possession that led to a goal.
     pub fn projected_events(&self) -> Vec<PossessionEvent> {
         let mut events = self.events.all().to_vec();
         if let Some(open) = &self.open_event {
             events.push(open.clone());
-        }
-        if let Some(inactive) = &self.inactive_pending {
-            events.push(inactive.clone());
         }
         events
     }
@@ -871,20 +870,16 @@ impl PossessionCalculator {
     }
 
     pub fn flush_pending_event(&mut self) {
-        if let Some(inactive) = self.inactive_pending.take() {
-            self.events.push(inactive);
-        }
         if let Some(open) = self.open_event.take() {
             self.events.push(open);
         }
     }
 
-    /// The span covering the most recently processed frame (the open segment if
-    /// live, else the last committed event).
+    /// The open team span if one is live, else the last committed event. Neutral
+    /// stretches have no event, so this returns the prior team span during them.
     pub fn current_event(&self) -> Option<&PossessionEvent> {
         self.open_event
             .as_ref()
-            .or(self.inactive_pending.as_ref())
             .or_else(|| self.events.all().last())
     }
 
@@ -901,12 +896,6 @@ impl PossessionCalculator {
         }
     }
 
-    fn flush_inactive(&mut self) {
-        if let Some(inactive) = self.inactive_pending.take() {
-            self.events.push(inactive);
-        }
-    }
-
     pub fn update(
         &mut self,
         frame: &FrameInfo,
@@ -916,55 +905,37 @@ impl PossessionCalculator {
         self.events.begin_update();
         self.new_resolved.clear();
 
-        // Commit segments the resolver finalized this frame. On the live→non-live
-        // edge these are the flushed tail of the just-ended stretch, so they must
-        // precede any inactive marker for this frame.
-        if !possession_state.newly_resolved.is_empty() {
-            self.flush_inactive();
-            for segment in &possession_state.newly_resolved {
+        // The resolver's segments feed the stats projection (which credits
+        // neutral time too) via `new_resolved`, but only team possession is
+        // exposed as an event. Neutral / loose-ball stretches and non-live time
+        // are simply gaps in the stream — there is no event when no team has the
+        // ball.
+        for segment in &possession_state.newly_resolved {
+            if segment.label != PossessionLabel::Neutral {
                 self.events.push(Self::segment_event(segment));
-                self.new_resolved.push(segment.clone());
             }
+            self.new_resolved.push(segment.clone());
         }
 
         if !live_play_state.is_live_play {
             self.open_event = None;
-            match self.inactive_pending.as_mut() {
-                Some(inactive) => {
-                    inactive.end_time = frame.time;
-                    inactive.end_frame = frame.frame_number;
-                    inactive.duration = (inactive.end_time - inactive.time).max(0.0);
-                }
-                None => {
-                    self.inactive_pending = Some(PossessionEvent {
-                        time: frame.time,
-                        frame: frame.frame_number,
-                        end_time: frame.time,
-                        end_frame: frame.frame_number,
-                        active: false,
-                        duration: 0.0,
-                        possession_state: PossessionLabel::Neutral.as_label_value().to_owned(),
-                        player_id: None,
-                    });
-                }
-            }
             return Ok(());
         }
 
-        self.flush_inactive();
-        self.open_event = possession_state.open_possession.as_ref().map(|open| {
-            let label = open.label.as_label_value().to_owned();
-            PossessionEvent {
+        self.open_event = possession_state
+            .open_possession
+            .as_ref()
+            .filter(|open| open.label != PossessionLabel::Neutral)
+            .map(|open| PossessionEvent {
                 time: open.start_time,
                 frame: open.start_frame,
                 end_time: frame.time,
                 end_frame: frame.frame_number,
                 active: true,
                 duration: (frame.time - open.start_time).max(0.0),
-                possession_state: label,
+                possession_state: open.label.as_label_value().to_owned(),
                 player_id: open.player.clone(),
-            }
-        });
+            });
         Ok(())
     }
 }

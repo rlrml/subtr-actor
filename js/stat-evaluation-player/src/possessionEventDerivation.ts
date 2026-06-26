@@ -16,7 +16,6 @@ interface RawPossessionStats {
 }
 
 interface PossessionState {
-  active: boolean;
   possessionState: string;
   fieldThird: string | null;
   fieldHalf: string | null;
@@ -137,17 +136,15 @@ function possessionTeamStats(raw: RawPossessionStats, isTeamZero: boolean): Poss
   };
 }
 
-function applyPossessionEvent(state: PossessionState, event: PossessionEvent): void {
-  state.active = event.active;
-  state.possessionState = event.possession_state;
-}
-
 function accumulatePossessionFrame(
   raw: RawPossessionStats,
   state: PossessionState,
   frame: StatsFrame,
 ): void {
-  if (!state.active) {
+  // Possession time is only tracked during live play; non-live stretches carry
+  // no possession event and are excluded here (matching the resolver, which
+  // only credits live frames).
+  if (!frame.is_live_play) {
     return;
   }
 
@@ -202,9 +199,9 @@ export function createPossessionEventDerivedStatsAccumulator(timeline: Materiali
   let eventIndex = 0;
   let ballThirdIndex = 0;
   let ballHalfIndex = 0;
+  let currentSpan: PossessionEvent | null = null;
   const raw = defaultRawPossessionStats();
   const state: PossessionState = {
-    active: false,
     possessionState: "neutral",
     fieldThird: null,
     fieldHalf: null,
@@ -213,9 +210,17 @@ export function createPossessionEventDerivedStatsAccumulator(timeline: Materiali
   return {
     applyFrame(frame: StatsFrame): void {
       while (eventIndex < events.length && events[eventIndex]!.frame <= frame.frame_number) {
-        applyPossessionEvent(state, events[eventIndex] as PossessionEvent);
+        currentSpan = events[eventIndex] as PossessionEvent;
         eventIndex += 1;
       }
+      // Possession events are sparse: only team spans are emitted, so a frame
+      // is that team's only while it falls inside the span. Frames past the
+      // span's end (a neutral / loose-ball gap before the next team takes over)
+      // carry no event and are neutral.
+      state.possessionState =
+        currentSpan != null && currentSpan.end_frame >= frame.frame_number
+          ? currentSpan.possession_state
+          : "neutral";
       while (
         ballThirdIndex < ballThirdEvents.length &&
         ballThirdEvents[ballThirdIndex]!.frame <= frame.frame_number
