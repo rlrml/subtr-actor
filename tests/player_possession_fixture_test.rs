@@ -34,8 +34,9 @@ fn player_possession_spans_are_sane_for_post_eac_doubles_replay() {
             "possessed duration cannot exceed the span's wall-clock window"
         );
         assert!(
-            span.touch_count >= 1,
-            "possession requires at least one touch by the owner"
+            span.touch_count >= 2,
+            "possession requires at least two distinct touches by the owner; a \
+             lone touch is not possession"
         );
         assert!(
             span.aerial_touch_count + span.wall_touch_count <= span.touch_count,
