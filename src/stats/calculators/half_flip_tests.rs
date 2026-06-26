@@ -73,6 +73,22 @@ fn player_at_z(
     }
 }
 
+fn player_with_spin(
+    id: u64,
+    z: f32,
+    velocity: glam::Vec3,
+    yaw: f32,
+    forward_pitch: f32,
+    angular_velocity: glam::Vec3,
+    dodge_active: bool,
+) -> PlayerSample {
+    let mut sample = player_at_z(id, z, velocity, yaw, forward_pitch, dodge_active);
+    if let Some(rigid_body) = sample.rigid_body.as_mut() {
+        rigid_body.angular_velocity = Some(glam_to_vec(&angular_velocity));
+    }
+    sample
+}
+
 fn frame(frame_number: usize, time: f32) -> FrameInfo {
     FrameInfo {
         frame_number,
@@ -495,6 +511,159 @@ fn rejects_end_over_end_flip_that_rotates_away_after_reaching_opposite() {
 
     assert!(calculator.player_stats().get(&player_id).is_none());
     assert!(calculator.events().is_empty());
+}
+
+#[test]
+fn rejects_air_hit_tumble_dodge_where_spin_precedes_the_dodge() {
+    // Failed wave dash after getting bumped in the air: the car is already
+    // tumbling hard (and traveling forward into the spin) *before* the dodge
+    // byte fires, then somersaults through vertical and lands facing the other
+    // way. The facing reversal was not produced by the dodge, so it must not be
+    // counted as a half-flip.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = HalfFlipCalculator::new();
+
+    // Pre-dodge frame: spinning fast, nose flat, moving forward (facing +X).
+    calculator
+        .update(
+            &frame(1, 1.00),
+            &players(player_with_spin(
+                1,
+                90.0,
+                glam::Vec3::new(600.0, 0.0, 0.0),
+                0.0,
+                0.0,
+                glam::Vec3::new(0.0, 0.0, 500.0),
+                false,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    // Dodge byte fires while still traveling forward into the spin.
+    calculator
+        .update(
+            &frame(2, 1.05),
+            &players(player_with_spin(
+                1,
+                95.0,
+                glam::Vec3::new(600.0, 0.0, 0.0),
+                0.0,
+                0.0,
+                glam::Vec3::new(0.0, 0.0, 500.0),
+                true,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(8, 1.35),
+            &players(player_with_spin(
+                1,
+                95.0,
+                glam::Vec3::new(600.0, 0.0, 0.0),
+                0.0,
+                std::f32::consts::FRAC_PI_2,
+                glam::Vec3::new(0.0, 0.0, 500.0),
+                true,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(15, 1.70),
+            &players(player_with_spin(
+                1,
+                80.0,
+                glam::Vec3::new(600.0, 0.0, 0.0),
+                std::f32::consts::PI,
+                0.0,
+                glam::Vec3::new(0.0, 0.0, 500.0),
+                true,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    assert!(calculator.player_stats().get(&player_id).is_none());
+    assert!(calculator.events().is_empty());
+}
+
+#[test]
+fn counts_deliberate_backward_half_flip_despite_elevated_pre_dodge_spin() {
+    // A real backward half-flip entry (velocity opposes facing) must still count
+    // even with elevated pre-dodge spin: the air-hit guard only rejects
+    // forward-entry tumbles, not deliberate reversals.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = HalfFlipCalculator::new();
+
+    // Pre-dodge frame: spinning, but driving backward (facing +X, moving -X).
+    calculator
+        .update(
+            &frame(1, 1.00),
+            &players(player_with_spin(
+                1,
+                74.0,
+                glam::Vec3::new(-600.0, 0.0, 0.0),
+                0.0,
+                0.0,
+                glam::Vec3::new(0.0, 0.0, 500.0),
+                false,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(2, 1.05),
+            &players(player_with_spin(
+                1,
+                72.0,
+                glam::Vec3::new(-600.0, 0.0, 0.0),
+                0.0,
+                0.0,
+                glam::Vec3::new(0.0, 0.0, 500.0),
+                true,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(8, 1.35),
+            &players(player_with_spin(
+                1,
+                62.0,
+                glam::Vec3::new(-600.0, 0.0, 0.0),
+                0.0,
+                std::f32::consts::FRAC_PI_2,
+                glam::Vec3::new(0.0, 0.0, 500.0),
+                true,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+    calculator
+        .update(
+            &frame(15, 1.70),
+            &players(player_with_spin(
+                1,
+                42.0,
+                glam::Vec3::new(-600.0, 0.0, 0.0),
+                std::f32::consts::PI,
+                0.0,
+                glam::Vec3::new(0.0, 0.0, 500.0),
+                true,
+            )),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    let stats = calculator.player_stats().get(&player_id).unwrap();
+    assert_eq!(stats.count, 1);
+    assert_eq!(calculator.events().len(), 1);
+    assert!(calculator.events()[0].start_backward_alignment >= 0.0);
 }
 
 #[test]

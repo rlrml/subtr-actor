@@ -7,6 +7,18 @@ const HALF_FLIP_MIN_POST_REVERSAL_RETAINED_REVERSAL: f32 = 0.45;
 const HALF_FLIP_MIN_FINAL_FORWARD_HORIZONTAL: f32 = 0.55;
 const HALF_FLIP_MIN_FORWARD_VERTICAL: f32 = 0.55;
 const HALF_FLIP_MIN_CONFIDENCE: f32 = 0.55;
+/// Pre-dodge angular speed above which the car was already spinning hard before
+/// the dodge byte fired. Replay angular velocity is stored in hundredths of
+/// rad/s (RL saturates around 550, i.e. 5.5 rad/s), so 250 is ~2.5 rad/s.
+const HALF_FLIP_PRE_DODGE_TUMBLE_ANGULAR_SPEED: f32 = 250.0;
+/// Pre-dodge nose verticality (|forward.z|) above which the car was already
+/// pitched well off flat before the dodge byte fired.
+const HALF_FLIP_PRE_DODGE_TUMBLE_FORWARD_VERTICAL: f32 = 0.5;
+/// Minimum backward-entry alignment (velocity opposing facing) below which a
+/// dodge is not a deliberate half-flip entry. Real half-flips reverse the car
+/// (positive alignment) or at worst travel forward with a controlled body; an
+/// air-hit tumble is knocked forward into the spin (strongly negative).
+const HALF_FLIP_PRE_DODGE_MIN_BACKWARD_ENTRY: f32 = 0.0;
 
 /// A dodge sequence that cancels a flip into an opposite facing direction.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
@@ -47,6 +59,14 @@ struct ActiveHalfFlipCandidate {
     min_forward_reversal_after_reaching_opposite: f32,
     latest_forward_horizontal: f32,
     max_forward_vertical: f32,
+    pre_dodge_angular_speed: f32,
+    pre_dodge_forward_vertical: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PreDodgeSnapshot {
+    angular_speed: f32,
+    forward_vertical: f32,
 }
 
 /// Detects half-flips from player frame state.
@@ -55,6 +75,7 @@ pub struct HalfFlipCalculator {
     events: EventStream<HalfFlipEvent>,
     active_candidates: HashMap<PlayerId, ActiveHalfFlipCandidate>,
     previous_dodge_active: HashMap<PlayerId, bool>,
+    pre_dodge_snapshot: HashMap<PlayerId, PreDodgeSnapshot>,
 }
 
 impl HalfFlipCalculator {
@@ -99,6 +120,14 @@ impl HalfFlipCalculator {
         Some(forward_xy)
     }
 
+    fn angular_speed(player: &PlayerSample) -> f32 {
+        player
+            .rigid_body
+            .as_ref()
+            .and_then(|rb| rb.angular_velocity.as_ref())
+            .map_or(0.0, |angular| vec_to_glam(angular).length())
+    }
+
     fn maybe_start_candidate(&mut self, frame: &FrameInfo, player: &PlayerSample) {
         let was_dodge_active = self
             .previous_dodge_active
@@ -124,6 +153,15 @@ impl HalfFlipCalculator {
         let max_forward_vertical =
             Self::forward_vector(player).map_or(0.0, |forward| forward.z.abs());
 
+        let pre_dodge = self
+            .pre_dodge_snapshot
+            .get(&player.player_id)
+            .copied()
+            .unwrap_or(PreDodgeSnapshot {
+                angular_speed: 0.0,
+                forward_vertical: 0.0,
+            });
+
         self.active_candidates.insert(
             player.player_id.clone(),
             ActiveHalfFlipCandidate {
@@ -144,6 +182,8 @@ impl HalfFlipCalculator {
                 min_forward_reversal_after_reaching_opposite: 1.0,
                 latest_forward_horizontal: start_forward_xy.length(),
                 max_forward_vertical,
+                pre_dodge_angular_speed: pre_dodge.angular_speed,
+                pre_dodge_forward_vertical: pre_dodge.forward_vertical,
             },
         );
     }
@@ -215,6 +255,20 @@ impl HalfFlipCalculator {
         let confidence = 0.75 * reversal_score + 0.25 * flip_score;
 
         if confidence < HALF_FLIP_MIN_CONFIDENCE {
+            return None;
+        }
+
+        // Reject dodges where the facing reversal was not produced by the dodge:
+        // if the car was already tumbling (high pre-dodge spin or an
+        // already-pitched nose) when the dodge byte fired *and* it was not a
+        // deliberate backward half-flip entry, this is an air-hit tumble / failed
+        // wave dash that happens to flip around through vertical, not a half-flip.
+        let was_already_tumbling = candidate.pre_dodge_angular_speed
+            >= HALF_FLIP_PRE_DODGE_TUMBLE_ANGULAR_SPEED
+            || candidate.pre_dodge_forward_vertical >= HALF_FLIP_PRE_DODGE_TUMBLE_FORWARD_VERTICAL;
+        if was_already_tumbling
+            && candidate.start_backward_alignment < HALF_FLIP_PRE_DODGE_MIN_BACKWARD_ENTRY
+        {
             return None;
         }
 
@@ -292,6 +346,22 @@ impl HalfFlipCalculator {
             visible_players.insert(player.player_id.clone());
             if let Some(candidate) = self.active_candidates.get_mut(&player.player_id) {
                 Self::update_candidate(candidate, frame, player);
+            }
+            // Remember the most recent non-dodging orientation so a freshly
+            // started candidate can tell whether the car was already tumbling
+            // (e.g. knocked into an air spin) *before* the dodge began. A real
+            // half-flip starts from a controlled, roughly-flat car and the
+            // dodge initiates the rotation; an air-hit tumble is already
+            // spinning hard when the dodge byte appears.
+            if !player.dodge_active {
+                self.pre_dodge_snapshot.insert(
+                    player.player_id.clone(),
+                    PreDodgeSnapshot {
+                        angular_speed: Self::angular_speed(player),
+                        forward_vertical: Self::forward_vector(player)
+                            .map_or(0.0, |forward| forward.z.abs()),
+                    },
+                );
             }
         }
 
