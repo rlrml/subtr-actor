@@ -13,4 +13,20 @@ dodge_forward_back: number,
  * Dodge direction (car-relative): signed sideways component (+right, -left;
  * the handedness source).
  */
-dodge_side: number, confidence: number, };
+dodge_side: number,
+/**
+ * Raw car-relative dodge torque (the flip's rotation axis) `[x, y, z]`:
+ * `y` = forward/back, `x` = left/right, `z` ≈ 0 (nonzero only when the car
+ * is tilted). `dodge_forward_back`/`dodge_side` are its normalized 2D
+ * projection; this is the full raw signal. `None` on inputs that don't
+ * replicate dodge torque (e.g. the BakkesMod live path).
+ */
+dodge_torque: [number, number, number] | null,
+/**
+ * Signed horizontal angle (radians) from the car's facing to its velocity
+ * heading at the launch touch (projected to the x/y plane) — how far the
+ * car was turned off its line of travel. With the car-relative dodge
+ * direction this recovers the dodge direction relative to the run's motion.
+ * 0 when the car's speed or horizontal facing is too small to be meaningful.
+ */
+travel_offset_radians: number, confidence: number, };

@@ -402,6 +402,9 @@ pub(in crate::collector::stats::playback) fn parse_flick_event(
             .unwrap_or([0.0, 0.0, 0.0]),
         dodge_forward_back: json_optional_f32(object.get("dodge_forward_back"))?.unwrap_or(0.0),
         dodge_side: json_optional_f32(object.get("dodge_side"))?.unwrap_or(0.0),
+        dodge_torque: json_optional_vec3(object.get("dodge_torque"))?,
+        travel_offset_radians: json_optional_f32(object.get("travel_offset_radians"))?
+            .unwrap_or(0.0),
         confidence: json_required_f32(object, "confidence")?,
     })
 }

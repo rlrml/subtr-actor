@@ -179,6 +179,8 @@ fn flick_event(time: f32, frame: usize, player: PlayerId) -> FlickEvent {
         local_ball_impulse: [0.0, 600.0, 0.0],
         dodge_forward_back: 0.0,
         dodge_side: 0.0,
+        dodge_torque: None,
+        travel_offset_radians: 0.0,
         confidence: 0.82,
     }
 }
