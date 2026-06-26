@@ -26,6 +26,7 @@ fn test_player(
         last_boost_amount: Some(last_boost_amount),
         boost_active: false,
         dodge_active: false,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
         match_assists: None,

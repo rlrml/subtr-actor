@@ -33,6 +33,13 @@ pub struct PlayerSample {
     pub last_boost_amount: Option<f32>,
     pub boost_active: bool,
     pub dodge_active: bool,
+    /// World-frame dodge torque of the player's most recent dodge, when
+    /// available. This is the flip's rotation axis (a horizontal vector; its
+    /// world-z is ~0), and combined with the travel direction at the dodge it
+    /// recovers the dodge direction (forward/back vs side) the player input. See
+    /// the flick detector's reverse/side classification. `None` on inputs that
+    /// do not replicate dodge torque (e.g. the BakkesMod live path).
+    pub dodge_torque: Option<glam::Vec3>,
     pub powerslide_active: bool,
     pub match_goals: Option<i32>,
     pub match_assists: Option<i32>,

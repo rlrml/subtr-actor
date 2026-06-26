@@ -28,6 +28,7 @@ fn player(id: u64, z: f32, horizontal_speed: f32, dodge_active: bool) -> PlayerS
         last_boost_amount: None,
         boost_active: false,
         dodge_active,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
         match_assists: None,

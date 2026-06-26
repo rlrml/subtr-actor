@@ -7,4 +7,13 @@ import type { RemoteIdTs } from "./RemoteIdTs.ts";
  * A dodge-start event, optionally carrying an estimated dodge impulse and the
  * orientation trajectory of the dodge.
  */
-export type DodgeEvent = { time: number, frame: number, resolved_time: number, resolved_frame: number, player: RemoteIdTs, is_team_0: boolean, dodge_impulse: DodgeImpulse | null, dodge_rotation: DodgeRotation | null, };
+export type DodgeEvent = { time: number, frame: number, resolved_time: number, resolved_frame: number, player: RemoteIdTs, is_team_0: boolean, dodge_impulse: DodgeImpulse | null, dodge_rotation: DodgeRotation | null,
+/**
+ * Replicated dodge torque (`TAGame.CarComponent_Dodge_TA:DodgeTorque`) read
+ * straight off the dodge component at onset — the flip's world-frame rotation
+ * axis (a horizontal vector; world-z ≈ 0). Unlike `dodge_rotation`'s onset
+ * angular velocity (sampled a frame late and contaminated by any ongoing car
+ * rotation), this is the exact commanded flip direction. `None` on inputs
+ * that do not replicate it (e.g. the BakkesMod live path).
+ */
+dodge_torque: [number, number, number] | null, };

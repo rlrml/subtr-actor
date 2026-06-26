@@ -25,6 +25,7 @@ fn player(velocity: glam::Vec3, dodge_active: bool, boost_active: bool) -> Playe
         last_boost_amount: None,
         boost_active,
         dodge_active,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
         match_assists: None,
@@ -115,6 +116,7 @@ fn subtracts_forward_boost_compensation() {
         max_up_deviation_degrees: 0.0,
         min_up_z: 1.0,
         rotation_sample_count: 0,
+        dodge_torque: None,
     };
 
     let event = FlipImpulseCalculator::candidate_event(&boxcars::RemoteId::Steam(1), candidate);
@@ -150,6 +152,7 @@ fn subtracts_forward_boost_compensation() {
         max_up_deviation_degrees: 0.0,
         min_up_z: 1.0,
         rotation_sample_count: 0,
+        dodge_torque: None,
     };
     let uncompensated = FlipImpulseCalculator::candidate_event(
         &boxcars::RemoteId::Steam(1),
@@ -160,4 +163,36 @@ fn subtracts_forward_boost_compensation() {
         .as_ref()
         .expect("expected uncompensated dodge impulse");
     assert!(uncompensated_impulse.local_forward_component > dodge_impulse.local_forward_component);
+}
+
+#[test]
+fn dodge_event_carries_replicated_dodge_torque() {
+    let mut calculator = FlipImpulseCalculator::new();
+    let live_play = LivePlayState::active_play();
+    let torque = glam::Vec3::new(0.0, 2.6, 0.0);
+
+    let mut onset_player = player(glam::Vec3::new(1000.0, 0.0, 0.0), true, false);
+    onset_player.dodge_torque = Some(torque);
+    calculator
+        .update_parts(
+            &frame(10, 1.0, 0.0),
+            &PlayerFrameState {
+                players: vec![onset_player],
+            },
+            &live_play,
+        )
+        .unwrap();
+    calculator
+        .update_parts(
+            &frame(12, 1.10, 0.10),
+            &PlayerFrameState {
+                players: vec![player(glam::Vec3::new(1100.0, 0.0, 0.0), true, false)],
+            },
+            &live_play,
+        )
+        .unwrap();
+    calculator.finalize_parts(&frame(16, 1.30, 0.10));
+
+    let event = calculator.events().first().expect("expected dodge event");
+    assert_eq!(event.dodge_torque, Some(torque.to_array()));
 }

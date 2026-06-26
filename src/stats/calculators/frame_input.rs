@@ -253,6 +253,10 @@ impl FrameInput {
                 last_boost_amount: processor.get_player_last_boost_level(player_id).ok(),
                 boost_active: processor.get_boost_active(player_id).unwrap_or(0) % 2 == 1,
                 dodge_active: processor.get_dodge_active(player_id).unwrap_or(0) % 2 == 1,
+                dodge_torque: processor
+                    .get_dodge_torque(player_id)
+                    .ok()
+                    .map(|(x, y, z)| glam::Vec3::new(x, y, z)),
                 powerslide_active: processor.get_powerslide_active(player_id).unwrap_or(false),
                 match_goals: processor.get_player_match_goals(player_id).ok(),
                 match_assists: processor.get_player_match_assists(player_id).ok(),

@@ -50,6 +50,7 @@ fn player(player_id: PlayerId, is_team_0: bool, goals: i32) -> PlayerSample {
         last_boost_amount: None,
         boost_active: false,
         dodge_active: false,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: Some(goals),
         match_assists: Some(0),

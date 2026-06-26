@@ -206,6 +206,10 @@ pub(crate) fn player_state(players: &[SaPlayerFrame]) -> PlayerFrameState {
                 last_boost_amount: Some(player.last_boost_amount),
                 boost_active: player.boost_active != 0,
                 dodge_active: player.dodge_active != 0,
+                // The live ABI does not (yet) replicate dodge torque, so the
+                // flick detector's reverse/side classification degrades to
+                // "other" on the live path. See PlayerSample::dodge_torque.
+                dodge_torque: None,
                 powerslide_active: player.powerslide_active != 0,
                 match_goals: (player.has_match_stats != 0).then_some(player.match_goals),
                 match_assists: (player.has_match_stats != 0).then_some(player.match_assists),

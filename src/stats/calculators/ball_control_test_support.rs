@@ -25,6 +25,7 @@ pub(crate) fn player(position: glam::Vec3, velocity: glam::Vec3) -> PlayerSample
         last_boost_amount: None,
         boost_active: false,
         dodge_active: false,
+        dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
         match_assists: None,
