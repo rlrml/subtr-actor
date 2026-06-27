@@ -304,6 +304,21 @@ fn confirmed_flip_reset_event(time: f32, frame: usize, player: PlayerId) -> Flip
     }
 }
 
+fn on_ball_dodge_reset_event(time: f32, frame: usize, player: PlayerId) -> DodgeResetEvent {
+    DodgeResetEvent {
+        time,
+        frame,
+        player,
+        player_position: Some([0.0, 2100.0, 600.0]),
+        is_team_0: true,
+        counter_value: 1,
+        on_ball: true,
+        used: false,
+        outcome: Some(FlipResetOutcome::GoalScored),
+        time_to_use: None,
+    }
+}
+
 fn touch_classification_event(
     time: f32,
     frame: usize,
@@ -1032,6 +1047,8 @@ fn flip_reset_goal_tags_matching_on_ball_reset_before_last_touch() {
     let events = FlipResetGoalCalculator::new().tag_goals(
         &[goal],
         &[confirmed_flip_reset_event(7.0, 70, player_id(1))],
+        &[],
+        &[],
     );
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlipResetGoal]);
@@ -1053,11 +1070,96 @@ fn flip_reset_goal_can_be_created_by_scoring_teammate() {
     let events = FlipResetGoalCalculator::new().tag_goals(
         &[goal],
         &[confirmed_flip_reset_event(7.0, 70, player_id(2))],
+        &[],
+        &[],
     );
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlipResetGoal]);
     assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Teammate));
     assert!(!has_modifier(&events[0], GoalTagModifier::ByScorer));
+}
+
+#[test]
+fn flip_reset_goal_tags_scoring_on_ball_reset_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2400.0, 700.0), Vec::new());
+    let events = FlipResetGoalCalculator::new().tag_goals(
+        &[goal],
+        &[],
+        &[on_ball_dodge_reset_event(9.5, 95, player_id(1))],
+        &[touch_classification_event(9.5, 95, player_id(1), "dodge")],
+    );
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlipResetGoal]);
+    assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Scorer));
+    assert!(has_modifier(&events[0], GoalTagModifier::ByScorer));
+    let metadata = events[0].tag.metadata();
+    assert!(
+        metadata
+            .related_events
+            .iter()
+            .any(|event_ref| event_ref.stream == GoalTagEventStream::DodgeReset)
+    );
+    assert!(
+        metadata
+            .related_events
+            .iter()
+            .any(|event_ref| event_ref.stream == GoalTagEventStream::Touch)
+    );
+    assert!(
+        metadata
+            .evidence
+            .iter()
+            .any(|evidence| evidence.kind == GoalTagEvidenceKind::FlipReset)
+    );
+}
+
+#[test]
+fn flip_reset_goal_rejects_direct_reset_touch_without_dodge_shot() {
+    let goal = goal_with_touch(true, position(0.0, 2400.0, 700.0), Vec::new());
+    let events = FlipResetGoalCalculator::new().tag_goals(
+        &[goal],
+        &[],
+        &[on_ball_dodge_reset_event(9.5, 95, player_id(1))],
+        &[touch_classification_event(
+            9.5,
+            95,
+            player_id(1),
+            "no_dodge",
+        )],
+    );
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn rocket_sense_goal_5_direct_reset_touch_is_flip_reset_goal() {
+    let data = std::fs::read("assets/rocket-sense-019f05c8-goal-5-flip-reset.replay")
+        .expect("replay fixture should be present");
+    let replay = boxcars::ParserBuilder::new(&data)
+        .always_check_crc()
+        .must_parse_network_data()
+        .parse()
+        .expect("replay fixture should parse");
+    let timeline = crate::StatsTimelineCollector::new()
+        .get_legacy_replay_stats_timeline(&replay)
+        .expect("stats timeline should build");
+    let goals: Vec<_> = timeline
+        .events
+        .events
+        .iter()
+        .filter_map(|event| match &event.payload {
+            EventPayload::GoalContext(goal) => Some(goal),
+            _ => None,
+        })
+        .collect();
+    let goal = goals.get(4).expect("fixture should contain goal 5");
+
+    assert!(
+        goal.tags
+            .iter()
+            .any(|tag| matches!(tag, GoalTag::FlipResetGoal(_))),
+        "goal 5 should be tagged as a flip reset goal"
+    );
 }
 
 #[test]
