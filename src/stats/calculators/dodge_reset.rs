@@ -12,6 +12,12 @@ const FALLBACK_RESET_MIN_PLAYER_HEIGHT: f32 = 95.0;
 const FALLBACK_RESET_MAX_LOCAL_VERTICAL_OFFSET: f32 = 10.0;
 const FALLBACK_RESET_MAX_LOCAL_FORWARD_OFFSET: f32 = 240.0;
 const FALLBACK_RESET_MAX_LOCAL_LATERAL_OFFSET: f32 = 240.0;
+/// A dodge can start while the car is already dragging through the ball, then
+/// the replay's active byte can drop before the sampled touch that carries the
+/// resulting impulse. Keep a short post-onset continuation window for matching
+/// that touch to the pending reset without broadening the global touch-classifier
+/// dodge-lag tolerance.
+const FLIP_RESET_DODGE_CONTACT_CONTINUATION_SECONDS: f32 = 0.35;
 /// How long after a conversion touch the dodge component's active byte may take
 /// to replicate. The ball-hit and the dodge activation routinely land on adjacent
 /// frames, so a flip-reset conversion touch can be sampled on the frame *before*
@@ -117,6 +123,7 @@ struct RecentResetTouch {
     frame: usize,
     team_is_team_0: bool,
     player_position: Option<[f32; 3]>,
+    dodge_contact: bool,
 }
 
 /// Internal bookkeeping for an on-ball dodge reset awaiting confirmation, including
@@ -450,19 +457,34 @@ impl DodgeResetCalculator {
 
     /// Record an attributed touch as a flip-reset conversion candidate and, when
     /// the toucher is already dodging, confirm the pending reset immediately.
-    fn process_touch_for_flip_reset(
-        &mut self,
+    fn reset_and_touch_are_same_dodge_contact(
+        reset_event: &DodgeRefreshedEvent,
+        touch: &RecentResetTouch,
+    ) -> bool {
+        touch.dodge_contact
+            && touch.frame == reset_event.frame
+            && (touch.time - reset_event.time).abs() <= f32::EPSILON
+    }
+
+    fn touch_matches_player_frame(
+        touch_event: &TouchEvent,
+        player_id: &PlayerId,
+        time: f32,
+        frame: usize,
+    ) -> bool {
+        touch_event.player.as_ref() == Some(player_id)
+            && touch_event.frame == frame
+            && (touch_event.time - time).abs() <= f32::EPSILON
+    }
+
+    fn recent_reset_touch(
         players: &PlayerFrameState,
         touch_event: &TouchEvent,
-    ) {
-        let Some(player_id) = touch_event.player.as_ref() else {
-            return;
-        };
-        if !self.pending_on_ball_resets.contains(player_id) {
-            return;
-        }
-
-        let touch = RecentResetTouch {
+    ) -> Option<RecentResetTouch> {
+        let player_id = touch_event.player.as_ref()?;
+        let dodge_contact =
+            touch_event.dodge_contact || Self::player_dodge_active(players, player_id);
+        Some(RecentResetTouch {
             time: touch_event.time,
             frame: touch_event.frame,
             team_is_team_0: touch_event.team_is_team_0,
@@ -470,6 +492,29 @@ impl DodgeResetCalculator {
                 .player_position
                 .map(|position| vec_to_glam(&position).to_array())
                 .or_else(|| players.player_position(player_id)),
+            dodge_contact,
+        })
+    }
+
+    fn touch_within_dodge_continuation(touch_time: f32, dodge_onset_time: f32) -> bool {
+        touch_time >= dodge_onset_time
+            && touch_time - dodge_onset_time <= FLIP_RESET_DODGE_CONTACT_CONTINUATION_SECONDS
+    }
+
+    fn process_touch_for_flip_reset(
+        &mut self,
+        players: &PlayerFrameState,
+        touch_event: &TouchEvent,
+    ) -> bool {
+        let Some(player_id) = touch_event.player.as_ref() else {
+            return false;
+        };
+        if !self.pending_on_ball_resets.contains(player_id) {
+            return false;
+        }
+
+        let Some(touch) = Self::recent_reset_touch(players, touch_event) else {
+            return false;
         };
         self.recent_confirmable_touch
             .insert(player_id.clone(), touch.clone());
@@ -477,11 +522,30 @@ impl DodgeResetCalculator {
         // Dodge-then-touch (or same-frame): the dodge byte is already up, so the
         // recorded onset anchors the timing window.
         if let Some(&dodge_onset_time) = self.pending_reset_dodge_onset.get(player_id) {
-            if Self::player_dodge_active(players, player_id) {
+            if touch.dodge_contact
+                || Self::touch_within_dodge_continuation(touch.time, dodge_onset_time)
+            {
                 let player_id = player_id.clone();
-                self.confirm_flip_reset(&player_id, &touch, dodge_onset_time);
+                return self.confirm_flip_reset(&player_id, &touch, dodge_onset_time);
             }
         }
+
+        // Same-frame dodge-on-ball resets have no positive reset-to-dodge delay:
+        // the contact both refreshes the dodge and hits the ball during the
+        // dodge. Treat that as a zero-latency used reset only when the touch
+        // itself carries dodge evidence, so ordinary reset contacts still remain
+        // pending.
+        if touch.dodge_contact && Self::player_dodge_active(players, player_id) {
+            let Some(pending) = self.pending_on_ball_resets.get(player_id) else {
+                return false;
+            };
+            if Self::reset_and_touch_are_same_dodge_contact(&pending.reset, &touch) {
+                let player_id = player_id.clone();
+                return self.confirm_flip_reset(&player_id, &touch, touch.time);
+            }
+        }
+
+        false
     }
 
     /// Confirm a pending on-ball reset as a used flip reset, gating on the
@@ -492,15 +556,21 @@ impl DodgeResetCalculator {
         player_id: &PlayerId,
         touch: &RecentResetTouch,
         dodge_onset_time: f32,
-    ) {
+    ) -> bool {
         let Some(pending) = self.pending_on_ball_resets.get(player_id) else {
-            return;
+            return false;
         };
         let reset_event = pending.reset.clone();
         let dodge_delay = dodge_onset_time - reset_event.time;
-        if dodge_delay < FLIP_RESET_MIN_DODGE_TOUCH_DELAY_SECONDS {
+        let same_frame_dodge_reset =
+            Self::reset_and_touch_are_same_dodge_contact(&reset_event, touch);
+        let time_since_reset = touch.time - reset_event.time;
+        if dodge_delay < FLIP_RESET_MIN_DODGE_TOUCH_DELAY_SECONDS
+            && time_since_reset < FLIP_RESET_MIN_DODGE_TOUCH_DELAY_SECONDS
+            && !same_frame_dodge_reset
+        {
             // The dodge is too close to the reset to be a distinct conversion.
-            return;
+            return false;
         }
         if dodge_delay > FLIP_RESET_MAX_DODGE_TOUCH_DELAY_SECONDS {
             self.resolve_pending(
@@ -511,11 +581,10 @@ impl DodgeResetCalculator {
                 touch.frame,
                 None,
             );
-            return;
+            return true;
         }
-        let time_since_reset = touch.time - reset_event.time;
         if time_since_reset < 0.0 {
-            return;
+            return false;
         }
 
         self.confirmed_flip_reset_events.push(FlipResetEvent {
@@ -537,6 +606,36 @@ impl DodgeResetCalculator {
             touch.frame,
             Some(time_since_reset),
         );
+        true
+    }
+
+    fn confirm_pending_with_same_frame_touch(
+        &mut self,
+        players: &PlayerFrameState,
+        touches: &[&TouchEvent],
+        player_id: &PlayerId,
+        time: f32,
+        frame: usize,
+    ) -> Option<usize> {
+        let (touch_index, touch_event) = touches.iter().enumerate().find(|(_, touch)| {
+            let dodge_onset_time = self.pending_reset_dodge_onset.get(player_id).copied();
+            Self::touch_matches_player_frame(touch, player_id, time, frame)
+                && (touch.dodge_contact
+                    || Self::player_dodge_active(players, player_id)
+                    || dodge_onset_time.is_some_and(|onset| {
+                        Self::touch_within_dodge_continuation(touch.time, onset)
+                    }))
+        })?;
+        let touch = Self::recent_reset_touch(players, touch_event)?;
+        self.recent_confirmable_touch
+            .insert(player_id.clone(), touch.clone());
+        let dodge_onset_time = self
+            .pending_reset_dodge_onset
+            .get(player_id)
+            .copied()
+            .unwrap_or(touch.time);
+        self.confirm_flip_reset(player_id, &touch, dodge_onset_time)
+            .then_some(touch_index)
     }
 
     pub fn update(
@@ -563,7 +662,9 @@ impl DodgeResetCalculator {
         }
         self.previous_live_play = Some(live_play_state.is_live_play);
 
-        self.prune_pending_resets(frame, players);
+        self.update_pending_reset_dodges(players, frame.time);
+        let ordered_touches = chronological_touch_events(&touch_state.touch_events);
+        let mut consumed_touch_indices = vec![false; ordered_touches.len()];
         for event in &events.dodge_refreshed_events {
             let on_ball = Self::on_ball_dodge_reset(ball, players, &event.player);
             let reset_event = event.clone();
@@ -580,6 +681,15 @@ impl DodgeResetCalculator {
                 time_to_use: None,
             };
             if on_ball {
+                if let Some(touch_index) = self.confirm_pending_with_same_frame_touch(
+                    players,
+                    &ordered_touches,
+                    &event.player,
+                    event.time,
+                    event.frame,
+                ) {
+                    consumed_touch_indices[touch_index] = true;
+                }
                 // A still-pending earlier reset for this player is superseded
                 // by the new one and counts as unused (no latency recorded).
                 self.resolve_pending(
@@ -604,13 +714,16 @@ impl DodgeResetCalculator {
             }
             self.events.push(event);
         }
-        self.update_pending_reset_dodges(players, frame.time);
-        for touch_event in chronological_touch_events(&touch_state.touch_events) {
+        for (touch_index, touch_event) in ordered_touches.iter().enumerate() {
+            if consumed_touch_indices[touch_index] {
+                continue;
+            }
             if !events.dodge_refreshed_counter_available {
                 self.arm_fallback_on_ball_reset(touch_event);
             }
             self.process_touch_for_flip_reset(players, touch_event);
         }
+        self.prune_pending_resets(frame, players);
         Ok(())
     }
 

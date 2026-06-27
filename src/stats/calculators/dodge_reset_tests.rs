@@ -102,6 +102,13 @@ fn touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
     }
 }
 
+fn dodge_touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
+    TouchEvent {
+        dodge_contact: true,
+        ..touch_event(player, time, frame)
+    }
+}
+
 fn underside_touch_event(player: PlayerId, time: f32, frame: usize) -> TouchEvent {
     TouchEvent {
         player_position: Some(boxcars::Vector3f {
@@ -473,6 +480,153 @@ fn dodge_byte_lagging_conversion_touch_still_confirms_flip_reset() {
         .iter()
         .find(|event| event.frame == 10)
         .expect("on-ball dodge reset event should be emitted");
+    assert!(reset.used);
+    assert_eq!(reset.outcome, Some(FlipResetOutcome::Used));
+}
+
+#[test]
+fn same_frame_dodge_touch_confirms_on_ball_reset() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    update_live(
+        &mut calculator,
+        &frame_info(1.0, 10),
+        &players(player_id.clone(), true),
+        &FrameEventsState {
+            dodge_refreshed_events: vec![reset_event_at(player_id.clone(), 1.0, 10, 1)],
+            ..FrameEventsState::default()
+        },
+        &touch_state(vec![touch_event(player_id.clone(), 1.0, 10)]),
+    );
+
+    let event = calculator
+        .confirmed_flip_reset_events()
+        .first()
+        .expect("same-frame dodge reset contact should confirm the flip reset");
+    assert_eq!(event.player, player_id);
+    assert_eq!(event.reset_frame, 10);
+    assert_eq!(event.frame, 10);
+    assert_eq!(event.time_since_reset, 0.0);
+
+    let reset = calculator.events().first().unwrap();
+    assert!(reset.used);
+    assert_eq!(reset.outcome, Some(FlipResetOutcome::Used));
+    assert_eq!(reset.time_to_use, Some(0.0));
+}
+
+#[test]
+fn same_frame_dodge_touch_uses_pending_reset_before_new_refresh_supersedes_it() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    update_live(
+        &mut calculator,
+        &frame_info(1.0, 10),
+        &players(player_id.clone(), false),
+        &FrameEventsState {
+            dodge_refreshed_events: vec![reset_event_at(player_id.clone(), 1.0, 10, 1)],
+            ..FrameEventsState::default()
+        },
+        &TouchState::default(),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.15, 11),
+        &players(player_id.clone(), true),
+        &FrameEventsState::default(),
+        &TouchState::default(),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.2, 12),
+        &players(player_id.clone(), false),
+        &FrameEventsState {
+            dodge_refreshed_events: vec![reset_event_at(player_id.clone(), 1.2, 12, 2)],
+            ..FrameEventsState::default()
+        },
+        &touch_state(vec![touch_event(player_id.clone(), 1.2, 12)]),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.6, 16),
+        &grounded_players(player_id.clone()),
+        &FrameEventsState::default(),
+        &TouchState::default(),
+    );
+
+    let confirmed = calculator.confirmed_flip_reset_events();
+    assert_eq!(confirmed.len(), 1);
+    assert_eq!(confirmed[0].reset_frame, 10);
+    assert_eq!(confirmed[0].frame, 12);
+    assert!((confirmed[0].time_since_reset - 0.2).abs() < 1e-5);
+
+    let outcomes = calculator.flip_reset_outcome_events();
+    assert_eq!(outcomes.len(), 2);
+    assert_eq!(outcomes[0].reset_frame, 10);
+    assert_eq!(outcomes[0].outcome, FlipResetOutcome::Used);
+    assert!((outcomes[0].time_to_use.unwrap() - 0.2).abs() < 1e-5);
+    assert_eq!(outcomes[1].reset_frame, 12);
+    assert_eq!(outcomes[1].outcome, FlipResetOutcome::Landed);
+
+    let first_reset = calculator
+        .events()
+        .iter()
+        .find(|event| event.frame == 10)
+        .unwrap();
+    assert!(first_reset.used);
+    assert_eq!(first_reset.outcome, Some(FlipResetOutcome::Used));
+
+    let second_reset = calculator
+        .events()
+        .iter()
+        .find(|event| event.frame == 12)
+        .unwrap();
+    assert!(!second_reset.used);
+    assert_eq!(second_reset.outcome, Some(FlipResetOutcome::Landed));
+}
+
+#[test]
+fn continuation_touch_on_landing_frame_uses_reset_before_landed_outcome() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    update_live(
+        &mut calculator,
+        &frame_info(1.0, 10),
+        &players(player_id.clone(), false),
+        &FrameEventsState {
+            dodge_refreshed_events: vec![reset_event_at(player_id.clone(), 1.0, 10, 1)],
+            ..FrameEventsState::default()
+        },
+        &touch_state(vec![touch_event(player_id.clone(), 1.0, 10)]),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.3, 12),
+        &players(player_id.clone(), true),
+        &FrameEventsState::default(),
+        &TouchState::default(),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.34, 13),
+        &grounded_players(player_id.clone()),
+        &FrameEventsState::default(),
+        &touch_state(vec![dodge_touch_event(player_id.clone(), 1.34, 13)]),
+    );
+
+    let confirmed = calculator.confirmed_flip_reset_events();
+    assert_eq!(confirmed.len(), 1);
+    assert_eq!(confirmed[0].reset_frame, 10);
+    assert_eq!(confirmed[0].frame, 13);
+    assert!((confirmed[0].time_since_reset - 0.34).abs() < 1e-5);
+
+    let outcomes = calculator.flip_reset_outcome_events();
+    assert_eq!(outcomes.len(), 1);
+    assert_eq!(outcomes[0].outcome, FlipResetOutcome::Used);
+
+    let reset = calculator.events().first().unwrap();
     assert!(reset.used);
     assert_eq!(reset.outcome, Some(FlipResetOutcome::Used));
 }
