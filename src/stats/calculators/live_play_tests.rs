@@ -1,5 +1,5 @@
 use super::*;
-use crate::{GAME_STATE_KICKOFF_COUNTDOWN, GoalEvent};
+use crate::{GAME_STATE_GOAL_SCORED_REPLAY, GAME_STATE_KICKOFF_COUNTDOWN, GoalEvent};
 
 #[test]
 fn kickoff_waiting_for_first_touch_is_not_live_play() {
@@ -13,6 +13,20 @@ fn kickoff_waiting_for_first_touch_is_not_live_play() {
     assert_eq!(state.gameplay_phase, GameplayPhase::KickoffWaitingForTouch);
     assert!(!state.is_live_play);
     assert!(state.gameplay_phase.counts_toward_player_motion());
+}
+
+#[test]
+fn goal_replay_with_unhit_ball_is_post_goal_not_kickoff() {
+    let mut tracker = LivePlayTracker::default();
+    let gameplay = GameplayState {
+        game_state: Some(GAME_STATE_GOAL_SCORED_REPLAY),
+        ball_has_been_hit: Some(false),
+        ..Default::default()
+    };
+    let state = tracker.state_parts(&gameplay, &FrameEventsState::default());
+
+    assert_eq!(state.gameplay_phase, GameplayPhase::PostGoal);
+    assert!(!state.is_live_play);
 }
 
 #[test]

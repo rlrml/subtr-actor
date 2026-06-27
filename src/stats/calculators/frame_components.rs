@@ -41,7 +41,8 @@ impl GameplayState {
     }
 
     pub fn kickoff_phase_active(&self) -> bool {
-        self.kickoff_countdown_active() || self.ball_has_been_hit == Some(false)
+        self.game_state != Some(GAME_STATE_GOAL_SCORED_REPLAY)
+            && (self.kickoff_countdown_active() || self.ball_has_been_hit == Some(false))
     }
 
     pub fn current_in_game_team_player_count(&self, is_team_0: bool) -> usize {
