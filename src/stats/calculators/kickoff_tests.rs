@@ -3387,6 +3387,53 @@ fn kickoff_goal_allows_deep_ball_in_conceding_half() {
 }
 
 #[test]
+fn goal_replay_frames_do_not_arm_phantom_missed_kickoffs() {
+    let blue_taker = PlayerId::Steam(64);
+    let orange_taker = PlayerId::Steam(65);
+    let players = PlayerFrameState {
+        players: vec![
+            player(
+                blue_taker,
+                true,
+                glam::Vec3::new(-256.0, -3840.0, 17.0),
+                85.0,
+            ),
+            player(
+                orange_taker,
+                false,
+                glam::Vec3::new(256.0, 3840.0, 17.0),
+                85.0,
+            ),
+        ],
+    };
+    let gameplay = GameplayState {
+        game_state: Some(GAME_STATE_GOAL_SCORED_REPLAY),
+        ball_has_been_hit: Some(false),
+        ..GameplayState::default()
+    };
+    let mut calculator = KickoffCalculator::new();
+
+    for frame_number in 0..20 {
+        calculator
+            .update(
+                &frame(frame_number, frame_number as f32 * 0.04),
+                &gameplay,
+                &ball(0.0),
+                &players,
+                &TouchState::default(),
+                &FrameEventsState::default(),
+            )
+            .unwrap();
+    }
+
+    calculator.finish();
+    assert!(
+        calculator.events().is_empty(),
+        "goal replay frames with ball_has_been_hit=false must not produce missed kickoff events"
+    );
+}
+
+#[test]
 fn next_kickoff_phase_flushes_kickoff_awaiting_attribution() {
     let blue_taker = PlayerId::Steam(66);
     let blue_support = PlayerId::Steam(67);
