@@ -157,13 +157,6 @@ mechanic_goal_tag_node!(
     BallCarryCalculator
 );
 mechanic_goal_tag_node!(
-    FlipResetGoalNode,
-    FlipResetGoalCalculator,
-    "flip_reset_goal",
-    dodge_reset_dependency,
-    DodgeResetCalculator
-);
-mechanic_goal_tag_node!(
     FlipIntoBallGoalNode,
     FlipIntoBallGoalCalculator,
     "flip_into_ball_goal",
@@ -223,6 +216,52 @@ impl AnalysisNode for HighAerialGoalNode {
             ctx.get::<MatchStatsCalculator>()?,
             ctx.get::<TouchCalculator>()?,
             ctx.get::<PossessionCalculator>()?,
+        )
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.calculator
+    }
+}
+
+pub struct FlipResetGoalNode {
+    calculator: FlipResetGoalCalculator,
+}
+
+impl FlipResetGoalNode {
+    pub fn new() -> Self {
+        Self {
+            calculator: FlipResetGoalCalculator::new(),
+        }
+    }
+}
+
+impl Default for FlipResetGoalNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AnalysisNode for FlipResetGoalNode {
+    type State = FlipResetGoalCalculator;
+
+    fn name(&self) -> &'static str {
+        "flip_reset_goal"
+    }
+
+    fn dependencies(&self) -> NodeDependencies {
+        vec![
+            match_stats_dependency(),
+            dodge_reset_dependency(),
+            touch_dependency(),
+        ]
+    }
+
+    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        self.calculator.update(
+            ctx.get::<MatchStatsCalculator>()?,
+            ctx.get::<DodgeResetCalculator>()?,
+            ctx.get::<TouchCalculator>()?,
         )
     }
 

@@ -2,6 +2,7 @@ use super::*;
 
 const MAX_EVENT_AFTER_GOAL_SECONDS: f32 = 0.05;
 const GOAL_KICKOFF_BOUNDARY_EPSILON_SECONDS: f32 = 0.05;
+const SCORING_TOUCH_MATCH_EPSILON_SECONDS: f32 = 0.05;
 
 pub(super) fn tag_goals_by_height(
     goals: &[GoalContextEvent],
@@ -220,6 +221,36 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
     tags
 }
 
+pub(super) fn latest_goal_tag_assignments(
+    calculators: &[&[GoalTagAssignment]],
+) -> Vec<GoalTagAssignment> {
+    let mut assignments: Vec<GoalTagAssignment> = Vec::new();
+    for assignment in calculators.iter().flat_map(|events| events.iter()) {
+        if let Some(existing) = assignments
+            .iter_mut()
+            .find(|existing| existing.goal_index == assignment.goal_index)
+        {
+            if goal_tag_assignment_time(assignment) > goal_tag_assignment_time(existing) {
+                *existing = assignment.clone();
+            }
+        } else {
+            assignments.push(assignment.clone());
+        }
+    }
+    assignments.sort_by_key(|assignment| assignment.goal_index);
+    assignments
+}
+
+fn goal_tag_assignment_time(assignment: &GoalTagAssignment) -> f32 {
+    assignment
+        .tag
+        .metadata()
+        .evidence
+        .first()
+        .map(|evidence| evidence.time)
+        .unwrap_or(0.0)
+}
+
 pub(super) fn point_event_matches_goal<E: GoalMechanicPointEvent>(
     event: &E,
     goal: &GoalContextEvent,
@@ -227,6 +258,63 @@ pub(super) fn point_event_matches_goal<E: GoalMechanicPointEvent>(
     event.event_team_is_team_0() == goal.scoring_team_is_team_0
         && event_time_is_in_goal_play(event.event_time(), goal)
         && event.event_frame() <= goal.frame
+}
+
+pub(super) fn scoring_on_ball_reset_matches_goal(
+    event: &DodgeResetEvent,
+    goal: &GoalContextEvent,
+    max_event_to_goal_seconds: f32,
+) -> bool {
+    if !event.on_ball
+        || event.is_team_0 != goal.scoring_team_is_team_0
+        || !event_time_is_in_goal_play(event.time, goal)
+        || event.frame > goal.frame
+        || goal.time - event.time > max_event_to_goal_seconds
+    {
+        return false;
+    }
+    goal.scorer_last_touch
+        .as_ref()
+        .is_some_and(|touch| scoring_touch_matches_dodge_reset(touch, event))
+}
+
+pub(super) fn scoring_dodge_touch_matches_on_ball_reset_goal(
+    touch_event: &TouchClassificationEvent,
+    reset_event: &DodgeResetEvent,
+    goal: &GoalContextEvent,
+    max_event_to_goal_seconds: f32,
+) -> bool {
+    let Some(touch) = goal.scorer_last_touch.as_ref() else {
+        return false;
+    };
+    scoring_on_ball_reset_matches_goal(reset_event, goal, max_event_to_goal_seconds)
+        && scoring_touch_is_dodge(touch_event, touch, goal)
+}
+
+pub(super) fn scoring_touch_is_dodge(
+    candidate: &TouchClassificationEvent,
+    touch: &GoalTouchContext,
+    goal: &GoalContextEvent,
+) -> bool {
+    // Joining by touch identity is exact; player + frame remains as a fallback
+    // for data serialized before touch ids existed.
+    let same_touch = match (candidate.touch_id, touch.touch_id) {
+        (Some(candidate_id), Some(touch_id)) => candidate_id == touch_id,
+        _ => {
+            candidate.player == touch.player
+                && (candidate.frame == touch.frame
+                    || (candidate.time - touch.time).abs() <= SCORING_TOUCH_MATCH_EPSILON_SECONDS)
+        }
+    };
+    same_touch
+        && candidate.is_team_0 == goal.scoring_team_is_team_0
+        && candidate.has_tag("dodge_state", FLIP_INTO_BALL_DODGE_STATE_LABEL)
+}
+
+fn scoring_touch_matches_dodge_reset(touch: &GoalTouchContext, event: &DodgeResetEvent) -> bool {
+    touch.player == event.player
+        && (touch.frame == event.frame
+            || (touch.time - event.time).abs() <= SCORING_TOUCH_MATCH_EPSILON_SECONDS)
 }
 
 pub(super) fn pass_event_matches_goal(event: &PassEvent, goal: &GoalContextEvent) -> bool {
@@ -436,6 +524,20 @@ pub(super) fn air_dribble_evidence(event: &BallCarryEvent) -> GoalTagEvidence {
 pub(super) fn flip_into_ball_evidence(event: &TouchClassificationEvent) -> GoalTagEvidence {
     GoalTagEvidence {
         kind: GoalTagEvidenceKind::FlipIntoBall,
+        time: event.time,
+        frame: event.frame,
+        player: Some(event.player.clone()),
+        player_position: event.player_position.map(|position| GoalContextPosition {
+            x: position[0],
+            y: position[1],
+            z: position[2],
+        }),
+    }
+}
+
+pub(super) fn dodge_reset_evidence(event: &DodgeResetEvent) -> GoalTagEvidence {
+    GoalTagEvidence {
+        kind: GoalTagEvidenceKind::FlipReset,
         time: event.time,
         frame: event.frame,
         player: Some(event.player.clone()),

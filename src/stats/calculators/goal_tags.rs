@@ -1419,10 +1419,13 @@ impl FlipResetGoalCalculator {
         &mut self,
         match_stats: &MatchStatsCalculator,
         dodge_reset: &DodgeResetCalculator,
+        touch: &TouchCalculator,
     ) -> SubtrActorResult<()> {
         self.events.replace_all_assuming_append_only(self.tag_goals(
             match_stats.goal_context_events(),
             dodge_reset.confirmed_flip_reset_events(),
+            dodge_reset.events(),
+            touch.events(),
         ));
         Ok(())
     }
@@ -1430,14 +1433,87 @@ impl FlipResetGoalCalculator {
     fn tag_goals(
         &self,
         goals: &[GoalContextEvent],
-        events: &[FlipResetEvent],
+        flip_reset_events: &[FlipResetEvent],
+        dodge_reset_events: &[DodgeResetEvent],
+        touch_events: &[TouchClassificationEvent],
     ) -> Vec<GoalTagAssignment> {
-        tag_goals_by_point_mechanic_event(
+        let confirmed_tags = tag_goals_by_point_mechanic_event(
             goals,
-            events,
+            flip_reset_events,
             GoalTagKind::FlipResetGoal,
             self.config.max_event_to_goal_seconds,
-        )
+        );
+        let direct_reset_tags =
+            self.tag_goals_by_scoring_reset_touch(goals, dodge_reset_events, touch_events);
+        latest_goal_tag_assignments(&[&confirmed_tags, &direct_reset_tags])
+    }
+
+    fn tag_goals_by_scoring_reset_touch(
+        &self,
+        goals: &[GoalContextEvent],
+        dodge_reset_events: &[DodgeResetEvent],
+        touch_events: &[TouchClassificationEvent],
+    ) -> Vec<GoalTagAssignment> {
+        let mut tags = Vec::new();
+        for (goal_index, goal) in goals.iter().enumerate() {
+            let ctx = GoalTaggingContext { goal_index };
+            let Some((event_index, event, touch_index, touch_event)) = dodge_reset_events
+                .iter()
+                .enumerate()
+                .filter_map(|(event_index, event)| {
+                    let (touch_index, touch_event) = touch_events
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, touch_event)| {
+                            scoring_dodge_touch_matches_on_ball_reset_goal(
+                                touch_event,
+                                event,
+                                goal,
+                                self.config.max_event_to_goal_seconds,
+                            )
+                        })
+                        .max_by(|left, right| {
+                            left.1
+                                .time
+                                .total_cmp(&right.1.time)
+                                .then_with(|| left.1.frame.cmp(&right.1.frame))
+                        })?;
+                    Some((event_index, event, touch_index, touch_event))
+                })
+                .max_by(|left, right| {
+                    left.1
+                        .time
+                        .total_cmp(&right.1.time)
+                        .then_with(|| left.1.frame.cmp(&right.1.frame))
+                })
+            else {
+                continue;
+            };
+
+            let mut evidence = mechanic_goal_evidence(goal, dodge_reset_evidence(event));
+            evidence.push(flip_into_ball_evidence(touch_event));
+
+            tags.push(mechanic_goal_tag(
+                ctx,
+                GoalTagKind::FlipResetGoal,
+                1.0,
+                mechanic_goal_performer(goal, &event.player),
+                mechanic_goal_modifiers(goal, &event.player),
+                evidence,
+                vec![
+                    GoalTagEventRef {
+                        stream: GoalTagEventStream::DodgeReset,
+                        index: event_index,
+                    },
+                    GoalTagEventRef {
+                        stream: GoalTagEventStream::Touch,
+                        index: touch_index,
+                    },
+                ],
+                Vec::new(),
+            ));
+        }
+        tags
     }
 }
 
@@ -1496,29 +1572,13 @@ impl FlipIntoBallGoalCalculator {
         touch_events
             .iter()
             .enumerate()
-            .filter(|(_, event)| Self::candidate_matches_scoring_touch(event, touch, goal))
+            .filter(|(_, event)| scoring_touch_is_dodge(event, touch, goal))
             .max_by(|left, right| {
                 left.1
                     .time
                     .total_cmp(&right.1.time)
                     .then_with(|| left.1.frame.cmp(&right.1.frame))
             })
-    }
-
-    fn candidate_matches_scoring_touch(
-        candidate: &TouchClassificationEvent,
-        touch: &GoalTouchContext,
-        goal: &GoalContextEvent,
-    ) -> bool {
-        // Joining by touch identity is exact; player + frame remains as a
-        // fallback for data serialized before touch ids existed.
-        let same_touch = match (candidate.touch_id, touch.touch_id) {
-            (Some(candidate_id), Some(touch_id)) => candidate_id == touch_id,
-            _ => candidate.player == touch.player && candidate.frame == touch.frame,
-        };
-        same_touch
-            && candidate.is_team_0 == goal.scoring_team_is_team_0
-            && candidate.has_tag("dodge_state", FLIP_INTO_BALL_DODGE_STATE_LABEL)
     }
 }
 
