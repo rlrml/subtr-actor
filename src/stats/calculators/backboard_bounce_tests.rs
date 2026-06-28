@@ -113,6 +113,102 @@ fn backboard_bounce_uses_primary_touch_not_last_contested_candidate() {
 }
 
 #[test]
+fn backboard_bounce_can_emit_on_simultaneous_touch_frame() {
+    let shooter = boxcars::RemoteId::Steam(1);
+    let initial_touch = touch(shooter.clone(), true, 0.0);
+    let mut calculator = BackboardBounceCalculator::new();
+
+    calculator.update(
+        &frame(1),
+        &ball(
+            glam::Vec3::new(0.0, 4700.0, 650.0),
+            glam::Vec3::new(0.0, 1000.0, 0.0),
+        ),
+        &PlayerFrameState::default(),
+        &TouchState {
+            touch_events: vec![initial_touch.clone()],
+            last_touch: Some(initial_touch),
+            last_touch_player: Some(shooter.clone()),
+            last_touch_team_is_team_0: Some(true),
+        },
+        &LivePlayState::active_play(),
+    );
+
+    let state = calculator.update(
+        &frame(2),
+        &ball(
+            glam::Vec3::new(0.0, 5000.0, 650.0),
+            glam::Vec3::new(0.0, -1000.0, 0.0),
+        ),
+        &PlayerFrameState::default(),
+        &TouchState {
+            touch_events: vec![TouchEvent {
+                time: 0.2,
+                frame: 2,
+                ..touch(shooter.clone(), true, 0.0)
+            }],
+            ..TouchState::default()
+        },
+        &LivePlayState::active_play(),
+    );
+
+    let [bounce] = state.bounce_events.as_slice() else {
+        panic!("expected exactly one simultaneous-frame backboard bounce");
+    };
+    assert_eq!(bounce.player, shooter);
+    assert!(bounce.is_team_0);
+    assert_eq!(bounce.frame, 2);
+}
+
+#[test]
+fn simultaneous_backboard_touch_does_not_require_rebound_velocity_sample() {
+    let shooter = boxcars::RemoteId::Steam(1);
+    let initial_touch = touch(shooter.clone(), true, 0.0);
+    let mut calculator = BackboardBounceCalculator::new();
+
+    calculator.update(
+        &frame(1),
+        &ball(
+            glam::Vec3::new(0.0, 4700.0, 650.0),
+            glam::Vec3::new(0.0, 1000.0, 0.0),
+        ),
+        &PlayerFrameState::default(),
+        &TouchState {
+            touch_events: vec![initial_touch.clone()],
+            last_touch: Some(initial_touch),
+            last_touch_player: Some(shooter.clone()),
+            last_touch_team_is_team_0: Some(true),
+        },
+        &LivePlayState::active_play(),
+    );
+
+    let state = calculator.update(
+        &frame(2),
+        &ball(
+            glam::Vec3::new(0.0, 5030.0, 650.0),
+            glam::Vec3::new(0.0, 1000.0, 0.0),
+        ),
+        &PlayerFrameState::default(),
+        &TouchState {
+            touch_events: vec![TouchEvent {
+                time: 0.2,
+                frame: 2,
+                ..touch(shooter.clone(), true, 0.0)
+            }],
+            ..TouchState::default()
+        },
+        &LivePlayState::active_play(),
+    );
+
+    let [bounce] = state.bounce_events.as_slice() else {
+        panic!("expected simultaneous touch to count as the backboard contact");
+    };
+    assert_eq!(bounce.player, shooter);
+    assert!(bounce.is_team_0);
+    assert_eq!(bounce.frame, 2);
+}
+
+#[test]
 fn surface_contact_between_touch_and_bounce_drops_attribution() {
     let shooter = boxcars::RemoteId::Steam(1);
     let touch_state = TouchState {

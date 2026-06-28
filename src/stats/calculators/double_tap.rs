@@ -123,7 +123,9 @@ impl DoubleTapCalculator {
         let resolved = self
             .pending_backboard_bounces
             .advance(frame.time, |_player, pending| {
-                if touch.time <= pending.time {
+                if touch.frame < pending.frame
+                    || (touch.frame == pending.frame && touch.time < pending.time)
+                {
                     return Disposition::Keep;
                 }
                 let is_matching_followup = touch.team_is_team_0 == pending.is_team_0

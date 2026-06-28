@@ -172,8 +172,8 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Approach</div>
 <ul class="tight">
 <li>Track the last touch during live play and attribute a later backboard rebound to that touch when it occurs within the configured attribution window.</li>
-<li>Require the ball to be high, near the backboard face, moving toward the backboard before the rebound, and moving away after the rebound.</li>
-<li>Ignore frames with a simultaneous touch so the rebound is not confused with a player-ball contact.</li>
+<li>Require the ball to be high, near the backboard face, and moving toward the backboard before contact.</li>
+<li>Confirm the contact either by rebound velocity away from the backboard or by a same-player simultaneous touch at the backboard face.</li>
 </ul>
 <div class="section-label">Limitations</div>
 <p class="muted">None documented.</p>

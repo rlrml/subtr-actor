@@ -41,18 +41,15 @@ impl BackboardBounceCalculator {
         &self,
         frame: &FrameInfo,
         ball: Option<&BallSample>,
-        touch_events: &[TouchEvent],
+        touch_state: &TouchState,
     ) -> Option<BackboardBounceEvent> {
         const BACKBOARD_MIN_BALL_Z: f32 = 500.0;
         const BACKBOARD_MIN_NORMALIZED_Y: f32 = 4700.0;
+        const BACKBOARD_SIMULTANEOUS_TOUCH_MIN_NORMALIZED_Y: f32 = 5000.0;
         const BACKBOARD_MAX_ABS_X: f32 = 1600.0;
         const BACKBOARD_MIN_APPROACH_SPEED_Y: f32 = 350.0;
         const BACKBOARD_MIN_REBOUND_SPEED_Y: f32 = 250.0;
         const BACKBOARD_TOUCH_ATTRIBUTION_MAX_SECONDS: f32 = 2.5;
-
-        if !touch_events.is_empty() {
-            return None;
-        }
 
         let last_touch = self.last_touch.as_ref()?;
         let player = last_touch.player.clone()?;
@@ -87,7 +84,17 @@ impl BackboardBounceCalculator {
         if previous_normalized_velocity_y < BACKBOARD_MIN_APPROACH_SPEED_Y {
             return None;
         }
-        if current_normalized_velocity_y > -BACKBOARD_MIN_REBOUND_SPEED_Y {
+
+        let has_rebound_velocity = current_normalized_velocity_y <= -BACKBOARD_MIN_REBOUND_SPEED_Y;
+        let has_simultaneous_same_player_touch =
+            touch_state.primary_touch_event().is_some_and(|touch| {
+                touch.team_is_team_0 == last_touch.team_is_team_0
+                    && touch.player.as_ref() == Some(&player)
+                    && normalized_position_y >= BACKBOARD_SIMULTANEOUS_TOUCH_MIN_NORMALIZED_Y
+                    && (touch.frame > last_touch.frame
+                        || (touch.frame == last_touch.frame && touch.time > last_touch.time))
+            });
+        if !has_rebound_velocity && !has_simultaneous_same_player_touch {
             return None;
         }
 
@@ -128,7 +135,7 @@ impl BackboardBounceCalculator {
         }
 
         let bounce_events: Vec<_> = self
-            .detect_bounce(frame, ball.sample(), &touch_state.touch_events)
+            .detect_bounce(frame, ball.sample(), touch_state)
             .into_iter()
             .collect();
         if let Some(last_bounce_event) = bounce_events.last() {

@@ -214,6 +214,43 @@ fn counts_delayed_followup_when_player_stays_airborne_and_touches_are_consecutiv
 }
 
 #[test]
+fn counts_same_frame_followup_when_touch_matches_new_backboard_bounce() {
+    let shooter = PlayerId::Steam(1);
+    let mut calculator = DoubleTapCalculator::new();
+
+    update_with_players(
+        &mut calculator,
+        frame(100, 10.0),
+        ball(
+            glam::Vec3::new(0.0, 5000.0, 500.0),
+            glam::Vec3::new(0.0, 1600.0, 0.0),
+        ),
+        players(vec![player(
+            shooter.clone(),
+            true,
+            glam::Vec3::new(0.0, 3000.0, PLAYER_GROUND_Z_THRESHOLD + 200.0),
+        )]),
+        vec![touch(100, 10.0, shooter.clone(), true)],
+        backboard_bounce_with_position(
+            100,
+            10.0,
+            shooter.clone(),
+            true,
+            Some(glam::Vec3::new(
+                0.0,
+                3000.0,
+                PLAYER_GROUND_Z_THRESHOLD + 200.0,
+            )),
+        ),
+    );
+
+    assert_eq!(calculator.events().len(), 1);
+    assert_eq!(calculator.events()[0].player, shooter);
+    assert_eq!(calculator.events()[0].frame, 100);
+    assert_eq!(calculator.events()[0].backboard_frame, 100);
+}
+
+#[test]
 fn rejects_followup_with_same_frame_other_touch() {
     let shooter = PlayerId::Steam(1);
     let defender = PlayerId::Steam(2);

@@ -18,6 +18,8 @@ const THIRD_GOAL_DOUBLE_TAP_REPLAY: &str =
     "assets/colonelpanic8-double-tap-third-goal-2026-05-24.replay";
 const NUTTRBACK_GOAL_7_DOUBLE_TAP_REPLAY: &str =
     "assets/nuttrback-double-tap-goal-7-2026-06-01.replay";
+const CALEMACAR_SIMULTANEOUS_BACKBOARD_DOUBLE_TAP_REPLAY: &str =
+    "assets/calemacar-simultaneous-backboard-double-tap-final-goal-2026-06-26.replay";
 
 struct DoubleTapCase {
     replay_path: &'static str,
@@ -111,5 +113,14 @@ fn clip_tags_nuttrback_seventh_goal_as_double_tap() {
         replay_path: NUTTRBACK_GOAL_7_DOUBLE_TAP_REPLAY,
         backboard_time: 343.42084,
         touch_time: 343.69733,
+    });
+}
+
+#[test]
+fn clip_tags_calemacar_final_goal_as_simultaneous_backboard_double_tap() {
+    assert_clip_detects_double_tap_goal(&DoubleTapCase {
+        replay_path: CALEMACAR_SIMULTANEOUS_BACKBOARD_DOUBLE_TAP_REPLAY,
+        backboard_time: 404.764,
+        touch_time: 404.764,
     });
 }

@@ -578,8 +578,8 @@ define_stats_event!(
     summary = "A ball rebound off the opponent backboard attributed to the player who sent the ball there.",
     approach = [
         "Track the last touch during live play and attribute a later backboard rebound to that touch when it occurs within the configured attribution window.",
-        "Require the ball to be high, near the backboard face, moving toward the backboard before the rebound, and moving away after the rebound.",
-        "Ignore frames with a simultaneous touch so the rebound is not confused with a player-ball contact.",
+        "Require the ball to be high, near the backboard face, and moving toward the backboard before contact.",
+        "Confirm the contact either by rebound velocity away from the backboard or by a same-player simultaneous touch at the backboard face.",
     ],
     scope = EventScope::Player
 );
