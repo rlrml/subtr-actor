@@ -113,6 +113,47 @@ fn backboard_bounce_uses_primary_touch_not_last_contested_candidate() {
 }
 
 #[test]
+fn wide_back_wall_rebound_counts_as_backboard_bounce() {
+    let shooter = boxcars::RemoteId::Steam(1);
+    let touch_state = TouchState {
+        touch_events: vec![touch(shooter.clone(), true, 0.0)],
+        last_touch: None,
+        last_touch_player: None,
+        last_touch_team_is_team_0: None,
+    };
+    let mut calculator = BackboardBounceCalculator::new();
+
+    calculator.update(
+        &frame(1),
+        &ball(
+            // Mirrors wide back-wall reads that are visually double taps even
+            // though they are outside the old central-backboard gate.
+            glam::Vec3::new(2746.0, 4840.0, 1400.0),
+            glam::Vec3::new(0.0, 500.0, 0.0),
+        ),
+        &PlayerFrameState::default(),
+        &touch_state,
+        &LivePlayState::active_play(),
+    );
+    let state = calculator.update(
+        &frame(2),
+        &ball(
+            glam::Vec3::new(2746.0, 4800.0, 1400.0),
+            glam::Vec3::new(0.0, -300.0, 0.0),
+        ),
+        &PlayerFrameState::default(),
+        &TouchState::default(),
+        &LivePlayState::active_play(),
+    );
+
+    let [bounce] = state.bounce_events.as_slice() else {
+        panic!("expected exactly one wide back-wall bounce");
+    };
+    assert_eq!(bounce.player, shooter);
+    assert!(bounce.is_team_0);
+}
+
+#[test]
 fn backboard_bounce_can_emit_on_simultaneous_touch_frame() {
     let shooter = boxcars::RemoteId::Steam(1);
     let initial_touch = touch(shooter.clone(), true, 0.0);

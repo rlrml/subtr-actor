@@ -46,7 +46,10 @@ impl BackboardBounceCalculator {
         const BACKBOARD_MIN_BALL_Z: f32 = 500.0;
         const BACKBOARD_MIN_NORMALIZED_Y: f32 = 4700.0;
         const BACKBOARD_SIMULTANEOUS_TOUCH_MIN_NORMALIZED_Y: f32 = 5000.0;
-        const BACKBOARD_MAX_ABS_X: f32 = 1600.0;
+        // Count the full opponent back wall, including wide corner reads. The
+        // y-position and y-velocity reversal checks below still keep pure
+        // side-wall touches from arming backboard plays.
+        const BACKBOARD_MAX_ABS_X: f32 = 4096.0;
         const BACKBOARD_MIN_APPROACH_SPEED_Y: f32 = 350.0;
         const BACKBOARD_MIN_REBOUND_SPEED_Y: f32 = 250.0;
         const BACKBOARD_TOUCH_ATTRIBUTION_MAX_SECONDS: f32 = 2.5;
