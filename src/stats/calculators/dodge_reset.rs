@@ -562,12 +562,13 @@ impl DodgeResetCalculator {
         };
         let reset_event = pending.reset.clone();
         let dodge_delay = dodge_onset_time - reset_event.time;
-        let same_frame_dodge_reset =
+        let immediate_dodge_reset =
             Self::reset_and_touch_are_same_dodge_contact(&reset_event, touch);
         let time_since_reset = touch.time - reset_event.time;
         if dodge_delay < FLIP_RESET_MIN_DODGE_TOUCH_DELAY_SECONDS
             && time_since_reset < FLIP_RESET_MIN_DODGE_TOUCH_DELAY_SECONDS
-            && !same_frame_dodge_reset
+            && !immediate_dodge_reset
+            && !touch.dodge_contact
         {
             // The dodge is too close to the reset to be a distinct conversion.
             return false;

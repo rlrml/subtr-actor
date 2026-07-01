@@ -516,6 +516,66 @@ fn same_frame_dodge_touch_confirms_on_ball_reset() {
 }
 
 #[test]
+fn adjacent_frame_immediate_dodge_touch_confirms_on_ball_reset() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    update_live(
+        &mut calculator,
+        &frame_info(1.0, 10),
+        &players(player_id.clone(), false),
+        &FrameEventsState {
+            dodge_refreshed_events: vec![reset_event_at(player_id.clone(), 1.0, 10, 1)],
+            ..FrameEventsState::default()
+        },
+        &TouchState::default(),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.046, 11),
+        &players(player_id.clone(), true),
+        &FrameEventsState::default(),
+        &touch_state(vec![touch_event(player_id.clone(), 1.046, 11)]),
+    );
+    update_live(
+        &mut calculator,
+        &frame_info(1.2, 15),
+        &players(player_id.clone(), true),
+        &FrameEventsState {
+            goal_events: vec![goal_event(1.2, 15)],
+            ..FrameEventsState::default()
+        },
+        &TouchState::default(),
+    );
+
+    let event = calculator
+        .confirmed_flip_reset_events()
+        .first()
+        .expect("adjacent-frame dodge touch should confirm the flip reset");
+    assert_eq!(event.player, player_id);
+    assert_eq!(event.reset_frame, 10);
+    assert_eq!(event.frame, 11);
+    assert!((event.time_since_reset - 0.046).abs() < 1e-5);
+
+    let reset = calculator.events().first().unwrap();
+    assert!(reset.used);
+    assert_eq!(reset.outcome, Some(FlipResetOutcome::Used));
+    assert!((reset.time_to_use.unwrap() - 0.046).abs() < 1e-5);
+
+    let outcomes = calculator.flip_reset_outcome_events();
+    assert_eq!(outcomes.len(), 1);
+    assert_eq!(outcomes[0].outcome, FlipResetOutcome::Used);
+    assert_eq!(
+        calculator.player_stats()[&player_id].flip_reset_used_count,
+        1
+    );
+    assert_eq!(
+        calculator.player_stats()[&player_id].flip_reset_unused_count,
+        0
+    );
+}
+
+#[test]
 fn same_frame_dodge_touch_uses_pending_reset_before_new_refresh_supersedes_it() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = DodgeResetCalculator::new();
