@@ -90,10 +90,25 @@ fn brief_control_with_no_follow_up_is_backdated_to_last_touch() {
     let mut sim = ResolverSim::new();
     sim.step(10, 1.0, &[touch(10, 1.0, p(1), true)]);
     sim.step(13, 1.3, &[touch(13, 1.3, p(1), true)]); // confirm
-    sim.step(90, 3.0, &[]); // 1.7s with no touch → loss, backdated to 1.3
-    sim.finish(120, 4.0);
+    sim.step(140, 4.7, &[]); // 3.4s with no touch → loss, backdated to 1.3
+    sim.finish(180, 6.0);
 
     assert_eq!(sim.team_segments(), vec![(true, 1.0, 1.3)]);
+}
+
+#[test]
+fn sparse_dribble_touches_within_loose_timeout_stay_one_continuous_hold() {
+    // Touches 2.5s apart — farther than the old 1.5s window but within the
+    // loose-ball timeout — must confirm and sustain a single hold, matching
+    // the eager tracker that drives per-player possession. Otherwise summed
+    // player possession exceeds team control.
+    let mut sim = ResolverSim::new();
+    sim.step(30, 1.0, &[touch(30, 1.0, p(1), true)]);
+    sim.step(105, 3.5, &[touch(105, 3.5, p(1), true)]); // confirm at 2.5s spacing
+    sim.step(180, 6.0, &[touch(180, 6.0, p(1), true)]); // extend at 2.5s spacing
+    sim.finish(300, 10.0);
+
+    assert_eq!(sim.team_segments(), vec![(true, 1.0, 6.0)]);
 }
 
 #[test]

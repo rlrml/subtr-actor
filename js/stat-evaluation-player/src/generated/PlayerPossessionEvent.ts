@@ -10,7 +10,10 @@ import type { RemoteIdTs } from "./RemoteIdTs.ts";
 export type PlayerPossessionEvent = { player_id: RemoteIdTs, is_team_0: boolean, start_frame: number, end_frame: number, start_time: number, end_time: number,
 /**
  * Seconds the player actually held possession. Excludes contested gap
- * time inside a merged span, so it can be less than `end_time - start_time`.
+ * time inside a merged span and the loose tail after the player's final
+ * touch (once the ball is hit away, the remaining flight time is nobody's
+ * possession — mirroring how team possession backdates a loss to the last
+ * touch), so it can be less than `end_time - start_time`.
  */
 duration: number, touch_count: number, aerial_touch_count: number, wall_touch_count: number,
 /**

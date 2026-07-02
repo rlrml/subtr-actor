@@ -270,3 +270,7 @@ pub fn graph_with_all_analysis_nodes() -> AnalysisGraph {
 #[cfg(test)]
 #[path = "module_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "possession_invariant_tests.rs"]
+mod possession_invariant_tests;

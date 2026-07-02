@@ -168,9 +168,12 @@ fn emits_single_enriched_span_for_continuous_possession() {
     assert_eq!(event.touch_count, 2);
     assert_eq!(event.aerial_touch_count, 0);
     assert_eq!(event.wall_touch_count, 0);
-    assert!((event.duration - 8.0 * DT).abs() < 1e-4);
-    // 7 inter-frame deltas of 100 uu each land inside the span.
-    assert!((event.advance_distance - 700.0).abs() < 1.0);
+    // Possessed duration is credited only up to the final touch (step 4);
+    // the touchless tail through step 7 is not possession.
+    assert!((event.duration - 5.0 * DT).abs() < 1e-4);
+    // 4 inter-frame deltas of 100 uu each land before the final touch; the
+    // drift after it is not credited.
+    assert!((event.advance_distance - 400.0).abs() < 1.0);
     assert_eq!(event.retreat_distance, 0.0);
     assert_eq!(event.carry_time, 0.0);
 }
@@ -244,8 +247,12 @@ fn merges_spans_across_a_short_neutral_gap() {
     let events = calculator.events();
     assert_eq!(events.len(), 1);
     let event = &events[0];
-    // The contested gap is excluded from possessed duration.
-    assert!((event.duration - 8.0 * DT).abs() < 1e-4);
+    // Possessed duration credits touch-to-touch time only: the provisional
+    // tail of the first stretch (after its lone touch at step 0) is rolled
+    // back when the span suspends, the contested gap is excluded, and the
+    // touchless tail after the final touch at step 8 is never credited. That
+    // leaves just the two touch frames.
+    assert!((event.duration - 2.0 * DT).abs() < 1e-4);
     assert_eq!(event.start_frame, 0);
     assert_eq!(event.end_frame, 11);
 }
@@ -419,7 +426,8 @@ fn accumulates_carry_time_when_ball_rides_the_player() {
     let events = calculator.events();
     assert_eq!(events.len(), 1);
     let event = &events[0];
-    assert!((event.carry_time - 8.0 * DT).abs() < 1e-4);
+    // Carry time is credited up to the final touch (step 4), like duration.
+    assert!((event.carry_time - 5.0 * DT).abs() < 1e-4);
     assert_eq!(event.carry_count, 1);
     assert_eq!(event.air_dribble_time, 0.0);
 }
@@ -540,9 +548,10 @@ fn ball_drifting_far_ends_the_span_without_crediting_the_drift() {
     assert_eq!(events.len(), 1);
     let event = &events[0];
     assert_eq!(event.touch_count, 2);
-    // Only the near frames (0..=3) are credited; the drift is excluded.
+    // The span's window ends where the drift starts, and possessed duration
+    // ends at the final touch (step 2).
     assert_eq!(event.end_frame, 3);
-    assert!((event.duration - 4.0 * DT).abs() < 1e-4);
+    assert!((event.duration - 3.0 * DT).abs() < 1e-4);
 }
 
 #[test]
