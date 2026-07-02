@@ -346,7 +346,13 @@ struct PendingFlick {
     real_dodge_start: Option<RecentDodgeStart>,
     /// Whether the touch was classified as a dodge contact downstream.
     classified_dodge: bool,
-    /// Ball velocity in the frame just before the touch.
+    /// Start of the impulse measurement: the time of the first touch in this
+    /// contact episode. Equal to the touch time unless this pending superseded
+    /// an earlier same-episode touch, in which case it inherits that touch's
+    /// anchor so the measured impulse spans the whole episode (a dodge drags
+    /// the ball across several frames; see [`FLICK_IMPULSE_WINDOW_SECONDS`]).
+    measure_start_time: f32,
+    /// Ball velocity in the frame just before the touch at `measure_start_time`.
     pre_velocity: glam::Vec3,
     peak_impulse: glam::Vec3,
     peak_magnitude: f32,
@@ -1020,17 +1026,47 @@ impl FlickCalculator {
         // One flick per dodge: a newer touch by the same player supersedes its
         // earlier window so a single dribble cannot emit multiple flicks when
         // its control touches fall within one impulse window of each other.
+        // A still-live pending being superseded is the same contact episode —
+        // it can only exist within the short retention window, and the touch
+        // rate limit only lets a same-player pair through that fast when a
+        // dodge-powered launch follows a passive contact. The new pending
+        // inherits the earlier measurement anchor instead of resetting it, so
+        // the launch impulse already delivered before this touch stays in the
+        // measured peak.
+        let inherited_measurement = self
+            .pending_flicks
+            .iter()
+            .find(|pending| {
+                pending.player.player_id == player.player_id
+                    && touch_event.time >= pending.touch_event.time
+            })
+            .map(|pending| {
+                (
+                    pending.measure_start_time,
+                    pending.pre_velocity,
+                    pending.peak_impulse,
+                    pending.peak_magnitude,
+                )
+            });
         self.pending_flicks
             .retain(|pending| pending.player.player_id != player.player_id);
+        let (measure_start_time, pre_velocity, peak_impulse, peak_magnitude) =
+            inherited_measurement.unwrap_or((
+                touch_event.time,
+                pre_velocity,
+                glam::Vec3::ZERO,
+                0.0,
+            ));
         self.pending_flicks.push(PendingFlick {
             touch_event: touch_event.clone(),
             ball: ball.clone(),
             player: player.clone(),
             real_dodge_start: self.dodge_start_for_touch(player),
             classified_dodge: false,
+            measure_start_time,
             pre_velocity,
-            peak_impulse: glam::Vec3::ZERO,
-            peak_magnitude: 0.0,
+            peak_impulse,
+            peak_magnitude,
         });
     }
 
@@ -1052,13 +1088,20 @@ impl FlickCalculator {
                 return false;
             }
 
-            // Measure the impulse only over the (shorter) impulse window; the
-            // entry is kept alive past it purely so a late-replicating dodge byte
-            // can still confirm the launch touch.
+            // Measure the impulse only over the (shorter) impulse window,
+            // anchored on the latest touch; the entry is kept alive past it
+            // purely so a late-replicating dodge byte can still confirm the
+            // launch touch. Gravity compensation spans from the episode's
+            // measurement anchor, which precedes the touch when this pending
+            // inherited an earlier same-episode window.
             if elapsed <= FLICK_IMPULSE_WINDOW_SECONDS {
                 if let Some(velocity) = current_velocity {
-                    let impulse =
-                        Self::gravity_compensated_impulse(velocity, flick.pre_velocity, elapsed);
+                    let measure_elapsed = (frame.time - flick.measure_start_time).max(0.0);
+                    let impulse = Self::gravity_compensated_impulse(
+                        velocity,
+                        flick.pre_velocity,
+                        measure_elapsed,
+                    );
                     let magnitude = impulse.length();
                     if magnitude > flick.peak_magnitude {
                         flick.peak_magnitude = magnitude;
