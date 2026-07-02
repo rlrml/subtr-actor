@@ -658,92 +658,75 @@ fn rejects_aerial_that_starts_near_wall_but_never_on_it() {
     assert!(calculator.events().is_empty());
 }
 
-// The car's up (roof) vector points away from the wall it is driving on, so the
-// wall lies along `-up`. These exercise the orientation-based classifier
-// directly (position is only consulted in the fallback path).
-const ON_WALL_POSITION: glam::Vec3 = glam::Vec3::new(0.0, 0.0, 600.0);
+// Which wall a position is on follows from the position alone: the residual of
+// each axis beyond the corner-arc start is the outward wall normal.
 
 #[test]
-fn classifies_side_walls_relative_to_attack_direction_from_orientation() {
-    // Team 0 attacks toward +y, so +x is their right.
-    let up_on_plus_x_wall = glam::Vec3::new(-1.0, 0.0, 0.05);
-    let up_on_minus_x_wall = glam::Vec3::new(1.0, 0.0, 0.05);
+fn classifies_side_walls_relative_to_attack_direction() {
+    let plus_x_wall = glam::Vec3::new(4096.0, 0.0, 600.0);
+    let minus_x_wall = glam::Vec3::new(-4096.0, 0.0, 600.0);
+    // Team 0 attacks toward +y, so the +x wall is their right.
     assert_eq!(
-        wall_aerial_wall_classification(true, ON_WALL_POSITION, Some(up_on_plus_x_wall)),
+        wall_aerial_wall_classification(true, plus_x_wall),
         WallAerialWall::Right,
     );
     assert_eq!(
-        wall_aerial_wall_classification(true, ON_WALL_POSITION, Some(up_on_minus_x_wall)),
+        wall_aerial_wall_classification(true, minus_x_wall),
         WallAerialWall::Left,
     );
     // Team 1 attacks toward -y, so the same +x wall is on their left.
     assert_eq!(
-        wall_aerial_wall_classification(false, ON_WALL_POSITION, Some(up_on_plus_x_wall)),
+        wall_aerial_wall_classification(false, plus_x_wall),
         WallAerialWall::Left,
     );
 }
 
 #[test]
-fn classifies_end_walls_as_front_or_back_from_orientation() {
-    // On the +y wall the roof points toward -y; for team 0 that is the
-    // opponent's (front) end. The opposite wall is their own (back) end.
+fn classifies_end_walls_as_front_or_back() {
+    let plus_y_wall = glam::Vec3::new(1500.0, 5120.0, 600.0);
+    let minus_y_wall = glam::Vec3::new(1500.0, -5120.0, 600.0);
+    // For team 0 the +y end wall is the opponent's (front) end.
     assert_eq!(
-        wall_aerial_wall_classification(
-            true,
-            ON_WALL_POSITION,
-            Some(glam::Vec3::new(0.0, -1.0, 0.05)),
-        ),
+        wall_aerial_wall_classification(true, plus_y_wall),
         WallAerialWall::Front,
     );
     assert_eq!(
-        wall_aerial_wall_classification(
-            true,
-            ON_WALL_POSITION,
-            Some(glam::Vec3::new(0.0, 1.0, 0.05)),
-        ),
+        wall_aerial_wall_classification(true, minus_y_wall),
         WallAerialWall::Back,
     );
     // Team 1's attack direction is flipped, so the same walls swap roles.
     assert_eq!(
-        wall_aerial_wall_classification(
-            false,
-            ON_WALL_POSITION,
-            Some(glam::Vec3::new(0.0, -1.0, 0.05)),
-        ),
+        wall_aerial_wall_classification(false, plus_y_wall),
         WallAerialWall::Back,
     );
 }
 
 #[test]
-fn classifies_diagonal_takeoffs_as_corners() {
-    // Roof pointing diagonally inward means the car is on a rounded corner.
-    let up_off_plus_x_plus_y_corner = glam::Vec3::new(-0.7, -0.7, 0.1);
+fn classifies_corner_arc_positions_as_corners() {
+    // The midpoint of the +x/+y corner arc: the radial (outward-normal)
+    // direction is a 45° diagonal.
+    let mid_corner = glam::Vec3::new(3758.6, 4782.6, 600.0);
     assert_eq!(
-        wall_aerial_wall_classification(true, ON_WALL_POSITION, Some(up_off_plus_x_plus_y_corner)),
+        wall_aerial_wall_classification(true, mid_corner),
         WallAerialWall::FrontRight,
     );
     assert_eq!(
-        wall_aerial_wall_classification(false, ON_WALL_POSITION, Some(up_off_plus_x_plus_y_corner)),
+        wall_aerial_wall_classification(false, mid_corner),
         WallAerialWall::BackLeft,
     );
 }
 
 #[test]
-fn falls_back_to_position_when_orientation_is_upright() {
-    // A purely vertical roof carries no wall information, so we classify from the
-    // field position instead (here a near-corner location).
-    let upright = glam::Vec3::new(0.0, 0.0, 1.0);
+fn side_wall_positions_near_a_corner_stay_side_walls() {
+    // Deep along the flat side wall, short of the corner-arc start: still side.
     assert_eq!(
-        wall_aerial_wall_classification(
-            true,
-            glam::Vec3::new(3700.0, 5100.0, 600.0),
-            Some(upright),
-        ),
-        WallAerialWall::FrontRight,
+        wall_aerial_wall_classification(true, glam::Vec3::new(4096.0, 3800.0, 600.0)),
+        WallAerialWall::Right,
     );
-    // Missing orientation entirely uses the same fallback.
+    // Just onto the corner arc near its side-wall end: the outward normal still
+    // points mostly sideways.
     assert_eq!(
-        wall_aerial_wall_classification(true, glam::Vec3::new(3700.0, 0.0, 600.0), None),
+        wall_aerial_wall_classification(true, glam::Vec3::new(4050.0, 4300.0, 600.0)),
         WallAerialWall::Right,
     );
 }

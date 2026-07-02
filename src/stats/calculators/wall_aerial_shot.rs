@@ -1,6 +1,6 @@
 use super::wall_aerial::{
-    WALL_AERIAL_MIN_TOUCH_BALL_Z, WALL_AERIAL_MIN_TOUCH_PLAYER_Z, player_up_vector,
-    wall_aerial_normalize_score, wall_aerial_wall_classification, wall_aerial_wall_for_position,
+    WALL_AERIAL_MIN_TOUCH_BALL_Z, WALL_AERIAL_MIN_TOUCH_PLAYER_Z, wall_aerial_normalize_score,
+    wall_aerial_wall_classification, wall_aerial_wall_for_position,
 };
 use super::*;
 
@@ -88,11 +88,7 @@ impl WallAerialShotCalculator {
             }
 
             if wall_aerial_wall_for_position(position).is_some() {
-                let wall_direction = wall_aerial_wall_classification(
-                    player.is_team_0,
-                    position,
-                    player_up_vector(player),
-                );
+                let wall_direction = wall_aerial_wall_classification(player.is_team_0, position);
                 self.recent_wall_contacts.insert(
                     player.player_id.clone(),
                     RecentWallContact {
