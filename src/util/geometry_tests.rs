@@ -323,7 +323,8 @@ fn touch_candidate_scoring_requires_ball_deviation_for_contact_gaps() {
     let scoring = TouchCandidateScoring::DEFAULT;
 
     assert!(!scoring.accepts_contact_gap(0.0, 0.0, 0.0));
-    assert!(scoring.accepts_contact_gap(0.0, 0.0, 50.0));
+    assert!(scoring.accepts_contact_gap(0.0, 0.0, 15.0));
+    assert!(!scoring.accepts_contact_gap(0.0, 0.0, 14.9));
     assert!(scoring.accepts_contact_gap(0.0, 25.0, 0.0));
     assert!(!scoring.accepts_contact_gap(10.0, 499.0, 999.0));
     assert!(scoring.accepts_contact_gap(10.0, 0.0, 1000.0));

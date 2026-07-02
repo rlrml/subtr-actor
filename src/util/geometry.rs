@@ -213,7 +213,7 @@ impl TouchCandidateScoring {
         relaxed_contact_gap_threshold: 25.0,
         strict_contact_min_position_deviation: 25.0,
         relaxed_contact_min_position_deviation: 500.0,
-        strict_contact_min_velocity_deviation: 50.0,
+        strict_contact_min_velocity_deviation: 15.0,
         relaxed_contact_min_velocity_deviation: 1000.0,
         relaxed_contact_score_penalty: 100.0,
         dodge_contact_score_bonus: 1.0,

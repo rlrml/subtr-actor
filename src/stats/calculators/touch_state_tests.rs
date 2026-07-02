@@ -273,6 +273,101 @@ fn team_only_explicit_touch_events_without_physics_candidate_are_ignored() {
 }
 
 #[test]
+fn dodge_refresh_on_current_frame_contact_is_counted_as_touch() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let players = players(player_id.clone());
+    let mut calculator = TouchStateCalculator::new();
+    let live_play = LivePlayState {
+        gameplay_phase: GameplayPhase::ActivePlay,
+        is_live_play: true,
+    };
+    let events = FrameEventsState {
+        dodge_refreshed_events: vec![DodgeRefreshedEvent {
+            time: frame(1).time,
+            frame: 1,
+            player: player_id.clone(),
+            player_position: None,
+            is_team_0: true,
+            counter_value: 1,
+        }],
+        ..FrameEventsState::default()
+    };
+
+    calculator.update(
+        &frame(0),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+    let touch_state = calculator.update(
+        &frame(1),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &events,
+        &live_play,
+    );
+
+    assert_eq!(touch_state.touch_events.len(), 1);
+    let touch = &touch_state.touch_events[0];
+    assert_eq!(touch.player, Some(player_id.clone()));
+    assert_eq!(touch.frame, 1);
+    assert!(touch.team_is_team_0);
+    assert_eq!(touch_state.last_touch_player, Some(player_id));
+    assert!(
+        touch.closest_approach_distance.unwrap() <= MARKER_CONTACT_ATTRIBUTION_MAX_GAP,
+        "expected dodge-refresh touch to be backed by current-frame contact"
+    );
+}
+
+#[test]
+fn dodge_refresh_away_from_ball_is_not_counted_as_touch() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let players = PlayerFrameState {
+        players: vec![player_sample(
+            player_id.clone(),
+            true,
+            glam::Vec3::new(2000.0, 0.0, BALL_RADIUS_Z),
+            glam::Vec3::ZERO,
+        )],
+    };
+    let mut calculator = TouchStateCalculator::new();
+    let live_play = LivePlayState {
+        gameplay_phase: GameplayPhase::ActivePlay,
+        is_live_play: true,
+    };
+    let events = FrameEventsState {
+        dodge_refreshed_events: vec![DodgeRefreshedEvent {
+            time: frame(1).time,
+            frame: 1,
+            player: player_id,
+            player_position: None,
+            is_team_0: true,
+            counter_value: 1,
+        }],
+        ..FrameEventsState::default()
+    };
+
+    calculator.update(
+        &frame(0),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+    let touch_state = calculator.update(
+        &frame(1),
+        &ball(glam::Vec3::ZERO),
+        &players,
+        &events,
+        &live_play,
+    );
+
+    assert!(touch_state.touch_events.is_empty());
+    assert_eq!(touch_state.last_touch_player, None);
+}
+
+#[test]
 fn team_only_explicit_touch_events_keep_event_time_when_enriched_from_recent_cache() {
     let player_id = boxcars::RemoteId::Steam(1);
     let players = players(player_id.clone());

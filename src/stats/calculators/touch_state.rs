@@ -349,6 +349,48 @@ impl TouchStateCalculator {
             })
     }
 
+    /// Finds a concrete current-frame contact for a dodge refresh when no
+    /// trajectory-deviation candidate was cached. Flip-reset underside contacts
+    /// can refresh the dodge without producing a replay `BallHitTeamNum` marker
+    /// or enough ball deviation to enter the candidate cache.
+    fn current_frame_touch_candidate_for_dodge_refresh(
+        &self,
+        dodge_refresh: &DodgeRefreshedEvent,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+    ) -> Option<TouchEvent> {
+        self.previous_ball_rigid_body?;
+        let ball = ball.sample()?;
+        let player = players
+            .players
+            .iter()
+            .find(|player| player.player_id == dodge_refresh.player)?;
+        let rigid_body = player.rigid_body.as_ref()?;
+        let (closest_contact_gap, _current_contact_gap) =
+            touch_candidate_contact_gap_rank_with_hitbox(
+                &ball.rigid_body,
+                rigid_body,
+                player.hitbox,
+            )?;
+        if closest_contact_gap > MARKER_CONTACT_ATTRIBUTION_MAX_GAP {
+            return None;
+        }
+        let contact_fields = touch_event_contact_fields(ball.position(), rigid_body, player.hitbox);
+        Some(TouchEvent {
+            touch_id: None,
+            time: dodge_refresh.time,
+            frame: dodge_refresh.frame,
+            team_is_team_0: dodge_refresh.is_team_0,
+            player: Some(dodge_refresh.player.clone()),
+            player_position: Some(rigid_body.location),
+            closest_approach_distance: Some(closest_contact_gap),
+            contact_local_ball_position: contact_fields.local_ball_position,
+            contact_local_hitbox_point: contact_fields.local_hitbox_point,
+            contact_world_hitbox_point: contact_fields.world_hitbox_point,
+            dodge_contact: player.dodge_active,
+        })
+    }
+
     /// Attributes a team-only replay touch marker to a concrete player.
     ///
     /// Prefers whichever of the recent candidate cache or the current frame's
@@ -664,7 +706,16 @@ impl TouchStateCalculator {
             if !confirmed_players.insert(dodge_refresh.player.clone()) {
                 continue;
             }
-            let Some(candidate) = self.candidate_for_player(&dodge_refresh.player) else {
+            let Some(candidate) = self
+                .candidate_for_player(&dodge_refresh.player)
+                .or_else(|| {
+                    self.current_frame_touch_candidate_for_dodge_refresh(
+                        dodge_refresh,
+                        ball,
+                        players,
+                    )
+                })
+            else {
                 continue;
             };
             touch_events.push(Self::touch_event_from_dodge_refresh(
