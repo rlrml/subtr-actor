@@ -37,7 +37,10 @@ pub struct PlayerPossessionEvent {
     pub start_time: f32,
     pub end_time: f32,
     /// Seconds the player actually held possession. Excludes contested gap
-    /// time inside a merged span, so it can be less than `end_time - start_time`.
+    /// time inside a merged span and the loose tail after the player's final
+    /// touch (once the ball is hit away, the remaining flight time is nobody's
+    /// possession — mirroring how team possession backdates a loss to the last
+    /// touch), so it can be less than `end_time - start_time`.
     pub duration: f32,
     pub touch_count: u32,
     pub aerial_touch_count: u32,
@@ -64,6 +67,20 @@ pub struct PlayerPossessionEvent {
     pub end_field_third: Option<String>,
 }
 
+/// The per-frame accumulators that only count while the ball is possessed.
+/// The running copy accrues every active frame; a snapshot is taken at each
+/// ball contact, and the snapshot is what the emitted event reports, so the
+/// provisional loose tail after the final touch is never credited.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+struct PossessedTotals {
+    duration: f32,
+    close_time: f32,
+    advance_distance: f32,
+    retreat_distance: f32,
+    carry_time: f32,
+    air_dribble_time: f32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct ActivePlayerPossession {
     player_id: PlayerId,
@@ -72,17 +89,14 @@ struct ActivePlayerPossession {
     end_frame: usize,
     start_time: f32,
     end_time: f32,
-    duration: f32,
+    running: PossessedTotals,
+    /// [`Self::running`] as of the player's most recent ball contact.
+    at_last_touch: PossessedTotals,
     touch_count: u32,
     aerial_touch_count: u32,
     wall_touch_count: u32,
     first_touch_time: Option<f32>,
     last_touch_time: Option<f32>,
-    close_time: f32,
-    advance_distance: f32,
-    retreat_distance: f32,
-    carry_time: f32,
-    air_dribble_time: f32,
     carry_count: u32,
     air_dribble_count: u32,
     last_carry_kind: Option<BallCarryKind>,
@@ -107,17 +121,13 @@ impl ActivePlayerPossession {
             end_frame: frame.frame_number,
             start_time: (frame.time - frame.dt).max(0.0),
             end_time: frame.time,
-            duration: 0.0,
+            running: PossessedTotals::default(),
+            at_last_touch: PossessedTotals::default(),
             touch_count: 0,
             aerial_touch_count: 0,
             wall_touch_count: 0,
             first_touch_time: None,
             last_touch_time: None,
-            close_time: 0.0,
-            advance_distance: 0.0,
-            retreat_distance: 0.0,
-            carry_time: 0.0,
-            air_dribble_time: 0.0,
             carry_count: 0,
             air_dribble_count: 0,
             last_carry_kind: None,
@@ -127,7 +137,7 @@ impl ActivePlayerPossession {
     }
 
     fn record_frame(&mut self, frame: &FrameInfo, field_third: Option<String>) {
-        self.duration += frame.dt.max(0.0);
+        self.running.duration += frame.dt.max(0.0);
         self.end_frame = frame.frame_number;
         self.end_time = frame.time;
         if field_third.is_some() {
@@ -136,6 +146,9 @@ impl ActivePlayerPossession {
     }
 
     fn record_touch(&mut self, touch: &TouchEvent) {
+        // Any contact — even one too close to the previous touch to count as
+        // distinct — extends the possessed totals to this frame.
+        self.at_last_touch = self.running;
         if self
             .last_touch_time
             .is_some_and(|last| touch.time - last < DISTINCT_TOUCH_GAP_SECONDS)
@@ -161,9 +174,9 @@ impl ActivePlayerPossession {
         let team_forward_sign = if self.is_team_0 { 1.0 } else { -1.0 };
         let advance = (ball_y - previous_ball_y) * team_forward_sign;
         if advance >= 0.0 {
-            self.advance_distance += advance;
+            self.running.advance_distance += advance;
         } else {
-            self.retreat_distance -= advance;
+            self.running.retreat_distance -= advance;
         }
     }
 
@@ -183,7 +196,7 @@ impl ActivePlayerPossession {
                 player_position.distance(ball_position) <= controlled_play::CLOSE_DISTANCE_3D
             });
         if close {
-            self.close_time += frame.dt.max(0.0);
+            self.running.close_time += frame.dt.max(0.0);
         }
     }
 
@@ -195,12 +208,13 @@ impl ActivePlayerPossession {
     }
 
     /// Controlled play's qualifying criteria, applied to this span. Kept in
-    /// lockstep via the shared constants in `controlled_play`.
+    /// lockstep via the shared constants in `controlled_play`, and judged on
+    /// the same possessed totals the emitted event reports.
     fn is_sustained_control(&self) -> bool {
         self.touch_count >= controlled_play::MIN_TOUCHES
-            && self.duration >= controlled_play::MIN_EPISODE_DURATION_SECONDS
+            && self.at_last_touch.duration >= controlled_play::MIN_EPISODE_DURATION_SECONDS
             && self.touch_span() >= controlled_play::MIN_FIRST_TO_LAST_TOUCH_DURATION_SECONDS
-            && self.close_time >= controlled_play::MIN_CLOSE_DURATION_SECONDS
+            && self.at_last_touch.close_time >= controlled_play::MIN_CLOSE_DURATION_SECONDS
     }
 
     fn record_carry_sample(&mut self, frame: &FrameInfo, kind: Option<BallCarryKind>) {
@@ -212,8 +226,8 @@ impl ActivePlayerPossession {
                 }
             }
             match kind {
-                BallCarryKind::Carry => self.carry_time += frame.dt.max(0.0),
-                BallCarryKind::AirDribble => self.air_dribble_time += frame.dt.max(0.0),
+                BallCarryKind::Carry => self.running.carry_time += frame.dt.max(0.0),
+                BallCarryKind::AirDribble => self.running.air_dribble_time += frame.dt.max(0.0),
             }
         }
         self.last_carry_kind = kind;
@@ -228,17 +242,17 @@ impl ActivePlayerPossession {
             end_frame: self.end_frame,
             start_time: self.start_time,
             end_time: self.end_time,
-            duration: self.duration,
+            duration: self.at_last_touch.duration,
             touch_count: self.touch_count,
             aerial_touch_count: self.aerial_touch_count,
             wall_touch_count: self.wall_touch_count,
-            advance_distance: self.advance_distance,
-            retreat_distance: self.retreat_distance,
-            carry_time: self.carry_time,
-            air_dribble_time: self.air_dribble_time,
+            advance_distance: self.at_last_touch.advance_distance,
+            retreat_distance: self.at_last_touch.retreat_distance,
+            carry_time: self.at_last_touch.carry_time,
+            air_dribble_time: self.at_last_touch.air_dribble_time,
             carry_count: self.carry_count,
             air_dribble_count: self.air_dribble_count,
-            close_time: self.close_time,
+            close_time: self.at_last_touch.close_time,
             sustained_control,
             start_field_third: self.start_field_third,
             end_field_third: self.end_field_third,
@@ -381,6 +395,10 @@ impl PlayerPossessionCalculator {
                     self.finalize(active);
                 } else {
                     active.last_carry_kind = None;
+                    // The loose tail since the last touch was provisional; the
+                    // hold lapsed, so it is not possession even if the same
+                    // player re-establishes control and the span resumes.
+                    active.running = active.at_last_touch;
                     self.suspended = Some((active, frame.time));
                 }
             }
@@ -422,13 +440,15 @@ impl PlayerPossessionCalculator {
         if let (Some(previous_ball_y), Some(ball_y)) = (self.previous_ball_y, ball_y) {
             active.record_ball_movement(previous_ball_y, ball_y);
         }
+        let carry_kind = Self::carry_sample_kind(&active.player_id, ball, players);
+        active.record_carry_sample(frame, carry_kind);
+        // Touches last: a touch snapshots the running possessed totals, which
+        // must already include this frame's samples.
         for touch in touch_state.touch_events.iter() {
             if touch.player.as_ref() == Some(&active.player_id) {
                 active.record_touch(touch);
             }
         }
-        let carry_kind = Self::carry_sample_kind(&active.player_id, ball, players);
-        active.record_carry_sample(frame, carry_kind);
         self.previous_ball_y = ball_y;
 
         Ok(())

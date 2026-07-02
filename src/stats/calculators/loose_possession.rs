@@ -2,9 +2,11 @@ use super::possession::{OpenPossession, PossessionLabel, ResolvedPossession};
 use super::*;
 
 /// How long the loose resolver waits for a follow-up touch before deciding a
-/// contested ball's fate. Mirrors the strict resolver's window, but the loose
-/// resolver keeps crediting the last team to touch through loose balls instead
-/// of letting them lapse to neutral.
+/// contested ball's fate. Unlike the strict resolver's window (which also
+/// bounds touch spacing within a hold, so it matches the loose-ball timeout),
+/// this only governs how long an opponent's unconfirmed challenge touch stays
+/// pending: the loose resolver keeps crediting the last team to touch through
+/// loose balls instead of letting them lapse to neutral.
 const LOOSE_RESOLUTION_WINDOW_SECONDS: f32 = 1.5;
 
 /// A team-possession span under the *loose* definition: the team that last

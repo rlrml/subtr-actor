@@ -8,11 +8,16 @@ const LOOSE_BALL_TIMEOUT_SECONDS: f32 = 3.0;
 /// last touch; the loose time after that touch stays provisional until either
 /// the same owner re-touches (kept), the opponent confirms a turnover (the gap
 /// goes neutral and the opponent is credited from their first touch), or this
-/// window elapses with no follow-up (the gap goes neutral). It unifies the old
-/// pending-turnover (1.25s) and loose-ball (3.0s) windows: with loss backdated
-/// to the last touch, the distinction no longer changes anyone's credited time,
-/// so a single resolution deadline suffices.
-const POSSESSION_RESOLUTION_WINDOW_SECONDS: f32 = 1.5;
+/// window elapses with no follow-up (the gap goes neutral).
+///
+/// This must match the per-player loose-ball timeout
+/// ([`LOOSE_BALL_TIMEOUT_SECONDS`], which drives the eager tracker behind
+/// per-player possession spans): both answer "how far apart may touches be
+/// before the hold is broken?". When this window was shorter (1.5s), a hold
+/// whose touches came 1.5–3s apart stayed continuous for the player stream but
+/// oscillated Acquiring→Neutral here — earning zero team-control credit — so
+/// summed player possession routinely exceeded team control.
+const POSSESSION_RESOLUTION_WINDOW_SECONDS: f32 = LOOSE_BALL_TIMEOUT_SECONDS;
 
 /// A team-or-neutral label for a resolved possession segment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
