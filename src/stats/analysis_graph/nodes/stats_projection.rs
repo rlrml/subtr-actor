@@ -206,6 +206,7 @@ struct StatsProjectionCursors {
     flip_reset: usize,
     dodge_reset_flip_reset_outcome: usize,
     ball_carry: usize,
+    air_dribble: usize,
     bump: usize,
     half_volley: usize,
     powerslide: usize,
@@ -566,6 +567,10 @@ impl StatsProjectionNode {
         for event in Self::events_since(&mut self.cursors.ball_carry, ball_carry.carry_events()) {
             self.state.ball_carry.apply_event(event);
         }
+        let air_dribble = ctx.get::<AirDribbleCalculator>()?;
+        for event in Self::events_since(&mut self.cursors.air_dribble, air_dribble.events()) {
+            self.state.ball_carry.apply_event(event);
+        }
         let boost = ctx.get::<BoostCalculator>()?;
         // The boost calculator now accumulates BoostStats directly as it processes frames, so we
         // mirror its accumulator instead of replaying projected ledger/state events.
@@ -682,6 +687,7 @@ impl AnalysisNode for StatsProjectionNode {
             flick_dependency(),
             dodge_reset_dependency(),
             ball_carry_dependency(),
+            air_dribble_dependency(),
             boost_dependency(),
             bump_dependency(),
             half_volley_dependency(),

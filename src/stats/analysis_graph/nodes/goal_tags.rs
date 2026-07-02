@@ -153,8 +153,8 @@ mechanic_goal_tag_node!(
     AirDribbleGoalNode,
     AirDribbleGoalCalculator,
     "air_dribble_goal",
-    ball_carry_dependency,
-    BallCarryCalculator
+    air_dribble_dependency,
+    AirDribbleCalculator
 );
 mechanic_goal_tag_node!(
     FlipIntoBallGoalNode,

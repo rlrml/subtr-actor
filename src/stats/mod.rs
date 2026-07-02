@@ -28,7 +28,7 @@
 //!   [`DodgeResetCalculator`], [`WallAerialCalculator`],
 //!   [`WallAerialShotCalculator`], [`CeilingShotCalculator`],
 //!   [`DoubleTapCalculator`], [`HalfVolleyCalculator`], [`OneTimerCalculator`],
-//!   [`BallCarryCalculator`] (carries / air dribbles).
+//!   [`BallCarryCalculator`], [`AirDribbleCalculator`].
 //! - **Play & contests** — [`TouchCalculator`], [`PassCalculator`],
 //!   [`CenterCalculator`], [`KickoffCalculator`], [`BumpCalculator`],
 //!   [`DemoCalculator`], [`RushCalculator`], [`ControlledPlayCalculator`],

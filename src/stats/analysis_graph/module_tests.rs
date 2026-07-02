@@ -1,15 +1,15 @@
 use super::*;
 use crate::{
-    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardCalculator, BallCarryCalculator,
-    BumpCalculator, CenterCalculator, CounterAttackGoalCalculator, DoubleTapGoalCalculator,
-    EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator, FlipIntoBallGoalCalculator,
-    FlipResetGoalCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
-    HighAerialGoalCalculator, LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator,
-    OneTimerGoalCalculator, OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator,
-    PlayerVerticalState, PossessionState, RotationCalculator, StatsTimelineCollector,
-    SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchState,
-    WallAerialCalculator, WallAerialShotCalculator, builtin_analysis_node_json,
-    builtin_analysis_nodes_json, builtin_stats_module_names,
+    AerialGoalCalculator, AirDribbleCalculator, AirDribbleGoalCalculator, BackboardCalculator,
+    BallCarryCalculator, BumpCalculator, CenterCalculator, CounterAttackGoalCalculator,
+    DoubleTapGoalCalculator, EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator,
+    FlipIntoBallGoalCalculator, FlipResetGoalCalculator, HalfVolleyCalculator,
+    HalfVolleyGoalCalculator, HighAerialGoalCalculator, LongDistanceGoalCalculator,
+    MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
+    PassCalculator, PassingGoalCalculator, PlayerVerticalState, PossessionState,
+    RotationCalculator, StatsTimelineCollector, SustainedPressureGoalCalculator,
+    TerritorialPressureCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
+    builtin_analysis_node_json, builtin_analysis_nodes_json, builtin_stats_module_names,
 };
 use std::any::TypeId;
 use std::collections::HashSet;
@@ -149,6 +149,27 @@ fn duplicate_node_requests_share_one_provider() {
         names.iter().filter(|name| **name == "ball_carry").count(),
         1
     );
+    assert!(graph.state::<BallCarryCalculator>().is_some());
+}
+
+#[test]
+fn air_dribble_and_ball_carry_resolve_as_separate_providers() {
+    let mut graph = graph_with_builtin_analysis_nodes(["air_dribble", "ball_carry"])
+        .expect("air dribble and ball carry requests should be accepted");
+    graph
+        .resolve()
+        .expect("air dribble and ball carry should resolve");
+
+    let names = graph.node_names().collect::<Vec<_>>();
+    assert_eq!(
+        names.iter().filter(|name| **name == "air_dribble").count(),
+        1
+    );
+    assert_eq!(
+        names.iter().filter(|name| **name == "ball_carry").count(),
+        1
+    );
+    assert!(graph.state::<AirDribbleCalculator>().is_some());
     assert!(graph.state::<BallCarryCalculator>().is_some());
 }
 

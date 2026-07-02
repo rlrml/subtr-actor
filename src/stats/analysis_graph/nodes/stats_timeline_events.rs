@@ -89,6 +89,7 @@ impl StatsTimelineEventsNode {
             flick_dependency(),
             dodge_reset_dependency(),
             ball_carry_dependency(),
+            air_dribble_dependency(),
             boost_dependency(),
             bump_dependency(),
             half_volley_dependency(),
@@ -133,6 +134,7 @@ impl StatsTimelineEventsNode {
         let demo = ctx.get::<DemoCalculator>()?;
         let backboard = ctx.get::<BackboardCalculator>()?;
         let ball_carry = ctx.get::<BallCarryCalculator>()?;
+        let air_dribble = ctx.get::<AirDribbleCalculator>()?;
         let ceiling_shot = ctx.get::<CeilingShotCalculator>()?;
         let wall_aerial = ctx.get::<WallAerialCalculator>()?;
         let wall_aerial_shot = ctx.get::<WallAerialShotCalculator>()?;
@@ -218,6 +220,7 @@ impl StatsTimelineEventsNode {
                 &goal_context,
                 backboard,
                 ball_carry,
+                air_dribble,
                 ceiling_shot,
                 wall_aerial,
                 wall_aerial_shot,
@@ -359,6 +362,7 @@ fn build_replay_events(
     goal_context: &[GoalContextEvent],
     backboard: &BackboardCalculator,
     ball_carry: &BallCarryCalculator,
+    air_dribble: &AirDribbleCalculator,
     ceiling_shot: &CeilingShotCalculator,
     wall_aerial: &WallAerialCalculator,
     wall_aerial_shot: &WallAerialShotCalculator,
@@ -700,10 +704,27 @@ fn build_replay_events(
 
     for (index, event) in ball_carry.carry_events().iter().enumerate() {
         events.push(make_event(
-            match event.kind {
-                BallCarryKind::Carry => MECHANIC_BALL_CARRY,
-                BallCarryKind::AirDribble => MECHANIC_AIR_DRIBBLE,
-            },
+            MECHANIC_BALL_CARRY,
+            index,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::BallCarry(event.clone()),
+            Some(event.player_id.clone()),
+            None,
+            Some(event.is_team_0),
+            Some(event.end_position),
+            Some(event.end_position),
+            None,
+        ));
+    }
+
+    for (index, event) in air_dribble.events().iter().enumerate() {
+        events.push(make_event(
+            MECHANIC_AIR_DRIBBLE,
             index,
             span(
                 event.start_frame,
