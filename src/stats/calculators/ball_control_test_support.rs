@@ -57,40 +57,6 @@ pub(crate) fn touch_state() -> TouchState {
     }
 }
 
-pub(crate) fn touch_state_with_touch(frame: usize, time: f32) -> TouchState {
-    let player_id = boxcars::RemoteId::Steam(1);
-    TouchState {
-        touch_events: vec![TouchEvent {
-            touch_id: None,
-            time,
-            frame,
-            team_is_team_0: true,
-            player: Some(player_id.clone()),
-            player_position: None,
-            closest_approach_distance: None,
-            contact_local_ball_position: None,
-            contact_local_hitbox_point: None,
-            contact_world_hitbox_point: None,
-            dodge_contact: false,
-        }],
-        last_touch: Some(TouchEvent {
-            touch_id: None,
-            time,
-            frame,
-            team_is_team_0: true,
-            player: Some(player_id.clone()),
-            player_position: None,
-            closest_approach_distance: None,
-            contact_local_ball_position: None,
-            contact_local_hitbox_point: None,
-            contact_world_hitbox_point: None,
-            dodge_contact: false,
-        }),
-        last_touch_player: Some(player_id),
-        last_touch_team_is_team_0: Some(true),
-    }
-}
-
 #[derive(Default)]
 pub(crate) struct BallCarryHarness {
     tracker: ContinuousBallControlTracker<BallCarryKind>,

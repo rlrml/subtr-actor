@@ -79,14 +79,6 @@ struct TeamPlayerStatsWithEventsExport<'a, Team, Player, Event> {
 }
 
 #[derive(Serialize)]
-struct TeamPlayerStatsWithCollectedEventsExport<'a, Team, Player, Event> {
-    team_zero: &'a Team,
-    team_one: &'a Team,
-    player_stats: Vec<PlayerStatsEntry<'a, Player>>,
-    events: Vec<&'a Event>,
-}
-
-#[derive(Serialize)]
 struct StatsExport<'a, T> {
     stats: &'a T,
 }
@@ -834,20 +826,15 @@ pub(crate) fn builtin_module_json(
             })
         }
         "air_dribble" => {
-            let calculator = graph_state::<BallCarryCalculator>(graph, module_name)?;
+            let calculator = graph_state::<AirDribbleCalculator>(graph, module_name)?;
             let projection = projected_stats(graph, module_name)?;
-            let events = calculator
-                .carry_events()
-                .iter()
-                .filter(|event| event.kind == BallCarryKind::AirDribble)
-                .collect::<Vec<_>>();
-            serialize_to_json_value(&TeamPlayerStatsWithCollectedEventsExport {
+            serialize_to_json_value(&TeamPlayerStatsWithEventsExport {
                 team_zero: projection.ball_carry.team_zero_air_dribble_stats(),
                 team_one: projection.ball_carry.team_one_air_dribble_stats(),
                 player_stats: player_stats_entries(
                     projection.ball_carry.player_air_dribble_stats(),
                 ),
-                events,
+                events: calculator.events(),
             })
         }
         "boost" => {

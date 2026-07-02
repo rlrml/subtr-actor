@@ -168,6 +168,7 @@ builtin_analysis_nodes! {
     PassNode,
     DodgeResetNode,
     BallCarryNode,
+    AirDribbleNode,
     BoostNode,
     BumpNode,
     MovementNode,

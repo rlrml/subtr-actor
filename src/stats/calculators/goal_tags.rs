@@ -1397,10 +1397,10 @@ impl AirDribbleGoalCalculator {
     pub fn update(
         &mut self,
         match_stats: &MatchStatsCalculator,
-        ball_carry: &BallCarryCalculator,
+        air_dribble: &AirDribbleCalculator,
     ) -> SubtrActorResult<()> {
         self.events.replace_all_assuming_append_only(
-            self.tag_goals(match_stats.goal_context_events(), ball_carry.carry_events()),
+            self.tag_goals(match_stats.goal_context_events(), air_dribble.events()),
         );
         Ok(())
     }

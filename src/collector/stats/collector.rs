@@ -30,13 +30,12 @@ enum SampleMode {
 ///
 /// Most modules share their providing node's name. The exceptions are modules
 /// that are a second view onto another node's calculator: `core` is served by
-/// the `match_stats` node, and `air_dribble` by the `ball_carry` node. This is
+/// the `match_stats` node, and `flip_reset` is served by `dodge_reset`. This is
 /// the only place that translation lives — there is no global node-name alias
 /// table.
 fn stats_module_analysis_node_name(module_name: &str) -> &str {
     match module_name {
         "core" => "match_stats",
-        "air_dribble" => "ball_carry",
         "flip_reset" => "dodge_reset",
         other => other,
     }

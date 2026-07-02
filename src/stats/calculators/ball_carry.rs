@@ -35,7 +35,7 @@ pub enum BallCarryKind {
     AirDribble,
 }
 
-/// Detects ball carries and air dribbles from continuous ball-control sequences.
+/// Detects ground ball carries from continuous ball-control sequences.
 #[derive(Debug, Clone, Default)]
 pub struct BallCarryCalculator {
     carry_events: EventStream<BallCarryEvent>,
@@ -66,17 +66,6 @@ impl BallCarryCalculator {
             .distance(ball_position.truncate());
         let vertical_gap = ball_position.z - player_position.z;
 
-        if AirDribblePolicy::is_sample(player_position, ball_position, horizontal_gap, vertical_gap)
-        {
-            return Some(ContinuousBallControlSample {
-                player_position,
-                kind: BallCarryKind::AirDribble,
-                horizontal_gap,
-                vertical_gap,
-                speed: player.speed().unwrap_or(0.0),
-            });
-        }
-
         if player_is_on_wall(player_position) {
             return None;
         }
@@ -102,8 +91,8 @@ impl BallCarryCalculator {
         })
     }
 
-    pub(crate) fn kind_requires_airborne(kind: BallCarryKind) -> bool {
-        AirDribblePolicy::kind_requires_airborne(kind)
+    pub(crate) fn kind_requires_airborne(_kind: BallCarryKind) -> bool {
+        false
     }
 
     pub(crate) fn control_player_statuses(
@@ -171,17 +160,11 @@ impl BallCarryCalculator {
             .find(|player| &player.player_id == player_id)
             .and_then(|player| {
                 Self::carry_frame_sample(player, ball).map(|sample| {
-                    let air_touch_count =
-                        if AirDribblePolicy::is_air_touch_position(sample.player_position) {
-                            touch_count
-                        } else {
-                            0
-                        };
                     ContinuousBallControlCandidate {
                         player_id: player.player_id.clone(),
                         is_team_0: player.is_team_0,
                         touch_count,
-                        air_touch_count,
+                        air_touch_count: 0,
                         sample,
                     }
                 })
@@ -191,8 +174,6 @@ impl BallCarryCalculator {
     fn event_from_sequence(
         sequence: CompletedBallControlSequence<BallCarryKind>,
     ) -> BallCarryEvent {
-        let air_dribble_origin = (sequence.kind == BallCarryKind::AirDribble)
-            .then(|| AirDribblePolicy::origin(sequence.start_position));
         BallCarryEvent {
             player_id: sequence.player_id,
             is_team_0: sequence.is_team_0,
@@ -211,7 +192,7 @@ impl BallCarryCalculator {
             average_speed: sequence.average_speed,
             touch_count: sequence.touch_count,
             air_touch_count: sequence.air_touch_count,
-            air_dribble_origin,
+            air_dribble_origin: None,
         }
     }
 
@@ -227,9 +208,6 @@ impl BallCarryCalculator {
             .skip(self.processed_control_sequence_count)
             .cloned()
         {
-            if !AirDribblePolicy::is_valid_sequence(&sequence) {
-                continue;
-            }
             self.record_carry_event(Self::event_from_sequence(sequence));
         }
         self.processed_control_sequence_count = control_state.completed_sequences.len();

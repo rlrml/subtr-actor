@@ -1195,6 +1195,13 @@ pub(crate) const BALL_CARRY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "BallCarryCalculator",
 )];
 
+pub(crate) const AIR_DRIBBLE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &BALL_CARRY_EVENT_DEFINITION,
+    "air_dribble",
+    "AirDribbleNode",
+    "AirDribbleCalculator",
+)];
+
 pub(crate) const CONTROLLED_PLAY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &CONTROLLED_PLAY_EVENT_DEFINITION,
     "controlled_play",

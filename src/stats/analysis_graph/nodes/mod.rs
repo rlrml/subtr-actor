@@ -1,14 +1,14 @@
 pub(crate) use super::graph::*;
 use crate::stats::calculators::{
-    AerialGoalCalculator, AirDribbleGoalCalculator, BackboardBounceState, BackboardCalculator,
-    BallCarryCalculator, BallFrameState, BallHalfCalculator, BallThirdCalculator, BoostCalculator,
-    BumpCalculator, BumpGoalCalculator, CeilingShotCalculator, CeilingShotGoalCalculator,
-    CenterCalculator, ContinuousBallControlState, ControlledPlayCalculator,
-    CounterAttackGoalCalculator, DemoCalculator, DemoGoalCalculator, DodgeResetCalculator,
-    DoubleTapCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator, FiftyFiftyCalculator,
-    FiftyFiftyState, FlickCalculator, FlickGoalCalculator, FlipImpulseCalculator,
-    FlipIntoBallGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo,
-    GameplayState, HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
+    AerialGoalCalculator, AirDribbleCalculator, AirDribbleGoalCalculator, BackboardBounceState,
+    BackboardCalculator, BallCarryCalculator, BallFrameState, BallHalfCalculator,
+    BallThirdCalculator, BoostCalculator, BumpCalculator, BumpGoalCalculator,
+    CeilingShotCalculator, CeilingShotGoalCalculator, CenterCalculator, ContinuousBallControlState,
+    ControlledPlayCalculator, CounterAttackGoalCalculator, DemoCalculator, DemoGoalCalculator,
+    DodgeResetCalculator, DoubleTapCalculator, DoubleTapGoalCalculator, EmptyNetGoalCalculator,
+    FiftyFiftyCalculator, FiftyFiftyState, FlickCalculator, FlickGoalCalculator,
+    FlipImpulseCalculator, FlipIntoBallGoalCalculator, FlipResetGoalCalculator, FrameEventsState,
+    FrameInfo, GameplayState, HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
     HighAerialGoalCalculator, KickoffCalculator, KickoffGoalCalculator, LivePlayState,
     LongDistanceGoalCalculator, LoosePossessionCalculator, MatchStatsCalculator,
     MovementCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
@@ -19,6 +19,7 @@ use crate::stats::calculators::{
     WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
 
+pub(crate) mod air_dribble;
 pub(crate) mod backboard;
 pub(crate) mod backboard_bounce;
 pub(crate) mod ball_carry;
@@ -73,6 +74,8 @@ pub(crate) mod wall_aerial_shot;
 pub(crate) mod wavedash;
 pub(crate) mod whiff;
 
+#[allow(unused_imports)]
+pub use air_dribble::AirDribbleNode;
 #[allow(unused_imports)]
 pub use backboard::BackboardNode;
 #[allow(unused_imports)]
@@ -446,6 +449,10 @@ pub(crate) fn dodge_reset_dependency() -> AnalysisDependency {
 
 pub(crate) fn ball_carry_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<BallCarryCalculator>(ball_carry::boxed_default)
+}
+
+pub(crate) fn air_dribble_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<AirDribbleCalculator>(air_dribble::boxed_default)
 }
 
 pub(crate) fn boost_dependency() -> AnalysisDependency {
