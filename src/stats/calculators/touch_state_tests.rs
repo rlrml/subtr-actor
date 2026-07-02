@@ -204,6 +204,65 @@ fn suppresses_same_player_touch_candidates_inside_cooldown() {
 }
 
 #[test]
+fn dodge_touch_bypasses_passive_contact_cooldown() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let passive_players = players(player_id.clone());
+    let mut dodging_sample = passive_players.players[0].clone();
+    dodging_sample.dodge_active = true;
+    let dodging_players = PlayerFrameState {
+        players: vec![dodging_sample],
+    };
+    let mut calculator = TouchStateCalculator::new();
+    let live_play = LivePlayState {
+        gameplay_phase: GameplayPhase::ActivePlay,
+        is_live_play: true,
+    };
+
+    calculator.update(
+        &frame(0),
+        &ball(glam::Vec3::ZERO),
+        &passive_players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+    // A passive contact touch starts the per-player cooldown window.
+    let passive_touch = calculator.update(
+        &frame(1),
+        &ball(glam::Vec3::new(300.0, 0.0, 0.0)),
+        &passive_players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+    // A dodge-powered touch inside the window is a distinct mechanic (flick,
+    // flip-reset conversion) and must not be swallowed by the passive contact.
+    let dodge_touch = calculator.update(
+        &frame(2),
+        &ball(glam::Vec3::new(650.0, 0.0, 0.0)),
+        &dodging_players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+    // Repeated dodge-contact samples still rate-limit against each other.
+    let repeat_dodge_touch = calculator.update(
+        &frame(3),
+        &ball(glam::Vec3::new(1000.0, 0.0, 0.0)),
+        &dodging_players,
+        &FrameEventsState::default(),
+        &live_play,
+    );
+
+    assert_eq!(passive_touch.touch_events.len(), 1);
+    assert!(!passive_touch.touch_events[0].dodge_contact);
+
+    assert_eq!(dodge_touch.touch_events.len(), 1);
+    assert!(dodge_touch.touch_events[0].dodge_contact);
+    assert_eq!(dodge_touch.touch_events[0].frame, 2);
+
+    assert!(repeat_dodge_touch.touch_events.is_empty());
+    assert_eq!(repeat_dodge_touch.last_touch_player, Some(player_id));
+}
+
+#[test]
 fn detects_touch_while_kickoff_waits_for_first_touch() {
     let player_id = boxcars::RemoteId::Steam(1);
     let players = players(player_id.clone());
