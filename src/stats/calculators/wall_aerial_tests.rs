@@ -154,7 +154,7 @@ fn records_controlled_wall_aerial_play_after_wall_carry_setup() {
 
     let event = calculator.events().first().expect("wall aerial event");
     assert_eq!(event.player, player.clone());
-    assert_eq!(event.wall, WallAerialWall::Right);
+    assert_eq!(event.wall, WallAerialWall::Left);
     assert!(event.setup_duration >= WALL_AERIAL_MIN_WALL_CONTACT_DURATION);
 
     let stats = calculator.player_stats().get(&player).unwrap();
@@ -220,7 +220,7 @@ fn records_soft_controlled_wall_aerial_continuation_after_wall_setup() {
         .first()
         .expect("soft wall aerial continuation event");
     assert_eq!(event.player, player.clone());
-    assert_eq!(event.wall, WallAerialWall::Right);
+    assert_eq!(event.wall, WallAerialWall::Left);
     assert_eq!(event.ball_speed_change, 0.0);
 
     let stats = calculator.player_stats().get(&player).unwrap();
@@ -665,19 +665,19 @@ fn rejects_aerial_that_starts_near_wall_but_never_on_it() {
 fn classifies_side_walls_relative_to_attack_direction() {
     let plus_x_wall = glam::Vec3::new(4096.0, 0.0, 600.0);
     let minus_x_wall = glam::Vec3::new(-4096.0, 0.0, 600.0);
-    // Team 0 attacks toward +y, so the +x wall is their right.
+    // Team 0 attacks toward +y, so the +x wall is their left.
     assert_eq!(
         wall_aerial_wall_classification(true, plus_x_wall),
-        WallAerialWall::Right,
+        WallAerialWall::Left,
     );
     assert_eq!(
         wall_aerial_wall_classification(true, minus_x_wall),
-        WallAerialWall::Left,
+        WallAerialWall::Right,
     );
-    // Team 1 attacks toward -y, so the same +x wall is on their left.
+    // Team 1 attacks toward -y, so the same +x wall is on their right.
     assert_eq!(
         wall_aerial_wall_classification(false, plus_x_wall),
-        WallAerialWall::Left,
+        WallAerialWall::Right,
     );
 }
 
@@ -708,11 +708,11 @@ fn classifies_corner_arc_positions_as_corners() {
     let mid_corner = glam::Vec3::new(3758.6, 4782.6, 600.0);
     assert_eq!(
         wall_aerial_wall_classification(true, mid_corner),
-        WallAerialWall::FrontRight,
+        WallAerialWall::FrontLeft,
     );
     assert_eq!(
         wall_aerial_wall_classification(false, mid_corner),
-        WallAerialWall::BackLeft,
+        WallAerialWall::BackRight,
     );
 }
 
@@ -721,12 +721,12 @@ fn side_wall_positions_near_a_corner_stay_side_walls() {
     // Deep along the flat side wall, short of the corner-arc start: still side.
     assert_eq!(
         wall_aerial_wall_classification(true, glam::Vec3::new(4096.0, 3800.0, 600.0)),
-        WallAerialWall::Right,
+        WallAerialWall::Left,
     );
     // Just onto the corner arc near its side-wall end: the outward normal still
     // points mostly sideways.
     assert_eq!(
         wall_aerial_wall_classification(true, glam::Vec3::new(4050.0, 4300.0, 600.0)),
-        WallAerialWall::Right,
+        WallAerialWall::Left,
     );
 }

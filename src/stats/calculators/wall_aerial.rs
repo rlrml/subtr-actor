@@ -101,10 +101,11 @@ pub(crate) fn wall_aerial_wall_classification(
 
 /// Map a horizontal direction toward the wall (any positive scale) into an
 /// attack-relative [`WallAerialWall`]. `x`/`y` are field-axis components; they
-/// are normalized for team so `+x` is the player's right and `+y` points at the
-/// opponent's (front) end wall.
+/// are normalized for team so `right` is the player's right and `front` points
+/// at the opponent's end wall. For team 0, Rocket League's positive X field
+/// axis is the player's left.
 fn wall_aerial_wall_from_axes(is_team_0: bool, x: f32, y: f32) -> WallAerialWall {
-    let right = if is_team_0 { x } else { -x };
+    let right = if is_team_0 { -x } else { x };
     let front = if is_team_0 { y } else { -y };
     let abs_right = right.abs();
     let abs_front = front.abs();
