@@ -772,9 +772,9 @@ fn exposes_live_graph_info_json() {
     assert!(builtin_names
         .iter()
         .any(|name| name == "continuous_ball_control"));
-    // `air_dribble` is a stats module, not an analysis node; its node is `ball_carry`.
+    // `air_dribble` is a standalone analysis node; `ball_carry` remains separate.
     assert!(builtin_names.iter().any(|name| name == "ball_carry"));
-    assert!(!builtin_names.iter().any(|name| name == "air_dribble"));
+    assert!(builtin_names.iter().any(|name| name == "air_dribble"));
     assert!(builtin_names.iter().any(|name| name == "frame_info"));
     assert!(builtin_names.iter().any(|name| name == "live_play"));
     assert!(builtin_names
@@ -794,12 +794,11 @@ fn exposes_live_graph_info_json() {
                 .to_owned()
         })
         .collect::<BTreeSet<_>>();
-    // `core` and `air_dribble` are stats-module names, not analysis nodes, so they
-    // are no longer callable as nodes; their providing nodes are.
+    // `core` is a stats-module name, not an analysis node, so its providing node is callable.
     assert!(callable_names.iter().any(|name| name == "match_stats"));
     assert!(callable_names.iter().any(|name| name == "ball_carry"));
     assert!(!callable_names.iter().any(|name| name == "core"));
-    assert!(!callable_names.iter().any(|name| name == "air_dribble"));
+    assert!(callable_names.iter().any(|name| name == "air_dribble"));
     assert!(callable_names
         .iter()
         .any(|name| name == "continuous_ball_control"));
