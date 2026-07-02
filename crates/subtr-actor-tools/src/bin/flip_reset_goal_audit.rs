@@ -8,7 +8,9 @@ use std::collections::HashMap;
 
 use anyhow::Context;
 use clap::Parser;
-use subtr_actor::{EventPayload, GoalTag, PlayerId, ReplayMeta, StatsTimelineCollector};
+use subtr_actor::{
+    BallCarryKind, EventPayload, GoalTag, PlayerId, ReplayMeta, StatsTimelineCollector,
+};
 
 #[derive(Debug, Parser)]
 #[command(about = "Audit FlipResetGoal tagging for a replay.")]
@@ -58,7 +60,61 @@ fn main() -> anyhow::Result<()> {
                 .tags
                 .iter()
                 .any(|t| matches!(t, GoalTag::FlipResetGoal(_)));
+            let has_air_dribble = goal
+                .tags
+                .iter()
+                .any(|t| matches!(t, GoalTag::AirDribbleGoal(_)));
             println!("         FlipResetGoal: {has_flip}");
+            println!("         AirDribbleGoal: {has_air_dribble}");
+        }
+    }
+
+    println!("\n==== AIR DRIBBLE events ====");
+    for event in &timeline.events.events {
+        if let EventPayload::BallCarry(carry) = &event.payload {
+            if carry.kind != BallCarryKind::AirDribble {
+                continue;
+            }
+            println!(
+                "clk {} abs {:.3}-{:.3} frames {}-{} player={} team0={} touches={} air_touches={} origin={:?}",
+                clock(carry.start_time),
+                carry.start_time,
+                carry.end_time,
+                carry.start_frame,
+                carry.end_frame,
+                player_name(&names, &carry.player_id),
+                carry.is_team_0,
+                carry.touch_count,
+                carry.air_touch_count,
+                carry.air_dribble_origin,
+            );
+        }
+    }
+
+    println!("\n==== TOUCH events ====");
+    for event in &timeline.events.events {
+        if let EventPayload::Touch(touch) = &event.payload {
+            let kind = touch.tag("kind").unwrap_or("<none>");
+            let surface = touch.tag("surface").unwrap_or("<none>");
+            println!(
+                "clk {} abs {:.3} frame {} player={} team0={} kind={} surface={} player_z={} ball_z={} speed_change={:.1}",
+                clock(touch.time),
+                touch.time,
+                touch.frame,
+                player_name(&names, &touch.player),
+                touch.is_team_0,
+                kind,
+                surface,
+                touch
+                    .player_position
+                    .map(|position| format!("{:.0}", position[2]))
+                    .unwrap_or_else(|| "<none>".to_owned()),
+                touch
+                    .ball_position
+                    .map(|position| format!("{:.0}", position[2]))
+                    .unwrap_or_else(|| "<none>".to_owned()),
+                touch.ball_speed_change,
+            );
         }
     }
 
