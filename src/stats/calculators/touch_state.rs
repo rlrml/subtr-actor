@@ -21,6 +21,15 @@ enum TouchCooldownKey {
     Team(bool),
 }
 
+/// Last rate-limit-accepted touch for a cooldown key: its time plus whether it
+/// carried dodge evidence, so a dodge-powered touch can bypass the rate limit
+/// imposed by an earlier passive contact.
+#[derive(Debug, Clone, Copy)]
+struct LastCooldownTouch {
+    time: f32,
+    dodge_contact: bool,
+}
+
 const TOUCH_SCORING: TouchCandidateScoring = TouchCandidateScoring::DEFAULT;
 const TOUCH_CANDIDATE_WINDOW_FRAMES: usize = 4;
 const CONTESTED_TOUCH_WINDOW_FRAMES: usize = 1;
@@ -158,7 +167,7 @@ pub struct TouchStateCalculator {
     previous_ball_rigid_body: Option<(boxcars::RigidBody, f32)>,
     current_last_touch: Option<TouchEvent>,
     recent_touch_candidates: HashMap<PlayerId, TouchEvent>,
-    last_touch_times: HashMap<TouchCooldownKey, f32>,
+    last_touch_times: HashMap<TouchCooldownKey, LastCooldownTouch>,
     recent_team_touches: Vec<RecentTeamTouch>,
     next_touch_id: u64,
 }
@@ -761,11 +770,24 @@ impl TouchStateCalculator {
         const FLOAT_EPSILON: f32 = 0.0001;
 
         let key = Self::touch_cooldown_key(event);
-        let allowed = self.last_touch_times.get(&key).is_none_or(|last_time| {
-            event.time - last_time + FLOAT_EPSILON >= TOUCH_RATE_LIMIT_SECONDS
+        let allowed = self.last_touch_times.get(&key).is_none_or(|last| {
+            // The rate limit dedupes repeat samples of one continuous contact
+            // (a carry or dribble). A dodge-powered touch arriving on the heels
+            // of a passive contact is a distinct mechanic (flip-reset
+            // conversion, flick), not another sample of the same contact, so it
+            // bypasses the limit. Repeated dodge touches still rate-limit
+            // against each other.
+            (event.dodge_contact && !last.dodge_contact)
+                || event.time - last.time + FLOAT_EPSILON >= TOUCH_RATE_LIMIT_SECONDS
         });
         if allowed {
-            self.last_touch_times.insert(key, event.time);
+            self.last_touch_times.insert(
+                key,
+                LastCooldownTouch {
+                    time: event.time,
+                    dodge_contact: event.dodge_contact,
+                },
+            );
         }
         allowed
     }
