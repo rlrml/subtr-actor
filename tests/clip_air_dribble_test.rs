@@ -14,8 +14,8 @@ use subtr_actor::{
 
 const AIR_DRIBBLE_GOAL_MOUTH_REPLAY: &str = "assets/air-dribble-goal-mouth-2026-05-24.replay";
 
-const AIR_DRIBBLE_START_TIME: f32 = 56.37;
-const AIR_DRIBBLE_END_TIME: f32 = 59.11;
+const AIR_DRIBBLE_START_TIME: f32 = 57.10;
+const AIR_DRIBBLE_END_TIME: f32 = 59.02;
 
 #[test]
 fn clip_detects_air_dribble_goal_and_rejects_unrelated_half_volley_tag() {
