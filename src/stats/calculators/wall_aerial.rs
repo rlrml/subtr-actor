@@ -15,10 +15,13 @@ pub(crate) const WALL_AERIAL_MIN_TOUCH_BALL_Z: f32 = 400.0;
 const WALL_AERIAL_REFERENCE_BALL_SPEED_CHANGE: f32 = 80.0;
 pub(crate) const WALL_AERIAL_HIGH_CONFIDENCE: f32 = 0.78;
 
-/// Minimum horizontal magnitude of the car's up (roof) vector before we trust
-/// it as a wall surface normal. Below this the car is roughly upright (on the
-/// floor or tumbling in the air) and we fall back to field position.
-const WALL_AERIAL_MIN_WALL_NORMAL_HORIZONTAL: f32 = 0.5;
+/// Field coordinates where the rounded corner arcs begin: the flat walls
+/// (side `|x| = 4096`, end `|y| = 5120`) curve into a quarter circle of radius
+/// 1152 beyond these. Subtracting them from an on-wall position (clamping the
+/// residual at zero) leaves the outward wall normal: axis-aligned on a flat
+/// wall, radial on a corner arc.
+const WALL_CORNER_ARC_START_ABS_X: f32 = 4096.0 - 1152.0;
+const WALL_CORNER_ARC_START_ABS_Y: f32 = 5120.0 - 1152.0;
 /// Ratio of the smaller to the larger attack-relative axis above which a wall
 /// takeoff is treated as a (diagonal) corner. `tan(22.5°)` splits each quadrant
 /// into three equal 45° sectors across the eight [`WallAerialWall`] directions.
@@ -82,36 +85,18 @@ pub(crate) fn wall_aerial_wall_for_position(position: glam::Vec3) -> Option<Wall
     None
 }
 
-/// The car's up (roof) vector, i.e. the surface normal of whatever it is resting
-/// on. On a wall this points away from the wall toward the field interior.
-pub(crate) fn player_up_vector(player: &PlayerSample) -> Option<glam::Vec3> {
-    let rigid_body = player.rigid_body.as_ref()?;
-    Some(quat_to_glam(&rigid_body.rotation) * glam::Vec3::Z)
-}
-
-/// Classify which wall (relative to the player's attack direction) a takeoff
-/// came from. Prefers the car's surface normal (its roof points away from the
-/// wall it is driving on), falling back to field position when orientation is
-/// unavailable or too upright to read a wall from.
+/// Classify which wall (relative to the player's attack direction) an on-wall
+/// position is on. The residual of each axis beyond the corner-arc start is the
+/// outward wall normal — zero along an axis whose flat wall is out of reach, and
+/// the radial direction of the arc in a corner — so field position alone
+/// determines the wall, independent of car orientation.
 pub(crate) fn wall_aerial_wall_classification(
     is_team_0: bool,
     position: glam::Vec3,
-    up: Option<glam::Vec3>,
 ) -> WallAerialWall {
-    if let Some(up) = up {
-        let horizontal = glam::vec2(up.x, up.y);
-        if horizontal.length() >= WALL_AERIAL_MIN_WALL_NORMAL_HORIZONTAL {
-            // The wall lies opposite the roof direction.
-            return wall_aerial_wall_from_axes(is_team_0, -horizontal.x, -horizontal.y);
-        }
-    }
-    // Fallback: scale each axis by its wall reach so the comparison reflects how
-    // close the car is to the side wall vs. the end wall.
-    wall_aerial_wall_from_axes(
-        is_team_0,
-        position.x / SIDE_WALL_CONTACT_ABS_X,
-        position.y / BACK_WALL_CONTACT_ABS_Y,
-    )
+    let x = position.x.signum() * (position.x.abs() - WALL_CORNER_ARC_START_ABS_X).max(0.0);
+    let y = position.y.signum() * (position.y.abs() - WALL_CORNER_ARC_START_ABS_Y).max(0.0);
+    wall_aerial_wall_from_axes(is_team_0, x, y)
 }
 
 /// Map a horizontal direction toward the wall (any positive scale) into an
@@ -268,7 +253,7 @@ impl WallAerialCalculator {
     /// A wall aerial is "ride the wall, leave it, hit the ball in the air." We
     /// detect the first two phases here, keyed purely on the player being on the
     /// wall surface (`wall_aerial_wall_for_position`) — no ball control required.
-    /// The attack-relative wall label is read from the car's roof vector at the
+    /// The attack-relative wall label is read from the field position at the
     /// last on-wall frame (`wall_aerial_wall_classification`).
     fn update_wall_contacts_and_takeoffs(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
         for player in &players.players {
@@ -278,11 +263,7 @@ impl WallAerialCalculator {
 
             // On the wall: start or extend the contact span, and defer takeoff.
             if let Some(surface) = wall_aerial_wall_for_position(position) {
-                let wall_direction = wall_aerial_wall_classification(
-                    player.is_team_0,
-                    position,
-                    player_up_vector(player),
-                );
+                let wall_direction = wall_aerial_wall_classification(player.is_team_0, position);
                 match self.wall_contacts.get_mut(&player.player_id) {
                     Some(span) if span.surface == surface => {
                         span.last_time = frame.time;
