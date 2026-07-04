@@ -1,11 +1,13 @@
 use super::wall_aerial::{
     WALL_AERIAL_MIN_TOUCH_BALL_Z, WALL_AERIAL_MIN_TOUCH_PLAYER_Z, wall_aerial_normalize_score,
-    wall_aerial_wall_classification, wall_aerial_wall_for_position,
+    wall_aerial_surface_contact, wall_aerial_wall_classification,
 };
 use super::*;
 
 const WALL_AERIAL_SHOT_MAX_WALL_CONTACT_TO_TAKEOFF_SECONDS: f32 = 2.25;
-const WALL_AERIAL_SHOT_MAX_TAKEOFF_TO_SHOT_SECONDS: f32 = 2.25;
+/// The takeoff is the frame the car genuinely leaves the wall surface, so the
+/// whole flight to the shot counts against this window.
+const WALL_AERIAL_SHOT_MAX_TAKEOFF_TO_SHOT_SECONDS: f32 = 2.75;
 const WALL_AERIAL_SHOT_GROUND_CONTACT_MAX_PLAYER_Z: f32 = 80.0;
 
 /// A shot credited to a player shortly after taking off from a wall.
@@ -87,7 +89,12 @@ impl WallAerialShotCalculator {
                 continue;
             }
 
-            if wall_aerial_wall_for_position(position).is_some() {
+            if player
+                .rigid_body
+                .as_ref()
+                .and_then(wall_aerial_surface_contact)
+                .is_some()
+            {
                 let wall_direction = wall_aerial_wall_classification(player.is_team_0, position);
                 self.recent_wall_contacts.insert(
                     player.player_id.clone(),

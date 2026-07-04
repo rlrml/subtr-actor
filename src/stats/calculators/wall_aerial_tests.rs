@@ -56,6 +56,32 @@ fn players(position: glam::Vec3) -> PlayerFrameState {
     }
 }
 
+fn wall_rigid_body(position: glam::Vec3, up: glam::Vec3) -> boxcars::RigidBody {
+    boxcars::RigidBody {
+        rotation: glam_to_quat(&glam::Quat::from_rotation_arc(
+            glam::Vec3::Z,
+            up.normalize(),
+        )),
+        ..rigid_body(position, glam::Vec3::ZERO)
+    }
+}
+
+/// A player riding the wall at `position`: roof pointed at the field along the
+/// inward wall normal, as wheels-on-wall contact implies.
+fn player_on_wall_at(position: glam::Vec3) -> PlayerSample {
+    let (outward, _) = wall_outward_normal_and_distance(position);
+    PlayerSample {
+        rigid_body: Some(wall_rigid_body(position, -outward)),
+        ..player_at(position)
+    }
+}
+
+fn players_on_wall(position: glam::Vec3) -> PlayerFrameState {
+    PlayerFrameState {
+        players: vec![player_on_wall_at(position)],
+    }
+}
+
 fn controlled_touch_state() -> TouchState {
     TouchState {
         last_touch_player: Some(boxcars::RemoteId::Steam(1)),
@@ -110,7 +136,7 @@ fn records_controlled_wall_aerial_play_after_wall_carry_setup() {
                 glam::Vec3::new(3520.0, 0.0, 330.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(3650.0, 0.0, 250.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 250.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -122,7 +148,7 @@ fn records_controlled_wall_aerial_play_after_wall_carry_setup() {
                 glam::Vec3::new(3500.0, 0.0, 340.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(3650.0, 0.0, 270.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 270.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -173,7 +199,7 @@ fn records_soft_controlled_wall_aerial_continuation_after_wall_setup() {
                 glam::Vec3::new(3520.0, 0.0, 330.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(3650.0, 0.0, 250.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 250.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -185,7 +211,7 @@ fn records_soft_controlled_wall_aerial_continuation_after_wall_setup() {
                 glam::Vec3::new(3500.0, 0.0, 340.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(3650.0, 0.0, 270.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 270.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -239,7 +265,7 @@ fn rejects_low_wall_setup_touch_that_never_becomes_aerial_continuation() {
                 glam::Vec3::new(3520.0, 0.0, 250.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(3650.0, 0.0, 220.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 220.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -251,7 +277,7 @@ fn rejects_low_wall_setup_touch_that_never_becomes_aerial_continuation() {
                 glam::Vec3::new(3500.0, 0.0, 260.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(3650.0, 0.0, 240.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 240.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -297,7 +323,7 @@ fn consumes_wall_setup_after_first_aerial_attempt() {
                 glam::Vec3::new(3520.0, 0.0, 330.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(3650.0, 0.0, 250.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 250.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -309,7 +335,7 @@ fn consumes_wall_setup_after_first_aerial_attempt() {
                 glam::Vec3::new(3500.0, 0.0, 340.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(3650.0, 0.0, 270.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 270.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -380,7 +406,7 @@ fn preserves_completed_wall_setup_while_sliding_off_wall() {
                 glam::Vec3::new(3980.0, 0.0, 420.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(4080.0, 0.0, 300.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 300.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -392,7 +418,7 @@ fn preserves_completed_wall_setup_while_sliding_off_wall() {
                 glam::Vec3::new(3920.0, 0.0, 560.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(4080.0, 0.0, 480.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 480.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -454,7 +480,7 @@ fn records_wall_aerial_when_first_continuation_touch_is_delayed() {
                 glam::Vec3::new(3980.0, 0.0, 420.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(4080.0, 0.0, 300.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 300.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -466,7 +492,7 @@ fn records_wall_aerial_when_first_continuation_touch_is_delayed() {
                 glam::Vec3::new(3920.0, 0.0, 560.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(4080.0, 0.0, 480.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 480.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -516,7 +542,7 @@ fn rejects_stale_wall_contact_that_arms_much_later() {
                 glam::Vec3::new(3980.0, 0.0, 420.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(4080.0, 0.0, 300.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 300.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -528,7 +554,7 @@ fn rejects_stale_wall_contact_that_arms_much_later() {
                 glam::Vec3::new(3920.0, 0.0, 560.0),
                 glam::Vec3::new(0.0, 0.0, 0.0),
             ),
-            &players(glam::Vec3::new(4080.0, 0.0, 480.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 480.0)),
             &controlled_touch_state(),
             &LivePlayState::active_play(),
         )
@@ -599,9 +625,8 @@ fn rejects_wall_aerial_play_without_wall_control_setup() {
 #[test]
 fn rejects_aerial_that_starts_near_wall_but_never_on_it() {
     // A normal aerial that launches from the floor *near* the side wall: the car
-    // passes through the near-wall band (|x| in 3200..3600) but is never on the
-    // wall surface (|x| >= 3600), then aerials up and away to the ball. This is
-    // the reported false positive — it must not be detected as a wall aerial.
+    // climbs past the wall without ever touching its surface, then aerials up
+    // and away to the ball. It must not be detected as a wall aerial.
     let player = boxcars::RemoteId::Steam(1);
     let mut calculator = WallAerialCalculator::new();
 
@@ -656,6 +681,131 @@ fn rejects_aerial_that_starts_near_wall_but_never_on_it() {
 
     assert!(calculator.player_stats().get(&player).is_none());
     assert!(calculator.events().is_empty());
+}
+
+#[test]
+fn rejects_ground_jump_aerial_that_climbs_through_the_near_wall_band() {
+    // Regression for a real replay: the player rode the left wall, came back to
+    // the ground, then jumped into an aerial from the floor near the wall. The
+    // climb spends >0.3s several hundred uu from the wall surface with the roof
+    // pointing straight up — it must not read as a wall ride, so leaving the
+    // area must not arm a wall-aerial takeoff.
+    let player = boxcars::RemoteId::Steam(1);
+    let mut calculator = WallAerialCalculator::new();
+
+    for (index, (x, z)) in [(3665.0, 130.0), (3655.0, 200.0), (3640.0, 270.0)]
+        .iter()
+        .enumerate()
+    {
+        calculator
+            .update(
+                &frame(index + 1, index as f32 * 0.2),
+                &ball(
+                    glam::Vec3::new(3400.0, -600.0, 600.0),
+                    glam::Vec3::new(0.0, 0.0, 0.0),
+                ),
+                &players(glam::Vec3::new(*x, 0.0, *z)),
+                &controlled_touch_state(),
+                &LivePlayState::active_play(),
+            )
+            .unwrap();
+    }
+    calculator
+        .update(
+            &frame(4, 0.6),
+            &ball(
+                glam::Vec3::new(3450.0, -500.0, 700.0),
+                glam::Vec3::new(0.0, -700.0, 80.0),
+            ),
+            &players(glam::Vec3::new(3520.0, -400.0, 560.0)),
+            &touch_state_with_touch(4, 0.6),
+            &LivePlayState::active_play(),
+        )
+        .unwrap();
+
+    assert!(calculator.player_stats().get(&player).is_none());
+    assert!(calculator.events().is_empty());
+}
+
+// Riding the wall requires actual surface contact: proximity to the wall plane
+// (or corner arc) plus the car roof leaning into the field.
+
+#[test]
+fn surface_contact_requires_wall_proximity() {
+    let inward_up = glam::Vec3::new(-1.0, 0.0, 0.0);
+    // Pinned to the side wall (car pivot ~17uu off the surface).
+    assert_eq!(
+        wall_aerial_surface_contact(&wall_rigid_body(
+            glam::Vec3::new(4079.0, 0.0, 600.0),
+            inward_up,
+        )),
+        Some(WallSurface::Side),
+    );
+    // Airborne inside the old near-wall band: hundreds of uu from the surface.
+    assert_eq!(
+        wall_aerial_surface_contact(&wall_rigid_body(
+            glam::Vec3::new(3650.0, 0.0, 600.0),
+            inward_up,
+        )),
+        None,
+    );
+}
+
+#[test]
+fn surface_contact_requires_roof_toward_field() {
+    // At the wall but flying past it with the roof up: not riding.
+    assert_eq!(
+        wall_aerial_surface_contact(&wall_rigid_body(
+            glam::Vec3::new(4079.0, 0.0, 600.0),
+            glam::Vec3::Z,
+        )),
+        None,
+    );
+    // Roof pointing out of the field is just as wrong.
+    assert_eq!(
+        wall_aerial_surface_contact(&wall_rigid_body(
+            glam::Vec3::new(4079.0, 0.0, 600.0),
+            glam::Vec3::X,
+        )),
+        None,
+    );
+}
+
+#[test]
+fn surface_contact_follows_each_walls_own_normal() {
+    // End wall: the inward normal is -y.
+    assert_eq!(
+        wall_aerial_surface_contact(&wall_rigid_body(
+            glam::Vec3::new(2000.0, 5103.0, 600.0),
+            glam::Vec3::new(0.0, -1.0, 0.0),
+        )),
+        Some(WallSurface::Back),
+    );
+    // A side-wall orientation on the end wall does not count.
+    assert_eq!(
+        wall_aerial_surface_contact(&wall_rigid_body(
+            glam::Vec3::new(2000.0, 5103.0, 600.0),
+            glam::Vec3::new(-1.0, 0.0, 0.0),
+        )),
+        None,
+    );
+    // Mid corner arc: the inward normal is the 45° diagonal toward the field
+    // (the coarse surface tie-breaks to Side).
+    assert_eq!(
+        wall_aerial_surface_contact(&wall_rigid_body(
+            glam::Vec3::new(3746.6, 4770.6, 600.0),
+            glam::Vec3::new(-1.0, -1.0, 0.0),
+        )),
+        Some(WallSurface::Side),
+    );
+    // The goal mouth is an opening, not a wall surface.
+    assert_eq!(
+        wall_aerial_surface_contact(&wall_rigid_body(
+            glam::Vec3::new(0.0, 5103.0, 600.0),
+            glam::Vec3::new(0.0, -1.0, 0.0),
+        )),
+        None,
+    );
 }
 
 // Which wall a position is on follows from the position alone: the residual of

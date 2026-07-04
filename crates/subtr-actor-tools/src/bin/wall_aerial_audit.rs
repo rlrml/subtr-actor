@@ -9,6 +9,7 @@ use anyhow::Context;
 use clap::Parser;
 use subtr_actor::{
     EventPayload, PlayerFrame, PlayerId, ReplayDataCollector, ReplayMeta, StatsTimelineCollector,
+    quat_to_glam, wall_aerial_surface_contact, wall_outward_normal_and_distance,
 };
 
 #[derive(Debug, Parser)]
@@ -112,9 +113,6 @@ fn dump_trajectory(
     range: &str,
     player_substr: Option<&str>,
 ) -> anyhow::Result<()> {
-    const SIDE_WALL_CONTACT_ABS_X: f32 = 3600.0;
-    const SETUP_SIDE_WALL_START_ABS_X: f32 = 3200.0;
-
     let (lo, hi) = range.split_once('-').context("range must be LO-HI")?;
     let lo: usize = lo.trim().parse().context("bad LO")?;
     let hi: usize = hi.trim().parse().context("bad HI")?;
@@ -146,13 +144,11 @@ fn dump_trajectory(
         for f in lo..=hi.min(frames.len().saturating_sub(1)) {
             if let Some(PlayerFrame::Data { rigid_body, .. }) = frames.get(f) {
                 let loc = rigid_body.location;
-                let side_on = loc.x.abs() >= SIDE_WALL_CONTACT_ABS_X;
-                let back_on = loc.y.abs() >= 5000.0 && loc.x.abs() > 900.0;
-                let on_wall = (side_on || back_on) && loc.z >= 120.0;
-                let side_setup = loc.x.abs() >= SETUP_SIDE_WALL_START_ABS_X;
-                let back_setup = loc.y.abs() >= 4600.0 && loc.x.abs() > 900.0;
-                let in_setup = (side_setup || back_setup) && loc.z >= 120.0;
                 let gv = glam::Vec3::new(loc.x, loc.y, loc.z);
+                let (outward, wall_dist) = wall_outward_normal_and_distance(gv);
+                let up = quat_to_glam(&rigid_body.rotation) * glam::Vec3::Z;
+                let up_alignment = up.dot(-outward);
+                let contact = wall_aerial_surface_contact(rigid_body);
                 let (ball_dist, control) = match ball_at(f) {
                     Some(b) => {
                         let d = gv.distance(b);
@@ -161,15 +157,8 @@ fn dump_trajectory(
                     None => ("?".to_string(), false),
                 };
                 println!(
-                    "  frame {f}: pos=[{:.0},{:.0},{:.0}] |x|={:.0} |y|={:.0} on_wall={} setup_band={} ball_dist={ball_dist} ctrl={control} ON_WALL_CTRL={}",
-                    loc.x,
-                    loc.y,
-                    loc.z,
-                    loc.x.abs(),
-                    loc.y.abs(),
-                    on_wall,
-                    in_setup,
-                    on_wall && control,
+                    "  frame {f}: pos=[{:.0},{:.0},{:.0}] wall_dist={wall_dist:.0} up_align={up_alignment:.2} contact={contact:?} ball_dist={ball_dist} ctrl={control}",
+                    loc.x, loc.y, loc.z,
                 );
             } else {
                 println!("  frame {f}: <no data>");

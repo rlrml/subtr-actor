@@ -2,12 +2,14 @@ use super::*;
 
 /// Minimum time a player must ride the wall before leaving it for the takeoff to
 /// count as a wall aerial. A wall aerial is launched *off the wall*, so the
-/// player must actually be on the wall surface (`wall_aerial_wall_for_position`)
+/// player must actually be on the wall surface (`wall_aerial_surface_contact`)
 /// for at least this long. Carrying the ball is *not* required — driving up the
 /// wall and then hitting the ball in the air is still a wall aerial.
 const WALL_AERIAL_MIN_WALL_CONTACT_DURATION: f32 = 0.30;
 const WALL_AERIAL_MAX_WALL_CONTACT_TO_TAKEOFF_SECONDS: f32 = 1.25;
-const WALL_AERIAL_MAX_TAKEOFF_TO_TOUCH_SECONDS: f32 = 2.25;
+/// The takeoff is the frame the car genuinely leaves the wall surface, so the
+/// whole flight to the touch counts against this window.
+const WALL_AERIAL_MAX_TAKEOFF_TO_TOUCH_SECONDS: f32 = 2.75;
 const WALL_AERIAL_MIN_SECONDS_BETWEEN_ATTEMPTS: f32 = 3.0;
 pub(crate) const WALL_AERIAL_MIN_TOUCH_PLAYER_Z: f32 = AIR_DRIBBLE_MIN_PLAYER_Z;
 const WALL_AERIAL_MIN_CONTINUATION_PLAYER_Z: f32 = 300.0;
@@ -15,13 +17,30 @@ pub(crate) const WALL_AERIAL_MIN_TOUCH_BALL_Z: f32 = 400.0;
 const WALL_AERIAL_REFERENCE_BALL_SPEED_CHANGE: f32 = 80.0;
 pub(crate) const WALL_AERIAL_HIGH_CONFIDENCE: f32 = 0.78;
 
+/// Field wall geometry: flat side walls at `|x| = 4096` and end walls at
+/// `|y| = 5120`, joined by quarter-circle corner arcs of radius 1152.
+const SIDE_WALL_SURFACE_ABS_X: f32 = 4096.0;
+const BACK_WALL_SURFACE_ABS_Y: f32 = 5120.0;
+const WALL_CORNER_ARC_RADIUS: f32 = 1152.0;
 /// Field coordinates where the rounded corner arcs begin: the flat walls
-/// (side `|x| = 4096`, end `|y| = 5120`) curve into a quarter circle of radius
-/// 1152 beyond these. Subtracting them from an on-wall position (clamping the
-/// residual at zero) leaves the outward wall normal: axis-aligned on a flat
-/// wall, radial on a corner arc.
-const WALL_CORNER_ARC_START_ABS_X: f32 = 4096.0 - 1152.0;
-const WALL_CORNER_ARC_START_ABS_Y: f32 = 5120.0 - 1152.0;
+/// curve into the corner arc beyond these. Subtracting them from an on-wall
+/// position (clamping the residual at zero) leaves the outward wall normal:
+/// axis-aligned on a flat wall, radial on a corner arc.
+const WALL_CORNER_ARC_START_ABS_X: f32 = SIDE_WALL_SURFACE_ABS_X - WALL_CORNER_ARC_RADIUS;
+const WALL_CORNER_ARC_START_ABS_Y: f32 = BACK_WALL_SURFACE_ABS_Y - WALL_CORNER_ARC_RADIUS;
+/// Maximum horizontal distance from the wall surface for a frame to count as
+/// riding it. A car on the wall keeps its pivot ~17uu off the surface; the
+/// margin covers sampling jitter and bumpy rides without admitting airborne
+/// cars. (An earlier `|x| >= 3600` band reached ~500uu into the field, so an
+/// aerial jumped from the ground near the wall read as a wall ride.)
+const WALL_SURFACE_CONTACT_MAX_DISTANCE: f32 = 60.0;
+/// Minimum alignment between the car roof (up-vector) and the *inward* wall
+/// normal for a frame to count as riding the wall. Wheels on a wall point the
+/// roof at the field; 0.5 tolerates up to ~60° of lean so transitions onto the
+/// curved wall base still count. The normal comes from the same corner-arc
+/// residual as the wall classification, so side, end, and corner surfaces each
+/// use their own normal.
+const WALL_SURFACE_CONTACT_MIN_UP_ALIGNMENT: f32 = 0.5;
 /// Ratio of the smaller to the larger attack-relative axis above which a wall
 /// takeoff is treated as a (diagonal) corner. `tan(22.5°)` splits each quadrant
 /// into three equal 45° sectors across the eight [`WallAerialWall`] directions.
@@ -65,24 +84,68 @@ impl WallAerialWall {
 /// while the player slides along a wall. The attack-relative [`WallAerialWall`]
 /// is computed separately at the moment of the recorded takeoff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum WallSurface {
+pub enum WallSurface {
     Side,
     Back,
 }
 
-pub(crate) fn wall_aerial_wall_for_position(position: glam::Vec3) -> Option<WallSurface> {
+/// Horizontal outward wall normal and distance from `position` to the nearest
+/// wall surface (the flat side/end walls plus the corner arcs joining them).
+/// The distance is negative past the wall plane (e.g. inside a goal).
+pub fn wall_outward_normal_and_distance(position: glam::Vec3) -> (glam::Vec3, f32) {
+    let arc_x = position.x.signum() * (position.x.abs() - WALL_CORNER_ARC_START_ABS_X).max(0.0);
+    let arc_y = position.y.signum() * (position.y.abs() - WALL_CORNER_ARC_START_ABS_Y).max(0.0);
+    if arc_x != 0.0 && arc_y != 0.0 {
+        let radial = glam::Vec3::new(arc_x, arc_y, 0.0);
+        let radial_length = radial.length();
+        (
+            radial / radial_length,
+            WALL_CORNER_ARC_RADIUS - radial_length,
+        )
+    } else {
+        let side_distance = SIDE_WALL_SURFACE_ABS_X - position.x.abs();
+        let back_distance = BACK_WALL_SURFACE_ABS_Y - position.y.abs();
+        if side_distance <= back_distance {
+            (
+                glam::Vec3::new(position.x.signum(), 0.0, 0.0),
+                side_distance,
+            )
+        } else {
+            (
+                glam::Vec3::new(0.0, position.y.signum(), 0.0),
+                back_distance,
+            )
+        }
+    }
+}
+
+/// Whether the car is riding a wall this frame: close to the actual wall
+/// surface (within [`WALL_SURFACE_CONTACT_MAX_DISTANCE`], excluding the goal
+/// mouths) with its roof leaning into the field along the inward wall normal.
+/// Position alone is not enough — a car aerialing *near* the wall must not
+/// count as being *on* it.
+pub fn wall_aerial_surface_contact(rigid_body: &boxcars::RigidBody) -> Option<WallSurface> {
+    let position = vec_to_glam(&rigid_body.location);
     if position.z < WALL_CONTACT_MIN_PLAYER_Z {
         return None;
     }
-    if position.y.abs() >= BACK_WALL_CONTACT_ABS_Y
-        && position.x.abs() > BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X
-    {
-        return Some(WallSurface::Back);
+    let (outward, distance) = wall_outward_normal_and_distance(position);
+    if distance > WALL_SURFACE_CONTACT_MAX_DISTANCE {
+        return None;
     }
-    if position.x.abs() >= SIDE_WALL_CONTACT_ABS_X {
-        return Some(WallSurface::Side);
+    let is_back_surface = outward.y.abs() > outward.x.abs();
+    if is_back_surface && position.x.abs() <= BACK_WALL_GOAL_MOUTH_HALF_WIDTH_X {
+        return None;
     }
-    None
+    let up = quat_to_glam(&rigid_body.rotation) * glam::Vec3::Z;
+    if up.dot(-outward) < WALL_SURFACE_CONTACT_MIN_UP_ALIGNMENT {
+        return None;
+    }
+    Some(if is_back_surface {
+        WallSurface::Back
+    } else {
+        WallSurface::Side
+    })
 }
 
 /// Classify which wall (relative to the player's attack direction) an on-wall
@@ -192,7 +255,7 @@ pub struct WallAerialEvent {
 }
 
 /// A continuous span of frames during which a player is on the wall surface
-/// (`wall_aerial_wall_for_position`). This is the wall-aerial "setup": the player
+/// (`wall_aerial_surface_contact`). This is the wall-aerial "setup": the player
 /// riding the wall before launching off it. Ball control is intentionally not
 /// tracked here — a wall aerial does not require carrying the ball.
 #[derive(Debug, Clone, PartialEq)]
@@ -253,7 +316,7 @@ impl WallAerialCalculator {
     ///
     /// A wall aerial is "ride the wall, leave it, hit the ball in the air." We
     /// detect the first two phases here, keyed purely on the player being on the
-    /// wall surface (`wall_aerial_wall_for_position`) — no ball control required.
+    /// wall surface (`wall_aerial_surface_contact`) — no ball control required.
     /// The attack-relative wall label is read from the field position at the
     /// last on-wall frame (`wall_aerial_wall_classification`).
     fn update_wall_contacts_and_takeoffs(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
@@ -263,7 +326,11 @@ impl WallAerialCalculator {
             };
 
             // On the wall: start or extend the contact span, and defer takeoff.
-            if let Some(surface) = wall_aerial_wall_for_position(position) {
+            if let Some(surface) = player
+                .rigid_body
+                .as_ref()
+                .and_then(wall_aerial_surface_contact)
+            {
                 let wall_direction = wall_aerial_wall_classification(player.is_team_0, position);
                 match self.wall_contacts.get_mut(&player.player_id) {
                     Some(span) if span.surface == surface => {

@@ -50,6 +50,21 @@ fn players(position: glam::Vec3) -> PlayerFrameState {
     }
 }
 
+fn players_on_wall(position: glam::Vec3) -> PlayerFrameState {
+    let (outward, _) = wall_outward_normal_and_distance(position);
+    let rotation = glam_to_quat(&glam::Quat::from_rotation_arc(
+        glam::Vec3::Z,
+        (-outward).normalize(),
+    ));
+    let mut player = player_at(position);
+    if let Some(rigid_body) = player.rigid_body.as_mut() {
+        rigid_body.rotation = rotation;
+    }
+    PlayerFrameState {
+        players: vec![player],
+    }
+}
+
 fn shot_event(frame: usize, time: f32, ball_body: &boxcars::RigidBody) -> PlayerStatEvent {
     let player = boxcars::RemoteId::Steam(1);
     let player_body = rigid_body(glam::Vec3::new(3350.0, 0.0, 340.0), glam::Vec3::ZERO);
@@ -76,7 +91,7 @@ fn records_wall_aerial_shot_without_requiring_prior_control() {
     calculator
         .update(
             &frame(1, 0.0),
-            &players(glam::Vec3::new(3650.0, 0.0, 260.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 260.0)),
             &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
@@ -122,7 +137,7 @@ fn rejects_wall_aerial_shot_after_returning_low_from_wall() {
     calculator
         .update(
             &frame(1, 0.0),
-            &players(glam::Vec3::new(3650.0, 0.0, 260.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 260.0)),
             &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
@@ -164,7 +179,7 @@ fn rejects_wall_aerial_shot_from_stale_wall_contact() {
     calculator
         .update(
             &frame(1, 0.0),
-            &players(glam::Vec3::new(3650.0, 0.0, 260.0)),
+            &players_on_wall(glam::Vec3::new(4080.0, 0.0, 260.0)),
             &FrameEventsState::default(),
             &LivePlayState::active_play(),
         )
