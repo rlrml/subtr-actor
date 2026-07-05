@@ -117,8 +117,8 @@ async function parseStatsTimelineParts(
     config,
     replay_meta: replayMeta,
     events,
-    frames,
     activity_summary: activitySummary,
+    frames,
     positioning_summary: positioningSummary,
     accumulation_tracks: accumulationTracks,
   };
