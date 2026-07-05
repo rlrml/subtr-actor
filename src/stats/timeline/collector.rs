@@ -7,7 +7,9 @@ use crate::stats::analysis_graph::{
 };
 use crate::stats::calculators::ReplayFrameInputBuilder;
 use crate::*;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+
+const ABSENT_PLAYER_MIN_MISSING_SECONDS: f32 = 30.0;
 
 pub fn build_legacy_timeline_graph() -> AnalysisGraph {
     let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
@@ -306,11 +308,18 @@ impl StatsTimelineEventCollector {
             .state::<BoostCalculator>()
             .map(|calculator| calculator.accumulation_tracks())
             .unwrap_or_default();
+        let activity_summary = replay_activity_summary(
+            &replay_meta,
+            &self.frames,
+            &events,
+            ABSENT_PLAYER_MIN_MISSING_SECONDS,
+        );
         Ok(ReplayStatsTimelineScaffold {
             config: default_stats_timeline_config(),
             replay_meta,
             events,
             frames: self.frames,
+            activity_summary,
             positioning_summary,
             accumulation_tracks,
         })
@@ -323,6 +332,60 @@ impl StatsTimelineEventCollector {
         let mut processor = ReplayProcessor::new(replay)?;
         processor.process(&mut self)?;
         self.into_replay_stats_timeline_scaffold()
+    }
+}
+
+fn replay_activity_summary(
+    replay_meta: &ReplayMeta,
+    frames: &[ReplayStatsFrameScaffold],
+    events: &ReplayStatsTimelineEvents,
+    absent_player_min_missing_seconds: f32,
+) -> ReplayStatsActivitySummary {
+    let live_play_seconds = frames
+        .iter()
+        .filter(|frame| frame.is_live_play)
+        .map(|frame| frame.dt)
+        .filter(|dt| dt.is_finite() && *dt > 0.0)
+        .sum::<f32>();
+    let mut active_seconds_by_player = HashMap::<PlayerId, f32>::new();
+    for event in &events.events {
+        let EventPayload::PlayerActivity(activity) = &event.payload else {
+            continue;
+        };
+        active_seconds_by_player
+            .entry(activity.player.clone())
+            .and_modify(|seconds| *seconds += activity.duration.max(0.0))
+            .or_insert_with(|| activity.duration.max(0.0));
+    }
+
+    let players = replay_meta
+        .player_order()
+        .map(|player| {
+            let active_seconds = active_seconds_by_player
+                .get(&player.remote_id)
+                .copied()
+                .unwrap_or_default();
+            let missing_live_play_seconds = (live_play_seconds - active_seconds).max(0.0);
+            ReplayStatsPlayerActivitySummary {
+                player_id: player.remote_id.clone(),
+                name: player.name.clone(),
+                is_team_0: StatsTimelineEventCollector::is_team_zero_player(replay_meta, player),
+                active_seconds,
+                missing_live_play_seconds,
+                absent_for_extended_period: missing_live_play_seconds
+                    >= absent_player_min_missing_seconds,
+            }
+        })
+        .collect::<Vec<_>>();
+    let has_absent_player = players
+        .iter()
+        .any(|player| player.absent_for_extended_period);
+
+    ReplayStatsActivitySummary {
+        live_play_seconds,
+        absent_player_min_missing_seconds,
+        has_absent_player,
+        players,
     }
 }
 

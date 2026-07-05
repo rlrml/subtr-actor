@@ -77,6 +77,11 @@ pub struct ReplayStatsTimelineScaffold {
     pub replay_meta: ReplayMeta,
     pub events: ReplayStatsTimelineEvents,
     pub frames: Vec<ReplayStatsFrameScaffold>,
+    /// Match-level player activity coverage used by downstream services to decide whether
+    /// aggregate/career statistics should include this replay. A player is flagged when they
+    /// are missing from live play for an extended period, which usually means they left or
+    /// otherwise stopped being tracked before the replay ended.
+    pub activity_summary: ReplayStatsActivitySummary,
     /// Whole-match distance totals per player. Distance is a continuous magnitude that cannot
     /// be reconstructed from events, so it is computed over the entire match and shipped once
     /// here rather than per frame, keeping the scaffold frames a pure event-only product.
@@ -86,6 +91,28 @@ pub struct ReplayStatsTimelineScaffold {
     /// alongside the event-only frames so the player can show a value growing during playback
     /// without re-deriving it from events. See [`AccumulationTrack`].
     pub accumulation_tracks: Vec<AccumulationTrack>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ReplayStatsActivitySummary {
+    pub live_play_seconds: f32,
+    pub absent_player_min_missing_seconds: f32,
+    pub has_absent_player: bool,
+    pub players: Vec<ReplayStatsPlayerActivitySummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ReplayStatsPlayerActivitySummary {
+    #[serde(rename = "player_id")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    pub name: String,
+    pub is_team_0: bool,
+    pub active_seconds: f32,
+    pub missing_live_play_seconds: f32,
+    pub absent_for_extended_period: bool,
 }
 
 /// A compressed per-player, per-frame numeric series.

@@ -172,6 +172,20 @@ fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(r
         full_timeline.frames.len(),
         "{replay_path} frame count should match"
     );
+    assert!(scaffold_timeline.activity_summary.live_play_seconds > 0.0);
+    assert_eq!(
+        scaffold_timeline.activity_summary.players.len(),
+        scaffold_timeline.replay_meta.player_count(),
+        "{replay_path} activity summary should include every replay player"
+    );
+    assert!(
+        scaffold_timeline
+            .activity_summary
+            .players
+            .iter()
+            .all(|player| player.active_seconds >= 0.0 && player.missing_live_play_seconds >= 0.0),
+        "{replay_path} activity summary durations should be non-negative"
+    );
 
     for (scaffold_frame, full_frame) in scaffold_timeline.frames.iter().zip(&full_timeline.frames) {
         assert_eq!(
