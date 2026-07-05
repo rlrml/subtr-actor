@@ -53,6 +53,10 @@ function parseStatsTimelineParts(
     config: parseJsonBuffer<StatsTimeline["config"]>(decoder, parts.config),
     replay_meta: parseJsonBuffer<StatsTimeline["replay_meta"]>(decoder, parts.replayMeta),
     events: parseJsonBuffer<StatsTimeline["events"]>(decoder, parts.events),
+    activity_summary: parseJsonBuffer<CompactStatsTimeline["activity_summary"]>(
+      decoder,
+      parts.activitySummary,
+    ),
     positioning_summary: parseJsonBuffer<CompactStatsTimeline["positioning_summary"]>(
       decoder,
       parts.positioningSummary,

@@ -29,6 +29,7 @@ interface TransferableStatsTimelineParts {
   configBuffer: ArrayBuffer;
   replayMetaBuffer: ArrayBuffer;
   eventsBuffer: ArrayBuffer;
+  activitySummaryBuffer: ArrayBuffer;
   positioningSummaryBuffer: ArrayBuffer;
   accumulationTracksBuffer: ArrayBuffer;
   frameChunkBuffers: ArrayBuffer[];
@@ -145,6 +146,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
           configBuffer: replayBundle.statsTimelineParts.config.buffer,
           replayMetaBuffer: replayBundle.statsTimelineParts.replayMeta.buffer,
           eventsBuffer: replayBundle.statsTimelineParts.events.buffer,
+          activitySummaryBuffer: replayBundle.statsTimelineParts.activitySummary.buffer,
           positioningSummaryBuffer: replayBundle.statsTimelineParts.positioningSummary.buffer,
           accumulationTracksBuffer: replayBundle.statsTimelineParts.accumulationTracks.buffer,
           frameChunkBuffers,
@@ -156,6 +158,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
         replayBundle.statsTimelineParts.config.buffer,
         replayBundle.statsTimelineParts.replayMeta.buffer,
         replayBundle.statsTimelineParts.events.buffer,
+        replayBundle.statsTimelineParts.activitySummary.buffer,
         replayBundle.statsTimelineParts.positioningSummary.buffer,
         replayBundle.statsTimelineParts.accumulationTracks.buffer,
         ...frameChunkBuffers,
