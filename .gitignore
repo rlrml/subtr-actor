@@ -25,3 +25,4 @@ flamegraph.svg
 .agents/feature-checklists/
 !assets/reverse-flick-vs-backflip-2026-06-26.replay
 !assets/wall-aerial-ground-jump-2026-07-03.replay
+/crates/subtr-actor-training/bindings

@@ -1,5 +1,12 @@
 [workspace]
-members = [".", "bakkesmod/rust", "crates/subtr-actor-tools", "js", "python"]
+members = [
+    ".",
+    "bakkesmod/rust",
+    "crates/subtr-actor-tools",
+    "crates/subtr-actor-training",
+    "js",
+    "python",
+]
 resolver = "3"
 
 [workspace.package]
