@@ -9,6 +9,8 @@ use subtr_actor::{
 };
 use wasm_bindgen::prelude::*;
 
+pub mod training;
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]

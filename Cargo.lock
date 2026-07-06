@@ -1187,6 +1187,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "subtr-actor",
+ "subtr-actor-training",
  "wasm-bindgen",
  "web-sys",
 ]

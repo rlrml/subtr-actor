@@ -166,6 +166,12 @@ export {
   formatReplayLoadProgressMeta,
 } from "./load-ui";
 export { ensureBindingsReady, loadReplayFromBytes, validateReplayBytes } from "./wasm";
+export { TrainingPackFile, defaultTrainingPack } from "./training-pack";
+export type { TrainingPackBindings, TrainingPackFileOptions } from "./training-pack";
+export type { Guid } from "./generated/Guid";
+export type { PlayerId } from "./generated/PlayerId";
+export type { Round } from "./generated/Round";
+export type { TrainingPack } from "./generated/TrainingPack";
 export type {
   ReplayPlayerActiveMetadata,
   BallSample,
