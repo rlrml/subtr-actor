@@ -83,23 +83,48 @@ fn update(
 }
 
 #[test]
-fn counts_three_same_player_non_ground_touches_as_air_dribble() {
+fn low_ball_at_ground_opener_does_not_break_before_first_qualifying_air_touch() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = AirDribbleCalculator::new();
     let mut touches = Vec::new();
 
-    for (frame_number, time, x, kind, surface) in [
-        (1, 0.0, 0.0, "hard_hit", "wall"),
-        (3, 0.4, 120.0, "medium_hit", "air"),
-        (5, 0.8, 260.0, "control", "air"),
+    let ground_player_position = glam::Vec3::new(0.0, 0.0, 17.0);
+    let ground_ball_position = glam::Vec3::new(30.0, 0.0, 98.0);
+    touches.push(touch(
+        1,
+        0.0,
+        (player_id.clone(), true),
+        ("control", "ground"),
+        (ground_player_position, ground_ball_position),
+    ));
+    update(
+        &mut calculator,
+        1,
+        0.0,
+        ground_player_position,
+        ground_ball_position,
+        &touches,
+    );
+    update(
+        &mut calculator,
+        2,
+        0.2,
+        glam::Vec3::new(60.0, 0.0, 17.0),
+        glam::Vec3::new(90.0, 0.0, 120.0),
+        &touches,
+    );
+
+    for (frame_number, time, x, kind, player_z, ball_z) in [
+        (3, 0.4, 120.0, "medium_hit", 360.0, 649.0),
+        (5, 0.8, 260.0, "control", 365.0, 655.0),
     ] {
-        let player_position = glam::Vec3::new(x, 0.0, 360.0);
-        let ball_position = glam::Vec3::new(x + 30.0, 0.0, 520.0);
+        let player_position = glam::Vec3::new(x, 0.0, player_z);
+        let ball_position = glam::Vec3::new(x + 30.0, 0.0, ball_z);
         touches.push(touch(
             frame_number,
             time,
             (player_id.clone(), true),
-            (kind, surface),
+            (kind, "air"),
             (player_position, ball_position),
         ));
         update(
@@ -119,7 +144,7 @@ fn counts_three_same_player_non_ground_touches_as_air_dribble() {
     assert_eq!(event.player_id, player_id);
     assert_eq!(event.kind, BallCarryKind::AirDribble);
     assert_eq!(event.touch_count, 3);
-    assert_eq!(event.air_touch_count, 3);
+    assert_eq!(event.air_touch_count, 2);
     assert_eq!(
         event.air_dribble_origin,
         Some(AirDribbleOrigin::GroundToAir)
@@ -127,19 +152,23 @@ fn counts_three_same_player_non_ground_touches_as_air_dribble() {
 }
 
 #[test]
-fn grounded_ball_between_touches_breaks_the_air_dribble_sequence() {
+fn low_ball_after_qualifying_air_touches_breaks_sequence() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = AirDribbleCalculator::new();
     let mut touches = Vec::new();
 
-    for (frame_number, time, x) in [(1, 0.0, 0.0), (3, 0.4, 120.0)] {
-        let player_position = glam::Vec3::new(x, 0.0, 360.0);
-        let ball_position = glam::Vec3::new(x + 30.0, 0.0, 520.0);
+    for (frame_number, time, x, surface, player_z, ball_z) in [
+        (1, 0.0, 0.0, "ground", 17.0, 98.0),
+        (3, 0.4, 120.0, "air", 360.0, 520.0),
+        (5, 0.8, 260.0, "air", 365.0, 530.0),
+    ] {
+        let player_position = glam::Vec3::new(x, 0.0, player_z);
+        let ball_position = glam::Vec3::new(x + 30.0, 0.0, ball_z);
         touches.push(touch(
             frame_number,
             time,
             (player_id.clone(), true),
-            ("control", "air"),
+            ("control", surface),
             (player_position, ball_position),
         ));
         update(
@@ -154,26 +183,32 @@ fn grounded_ball_between_touches_breaks_the_air_dribble_sequence() {
 
     update(
         &mut calculator,
-        4,
-        0.6,
-        glam::Vec3::new(180.0, 0.0, 360.0),
-        glam::Vec3::new(180.0, 0.0, 120.0),
+        6,
+        1.0,
+        glam::Vec3::new(320.0, 0.0, 365.0),
+        glam::Vec3::new(350.0, 0.0, 120.0),
         &touches,
     );
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = &calculator.events()[0];
+    assert_eq!(event.touch_count, 3);
+    assert_eq!(event.air_touch_count, 2);
+    assert_eq!(event.end_frame, 5);
 
     let player_position = glam::Vec3::new(260.0, 0.0, 360.0);
     let ball_position = glam::Vec3::new(290.0, 0.0, 520.0);
     touches.push(touch(
-        5,
-        0.8,
+        7,
+        1.2,
         (player_id, true),
         ("control", "air"),
         (player_position, ball_position),
     ));
     update(
         &mut calculator,
-        5,
-        0.8,
+        7,
+        1.2,
         player_position,
         ball_position,
         &touches,
@@ -181,16 +216,16 @@ fn grounded_ball_between_touches_breaks_the_air_dribble_sequence() {
 
     calculator.finish().unwrap();
 
-    assert!(calculator.events().is_empty());
+    assert_eq!(calculator.events().len(), 1);
 }
 
 #[test]
-fn non_air_control_touch_breaks_the_air_dribble_sequence() {
+fn fewer_than_two_qualifying_air_touches_does_not_emit() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = AirDribbleCalculator::new();
     let mut touches = Vec::new();
 
-    for (frame_number, time, surface) in [(1, 0.0, "air"), (3, 0.4, "ground"), (5, 0.8, "air")] {
+    for (frame_number, time, surface) in [(1, 0.0, "ground"), (3, 0.4, "ground"), (5, 0.8, "air")] {
         let x = frame_number as f32 * 60.0;
         let player_position = glam::Vec3::new(x, 0.0, 360.0);
         let ball_position = glam::Vec3::new(x + 30.0, 0.0, 520.0);
@@ -214,6 +249,112 @@ fn non_air_control_touch_breaks_the_air_dribble_sequence() {
     calculator.finish().unwrap();
 
     assert!(calculator.events().is_empty());
+}
+
+#[test]
+fn wall_touches_do_not_count_toward_air_touch_threshold() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = AirDribbleCalculator::new();
+    let mut touches = Vec::new();
+
+    for (frame_number, time, surface, player_position, ball_position) in [
+        (
+            1,
+            0.0,
+            "wall",
+            glam::Vec3::new(3300.0, 0.0, 180.0),
+            glam::Vec3::new(3328.0, 0.0, 390.0),
+        ),
+        (
+            3,
+            0.4,
+            "wall",
+            glam::Vec3::new(3330.0, 0.0, 260.0),
+            glam::Vec3::new(3358.0, 0.0, 460.0),
+        ),
+        (
+            5,
+            0.8,
+            "air",
+            glam::Vec3::new(340.0, 0.0, 360.0),
+            glam::Vec3::new(370.0, 0.0, 540.0),
+        ),
+    ] {
+        touches.push(touch(
+            frame_number,
+            time,
+            (player_id.clone(), true),
+            ("control", surface),
+            (player_position, ball_position),
+        ));
+        update(
+            &mut calculator,
+            frame_number,
+            time,
+            player_position,
+            ball_position,
+            &touches,
+        );
+    }
+
+    calculator.finish().unwrap();
+
+    assert!(calculator.events().is_empty());
+}
+
+#[test]
+fn wall_opener_plus_two_air_touches_emits_with_two_air_touches() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = AirDribbleCalculator::new();
+    let mut touches = Vec::new();
+
+    for (frame_number, time, surface, player_position, ball_position) in [
+        (
+            1,
+            0.0,
+            "wall",
+            glam::Vec3::new(3300.0, 0.0, 180.0),
+            glam::Vec3::new(3328.0, 0.0, 390.0),
+        ),
+        (
+            3,
+            0.4,
+            "air",
+            glam::Vec3::new(220.0, 0.0, 360.0),
+            glam::Vec3::new(250.0, 0.0, 540.0),
+        ),
+        (
+            5,
+            0.8,
+            "air",
+            glam::Vec3::new(360.0, 0.0, 365.0),
+            glam::Vec3::new(390.0, 0.0, 560.0),
+        ),
+    ] {
+        touches.push(touch(
+            frame_number,
+            time,
+            (player_id.clone(), true),
+            ("control", surface),
+            (player_position, ball_position),
+        ));
+        update(
+            &mut calculator,
+            frame_number,
+            time,
+            player_position,
+            ball_position,
+            &touches,
+        );
+    }
+
+    calculator.finish().unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = &calculator.events()[0];
+    assert_eq!(event.touch_count, 3);
+    assert_eq!(event.air_touch_count, 2);
+    assert_eq!(event.air_dribble_origin, Some(AirDribbleOrigin::WallToAir));
 }
 
 #[test]

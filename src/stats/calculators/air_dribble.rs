@@ -4,6 +4,7 @@ const AIR_DRIBBLE_MIN_BALL_Z: f32 = 300.0;
 pub(crate) const AIR_DRIBBLE_MIN_PLAYER_Z: f32 = 100.0;
 pub(crate) const AIR_DRIBBLE_MIN_DURATION: f32 = 0.65;
 const AIR_DRIBBLE_MIN_TOUCHES: u32 = 3;
+const AIR_DRIBBLE_MIN_AIR_TOUCHES: u32 = 2;
 const AIR_DRIBBLE_TOUCH_MAX_GAP_SECONDS: f32 = 3.0;
 const WALL_TAKEOFF_MIN_Z: f32 = 120.0;
 const SIDE_WALL_START_ABS_X: f32 = 3200.0;
@@ -60,6 +61,7 @@ struct ActiveAirDribble {
     horizontal_gap_sum: f32,
     vertical_gap_sum: f32,
     touch_count: u32,
+    air_touch_count: u32,
 }
 
 impl ActiveAirDribble {
@@ -80,6 +82,7 @@ impl ActiveAirDribble {
             horizontal_gap_sum: horizontal_gap,
             vertical_gap_sum: vertical_gap,
             touch_count: 1,
+            air_touch_count: u32::from(is_qualifying_air_dribble_touch(touch)),
         })
     }
 
@@ -94,11 +97,15 @@ impl ActiveAirDribble {
         self.horizontal_gap_sum += horizontal_gap;
         self.vertical_gap_sum += vertical_gap;
         self.touch_count += 1;
+        self.air_touch_count += u32::from(is_qualifying_air_dribble_touch(touch));
         Some(())
     }
 
     fn event(self) -> Option<BallCarryEvent> {
         if self.touch_count < AIR_DRIBBLE_MIN_TOUCHES {
+            return None;
+        }
+        if self.air_touch_count < AIR_DRIBBLE_MIN_AIR_TOUCHES {
             return None;
         }
         let duration = self.end_time - self.start_time;
@@ -130,9 +137,13 @@ impl ActiveAirDribble {
             average_vertical_gap: self.vertical_gap_sum / self.touch_count as f32,
             average_speed,
             touch_count: self.touch_count,
-            air_touch_count: self.touch_count,
+            air_touch_count: self.air_touch_count,
             air_dribble_origin: Some(AirDribblePolicy::origin(self.start_position)),
         })
+    }
+
+    fn has_qualifying_air_touch(&self) -> bool {
+        self.air_touch_count > 0
     }
 }
 
@@ -145,14 +156,14 @@ fn touch_gaps(player_position: glam::Vec3, ball_position: glam::Vec3) -> (f32, f
     )
 }
 
-fn is_air_dribble_touch(touch: &TouchClassificationEvent) -> bool {
-    matches!(touch.tag("surface"), Some("air" | "wall"))
+fn is_qualifying_air_dribble_touch(touch: &TouchClassificationEvent) -> bool {
+    matches!(touch.tag("surface"), Some("air"))
         && touch
             .ball_position
             .is_some_and(|position| position[2] >= AIR_DRIBBLE_MIN_BALL_Z)
 }
 
-/// Detects air dribbles from continuous same-player non-ground touches.
+/// Detects air dribbles from continuous same-player touches.
 #[derive(Debug, Clone, Default)]
 pub struct AirDribbleCalculator {
     events: EventStream<BallCarryEvent>,
@@ -180,11 +191,6 @@ impl AirDribbleCalculator {
     }
 
     fn observe_touch(&mut self, touch: &TouchClassificationEvent) {
-        if !is_air_dribble_touch(touch) {
-            self.finish_active();
-            return;
-        }
-
         let same_sequence = self.active.as_ref().is_some_and(|active| {
             active.player_id == touch.player
                 && active.is_team_0 == touch.is_team_0
@@ -237,9 +243,13 @@ impl AirDribbleCalculator {
             self.processed_touch_count = touch_events.len();
             return Ok(());
         }
-        if ball
-            .position()
-            .is_none_or(|position| position.z < AIR_DRIBBLE_MIN_BALL_Z)
+        if self
+            .active
+            .as_ref()
+            .is_some_and(ActiveAirDribble::has_qualifying_air_touch)
+            && ball
+                .position()
+                .is_some_and(|position| position.z < AIR_DRIBBLE_MIN_BALL_Z)
         {
             self.finish_active();
         }
