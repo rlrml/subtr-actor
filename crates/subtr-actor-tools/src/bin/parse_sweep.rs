@@ -62,9 +62,12 @@ fn sweep_one(path: &Path) -> Result<(), (Stage, String)> {
     let replay = guarded(|| parse_replay(&data)).map_err(|m| (Stage::Parse, m))?;
 
     guarded(|| {
-        ReplayProcessor::new(&replay)
-            .and_then(|mut p| p.process_and_get_replay_meta().map(|_| ()))
-            .map_err(|e| format!("{e:?}"))
+        #[allow(clippy::result_large_err)] // SubtrActorError is large; boxing it is out of scope
+        fn process_meta(replay: &boxcars::Replay) -> subtr_actor::SubtrActorResult<()> {
+            ReplayProcessor::new(replay)
+                .and_then(|mut p| p.process_and_get_replay_meta().map(|_| ()))
+        }
+        process_meta(&replay).map_err(|e| format!("{e:?}"))
     })
     .map_err(|m| (Stage::Meta, m))?;
 
