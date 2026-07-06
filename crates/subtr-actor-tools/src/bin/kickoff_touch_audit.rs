@@ -90,10 +90,7 @@ impl Collector for GapCollector {
         frame_number: usize,
         current_time: f32,
     ) -> subtr_actor::SubtrActorResult<TimeAdvance> {
-        if let Some(ball_body) = processor
-            .get_velocity_applied_ball_rigid_body(current_time)
-            .ok()
-        {
+        if let Ok(ball_body) = processor.get_velocity_applied_ball_rigid_body(current_time) {
             let ball_speed = ball_body
                 .linear_velocity
                 .map(|v| vec_to_glam(&v).length())
