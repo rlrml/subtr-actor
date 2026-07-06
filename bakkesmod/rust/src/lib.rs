@@ -18,22 +18,24 @@ use flate2::{
     write::DeflateEncoder,
 };
 #[cfg(test)]
+use subtr_actor::BoostPickupPadZone;
+#[cfg(test)]
 use subtr_actor::ReplayFrameInputBuilder;
 use subtr_actor::{
     BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
-    BoostPickupEvent, BoostPickupPadZone, BumpEvent, CarHitbox, CorePlayerScoreboardEvent,
-    DemoEventSample, DemolishAttribute, DemolishInfo, DemolitionEvent, DodgeRefreshedEvent, Event,
-    EventPayload, EventTiming, FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput,
-    GameplayPhase, GameplayState, GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagKind,
-    LivePlayState, PlayerCameraStateChange, PlayerFrameState, PlayerId, PlayerInfo, PlayerSample,
-    PlayerStatEvent, PlayerStatEventKind, ProcessorView, ReplayMeta, ReplayStatsFrame,
-    ReplayStatsTimeline, ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata,
-    StatsTimelineCollector, StatsTimelineEventCollector, SubtrActorError, SubtrActorErrorVariant,
-    SubtrActorResult, TimelineEvent, TimelineEventKind, TouchEvent, TouchStateCalculator,
-    WhiffEvent, boost_amount_to_percent, builtin_analysis_node_json,
-    builtin_stats_graph_snapshot_json, builtin_stats_module_config_json,
-    builtin_stats_module_frame_json, builtin_stats_module_json, builtin_stats_module_names,
-    car_hitbox_for_body_id, default_car_hitbox, default_stats_timeline_config,
+    BoostPickupEvent, BumpEvent, CarHitbox, CorePlayerScoreboardEvent, DemoEventSample,
+    DemolishAttribute, DemolishInfo, DemolitionEvent, DodgeRefreshedEvent, Event, EventPayload,
+    EventTiming, FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase,
+    GameplayState, GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagKind, LivePlayState,
+    PlayerCameraStateChange, PlayerFrameState, PlayerId, PlayerInfo, PlayerSample, PlayerStatEvent,
+    PlayerStatEventKind, ProcessorView, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline,
+    ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata, StatsTimelineCollector,
+    StatsTimelineEventCollector, SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
+    TimelineEvent, TimelineEventKind, TouchEvent, TouchStateCalculator, WhiffEvent,
+    boost_amount_to_percent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
+    builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
+    builtin_stats_module_names, car_hitbox_for_body_id, default_car_hitbox,
+    default_stats_timeline_config,
     geometry::apply_velocities_to_rigid_body,
     hitbox_family_for_body_id,
     stats::analysis_graph::{
