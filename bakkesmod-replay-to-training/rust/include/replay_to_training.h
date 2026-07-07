@@ -106,9 +106,20 @@ uint32_t replay_to_training_pack_difficulty(const TrPack *pack);
  * assigns it (shot -> Striker, save -> Goalie) or the setter overrides it;
  * the getter additionally reports 4 = unset and 5 = a type this crate does
  * not model. The setter marks the type assigned (later mismatched-mode
- * captures warn via add_shot's return code 2) and rejects values > 3. */
+ * captures are REFUSED via add_shot's return code 2) and rejects values
+ * > 3. */
 int32_t replay_to_training_pack_set_training_type(TrPack *pack, uint32_t training_type);
 uint32_t replay_to_training_pack_training_type(const TrPack *pack);
+
+/* The capture mode the plugin's mode-selection cvar
+ * (replay_to_training_capture_mode) should sync to when this pack becomes
+ * active (the pack's assigned type is authoritative):
+ *   0  sync to shot/striker (Striker pack),
+ *   1  sync to save/goalie (Goalie pack),
+ *  -1  leave the selection untouched (null pack, unset type, or an
+ *      Aerial/None/unmodeled type).
+ * The 0/1 values match the TrCapturedShot mode encoding. */
+int32_t replay_to_training_pack_capture_mode_sync(const TrPack *pack);
 
 /* Pack name readback for the settings UI. */
 size_t replay_to_training_pack_name_len(const TrPack *pack);
@@ -117,8 +128,10 @@ size_t replay_to_training_pack_write_name(const TrPack *pack, uint8_t *out_bytes
 /* Shots (training rounds). add_shot returns:
  *   0  added (mode agreed with, or assigned, the pack training type),
  *   1  failure (last-error set),
- *   2  added, but the capture's mode conflicts with the pack's assigned
- *      training type (pack-level ETrainingType cannot tag rounds; warn). */
+ *   2  REFUSED: the capture's mode conflicts with the pack's assigned
+ *      training type (pack-level ETrainingType cannot tag rounds). Nothing
+ *      was added — the pack is untouched — and the pack's last-error is
+ *      set to an explanatory message. */
 int32_t replay_to_training_pack_add_shot(TrPack *pack, const TrCapturedShot *shot);
 int32_t replay_to_training_pack_remove_shot(TrPack *pack, size_t index);
 size_t replay_to_training_pack_shot_count(const TrPack *pack);

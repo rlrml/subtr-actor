@@ -298,10 +298,11 @@ fn fresh_pack_training_type_is_unset_until_first_capture() {
 }
 
 /// The first capture's mode assigns the pack type (shot -> Striker,
-/// save -> Goalie) and later mismatched-mode captures are appended with a
-/// warning outcome — the `.tem` format cannot tag rounds individually.
+/// save -> Goalie); a later mismatched-mode capture is REFUSED outright —
+/// the `.tem` format cannot tag rounds individually — leaving the pack
+/// completely untouched.
 #[test]
-fn capture_mode_assigns_pack_type_and_mismatched_mode_warns() {
+fn capture_mode_assigns_pack_type_and_mismatched_mode_is_refused() {
     let mut recorder = RecorderPack::new();
     let save = ShotOptions {
         mode: CaptureMode::Save,
@@ -316,30 +317,34 @@ fn capture_mode_assigns_pack_type_and_mismatched_mode_warns() {
     assert!(recorder.training_type_assigned());
     assert_eq!(recorder.training_type().unwrap(), TrainingType::Goalie);
 
-    // A same-mode capture stays warning-free.
+    // A same-mode capture is accepted.
     assert_eq!(
         recorder
             .add_shot(&sample_ball(), &[sample_car()], 8.0, &save)
             .unwrap(),
         AddShotOutcome::Added
     );
+    let before = recorder.pack().unwrap();
 
-    // A shot capture into the now-Goalie pack is added but warns.
+    // A shot capture into the now-Goalie pack is refused: round count
+    // unchanged, rounds byte-identical, type untouched.
     assert_eq!(
         recorder
             .add_shot(&sample_ball(), &[sample_car()], 8.0, &legacy_options())
             .unwrap(),
-        AddShotOutcome::AddedTypeMismatch
+        AddShotOutcome::RefusedTypeMismatch
     );
-    assert_eq!(recorder.shot_count(), 3);
-    // The mismatch never re-types the pack.
-    assert_eq!(recorder.training_type().unwrap(), TrainingType::Goalie);
+    assert_eq!(recorder.shot_count(), 2);
+    let after = recorder.pack().unwrap();
+    assert_eq!(after.rounds, before.rounds);
+    assert_eq!(after.training_type, TrainingType::Goalie);
 }
 
 /// The manual override (window dropdown) assigns the type ahead of any
-/// capture, and Aerial/None packs accept either capture mode silently.
+/// capture, and Aerial/None packs accept either capture mode (no
+/// refusal).
 #[test]
-fn manual_type_override_assigns_and_suppresses_mode_warnings() {
+fn manual_type_override_assigns_and_permits_both_modes() {
     let mut recorder = RecorderPack::new();
     recorder.set_training_type(&TrainingType::Aerial).unwrap();
     assert!(recorder.training_type_assigned());
@@ -360,8 +365,10 @@ fn manual_type_override_assigns_and_suppresses_mode_warnings() {
     assert_eq!(recorder.training_type().unwrap(), TrainingType::Aerial);
 }
 
-/// A pack opened from disk keeps its saved type and treats it as assigned,
-/// so mismatched captures warn instead of silently re-typing it.
+/// A pack opened from disk keeps its saved type, treats it as assigned
+/// (mismatched captures are refused, round count unchanged), and reports
+/// the matching capture-mode sync so the plugin's selection cvar follows
+/// the pack.
 #[test]
 fn opened_pack_treats_training_type_as_assigned() {
     let path = scratch_path("type-roundtrip.Tem");
@@ -380,13 +387,38 @@ fn opened_pack_treats_training_type_as_assigned() {
     let mut reopened = RecorderPack::open(&path).unwrap();
     assert!(reopened.training_type_assigned());
     assert_eq!(reopened.training_type().unwrap(), TrainingType::Goalie);
+    // Opening the typed pack tells the plugin to sync its selection cvar.
+    assert_eq!(reopened.capture_mode_sync(), Some(CaptureMode::Save));
     assert_eq!(
         reopened
             .add_shot(&sample_ball(), &[sample_car()], 8.0, &legacy_options())
             .unwrap(),
-        AddShotOutcome::AddedTypeMismatch
+        AddShotOutcome::RefusedTypeMismatch
     );
+    assert_eq!(reopened.shot_count(), 1);
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+/// The selection-sync rule: the assigned pack type is authoritative for
+/// Striker/Goalie; everything else (fresh/unset, Aerial, None) leaves the
+/// plugin's mode selection untouched.
+#[test]
+fn capture_mode_sync_follows_striker_goalie_and_ignores_the_rest() {
+    // Fresh pack: type unset, selection decides -> no sync.
+    let mut recorder = RecorderPack::new();
+    assert_eq!(recorder.capture_mode_sync(), None);
+
+    recorder.set_training_type(&TrainingType::Striker).unwrap();
+    assert_eq!(recorder.capture_mode_sync(), Some(CaptureMode::Shot));
+
+    recorder.set_training_type(&TrainingType::Goalie).unwrap();
+    assert_eq!(recorder.capture_mode_sync(), Some(CaptureMode::Save));
+
+    // Aerial/None are assigned but mode-agnostic: no sync.
+    recorder.set_training_type(&TrainingType::Aerial).unwrap();
+    assert_eq!(recorder.capture_mode_sync(), None);
+    recorder.set_training_type(&TrainingType::None).unwrap();
+    assert_eq!(recorder.capture_mode_sync(), None);
 }
 
 /// End-to-end mirroring: an orange (team 1) capture with mirror-by-team ON

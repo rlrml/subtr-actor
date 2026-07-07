@@ -188,33 +188,58 @@ fn ffi_smoke_create_edit_save_open_destroy() {
 
 /// Mode-driven training-type assignment across the ABI: a fresh pack
 /// reports unset (4), the first capture's mode assigns the type, a
-/// mismatched-mode capture still lands but returns the warning code 2, and
-/// the manual override setter re-types the pack.
+/// mismatched-mode capture is REFUSED with code 2 (nothing added,
+/// explanatory last-error), and the manual override setter re-types the
+/// pack. The capture-mode-sync export follows the assigned type.
 #[test]
-fn ffi_training_type_assignment_and_mismatch_warning() {
+fn ffi_training_type_assignment_and_mismatch_refusal() {
     let pack = replay_to_training_pack_create();
     unsafe {
         assert_eq!(replay_to_training_pack_training_type(pack), 4);
+        // Unset type: the plugin's selection cvar is left untouched.
+        assert_eq!(replay_to_training_pack_capture_mode_sync(pack), -1);
         let cars = [sample_car()];
         let mut shot = sample_shot(&cars);
         shot.mode = 1; // defensive save capture
         assert_eq!(replay_to_training_pack_add_shot(pack, &raw const shot), 0);
-        // First capture assigned Goalie.
+        // First capture assigned Goalie; sync now selects save/goalie.
         assert_eq!(replay_to_training_pack_training_type(pack), 2);
-        // A mismatched shot capture is still added but reports code 2.
+        assert_eq!(replay_to_training_pack_capture_mode_sync(pack), 1);
+        // A mismatched shot capture is REFUSED: code 2, nothing added, and
+        // the last-error explains what to do instead.
         shot.mode = 0;
         assert_eq!(replay_to_training_pack_add_shot(pack, &raw const shot), 2);
-        assert_eq!(replay_to_training_pack_shot_count(pack), 2);
-        // Manual override to Striker; shot captures agree again.
+        assert_eq!(replay_to_training_pack_shot_count(pack), 1);
+        let error = read_string(replay_to_training_pack_last_error_len(pack), |buf, cap| {
+            replay_to_training_pack_write_last_error(pack, buf, cap)
+        });
+        assert!(
+            error.contains("refused") && error.contains("Training_Goalie"),
+            "error was {error:?}"
+        );
+        // Manual override to Striker; shot captures are accepted again and
+        // the sync flips to shot/striker.
         assert_eq!(replay_to_training_pack_set_training_type(pack, 3), 0);
         assert_eq!(replay_to_training_pack_training_type(pack), 3);
+        assert_eq!(replay_to_training_pack_capture_mode_sync(pack), 0);
         assert_eq!(replay_to_training_pack_add_shot(pack, &raw const shot), 0);
+        assert_eq!(replay_to_training_pack_shot_count(pack), 2);
+        // Aerial/None overrides never drive the selection.
+        assert_eq!(replay_to_training_pack_set_training_type(pack, 1), 0);
+        assert_eq!(replay_to_training_pack_capture_mode_sync(pack), -1);
+        assert_eq!(replay_to_training_pack_set_training_type(pack, 0), 0);
+        assert_eq!(replay_to_training_pack_capture_mode_sync(pack), -1);
         // Out-of-range values are rejected.
         assert_eq!(replay_to_training_pack_set_training_type(pack, 9), 1);
         assert_eq!(
             replay_to_training_pack_training_type(std::ptr::null()),
             4,
             "null pack reports unset"
+        );
+        assert_eq!(
+            replay_to_training_pack_capture_mode_sync(std::ptr::null()),
+            -1,
+            "null pack leaves the selection untouched"
         );
         replay_to_training_pack_destroy(pack);
     }
