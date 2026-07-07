@@ -184,10 +184,13 @@ fn write_json_file(path: &std::path::Path, value: serde_json::Value) {
 
 fn validate_graph_dump_with_python(dump_dir: &std::path::Path) {
     let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
+        .join("../../..")
         .canonicalize()
         .expect("repo root should resolve");
-    let validator = repo_root.join("bakkesmod").join("verify-graph-dump.py");
+    let validator = repo_root
+        .join("bakkesmod")
+        .join("subtr-actor")
+        .join("verify-graph-dump.py");
     let python_candidates = if cfg!(windows) {
         ["python", "python3"]
     } else {

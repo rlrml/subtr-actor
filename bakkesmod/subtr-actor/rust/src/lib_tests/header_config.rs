@@ -18,7 +18,7 @@ fn checked_in_header_text() -> String {
 
 fn real_replay_path() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
+        .join("../../..")
         .join("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay")
         .canonicalize()
         .expect("real replay fixture should resolve")

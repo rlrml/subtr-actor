@@ -14,4 +14,4 @@ name = "replay_to_training"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-subtr-actor-training = { path = "../../crates/subtr-actor-training" }
+subtr-actor-training = { path = "../../../crates/subtr-actor-training" }

@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
+# Linux MSVC-ABI cross build of the replay-to-training plugin (clang-cl +
+# lld-link + xwin sysroot), mirroring bakkesmod/subtr-actor/build-linux-msvc.sh
+# and reusing the shared CMake toolchain file at bakkesmod/toolchains/.
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd -- "$script_dir/.." && pwd)"
+repo_root="$(cd -- "$script_dir/../.." && pwd)"
+toolchain_file="$repo_root/bakkesmod/toolchains/linux-msvc-clang.cmake"
 
 build_dir="${BUILD_DIR:-$script_dir/build-linux-msvc}"
 configuration="${CONFIGURATION:-Release}"
@@ -149,7 +153,7 @@ else
 fi
 
 pushd "$repo_root" >/dev/null
-cargo build -p subtr-actor-bakkesmod --release --target "$target"
+cargo build -p subtr-actor-replay-to-training --release --target "$target"
 popd >/dev/null
 
 cmake_args=(
@@ -157,7 +161,7 @@ cmake_args=(
   -B "$build_dir"
   -G Ninja
   -DCMAKE_BUILD_TYPE="$configuration"
-  -DCMAKE_TOOLCHAIN_FILE="$script_dir/toolchains/linux-msvc-clang.cmake"
+  -DCMAKE_TOOLCHAIN_FILE="$toolchain_file"
   -DXWIN_SYSROOT="$xwin_sysroot"
   -DXWIN_VC_LIB_DIR="$vc_lib_dir"
   -DXWIN_UCRT_LIB_DIR="$ucrt_lib_dir"
@@ -173,24 +177,24 @@ cmake --build "$build_dir" --config "$configuration"
 
 plugin_out_dir="$build_dir/$configuration"
 mkdir -p "$plugin_out_dir"
-if [[ -f "$build_dir/SubtrActorPlugin.dll" ]]; then
-  cp -f "$build_dir/SubtrActorPlugin.dll" "$plugin_out_dir/SubtrActorPlugin.dll"
-elif [[ ! -f "$plugin_out_dir/SubtrActorPlugin.dll" ]]; then
-  echo "missing built plugin DLL: $build_dir/SubtrActorPlugin.dll" >&2
+if [[ -f "$build_dir/ReplayToTrainingPlugin.dll" ]]; then
+  cp -f "$build_dir/ReplayToTrainingPlugin.dll" "$plugin_out_dir/ReplayToTrainingPlugin.dll"
+elif [[ ! -f "$plugin_out_dir/ReplayToTrainingPlugin.dll" ]]; then
+  echo "missing built plugin DLL: $build_dir/ReplayToTrainingPlugin.dll" >&2
   exit 1
 fi
 cp \
-  "$repo_root/target/$target/release/subtr_actor_bakkesmod.dll" \
-  "$plugin_out_dir/subtr_actor_bakkesmod.dll"
+  "$repo_root/target/$target/release/replay_to_training.dll" \
+  "$plugin_out_dir/replay_to_training.dll"
 
 install_layout_dir="$plugin_out_dir/bakkesmod-install"
-mkdir -p "$install_layout_dir/plugins" "$install_layout_dir/data/subtr-actor"
+mkdir -p "$install_layout_dir/plugins" "$install_layout_dir/data/replay-to-training"
 cp -f \
-  "$plugin_out_dir/SubtrActorPlugin.dll" \
-  "$install_layout_dir/plugins/SubtrActorPlugin.dll"
+  "$plugin_out_dir/ReplayToTrainingPlugin.dll" \
+  "$install_layout_dir/plugins/ReplayToTrainingPlugin.dll"
 cp -f \
-  "$plugin_out_dir/subtr_actor_bakkesmod.dll" \
-  "$install_layout_dir/data/subtr-actor/subtr_actor_bakkesmod.dll"
+  "$plugin_out_dir/replay_to_training.dll" \
+  "$install_layout_dir/data/replay-to-training/replay_to_training.dll"
 
-echo "Built Linux MSVC-ABI plugin artifacts in $plugin_out_dir"
+echo "Built Linux MSVC-ABI replay-to-training artifacts in $plugin_out_dir"
 echo "Prepared install layout in $install_layout_dir"

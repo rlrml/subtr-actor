@@ -5,7 +5,7 @@ Checks that ``replay_to_training.dll`` exports exactly the ``replay_to_training_
 functions declared in ``rust/include/replay_to_training.h`` (the header the C++
 plugin binds with GetProcAddress), and that ``ReplayToTrainingPlugin.dll``
 exposes the BakkesMod plugin entry points. Reuses the PE export-table
-parser from ``bakkesmod/verify-rust-dll-exports.py``.
+parser from ``bakkesmod/subtr-actor/verify-rust-dll-exports.py``.
 """
 
 from __future__ import annotations
@@ -16,9 +16,9 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-ABI_HEADER = REPO_ROOT / "bakkesmod-replay-to-training/rust/include/replay_to_training.h"
-PE_EXPORT_VERIFIER = REPO_ROOT / "bakkesmod/verify-rust-dll-exports.py"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ABI_HEADER = REPO_ROOT / "bakkesmod/replay-to-training/rust/include/replay_to_training.h"
+PE_EXPORT_VERIFIER = REPO_ROOT / "bakkesmod/subtr-actor/verify-rust-dll-exports.py"
 EXPORT_PREFIX = "replay_to_training_"
 REQUIRED_BAKKESMOD_EXPORTS = frozenset({"getPlugin", "deleteMe", "exports"})
 
