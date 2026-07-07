@@ -76,6 +76,28 @@
           wheel = [ ];
         };
         projectVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
+        # Build identification for the replay-to-training plugin: the nix
+        # sandbox has no .git, so the hash/dirty/date come from the flake's
+        # own source metadata and are exported as environment variables the
+        # CMake configure and Rust build.rs both honor.
+        formatCommitDate =
+          value:
+          if value == "unknown" then
+            value
+          else if builtins.stringLength value >= 14 then
+            "${builtins.substring 0 4 value}-${builtins.substring 4 2 value}-${builtins.substring 6 2 value}T${builtins.substring 8 2 value}:${builtins.substring 10 2 value}:${builtins.substring 12 2 value}Z"
+          else
+            value;
+        buildGitHash =
+          if self ? shortRev then
+            self.shortRev
+          else if self ? dirtyShortRev then
+            self.dirtyShortRev
+          else
+            "unknown";
+        buildGitDirty = if self ? dirtyShortRev then "1" else "0";
+        buildCommitDate =
+          if self ? lastModifiedDate then formatCommitDate self.lastModifiedDate else "unknown";
         mingw = pkgs.pkgsCross.mingwW64;
         xwinMsvcSysroot = pkgs.stdenvNoCC.mkDerivation {
           pname = "xwin-msvc-sysroot";
@@ -309,8 +331,8 @@
           doCheck = false;
           dontCargoInstall = true;
         };
-        packages.bakkesmod-tem-recorder = rustPlatform.buildRustPackage {
-          pname = "subtr-actor-tem-recorder-plugin";
+        packages.bakkesmod-replay-to-training = rustPlatform.buildRustPackage {
+          pname = "subtr-actor-replay-to-training-plugin";
           version = projectVersion;
           src = ./.;
           cargoLock = {
@@ -328,11 +350,14 @@
           buildPhase = ''
             runHook preBuild
             export HOME="$TMPDIR"
-            export BUILD_DIR="$TMPDIR/bakkesmod-tem-recorder-build"
+            export BUILD_DIR="$TMPDIR/bakkesmod-replay-to-training-build"
             export XWIN_SYSROOT="${xwinMsvcSysroot}"
             export BAKKESMODSDK_DIR="${bakkesmod-sdk}"
             export BAKKESMOD_SDK_DIR="$BAKKESMODSDK_DIR"
-            bash bakkesmod-tem-recorder/build-linux-msvc.sh
+            export REPLAY_TO_TRAINING_GIT_HASH="${buildGitHash}"
+            export REPLAY_TO_TRAINING_GIT_DIRTY="${buildGitDirty}"
+            export REPLAY_TO_TRAINING_COMMIT_DATE="${buildCommitDate}"
+            bash bakkesmod-replay-to-training/build-linux-msvc.sh
             runHook postBuild
           '';
           installPhase = ''

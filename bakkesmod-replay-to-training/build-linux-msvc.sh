@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Linux MSVC-ABI cross build of the tem-recorder plugin (clang-cl +
+# Linux MSVC-ABI cross build of the replay-to-training plugin (clang-cl +
 # lld-link + xwin sysroot), mirroring bakkesmod/build-linux-msvc.sh and
 # reusing its CMake toolchain file.
 set -euo pipefail
@@ -153,7 +153,7 @@ else
 fi
 
 pushd "$repo_root" >/dev/null
-cargo build -p subtr-actor-tem-recorder --release --target "$target"
+cargo build -p subtr-actor-replay-to-training --release --target "$target"
 popd >/dev/null
 
 cmake_args=(
@@ -177,24 +177,24 @@ cmake --build "$build_dir" --config "$configuration"
 
 plugin_out_dir="$build_dir/$configuration"
 mkdir -p "$plugin_out_dir"
-if [[ -f "$build_dir/TemRecorderPlugin.dll" ]]; then
-  cp -f "$build_dir/TemRecorderPlugin.dll" "$plugin_out_dir/TemRecorderPlugin.dll"
-elif [[ ! -f "$plugin_out_dir/TemRecorderPlugin.dll" ]]; then
-  echo "missing built plugin DLL: $build_dir/TemRecorderPlugin.dll" >&2
+if [[ -f "$build_dir/ReplayToTrainingPlugin.dll" ]]; then
+  cp -f "$build_dir/ReplayToTrainingPlugin.dll" "$plugin_out_dir/ReplayToTrainingPlugin.dll"
+elif [[ ! -f "$plugin_out_dir/ReplayToTrainingPlugin.dll" ]]; then
+  echo "missing built plugin DLL: $build_dir/ReplayToTrainingPlugin.dll" >&2
   exit 1
 fi
 cp \
-  "$repo_root/target/$target/release/tem_recorder.dll" \
-  "$plugin_out_dir/tem_recorder.dll"
+  "$repo_root/target/$target/release/replay_to_training.dll" \
+  "$plugin_out_dir/replay_to_training.dll"
 
 install_layout_dir="$plugin_out_dir/bakkesmod-install"
-mkdir -p "$install_layout_dir/plugins" "$install_layout_dir/data/tem-recorder"
+mkdir -p "$install_layout_dir/plugins" "$install_layout_dir/data/replay-to-training"
 cp -f \
-  "$plugin_out_dir/TemRecorderPlugin.dll" \
-  "$install_layout_dir/plugins/TemRecorderPlugin.dll"
+  "$plugin_out_dir/ReplayToTrainingPlugin.dll" \
+  "$install_layout_dir/plugins/ReplayToTrainingPlugin.dll"
 cp -f \
-  "$plugin_out_dir/tem_recorder.dll" \
-  "$install_layout_dir/data/tem-recorder/tem_recorder.dll"
+  "$plugin_out_dir/replay_to_training.dll" \
+  "$install_layout_dir/data/replay-to-training/replay_to_training.dll"
 
-echo "Built Linux MSVC-ABI tem-recorder artifacts in $plugin_out_dir"
+echo "Built Linux MSVC-ABI replay-to-training artifacts in $plugin_out_dir"
 echo "Prepared install layout in $install_layout_dir"
