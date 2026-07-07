@@ -61,8 +61,9 @@ capture window):
 
 | Notifier | Effect |
 | --- | --- |
-| `replay_to_training_capture_shot` | Capture the current replay frame as an OFFENSIVE (striker) shot |
-| `replay_to_training_capture_save` | Capture the current replay frame as a DEFENSIVE (goalie) save |
+| `replay_to_training_capture` | Capture the current replay frame using the current mode selection (`replay_to_training_capture_mode`) |
+| `replay_to_training_capture_shot` | Set the mode selection to striker, then capture an OFFENSIVE shot |
+| `replay_to_training_capture_save` | Set the mode selection to goalie, then capture a DEFENSIVE save |
 | `replay_to_training_save_pack` | Save the in-memory pack as `<GUID>.Tem` |
 | `replay_to_training_new_pack` | Start a fresh pack (new GUID, pack type unset) |
 | `replay_to_training_open_pack <path>` | Open an existing `.Tem` to append shots to |
@@ -71,20 +72,24 @@ capture window):
 | `replay_to_training_window` | Toggle the standalone capture window (same as `togglemenu replaytotraining`) |
 | `replay_to_training_version` | Log the loaded plugin and Rust core build identifiers |
 
-Suggested binding, so single keys capture shots/saves while scrubbing a
-replay:
+Suggested binding, so single keys capture while scrubbing a replay (the
+generic `capture` follows the mode dropdown; the explicit pair also flips
+the selection):
 
 ```
 bind F6 replay_to_training_capture_save
 bind F7 replay_to_training_capture_shot
 bind F8 replay_to_training_save_pack
 bind F9 replay_to_training_window
+bind F10 replay_to_training_capture
 ```
 
-Cvars (all persisted): `replay_to_training_pack_name`,
-`replay_to_training_creator_name`, `replay_to_training_time_limit` (seconds
-per shot, default 8), `replay_to_training_mirror_by_team` (default on; see
-below), `replay_to_training_capture_momentum` (default on; see below),
+Cvars (all persisted): `replay_to_training_capture_mode` (`striker` |
+`goalie`, default `striker`; the mode dropdown in both UIs),
+`replay_to_training_pack_name`, `replay_to_training_creator_name`,
+`replay_to_training_time_limit` (seconds per shot, default 8),
+`replay_to_training_mirror_by_team` (default on; see below),
+`replay_to_training_capture_momentum` (default on; see below),
 `replay_to_training_autosave` (default on),
 `replay_to_training_output_dir`, and `replay_to_training_target_save_name`
 (persisted target).
@@ -94,8 +99,8 @@ below), `replay_to_training_capture_momentum` (default on; see below),
 `togglemenu replaytotraining` (or `replay_to_training_window`, bindable)
 opens a standalone in-game window — a compact one-stop capture HUD usable
 while watching a replay. It contains: the pack type display + manual
-override dropdown, the per-shot time limit, the mirror-by-team /
-capture-momentum / autosave toggles, pack name / creator fields, the active
+override dropdown, the capture-mode dropdown, the per-shot time limit, the
+mirror-by-team / capture-momentum / autosave toggles, pack name / creator fields, the active
 target display with set/clear and the discovered-target picker, capture
 shot / capture save / save / new-pack buttons, the captured-shot list with
 per-shot Remove, and the status line. Every control is backed by its
@@ -106,16 +111,24 @@ for parity.
 ## Striker vs goalie captures and pack type
 
 The `.tem` format tags the training type (`ETrainingType`) at the PACK
-level — rounds cannot carry their own type. The plugin therefore expresses
-the mode through which zero-arg capture command is used:
+level — rounds cannot carry their own type. The plugin keeps a persisted
+mode selection (`replay_to_training_capture_mode`) shown as a dropdown in
+both UIs; the zero-arg commands express or follow it:
 
-- A fresh pack's type is **unset**; the first capture assigns it
-  (`capture_shot` → Striker, `capture_save` → Goalie).
-- Later captures whose mode conflicts with the assigned type (a save into a
-  Striker pack or vice versa) are still recorded — the format cannot
-  distinguish them — but the status line WARNS.
-- The capture window's dropdown can override the type manually, including
-  Aerial and None for publishing metadata.
+- A fresh pack's type is **unset**; the mode selection decides and the
+  first capture stamps it (striker → Striker, goalie → Goalie).
+- The bound pack's type is **authoritative**: opening a pack (or
+  setting/restoring a target) whose type is Striker or Goalie auto-syncs
+  the selection to match. Aerial/None-typed packs leave the selection
+  untouched.
+- A capture whose mode contradicts the active pack's assigned type is
+  **refused** — nothing is added, nothing autosaved — with a status like
+  `capture refused: this pack is Goalie; use
+  replay_to_training_capture_save, or new_pack/retarget to capture a
+  shot`.
+- The capture window's dropdown can override the pack type manually,
+  including Aerial and None for publishing metadata; overriding re-syncs
+  the mode selection.
 - `replay_to_training_new_pack` resets the type to unset.
 
 ## Auto-mirroring by team (`replay_to_training_mirror_by_team`, default on)

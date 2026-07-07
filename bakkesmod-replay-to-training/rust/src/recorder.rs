@@ -68,17 +68,22 @@ impl Default for ShotOptions {
     }
 }
 
-/// Outcome of a successful [`RecorderPack::add_shot`].
+/// Outcome of a non-erroring [`RecorderPack::add_shot`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddShotOutcome {
-    /// The shot was appended and its mode agreed with (or assigned) the
-    /// pack's training type.
+    /// The shot was appended; its mode agreed with (or, on the first
+    /// capture into a fresh pack, assigned) the pack's training type.
     Added,
-    /// The shot was appended, but its mode conflicts with the pack's
+    /// The capture was REFUSED: its mode conflicts with the pack's
     /// already-assigned training type (a save capture into a Striker pack
-    /// or a shot capture into a Goalie pack). The `.tem` format has no
-    /// per-round type, so the capture is kept and the caller should WARN.
-    AddedTypeMismatch,
+    /// or a shot capture into a Goalie pack), and the `.tem` format has no
+    /// per-round type under which the conflicting round could be
+    /// represented honestly. NOTHING was added — the pack is untouched.
+    /// The caller should point the user at the matching capture command,
+    /// or at new_pack/retarget to capture under the other type. (Mirrors
+    /// the [`TargetSaveOutcome::RefusedDifferentPack`] refuse-don't-mangle
+    /// pattern.)
+    RefusedTypeMismatch,
 }
 
 /// Outcome of the pre-save clobber check performed by
@@ -216,7 +221,8 @@ impl RecorderPack {
             loaded_from: Some(path.to_path_buf()),
             // A pack from disk carries whatever type it was saved with
             // (including a deliberate Training_None); treat it as assigned
-            // so mismatched captures warn instead of silently retyping it.
+            // so mismatched captures are refused instead of silently
+            // retyping it.
             training_type_assigned: true,
         })
     }
@@ -269,7 +275,8 @@ impl RecorderPack {
     }
 
     /// Explicitly sets (or overrides) the pack training type, marking it
-    /// assigned so later captures warn on mismatch instead of re-assigning.
+    /// assigned so later mismatched-mode captures are refused instead of
+    /// re-assigning it.
     pub fn set_training_type(&mut self, training_type: &TrainingType) -> Result<(), String> {
         self.file
             .set_training_type(training_type)
@@ -297,6 +304,25 @@ impl RecorderPack {
         }
     }
 
+    /// The capture mode the plugin's mode-selection cvar should sync to
+    /// when this pack becomes the active one: the pack's assigned type is
+    /// AUTHORITATIVE, so a Striker pack selects [`CaptureMode::Shot`] and a
+    /// Goalie pack selects [`CaptureMode::Save`]. `None` — leave the
+    /// current selection untouched — for everything else: an unassigned
+    /// (fresh) type, where the selection decides and the first capture
+    /// stamps it, and Aerial/None/unmodeled types, which accept either
+    /// mode.
+    pub fn capture_mode_sync(&self) -> Option<CaptureMode> {
+        if !self.training_type_assigned {
+            return None;
+        }
+        match self.training_type() {
+            Ok(TrainingType::Striker) => Some(CaptureMode::Shot),
+            Ok(TrainingType::Goalie) => Some(CaptureMode::Save),
+            _ => None,
+        }
+    }
+
     /// Appends a captured shot as a new round.
     ///
     /// * When [`ShotOptions::mirror_by_team`] is set and the captured
@@ -306,9 +332,9 @@ impl RecorderPack {
     /// * The first capture into a type-unset pack assigns the pack type
     ///   from the mode (shot → Striker, save → Goalie). `ETrainingType` is
     ///   pack-level in the `.tem` format — rounds cannot be tagged — so a
-    ///   later capture whose mode conflicts with the assigned type is still
-    ///   appended but reports [`AddShotOutcome::AddedTypeMismatch`] for the
-    ///   caller to warn about.
+    ///   capture whose mode conflicts with the already-assigned type is
+    ///   REFUSED: [`AddShotOutcome::RefusedTypeMismatch`] is returned and
+    ///   the pack is left completely untouched.
     pub fn add_shot(
         &mut self,
         ball: &TrBallState,
@@ -316,6 +342,20 @@ impl RecorderPack {
         time_limit: f32,
         options: &ShotOptions,
     ) -> Result<AddShotOutcome, String> {
+        // Refusal check FIRST, before any mutation, so a refused capture
+        // leaves the pack byte-identical.
+        if self.training_type_assigned {
+            let current = self.training_type()?;
+            let implied = Self::mode_training_type(options.mode);
+            // Only the two mode-implied types can conflict with a mode;
+            // Aerial/None/other packs accept either capture command (they
+            // are manual-override territory).
+            if current != implied && matches!(current, TrainingType::Striker | TrainingType::Goalie)
+            {
+                return Ok(AddShotOutcome::RefusedTypeMismatch);
+            }
+        }
+
         let mut ball = *ball;
         let mut cars = cars.to_vec();
         let primary_team = cars
@@ -323,29 +363,17 @@ impl RecorderPack {
             .find(|car| car.is_primary != 0)
             .or_else(|| cars.first())
             .map(|car| car.team);
+        // Mirroring uses the capture's effective mode, which the refusal
+        // gate above guarantees agrees with the pack type.
         if options.mirror_by_team
             && primary_team.is_some_and(|team| should_mirror(options.mode, team))
         {
             mirror_shot(&mut ball, &mut cars);
         }
 
-        let outcome = if !self.training_type_assigned {
+        if !self.training_type_assigned {
             self.set_training_type(&Self::mode_training_type(options.mode))?;
-            AddShotOutcome::Added
-        } else {
-            let current = self.training_type()?;
-            let implied = Self::mode_training_type(options.mode);
-            // Only the two mode-implied types can conflict with a mode;
-            // Aerial/None/other packs accept either capture command without
-            // warning (they are manual-override territory).
-            let mismatch = current != implied
-                && matches!(current, TrainingType::Striker | TrainingType::Goalie);
-            if mismatch {
-                AddShotOutcome::AddedTypeMismatch
-            } else {
-                AddShotOutcome::Added
-            }
-        };
+        }
 
         let round = Round {
             time_limit,
@@ -354,7 +382,7 @@ impl RecorderPack {
         self.file
             .add_round(&round)
             .map_err(|error| error.to_string())?;
-        Ok(outcome)
+        Ok(AddShotOutcome::Added)
     }
 
     /// Removes the shot (round) at `index`.

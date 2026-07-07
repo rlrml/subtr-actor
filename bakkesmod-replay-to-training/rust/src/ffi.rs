@@ -287,9 +287,10 @@ pub unsafe extern "C" fn replay_to_training_pack_write_name(
 /// * `0` — added; the mode agreed with (or, on the first capture into a
 ///   fresh pack, assigned) the pack training type,
 /// * `1` — failure (null pack/shot or serialization error; last-error set),
-/// * `2` — added, but the mode conflicts with the pack's already-assigned
+/// * `2` — REFUSED: the mode conflicts with the pack's already-assigned
 ///   training type (`ETrainingType` is pack-level, so the round cannot be
-///   tagged differently); the caller should warn.
+///   tagged differently). Nothing was added — the pack is untouched — and
+///   the pack's last-error is set to an explanatory message.
 ///
 /// # Safety
 ///
@@ -321,7 +322,24 @@ pub unsafe extern "C" fn replay_to_training_pack_add_shot(
     };
     match pack.inner.add_shot(&ball, cars, time_limit, &options) {
         Ok(AddShotOutcome::Added) => 0,
-        Ok(AddShotOutcome::AddedTypeMismatch) => 2,
+        Ok(AddShotOutcome::RefusedTypeMismatch) => {
+            let pack_type = pack
+                .inner
+                .training_type()
+                .map(|training_type| training_type.as_name().to_string())
+                .unwrap_or_else(|_| "assigned".to_string());
+            let (attempted, matching) = match options.mode {
+                CaptureMode::Shot => ("shot", "save"),
+                CaptureMode::Save => ("save", "shot"),
+            };
+            pack.inner.record_error(format!(
+                "capture refused: this pack's type is {pack_type}, which conflicts \
+                 with a {attempted} capture; use the {matching} capture command, or \
+                 start a new pack / retarget to capture a {attempted}. Nothing was \
+                 added."
+            ));
+            2
+        }
         Err(error) => {
             pack.inner.record_error(error);
             1
@@ -341,8 +359,9 @@ const TR_TRAINING_TYPE_UNSET: u32 = 4;
 const TR_TRAINING_TYPE_OTHER: u32 = 5;
 
 /// Manually sets (overrides) the pack training type: 0 = None, 1 = Aerial,
-/// 2 = Goalie, 3 = Striker. Marks the type as assigned, so later captures
-/// warn on mode mismatch instead of re-assigning. Returns 0 on success.
+/// 2 = Goalie, 3 = Striker. Marks the type as assigned, so later
+/// mismatched-mode captures are refused instead of re-assigning it.
+/// Returns 0 on success.
 ///
 /// # Safety
 ///
@@ -384,6 +403,33 @@ pub unsafe extern "C" fn replay_to_training_pack_training_type(pack: *const TrPa
         Ok(TrainingType::Goalie) => TR_TRAINING_TYPE_GOALIE,
         Ok(TrainingType::Striker) => TR_TRAINING_TYPE_STRIKER,
         Ok(_) | Err(_) => TR_TRAINING_TYPE_OTHER,
+    }
+}
+
+/// The capture mode the plugin's mode-selection cvar
+/// (`replay_to_training_capture_mode`) should sync to when this pack
+/// becomes active — the pack's assigned type is authoritative. Returns:
+///
+/// * `0` — sync the selection to shot/striker (the pack is a Striker pack),
+/// * `1` — sync the selection to save/goalie (the pack is a Goalie pack),
+/// * `-1` — leave the current selection untouched (null pack, type unset —
+///   the selection decides and the first capture stamps it — or an
+///   Aerial/None/unmodeled type, which accepts either mode).
+///
+/// The `0`/`1` values match the `TrCapturedShot::mode` encoding.
+///
+/// # Safety
+///
+/// `pack` must be null or a valid pack handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_pack_capture_mode_sync(pack: *const TrPack) -> i32 {
+    let Some(pack) = (unsafe { pack_ref(pack) }) else {
+        return -1;
+    };
+    match pack.inner.capture_mode_sync() {
+        Some(CaptureMode::Shot) => 0,
+        Some(CaptureMode::Save) => 1,
+        None => -1,
     }
 }
 

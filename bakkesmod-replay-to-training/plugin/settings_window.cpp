@@ -47,9 +47,31 @@ void ReplayToTrainingPlugin::renderPackTypeControls() {
   }
 }
 
+// The persisted capture-mode selection (striker vs goalie), shown in both
+// UIs. The generic capture command and the window's Capture buttons follow
+// it; the explicit capture_shot/capture_save shortcuts and an activated
+// typed pack update it (the bound pack's type is authoritative, so with a
+// typed pack active the dropdown effectively tracks the pack).
+void ReplayToTrainingPlugin::renderCaptureModeSelector() {
+  static const char *modeLabels[] = {"Striker (shots)", "Goalie (saves)"};
+  int modeIndex = selectedCaptureMode() == CaptureMode::Save ? 1 : 0;
+  if (ImGui::Combo("Capture mode", &modeIndex, modeLabels, 2)) {
+    setSelectedCaptureMode(modeIndex == 1 ? CaptureMode::Save
+                                          : CaptureMode::Shot);
+  }
+  if (ImGui::IsItemHovered()) {
+    ImGui::SetTooltip(
+        "Mode used by replay_to_training_capture (bindable single key).\n"
+        "capture_shot/capture_save set it; opening or targeting a typed\n"
+        "pack syncs it. Captures that contradict the active pack's type\n"
+        "are refused.");
+  }
+}
+
 // Cvar-backed capture tunables (the plugin's commands are all zero-arg, so
 // these persisted defaults are the only way capture behavior is tuned).
 void ReplayToTrainingPlugin::renderCaptureToggles() {
+  renderCaptureModeSelector();
   float timeLimit = timeLimitSeconds();
   if (ImGui::SliderFloat("Time limit (s)", &timeLimit, 1.0f, 120.0f, "%.0f")) {
     auto cvar = cvarManager->getCvar("replay_to_training_time_limit");
@@ -143,8 +165,8 @@ void ReplayToTrainingPlugin::renderTargetControls() {
 }
 
 // New pack / capture (shot and save) / save buttons. The two capture
-// buttons mirror the two zero-arg notifiers: which one is used expresses
-// the mode (offense vs defense).
+// buttons mirror the two zero-arg notifiers: they set the persisted mode
+// selection and capture with it (offense vs defense).
 void ReplayToTrainingPlugin::renderPackActions() {
   if (ImGui::Button("New pack")) {
     gameWrapper->Execute([this](GameWrapper *) { newPack(); });
@@ -154,9 +176,12 @@ void ReplayToTrainingPlugin::renderPackActions() {
   // The SDK bundles ImGui 1.75 (no BeginDisabled); emulate by branching.
   if (ImGui::Button(inReplay ? "Capture shot" : "Capture shot (needs replay)")) {
     if (inReplay) {
-      // Capture touches game wrappers, so hop to the game thread.
-      gameWrapper->Execute(
-          [this](GameWrapper *) { captureShot(CaptureMode::Shot); });
+      // Like the capture_shot notifier: update the mode selection, then
+      // capture. Capture touches game wrappers, so hop to the game thread.
+      gameWrapper->Execute([this](GameWrapper *) {
+        setSelectedCaptureMode(CaptureMode::Shot);
+        captureShot(CaptureMode::Shot);
+      });
     } else {
       setStatus("capture requires an in-game replay");
     }
@@ -164,8 +189,11 @@ void ReplayToTrainingPlugin::renderPackActions() {
   ImGui::SameLine();
   if (ImGui::Button(inReplay ? "Capture save" : "Capture save (needs replay)")) {
     if (inReplay) {
-      gameWrapper->Execute(
-          [this](GameWrapper *) { captureShot(CaptureMode::Save); });
+      // Like the capture_save notifier: selection follows the button.
+      gameWrapper->Execute([this](GameWrapper *) {
+        setSelectedCaptureMode(CaptureMode::Save);
+        captureShot(CaptureMode::Save);
+      });
     } else {
       setStatus("capture requires an in-game replay");
     }

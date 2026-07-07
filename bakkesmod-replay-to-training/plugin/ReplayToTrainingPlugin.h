@@ -60,6 +60,7 @@ private:
   using PackDifficulty = uint32_t (*)(const TrPack *);
   using PackSetTrainingType = int32_t (*)(TrPack *, uint32_t);
   using PackTrainingType = uint32_t (*)(const TrPack *);
+  using PackCaptureModeSync = int32_t (*)(const TrPack *);
   using PackStringLen = size_t (*)(const TrPack *);
   using PackWriteString = size_t (*)(const TrPack *, uint8_t *, size_t);
   using PackAddShot = int32_t (*)(TrPack *, const TrCapturedShot *);
@@ -93,6 +94,7 @@ private:
   PackDifficulty packDifficulty = nullptr;
   PackSetTrainingType packSetTrainingType = nullptr;
   PackTrainingType packTrainingType = nullptr;
+  PackCaptureModeSync packCaptureModeSync = nullptr;
   PackStringLen packNameLen = nullptr;
   PackWriteString packWriteName = nullptr;
   PackAddShot packAddShot = nullptr;
@@ -165,6 +167,15 @@ private:
   bool autosaveEnabled();
   bool mirrorByTeamEnabled();
   bool captureMomentumEnabled();
+  // The persisted capture-mode selection (cvar
+  // replay_to_training_capture_mode: "striker" | "goalie"), used by the
+  // generic replay_to_training_capture notifier; the explicit
+  // capture_shot/capture_save shortcuts set it before capturing, and an
+  // activated pack with an assigned Striker/Goalie type auto-syncs it
+  // (the pack's type is authoritative).
+  CaptureMode selectedCaptureMode();
+  void setSelectedCaptureMode(CaptureMode mode);
+  void syncSelectionFromPackType();
   // Current pack training type in the ABI encoding (0 None, 1 Aerial,
   // 2 Goalie, 3 Striker, 4 unset, 5 other), and its display label.
   uint32_t packTrainingTypeIndex();
@@ -187,6 +198,7 @@ private:
   // hops to the game thread via gameWrapper->Execute.
   void renderPackMetadataControls();
   void renderPackTypeControls();
+  void renderCaptureModeSelector();
   void renderCaptureToggles();
   void renderTargetControls();
   void renderPackActions();

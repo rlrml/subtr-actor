@@ -82,6 +82,8 @@ bool ReplayToTrainingPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "replay_to_training_pack_set_training_type"));
   packTrainingType = reinterpret_cast<PackTrainingType>(
       GetProcAddress(rustLibrary, "replay_to_training_pack_training_type"));
+  packCaptureModeSync = reinterpret_cast<PackCaptureModeSync>(
+      GetProcAddress(rustLibrary, "replay_to_training_pack_capture_mode_sync"));
   packNameLen = reinterpret_cast<PackStringLen>(
       GetProcAddress(rustLibrary, "replay_to_training_pack_name_len"));
   packWriteName = reinterpret_cast<PackWriteString>(
@@ -130,6 +132,7 @@ bool ReplayToTrainingPlugin::loadRustLibrary() {
   const bool complete = packCreate && packOpen && packDestroy && packSetName &&
       packSetCode && packSetCreatorName && packSetMapName && packSetDifficulty &&
       packDifficulty && packSetTrainingType && packTrainingType &&
+      packCaptureModeSync &&
       packNameLen && packWriteName && packAddShot &&
       packRemoveShot && packShotCount && packShotSummaryLen &&
       packWriteShotSummary && packGuidHex && packSave && packSaveToTarget &&
@@ -163,6 +166,7 @@ void ReplayToTrainingPlugin::unloadRustLibrary() {
   packDifficulty = nullptr;
   packSetTrainingType = nullptr;
   packTrainingType = nullptr;
+  packCaptureModeSync = nullptr;
   packNameLen = nullptr;
   packWriteName = nullptr;
   packAddShot = nullptr;
