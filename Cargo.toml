@@ -1,6 +1,7 @@
 [workspace]
 members = [
     ".",
+    "bakkesmod-tem-recorder/rust",
     "bakkesmod/rust",
     "crates/subtr-actor-tools",
     "crates/subtr-actor-training",
