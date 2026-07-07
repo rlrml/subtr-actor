@@ -71,7 +71,8 @@ declare module "../scripts/ensure-wasm-package.mjs" {
   export function ensureWasmPackageFresh(options: {
     force?: boolean;
     log?: (message: string) => void;
-  }): Promise<void>;
+    targets?: ("web" | "node")[];
+  }): Promise<boolean>;
   export function getWasmWatchTargets(): string[];
   export function isWasmSourcePath(filePath: string): boolean;
 }
