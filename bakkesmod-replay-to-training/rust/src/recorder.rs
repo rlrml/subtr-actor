@@ -53,9 +53,7 @@ fn json_number_field(archetype: &str, key: &str) -> Option<f64> {
     let marker = format!("\"{key}\":");
     let start = archetype.find(&marker)? + marker.len();
     let rest = &archetype[start..];
-    let end = rest
-        .find(|character: char| character == ',' || character == '}')
-        .unwrap_or(rest.len());
+    let end = rest.find([',', '}']).unwrap_or(rest.len());
     rest[..end].trim().parse().ok()
 }
 

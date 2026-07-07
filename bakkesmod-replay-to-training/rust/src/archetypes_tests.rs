@@ -68,17 +68,55 @@ fn ball_archetype_formats_fixture_location_exactly() {
     );
 }
 
+/// The spawn point must carry the captured car's transform — the game
+/// places the training car from this entry (a default-placed spawn point
+/// was the "car always spawns at center field" bug).
 #[test]
-fn spawn_point_archetype_matches_corpus_default() {
+fn spawn_point_archetype_carries_the_captured_car_transform() {
+    let car = TrCarState {
+        location: vec3(-599.9999, -700.0001, 530.0),
+        rotation: TrRotator {
+            pitch: -837,
+            yaw: 3634,
+            roll: 128,
+        },
+        is_primary: 1,
+        ..TrCarState::default()
+    };
     assert_eq!(
-        Archetype::CarSpawnPoint(CarSpawn::default()).to_archetype_string(),
+        Archetype::CarSpawnPoint(car_spawn_point(&car)).to_archetype_string(),
         concat!(
             "{\"ObjectArchetype\":\"Archetypes.GameEditor.DynamicSpawnPointMesh\",",
-            "\"LocationX\":0.0000,\"LocationY\":0.0000,\"LocationZ\":30.0000,",
-            "\"RotationP\":0,\"RotationY\":16384,\"RotationR\":0,",
+            "\"LocationX\":-599.9999,\"LocationY\":-700.0001,\"LocationZ\":530.0000,",
+            "\"RotationP\":-837,\"RotationY\":3634,\"RotationR\":128,",
             "\"VelocityStartSpeed\":0.0000}"
         )
     );
+}
+
+/// Ground-clipped captures (Z below a resting car's ~17uu origin) are
+/// clamped up to the floor so the spawn is not embedded in the ground;
+/// anything at or above the floor — including aerial captures — passes
+/// through untouched.
+#[test]
+fn spawn_point_clamps_ground_clipping_z_but_passes_airborne_z_through() {
+    let clipping = TrCarState {
+        location: vec3(100.0, 200.0, 12.5),
+        ..TrCarState::default()
+    };
+    let clipped = car_spawn_point(&clipping);
+    assert_eq!(clipped.location_z, MIN_SPAWN_LOCATION_Z);
+    assert!(
+        Archetype::CarSpawnPoint(clipped)
+            .to_archetype_string()
+            .contains("\"LocationZ\":17.0000"),
+    );
+
+    let aerial = TrCarState {
+        location: vec3(100.0, 200.0, 1234.5),
+        ..TrCarState::default()
+    };
+    assert_eq!(car_spawn_point(&aerial).location_z, 1234.5);
 }
 
 #[test]
@@ -152,7 +190,10 @@ fn round_archetypes_emit_ball_spawn_and_single_primary_car() {
     let archetypes = build_round_archetypes(&ball, &[secondary, primary]);
     assert_eq!(archetypes.len(), 3);
     assert!(archetypes[0].contains("Ball_GameEditor"));
+    // The spawn point tracks the primary car (the game places the training
+    // car from it), not the secondary car or the editor default.
     assert!(archetypes[1].contains("DynamicSpawnPointMesh"));
+    assert!(archetypes[1].contains("\"LocationX\":-100.0000,\"LocationY\":200.0000"));
     // The primary-flagged car wins even when it is not first.
     assert!(archetypes[2].starts_with("{\"IsPC\":true,"));
     assert!(archetypes[2].contains("\"LocationX\":-100.0000"));

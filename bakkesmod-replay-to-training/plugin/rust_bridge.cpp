@@ -100,6 +100,16 @@ bool ReplayToTrainingPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "replay_to_training_pack_save_to_target"));
   fileGuidHex = reinterpret_cast<FileGuidHex>(
       GetProcAddress(rustLibrary, "replay_to_training_file_guid_hex"));
+  sanitizeTarget = reinterpret_cast<SanitizeTarget>(
+      GetProcAddress(rustLibrary, "replay_to_training_sanitize_target"));
+  targetsLen = reinterpret_cast<TargetsLen>(
+      GetProcAddress(rustLibrary, "replay_to_training_targets_len"));
+  writeTargets = reinterpret_cast<WriteTargets>(
+      GetProcAddress(rustLibrary, "replay_to_training_write_targets"));
+  resolveTarget = reinterpret_cast<ResolveTarget>(
+      GetProcAddress(rustLibrary, "replay_to_training_resolve_target"));
+  defaultSaveDir = reinterpret_cast<DefaultSaveDir>(
+      GetProcAddress(rustLibrary, "replay_to_training_default_save_dir"));
   packLastErrorLen = reinterpret_cast<PackStringLen>(
       GetProcAddress(rustLibrary, "replay_to_training_pack_last_error_len"));
   packWriteLastError = reinterpret_cast<PackWriteString>(
@@ -118,9 +128,10 @@ bool ReplayToTrainingPlugin::loadRustLibrary() {
       packDifficulty && packNameLen && packWriteName && packAddShot &&
       packRemoveShot && packShotCount && packShotSummaryLen &&
       packWriteShotSummary && packGuidHex && packSave && packSaveToTarget &&
-      fileGuidHex && packLastErrorLen && packWriteLastError &&
-      globalLastErrorLen && globalWriteLastError && rustBuildInfoLen &&
-      rustWriteBuildInfo;
+      fileGuidHex && sanitizeTarget && targetsLen && writeTargets &&
+      resolveTarget && defaultSaveDir && packLastErrorLen &&
+      packWriteLastError && globalLastErrorLen && globalWriteLastError &&
+      rustBuildInfoLen && rustWriteBuildInfo;
   if (!complete) {
     cvarManager->log(
         "replay-to-training: replay_to_training.dll is missing expected exports; "
@@ -156,6 +167,11 @@ void ReplayToTrainingPlugin::unloadRustLibrary() {
   packSave = nullptr;
   packSaveToTarget = nullptr;
   fileGuidHex = nullptr;
+  sanitizeTarget = nullptr;
+  targetsLen = nullptr;
+  writeTargets = nullptr;
+  resolveTarget = nullptr;
+  defaultSaveDir = nullptr;
   packLastErrorLen = nullptr;
   packWriteLastError = nullptr;
   globalLastErrorLen = nullptr;

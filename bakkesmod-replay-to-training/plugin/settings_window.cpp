@@ -40,8 +40,8 @@ void ReplayToTrainingPlugin::RenderSettings() {
   }
   ImGui::TextWrapped(
       "Empty output directory / training root resolves to Documents\\My "
-      "Games\\Rocket League\\TAGame\\Training. Set a target below to save "
-      "into MyTraining\\, which is what the game lists.");
+      "Games\\Rocket League\\TAGame\\Training. Saves land in your account's "
+      "MyTraining\\ under that root, which is what the game lists.");
 
   ImGui::Separator();
 
@@ -56,7 +56,8 @@ void ReplayToTrainingPlugin::RenderSettings() {
         "Captures append here; Save writes back non-destructively.");
   } else {
     ImGui::TextWrapped(
-        "No target set. Captures go to an auto <GUID>.Tem on save.");
+        "No target set. Saves go to an auto <GUID>.Tem in the account's "
+        "MyTraining folder (or the Training root).");
   }
   ImGui::InputText("Target name", targetBuffer.data(), targetBuffer.size());
   ImGui::SameLine();
@@ -96,6 +97,15 @@ void ReplayToTrainingPlugin::RenderSettings() {
   }
 
   ImGui::Separator();
+
+  bool autosave = autosaveEnabled();
+  if (ImGui::Checkbox("Autosave after each capture", &autosave)) {
+    setCvarString("replay_to_training_autosave", autosave ? "1" : "0");
+  }
+  if (!autosave) {
+    ImGui::TextWrapped(
+        "Autosave is off: captured shots stay in memory until you save.");
+  }
 
   if (ImGui::Button("New pack")) {
     gameWrapper->Execute([this](GameWrapper *) { newPack(); });
