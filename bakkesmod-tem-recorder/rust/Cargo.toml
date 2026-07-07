@@ -1,0 +1,17 @@
+[package]
+name = "subtr-actor-tem-recorder"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "C ABI for saving replay-captured shots into Rocket League custom training pack (.tem) files from a BakkesMod plugin"
+
+[lib]
+name = "tem_recorder"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+subtr-actor-training = { path = "../../crates/subtr-actor-training" }
