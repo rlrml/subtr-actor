@@ -14,7 +14,11 @@ use subtr_actor::{
 
 const AIR_DRIBBLE_GOAL_MOUTH_REPLAY: &str = "assets/air-dribble-goal-mouth-2026-05-24.replay";
 
-const AIR_DRIBBLE_START_TIME: f32 = 57.10;
+// Reviewed ground truth: the dribbler's earlier ground pop at ~53.7s falls all
+// the way back to resting height (ball Z bottoms at ~95uu around 56.0s) before
+// the real air dribble opens from the ground with the touch at ~56.23s, after
+// which the ball stays airborne through the remaining touches into the goal.
+const AIR_DRIBBLE_START_TIME: f32 = 56.23;
 const AIR_DRIBBLE_END_TIME: f32 = 59.02;
 
 #[test]

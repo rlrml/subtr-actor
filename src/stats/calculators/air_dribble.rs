@@ -6,6 +6,15 @@ pub(crate) const AIR_DRIBBLE_MIN_DURATION: f32 = 0.65;
 const AIR_DRIBBLE_MIN_TOUCHES: u32 = 3;
 const AIR_DRIBBLE_MIN_AIR_TOUCHES: u32 = 2;
 const AIR_DRIBBLE_TOUCH_MAX_GAP_SECONDS: f32 = 3.0;
+/// A resting ball's center sits at ~93uu (ball radius ≈ 92.75uu), so a ball
+/// whose center descends to this height between touches has effectively
+/// returned to the ground and any active dribble must not bridge across it;
+/// the small margin above resting height absorbs physics/sampling jitter.
+/// The gate deliberately keys on genuine ground-level height rather than wall
+/// proximity: a ball hugging a wall at ~100uu is sitting in the ground corner,
+/// where breaking the dribble is correct, while a true wall dribble keeps the
+/// ball well above resting height.
+const AIR_DRIBBLE_BALL_GROUND_RETURN_MAX_Z: f32 = 110.0;
 const WALL_TAKEOFF_MIN_Z: f32 = 120.0;
 const SIDE_WALL_START_ABS_X: f32 = 3200.0;
 const BACK_WALL_START_ABS_Y: f32 = 4600.0;
@@ -62,6 +71,12 @@ struct ActiveAirDribble {
     vertical_gap_sum: f32,
     touch_count: u32,
     air_touch_count: u32,
+    /// Lowest ball height observed on frames since this dribble's most recent
+    /// touch. Touch events sample with lag (a touch can register with the
+    /// ball already back above ground level), so the between-touch per-frame
+    /// minimum — not the touch's own ball height — is what detects the ball
+    /// returning to the ground between touches.
+    min_ball_z_since_last_touch: f32,
 }
 
 impl ActiveAirDribble {
@@ -83,6 +98,7 @@ impl ActiveAirDribble {
             vertical_gap_sum: vertical_gap,
             touch_count: 1,
             air_touch_count: u32::from(is_qualifying_air_dribble_touch(touch)),
+            min_ball_z_since_last_touch: f32::INFINITY,
         })
     }
 
@@ -98,7 +114,16 @@ impl ActiveAirDribble {
         self.vertical_gap_sum += vertical_gap;
         self.touch_count += 1;
         self.air_touch_count += u32::from(is_qualifying_air_dribble_touch(touch));
+        self.min_ball_z_since_last_touch = f32::INFINITY;
         Some(())
+    }
+
+    fn observe_ball_height(&mut self, ball_z: f32) {
+        self.min_ball_z_since_last_touch = self.min_ball_z_since_last_touch.min(ball_z);
+    }
+
+    fn ball_returned_to_ground_since_last_touch(&self) -> bool {
+        self.min_ball_z_since_last_touch <= AIR_DRIBBLE_BALL_GROUND_RETURN_MAX_Z
     }
 
     fn event(self) -> Option<BallCarryEvent> {
@@ -195,6 +220,7 @@ impl AirDribbleCalculator {
             active.player_id == touch.player
                 && active.is_team_0 == touch.is_team_0
                 && touch.time - active.end_time <= AIR_DRIBBLE_TOUCH_MAX_GAP_SECONDS
+                && !active.ball_returned_to_ground_since_last_touch()
         });
         if same_sequence {
             if self
@@ -242,6 +268,9 @@ impl AirDribbleCalculator {
             self.finish_active();
             self.processed_touch_count = touch_events.len();
             return Ok(());
+        }
+        if let (Some(active), Some(position)) = (self.active.as_mut(), ball.position()) {
+            active.observe_ball_height(position.z);
         }
         if self
             .active
