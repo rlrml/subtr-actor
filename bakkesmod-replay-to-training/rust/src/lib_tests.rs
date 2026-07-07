@@ -359,6 +359,54 @@ fn ffi_target_save_appends_and_guards_against_clobber() {
     let _ = std::fs::remove_dir_all(&scratch);
 }
 
+/// The momentum-note export mirrors `archetypes::momentum_warning`: bytes
+/// of the warning for an unrepresentable velocity, 0 for a representable
+/// one and for a null car.
+#[test]
+fn ffi_momentum_note_reports_unrepresentable_velocity() {
+    // Facing +X (default rotator), drifting fast sideways: everything lost.
+    let drifting = TrCarState {
+        linear_velocity: TrVec3 {
+            x: 0.0,
+            y: 900.0,
+            z: 0.0,
+        },
+        ..TrCarState::default()
+    };
+    unsafe {
+        let mut buffer = [0u8; 256];
+        let written = replay_to_training_momentum_note(
+            &raw const drifting,
+            buffer.as_mut_ptr(),
+            buffer.len(),
+        );
+        assert!(written > 0);
+        let note = std::str::from_utf8(&buffer[..written]).unwrap();
+        assert_eq!(
+            note,
+            "car moving 900 uu/s at 90\u{b0} off facing; only 0 uu/s representable as spawn momentum"
+        );
+
+        // Driving straight down the facing: representable, no note.
+        let clean = TrCarState {
+            linear_velocity: TrVec3 {
+                x: 1400.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            ..TrCarState::default()
+        };
+        assert_eq!(
+            replay_to_training_momentum_note(&raw const clean, buffer.as_mut_ptr(), buffer.len()),
+            0
+        );
+        assert_eq!(
+            replay_to_training_momentum_note(std::ptr::null(), buffer.as_mut_ptr(), buffer.len()),
+            0
+        );
+    }
+}
+
 /// The build-info exports must produce a well-formed identifier whatever
 /// the build environment (env override, git, or the unknown fallback).
 #[test]

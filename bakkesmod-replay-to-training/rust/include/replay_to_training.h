@@ -133,6 +133,21 @@ size_t replay_to_training_pack_write_name(const TrPack *pack, uint8_t *out_bytes
  *      was added — the pack is untouched — and the pack's last-error is
  *      set to an explanatory message. */
 int32_t replay_to_training_pack_add_shot(TrPack *pack, const TrCapturedShot *shot);
+
+/* Momentum-loss diagnostic for momentum capture. The spawn mesh class has
+ * only a scalar VelocityStartSpeed (no direction property, per the game's
+ * class dump), so only the along-facing share of a captured car's velocity
+ * is representable. When a meaningful share is lost (total speed > 300
+ * uu/s AND (lost magnitude > 400 uu/s OR velocity more than 30 degrees off
+ * the facing)), writes a human-readable warning like
+ *   "car moving 1320 uu/s at 74° off facing; only 338 uu/s representable
+ *    as spawn momentum"
+ * into `out_bytes` (up to `max_bytes`, no NUL) and returns bytes written.
+ * Returns 0 when there is no warning (or `car` is null). Stateless. */
+size_t replay_to_training_momentum_note(
+    const TrCarState *car,
+    uint8_t *out_bytes,
+    size_t max_bytes);
 int32_t replay_to_training_pack_remove_shot(TrPack *pack, size_t index);
 size_t replay_to_training_pack_shot_count(const TrPack *pack);
 size_t replay_to_training_pack_shot_summary_len(const TrPack *pack, size_t index);

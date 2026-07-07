@@ -74,30 +74,10 @@ pub const MIN_SPAWN_LOCATION_Z: f64 = 17.0;
 /// stationary spawn, not a fraction-of-a-uu crawl from physics noise.
 pub const MIN_FORWARD_SPEED: f64 = 1.0;
 
-/// The forward component of a captured car's velocity along its facing, in
-/// uu/s, for the spawn mesh's `VelocityStartSpeed` field.
-///
-/// The spawn mesh is the editor's car-start-speed feature: it encodes only
-/// a facing (`RotationP/Y/R`) plus a scalar speed — always `0.0` in the
-/// decoded corpus (the Psyonix pack omits the key entirely; every
-/// editor-authored pack writes `0.0`) — so a full velocity VECTOR is not
-/// representable. Projecting the captured velocity onto the car's facing
-/// keeps exactly the part of the car's momentum the format can express and
-/// the game can reproduce (speed along the spawn facing); lateral drift
-/// and any motion opposed to the facing are dropped:
-///
-/// * projection < 0 (reversing / moving away from the facing) clamps to
-///   `0.0` — a negative scalar would be interpreted as forward speed by an
-///   unknown convention, and a spawned car cannot start in reverse;
-/// * projection below [`MIN_FORWARD_SPEED`] flushes to exactly `0.0`.
-///
-/// The facing includes pitch, so an airborne car keeps the along-facing
-/// share of its momentum.
-///
-/// TODO(in-game): starting boost is not captured yet; the archetype key for
-/// it (if any) is pending discovery from a user-authored editor pack that
-/// sets a starting boost.
-pub fn forward_speed(car: &TrCarState) -> f64 {
+/// The signed projection of a captured car's velocity onto its facing
+/// (negative when reversing) plus the total speed, both in uu/s. Shared by
+/// [`forward_speed`] and [`momentum_warning`].
+fn facing_projection_and_speed(car: &TrCarState) -> (f64, f64) {
     const UNITS_TO_RADIANS: f64 = std::f64::consts::PI / 32768.0;
     let pitch = f64::from(car.rotation.pitch) * UNITS_TO_RADIANS;
     let yaw = f64::from(car.rotation.yaw) * UNITS_TO_RADIANS;
@@ -109,14 +89,103 @@ pub fn forward_speed(car: &TrCarState) -> f64 {
         pitch.sin(),
     );
     let velocity = car.linear_velocity;
-    let projection = f64::from(velocity.x) * forward.0
-        + f64::from(velocity.y) * forward.1
-        + f64::from(velocity.z) * forward.2;
+    let x = f64::from(velocity.x);
+    let y = f64::from(velocity.y);
+    let z = f64::from(velocity.z);
+    let projection = x * forward.0 + y * forward.1 + z * forward.2;
+    let speed = (x * x + y * y + z * z).sqrt();
+    (projection, speed)
+}
+
+/// The forward component of a captured car's velocity along its facing, in
+/// uu/s, for the spawn mesh's `VelocityStartSpeed` field.
+///
+/// The spawn mesh is the editor's car-start-speed feature, and — per the
+/// game's own class dump (RLSDK `TAGame.DynamicSpawnPointMesh_TA`) — the
+/// class carries ONLY `VelocityStartSpeed: float` and `MaxStartSpeed:
+/// float`. There is no direction property (unlike the ball's
+/// `Ball_GameEditor_TA`, which has a full `VelocityStartRotation: FRotator`
+/// next to its `VelocityStartSpeed`), so car spawn momentum is
+/// scalar-along-facing BY GAME DESIGN: a full velocity vector is not
+/// representable, and projecting the captured velocity onto the car's
+/// facing is the maximal-fidelity encoding the format admits. Lateral
+/// drift and any motion opposed to the facing are dropped (see
+/// [`momentum_warning`] for the capture-time diagnostic):
+///
+/// * projection < 0 (reversing / moving away from the facing) clamps to
+///   `0.0` — a negative scalar would be interpreted as forward speed by an
+///   unknown convention, and a spawned car cannot start in reverse;
+/// * projection below [`MIN_FORWARD_SPEED`] flushes to exactly `0.0`.
+///
+/// The facing includes pitch, so an airborne car keeps the along-facing
+/// share of its momentum.
+///
+/// Starting boost is NOT supported by the format: the class dump shows no
+/// starting-boost property on either editor class
+/// (`Ball_GameEditor_TA` / `DynamicSpawnPointMesh_TA`), so the captured
+/// `boost_amount` is carried across the ABI but cannot land in the pack.
+///
+/// TODO(in-game): `MaxStartSpeed` exists on `DynamicSpawnPointMesh_TA` and
+/// MAY clamp large written speeds; check whether captured speeds above the
+/// editor slider max survive a load/play round-trip (we do not emit
+/// `MaxStartSpeed` yet).
+pub fn forward_speed(car: &TrCarState) -> f64 {
+    let (projection, _speed) = facing_projection_and_speed(car);
     if projection < MIN_FORWARD_SPEED {
         0.0
     } else {
         projection
     }
+}
+
+/// Total speed below which no momentum warning is raised, in uu/s. A
+/// slow-moving car loses little absolute momentum whatever its direction,
+/// and near-stationary velocity direction is mostly physics noise.
+pub const MOMENTUM_WARNING_MIN_SPEED: f64 = 300.0;
+
+/// Unrepresentable (lost) velocity magnitude above which a momentum
+/// warning is raised, in uu/s. Roughly a third of max driving speed:
+/// enough loss to visibly change how a recreated shot plays.
+pub const MOMENTUM_WARNING_MIN_LOST_SPEED: f64 = 400.0;
+
+/// Angle between velocity and facing above which a momentum warning is
+/// raised, in degrees. Past ~30° the car is drifting/sliding rather than
+/// driving where it points, so the along-facing projection misrepresents
+/// the motion even when the lost magnitude is modest.
+pub const MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES: f64 = 30.0;
+
+/// Capture-time diagnostic for momentum capture: a human-readable warning
+/// when a meaningful share of the car's velocity cannot be encoded in the
+/// spawn mesh's scalar `VelocityStartSpeed` (see [`forward_speed`] for why
+/// the format only stores speed-along-facing).
+///
+/// With total speed `s`, emitted forward speed `f` ([`forward_speed`], so
+/// already clamped/flushed) and signed facing projection `p`, the lost
+/// magnitude is `sqrt(max(s² − f², 0))` (reversing ⇒ everything lost) and
+/// the off-axis angle is `acos(clamp(p / s, −1, 1))`. Warns — capture
+/// still proceeds — when `s >` [`MOMENTUM_WARNING_MIN_SPEED`] AND (lost
+/// `>` [`MOMENTUM_WARNING_MIN_LOST_SPEED`] OR angle `>`
+/// [`MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES`]). Returns `None` when the
+/// velocity is representable enough.
+pub fn momentum_warning(car: &TrCarState) -> Option<String> {
+    let (projection, speed) = facing_projection_and_speed(car);
+    if speed <= MOMENTUM_WARNING_MIN_SPEED {
+        return None;
+    }
+    let representable = forward_speed(car);
+    let lost = (speed * speed - representable * representable)
+        .max(0.0)
+        .sqrt();
+    let off_axis_degrees = (projection / speed).clamp(-1.0, 1.0).acos().to_degrees();
+    if lost <= MOMENTUM_WARNING_MIN_LOST_SPEED
+        && off_axis_degrees <= MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES
+    {
+        return None;
+    }
+    Some(format!(
+        "car moving {speed:.0} uu/s at {off_axis_degrees:.0}\u{b0} off facing; \
+         only {representable:.0} uu/s representable as spawn momentum"
+    ))
 }
 
 /// Builds the spawn-point (`DynamicSpawnPointMesh`) archetype for the

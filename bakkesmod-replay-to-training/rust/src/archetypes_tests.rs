@@ -295,3 +295,95 @@ fn spawn_point_momentum_toggle_controls_velocity_start_speed() {
             .contains("\"VelocityStartSpeed\":0.0000"),
     );
 }
+
+/// A car driving where it points (fast, straight down its facing) is fully
+/// representable: no momentum warning.
+#[test]
+fn momentum_warning_none_for_along_facing_motion() {
+    let forward = TrCarState {
+        rotation: TrRotator {
+            pitch: 0,
+            yaw: 16384,
+            roll: 0,
+        },
+        linear_velocity: vec3(0.0, 1400.0, 0.0),
+        ..TrCarState::default()
+    };
+    assert_eq!(momentum_warning(&forward), None);
+}
+
+/// Below the total-speed floor no warning fires, however unrepresentable
+/// the direction: a slow car loses little absolute momentum.
+#[test]
+fn momentum_warning_none_below_min_speed() {
+    // Pure sideways drift, but under MOMENTUM_WARNING_MIN_SPEED.
+    let slow_drift = TrCarState {
+        linear_velocity: vec3(0.0, 250.0, 0.0),
+        ..TrCarState::default()
+    };
+    assert_eq!(momentum_warning(&slow_drift), None);
+}
+
+/// A fast lateral drift (facing +X, moving +Y) loses everything to the
+/// projection: warns with the documented wording and numbers.
+#[test]
+fn momentum_warning_fires_for_fast_sideways_drift() {
+    let drift = TrCarState {
+        linear_velocity: vec3(0.0, 900.0, 0.0),
+        ..TrCarState::default()
+    };
+    assert_eq!(
+        momentum_warning(&drift).as_deref(),
+        Some(
+            "car moving 900 uu/s at 90\u{b0} off facing; only 0 uu/s representable as spawn momentum"
+        )
+    );
+}
+
+/// Reversing (velocity opposed to facing) clamps the emitted speed to 0,
+/// so the whole magnitude is lost and the angle exceeds 90 degrees.
+#[test]
+fn momentum_warning_fires_for_reversing_car() {
+    let reversing = TrCarState {
+        linear_velocity: vec3(-1000.0, 0.0, 0.0),
+        ..TrCarState::default()
+    };
+    assert_eq!(
+        momentum_warning(&reversing).as_deref(),
+        Some(
+            "car moving 1000 uu/s at 180\u{b0} off facing; only 0 uu/s representable as spawn momentum"
+        )
+    );
+}
+
+/// The angle gate catches a fast slide even when the lost magnitude stays
+/// under the lost-speed threshold, and a mild off-axis angle under both
+/// thresholds stays quiet.
+#[test]
+fn momentum_warning_angle_gate_and_quiet_zone() {
+    // 45 degrees off facing at 500 uu/s: lost = 500*sin(45) ~ 354 <= 400,
+    // but the angle (45 > 30) trips the warning.
+    let sliding = TrCarState {
+        linear_velocity: vec3(353.5534, 353.5534, 0.0),
+        ..TrCarState::default()
+    };
+    assert_eq!(
+        momentum_warning(&sliding).as_deref(),
+        Some(
+            "car moving 500 uu/s at 45\u{b0} off facing; only 354 uu/s representable as spawn momentum"
+        )
+    );
+
+    // 20 degrees off at 800 uu/s: lost = 800*sin(20) ~ 274 <= 400 and the
+    // angle is under 30, so the capture is representable enough.
+    let angle = 20.0_f64.to_radians();
+    let mild = TrCarState {
+        linear_velocity: vec3(
+            (800.0 * angle.cos()) as f32,
+            (800.0 * angle.sin()) as f32,
+            0.0,
+        ),
+        ..TrCarState::default()
+    };
+    assert_eq!(momentum_warning(&mild), None);
+}

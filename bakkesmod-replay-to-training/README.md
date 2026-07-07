@@ -154,13 +154,32 @@ only `should_mirror` in `rust/src/mirror.rs` needs to flip.
 ## Car momentum capture (`replay_to_training_capture_momentum`, default on)
 
 The spawn-point mesh's `VelocityStartSpeed` field is the editor's
-car-start-speed feature (a facing plus a scalar speed; `0.0` everywhere in
-the corpus). With the toggle on, the plugin writes the captured car's
-forward speed — its velocity projected onto its facing — so the training
-car starts moving like it did in the replay. Lateral drift and reverse
-motion are not representable and clamp to `0.0`. Starting boost is
-TODO(in-game), pending discovery of the archetype key from a user-authored
-editor pack.
+car-start-speed feature, and the game's own class dump (RLSDK
+`TAGame.DynamicSpawnPointMesh_TA`) shows the class carries **only**
+`VelocityStartSpeed: float` and `MaxStartSpeed: float` — no direction
+property (the ball's `Ball_GameEditor_TA`, by contrast, has a full
+`VelocityStartRotation: FRotator` next to its speed). Car spawn momentum
+is scalar-along-facing **by the game's class design**, so a full velocity
+vector is not representable and forward projection — the captured
+velocity projected onto the car's facing — is the maximal-fidelity
+encoding the format admits. With the toggle on, the plugin writes that
+forward speed so the training car starts moving like it did in the
+replay; lateral drift and reverse motion clamp to `0.0`.
+
+When the captured car's velocity is meaningfully unrepresentable — total
+speed above 300 uu/s AND (lost magnitude above 400 uu/s OR velocity more
+than 30° off the facing) — the capture still proceeds but **warns**, e.g.
+`warning: car moving 1320 uu/s at 74° off facing; only 338 uu/s
+representable as spawn momentum`. The warning is appended to the capture
+status message (and thus the BakkesMod console log) and stays on a
+dedicated colored line in the capture window and F2 page until the next
+warning-free capture or a new pack.
+
+Starting boost is **not supported by the format**: the class dump shows no
+starting-boost property on either editor class. `MaxStartSpeed` exists on
+the spawn-mesh class and MAY clamp large written speeds — TODO(in-game):
+check whether captured speeds above the editor slider max survive (the
+plugin does not emit `MaxStartSpeed`).
 
 ## Target (persistent default save)
 
@@ -231,11 +250,14 @@ under a per-account `<online-id>\` folder).
 ## What a captured shot contains
 
 The `.tem` archetype format stores: ball location + initial velocity
-(direction/speed), and one player car location + rotation. Car velocity,
-boost, and ball/car angular velocity are **not representable** in the
-format (confirmed by the typed archetype structs in
-`subtr-actor-training`); the plugin still captures them across the ABI so
-nothing needs to change if the format ever grows those fields. Only the
+(direction/speed), one player car location + rotation, and the car's
+forward speed (the scalar spawn momentum described above). Full car
+velocity, boost, and ball/car angular velocity are **not representable**
+in the format (confirmed by the typed archetype structs in
+`subtr-actor-training` and, for car velocity direction and starting
+boost, definitively by the game's class dump); the plugin still captures
+them across the ABI so nothing needs to change if the format ever grows
+those fields. Only the
 primary car (the replay camera's view target, falling back to the first
 car) is written into the round.
 

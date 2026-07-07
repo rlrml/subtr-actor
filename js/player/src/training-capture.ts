@@ -58,6 +58,14 @@ export interface CapturedCarState {
    * `null`/absent falls back to the identity rotator (facing +X).
    */
   rotation?: Quaternion | null;
+  /**
+   * Car velocity, raw Unreal units per second. Only the along-facing
+   * component is representable as spawn momentum (the spawn mesh class has
+   * a scalar `VelocityStartSpeed` and no direction property, per the
+   * game's class dump), so this feeds {@link momentumLossWarning} rather
+   * than the serialized archetypes.
+   */
+  linearVelocity?: Vec3 | null;
 }
 
 /** One replay frame's states to turn into a training round. */
@@ -153,6 +161,75 @@ export function quaternionToRotator(rotation: Quaternion): RotatorUnits {
     yaw: radiansToRotatorUnits(Math.atan2(forward.y, forward.x)),
     roll: radiansToRotatorUnits(Math.atan2(right.z, up.z)),
   };
+}
+
+/**
+ * Forward speeds below this (uu/s) count as `0` spawn momentum, matching
+ * the BakkesMod plugin's physics-noise flush (`MIN_FORWARD_SPEED` in
+ * `bakkesmod-replay-to-training/rust/src/archetypes.rs`).
+ */
+export const MIN_FORWARD_SPEED = 1;
+
+/**
+ * Total speed below which no momentum warning is raised, in uu/s. A
+ * slow-moving car loses little absolute momentum whatever its direction.
+ */
+export const MOMENTUM_WARNING_MIN_SPEED = 300;
+
+/**
+ * Unrepresentable (lost) velocity magnitude above which a momentum
+ * warning is raised, in uu/s.
+ */
+export const MOMENTUM_WARNING_MIN_LOST_SPEED = 400;
+
+/**
+ * Angle between velocity and facing above which a momentum warning is
+ * raised, in degrees: past this the car is drifting/sliding rather than
+ * driving where it points.
+ */
+export const MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES = 30;
+
+/**
+ * Capture-time diagnostic for spawn momentum, mirroring the BakkesMod
+ * plugin's `momentum_warning` (same thresholds, same wording): the spawn
+ * mesh stores only a scalar speed along the car's facing, so when a
+ * meaningful share of the captured car's velocity is off-facing the
+ * capture misrepresents the motion. With total speed `s`, representable
+ * forward speed `f` (the facing projection, clamped at 0 and flushed
+ * below {@link MIN_FORWARD_SPEED}) and signed projection `p`, the lost
+ * magnitude is `sqrt(max(s² − f², 0))` and the off-axis angle is
+ * `acos(clamp(p / s, −1, 1))`. Returns the warning string when `s >`
+ * {@link MOMENTUM_WARNING_MIN_SPEED} AND (lost `>`
+ * {@link MOMENTUM_WARNING_MIN_LOST_SPEED} OR angle `>`
+ * {@link MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES}), `null` when the
+ * velocity is representable enough.
+ */
+export function momentumLossWarning(car: CapturedCarState): string | null {
+  const velocity = car.linearVelocity;
+  const x = velocity?.x ?? 0;
+  const y = velocity?.y ?? 0;
+  const z = velocity?.z ?? 0;
+  const speed = Math.hypot(x, y, z);
+  if (speed <= MOMENTUM_WARNING_MIN_SPEED) {
+    return null;
+  }
+  const forward = car.rotation
+    ? rotateVectorByQuaternion({ x: 1, y: 0, z: 0 }, car.rotation)
+    : { x: 1, y: 0, z: 0 };
+  const projection = x * forward.x + y * forward.y + z * forward.z;
+  const representable = projection < MIN_FORWARD_SPEED ? 0 : projection;
+  const lost = Math.sqrt(Math.max(speed * speed - representable * representable, 0));
+  const offAxisDegrees = (Math.acos(Math.min(Math.max(projection / speed, -1), 1)) * 180) / Math.PI;
+  if (
+    lost <= MOMENTUM_WARNING_MIN_LOST_SPEED &&
+    offAxisDegrees <= MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES
+  ) {
+    return null;
+  }
+  return (
+    `car moving ${Math.round(speed)} uu/s at ${Math.round(offAxisDegrees)}\u{b0} off facing; ` +
+    `only ${Math.round(representable)} uu/s representable as spawn momentum`
+  );
 }
 
 /** Builds the ball archetype of a captured round. */

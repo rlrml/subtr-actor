@@ -64,6 +64,7 @@ private:
   using PackStringLen = size_t (*)(const TrPack *);
   using PackWriteString = size_t (*)(const TrPack *, uint8_t *, size_t);
   using PackAddShot = int32_t (*)(TrPack *, const TrCapturedShot *);
+  using MomentumNote = size_t (*)(const TrCarState *, uint8_t *, size_t);
   using PackRemoveShot = int32_t (*)(TrPack *, size_t);
   using PackShotCount = size_t (*)(const TrPack *);
   using PackShotSummaryLen = size_t (*)(const TrPack *, size_t);
@@ -98,6 +99,7 @@ private:
   PackStringLen packNameLen = nullptr;
   PackWriteString packWriteName = nullptr;
   PackAddShot packAddShot = nullptr;
+  MomentumNote momentumNote = nullptr;
   PackRemoveShot packRemoveShot = nullptr;
   PackShotCount packShotCount = nullptr;
   PackShotSummaryLen packShotSummaryLen = nullptr;
@@ -120,6 +122,11 @@ private:
 
   uintptr_t imguiContext = 0;
   std::string statusLine = "replay-to-training: loading";
+  // The most recent capture's momentum-loss warning (empty when the last
+  // capture was clean). Shown as a dedicated colored line by
+  // renderStatusLine (both the capture window and the F2 page); cleared by
+  // the next warning-free capture and by newPack.
+  std::string momentumWarningLine;
   std::array<char, 128> packNameBuffer{};
   std::array<char, 128> creatorNameBuffer{};
   std::array<char, 512> outputDirBuffer{};
@@ -149,6 +156,10 @@ private:
   std::string shotSummary(size_t index);
   std::string rustCoreBuildInfo();
   std::string fileGuidHexString(const std::string &path);
+  // Momentum-loss warning for a captured car state (empty when the
+  // velocity is representable as spawn momentum); see
+  // replay_to_training_momentum_note.
+  std::string momentumNoteString(const TrCarState &car);
 
   // capture.cpp
   std::string buildId() const;
