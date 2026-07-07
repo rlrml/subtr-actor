@@ -7,108 +7,67 @@
 // (existing rounds included), capture appends to memory, and save writes
 // memory back to the target path. See recorder.rs `save_to_target`.
 //
-// Sanitize/discover logic is adapted from
-// rlrml-training-pack-snapshot/plugin/TrainingPackSnapshotPlugin.cpp
-// (sanitizeTrainingSaveName / discoverTrainingTargets).
+// All path logic (sanitizing, discovery, resolution, default save dir) lives
+// in the Rust core (rust/src/targets.rs) behind the ABI, where it is
+// unit-tested; this file only marshals strings across. The Rust side is
+// account-directory aware: the game keeps the listing folders under
+// `<root>\<account>\MyTraining` etc. (e.g. `Training\0000000000000000\
+// MyTraining\*.Tem`), with a root-level `MyTraining` also scanned for
+// robustness.
 
-#include <cctype>
-#include <sstream>
-#include <string_view>
 #include <system_error>
 
 namespace {
 
-std::string trimWhitespace(std::string value) {
-  const auto notSpace = [](unsigned char ch) { return !std::isspace(ch); };
-  value.erase(value.begin(),
-              std::find_if(value.begin(), value.end(), notSpace));
-  value.erase(std::find_if(value.rbegin(), value.rend(), notSpace).base(),
-              value.end());
-  return value;
+// Reads a `size_t (const char*, uint8_t*, size_t)`-shaped ABI string
+// function into a std::string, given the exact byte length.
+template <typename WriteFn>
+std::string readAbiString(size_t length, WriteFn &&write) {
+  if (length == 0) {
+    return {};
+  }
+  std::string text(length, '\0');
+  const size_t written =
+      write(reinterpret_cast<uint8_t *>(text.data()), text.size());
+  text.resize(written);
+  return text;
 }
-
-std::string toLower(std::string value) {
-  std::transform(value.begin(), value.end(), value.begin(),
-                 [](unsigned char ch) { return std::tolower(ch); });
-  return value;
-}
-
-bool hasTemExtension(const std::filesystem::path &path) {
-  return toLower(path.extension().string()) == ".tem";
-}
-
-// The subfolders the game lists custom training from, under the Training
-// root. Targets resolve into one of these.
-constexpr std::array<std::string_view, 2> kTargetFolders = {"MyTraining",
-                                                            "Downloaded"};
 
 }  // namespace
 
-// Normalizes a user-entered target: trims, converts '/'→'\\', drops a
-// trailing .tem/.Tem, and — when the name is `<parent>\<stem>` with a known
-// parent (MyTraining/Downloaded) — canonicalizes the parent's case, e.g.
-// "mytraining/AEB.tem" -> "MyTraining\\AEB". A bare stem is returned as-is
-// (resolveTargetPath defaults it into MyTraining\).
+// Normalizes a user-entered target via the Rust core: trims, '/' -> '\\',
+// drops a trailing .tem/.Tem, canonicalizes a known folder's case, and
+// collapses a pasted full path to `<account>\<Folder>\<stem>`. Empty when
+// the name sanitizes to nothing or the Rust ABI is unavailable.
 std::string ReplayToTrainingPlugin::sanitizeTargetName(std::string value) {
-  value = trimWhitespace(std::move(value));
-  std::replace(value.begin(), value.end(), '/', '\\');
-
-  constexpr std::string_view suffix = ".tem";
-  if (value.size() >= suffix.size() &&
-      toLower(value.substr(value.size() - suffix.size())) == suffix) {
-    value.erase(value.size() - suffix.size());
+  if (!sanitizeTarget) {
+    return {};
   }
-
-  std::vector<std::string> components;
-  std::stringstream stream(value);
-  std::string component;
-  while (std::getline(stream, component, '\\')) {
-    if (!component.empty()) {
-      components.push_back(component);
-    }
-  }
-  if (components.size() >= 2) {
-    const std::string parent = toLower(components[components.size() - 2]);
-    for (const std::string_view folder : kTargetFolders) {
-      if (parent == toLower(std::string(folder))) {
-        return std::string(folder) + "\\" + components.back();
-      }
-    }
-  }
-  return value;
+  // Sanitizing only ever removes or same-length-rewrites characters, so the
+  // input size bounds the output size.
+  return readAbiString(value.size(), [&](uint8_t *buffer, size_t capacity) {
+    return sanitizeTarget(value.c_str(), buffer, capacity);
+  });
 }
 
-// The Training root that holds the MyTraining\ and Downloaded\ subfolders.
-// Reuses the same resolution as the output directory (cvar override, then
-// %USERPROFILE%\...\TAGame\Training).
+// The Training root that holds the account directories and the MyTraining\
+// and Downloaded\ subfolders. Reuses the same resolution as the output
+// directory (cvar override, then %USERPROFILE%\...\TAGame\Training).
 std::filesystem::path ReplayToTrainingPlugin::resolveTrainingRoot() {
   return resolveOutputDirectory();
 }
 
-// Turns a sanitized target name into an on-disk path
-// `<trainingRoot>/<sub>/<stem>.Tem`. A bare stem (no subfolder) defaults
-// into MyTraining\, which is where the game lists locally created packs.
-std::filesystem::path ReplayToTrainingPlugin::resolveTargetPath(
-    const std::string &sanitizedName) {
-  if (sanitizedName.empty()) {
-    return {};
-  }
-  std::filesystem::path relative;
-  const size_t separator = sanitizedName.find('\\');
-  if (separator == std::string::npos) {
-    relative = std::filesystem::path("MyTraining") / sanitizedName;
-  } else {
-    relative = std::filesystem::path(sanitizedName.substr(0, separator)) /
-               std::filesystem::path(sanitizedName.substr(separator + 1));
-  }
-  return resolveTrainingRoot() / relative.replace_extension(".Tem");
-}
-
-// Scans MyTraining\ and Downloaded\ under the Training root for .Tem files
-// and returns their sanitized `<sub>\<stem>` names (sorted).
+// Scans the Training root (root-level and per-account MyTraining\ and
+// Downloaded\) for .Tem files via the Rust core and returns their target
+// names, sorted. Duplicate stems across accounts come back qualified as
+// `<account>\<Folder>\<stem>`.
 std::vector<std::string> ReplayToTrainingPlugin::discoverTargets(
     std::string &error) {
   std::vector<std::string> targets;
+  if (!targetsLen || !writeTargets) {
+    error = "rust library not loaded";
+    return targets;
+  }
   const std::filesystem::path root = resolveTrainingRoot();
   std::error_code ec;
   if (root.empty() || !std::filesystem::exists(root, ec) ||
@@ -119,32 +78,21 @@ std::vector<std::string> ReplayToTrainingPlugin::discoverTargets(
     return targets;
   }
 
-  for (const std::string_view folderView : kTargetFolders) {
-    const std::string folder(folderView);
-    const std::filesystem::path directory = root / folder;
-    if (!std::filesystem::exists(directory, ec) ||
-        !std::filesystem::is_directory(directory, ec)) {
-      ec.clear();
-      continue;
+  const std::string rootString = root.string();
+  const std::string joined = readAbiString(
+      targetsLen(rootString.c_str()), [&](uint8_t *buffer, size_t capacity) {
+        return writeTargets(rootString.c_str(), buffer, capacity);
+      });
+  size_t begin = 0;
+  while (begin < joined.size()) {
+    size_t end = joined.find('\n', begin);
+    if (end == std::string::npos) {
+      end = joined.size();
     }
-    std::vector<std::string> folderTargets;
-    std::filesystem::directory_iterator it(
-        directory, std::filesystem::directory_options::skip_permission_denied,
-        ec);
-    const std::filesystem::directory_iterator end;
-    for (; !ec && it != end; it.increment(ec)) {
-      if (it->is_regular_file(ec) && hasTemExtension(it->path())) {
-        folderTargets.push_back(
-            sanitizeTargetName(folder + "\\" + it->path().stem().string()));
-      }
+    if (end > begin) {
+      targets.emplace_back(joined.substr(begin, end - begin));
     }
-    if (ec) {
-      error = "Stopped scanning " + folder + " after filesystem error: " +
-              ec.message();
-      return targets;
-    }
-    std::sort(folderTargets.begin(), folderTargets.end());
-    targets.insert(targets.end(), folderTargets.begin(), folderTargets.end());
+    begin = end + 1;
   }
   return targets;
 }
@@ -159,13 +107,37 @@ void ReplayToTrainingPlugin::clearTarget() {
 // exists it is OPENED into memory (existing rounds shown in the shot list,
 // so capture appends to them); otherwise a fresh pack is started but the
 // target path is remembered so the first save creates the file there.
+//
+// Resolution is account-directory aware (Rust core): an unqualified
+// `MyTraining\<stem>` binds to the single location where that file exists
+// (root-level or any account dir), or into the sole account dir for a new
+// name. When the same stem exists under several accounts the set is refused
+// with the qualified `<account>\MyTraining\<stem>` candidates, which are
+// also accepted here directly.
 void ReplayToTrainingPlugin::setTarget(const std::string &requested) {
+  if (!resolveTarget) {
+    setStatus("rust library not loaded");
+    return;
+  }
   const std::string sanitized = sanitizeTargetName(requested);
   if (sanitized.empty()) {
     setStatus("target name is empty after sanitizing");
     return;
   }
-  const std::filesystem::path resolved = resolveTargetPath(sanitized);
+  const std::string rootString = resolveTrainingRoot().string();
+  std::string resolvedBuffer(4096, '\0');
+  const int32_t outcome = resolveTarget(
+      rootString.c_str(), sanitized.c_str(),
+      reinterpret_cast<uint8_t *>(resolvedBuffer.data()),
+      resolvedBuffer.size());
+  if (outcome < 0) {
+    // -2 = ambiguous across accounts (message lists the qualified
+    // candidates to use), -1 = invalid name.
+    setStatus(std::format("target not set: {}", globalErrorMessage()));
+    return;
+  }
+  resolvedBuffer.resize(static_cast<size_t>(outcome));
+  const std::filesystem::path resolved(resolvedBuffer);
   std::snprintf(targetBuffer.data(), targetBuffer.size(), "%s",
                 sanitized.c_str());
   setCvarString("replay_to_training_target_save_name", sanitized);

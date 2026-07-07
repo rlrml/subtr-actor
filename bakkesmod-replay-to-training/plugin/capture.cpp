@@ -102,6 +102,14 @@ void ReplayToTrainingPlugin::registerCvarsAndNotifiers() {
       "file. Empty = auto <GUID>.Tem in replay_to_training_output_dir.",
       true);
   cvarManager->registerCvar(
+      "replay_to_training_autosave",
+      "1",
+      "Autosave after each captured shot: runs the normal save flow (to the "
+      "target when one is set, else an auto <GUID>.Tem) so captures land on "
+      "disk immediately. 0 keeps captures in memory until "
+      "replay_to_training_save_pack.",
+      true);
+  cvarManager->registerCvar(
       "replay_to_training_time_limit",
       "8.0",
       "Per-shot time limit in seconds for captured rounds.",
@@ -315,9 +323,30 @@ void ReplayToTrainingPlugin::captureShot() {
     return;
   }
   const size_t count = packShotCount ? packShotCount(pack) : 0;
-  setStatus(std::format("captured shot {} at replay time {:.1f}s",
-                        count,
-                        server.GetReplayTimeElapsed()));
+  if (autosaveEnabled()) {
+    // Run the normal save flow (target-bound with its clobber guardrails
+    // when a target is set, else auto-GUID) so the capture is on disk
+    // immediately.
+    std::string saveMessage;
+    if (savePackInternal(saveMessage)) {
+      // saveMessage reads "saved ..." -> "captured shot N; autosaved ...".
+      setStatus(std::format("captured shot {}; auto{}", count, saveMessage));
+    } else {
+      setStatus(std::format("captured shot {}; autosave failed: {}", count,
+                            saveMessage));
+    }
+    return;
+  }
+  setStatus(std::format(
+      "captured shot {} at replay time {:.1f}s (unsaved; "
+      "replay_to_training_save_pack writes it)",
+      count,
+      server.GetReplayTimeElapsed()));
+}
+
+bool ReplayToTrainingPlugin::autosaveEnabled() {
+  auto cvar = cvarManager->getCvar("replay_to_training_autosave");
+  return static_cast<bool>(cvar) ? cvar.getBoolValue() : true;
 }
 
 std::filesystem::path ReplayToTrainingPlugin::resolveOutputDirectory() {
@@ -325,12 +354,11 @@ std::filesystem::path ReplayToTrainingPlugin::resolveOutputDirectory() {
   if (!configured.empty()) {
     return std::filesystem::path(configured);
   }
-  // The game lists locally created packs from MyTraining\ under this
-  // Training root (older builds used a per-account <online-id>\MyTraining
-  // subfolder). Prefer setting a target (replay_to_training_target
-  // MyTraining\<name>), which resolves into MyTraining\ automatically and is
-  // what the game lists; point replay_to_training_output_dir here only for
-  // the no-target auto-GUID fallback.
+  // The game lists locally created packs from <account>\MyTraining\ under
+  // this Training root (the per-account directory is inserted by the game;
+  // a root-level MyTraining\ also works on some setups). Target resolution
+  // and the auto-GUID default save dir handle the account directory in the
+  // Rust core; this only picks the root.
   char *profile = nullptr;
   size_t profileLength = 0;
   if (_dupenv_s(&profile, &profileLength, "USERPROFILE") == 0 && profile) {
@@ -341,10 +369,38 @@ std::filesystem::path ReplayToTrainingPlugin::resolveOutputDirectory() {
   return gameWrapper->GetDataFolder() / "replay-to-training";
 }
 
+// The directory untargeted auto-GUID saves land in. The Rust core redirects
+// into `<root>\<account>\MyTraining\` when the Training root contains
+// exactly one account directory (so the pack shows up under Training >
+// Custom Training in-game); otherwise the root itself, matching the old
+// behavior.
+std::filesystem::path ReplayToTrainingPlugin::defaultSaveDirectory() {
+  const std::filesystem::path root = resolveTrainingRoot();
+  if (!defaultSaveDir) {
+    return root;
+  }
+  const std::string rootString = root.string();
+  std::string directory(4096, '\0');
+  const size_t written = defaultSaveDir(
+      rootString.c_str(), reinterpret_cast<uint8_t *>(directory.data()),
+      directory.size());
+  if (written == 0) {
+    return root;
+  }
+  directory.resize(written);
+  return std::filesystem::path(directory);
+}
+
 void ReplayToTrainingPlugin::savePack() {
+  std::string message;
+  savePackInternal(message);
+  setStatus(std::move(message));
+}
+
+bool ReplayToTrainingPlugin::savePackInternal(std::string &message) {
   if (!rustLoaded || !pack || !packSave) {
-    setStatus("rust library not loaded");
-    return;
+    message = "rust library not loaded";
+    return false;
   }
   applyMetadataToPack();
 
@@ -357,38 +413,39 @@ void ReplayToTrainingPlugin::savePack() {
         packSaveToTarget(pack, activeTargetPath.string().c_str());
     switch (outcome) {
       case 0:
-        setStatus(std::format("saved (created) target {}",
-                              activeTargetPath.string()));
-        break;
+        message = std::format("saved (created) target {}",
+                              activeTargetPath.string());
+        return true;
       case 1:
-        setStatus(std::format("saved (appended) target {}",
-                              activeTargetPath.string()));
-        break;
+        message = std::format("saved (appended) target {}",
+                              activeTargetPath.string());
+        return true;
       case 2:
         // Refused: last-error explains ("target already contains a different
         // pack; ..."). Nothing was written.
-        setStatus(std::format("save refused: {}", packErrorMessage()));
-        break;
+        message = std::format("save refused: {}", packErrorMessage());
+        return false;
       default:
-        setStatus(std::format("save failed: {}", packErrorMessage()));
-        break;
+        message = std::format("save failed: {}", packErrorMessage());
+        return false;
     }
-    return;
   }
 
-  // No target: auto <GUID>.Tem in the output directory (unchanged).
+  // No target: auto <GUID>.Tem in the default save directory (the sole
+  // account's MyTraining\ when one exists, else the Training root).
   const std::string guidHex = packGuidHexString();
   if (guidHex.empty()) {
-    setStatus("could not derive pack GUID");
-    return;
+    message = "could not derive pack GUID";
+    return false;
   }
   const std::filesystem::path outputPath =
-      resolveOutputDirectory() / (guidHex + ".Tem");
+      defaultSaveDirectory() / (guidHex + ".Tem");
   if (packSave(pack, outputPath.string().c_str()) != 0) {
-    setStatus(std::format("save failed: {}", packErrorMessage()));
-    return;
+    message = std::format("save failed: {}", packErrorMessage());
+    return false;
   }
-  setStatus(std::format("saved {}", outputPath.string()));
+  message = std::format("saved {}", outputPath.string());
+  return true;
 }
 
 void ReplayToTrainingPlugin::removeShot(size_t index) {

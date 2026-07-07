@@ -50,6 +50,11 @@ private:
   using PackSave = int32_t (*)(TrPack *, const char *);
   using PackSaveToTarget = int32_t (*)(TrPack *, const char *);
   using FileGuidHex = size_t (*)(const char *, uint8_t *, size_t);
+  using SanitizeTarget = size_t (*)(const char *, uint8_t *, size_t);
+  using TargetsLen = size_t (*)(const char *);
+  using WriteTargets = size_t (*)(const char *, uint8_t *, size_t);
+  using ResolveTarget = int32_t (*)(const char *, const char *, uint8_t *, size_t);
+  using DefaultSaveDir = size_t (*)(const char *, uint8_t *, size_t);
   using GlobalErrorLen = size_t (*)();
   using GlobalWriteError = size_t (*)(uint8_t *, size_t);
 
@@ -77,6 +82,11 @@ private:
   PackSave packSave = nullptr;
   PackSaveToTarget packSaveToTarget = nullptr;
   FileGuidHex fileGuidHex = nullptr;
+  SanitizeTarget sanitizeTarget = nullptr;
+  TargetsLen targetsLen = nullptr;
+  WriteTargets writeTargets = nullptr;
+  ResolveTarget resolveTarget = nullptr;
+  DefaultSaveDir defaultSaveDir = nullptr;
   PackStringLen packLastErrorLen = nullptr;
   PackWriteString packWriteLastError = nullptr;
   GlobalErrorLen globalLastErrorLen = nullptr;
@@ -122,17 +132,28 @@ private:
   void applyMetadataToPack();
   void captureShot();
   void savePack();
+  // Runs the save flow (target-bound when a target is set, auto-GUID
+  // otherwise) without touching the status line; the human-readable outcome
+  // goes into `message`. Shared by the manual save button/notifier and the
+  // capture autosave.
+  bool savePackInternal(std::string &message);
+  bool autosaveEnabled();
   void removeShot(size_t index);
   float timeLimitSeconds();
   std::filesystem::path resolveOutputDirectory();
+  // Where untargeted auto-GUID saves land: the Rust core redirects into the
+  // sole account's MyTraining\ under the Training root when there is exactly
+  // one account directory, else the root itself.
+  std::filesystem::path defaultSaveDirectory();
   std::string cvarString(const char *name, const std::string &fallback);
   void setCvarString(const char *name, const std::string &value);
   void setStatus(std::string message);
 
-  // target.cpp — persistent default-save target.
+  // target.cpp — persistent default-save target. Path logic (sanitizing,
+  // discovery, resolution) lives in the Rust core (rust/src/targets.rs)
+  // behind the ABI so it is unit-testable; these are thin wrappers.
   std::filesystem::path resolveTrainingRoot();
   std::string sanitizeTargetName(std::string value);
-  std::filesystem::path resolveTargetPath(const std::string &sanitizedName);
   std::vector<std::string> discoverTargets(std::string &error);
   void setTarget(const std::string &requested);
   void clearTarget();

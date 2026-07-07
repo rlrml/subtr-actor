@@ -477,6 +477,151 @@ pub unsafe extern "C" fn replay_to_training_file_guid_hex(
     }
 }
 
+// --- target path logic (see `targets` module docs for the account-dir
+// layout) ---
+
+/// Sanitizes a user-entered target name (slash/case/extension
+/// normalization; a pasted full path collapses to
+/// `<account>\Folder\<stem>`). Writes the result into `out_bytes`; returns
+/// bytes written (`0` for a null/invalid or empty-after-sanitizing name).
+///
+/// # Safety
+///
+/// `name` must be null or a valid NUL-terminated C string; `out_bytes` must
+/// be null or valid for `max_bytes` writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_sanitize_target(
+    name: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(name) = (unsafe { utf8_arg(name) }) else {
+        return 0;
+    };
+    unsafe {
+        write_text(
+            &crate::targets::sanitize_target_name(name),
+            out_bytes,
+            max_bytes,
+        )
+    }
+}
+
+fn joined_targets(root: &str) -> String {
+    crate::targets::discover_targets(std::path::Path::new(root)).join("\n")
+}
+
+/// Returns the UTF-8 byte length of the newline-joined target list under
+/// the Training `root` (see `replay_to_training_write_targets`).
+///
+/// # Safety
+///
+/// `root` must be null or a valid NUL-terminated C string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_targets_len(root: *const c_char) -> usize {
+    let Some(root) = (unsafe { utf8_arg(root) }) else {
+        return 0;
+    };
+    joined_targets(root).len()
+}
+
+/// Writes the newline-joined, sorted target names discovered under the
+/// Training `root` — scanning both `<root>/<Folder>` and every
+/// `<root>/<account>/<Folder>` — into `out_bytes`; returns bytes written.
+/// Duplicate stems across accounts come back qualified as
+/// `<account>\Folder\<stem>`.
+///
+/// # Safety
+///
+/// `root` must be null or a valid NUL-terminated C string; `out_bytes` must
+/// be null or valid for `max_bytes` writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_write_targets(
+    root: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(root) = (unsafe { utf8_arg(root) }) else {
+        return 0;
+    };
+    unsafe { write_text(&joined_targets(root), out_bytes, max_bytes) }
+}
+
+/// Resolves a target `name` against the Training `root` (account-dir
+/// aware). Returns:
+///
+/// * `>= 0` — bytes of the resolved on-disk path written into `out_bytes`
+///   (the file may not exist yet; the first save creates it),
+/// * `-2` — the unqualified name matched existing files in several
+///   locations; the newline-joined qualified candidate names are written
+///   into `out_bytes` so the caller can tell the user what to pick,
+/// * `-1` — null/invalid arguments or an empty-after-sanitizing name.
+///
+/// Both negative outcomes also record a human-readable message through the
+/// global last-error functions (`replay_to_training_last_error_len` /
+/// `replay_to_training_write_last_error`), so callers can surface it
+/// without decoding `out_bytes`.
+///
+/// # Safety
+///
+/// `root` and `name` must be null or valid NUL-terminated C strings;
+/// `out_bytes` must be null or valid for `max_bytes` writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_resolve_target(
+    root: *const c_char,
+    name: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> i32 {
+    let (Some(root), Some(name)) = (unsafe { utf8_arg(root) }, unsafe { utf8_arg(name) }) else {
+        set_global_error("resolve target: null or non-UTF-8 argument".to_string());
+        return -1;
+    };
+    match crate::targets::resolve_target_path(std::path::Path::new(root), name) {
+        Ok(crate::targets::ResolvedTarget::Path(path)) => {
+            let text = path.to_string_lossy();
+            unsafe { write_text(&text, out_bytes, max_bytes) as i32 }
+        }
+        Ok(crate::targets::ResolvedTarget::Ambiguous(candidates)) => {
+            set_global_error(format!(
+                "target name is ambiguous across accounts; use the qualified \
+                 form: {}",
+                candidates.join(" or ")
+            ));
+            let joined = candidates.join("\n");
+            unsafe { write_text(&joined, out_bytes, max_bytes) };
+            -2
+        }
+        Err(error) => {
+            set_global_error(error);
+            -1
+        }
+    }
+}
+
+/// Writes the directory untargeted (auto-GUID) saves should land in: the
+/// sole account directory's `MyTraining\` when the Training `root` has
+/// exactly one account directory, otherwise `root` itself. Returns bytes
+/// written.
+///
+/// # Safety
+///
+/// `root` must be null or a valid NUL-terminated C string; `out_bytes` must
+/// be null or valid for `max_bytes` writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_default_save_dir(
+    root: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(root) = (unsafe { utf8_arg(root) }) else {
+        return 0;
+    };
+    let dir = crate::targets::default_save_dir(std::path::Path::new(root));
+    let text = dir.to_string_lossy();
+    unsafe { write_text(&text, out_bytes, max_bytes) }
+}
+
 /// Returns the UTF-8 byte length of the pack's last error message.
 ///
 /// # Safety

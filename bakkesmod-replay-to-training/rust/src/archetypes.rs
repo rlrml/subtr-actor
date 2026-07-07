@@ -61,6 +61,35 @@ pub fn ball_spawn(ball: &TrBallState) -> BallSpawn {
     }
 }
 
+/// Minimum spawn-point height in uu. A resting car's origin sits at ~17uu
+/// (half the hitbox height plus wheel clearance); replay physics can sample
+/// a car a hair below that mid-landing, and a spawn point clipped into the
+/// floor produces a broken spawn in the editor. Captured Z is clamped up to
+/// this floor; anything above it (aerial captures) passes through untouched
+/// because mid-air captures are legitimate aerial scenarios.
+pub const MIN_SPAWN_LOCATION_Z: f64 = 17.0;
+
+/// Builds the spawn-point (`DynamicSpawnPointMesh`) archetype for the
+/// captured primary car.
+///
+/// In-game testing showed the game places the training car from THIS entry,
+/// not from the `IsPC` player-car entry (Psyonix packs have all-zero `IsPC`
+/// transforms and still place correctly), so the captured transform must
+/// land here. Location and rotation pass through faithfully apart from the
+/// [`MIN_SPAWN_LOCATION_Z`] clamp; `VelocityStartSpeed` stays 0 like every
+/// corpus spawn point (car velocity is not representable in the format).
+pub fn car_spawn_point(car: &TrCarState) -> CarSpawn {
+    CarSpawn {
+        location_x: f64::from(car.location.x),
+        location_y: f64::from(car.location.y),
+        location_z: f64::from(car.location.z).max(MIN_SPAWN_LOCATION_Z),
+        rotation_p: car.rotation.pitch,
+        rotation_y: car.rotation.yaw,
+        rotation_r: car.rotation.roll,
+        ..CarSpawn::default()
+    }
+}
+
 /// Builds the typed player-car archetype for a captured car state.
 ///
 /// Car linear/angular velocity and boost are not representable in the
@@ -80,9 +109,16 @@ pub fn player_car_spawn(car: &TrCarState) -> PlayerCarSpawn {
 }
 
 /// Builds the full `SerializedArchetypes` list for one captured shot, in
-/// the order every corpus round uses: ball, spawn-point marker (at the
-/// editor's default placement, [`CarSpawn::default`]), then exactly one
-/// `"IsPC":true` player car.
+/// the order every corpus round uses: ball, spawn-point marker, then
+/// exactly one `"IsPC":true` player car.
+///
+/// The spawn-point marker carries the captured primary car's transform
+/// (see [`car_spawn_point`]): in-game testing confirmed the game spawns the
+/// training car from the `DynamicSpawnPointMesh` entry, so emitting it at
+/// the editor default put every captured shot at center field. The `IsPC`
+/// entry keeps the same captured transform it always carried — Psyonix
+/// packs zero it, but the game demonstrably ignores it for placement, and
+/// keeping it preserves information for round-trip tooling.
 ///
 /// The emitted car is the captured car flagged `is_primary` (falling back
 /// to the first captured car, or a default car at the origin when none were
@@ -92,10 +128,6 @@ pub fn player_car_spawn(car: &TrCarState) -> PlayerCarSpawn {
 ///
 /// TODO(in-game): revisit multi-car emission if in-game testing shows the
 /// editor accepts more than one car per round.
-/// TODO(in-game): corpus packs always contain exactly one spawn-point
-/// marker at the editor default; whether it is required for the pack to
-/// load, and whether it should track the primary car instead, needs
-/// in-game validation.
 pub fn build_round_archetypes(ball: &TrBallState, cars: &[TrCarState]) -> Vec<String> {
     let primary = cars
         .iter()
@@ -105,7 +137,7 @@ pub fn build_round_archetypes(ball: &TrBallState, cars: &[TrCarState]) -> Vec<St
         .unwrap_or_default();
     vec![
         Archetype::Ball(ball_spawn(ball)).to_archetype_string(),
-        Archetype::CarSpawnPoint(CarSpawn::default()).to_archetype_string(),
+        Archetype::CarSpawnPoint(car_spawn_point(&primary)).to_archetype_string(),
         Archetype::PlayerCar(player_car_spawn(&primary)).to_archetype_string(),
     ]
 }

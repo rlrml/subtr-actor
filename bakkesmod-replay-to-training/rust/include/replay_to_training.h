@@ -126,6 +126,35 @@ int32_t replay_to_training_pack_save_to_target(TrPack *pack, const char *path);
  * pack. Used by the plugin's clobber guard. */
 size_t replay_to_training_file_guid_hex(const char *path, uint8_t *out_bytes, size_t max_bytes);
 
+/* Target path logic (account-dir aware: the game keeps the listing folders
+ * under `<root>/<account>/MyTraining` etc., where <account> is a 16-digit
+ * or online-id directory; a root-level `MyTraining` is also scanned for
+ * robustness).
+ *
+ * - sanitize_target: normalizes a user-entered name; returns bytes written
+ *   (0 when empty/invalid).
+ * - targets_len / write_targets: newline-joined sorted names discovered
+ *   under `root`; duplicate stems across accounts come back qualified as
+ *   `<account>\Folder\<stem>`.
+ * - resolve_target: >= 0 = bytes of the resolved on-disk path written;
+ *   -2 = ambiguous (newline-joined qualified candidates written);
+ *   -1 = invalid/empty name.
+ * - default_save_dir: directory untargeted auto-GUID saves land in (the
+ *   sole account's MyTraining when exactly one account dir exists, else
+ *   `root`); returns bytes written. */
+size_t replay_to_training_sanitize_target(const char *name, uint8_t *out_bytes, size_t max_bytes);
+size_t replay_to_training_targets_len(const char *root);
+size_t replay_to_training_write_targets(const char *root, uint8_t *out_bytes, size_t max_bytes);
+int32_t replay_to_training_resolve_target(
+    const char *root,
+    const char *name,
+    uint8_t *out_bytes,
+    size_t max_bytes);
+size_t replay_to_training_default_save_dir(
+    const char *root,
+    uint8_t *out_bytes,
+    size_t max_bytes);
+
 /* Per-pack last error (set by failed pack operations). */
 size_t replay_to_training_pack_last_error_len(const TrPack *pack);
 size_t replay_to_training_pack_write_last_error(

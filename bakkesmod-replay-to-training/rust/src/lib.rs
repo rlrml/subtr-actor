@@ -17,6 +17,7 @@ pub mod abi;
 pub mod archetypes;
 pub mod ffi;
 pub mod recorder;
+pub mod targets;
 
 pub use abi::{TrBallState, TrCapturedShot, TrCarState, TrRotator, TrVec3};
 pub use ffi::TrPack;
