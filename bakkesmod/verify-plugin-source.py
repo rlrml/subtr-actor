@@ -570,6 +570,8 @@ def main() -> int:
     # surfaces out of the BakkesMod launcher even though the web player retains them.
     # The missed-event capture window is a post-hoc recall-labeling tool for the web
     # stats player, so it is likewise web-only and stays out of the live plugin.
+    # The training-pack capture window authors .tem files from the web player and is
+    # unrelated to the live stats plugin, so it is web-only as well.
     plugin_excluded_web_window_ids = (
         "camera",
         "playback",
@@ -577,6 +579,7 @@ def main() -> int:
         "replay-loading",
         "touch-legend",
         "missed-events",
+        "training-pack",
     )
     plugin_expected_web_singleton_window_ids = tuple(
         window_id
