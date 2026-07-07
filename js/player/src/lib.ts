@@ -168,6 +168,27 @@ export {
 export { ensureBindingsReady, loadReplayFromBytes, validateReplayBytes } from "./wasm";
 export { TrainingPackFile, defaultTrainingPack } from "./training-pack";
 export type { TrainingPackBindings, TrainingPackFileOptions } from "./training-pack";
+export {
+  DEFAULT_TRAINING_SHOT_TIME_LIMIT_SECONDS,
+  MIN_CAR_SPAWN_Z,
+  appendCapturedRound,
+  ballSpawnFromReplayState,
+  capturedTrainingPackDefaults,
+  carSpawnFromReplayState,
+  generateTrainingPackGuid,
+  playerCarSpawnFromReplayState,
+  quaternionToRotator,
+  radiansToRotatorUnits,
+  trainingPackFileName,
+  trainingPackGuidHex,
+  velocityToRotatorAndSpeed,
+} from "./training-capture";
+export type {
+  CapturedBallState,
+  CapturedCarState,
+  RotatorUnits,
+  TrainingCaptureOptions,
+} from "./training-capture";
 export type { Guid } from "./generated/Guid";
 export type { PlayerId } from "./generated/PlayerId";
 export type { Round } from "./generated/Round";
