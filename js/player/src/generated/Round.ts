@@ -5,6 +5,7 @@
  */
 export type Round = { time_limit: number,
 /**
- * Opaque archetype strings, preserved exactly.
+ * Raw archetype strings, preserved exactly. Parse them with
+ * [`crate::archetype::Archetype::parse`].
  */
 serialized_archetypes: Array<string>, };

@@ -19,8 +19,11 @@
 //! * [`TrainingPack`] — a typed view mirroring `TrainingEditorData_TA`
 //!   (name, code, difficulty, rounds, ...), with edit methods on
 //!   [`TrainingFile`] that write back into the tree so unknown data
-//!   survives edits. `SerializedArchetypes` strings are opaque in this
-//!   phase and preserved exactly.
+//!   survives edits.
+//! * [`Archetype`] — structured parsing/editing of the per-round
+//!   `SerializedArchetypes` strings (ball, car spawn point, player car).
+//!   Parsing is on demand and editing regenerates only the string being
+//!   modified; untouched strings are preserved exactly.
 //!
 //! # Example
 //!
@@ -35,6 +38,7 @@
 //! std::fs::write("edited.tem", file.to_bytes().unwrap()).unwrap();
 //! ```
 
+pub mod archetype;
 pub mod container;
 pub mod crc32;
 pub mod crypto;
@@ -43,6 +47,7 @@ pub mod io;
 pub mod pack;
 pub mod property;
 
+pub use archetype::{Archetype, BallSpawn, CarSpawn, PlayerCarSpawn};
 pub use container::{SaveObject, TrainingFile, VersionInfo};
 pub use error::{Error, Result};
 pub use io::UeString;
