@@ -111,9 +111,9 @@ fmt:
 fmt-check:
     {{nix_develop}} cargo fmt --all -- --check
 
-# Run clippy (matches CI: --all-targets --all-features -D warnings)
+# Run clippy (matches CI: --workspace --all-targets --all-features -D warnings)
 clippy:
-    {{nix_develop}} cargo clippy --all-targets --all-features -- -D warnings
+    {{nix_develop}} cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 # Regenerate the README overview section from the src/lib.rs crate docs
 readme:
@@ -141,7 +141,7 @@ check-rust:
     {{nix_develop}} python3 scripts/check_release_versions.py
     {{nix_develop}} cargo fmt --all -- --check
     {{nix_develop}} cargo metadata --locked --format-version 1 > /dev/null
-    {{nix_develop}} cargo clippy --all-targets --all-features -- -D warnings
+    {{nix_develop}} cargo clippy --workspace --all-targets --all-features -- -D warnings
     {{nix_develop}} cargo rdme --check --heading-base-level 0
 
 # JS/TS style gate (prettier + eslint; mirrors CI "Check JS/TS style")
