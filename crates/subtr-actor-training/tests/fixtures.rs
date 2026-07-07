@@ -4,7 +4,7 @@
 //! files are personal data and are not committed to the repository; those
 //! tests skip silently when the variable is unset).
 
-use subtr_actor_training::{Difficulty, TrainingFile, TrainingType, crypto};
+use subtr_actor_training::{Archetype, Difficulty, TrainingFile, TrainingType, crypto};
 
 const SYNTHETIC: &[u8] = include_bytes!("../assets/synthetic-pack.tem");
 
@@ -67,4 +67,49 @@ fn real_fixtures_roundtrip_byte_for_byte() {
         checked += 1;
     }
     assert!(checked > 0, "no .tem/.save files found in {dir}");
+}
+
+/// Every archetype string in the real fixtures must parse to a *structured*
+/// archetype (no `Unknown` fallback), and regenerating the string from the
+/// parsed value must be semantically lossless (reparse to an equal value).
+#[test]
+fn real_fixture_archetypes_all_parse_structured() {
+    let Ok(dir) = std::env::var("SUBTR_ACTOR_TEM_FIXTURE_DIR") else {
+        eprintln!("SUBTR_ACTOR_TEM_FIXTURE_DIR unset; skipping");
+        return;
+    };
+    let mut checked_strings = 0;
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        let extension = path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(str::to_ascii_lowercase);
+        if !matches!(extension.as_deref(), Some("tem") | Some("save")) {
+            continue;
+        }
+        let file = TrainingFile::from_bytes(&std::fs::read(&path).unwrap()).unwrap();
+        // `.save` editor files may not contain training data; only packs
+        // with a typed view participate.
+        let Ok(pack) = file.pack() else { continue };
+        for (round_index, round) in pack.rounds.iter().enumerate() {
+            for (archetype_index, raw) in round.serialized_archetypes.iter().enumerate() {
+                let parsed = Archetype::parse(raw);
+                assert!(
+                    !matches!(parsed, Archetype::Unknown { .. }),
+                    "unstructured archetype in {path:?} round {round_index} \
+                     index {archetype_index}: {raw}"
+                );
+                let regenerated = parsed.to_archetype_string();
+                assert_eq!(
+                    Archetype::parse(&regenerated),
+                    parsed,
+                    "semantic round-trip failed in {path:?} round {round_index} \
+                     index {archetype_index}:\n  original:    {raw}\n  regenerated: {regenerated}"
+                );
+                checked_strings += 1;
+            }
+        }
+    }
+    assert!(checked_strings > 0, "no archetype strings found in {dir}");
 }

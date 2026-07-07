@@ -36,7 +36,7 @@
 //! (Steam ids exceed `Number.MAX_SAFE_INTEGER`).
 
 use serde::Serialize;
-use subtr_actor_training::{Round, TrainingFile, TrainingPack};
+use subtr_actor_training::{Archetype, BallSpawn, Round, TrainingFile, TrainingPack};
 use wasm_bindgen::prelude::*;
 
 fn training_file_from_bytes(data: &[u8]) -> Result<TrainingFile, JsValue> {
@@ -72,6 +72,29 @@ fn typed_pack_from_js(typed_pack: JsValue) -> Result<TrainingPack, JsValue> {
 fn round_from_js(round: JsValue) -> Result<Round, JsValue> {
     serde_wasm_bindgen::from_value(round)
         .map_err(|e| JsValue::from_str(&format!("Failed to read training round: {e}")))
+}
+
+fn archetypes_to_js(archetypes: &[Archetype]) -> Result<JsValue, JsValue> {
+    // `serialize_maps_as_objects` keeps each archetype's `extras` map a plain
+    // JS object (matching the generated `Record<string, unknown>` type)
+    // instead of an ES `Map`; `serialize_missing_as_null` keeps `Option`
+    // fields as `null` to match the generated TS types.
+    let serializer = serde_wasm_bindgen::Serializer::new()
+        .serialize_maps_as_objects(true)
+        .serialize_missing_as_null(true);
+    archetypes
+        .serialize(&serializer)
+        .map_err(|e| JsValue::from_str(&format!("Failed to convert archetypes to JS: {e}")))
+}
+
+fn archetype_from_js(archetype: JsValue) -> Result<Archetype, JsValue> {
+    serde_wasm_bindgen::from_value(archetype)
+        .map_err(|e| JsValue::from_str(&format!("Failed to read archetype: {e}")))
+}
+
+fn ball_from_js(ball: JsValue) -> Result<BallSpawn, JsValue> {
+    serde_wasm_bindgen::from_value(ball)
+        .map_err(|e| JsValue::from_str(&format!("Failed to read ball spawn: {e}")))
 }
 
 /// Parse an encrypted `.tem` file into the typed `TrainingPack` view.
@@ -217,4 +240,90 @@ pub fn training_pack_append_rounds(
 ) -> Result<String, JsValue> {
     let other = training_file_from_lossless(other_lossless)?;
     edit_training_file(lossless, |file| file.append_rounds_from(&other).map(|_| ()))
+}
+
+// --- round archetype editing ---
+//
+// Parsing is on demand and edits regenerate only the archetype string being
+// modified, so untouched archetype strings stay byte-identical (see the
+// `subtr_actor_training::archetype` module docs for the fidelity model).
+
+/// Parse the archetypes of the round at `round_index` into an array of
+/// typed `Archetype` values (a `kind`-tagged union; unrecognized strings
+/// come back as `kind: "Unknown"` carrying the raw string verbatim).
+#[wasm_bindgen]
+pub fn training_pack_round_archetypes(
+    lossless: &str,
+    round_index: usize,
+) -> Result<JsValue, JsValue> {
+    let file = training_file_from_lossless(lossless)?;
+    let archetypes = file
+        .round_archetypes(round_index)
+        .map_err(|e| JsValue::from_str(&format!("Failed to read round archetypes: {e}")))?;
+    archetypes_to_js(&archetypes)
+}
+
+/// Replace the archetype at `archetype_index` of round `round_index`.
+#[wasm_bindgen]
+pub fn training_pack_set_round_archetype(
+    lossless: &str,
+    round_index: usize,
+    archetype_index: usize,
+    archetype: JsValue,
+) -> Result<String, JsValue> {
+    let archetype = archetype_from_js(archetype)?;
+    edit_training_file(lossless, |file| {
+        file.set_round_archetype(round_index, archetype_index, &archetype)
+    })
+}
+
+/// Append an archetype to the round at `round_index`.
+#[wasm_bindgen]
+pub fn training_pack_add_round_archetype(
+    lossless: &str,
+    round_index: usize,
+    archetype: JsValue,
+) -> Result<String, JsValue> {
+    let archetype = archetype_from_js(archetype)?;
+    edit_training_file(lossless, |file| {
+        file.add_round_archetype(round_index, &archetype)
+    })
+}
+
+/// Remove the archetype at `archetype_index` of round `round_index`.
+#[wasm_bindgen]
+pub fn training_pack_remove_round_archetype(
+    lossless: &str,
+    round_index: usize,
+    archetype_index: usize,
+) -> Result<String, JsValue> {
+    edit_training_file(lossless, |file| {
+        file.remove_round_archetype(round_index, archetype_index)
+            .map(|_| ())
+    })
+}
+
+/// Set the ball of the round at `round_index`: replaces the round's first
+/// ball archetype, or inserts one at position 0 if the round has none.
+#[wasm_bindgen]
+pub fn training_pack_set_round_ball(
+    lossless: &str,
+    round_index: usize,
+    ball: JsValue,
+) -> Result<String, JsValue> {
+    let ball = ball_from_js(ball)?;
+    edit_training_file(lossless, |file| file.set_round_ball(round_index, &ball))
+}
+
+/// Set the time limit of the round at `round_index` in place (0 removes the
+/// property, matching the game's omit-default convention).
+#[wasm_bindgen]
+pub fn training_pack_set_round_time_limit(
+    lossless: &str,
+    round_index: usize,
+    time_limit: f32,
+) -> Result<String, JsValue> {
+    edit_training_file(lossless, |file| {
+        file.set_round_time_limit(round_index, time_limit)
+    })
 }

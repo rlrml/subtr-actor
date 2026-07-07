@@ -4,8 +4,8 @@
 //! `SaveData_GameEditor_Training_TA` fields. It is a *view*: reading builds
 //! it from the tree, and the edit methods on [`TrainingFile`] write back
 //! into the tree in place, so unknown properties are retained in position.
-//! `SerializedArchetypes` strings are treated as opaque and preserved
-//! exactly.
+//! `SerializedArchetypes` strings are preserved exactly here; structured
+//! parsing/editing of them lives in [`crate::archetype`].
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -162,7 +162,8 @@ pub struct PlayerId {
 #[ts(export)]
 pub struct Round {
     pub time_limit: f32,
-    /// Opaque archetype strings, preserved exactly.
+    /// Raw archetype strings, preserved exactly. Parse them with
+    /// [`crate::archetype::Archetype::parse`].
     pub serialized_archetypes: Vec<String>,
 }
 

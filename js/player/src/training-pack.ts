@@ -1,6 +1,12 @@
+import type { Archetype } from "./generated/Archetype";
+import type { BallSpawn } from "./generated/BallSpawn";
+import type { CarSpawn } from "./generated/CarSpawn";
 import type { Guid } from "./generated/Guid";
+import type { PlayerCarSpawn } from "./generated/PlayerCarSpawn";
 import type { Round } from "./generated/Round";
 import type { TrainingPack } from "./generated/TrainingPack";
+
+export type { Archetype, BallSpawn, CarSpawn, PlayerCarSpawn };
 
 /**
  * The subset of the `@rlrml/subtr-actor` WASM exports used for training pack
@@ -25,6 +31,29 @@ export interface TrainingPackBindings {
   training_pack_move_round(lossless: string, from: number, to: number): string;
   training_pack_duplicate_round(lossless: string, index: number): string;
   training_pack_append_rounds(lossless: string, otherLossless: string): string;
+  training_pack_round_archetypes(lossless: string, roundIndex: number): unknown;
+  training_pack_set_round_archetype(
+    lossless: string,
+    roundIndex: number,
+    archetypeIndex: number,
+    archetype: unknown,
+  ): string;
+  training_pack_add_round_archetype(
+    lossless: string,
+    roundIndex: number,
+    archetype: unknown,
+  ): string;
+  training_pack_remove_round_archetype(
+    lossless: string,
+    roundIndex: number,
+    archetypeIndex: number,
+  ): string;
+  training_pack_set_round_ball(lossless: string, roundIndex: number, ball: unknown): string;
+  training_pack_set_round_time_limit(
+    lossless: string,
+    roundIndex: number,
+    timeLimit: number,
+  ): string;
 }
 
 export interface TrainingPackFileOptions {
@@ -61,6 +90,57 @@ export function defaultTrainingPack(): TrainingPack {
     unowned: false,
     perfect_completed: false,
     shots_completed: 0,
+  };
+}
+
+/**
+ * The ball of a freshly created editor round (centered in front of the
+ * orange goal, lobbed toward it), mirroring the Rust `BallSpawn::default()`.
+ */
+export function defaultBallSpawn(): BallSpawn {
+  return {
+    start_location_x: 0,
+    start_location_y: 4120,
+    start_location_z: 100.4872,
+    velocity_start_rotation_p: 8191,
+    velocity_start_rotation_y: -16384,
+    velocity_start_rotation_r: 0,
+    velocity_start_speed: 1500,
+    extras: {},
+  };
+}
+
+/**
+ * The car spawn point of a freshly created editor round (center field,
+ * facing the orange goal), mirroring the Rust `CarSpawn::default()`.
+ */
+export function defaultCarSpawn(): CarSpawn {
+  return {
+    location_x: 0,
+    location_y: 0,
+    location_z: 30,
+    rotation_p: 0,
+    rotation_y: 16384,
+    rotation_r: 0,
+    velocity_start_speed: 0,
+    extras: {},
+  };
+}
+
+/**
+ * A player car entry with a zeroed transform, mirroring the Rust
+ * `PlayerCarSpawn::default()`.
+ */
+export function defaultPlayerCarSpawn(): PlayerCarSpawn {
+  return {
+    is_pc: true,
+    location_x: 0,
+    location_y: 0,
+    location_z: 0,
+    rotation_p: 0,
+    rotation_y: 0,
+    rotation_r: 0,
+    extras: {},
   };
 }
 
@@ -316,6 +396,76 @@ export class TrainingPackFile {
   /** Duplicate the round at `index`, inserting the copy right after it. */
   duplicateRound(index: number): void {
     this.apply(() => this.bindings.training_pack_duplicate_round(this.lossless, index));
+  }
+
+  /**
+   * The parsed archetypes of the round at `roundIndex` (ball, car spawn
+   * point, player car — or `kind: "Unknown"` carrying the raw string for
+   * anything unrecognized). Parsing is on demand; the round keeps its
+   * original strings until an archetype is edited.
+   */
+  getRoundArchetypes(roundIndex: number): Archetype[] {
+    return rethrowAsError(
+      () => this.bindings.training_pack_round_archetypes(this.lossless, roundIndex) as Archetype[],
+    );
+  }
+
+  /**
+   * Replace the archetype at `archetypeIndex` of round `roundIndex`. Only
+   * that one serialized string is regenerated; all other strings in the
+   * file stay byte-identical.
+   */
+  setRoundArchetype(roundIndex: number, archetypeIndex: number, archetype: Archetype): void {
+    this.apply(() =>
+      this.bindings.training_pack_set_round_archetype(
+        this.lossless,
+        roundIndex,
+        archetypeIndex,
+        archetype,
+      ),
+    );
+  }
+
+  /** Append an archetype to the round at `roundIndex`. */
+  addRoundArchetype(roundIndex: number, archetype: Archetype): void {
+    this.apply(() =>
+      this.bindings.training_pack_add_round_archetype(this.lossless, roundIndex, archetype),
+    );
+  }
+
+  /**
+   * Remove the archetype at `archetypeIndex` of round `roundIndex`,
+   * returning its parsed view.
+   */
+  removeRoundArchetype(roundIndex: number, archetypeIndex: number): Archetype {
+    const removed = this.getRoundArchetypes(roundIndex)[archetypeIndex];
+    this.apply(() =>
+      this.bindings.training_pack_remove_round_archetype(this.lossless, roundIndex, archetypeIndex),
+    );
+    return removed;
+  }
+
+  /**
+   * Set the ball of the round at `roundIndex`: replaces the round's first
+   * ball archetype, or inserts one at position 0 if the round has none.
+   */
+  setRoundBall(roundIndex: number, ball: BallSpawn): void {
+    this.apply(() => this.bindings.training_pack_set_round_ball(this.lossless, roundIndex, ball));
+  }
+
+  /** Append a car spawn point to the round at `roundIndex`. */
+  addRoundCar(roundIndex: number, car: CarSpawn): void {
+    this.addRoundArchetype(roundIndex, { kind: "CarSpawnPoint", ...car });
+  }
+
+  /**
+   * Set the time limit of the round at `roundIndex` in place (0 removes the
+   * property, matching the game's omit-default convention).
+   */
+  setRoundTimeLimit(roundIndex: number, timeLimit: number): void {
+    this.apply(() =>
+      this.bindings.training_pack_set_round_time_limit(this.lossless, roundIndex, timeLimit),
+    );
   }
 
   /**
