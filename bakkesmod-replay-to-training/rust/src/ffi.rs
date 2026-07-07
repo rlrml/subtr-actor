@@ -2,7 +2,7 @@
 //!
 //! Conventions (mirroring `subtr-actor-bakkesmod`):
 //! * `TrPack` is an opaque handle owned by the caller and freed with
-//!   [`tem_recorder_pack_destroy`].
+//!   [`replay_to_training_pack_destroy`].
 //! * String outputs come as `..._len` / `..._write_...` pairs: the `len`
 //!   function returns the UTF-8 byte length (no NUL), the `write` function
 //!   copies up to `max_bytes` bytes into the caller's buffer and returns
@@ -19,7 +19,7 @@ use std::sync::Mutex;
 use subtr_actor_training::Difficulty;
 
 use crate::abi::TrCapturedShot;
-use crate::recorder::RecorderPack;
+use crate::recorder::{RecorderPack, TargetSaveOutcome, file_guid_hex};
 
 /// Opaque pack handle exposed through the C ABI.
 pub struct TrPack {
@@ -92,9 +92,9 @@ unsafe fn with_pack_mut(
 /// metadata.
 ///
 /// The caller owns the returned pointer and must free it with
-/// `tem_recorder_pack_destroy`. Never returns null.
+/// `replay_to_training_pack_destroy`. Never returns null.
 #[unsafe(no_mangle)]
-pub extern "C" fn tem_recorder_pack_create() -> *mut TrPack {
+pub extern "C" fn replay_to_training_pack_create() -> *mut TrPack {
     Box::into_raw(Box::new(TrPack {
         inner: RecorderPack::new(),
     }))
@@ -103,13 +103,13 @@ pub extern "C" fn tem_recorder_pack_create() -> *mut TrPack {
 /// Opens an existing `.tem` file so new shots append to it.
 ///
 /// Returns null on failure; the message is retrievable through
-/// `tem_recorder_last_error_len` / `tem_recorder_write_last_error`.
+/// `replay_to_training_last_error_len` / `replay_to_training_write_last_error`.
 ///
 /// # Safety
 ///
 /// `path` must be null or a valid NUL-terminated C string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_open(path: *const c_char) -> *mut TrPack {
+pub unsafe extern "C" fn replay_to_training_pack_open(path: *const c_char) -> *mut TrPack {
     let Some(path) = (unsafe { utf8_arg(path) }) else {
         set_global_error("open: path is null or not valid UTF-8".to_string());
         return std::ptr::null_mut();
@@ -123,15 +123,15 @@ pub unsafe extern "C" fn tem_recorder_pack_open(path: *const c_char) -> *mut TrP
     }
 }
 
-/// Destroys a pack handle allocated by `tem_recorder_pack_create` or
-/// `tem_recorder_pack_open`.
+/// Destroys a pack handle allocated by `replay_to_training_pack_create` or
+/// `replay_to_training_pack_open`.
 ///
 /// # Safety
 ///
 /// `pack` must be null or a pointer returned by one of the constructors,
 /// not yet destroyed.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_destroy(pack: *mut TrPack) {
+pub unsafe extern "C" fn replay_to_training_pack_destroy(pack: *mut TrPack) {
     if !pack.is_null() {
         drop(unsafe { Box::from_raw(pack) });
     }
@@ -144,7 +144,10 @@ pub unsafe extern "C" fn tem_recorder_pack_destroy(pack: *mut TrPack) {
 /// `pack` must be a valid pack handle; `name` must be null (clears the
 /// name) or a valid NUL-terminated C string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_set_name(pack: *mut TrPack, name: *const c_char) -> i32 {
+pub unsafe extern "C" fn replay_to_training_pack_set_name(
+    pack: *mut TrPack,
+    name: *const c_char,
+) -> i32 {
     let name = unsafe { utf8_arg(name) }.map(str::to_string);
     unsafe { with_pack_mut(pack, |inner| inner.set_name(name.as_deref())) }
 }
@@ -156,7 +159,10 @@ pub unsafe extern "C" fn tem_recorder_pack_set_name(pack: *mut TrPack, name: *co
 /// `pack` must be a valid pack handle; `code` must be null or a valid
 /// NUL-terminated C string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_set_code(pack: *mut TrPack, code: *const c_char) -> i32 {
+pub unsafe extern "C" fn replay_to_training_pack_set_code(
+    pack: *mut TrPack,
+    code: *const c_char,
+) -> i32 {
     let code = unsafe { utf8_arg(code) }.map(str::to_string);
     unsafe { with_pack_mut(pack, |inner| inner.set_code(code.as_deref())) }
 }
@@ -168,7 +174,7 @@ pub unsafe extern "C" fn tem_recorder_pack_set_code(pack: *mut TrPack, code: *co
 /// `pack` must be a valid pack handle; `creator_name` must be null or a
 /// valid NUL-terminated C string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_set_creator_name(
+pub unsafe extern "C" fn replay_to_training_pack_set_creator_name(
     pack: *mut TrPack,
     creator_name: *const c_char,
 ) -> i32 {
@@ -187,7 +193,7 @@ pub unsafe extern "C" fn tem_recorder_pack_set_creator_name(
 /// `pack` must be a valid pack handle; `map_name` must be a valid
 /// NUL-terminated C string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_set_map_name(
+pub unsafe extern "C" fn replay_to_training_pack_set_map_name(
     pack: *mut TrPack,
     map_name: *const c_char,
 ) -> i32 {
@@ -204,7 +210,7 @@ pub unsafe extern "C" fn tem_recorder_pack_set_map_name(
 ///
 /// `pack` must be a valid pack handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_set_difficulty(
+pub unsafe extern "C" fn replay_to_training_pack_set_difficulty(
     pack: *mut TrPack,
     difficulty: u32,
 ) -> i32 {
@@ -224,7 +230,7 @@ pub unsafe extern "C" fn tem_recorder_pack_set_difficulty(
 ///
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_difficulty(pack: *const TrPack) -> u32 {
+pub unsafe extern "C" fn replay_to_training_pack_difficulty(pack: *const TrPack) -> u32 {
     let Some(pack) = (unsafe { pack_ref(pack) }) else {
         return 1;
     };
@@ -241,7 +247,7 @@ pub unsafe extern "C" fn tem_recorder_pack_difficulty(pack: *const TrPack) -> u3
 ///
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_name_len(pack: *const TrPack) -> usize {
+pub unsafe extern "C" fn replay_to_training_pack_name_len(pack: *const TrPack) -> usize {
     unsafe { pack_ref(pack) }
         .and_then(|pack| pack.inner.pack().ok())
         .and_then(|pack| pack.name)
@@ -257,7 +263,7 @@ pub unsafe extern "C" fn tem_recorder_pack_name_len(pack: *const TrPack) -> usiz
 /// `pack` must be null or a valid pack handle; `out_bytes` must be null or
 /// valid for `max_bytes` writable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_write_name(
+pub unsafe extern "C" fn replay_to_training_pack_write_name(
     pack: *const TrPack,
     out_bytes: *mut u8,
     max_bytes: usize,
@@ -280,7 +286,7 @@ pub unsafe extern "C" fn tem_recorder_pack_write_name(
 /// valid `TrCapturedShot` whose `cars` pointer is valid for `car_count`
 /// elements.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_add_shot(
+pub unsafe extern "C" fn replay_to_training_pack_add_shot(
     pack: *mut TrPack,
     shot: *const TrCapturedShot,
 ) -> i32 {
@@ -303,7 +309,10 @@ pub unsafe extern "C" fn tem_recorder_pack_add_shot(
 ///
 /// `pack` must be a valid pack handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_remove_shot(pack: *mut TrPack, index: usize) -> i32 {
+pub unsafe extern "C" fn replay_to_training_pack_remove_shot(
+    pack: *mut TrPack,
+    index: usize,
+) -> i32 {
     unsafe { with_pack_mut(pack, |inner| inner.remove_shot(index)) }
 }
 
@@ -314,7 +323,7 @@ pub unsafe extern "C" fn tem_recorder_pack_remove_shot(pack: *mut TrPack, index:
 ///
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_shot_count(pack: *const TrPack) -> usize {
+pub unsafe extern "C" fn replay_to_training_pack_shot_count(pack: *const TrPack) -> usize {
     unsafe { pack_ref(pack) }
         .map(|pack| pack.inner.shot_count())
         .unwrap_or(0)
@@ -327,7 +336,7 @@ pub unsafe extern "C" fn tem_recorder_pack_shot_count(pack: *const TrPack) -> us
 ///
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_shot_summary_len(
+pub unsafe extern "C" fn replay_to_training_pack_shot_summary_len(
     pack: *const TrPack,
     index: usize,
 ) -> usize {
@@ -345,7 +354,7 @@ pub unsafe extern "C" fn tem_recorder_pack_shot_summary_len(
 /// `pack` must be null or a valid pack handle; `out_bytes` must be null or
 /// valid for `max_bytes` writable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_write_shot_summary(
+pub unsafe extern "C" fn replay_to_training_pack_write_shot_summary(
     pack: *const TrPack,
     index: usize,
     out_bytes: *mut u8,
@@ -367,7 +376,7 @@ pub unsafe extern "C" fn tem_recorder_pack_write_shot_summary(
 /// `pack` must be null or a valid pack handle; `out_bytes` must be null or
 /// valid for `max_bytes` writable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_guid_hex(
+pub unsafe extern "C" fn replay_to_training_pack_guid_hex(
     pack: *const TrPack,
     out_bytes: *mut u8,
     max_bytes: usize,
@@ -386,11 +395,86 @@ pub unsafe extern "C" fn tem_recorder_pack_guid_hex(
 /// `pack` must be a valid pack handle; `path` must be a valid
 /// NUL-terminated C string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_save(pack: *mut TrPack, path: *const c_char) -> i32 {
+pub unsafe extern "C" fn replay_to_training_pack_save(
+    pack: *mut TrPack,
+    path: *const c_char,
+) -> i32 {
     let Some(path) = (unsafe { utf8_arg(path) }).map(PathBuf::from) else {
         return 1;
     };
     unsafe { with_pack_mut(pack, move |inner| inner.save(&path)) }
+}
+
+/// Non-destructively saves the pack to a target `.tem` `path`. Return codes:
+///
+/// * `0` — created (path did not exist),
+/// * `1` — appended (path held this same pack; write is non-destructive),
+/// * `2` — refused (path holds a DIFFERENT pack this session did not load;
+///   nothing was written), and the pack's last-error is set to an
+///   explanatory message,
+/// * `-1` — a real error occurred (null pack/path, filesystem/parse error);
+///   the pack's last-error is set.
+///
+/// See [`RecorderPack::save_to_target`]; memory is the single source of
+/// truth, so this never merges at the I/O layer.
+///
+/// # Safety
+///
+/// `pack` must be a valid pack handle; `path` must be a valid
+/// NUL-terminated C string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_pack_save_to_target(
+    pack: *mut TrPack,
+    path: *const c_char,
+) -> i32 {
+    let Some(pack) = (unsafe { pack_mut(pack) }) else {
+        return -1;
+    };
+    let Some(path) = (unsafe { utf8_arg(path) }).map(PathBuf::from) else {
+        pack.inner
+            .record_error("save target: path is null or not valid UTF-8".to_string());
+        return -1;
+    };
+    match pack.inner.save_to_target(&path) {
+        Ok(TargetSaveOutcome::Created) => 0,
+        Ok(TargetSaveOutcome::Appended) => 1,
+        Ok(TargetSaveOutcome::RefusedDifferentPack) => {
+            pack.inner.record_error(
+                "target already contains a different pack; open/target it first to append"
+                    .to_string(),
+            );
+            2
+        }
+        Err(error) => {
+            pack.inner.record_error(error);
+            -1
+        }
+    }
+}
+
+/// Writes the GUID of the `.tem` pack at `path` as 32 uppercase hex
+/// characters into `out_bytes`; returns bytes written (32 when large
+/// enough), or `0` when the path is missing/unreadable/unparseable (the
+/// caller cannot distinguish those cases — it only needs "is there a
+/// readable pack GUID here"). Does not touch the in-memory pack.
+///
+/// # Safety
+///
+/// `path` must be a valid NUL-terminated C string; `out_bytes` must be null
+/// or valid for `max_bytes` writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_file_guid_hex(
+    path: *const c_char,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(path) = (unsafe { utf8_arg(path) }) else {
+        return 0;
+    };
+    match file_guid_hex(std::path::Path::new(path)) {
+        Ok(Some(hex)) => unsafe { write_text(&hex, out_bytes, max_bytes) },
+        _ => 0,
+    }
 }
 
 /// Returns the UTF-8 byte length of the pack's last error message.
@@ -399,7 +483,7 @@ pub unsafe extern "C" fn tem_recorder_pack_save(pack: *mut TrPack, path: *const 
 ///
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_last_error_len(pack: *const TrPack) -> usize {
+pub unsafe extern "C" fn replay_to_training_pack_last_error_len(pack: *const TrPack) -> usize {
     unsafe { pack_ref(pack) }
         .map(|pack| pack.inner.last_error().len())
         .unwrap_or(0)
@@ -413,7 +497,7 @@ pub unsafe extern "C" fn tem_recorder_pack_last_error_len(pack: *const TrPack) -
 /// `pack` must be null or a valid pack handle; `out_bytes` must be null or
 /// valid for `max_bytes` writable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_pack_write_last_error(
+pub unsafe extern "C" fn replay_to_training_pack_write_last_error(
     pack: *const TrPack,
     out_bytes: *mut u8,
     max_bytes: usize,
@@ -425,9 +509,9 @@ pub unsafe extern "C" fn tem_recorder_pack_write_last_error(
 }
 
 /// Returns the UTF-8 byte length of the global last error (set by failed
-/// `tem_recorder_pack_open` calls).
+/// `replay_to_training_pack_open` calls).
 #[unsafe(no_mangle)]
-pub extern "C" fn tem_recorder_last_error_len() -> usize {
+pub extern "C" fn replay_to_training_last_error_len() -> usize {
     global_error().len()
 }
 
@@ -438,9 +522,44 @@ pub extern "C" fn tem_recorder_last_error_len() -> usize {
 ///
 /// `out_bytes` must be null or valid for `max_bytes` writable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tem_recorder_write_last_error(
+pub unsafe extern "C" fn replay_to_training_write_last_error(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
     unsafe { write_text(&global_error(), out_bytes, max_bytes) }
+}
+
+/// Build identifier of this Rust core DLL, e.g.
+/// `replay_to_training 1.1.0 build=20eb058 dirty=0 commit_date=2026-07-01T…`.
+/// The hash/dirty/date values are embedded by `build.rs` (environment
+/// override, then git, then `unknown`); the C++ plugin logs this next to its
+/// own build id so mismatched DLL pairs are visible.
+pub(crate) fn build_info() -> String {
+    format!(
+        "replay_to_training {} build={} dirty={} commit_date={}",
+        env!("CARGO_PKG_VERSION"),
+        env!("REPLAY_TO_TRAINING_GIT_HASH"),
+        env!("REPLAY_TO_TRAINING_GIT_DIRTY"),
+        env!("REPLAY_TO_TRAINING_COMMIT_DATE"),
+    )
+}
+
+/// Returns the UTF-8 byte length of the build identifier string.
+#[unsafe(no_mangle)]
+pub extern "C" fn replay_to_training_build_info_len() -> usize {
+    build_info().len()
+}
+
+/// Copies the build identifier into `out_bytes` (up to `max_bytes`, no
+/// NUL); returns bytes written.
+///
+/// # Safety
+///
+/// `out_bytes` must be null or valid for `max_bytes` writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_write_build_info(
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    unsafe { write_text(&build_info(), out_bytes, max_bytes) }
 }

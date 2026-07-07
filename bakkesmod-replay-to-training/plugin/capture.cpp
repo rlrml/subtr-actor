@@ -4,67 +4,105 @@ namespace {
 
 // BakkesMod `Vector` is float Unreal units in the game's own coordinate
 // system, which is exactly what the archetype Location fields store: a
-// direct 1:1 copy with no axis flip or rescale.
-// TODO(phase-3): confirm against typed archetype constructors.
-TrVec3 temRecorderVec3(const Vector &value) {
+// direct 1:1 copy with no axis flip or rescale (confirmed against the typed
+// archetype constructors in subtr-actor-training, which document the
+// Location fields as floats in uu).
+TrVec3 replayToTrainingVec3(const Vector &value) {
   return TrVec3{value.X, value.Y, value.Z};
 }
 
 // BakkesMod `Rotator` is integer Unreal rotator units (65536 = full turn),
-// the same units the archetype RotationP/Y/R fields store: direct copy.
-// TODO(phase-3): confirm against typed archetype constructors.
-TrRotator temRecorderRotator(const Rotator &value) {
+// the same units the archetype RotationP/Y/R fields store: direct copy
+// (confirmed against the typed archetype constructors in
+// subtr-actor-training, which document RotationP/Y/R as integer UE rotator
+// units).
+TrRotator replayToTrainingRotator(const Rotator &value) {
   return TrRotator{value.Pitch, value.Yaw, value.Roll};
 }
 
 }  // namespace
 
-void TemRecorderPlugin::onLoad() {
+std::string ReplayToTrainingPlugin::buildId() const {
+  return std::format(
+      "replay-to-training plugin {} build={} dirty={} commit_date={}",
+      REPLAY_TO_TRAINING_PLUGIN_VERSION,
+      REPLAY_TO_TRAINING_GIT_HASH,
+      REPLAY_TO_TRAINING_GIT_DIRTY ? 1 : 0,
+      REPLAY_TO_TRAINING_COMMIT_DATE);
+}
+
+// Logs both halves of the shipped DLL pair so a mismatched
+// plugin/rust-core install is immediately visible.
+void ReplayToTrainingPlugin::logVersion() {
+  cvarManager->log(buildId());
+  cvarManager->log(std::format("rust core: {}", rustCoreBuildInfo()));
+}
+
+void ReplayToTrainingPlugin::onLoad() {
   registerCvarsAndNotifiers();
 
   rustLoaded = loadRustLibrary();
+  logVersion();
   if (!rustLoaded) {
-    setStatus("tem_recorder.dll not found; capture disabled");
+    setStatus("replay_to_training.dll not found; capture disabled");
     return;
   }
 
-  const std::string defaultName = cvarString("tem_recorder_pack_name", "TEM Recorder Pack");
-  const std::string defaultCreator = cvarString("tem_recorder_creator_name", "");
-  const std::string outputDir = cvarString("tem_recorder_output_dir", "");
+  const std::string defaultName = cvarString("replay_to_training_pack_name", "Replay To Training Pack");
+  const std::string defaultCreator = cvarString("replay_to_training_creator_name", "");
+  const std::string outputDir = cvarString("replay_to_training_output_dir", "");
+  const std::string persistedTarget =
+      cvarString("replay_to_training_target_save_name", "");
   std::snprintf(packNameBuffer.data(), packNameBuffer.size(), "%s", defaultName.c_str());
   std::snprintf(
       creatorNameBuffer.data(), creatorNameBuffer.size(), "%s", defaultCreator.c_str());
   std::snprintf(outputDirBuffer.data(), outputDirBuffer.size(), "%s", outputDir.c_str());
+  std::snprintf(targetBuffer.data(), targetBuffer.size(), "%s", persistedTarget.c_str());
 
-  newPack();
+  if (persistedTarget.empty()) {
+    newPack();
+  } else {
+    // Restore the persisted target: this loads the bound .Tem into memory
+    // (existing rounds included) so a session resumes appending to it.
+    setTarget(persistedTarget);
+  }
 }
 
-void TemRecorderPlugin::onUnload() {
+void ReplayToTrainingPlugin::onUnload() {
   unloadRustLibrary();
 }
 
-void TemRecorderPlugin::registerCvarsAndNotifiers() {
+void ReplayToTrainingPlugin::registerCvarsAndNotifiers() {
   cvarManager->registerCvar(
-      "tem_recorder_output_dir",
+      "replay_to_training_output_dir",
       "",
-      // TODO: the real game directory contains a per-account subfolder
-      // (<online-id>\\MyTraining); users may need to point this cvar there
-      // for the game to list saved packs.
-      "Directory to save .Tem files into. Empty resolves to "
-      "%USERPROFILE%\\Documents\\My Games\\Rocket League\\TAGame\\Training.",
+      // Also serves as the Training root scanned by
+      // replay_to_training_list_targets and used to resolve targets into
+      // MyTraining\ / Downloaded\.
+      "Training root for saving/scanning .Tem files. Empty resolves to "
+      "%USERPROFILE%\\Documents\\My Games\\Rocket League\\TAGame\\Training. "
+      "Set a target to save into MyTraining\\ (what the game lists).",
       true);
   cvarManager->registerCvar(
-      "tem_recorder_pack_name",
-      "TEM Recorder Pack",
+      "replay_to_training_pack_name",
+      "Replay To Training Pack",
       "Display name written into new training packs.",
       true);
   cvarManager->registerCvar(
-      "tem_recorder_creator_name",
+      "replay_to_training_creator_name",
       "",
       "Creator name written into new training packs.",
       true);
   cvarManager->registerCvar(
-      "tem_recorder_time_limit",
+      "replay_to_training_target_save_name",
+      "",
+      "Persistent default-save target, e.g. MyTraining\\<name> or "
+      "Downloaded\\<name>. When set, captures append into that .Tem and "
+      "save writes back to it (non-destructively) instead of a random GUID "
+      "file. Empty = auto <GUID>.Tem in replay_to_training_output_dir.",
+      true);
+  cvarManager->registerCvar(
+      "replay_to_training_time_limit",
       "8.0",
       "Per-shot time limit in seconds for captured rounds.",
       true,
@@ -74,37 +112,55 @@ void TemRecorderPlugin::registerCvarsAndNotifiers() {
       120);
 
   cvarManager->registerNotifier(
-      "tem_recorder_capture_shot",
+      "replay_to_training_capture_shot",
       [this](std::vector<std::string>) { captureShot(); },
       "Captures the current replay frame's ball and car states as a new "
       "shot in the in-memory training pack.",
       PERMISSION_ALL);
   cvarManager->registerNotifier(
-      "tem_recorder_save_pack",
+      "replay_to_training_save_pack",
       [this](std::vector<std::string>) { savePack(); },
       "Saves the in-memory training pack as an encrypted .Tem file in "
-      "tem_recorder_output_dir.",
+      "replay_to_training_output_dir.",
       PERMISSION_ALL);
   cvarManager->registerNotifier(
-      "tem_recorder_new_pack",
+      "replay_to_training_new_pack",
       [this](std::vector<std::string>) { newPack(); },
       "Discards the in-memory training pack and starts a fresh one.",
       PERMISSION_ALL);
   cvarManager->registerNotifier(
-      "tem_recorder_open_pack",
+      "replay_to_training_open_pack",
       [this](std::vector<std::string> params) {
         if (params.size() < 2) {
-          setStatus("usage: tem_recorder_open_pack <path-to-.Tem>");
+          setStatus("usage: replay_to_training_open_pack <path-to-.Tem>");
           return;
         }
         openPackFromPath(params[1]);
       },
       "Opens an existing .Tem file so captured shots append to it. "
-      "Usage: tem_recorder_open_pack <path>",
+      "Usage: replay_to_training_open_pack <path>",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "replay_to_training_version",
+      [this](std::vector<std::string>) { logVersion(); },
+      "Log the loaded plugin and Rust core build identifiers.",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "replay_to_training_target",
+      [this](std::vector<std::string> args) { targetCommand(args); },
+      "Set or show the persistent default-save target. Setting one loads "
+      "that .Tem into memory so captures append to it. "
+      "Usage: replay_to_training_target [MyTraining\\<name>]",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "replay_to_training_list_targets",
+      [this](std::vector<std::string>) { listTargetsCommand(); },
+      "List local custom-training .Tem targets under MyTraining\\ and "
+      "Downloaded\\.",
       PERMISSION_ALL);
 }
 
-void TemRecorderPlugin::newPack() {
+void ReplayToTrainingPlugin::newPack() {
   if (!rustLoaded || !packCreate) {
     setStatus("rust library not loaded");
     return;
@@ -113,11 +169,15 @@ void TemRecorderPlugin::newPack() {
     packDestroy(pack);
   }
   pack = packCreate();
+  // Guardrail (a): a fresh pack is never bound to a target, so it falls back
+  // to the auto-GUID save flow and cannot overwrite a target file. setTarget
+  // re-binds after calling this.
+  clearTarget();
   applyMetadataToPack();
   setStatus(std::format("new pack {}", packGuidHexString()));
 }
 
-void TemRecorderPlugin::openPackFromPath(const std::string &path) {
+void ReplayToTrainingPlugin::openPackFromPath(const std::string &path) {
   if (!rustLoaded || !packOpen) {
     setStatus("rust library not loaded");
     return;
@@ -140,7 +200,7 @@ void TemRecorderPlugin::openPackFromPath(const std::string &path) {
     name.resize(written);
     if (!name.empty()) {
       std::snprintf(packNameBuffer.data(), packNameBuffer.size(), "%s", name.c_str());
-      setCvarString("tem_recorder_pack_name", name);
+      setCvarString("replay_to_training_pack_name", name);
     }
   }
   if (packDifficulty) {
@@ -149,12 +209,12 @@ void TemRecorderPlugin::openPackFromPath(const std::string &path) {
   setStatus(std::format("opened {} ({} shots)", path, count));
 }
 
-void TemRecorderPlugin::applyMetadataToPack() {
+void ReplayToTrainingPlugin::applyMetadataToPack() {
   if (!pack) {
     return;
   }
-  const std::string name = cvarString("tem_recorder_pack_name", "TEM Recorder Pack");
-  const std::string creator = cvarString("tem_recorder_creator_name", "");
+  const std::string name = cvarString("replay_to_training_pack_name", "Replay To Training Pack");
+  const std::string creator = cvarString("replay_to_training_creator_name", "");
   if (packSetName && packSetName(pack, name.c_str()) != 0) {
     setStatus(std::format("set name failed: {}", packErrorMessage()));
   }
@@ -169,13 +229,13 @@ void TemRecorderPlugin::applyMetadataToPack() {
   }
 }
 
-float TemRecorderPlugin::timeLimitSeconds() {
-  auto cvar = cvarManager->getCvar("tem_recorder_time_limit");
+float ReplayToTrainingPlugin::timeLimitSeconds() {
+  auto cvar = cvarManager->getCvar("replay_to_training_time_limit");
   const float value = static_cast<bool>(cvar) ? cvar.getFloatValue() : 8.0f;
   return value > 0.0f ? value : 8.0f;
 }
 
-void TemRecorderPlugin::captureShot() {
+void ReplayToTrainingPlugin::captureShot() {
   if (!rustLoaded || !pack || !packAddShot) {
     setStatus("rust library not loaded");
     return;
@@ -196,15 +256,15 @@ void TemRecorderPlugin::captureShot() {
   }
 
   TrBallState ballState{};
-  ballState.location = temRecorderVec3(ball.GetLocation());
+  ballState.location = replayToTrainingVec3(ball.GetLocation());
   // Ball velocity crosses the ABI as a vector; the Rust side converts it to
   // the direction-rotator + speed encoding the archetype stores.
-  ballState.linear_velocity = temRecorderVec3(ball.GetVelocity());
-  // Not representable in current .tem archetypes; carried for phase-3.
-  ballState.angular_velocity = temRecorderVec3(ball.GetAngularVelocity());
+  ballState.linear_velocity = replayToTrainingVec3(ball.GetVelocity());
+  // Not representable in .tem archetypes; carried across the ABI anyway.
+  ballState.angular_velocity = replayToTrainingVec3(ball.GetAngularVelocity());
 
   // The replay camera's current view target marks the primary (IsPC) car.
-  // TODO(phase-3): pick the spectated player explicitly; the view target
+  // TODO(in-game): pick the spectated player explicitly; the view target
   // can be the ball or a free camera, in which case the first car wins.
   ActorWrapper viewTarget = server.GetViewTarget();
   const std::uintptr_t viewTargetAddress =
@@ -218,12 +278,12 @@ void TemRecorderPlugin::captureShot() {
       continue;
     }
     TrCarState state{};
-    state.location = temRecorderVec3(car.GetLocation());
+    state.location = replayToTrainingVec3(car.GetLocation());
     // Rotator ints pass straight through to the archetype RotationP/Y/R.
-    state.rotation = temRecorderRotator(car.GetRotation());
-    // Not representable in current .tem archetypes; carried for phase-3.
-    state.linear_velocity = temRecorderVec3(car.GetVelocity());
-    state.angular_velocity = temRecorderVec3(car.GetAngularVelocity());
+    state.rotation = replayToTrainingRotator(car.GetRotation());
+    // Not representable in .tem archetypes; carried across the ABI anyway.
+    state.linear_velocity = replayToTrainingVec3(car.GetVelocity());
+    state.angular_velocity = replayToTrainingVec3(car.GetAngularVelocity());
     // Boost is a 0..1 float from BakkesMod; not representable in current
     // .tem archetypes, carried through the ABI for phase-3.
     BoostWrapper boost = car.GetBoostComponent();
@@ -260,16 +320,17 @@ void TemRecorderPlugin::captureShot() {
                         server.GetReplayTimeElapsed()));
 }
 
-std::filesystem::path TemRecorderPlugin::resolveOutputDirectory() {
-  const std::string configured = cvarString("tem_recorder_output_dir", "");
+std::filesystem::path ReplayToTrainingPlugin::resolveOutputDirectory() {
+  const std::string configured = cvarString("replay_to_training_output_dir", "");
   if (!configured.empty()) {
     return std::filesystem::path(configured);
   }
-  // TODO: the game actually lists packs from a per-account subfolder,
-  // %USERPROFILE%\Documents\My Games\Rocket League\TAGame\Training\
-  // <online-id>\MyTraining. Without knowing the account id we default to
-  // the Training root; point tem_recorder_output_dir at the MyTraining
-  // folder to have packs show up in-game.
+  // The game lists locally created packs from MyTraining\ under this
+  // Training root (older builds used a per-account <online-id>\MyTraining
+  // subfolder). Prefer setting a target (replay_to_training_target
+  // MyTraining\<name>), which resolves into MyTraining\ automatically and is
+  // what the game lists; point replay_to_training_output_dir here only for
+  // the no-target auto-GUID fallback.
   char *profile = nullptr;
   size_t profileLength = 0;
   if (_dupenv_s(&profile, &profileLength, "USERPROFILE") == 0 && profile) {
@@ -277,15 +338,45 @@ std::filesystem::path TemRecorderPlugin::resolveOutputDirectory() {
     std::free(profile);
     return base / "Documents" / "My Games" / "Rocket League" / "TAGame" / "Training";
   }
-  return gameWrapper->GetDataFolder() / "tem-recorder";
+  return gameWrapper->GetDataFolder() / "replay-to-training";
 }
 
-void TemRecorderPlugin::savePack() {
+void ReplayToTrainingPlugin::savePack() {
   if (!rustLoaded || !pack || !packSave) {
     setStatus("rust library not loaded");
     return;
   }
   applyMetadataToPack();
+
+  // Target flow: write the in-memory pack back to the bound target path.
+  // Because memory was seeded from that file when the target was set, this
+  // is inherently append/non-destructive; the Rust side additionally refuses
+  // to clobber a different pack that ended up at the path (guardrail (b)).
+  if (!activeTargetPath.empty() && packSaveToTarget) {
+    const int outcome =
+        packSaveToTarget(pack, activeTargetPath.string().c_str());
+    switch (outcome) {
+      case 0:
+        setStatus(std::format("saved (created) target {}",
+                              activeTargetPath.string()));
+        break;
+      case 1:
+        setStatus(std::format("saved (appended) target {}",
+                              activeTargetPath.string()));
+        break;
+      case 2:
+        // Refused: last-error explains ("target already contains a different
+        // pack; ..."). Nothing was written.
+        setStatus(std::format("save refused: {}", packErrorMessage()));
+        break;
+      default:
+        setStatus(std::format("save failed: {}", packErrorMessage()));
+        break;
+    }
+    return;
+  }
+
+  // No target: auto <GUID>.Tem in the output directory (unchanged).
   const std::string guidHex = packGuidHexString();
   if (guidHex.empty()) {
     setStatus("could not derive pack GUID");
@@ -300,7 +391,7 @@ void TemRecorderPlugin::savePack() {
   setStatus(std::format("saved {}", outputPath.string()));
 }
 
-void TemRecorderPlugin::removeShot(size_t index) {
+void ReplayToTrainingPlugin::removeShot(size_t index) {
   if (!rustLoaded || !pack || !packRemoveShot) {
     setStatus("rust library not loaded");
     return;
@@ -312,19 +403,19 @@ void TemRecorderPlugin::removeShot(size_t index) {
   setStatus(std::format("removed shot {}", index + 1));
 }
 
-std::string TemRecorderPlugin::cvarString(const char *name, const std::string &fallback) {
+std::string ReplayToTrainingPlugin::cvarString(const char *name, const std::string &fallback) {
   auto cvar = cvarManager->getCvar(name);
   return static_cast<bool>(cvar) ? cvar.getStringValue() : fallback;
 }
 
-void TemRecorderPlugin::setCvarString(const char *name, const std::string &value) {
+void ReplayToTrainingPlugin::setCvarString(const char *name, const std::string &value) {
   auto cvar = cvarManager->getCvar(name);
   if (static_cast<bool>(cvar)) {
     cvar.setValue(value);
   }
 }
 
-void TemRecorderPlugin::setStatus(std::string message) {
+void ReplayToTrainingPlugin::setStatus(std::string message) {
   statusLine = std::move(message);
-  cvarManager->log(std::format("tem-recorder: {}", statusLine));
+  cvarManager->log(std::format("replay-to-training: {}", statusLine));
 }

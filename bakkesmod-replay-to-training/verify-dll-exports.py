@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Validate built tem-recorder DLL artifacts.
+"""Validate built replay-to-training DLL artifacts.
 
-Checks that ``tem_recorder.dll`` exports exactly the ``tem_recorder_``
-functions declared in ``rust/include/tem_recorder.h`` (the header the C++
-plugin binds with GetProcAddress), and that ``TemRecorderPlugin.dll``
+Checks that ``replay_to_training.dll`` exports exactly the ``replay_to_training_``
+functions declared in ``rust/include/replay_to_training.h`` (the header the C++
+plugin binds with GetProcAddress), and that ``ReplayToTrainingPlugin.dll``
 exposes the BakkesMod plugin entry points. Reuses the PE export-table
 parser from ``bakkesmod/verify-rust-dll-exports.py``.
 """
@@ -17,9 +17,9 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ABI_HEADER = REPO_ROOT / "bakkesmod-tem-recorder/rust/include/tem_recorder.h"
+ABI_HEADER = REPO_ROOT / "bakkesmod-replay-to-training/rust/include/replay_to_training.h"
 PE_EXPORT_VERIFIER = REPO_ROOT / "bakkesmod/verify-rust-dll-exports.py"
-EXPORT_PREFIX = "tem_recorder_"
+EXPORT_PREFIX = "replay_to_training_"
 REQUIRED_BAKKESMOD_EXPORTS = frozenset({"getPlugin", "deleteMe", "exports"})
 
 
@@ -72,9 +72,9 @@ def validate_plugin_dll(path: Path, pe_parser) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--rust-dll", type=Path, required=True, help="tem_recorder.dll artifact")
+    parser.add_argument("--rust-dll", type=Path, required=True, help="replay_to_training.dll artifact")
     parser.add_argument(
-        "--plugin-dll", type=Path, required=True, help="TemRecorderPlugin.dll artifact"
+        "--plugin-dll", type=Path, required=True, help="ReplayToTrainingPlugin.dll artifact"
     )
     args = parser.parse_args()
 

@@ -1412,7 +1412,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "subtr-actor-tem-recorder"
+name = "subtr-actor-replay-to-training"
 version = "1.1.0"
 dependencies = [
  "subtr-actor-training",

@@ -1,5 +1,5 @@
 [package]
-name = "subtr-actor-tem-recorder"
+name = "subtr-actor-replay-to-training"
 version.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -10,7 +10,7 @@ publish = false
 description = "C ABI for saving replay-captured shots into Rocket League custom training pack (.tem) files from a BakkesMod plugin"
 
 [lib]
-name = "tem_recorder"
+name = "replay_to_training"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]

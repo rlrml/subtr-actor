@@ -13,7 +13,7 @@ fn ball_archetype_with_zero_velocity_matches_corpus_shape() {
         angular_velocity: TrVec3::default(),
     };
     assert_eq!(
-        ball_archetype(&ball),
+        Archetype::Ball(ball_spawn(&ball)).to_archetype_string(),
         concat!(
             "{\"ObjectArchetype\":\"Archetypes.Ball.Ball_GameEditor\",",
             "\"StartLocationX\":100.5000,\"StartLocationY\":-200.2500,",
@@ -59,7 +59,7 @@ fn ball_archetype_formats_fixture_location_exactly() {
         linear_velocity: TrVec3::default(),
         angular_velocity: TrVec3::default(),
     };
-    let archetype = ball_archetype(&ball);
+    let archetype = Archetype::Ball(ball_spawn(&ball)).to_archetype_string();
     assert!(
         archetype.contains(
             "\"StartLocationX\":24.5048,\"StartLocationY\":4269.2217,\"StartLocationZ\":224.4333"
@@ -71,7 +71,7 @@ fn ball_archetype_formats_fixture_location_exactly() {
 #[test]
 fn spawn_point_archetype_matches_corpus_default() {
     assert_eq!(
-        spawn_point_archetype(),
+        Archetype::CarSpawnPoint(CarSpawn::default()).to_archetype_string(),
         concat!(
             "{\"ObjectArchetype\":\"Archetypes.GameEditor.DynamicSpawnPointMesh\",",
             "\"LocationX\":0.0000,\"LocationY\":0.0000,\"LocationZ\":30.0000,",
@@ -94,13 +94,47 @@ fn car_archetype_matches_corpus_shape() {
         ..TrCarState::default()
     };
     assert_eq!(
-        car_archetype(&car),
+        Archetype::PlayerCar(player_car_spawn(&car)).to_archetype_string(),
         concat!(
             "{\"IsPC\":true,",
             "\"LocationX\":-599.9999,\"LocationY\":-700.0001,\"LocationZ\":530.0000,",
             "\"RotationP\":-837,\"RotationY\":3634,\"RotationR\":0}"
         )
     );
+}
+
+/// The emitted strings must parse back into the same archetype kinds and
+/// re-serialize byte-identically (stable through a parse/write round
+/// trip). Numeric-value equality is only up to `%.4f` rounding, so the
+/// assertion is on the regenerated strings.
+#[test]
+fn built_archetype_strings_parse_back_to_typed_values() {
+    let ball = TrBallState {
+        location: vec3(24.5, 4269.25, 224.4375),
+        linear_velocity: vec3(500.0, 0.0, 250.0),
+        angular_velocity: TrVec3::default(),
+    };
+    let car = TrCarState {
+        location: vec3(-600.0, -700.0, 17.0),
+        rotation: TrRotator {
+            pitch: -837,
+            yaw: 3634,
+            roll: 0,
+        },
+        is_primary: 1,
+        ..TrCarState::default()
+    };
+    let strings = build_round_archetypes(&ball, &[car]);
+    let parsed: Vec<Archetype> = strings
+        .iter()
+        .map(|string| Archetype::parse(string))
+        .collect();
+    assert!(matches!(parsed[0], Archetype::Ball(_)));
+    assert!(matches!(parsed[1], Archetype::CarSpawnPoint(_)));
+    assert!(matches!(parsed[2], Archetype::PlayerCar(_)));
+    for (archetype, string) in parsed.iter().zip(&strings) {
+        assert_eq!(&archetype.to_archetype_string(), string);
+    }
 }
 
 #[test]

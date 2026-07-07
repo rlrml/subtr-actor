@@ -1,7 +1,7 @@
 //! `repr(C)` types shared with the C++ plugin.
 //!
 //! Every struct here is mirrored by a `typedef struct` in
-//! `include/tem_recorder.h`; sizes and field offsets are locked by
+//! `include/replay_to_training.h`; sizes and field offsets are locked by
 //! `lib_tests.rs` so drift between the two is caught by `cargo test`.
 
 /// A position or velocity vector in Unreal units, matching BakkesMod's
@@ -29,11 +29,11 @@ pub struct TrRotator {
 
 /// Captured ball state for one shot.
 ///
-/// The current `.tem` archetype format stores ball velocity as a direction
-/// rotator plus a speed magnitude and has no angular-velocity field at all;
+/// The `.tem` archetype format stores ball velocity as a direction rotator
+/// plus a speed magnitude and has no angular-velocity field at all
+/// (confirmed by the typed `subtr_actor_training::BallSpawn`);
 /// `angular_velocity` is carried through the ABI anyway so the plugin does
-/// not need to change when the typed archetype constructors land
-/// (TODO(phase-3)).
+/// not need to change if the format ever grows one.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct TrBallState {
@@ -44,10 +44,11 @@ pub struct TrBallState {
 
 /// Captured car state for one shot.
 ///
-/// The current `.tem` archetype format only stores car location and
-/// rotation; `linear_velocity`, `angular_velocity`, and `boost_amount`
-/// (0.0..=1.0 as BakkesMod reports it) are captured for phase-3 but are not
-/// yet representable in the serialized pack.
+/// The `.tem` archetype format only stores car location and rotation
+/// (confirmed by the typed `subtr_actor_training::PlayerCarSpawn`);
+/// `linear_velocity`, `angular_velocity`, and `boost_amount` (0.0..=1.0 as
+/// BakkesMod reports it) are captured across the ABI but are not
+/// representable in the serialized pack.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct TrCarState {
@@ -60,7 +61,8 @@ pub struct TrCarState {
     /// Nonzero for the car the shot is "for"; it becomes the `IsPC` car in
     /// the round archetypes.
     pub is_primary: u8,
-    /// 0 or 1; captured for phase-3, not currently serialized.
+    /// 0 or 1; captured across the ABI, not representable in the
+    /// serialized pack.
     pub team: u8,
 }
 
