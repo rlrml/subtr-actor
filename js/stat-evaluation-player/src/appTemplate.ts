@@ -26,6 +26,7 @@ export function getAppTemplate(): string {
               <button type="button" data-window-toggle="scoreboard">Scoreboard</button>
               <button type="button" data-window-toggle="playback">Playback</button>
               <button type="button" data-window-toggle="recording">Recording</button>
+              <button type="button" data-window-toggle="training-pack">Training pack</button>
               <button type="button" data-window-toggle="mechanics">Events</button>
               <button type="button" data-window-toggle="event-playlist">Event playlist</button>
               <button type="button" data-window-toggle="mechanics-review">Events review</button>
@@ -421,6 +422,70 @@ export function getAppTemplate(): string {
                 <dd id="recording-type">WebM</dd>
               </div>
             </div>
+          </section>
+
+          <section
+            class="floating-window floating-window-training-pack"
+            data-window-id="training-pack"
+            hidden
+            style="--window-x: calc(100vw - 28rem); --window-y: 20rem;"
+          >
+            <header class="floating-window-header">
+              <div>
+                <h2>Training pack</h2>
+              </div>
+              <button class="floating-window-hide" type="button" data-window-hide="training-pack">
+                Hide
+              </button>
+            </header>
+            <label>
+              <span class="label">Pack name</span>
+              <input id="training-pack-name" type="text" placeholder="Captured Training Pack" />
+            </label>
+            <label>
+              <span class="label">Creator</span>
+              <input id="training-pack-creator" type="text" placeholder="Creator name" />
+            </label>
+            <label>
+              <span class="label">Description</span>
+              <input id="training-pack-description" type="text" placeholder="Description" />
+            </label>
+            <label>
+              <span class="label">Difficulty</span>
+              <select id="training-pack-difficulty">
+                <option value="D_Easy">Easy</option>
+                <option value="D_Medium" selected>Medium</option>
+                <option value="D_Hard">Hard</option>
+              </select>
+            </label>
+            <label>
+              <span class="label">Shooter</span>
+              <select id="training-pack-shooter" disabled>
+                <option value="">Followed player (camera)</option>
+              </select>
+            </label>
+            <label>
+              <span class="label">Shot time limit (s)</span>
+              <input
+                id="training-pack-time-limit"
+                type="number"
+                min="0"
+                max="120"
+                step="0.5"
+                value="8"
+              />
+            </label>
+            <div class="transport-row">
+              <button id="training-pack-capture" type="button" disabled>Capture shot</button>
+              <button id="training-pack-download" type="button">Download .Tem</button>
+            </div>
+            <div class="transport-row">
+              <button id="training-pack-load" type="button">Load pack...</button>
+              <button id="training-pack-new" type="button">New pack</button>
+              <input id="training-pack-load-input" type="file" accept=".tem,.Tem" hidden />
+            </div>
+            <ol id="training-pack-shots" class="training-pack-shots"></ol>
+            <p id="training-pack-status" class="training-pack-status"></p>
           </section>
 
           <section

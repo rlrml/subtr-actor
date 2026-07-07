@@ -51,3 +51,33 @@
   min-height: 1rem;
   color: #9fadb7;
 }
+
+/* Shot list + status of the "Training pack" floating window. */
+.training-pack-shots {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  overflow-y: auto;
+  max-height: 12rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.training-pack-shots li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 0.3rem;
+  background: rgba(28, 39, 46, 0.9);
+}
+
+.training-pack-status {
+  margin: 0.4rem 0 0;
+  min-height: 1rem;
+  font-size: 0.8rem;
+  color: #9fadb7;
+}

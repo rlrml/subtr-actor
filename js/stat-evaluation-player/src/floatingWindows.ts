@@ -11,6 +11,7 @@ const SINGLETON_WINDOW_IDS: SingletonWindowId[] = [
   "scoreboard",
   "playback",
   "recording",
+  "training-pack",
   "mechanics",
   "event-playlist",
   "mechanics-review",
