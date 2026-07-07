@@ -68,12 +68,14 @@ catch those locally without running the whole suite:
 - **Always run `just check` clean before committing.** It is the fast gate that
   mirrors CI's blocking lint/compile checks: `check_release_versions.py`,
   `cargo fmt --all -- --check`, `cargo metadata --locked`,
-  `cargo clippy --all-targets --all-features -- -D warnings`, and the JS
-  prettier/eslint style check. If it is not clean, do not commit.
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`, and
+  the JS prettier/eslint style check. If it is not clean, do not commit.
 - Run `just check-rust` or `just check-style` alone when a change is purely
   Rust or purely JS and you want a faster loop. `just check` runs both.
-- Clippy in CI uses `--all-targets --all-features`, so a warning in a test or
-  feature-gated module fails CI even though a plain `cargo build` passes. The
+- Clippy in CI uses `--workspace --all-targets --all-features`, so a warning
+  in a test or feature-gated module of *any* workspace member fails CI even
+  though a plain `cargo build` passes. Without `--workspace`, cargo only lints
+  the root `subtr-actor` package, silently skipping every other member. The
   `just clippy` / `just fmt-check` recipes now use the same flags as CI — bare
   `cargo clippy` / `cargo fmt --check` do not, so prefer the `just` recipes.
 - When you touch JS/TS, or any Rust type that is exported via `ts-rs`, also run
