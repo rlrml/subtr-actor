@@ -16,12 +16,14 @@
 pub mod abi;
 pub mod archetypes;
 pub mod ffi;
+pub mod mirror;
 pub mod recorder;
 pub mod targets;
 
 pub use abi::{TrBallState, TrCapturedShot, TrCarState, TrRotator, TrVec3};
 pub use ffi::TrPack;
-pub use recorder::RecorderPack;
+pub use mirror::CaptureMode;
+pub use recorder::{AddShotOutcome, RecorderPack, ShotOptions};
 
 #[cfg(test)]
 #[path = "lib_tests.rs"]

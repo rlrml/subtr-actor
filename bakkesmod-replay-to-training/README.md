@@ -55,33 +55,99 @@ but capture is disabled.
 
 ## Usage
 
-Notifiers (bindable console commands):
+Notifiers (bindable console commands — all zero-arg by design except
+`open_pack`/`target`; every tunable lives in a persisted cvar edited in the
+capture window):
 
 | Notifier | Effect |
 | --- | --- |
-| `replay_to_training_capture_shot` | Capture the current replay frame as a new shot |
+| `replay_to_training_capture_shot` | Capture the current replay frame as an OFFENSIVE (striker) shot |
+| `replay_to_training_capture_save` | Capture the current replay frame as a DEFENSIVE (goalie) save |
 | `replay_to_training_save_pack` | Save the in-memory pack as `<GUID>.Tem` |
-| `replay_to_training_new_pack` | Start a fresh pack (new GUID) |
+| `replay_to_training_new_pack` | Start a fresh pack (new GUID, pack type unset) |
 | `replay_to_training_open_pack <path>` | Open an existing `.Tem` to append shots to |
 | `replay_to_training_target [<name>]` | Set (or show) the persistent default-save target, e.g. `MyTraining\<name>` |
 | `replay_to_training_list_targets` | List local `.Tem` targets under `MyTraining\` and `Downloaded\` |
+| `replay_to_training_window` | Toggle the standalone capture window (same as `togglemenu replaytotraining`) |
 | `replay_to_training_version` | Log the loaded plugin and Rust core build identifiers |
 
-Suggested binding, so a single key captures a shot while scrubbing a replay:
+Suggested binding, so single keys capture shots/saves while scrubbing a
+replay:
 
 ```
+bind F6 replay_to_training_capture_save
 bind F7 replay_to_training_capture_shot
 bind F8 replay_to_training_save_pack
+bind F9 replay_to_training_window
 ```
 
-Cvars: `replay_to_training_pack_name`, `replay_to_training_creator_name`,
-`replay_to_training_time_limit` (seconds per shot, default 8),
+Cvars (all persisted): `replay_to_training_pack_name`,
+`replay_to_training_creator_name`, `replay_to_training_time_limit` (seconds
+per shot, default 8), `replay_to_training_mirror_by_team` (default on; see
+below), `replay_to_training_capture_momentum` (default on; see below),
+`replay_to_training_autosave` (default on),
 `replay_to_training_output_dir`, and `replay_to_training_target_save_name`
 (persisted target).
 
-A settings page under **F2 > Plugins > replay-to-training** provides the same
-controls plus the captured-shot list (with per-shot Remove buttons), the
-target field / discovered-target picker, and a status/error line.
+## Capture window
+
+`togglemenu replaytotraining` (or `replay_to_training_window`, bindable)
+opens a standalone in-game window — a compact one-stop capture HUD usable
+while watching a replay. It contains: the pack type display + manual
+override dropdown, the per-shot time limit, the mirror-by-team /
+capture-momentum / autosave toggles, pack name / creator fields, the active
+target display with set/clear and the discovered-target picker, capture
+shot / capture save / save / new-pack buttons, the captured-shot list with
+per-shot Remove, and the status line. Every control is backed by its
+persisted cvar. The **F2 > Plugins > replay-to-training** settings page
+keeps the same controls (plus the output-directory and open-path fields)
+for parity.
+
+## Striker vs goalie captures and pack type
+
+The `.tem` format tags the training type (`ETrainingType`) at the PACK
+level — rounds cannot carry their own type. The plugin therefore expresses
+the mode through which zero-arg capture command is used:
+
+- A fresh pack's type is **unset**; the first capture assigns it
+  (`capture_shot` → Striker, `capture_save` → Goalie).
+- Later captures whose mode conflicts with the assigned type (a save into a
+  Striker pack or vice versa) are still recorded — the format cannot
+  distinguish them — but the status line WARNS.
+- The capture window's dropdown can override the type manually, including
+  Aerial and None for publishing metadata.
+- `replay_to_training_new_pack` resets the type to unset.
+
+## Auto-mirroring by team (`replay_to_training_mirror_by_team`, default on)
+
+Training scenarios live in a fixed field frame. Derived from the decoded
+Psyonix striker pack in the corpus ("Diamond Pack May 2023", 9 rounds):
+striker scenarios attack the **+Y** goal (ball spawns bias toward +Y — 7/9
+rounds, deepest +4502uu vs the +Y goal line at 5120uu — with the car placed
+on the −Y side of the ball in 8/9 rounds, and near-goal serves aimed
+straight at +Y). With the standard replay convention that blue / team 0
+defends −Y and attacks +Y, the training player is blue-oriented, so
+captures where the spectated player is on ORANGE are mirrored 180° about
+field center (X/Y locations negated, yaws + half turn, ball velocity yaw
+flipped with pitch preserved) — the whole scenario flips together, so an
+orange breakaway becomes the same breakaway attacking the training goal.
+
+No goalie pack exists in the corpus, so save captures use the natural
+choice that the training player occupies the same field end in both modes
+(goalie defends the −Y goal). **TODO(in-game): validate the goalie
+orientation** — if the game expects goalie packs mirrored the other way,
+only `should_mirror` in `rust/src/mirror.rs` needs to flip.
+
+## Car momentum capture (`replay_to_training_capture_momentum`, default on)
+
+The spawn-point mesh's `VelocityStartSpeed` field is the editor's
+car-start-speed feature (a facing plus a scalar speed; `0.0` everywhere in
+the corpus). With the toggle on, the plugin writes the captured car's
+forward speed — its velocity projected onto its facing — so the training
+car starts moving like it did in the replay. Lateral drift and reverse
+motion are not representable and clamp to `0.0`. Starting boost is
+TODO(in-game), pending discovery of the archetype key from a user-authored
+editor pack.
 
 ## Target (persistent default save)
 

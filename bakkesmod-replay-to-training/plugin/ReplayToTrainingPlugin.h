@@ -11,6 +11,7 @@
 
 #include "bakkesmod/plugin/bakkesmodplugin.h"
 #include "bakkesmod/plugin/PluginSettingsWindow.h"
+#include "bakkesmod/plugin/pluginwindow.h"
 #include "bakkesmod/wrappers/arraywrapper.h"
 #include "bakkesmod/wrappers/Engine/ActorWrapper.h"
 #include "bakkesmod/wrappers/GameObject/BallWrapper.h"
@@ -21,15 +22,32 @@
 #include "replay_to_training.h"
 
 class ReplayToTrainingPlugin : public BakkesMod::Plugin::BakkesModPlugin,
-                               public BakkesMod::Plugin::PluginSettingsWindow {
+                               public BakkesMod::Plugin::PluginSettingsWindow,
+                               public BakkesMod::Plugin::PluginWindow {
 public:
   void onLoad() override;
   void onUnload() override;
   void RenderSettings() override;
   std::string GetPluginName() override;
+  // Shared by PluginSettingsWindow and PluginWindow (same signature, so one
+  // override satisfies both bases).
   void SetImGuiContext(uintptr_t ctx) override;
 
+  // BakkesMod::Plugin::PluginWindow — the standalone capture HUD, opened
+  // in-game with `togglemenu replaytotraining` (window.cpp).
+  void Render() override;
+  std::string GetMenuName() override;
+  std::string GetMenuTitle() override;
+  bool ShouldBlockInput() override;
+  bool IsActiveOverlay() override;
+  void OnOpen() override;
+  void OnClose() override;
+
 private:
+  // Which zero-arg capture command was used; selects the training-pack
+  // semantic (mirroring convention + the type the first capture assigns).
+  // Values match the ABI TrCapturedShot::mode encoding.
+  enum class CaptureMode : uint8_t { Shot = 0, Save = 1 };
   // Function-pointer table for replay_to_training.dll, mirroring
   // rust/include/replay_to_training.h. The Rust cdylib is loaded at runtime via
   // LoadLibraryW/GetProcAddress (like the existing SubtrActorPlugin); the
@@ -40,6 +58,8 @@ private:
   using PackSetString = int32_t (*)(TrPack *, const char *);
   using PackSetDifficulty = int32_t (*)(TrPack *, uint32_t);
   using PackDifficulty = uint32_t (*)(const TrPack *);
+  using PackSetTrainingType = int32_t (*)(TrPack *, uint32_t);
+  using PackTrainingType = uint32_t (*)(const TrPack *);
   using PackStringLen = size_t (*)(const TrPack *);
   using PackWriteString = size_t (*)(const TrPack *, uint8_t *, size_t);
   using PackAddShot = int32_t (*)(TrPack *, const TrCapturedShot *);
@@ -71,6 +91,8 @@ private:
   PackSetString packSetMapName = nullptr;
   PackSetDifficulty packSetDifficulty = nullptr;
   PackDifficulty packDifficulty = nullptr;
+  PackSetTrainingType packSetTrainingType = nullptr;
+  PackTrainingType packTrainingType = nullptr;
   PackStringLen packNameLen = nullptr;
   PackWriteString packWriteName = nullptr;
   PackAddShot packAddShot = nullptr;
@@ -102,6 +124,9 @@ private:
   std::array<char, 512> openPathBuffer{};
   std::array<char, 256> targetBuffer{};
   int difficultyIndex = 1;
+  // Open-state of the standalone PluginWindow (window.cpp); BakkesMod
+  // drives it through OnOpen/OnClose via `togglemenu replaytotraining`.
+  bool captureWindowOpen = false;
 
   // The active target's resolved on-disk path, when a target is set (empty
   // otherwise). Save writes here instead of the auto-GUID path; new_pack
@@ -130,7 +155,7 @@ private:
   void newPack();
   void openPackFromPath(const std::string &path);
   void applyMetadataToPack();
-  void captureShot();
+  void captureShot(CaptureMode mode);
   void savePack();
   // Runs the save flow (target-bound when a target is set, auto-GUID
   // otherwise) without touching the status line; the human-readable outcome
@@ -138,6 +163,13 @@ private:
   // capture autosave.
   bool savePackInternal(std::string &message);
   bool autosaveEnabled();
+  bool mirrorByTeamEnabled();
+  bool captureMomentumEnabled();
+  // Current pack training type in the ABI encoding (0 None, 1 Aerial,
+  // 2 Goalie, 3 Striker, 4 unset, 5 other), and its display label.
+  uint32_t packTrainingTypeIndex();
+  static const char *trainingTypeLabel(uint32_t index);
+  void overridePackTrainingType(uint32_t index);
   void removeShot(size_t index);
   float timeLimitSeconds();
   std::filesystem::path resolveOutputDirectory();
@@ -148,6 +180,18 @@ private:
   std::string cvarString(const char *name, const std::string &fallback);
   void setCvarString(const char *name, const std::string &value);
   void setStatus(std::string message);
+
+  // settings_window.cpp — shared ImGui building blocks used by both the F2
+  // settings page (RenderSettings) and the standalone capture window
+  // (Render). All run on the render thread; anything touching game state
+  // hops to the game thread via gameWrapper->Execute.
+  void renderPackMetadataControls();
+  void renderPackTypeControls();
+  void renderCaptureToggles();
+  void renderTargetControls();
+  void renderPackActions();
+  void renderShotList();
+  void renderStatusLine();
 
   // target.cpp — persistent default-save target. Path logic (sanitizing,
   // discovery, resolution) lives in the Rust core (rust/src/targets.rs)

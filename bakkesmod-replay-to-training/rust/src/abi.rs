@@ -66,8 +66,15 @@ pub struct TrCarState {
     pub team: u8,
 }
 
+/// Capture mode discriminant carried in [`TrCapturedShot::mode`]: `0` for
+/// an offensive (striker/shot) capture, `1` for a defensive (goalie/save)
+/// capture. Mirrors `crate::mirror::CaptureMode`.
+pub const TR_CAPTURE_MODE_SHOT: u8 = 0;
+/// See [`TR_CAPTURE_MODE_SHOT`].
+pub const TR_CAPTURE_MODE_SAVE: u8 = 1;
+
 /// One captured shot: the ball plus every car on the field at the captured
-/// replay frame.
+/// replay frame, and the per-capture options the plugin's cvars selected.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct TrCapturedShot {
@@ -78,4 +85,17 @@ pub struct TrCapturedShot {
     /// when `car_count` is zero.
     pub cars: *const TrCarState,
     pub car_count: usize,
+    /// Capture mode: [`TR_CAPTURE_MODE_SHOT`] (offensive) or
+    /// [`TR_CAPTURE_MODE_SAVE`] (defensive). Decides the pack training
+    /// type assigned by the first capture and the orientation convention
+    /// used by mirroring.
+    pub mode: u8,
+    /// Nonzero to auto-mirror the whole scenario 180° about field center
+    /// when the captured primary car's team does not match the training
+    /// convention for `mode` (cvar `replay_to_training_mirror_by_team`).
+    pub mirror_by_team: u8,
+    /// Nonzero to write the primary car's forward speed into the spawn
+    /// mesh's `VelocityStartSpeed` (cvar
+    /// `replay_to_training_capture_momentum`).
+    pub capture_momentum: u8,
 }

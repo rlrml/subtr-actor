@@ -84,7 +84,7 @@ fn spawn_point_archetype_carries_the_captured_car_transform() {
         ..TrCarState::default()
     };
     assert_eq!(
-        Archetype::CarSpawnPoint(car_spawn_point(&car)).to_archetype_string(),
+        Archetype::CarSpawnPoint(car_spawn_point(&car, false)).to_archetype_string(),
         concat!(
             "{\"ObjectArchetype\":\"Archetypes.GameEditor.DynamicSpawnPointMesh\",",
             "\"LocationX\":-599.9999,\"LocationY\":-700.0001,\"LocationZ\":530.0000,",
@@ -104,7 +104,7 @@ fn spawn_point_clamps_ground_clipping_z_but_passes_airborne_z_through() {
         location: vec3(100.0, 200.0, 12.5),
         ..TrCarState::default()
     };
-    let clipped = car_spawn_point(&clipping);
+    let clipped = car_spawn_point(&clipping, false);
     assert_eq!(clipped.location_z, MIN_SPAWN_LOCATION_Z);
     assert!(
         Archetype::CarSpawnPoint(clipped)
@@ -116,7 +116,7 @@ fn spawn_point_clamps_ground_clipping_z_but_passes_airborne_z_through() {
         location: vec3(100.0, 200.0, 1234.5),
         ..TrCarState::default()
     };
-    assert_eq!(car_spawn_point(&aerial).location_z, 1234.5);
+    assert_eq!(car_spawn_point(&aerial, false).location_z, 1234.5);
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn built_archetype_strings_parse_back_to_typed_values() {
         is_primary: 1,
         ..TrCarState::default()
     };
-    let strings = build_round_archetypes(&ball, &[car]);
+    let strings = build_round_archetypes(&ball, &[car], false);
     let parsed: Vec<Archetype> = strings
         .iter()
         .map(|string| Archetype::parse(string))
@@ -187,7 +187,7 @@ fn round_archetypes_emit_ball_spawn_and_single_primary_car() {
         is_primary: 1,
         ..TrCarState::default()
     };
-    let archetypes = build_round_archetypes(&ball, &[secondary, primary]);
+    let archetypes = build_round_archetypes(&ball, &[secondary, primary], false);
     assert_eq!(archetypes.len(), 3);
     assert!(archetypes[0].contains("Ball_GameEditor"));
     // The spawn point tracks the primary car (the game places the training
@@ -201,7 +201,97 @@ fn round_archetypes_emit_ball_spawn_and_single_primary_car() {
 
 #[test]
 fn round_archetypes_without_cars_fall_back_to_default_car() {
-    let archetypes = build_round_archetypes(&TrBallState::default(), &[]);
+    let archetypes = build_round_archetypes(&TrBallState::default(), &[], false);
     assert_eq!(archetypes.len(), 3);
     assert!(archetypes[2].starts_with("{\"IsPC\":true,"));
+}
+
+/// Forward-speed projection for momentum capture: only the component of
+/// the captured velocity along the car's facing survives.
+#[test]
+fn forward_speed_projects_velocity_onto_facing() {
+    // Facing +Y (yaw = 16384 units = 90 degrees), moving straight +Y.
+    let forward = TrCarState {
+        rotation: TrRotator {
+            pitch: 0,
+            yaw: 16384,
+            roll: 0,
+        },
+        linear_velocity: vec3(0.0, 1200.0, 0.0),
+        ..TrCarState::default()
+    };
+    assert!(
+        (forward_speed(&forward) - 1200.0).abs() < 1e-6,
+        "forward speed was {}",
+        forward_speed(&forward)
+    );
+
+    // Pure sideways drift (facing +X, moving +Y): projection ~0 -> 0.0.
+    let sideways = TrCarState {
+        linear_velocity: vec3(0.0, 800.0, 0.0),
+        ..TrCarState::default()
+    };
+    assert_eq!(forward_speed(&sideways), 0.0);
+
+    // Reversing (facing +X, moving -X): a negative projection clamps to 0.
+    let reversing = TrCarState {
+        linear_velocity: vec3(-500.0, 0.0, 0.0),
+        ..TrCarState::default()
+    };
+    assert_eq!(forward_speed(&reversing), 0.0);
+
+    // Airborne: facing 45 degrees up along +X (pitch = 8192 units), moving
+    // diagonally up-forward; the along-facing share is kept, including the
+    // vertical part of the facing.
+    let airborne = TrCarState {
+        rotation: TrRotator {
+            pitch: 8192,
+            yaw: 0,
+            roll: 0,
+        },
+        linear_velocity: vec3(300.0, 0.0, 300.0),
+        ..TrCarState::default()
+    };
+    let expected = 600.0 / std::f64::consts::SQRT_2; // 300*cos45 + 300*sin45
+    assert!(
+        (forward_speed(&airborne) - expected).abs() < 1e-6,
+        "airborne forward speed was {}",
+        forward_speed(&airborne)
+    );
+}
+
+/// Sub-1uu/s projections flush to an exact corpus-matching 0.0.
+#[test]
+fn forward_speed_flushes_physics_noise_to_zero() {
+    let crawling = TrCarState {
+        linear_velocity: vec3(0.5, 0.0, 0.0),
+        ..TrCarState::default()
+    };
+    assert_eq!(forward_speed(&crawling), 0.0);
+}
+
+/// Momentum capture lands in the serialized spawn-point string; the
+/// toggle off keeps the corpus 0.0.
+#[test]
+fn spawn_point_momentum_toggle_controls_velocity_start_speed() {
+    let car = TrCarState {
+        rotation: TrRotator {
+            pitch: 0,
+            yaw: 16384,
+            roll: 0,
+        },
+        linear_velocity: vec3(0.0, 987.6543, 0.0),
+        is_primary: 1,
+        ..TrCarState::default()
+    };
+    assert!(
+        Archetype::CarSpawnPoint(car_spawn_point(&car, true))
+            .to_archetype_string()
+            .contains("\"VelocityStartSpeed\":987.6543"),
+    );
+    assert!(
+        Archetype::CarSpawnPoint(car_spawn_point(&car, false))
+            .to_archetype_string()
+            .contains("\"VelocityStartSpeed\":0.0000"),
+    );
 }
