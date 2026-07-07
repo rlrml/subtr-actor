@@ -7,6 +7,7 @@ use subtr_actor_training::{Difficulty, Guid, Round, TrainingFile, TrainingPack, 
 
 use crate::abi::{TrBallState, TrCarState};
 use crate::archetypes::build_round_archetypes;
+use crate::mirror::{CaptureMode, mirror_shot, should_mirror};
 
 /// Default pack name for freshly created packs.
 pub const DEFAULT_PACK_NAME: &str = "Replay To Training Pack";
@@ -27,6 +28,57 @@ pub struct RecorderPack {
     /// pack IS that file) while still refusing to clobber a *different* pack
     /// that already lives at some other target path.
     loaded_from: Option<PathBuf>,
+    /// Whether the pack's [`TrainingType`] has been decided — by the first
+    /// capture's mode, a manual override, or opening a pack from disk. A
+    /// fresh pack stays "unset until first capture": the serialized type is
+    /// `Training_None` but the first capture (or an explicit
+    /// [`RecorderPack::set_training_type`]) assigns the real one.
+    /// `TrainingType::None` itself is a legitimate ASSIGNED value (the
+    /// manual override offers it for publishing metadata), which is why
+    /// this is a separate flag and not `Option`-typed pack state.
+    training_type_assigned: bool,
+}
+
+/// How a capture is being taken: the semantic [`CaptureMode`] plus the
+/// cvar-backed toggles the plugin passes through the ABI.
+#[derive(Debug, Clone, Copy)]
+pub struct ShotOptions {
+    /// Offensive ([`CaptureMode::Shot`]) or defensive
+    /// ([`CaptureMode::Save`]) capture; decides the pack type assigned by
+    /// the first capture and the orientation convention mirroring enforces.
+    pub mode: CaptureMode,
+    /// Auto-mirror the whole scenario 180° about field center when the
+    /// captured primary car's team does not match the training convention
+    /// for `mode` (cvar `replay_to_training_mirror_by_team`).
+    pub mirror_by_team: bool,
+    /// Write the primary car's forward speed into the spawn mesh's
+    /// `VelocityStartSpeed` (cvar `replay_to_training_capture_momentum`).
+    pub capture_momentum: bool,
+}
+
+impl Default for ShotOptions {
+    /// The plugin's cvar defaults: an offensive capture with mirroring and
+    /// momentum capture ON.
+    fn default() -> ShotOptions {
+        ShotOptions {
+            mode: CaptureMode::Shot,
+            mirror_by_team: true,
+            capture_momentum: true,
+        }
+    }
+}
+
+/// Outcome of a successful [`RecorderPack::add_shot`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddShotOutcome {
+    /// The shot was appended and its mode agreed with (or assigned) the
+    /// pack's training type.
+    Added,
+    /// The shot was appended, but its mode conflicts with the pack's
+    /// already-assigned training type (a save capture into a Striker pack
+    /// or a shot capture into a Goalie pack). The `.tem` format has no
+    /// per-round type, so the capture is kept and the caller should WARN.
+    AddedTypeMismatch,
 }
 
 /// Outcome of the pre-save clobber check performed by
@@ -121,13 +173,16 @@ fn generate_guid() -> Guid {
 
 impl RecorderPack {
     /// Creates a fresh pack with a generated GUID, current timestamps, and
-    /// corpus-matching defaults.
+    /// corpus-matching defaults. The training type starts UNSET (serialized
+    /// as `Training_None` until assigned): the first capture's mode decides
+    /// Striker vs Goalie, unless a manual
+    /// [`RecorderPack::set_training_type`] override lands first.
     pub fn new() -> RecorderPack {
         let now = unix_time();
         let pack = TrainingPack {
             guid: generate_guid(),
             name: Some(DEFAULT_PACK_NAME.to_string()),
-            training_type: TrainingType::Striker,
+            training_type: TrainingType::None,
             difficulty: Difficulty::Medium,
             map_name: Some(DEFAULT_MAP_NAME.to_string()),
             created_at: now,
@@ -140,6 +195,7 @@ impl RecorderPack {
             file,
             last_error: String::new(),
             loaded_from: None,
+            training_type_assigned: false,
         }
     }
 
@@ -158,6 +214,10 @@ impl RecorderPack {
             file,
             last_error: String::new(),
             loaded_from: Some(path.to_path_buf()),
+            // A pack from disk carries whatever type it was saved with
+            // (including a deliberate Training_None); treat it as assigned
+            // so mismatched captures warn instead of silently retyping it.
+            training_type_assigned: true,
         })
     }
 
@@ -208,20 +268,93 @@ impl RecorderPack {
             .map_err(|error| error.to_string())
     }
 
+    /// Explicitly sets (or overrides) the pack training type, marking it
+    /// assigned so later captures warn on mismatch instead of re-assigning.
+    pub fn set_training_type(&mut self, training_type: &TrainingType) -> Result<(), String> {
+        self.file
+            .set_training_type(training_type)
+            .map_err(|error| error.to_string())?;
+        self.training_type_assigned = true;
+        Ok(())
+    }
+
+    /// The pack's current training type.
+    pub fn training_type(&self) -> Result<TrainingType, String> {
+        self.pack().map(|pack| pack.training_type)
+    }
+
+    /// Whether the training type has been decided yet (first capture,
+    /// manual override, or opened-from-disk); see the field docs.
+    pub fn training_type_assigned(&self) -> bool {
+        self.training_type_assigned
+    }
+
+    /// The pack training type a capture `mode` implies.
+    fn mode_training_type(mode: CaptureMode) -> TrainingType {
+        match mode {
+            CaptureMode::Shot => TrainingType::Striker,
+            CaptureMode::Save => TrainingType::Goalie,
+        }
+    }
+
     /// Appends a captured shot as a new round.
+    ///
+    /// * When [`ShotOptions::mirror_by_team`] is set and the captured
+    ///   primary car's team does not match the training convention for the
+    ///   mode (see [`crate::mirror`]), the WHOLE scenario is mirrored 180°
+    ///   about field center before serialization.
+    /// * The first capture into a type-unset pack assigns the pack type
+    ///   from the mode (shot → Striker, save → Goalie). `ETrainingType` is
+    ///   pack-level in the `.tem` format — rounds cannot be tagged — so a
+    ///   later capture whose mode conflicts with the assigned type is still
+    ///   appended but reports [`AddShotOutcome::AddedTypeMismatch`] for the
+    ///   caller to warn about.
     pub fn add_shot(
         &mut self,
         ball: &TrBallState,
         cars: &[TrCarState],
         time_limit: f32,
-    ) -> Result<(), String> {
+        options: &ShotOptions,
+    ) -> Result<AddShotOutcome, String> {
+        let mut ball = *ball;
+        let mut cars = cars.to_vec();
+        let primary_team = cars
+            .iter()
+            .find(|car| car.is_primary != 0)
+            .or_else(|| cars.first())
+            .map(|car| car.team);
+        if options.mirror_by_team
+            && primary_team.is_some_and(|team| should_mirror(options.mode, team))
+        {
+            mirror_shot(&mut ball, &mut cars);
+        }
+
+        let outcome = if !self.training_type_assigned {
+            self.set_training_type(&Self::mode_training_type(options.mode))?;
+            AddShotOutcome::Added
+        } else {
+            let current = self.training_type()?;
+            let implied = Self::mode_training_type(options.mode);
+            // Only the two mode-implied types can conflict with a mode;
+            // Aerial/None/other packs accept either capture command without
+            // warning (they are manual-override territory).
+            let mismatch = current != implied
+                && matches!(current, TrainingType::Striker | TrainingType::Goalie);
+            if mismatch {
+                AddShotOutcome::AddedTypeMismatch
+            } else {
+                AddShotOutcome::Added
+            }
+        };
+
         let round = Round {
             time_limit,
-            serialized_archetypes: build_round_archetypes(ball, cars),
+            serialized_archetypes: build_round_archetypes(&ball, &cars, options.capture_momentum),
         };
         self.file
             .add_round(&round)
-            .map_err(|error| error.to_string())
+            .map_err(|error| error.to_string())?;
+        Ok(outcome)
     }
 
     /// Removes the shot (round) at `index`.

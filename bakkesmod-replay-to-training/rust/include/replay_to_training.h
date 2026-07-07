@@ -63,13 +63,27 @@ typedef struct TrCarState {
   uint8_t team;
 } TrCarState;
 
-/* One captured shot: ball plus `car_count` cars and a round time limit in
- * seconds. `cars` may be null when `car_count` is 0. */
+/* One captured shot: ball plus `car_count` cars, a round time limit in
+ * seconds, and per-capture options. `cars` may be null when `car_count`
+ * is 0.
+ *
+ *  - `mode`: 0 = offensive shot capture, 1 = defensive save capture.
+ *    Decides the pack training type the first capture assigns
+ *    (Striker/Goalie) and the orientation convention mirroring enforces.
+ *  - `mirror_by_team`: nonzero mirrors the whole scenario 180 degrees
+ *    about field center when the captured primary car's team does not
+ *    match the training convention for `mode` (blue/team 0 defends -Y,
+ *    training scenarios are blue-oriented; see rust/src/mirror.rs).
+ *  - `capture_momentum`: nonzero writes the primary car's forward speed
+ *    into the spawn mesh's VelocityStartSpeed. */
 typedef struct TrCapturedShot {
   TrBallState ball;
   float time_limit;
   const TrCarState *cars;
   size_t car_count;
+  uint8_t mode;
+  uint8_t mirror_by_team;
+  uint8_t capture_momentum;
 } TrCapturedShot;
 
 /* Constructors / destructor. `create` never returns null; `open` returns
@@ -87,11 +101,24 @@ int32_t replay_to_training_pack_set_map_name(TrPack *pack, const char *map_name)
 int32_t replay_to_training_pack_set_difficulty(TrPack *pack, uint32_t difficulty);
 uint32_t replay_to_training_pack_difficulty(const TrPack *pack);
 
+/* Pack training type (ETrainingType): 0 = None, 1 = Aerial, 2 = Goalie,
+ * 3 = Striker. A fresh pack's type is UNSET until the first capture's mode
+ * assigns it (shot -> Striker, save -> Goalie) or the setter overrides it;
+ * the getter additionally reports 4 = unset and 5 = a type this crate does
+ * not model. The setter marks the type assigned (later mismatched-mode
+ * captures warn via add_shot's return code 2) and rejects values > 3. */
+int32_t replay_to_training_pack_set_training_type(TrPack *pack, uint32_t training_type);
+uint32_t replay_to_training_pack_training_type(const TrPack *pack);
+
 /* Pack name readback for the settings UI. */
 size_t replay_to_training_pack_name_len(const TrPack *pack);
 size_t replay_to_training_pack_write_name(const TrPack *pack, uint8_t *out_bytes, size_t max_bytes);
 
-/* Shots (training rounds). */
+/* Shots (training rounds). add_shot returns:
+ *   0  added (mode agreed with, or assigned, the pack training type),
+ *   1  failure (last-error set),
+ *   2  added, but the capture's mode conflicts with the pack's assigned
+ *      training type (pack-level ETrainingType cannot tag rounds; warn). */
 int32_t replay_to_training_pack_add_shot(TrPack *pack, const TrCapturedShot *shot);
 int32_t replay_to_training_pack_remove_shot(TrPack *pack, size_t index);
 size_t replay_to_training_pack_shot_count(const TrPack *pack);

@@ -38,3 +38,4 @@ BAKKESMOD_PLUGIN(
 #include "capture.cpp"
 #include "target.cpp"
 #include "settings_window.cpp"
+#include "window.cpp"

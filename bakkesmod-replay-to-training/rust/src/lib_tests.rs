@@ -60,11 +60,14 @@ fn abi_layout_matches_plugin_header_expectations() {
     assert_offset!(TrCarState, is_primary, 52);
     assert_offset!(TrCarState, team, 53);
 
-    assert_layout!(TrCapturedShot, size = 56, align = 8);
+    assert_layout!(TrCapturedShot, size = 64, align = 8);
     assert_offset!(TrCapturedShot, ball, 0);
     assert_offset!(TrCapturedShot, time_limit, 36);
     assert_offset!(TrCapturedShot, cars, 40);
     assert_offset!(TrCapturedShot, car_count, 48);
+    assert_offset!(TrCapturedShot, mode, 56);
+    assert_offset!(TrCapturedShot, mirror_by_team, 57);
+    assert_offset!(TrCapturedShot, capture_momentum, 58);
 }
 
 fn sample_shot(cars: &[TrCarState]) -> TrCapturedShot {
@@ -89,6 +92,12 @@ fn sample_shot(cars: &[TrCarState]) -> TrCapturedShot {
             cars.as_ptr()
         },
         car_count: cars.len(),
+        // Shot mode with mirroring/momentum off: these smoke tests assert
+        // pre-existing byte-level behavior, and the sample car is team 0 so
+        // mirroring would be a no-op anyway.
+        mode: 0,
+        mirror_by_team: 0,
+        capture_momentum: 0,
     }
 }
 
@@ -175,6 +184,40 @@ fn ffi_smoke_create_edit_save_open_destroy() {
         replay_to_training_pack_destroy(pack);
     }
     let _ = std::fs::remove_dir_all(&scratch);
+}
+
+/// Mode-driven training-type assignment across the ABI: a fresh pack
+/// reports unset (4), the first capture's mode assigns the type, a
+/// mismatched-mode capture still lands but returns the warning code 2, and
+/// the manual override setter re-types the pack.
+#[test]
+fn ffi_training_type_assignment_and_mismatch_warning() {
+    let pack = replay_to_training_pack_create();
+    unsafe {
+        assert_eq!(replay_to_training_pack_training_type(pack), 4);
+        let cars = [sample_car()];
+        let mut shot = sample_shot(&cars);
+        shot.mode = 1; // defensive save capture
+        assert_eq!(replay_to_training_pack_add_shot(pack, &raw const shot), 0);
+        // First capture assigned Goalie.
+        assert_eq!(replay_to_training_pack_training_type(pack), 2);
+        // A mismatched shot capture is still added but reports code 2.
+        shot.mode = 0;
+        assert_eq!(replay_to_training_pack_add_shot(pack, &raw const shot), 2);
+        assert_eq!(replay_to_training_pack_shot_count(pack), 2);
+        // Manual override to Striker; shot captures agree again.
+        assert_eq!(replay_to_training_pack_set_training_type(pack, 3), 0);
+        assert_eq!(replay_to_training_pack_training_type(pack), 3);
+        assert_eq!(replay_to_training_pack_add_shot(pack, &raw const shot), 0);
+        // Out-of-range values are rejected.
+        assert_eq!(replay_to_training_pack_set_training_type(pack, 9), 1);
+        assert_eq!(
+            replay_to_training_pack_training_type(std::ptr::null()),
+            4,
+            "null pack reports unset"
+        );
+        replay_to_training_pack_destroy(pack);
+    }
 }
 
 #[test]

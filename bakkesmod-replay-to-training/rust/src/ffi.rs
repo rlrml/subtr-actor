@@ -16,10 +16,13 @@ use std::os::raw::c_char;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use subtr_actor_training::Difficulty;
+use subtr_actor_training::{Difficulty, TrainingType};
 
 use crate::abi::TrCapturedShot;
-use crate::recorder::{RecorderPack, TargetSaveOutcome, file_guid_hex};
+use crate::mirror::CaptureMode;
+use crate::recorder::{
+    AddShotOutcome, RecorderPack, ShotOptions, TargetSaveOutcome, file_guid_hex,
+};
 
 /// Opaque pack handle exposed through the C ABI.
 pub struct TrPack {
@@ -277,8 +280,16 @@ pub unsafe extern "C" fn replay_to_training_pack_write_name(
     unsafe { write_text(&name, out_bytes, max_bytes) }
 }
 
-/// Appends a captured shot to the pack as a new round. Returns 0 on
-/// success.
+/// Appends a captured shot to the pack as a new round, honoring the
+/// per-capture options carried in the shot (mode, mirror-by-team,
+/// momentum). Returns:
+///
+/// * `0` — added; the mode agreed with (or, on the first capture into a
+///   fresh pack, assigned) the pack training type,
+/// * `1` — failure (null pack/shot or serialization error; last-error set),
+/// * `2` — added, but the mode conflicts with the pack's already-assigned
+///   training type (`ETrainingType` is pack-level, so the round cannot be
+///   tagged differently); the caller should warn.
 ///
 /// # Safety
 ///
@@ -298,9 +309,82 @@ pub unsafe extern "C" fn replay_to_training_pack_add_shot(
     } else {
         unsafe { std::slice::from_raw_parts(shot.cars, shot.car_count) }
     };
+    let options = ShotOptions {
+        mode: CaptureMode::from_abi(shot.mode),
+        mirror_by_team: shot.mirror_by_team != 0,
+        capture_momentum: shot.capture_momentum != 0,
+    };
     let ball = shot.ball;
     let time_limit = shot.time_limit;
-    unsafe { with_pack_mut(pack, move |inner| inner.add_shot(&ball, cars, time_limit)) }
+    let Some(pack) = (unsafe { pack_mut(pack) }) else {
+        return 1;
+    };
+    match pack.inner.add_shot(&ball, cars, time_limit, &options) {
+        Ok(AddShotOutcome::Added) => 0,
+        Ok(AddShotOutcome::AddedTypeMismatch) => 2,
+        Err(error) => {
+            pack.inner.record_error(error);
+            1
+        }
+    }
+}
+
+/// ABI encoding of the pack training type (`ETrainingType`):
+/// `0` = None, `1` = Aerial, `2` = Goalie, `3` = Striker. The getter
+/// additionally reports `4` = unset (fresh pack; the first capture's mode
+/// will assign the type) and `5` = a type this crate does not model.
+const TR_TRAINING_TYPE_NONE: u32 = 0;
+const TR_TRAINING_TYPE_AERIAL: u32 = 1;
+const TR_TRAINING_TYPE_GOALIE: u32 = 2;
+const TR_TRAINING_TYPE_STRIKER: u32 = 3;
+const TR_TRAINING_TYPE_UNSET: u32 = 4;
+const TR_TRAINING_TYPE_OTHER: u32 = 5;
+
+/// Manually sets (overrides) the pack training type: 0 = None, 1 = Aerial,
+/// 2 = Goalie, 3 = Striker. Marks the type as assigned, so later captures
+/// warn on mode mismatch instead of re-assigning. Returns 0 on success.
+///
+/// # Safety
+///
+/// `pack` must be a valid pack handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_pack_set_training_type(
+    pack: *mut TrPack,
+    training_type: u32,
+) -> i32 {
+    let training_type = match training_type {
+        TR_TRAINING_TYPE_NONE => TrainingType::None,
+        TR_TRAINING_TYPE_AERIAL => TrainingType::Aerial,
+        TR_TRAINING_TYPE_GOALIE => TrainingType::Goalie,
+        TR_TRAINING_TYPE_STRIKER => TrainingType::Striker,
+        _ => return 1,
+    };
+    unsafe { with_pack_mut(pack, |inner| inner.set_training_type(&training_type)) }
+}
+
+/// Returns the pack training type in the encoding documented on
+/// `replay_to_training_pack_set_training_type`, plus `4` for a fresh pack
+/// whose type is still unset (first capture decides) and `5` for a type
+/// this crate does not model. A null pack reports unset.
+///
+/// # Safety
+///
+/// `pack` must be null or a valid pack handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_pack_training_type(pack: *const TrPack) -> u32 {
+    let Some(pack) = (unsafe { pack_ref(pack) }) else {
+        return TR_TRAINING_TYPE_UNSET;
+    };
+    if !pack.inner.training_type_assigned() {
+        return TR_TRAINING_TYPE_UNSET;
+    }
+    match pack.inner.training_type() {
+        Ok(TrainingType::None) => TR_TRAINING_TYPE_NONE,
+        Ok(TrainingType::Aerial) => TR_TRAINING_TYPE_AERIAL,
+        Ok(TrainingType::Goalie) => TR_TRAINING_TYPE_GOALIE,
+        Ok(TrainingType::Striker) => TR_TRAINING_TYPE_STRIKER,
+        Ok(_) | Err(_) => TR_TRAINING_TYPE_OTHER,
+    }
 }
 
 /// Removes the shot (round) at `index`. Returns 0 on success.

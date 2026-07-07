@@ -118,12 +118,45 @@ void ReplayToTrainingPlugin::registerCvarsAndNotifiers() {
       1,
       true,
       120);
+  cvarManager->registerCvar(
+      "replay_to_training_mirror_by_team",
+      "1",
+      "Auto-mirror captures 180 degrees about field center when the "
+      "captured player's team does not match the training convention "
+      "(striker scenarios attack +Y, goalie scenarios defend -Y; the "
+      "training player is blue-oriented, so orange captures are flipped). "
+      "0 captures the raw replay orientation.",
+      true);
+  cvarManager->registerCvar(
+      "replay_to_training_capture_momentum",
+      "1",
+      "Write the captured car's forward speed (velocity projected onto its "
+      "facing) into the spawn point's VelocityStartSpeed so the training "
+      "car starts moving like it was in the replay. 0 spawns the car "
+      "stationary.",
+      true);
 
   cvarManager->registerNotifier(
       "replay_to_training_capture_shot",
-      [this](std::vector<std::string>) { captureShot(); },
-      "Captures the current replay frame's ball and car states as a new "
-      "shot in the in-memory training pack.",
+      [this](std::vector<std::string>) { captureShot(CaptureMode::Shot); },
+      "Captures the current replay frame as an OFFENSIVE (striker) shot in "
+      "the in-memory training pack. The first capture into a fresh pack "
+      "sets the pack type to Striker.",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "replay_to_training_capture_save",
+      [this](std::vector<std::string>) { captureShot(CaptureMode::Save); },
+      "Captures the current replay frame as a DEFENSIVE (goalie) save in "
+      "the in-memory training pack. The first capture into a fresh pack "
+      "sets the pack type to Goalie.",
+      PERMISSION_ALL);
+  cvarManager->registerNotifier(
+      "replay_to_training_window",
+      [this](std::vector<std::string>) {
+        cvarManager->executeCommand("togglemenu " + GetMenuName());
+      },
+      "Toggles the replay-to-training capture window (same as `togglemenu "
+      "replaytotraining`).",
       PERMISSION_ALL);
   cvarManager->registerNotifier(
       "replay_to_training_save_pack",
@@ -182,7 +215,10 @@ void ReplayToTrainingPlugin::newPack() {
   // re-binds after calling this.
   clearTarget();
   applyMetadataToPack();
-  setStatus(std::format("new pack {}", packGuidHexString()));
+  // The fresh pack's training type is unset until the first capture
+  // (capture_shot -> Striker, capture_save -> Goalie) or a manual override.
+  setStatus(std::format("new pack {} (type unset; first capture decides)",
+                        packGuidHexString()));
 }
 
 void ReplayToTrainingPlugin::openPackFromPath(const std::string &path) {
@@ -243,7 +279,7 @@ float ReplayToTrainingPlugin::timeLimitSeconds() {
   return value > 0.0f ? value : 8.0f;
 }
 
-void ReplayToTrainingPlugin::captureShot() {
+void ReplayToTrainingPlugin::captureShot(CaptureMode mode) {
   if (!rustLoaded || !pack || !packAddShot) {
     setStatus("rust library not loaded");
     return;
@@ -318,10 +354,28 @@ void ReplayToTrainingPlugin::captureShot() {
   shot.time_limit = timeLimitSeconds();
   shot.cars = cars.empty() ? nullptr : cars.data();
   shot.car_count = cars.size();
-  if (packAddShot(pack, &shot) != 0) {
+  // Per-capture options: the mode comes from which zero-arg command was
+  // used; everything else is a persisted cvar default (no command
+  // parameters, per the plugin's UX convention).
+  shot.mode = static_cast<uint8_t>(mode);
+  shot.mirror_by_team = mirrorByTeamEnabled() ? 1 : 0;
+  shot.capture_momentum = captureMomentumEnabled() ? 1 : 0;
+  const int32_t added = packAddShot(pack, &shot);
+  if (added == 1) {
     setStatus(std::format("capture failed: {}", packErrorMessage()));
     return;
   }
+  const char *modeLabel = mode == CaptureMode::Save ? "save" : "shot";
+  // Return code 2: the capture landed, but its mode conflicts with the
+  // pack's already-assigned training type. The .tem format has no
+  // per-round type, so warn rather than refuse.
+  const std::string mismatchWarning =
+      added == 2 ? std::format(
+                       " WARNING: {} capture in a {} pack (type is "
+                       "pack-level; round kept)",
+                       modeLabel,
+                       trainingTypeLabel(packTrainingTypeIndex()))
+                 : "";
   const size_t count = packShotCount ? packShotCount(pack) : 0;
   if (autosaveEnabled()) {
     // Run the normal save flow (target-bound with its clobber guardrails
@@ -330,23 +384,70 @@ void ReplayToTrainingPlugin::captureShot() {
     std::string saveMessage;
     if (savePackInternal(saveMessage)) {
       // saveMessage reads "saved ..." -> "captured shot N; autosaved ...".
-      setStatus(std::format("captured shot {}; auto{}", count, saveMessage));
+      setStatus(std::format("captured {} {}; auto{}{}", modeLabel, count,
+                            saveMessage, mismatchWarning));
     } else {
-      setStatus(std::format("captured shot {}; autosave failed: {}", count,
-                            saveMessage));
+      setStatus(std::format("captured {} {}; autosave failed: {}{}",
+                            modeLabel, count, saveMessage, mismatchWarning));
     }
     return;
   }
   setStatus(std::format(
-      "captured shot {} at replay time {:.1f}s (unsaved; "
-      "replay_to_training_save_pack writes it)",
+      "captured {} {} at replay time {:.1f}s (unsaved; "
+      "replay_to_training_save_pack writes it){}",
+      modeLabel,
       count,
-      server.GetReplayTimeElapsed()));
+      server.GetReplayTimeElapsed(),
+      mismatchWarning));
 }
 
 bool ReplayToTrainingPlugin::autosaveEnabled() {
   auto cvar = cvarManager->getCvar("replay_to_training_autosave");
   return static_cast<bool>(cvar) ? cvar.getBoolValue() : true;
+}
+
+bool ReplayToTrainingPlugin::mirrorByTeamEnabled() {
+  auto cvar = cvarManager->getCvar("replay_to_training_mirror_by_team");
+  return static_cast<bool>(cvar) ? cvar.getBoolValue() : true;
+}
+
+bool ReplayToTrainingPlugin::captureMomentumEnabled() {
+  auto cvar = cvarManager->getCvar("replay_to_training_capture_momentum");
+  return static_cast<bool>(cvar) ? cvar.getBoolValue() : true;
+}
+
+// ABI training-type encoding (replay_to_training.h): 0 None, 1 Aerial,
+// 2 Goalie, 3 Striker, 4 unset (first capture decides), 5 unmodeled.
+uint32_t ReplayToTrainingPlugin::packTrainingTypeIndex() {
+  if (!pack || !packTrainingType) {
+    return 4;
+  }
+  return packTrainingType(pack);
+}
+
+const char *ReplayToTrainingPlugin::trainingTypeLabel(uint32_t index) {
+  switch (index) {
+    case 0: return "None";
+    case 1: return "Aerial";
+    case 2: return "Goalie";
+    case 3: return "Striker";
+    case 4: return "unset (first capture decides)";
+    default: return "other";
+  }
+}
+
+// Manual override (window dropdown), incl. Aerial/None for publishing
+// metadata; marks the type assigned so later mismatched-mode captures warn.
+void ReplayToTrainingPlugin::overridePackTrainingType(uint32_t index) {
+  if (!rustLoaded || !pack || !packSetTrainingType) {
+    setStatus("rust library not loaded");
+    return;
+  }
+  if (packSetTrainingType(pack, index) != 0) {
+    setStatus(std::format("set pack type failed: {}", packErrorMessage()));
+    return;
+  }
+  setStatus(std::format("pack type set to {}", trainingTypeLabel(index)));
 }
 
 std::filesystem::path ReplayToTrainingPlugin::resolveOutputDirectory() {
