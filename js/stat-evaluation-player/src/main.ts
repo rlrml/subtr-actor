@@ -72,6 +72,10 @@ import {
   createMissedEventCaptureController,
   type MissedEventCaptureController,
 } from "./missedEventCaptureWindow.ts";
+import {
+  createTrainingPackWindowController,
+  type TrainingPackWindowController,
+} from "./trainingPackWindow.ts";
 import { createActiveModulesRuntime } from "./activeModulesRuntime.ts";
 import { getMechanicsReviewMechanicKind, type MechanicsReviewItem } from "./mechanicsReview.ts";
 import { createMechanicsReviewReplayLoadsController } from "./mechanicsReviewReplayLoads.ts";
@@ -239,6 +243,7 @@ let statRegistry: StatDefinition[] = createStatRegistry(null);
 let cameraControlsController: CameraControlsController | null = null;
 let recordingWindowController: RecordingWindowController | null = null;
 let missedEventCaptureController: MissedEventCaptureController | null = null;
+let trainingPackWindowController: TrainingPackWindowController | null = null;
 let statsWindowsController: StatsWindowsController | null = null;
 let eventPlaylistController: EventPlaylistWindowController | null = null;
 let eventTimelineControlsController: EventTimelineControlsController | null = null;
@@ -466,6 +471,7 @@ function setTransportEnabled(enabled: boolean): void {
 
 function syncRecordingWindow(status = canvasRecorder?.getStatus() ?? null): void {
   recordingWindowController?.sync(status);
+  trainingPackWindowController?.sync();
 }
 
 function renderSnapshot(state: ReplayPlayerState): void {
@@ -894,6 +900,24 @@ export function mountStatEvaluationPlayer(
     getReplayPlayer: () => replayPlayer,
     showWindow: () => windowCommands.showWindow("missed-events"),
   });
+  trainingPackWindowController = createTrainingPackWindowController({
+    elements: {
+      name: mustElement<HTMLInputElement>(root, "#training-pack-name"),
+      creator: mustElement<HTMLInputElement>(root, "#training-pack-creator"),
+      description: mustElement<HTMLInputElement>(root, "#training-pack-description"),
+      difficulty: mustElement<HTMLSelectElement>(root, "#training-pack-difficulty"),
+      shooter: mustElement<HTMLSelectElement>(root, "#training-pack-shooter"),
+      timeLimit: mustElement<HTMLInputElement>(root, "#training-pack-time-limit"),
+      capture: mustElement<HTMLButtonElement>(root, "#training-pack-capture"),
+      load: mustElement<HTMLButtonElement>(root, "#training-pack-load"),
+      loadInput: mustElement<HTMLInputElement>(root, "#training-pack-load-input"),
+      newPack: mustElement<HTMLButtonElement>(root, "#training-pack-new"),
+      download: mustElement<HTMLButtonElement>(root, "#training-pack-download"),
+      shotList: mustElement<HTMLOListElement>(root, "#training-pack-shots"),
+      status: mustElement<HTMLElement>(root, "#training-pack-status"),
+    },
+    getReplayPlayer: () => replayPlayer,
+  });
   configBindings = createPlayerConfigBindings({
     modules: MODULES,
     playbackRate,
@@ -964,6 +988,7 @@ export function mountStatEvaluationPlayer(
     autoPossessionCameraController = null;
     cameraControlsController = null;
     recordingWindowController = null;
+    trainingPackWindowController = null;
     moduleControlsController = null;
     scoreboardWindowController = null;
     playbackReadoutsController = null;
@@ -1061,6 +1086,7 @@ export function mountStatEvaluationPlayer(
   mechanicsReviewController?.installEventListeners(listeners.signal);
   recordingWindowController?.installEventListeners(listeners.signal);
   missedEventCaptureController?.installEventListeners(listeners.signal);
+  trainingPackWindowController?.installEventListeners(listeners.signal);
   cameraControlsController?.installEventListeners(listeners.signal);
   // WASD flies the free camera whenever no text field has focus.
   installFreeCameraKeyboard({

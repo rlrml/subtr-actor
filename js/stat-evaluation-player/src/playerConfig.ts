@@ -19,6 +19,7 @@ export type SingletonWindowId =
   | "scoreboard"
   | "playback"
   | "recording"
+  | "training-pack"
   | "mechanics"
   | "event-playlist"
   | "mechanics-review"
@@ -450,6 +451,7 @@ function isSingletonWindowId(value: unknown): value is SingletonWindowId {
     value === "scoreboard" ||
     value === "playback" ||
     value === "recording" ||
+    value === "training-pack" ||
     value === "mechanics" ||
     value === "event-playlist" ||
     value === "mechanics-review" ||
