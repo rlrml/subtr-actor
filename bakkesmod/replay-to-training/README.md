@@ -9,7 +9,7 @@ new shot in an in-memory pack; save the pack when you are done. Pack
 serialization is done by the [`subtr-actor-training`](../crates/subtr-actor-training)
 crate through the thin C ABI crate in [`rust/`](./rust).
 
-This plugin is separate from the [`bakkesmod/`](../bakkesmod) live-analysis
+This plugin is separate from the [`bakkesmod/subtr-actor/`](../subtr-actor) live-analysis
 plugin and can be installed independently.
 
 ## Build
@@ -17,20 +17,20 @@ plugin and can be installed independently.
 From a Windows machine with Rust, CMake, and Visual Studio 2022:
 
 ```powershell
-.\bakkesmod-replay-to-training\build-windows.ps1
+.\bakkesmod\replay-to-training\build-windows.ps1
 ```
 
 On Linux, the same DLLs cross-compile with clang-cl + lld-link against an
-xwin MSVC sysroot (mirroring the `bakkesmod/` live plugin's build):
+xwin MSVC sysroot (mirroring the `bakkesmod/subtr-actor/` live plugin's build):
 
 ```sh
 nix build .#bakkesmod-replay-to-training   # hermetic; artifacts in ./result
 # or, inside `nix develop .#bakkesmod`:
-bakkesmod-replay-to-training/build-linux-msvc.sh
+bakkesmod/replay-to-training/build-linux-msvc.sh
 ```
 
 Built artifacts can be checked with
-`python3 bakkesmod-replay-to-training/verify-dll-exports.py --rust-dll <replay_to_training.dll> --plugin-dll <ReplayToTrainingPlugin.dll>`
+`python3 bakkesmod/replay-to-training/verify-dll-exports.py --rust-dll <replay_to_training.dll> --plugin-dll <ReplayToTrainingPlugin.dll>`
 (also run by CI).
 
 Either path builds two DLLs and prepares an install layout under

@@ -9,8 +9,8 @@ import sys
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-PE_EXPORT_VERIFIER = REPO_ROOT / "bakkesmod/verify-rust-dll-exports.py"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PE_EXPORT_VERIFIER = REPO_ROOT / "bakkesmod/subtr-actor/verify-rust-dll-exports.py"
 REQUIRED_BAKKESMOD_EXPORTS = frozenset({"getPlugin", "deleteMe", "exports"})
 
 

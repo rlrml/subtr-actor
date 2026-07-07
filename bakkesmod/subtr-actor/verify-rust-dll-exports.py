@@ -17,9 +17,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-ABI_HEADER = REPO_ROOT / "bakkesmod/rust/include/subtr_actor_bakkesmod.h"
-PLUGIN_SOURCE_VERIFIER = REPO_ROOT / "bakkesmod/verify-plugin-source.py"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ABI_HEADER = REPO_ROOT / "bakkesmod/subtr-actor/rust/include/subtr_actor_bakkesmod.h"
+PLUGIN_SOURCE_VERIFIER = REPO_ROOT / "bakkesmod/subtr-actor/verify-plugin-source.py"
 EXPORT_PREFIX = "subtr_actor_bakkesmod_"
 
 

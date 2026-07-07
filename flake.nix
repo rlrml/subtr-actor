@@ -319,7 +319,7 @@
             export XWIN_SYSROOT="${xwinMsvcSysroot}"
             export BAKKESMODSDK_DIR="${bakkesmod-sdk}"
             export BAKKESMOD_SDK_DIR="$BAKKESMODSDK_DIR"
-            bash bakkesmod/build-linux-msvc.sh
+            bash bakkesmod/subtr-actor/build-linux-msvc.sh
             runHook postBuild
           '';
           installPhase = ''
@@ -357,7 +357,7 @@
             export REPLAY_TO_TRAINING_GIT_HASH="${buildGitHash}"
             export REPLAY_TO_TRAINING_GIT_DIRTY="${buildGitDirty}"
             export REPLAY_TO_TRAINING_COMMIT_DATE="${buildCommitDate}"
-            bash bakkesmod-replay-to-training/build-linux-msvc.sh
+            bash bakkesmod/replay-to-training/build-linux-msvc.sh
             runHook postBuild
           '';
           installPhase = ''
@@ -412,7 +412,7 @@
             echo "subtr-actor BakkesMod shell"
             echo "  Rust ABI: cargo build -p subtr-actor-bakkesmod --release"
             echo "  SDK:      $BAKKESMODSDK_DIR"
-            echo "  Linux MSVC build: bakkesmod/build-linux-msvc.sh"
+            echo "  Linux MSVC build: bakkesmod/subtr-actor/build-linux-msvc.sh"
             echo "  Wine:     wine <windows-exe> for local MSVC artifact smoke tests"
             echo "  MinGW note: MinGW can smoke-compile headers, but final plugin linking needs MSVC ABI."
           '';

@@ -1,5 +1,5 @@
 // Runtime loading of replay_to_training.dll (the Rust cdylib built from
-// bakkesmod-replay-to-training/rust). Mirrors the SubtrActorPlugin approach:
+// bakkesmod/replay-to-training/rust). Mirrors the SubtrActorPlugin approach:
 // LoadLibraryW over a small search-path list, GetProcAddress for every
 // exported symbol, all-or-nothing with cvarManager->log diagnostics, and
 // graceful degradation when the DLL is missing.

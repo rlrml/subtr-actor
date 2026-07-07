@@ -2,12 +2,12 @@
 
 This is an early BakkesMod integration spike. It is intentionally split into:
 
-- `bakkesmod/rust`: Rust C ABI that accepts sampled live frames,
+- `bakkesmod/subtr-actor/rust`: Rust C ABI that accepts sampled live frames,
   adapts them through a `ProcessorView`, evaluates the shared `subtr-actor`
   analysis graph, drains normalized player and team events for overlay use, and
   exposes the live graph metadata, timeline, event bundle, graph-backed stats
   modules, and current frame stats snapshot as JSON.
-- `bakkesmod/SubtrActorPlugin.*`: C++ BakkesMod plugin shell that samples active
+- `bakkesmod/subtr-actor/SubtrActorPlugin.*`: C++ BakkesMod plugin shell that samples active
   cars and the ball, calls the Rust ABI, and renders short on-screen labels.
   The `subtr_actor_dump_graph` console command writes the current graph
   metadata, full timeline payload, event bundle, graph-backed stats modules, all
@@ -200,7 +200,7 @@ acceptance check for live graph callability and event-generation parity.
    You can validate the dumped files from this repository with:
 
    ```sh
-   python3 bakkesmod/verify-graph-dump.py <path-to-BakkesMod-data>/subtr-actor \
+   python3 bakkesmod/subtr-actor/verify-graph-dump.py <path-to-BakkesMod-data>/subtr-actor \
      --require-event-history \
      --require-graph-events
    ```
@@ -260,7 +260,7 @@ Linux-side MSVC-ABI plugin build path:
 
 ```sh
 nix develop .#bakkesmod
-bakkesmod/build-linux-msvc.sh
+bakkesmod/subtr-actor/build-linux-msvc.sh
 ```
 
 This uses `xwin` to download/splat the Microsoft CRT and Windows SDK, then
@@ -281,11 +281,11 @@ smoke-tested as a Windows DLL from Linux after the MSVC-ABI build:
 
 ```sh
 x86_64-w64-mingw32-g++ -std=c++20 -static -static-libgcc -static-libstdc++ \
-  -I bakkesmod/rust/include \
-  bakkesmod/verify-rust-dll-runtime.cpp \
+  -I bakkesmod/subtr-actor/rust/include \
+  bakkesmod/subtr-actor/verify-rust-dll-runtime.cpp \
   -o /tmp/subtr-actor-verify-rust-dll-runtime.exe
 
-cp ./bakkesmod/build-linux-msvc/Release/subtr_actor_bakkesmod.dll \
+cp ./bakkesmod/subtr-actor/build-linux-msvc/Release/subtr_actor_bakkesmod.dll \
   /tmp/subtr_actor_bakkesmod.dll
 
 WINEPREFIX="$HOME/.wine-subtr-actor" \

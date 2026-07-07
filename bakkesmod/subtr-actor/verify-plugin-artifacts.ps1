@@ -1,5 +1,5 @@
 param(
-    [string]$BuildDir = "bakkesmod/build",
+    [string]$BuildDir = "bakkesmod/subtr-actor/build",
     [string]$Configuration = "Release",
     [switch]$SkipRuntimeCheck
 )
@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$RepoRoot = Resolve-Path (Join-Path $ScriptDir "..")
+$RepoRoot = Resolve-Path (Join-Path $ScriptDir "../..")
 
 function Resolve-RepoPath([string]$Path) {
     if ([System.IO.Path]::IsPathRooted($Path)) {
@@ -68,10 +68,10 @@ Assert-SameFileHash $RustDll $InstallRustDll "Install layout Rust DLL"
 
 Push-Location $RepoRoot
 try {
-    Invoke-CheckedPython @("bakkesmod/verify-rust-dll-exports.py", $RustDll, $InstallRustDll)
-    Invoke-CheckedPython @("bakkesmod/verify-plugin-dll-exports.py", $PluginDll, $InstallPluginDll)
+    Invoke-CheckedPython @("bakkesmod/subtr-actor/verify-rust-dll-exports.py", $RustDll, $InstallRustDll)
+    Invoke-CheckedPython @("bakkesmod/subtr-actor/verify-plugin-dll-exports.py", $PluginDll, $InstallPluginDll)
     if (-not $SkipRuntimeCheck) {
-        Invoke-CheckedPython @("bakkesmod/verify-rust-dll-runtime.py", $RustDll, $InstallRustDll)
+        Invoke-CheckedPython @("bakkesmod/subtr-actor/verify-rust-dll-runtime.py", $RustDll, $InstallRustDll)
     }
 }
 finally {

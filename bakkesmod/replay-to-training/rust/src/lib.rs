@@ -1,7 +1,7 @@
 //! C ABI for saving replay-captured shots into Rocket League custom
 //! training pack (`.tem`) files.
 //!
-//! This crate backs the `bakkesmod-replay-to-training/` BakkesMod plugin: the C++
+//! This crate backs the `bakkesmod/replay-to-training/` BakkesMod plugin: the C++
 //! side captures ball and car rigid-body state from the in-game replay
 //! viewer and hands it across the C ABI defined in [`ffi`]; this crate turns
 //! each captured shot into a training-pack round (via the typed-archetype

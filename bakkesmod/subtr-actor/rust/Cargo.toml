@@ -16,4 +16,4 @@ base64 = "0.22.1"
 boxcars.workspace = true
 flate2 = "1.1.2"
 serde_json = "1.0.140"
-subtr-actor = { path = "../.." }
+subtr-actor = { path = "../../.." }

@@ -88,7 +88,7 @@ catch those locally without running the whole suite:
 - When you change exported event/state structs or stats timeline data that may
   flow through the BakkesMod live-plugin ABI, also run
   `cargo test -p subtr-actor-bakkesmod --no-run` before committing. This catches
-  missed mirror updates in `bakkesmod/rust/src/lib_tests/abi_layout.rs` and other
+  missed mirror updates in `bakkesmod/subtr-actor/rust/src/lib_tests/abi_layout.rs` and other
   BakkesMod compile-time fixtures without requiring the full Windows DLL build.
 - `just check` deliberately omits the slow CI jobs (`cargo test`, the release
   build, JS bundling, the binding-regen step). Run those targeted at what you

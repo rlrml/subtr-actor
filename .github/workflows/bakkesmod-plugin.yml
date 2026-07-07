@@ -7,7 +7,6 @@ on:
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'bakkesmod/**'
-      - 'bakkesmod-replay-to-training/**'
       - 'crates/subtr-actor-training/**'
       - 'src/**'
   pull_request:
@@ -17,7 +16,6 @@ on:
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'bakkesmod/**'
-      - 'bakkesmod-replay-to-training/**'
       - 'crates/subtr-actor-training/**'
       - 'src/**'
   workflow_dispatch:
@@ -35,8 +33,8 @@ jobs:
 
       - name: Validate BakkesMod helper scripts
         run: |
-          python -m py_compile bakkesmod/verify-graph-dump.py bakkesmod/verify-plugin-source.py bakkesmod/verify-rust-dll-exports.py bakkesmod/verify-plugin-dll-exports.py bakkesmod/verify-rust-dll-runtime.py bakkesmod-replay-to-training/verify-dll-exports.py
-          python bakkesmod/verify-plugin-source.py
+          python -m py_compile bakkesmod/subtr-actor/verify-graph-dump.py bakkesmod/subtr-actor/verify-plugin-source.py bakkesmod/subtr-actor/verify-rust-dll-exports.py bakkesmod/subtr-actor/verify-plugin-dll-exports.py bakkesmod/subtr-actor/verify-rust-dll-runtime.py bakkesmod/replay-to-training/verify-dll-exports.py
+          python bakkesmod/subtr-actor/verify-plugin-source.py
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -52,18 +50,18 @@ jobs:
 
       - name: Build BakkesMod plugin
         shell: pwsh
-        run: .\bakkesmod\build-windows.ps1
+        run: .\bakkesmod\subtr-actor\build-windows.ps1
 
       - name: Verify live graph surface in plugin artifacts
         shell: pwsh
-        run: .\bakkesmod\verify-plugin-artifacts.ps1
+        run: .\bakkesmod\subtr-actor\verify-plugin-artifacts.ps1
 
       - name: Build replay-to-training plugin
         shell: pwsh
-        run: .\bakkesmod-replay-to-training\build-windows.ps1
+        run: .\bakkesmod\replay-to-training\build-windows.ps1
 
       - name: Verify replay-to-training DLL exports
-        run: python bakkesmod-replay-to-training/verify-dll-exports.py --rust-dll bakkesmod-replay-to-training/build/Release/replay_to_training.dll --plugin-dll bakkesmod-replay-to-training/build/Release/ReplayToTrainingPlugin.dll
+        run: python bakkesmod/replay-to-training/verify-dll-exports.py --rust-dll bakkesmod/replay-to-training/build/Release/replay_to_training.dll --plugin-dll bakkesmod/replay-to-training/build/Release/ReplayToTrainingPlugin.dll
 
       - name: Upload plugin artifacts
         uses: actions/upload-artifact@v4
@@ -71,9 +69,9 @@ jobs:
           name: subtr-actor-bakkesmod-plugin
           if-no-files-found: error
           path: |
-            bakkesmod/build/Release/SubtrActorPlugin.dll
-            bakkesmod/build/Release/subtr_actor_bakkesmod.dll
-            bakkesmod/build/Release/bakkesmod-install/**
+            bakkesmod/subtr-actor/build/Release/SubtrActorPlugin.dll
+            bakkesmod/subtr-actor/build/Release/subtr_actor_bakkesmod.dll
+            bakkesmod/subtr-actor/build/Release/bakkesmod-install/**
 
       - name: Upload replay-to-training plugin artifacts
         uses: actions/upload-artifact@v4
@@ -81,6 +79,6 @@ jobs:
           name: subtr-actor-replay-to-training-plugin
           if-no-files-found: error
           path: |
-            bakkesmod-replay-to-training/build/Release/ReplayToTrainingPlugin.dll
-            bakkesmod-replay-to-training/build/Release/replay_to_training.dll
-            bakkesmod-replay-to-training/build/Release/bakkesmod-install/**
+            bakkesmod/replay-to-training/build/Release/ReplayToTrainingPlugin.dll
+            bakkesmod/replay-to-training/build/Release/replay_to_training.dll
+            bakkesmod/replay-to-training/build/Release/bakkesmod-install/**

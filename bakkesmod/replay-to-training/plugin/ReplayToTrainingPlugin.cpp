@@ -32,7 +32,7 @@ BAKKESMOD_PLUGIN(
     PLUGINTYPE_REPLAY)
 
 // Unity build: every other plugin .cpp is compiled through this single
-// translation unit (mirroring bakkesmod/plugin/SubtrActorPlugin.cpp), so
+// translation unit (mirroring bakkesmod/subtr-actor/plugin/SubtrActorPlugin.cpp), so
 // none of the included files may define colliding file-scope names.
 #include "rust_bridge.cpp"
 #include "capture.cpp"

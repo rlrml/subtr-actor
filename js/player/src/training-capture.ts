@@ -7,7 +7,7 @@ import type { Quaternion, Vec3 } from "./types";
 /**
  * Capture of a replay frame's ball + car states into a custom training
  * (`.tem`) round, mirroring the BakkesMod tem-recorder plugin's output
- * vocabulary (`bakkesmod-tem-recorder/rust/src/archetypes.rs`) so packs
+ * vocabulary (`bakkesmod/replay-to-training/rust/src/archetypes.rs`) so packs
  * captured in-browser and in-game look alike.
  *
  * COORDINATE FRAME: every input here is the *replay model's* rigid-body
@@ -166,7 +166,7 @@ export function quaternionToRotator(rotation: Quaternion): RotatorUnits {
 /**
  * Forward speeds below this (uu/s) count as `0` spawn momentum, matching
  * the BakkesMod plugin's physics-noise flush (`MIN_FORWARD_SPEED` in
- * `bakkesmod-replay-to-training/rust/src/archetypes.rs`).
+ * `bakkesmod/replay-to-training/rust/src/archetypes.rs`).
  */
 export const MIN_FORWARD_SPEED = 1;
 
