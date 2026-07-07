@@ -50,7 +50,7 @@ jobs:
       run: cargo metadata --locked --format-version 1 > /dev/null
 
     - name: Run clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
     - name: Install cargo-rdme
       run: bash .github/scripts/install-cargo-rdme.sh
