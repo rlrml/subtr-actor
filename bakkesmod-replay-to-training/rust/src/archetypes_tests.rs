@@ -362,7 +362,7 @@ fn momentum_warning_fires_for_reversing_car() {
 #[test]
 fn momentum_warning_angle_gate_and_quiet_zone() {
     // 45 degrees off facing at 500 uu/s: lost = 500*sin(45) ~ 354 <= 400,
-    // but the angle (45 > 30) trips the warning.
+    // but the angle (45 > 20) trips the warning.
     let sliding = TrCarState {
         linear_velocity: vec3(353.5534, 353.5534, 0.0),
         ..TrCarState::default()
@@ -374,9 +374,48 @@ fn momentum_warning_angle_gate_and_quiet_zone() {
         )
     );
 
-    // 20 degrees off at 800 uu/s: lost = 800*sin(20) ~ 274 <= 400 and the
-    // angle is under 30, so the capture is representable enough.
-    let angle = 20.0_f64.to_radians();
+    // 21 degrees off at 800 uu/s: lost = 800*sin(21) ~ 287 <= 400, but the
+    // angle (21 > 20) trips the warning — just over the tightened gate.
+    let just_over = 21.0_f64.to_radians();
+    let over = TrCarState {
+        linear_velocity: vec3(
+            (800.0 * just_over.cos()) as f32,
+            (800.0 * just_over.sin()) as f32,
+            0.0,
+        ),
+        ..TrCarState::default()
+    };
+    assert_eq!(
+        momentum_warning(&over).as_deref(),
+        Some(
+            "car moving 800 uu/s at 21\u{b0} off facing; only 747 uu/s representable as spawn momentum"
+        )
+    );
+
+    // 19 degrees off at 800 uu/s: lost = 800*sin(19) ~ 260 <= 400 and the
+    // angle is under 20, so the capture is representable enough — just under
+    // the tightened gate.
+    let just_under = 19.0_f64.to_radians();
+    let mild = TrCarState {
+        linear_velocity: vec3(
+            (800.0 * just_under.cos()) as f32,
+            (800.0 * just_under.sin()) as f32,
+            0.0,
+        ),
+        ..TrCarState::default()
+    };
+    assert_eq!(momentum_warning(&mild), None);
+}
+
+/// Custom thresholds flip the verdict: a 19-degree drift that the default
+/// gate leaves quiet warns once the caller tightens the angle gate below
+/// 19 degrees, and a default-warning sideways drift goes quiet once the
+/// caller raises the speed floor above the car's speed (the plugin's
+/// "disable the warning" mechanism).
+#[test]
+fn momentum_warning_with_thresholds_respects_custom_gates() {
+    // 19 degrees off at 800 uu/s: quiet under the default 20-degree gate.
+    let angle = 19.0_f64.to_radians();
     let mild = TrCarState {
         linear_velocity: vec3(
             (800.0 * angle.cos()) as f32,
@@ -386,4 +425,20 @@ fn momentum_warning_angle_gate_and_quiet_zone() {
         ..TrCarState::default()
     };
     assert_eq!(momentum_warning(&mild), None);
+    // Tighten the angle gate to 15 degrees: now 19 > 15 trips the warning
+    // (lost ~260 stays under the 400 lost-speed floor, so the angle gate is
+    // the decisive change).
+    assert!(momentum_warning_with_thresholds(&mild, 300.0, 400.0, 15.0).is_some());
+
+    // A sideways drift that warns under the defaults.
+    let drift = TrCarState {
+        linear_velocity: vec3(0.0, 900.0, 0.0),
+        ..TrCarState::default()
+    };
+    assert!(momentum_warning(&drift).is_some());
+    // Raise the speed floor above 900 uu/s: the warning is disabled.
+    assert_eq!(
+        momentum_warning_with_thresholds(&drift, 1000.0, 400.0, 20.0),
+        None
+    );
 }

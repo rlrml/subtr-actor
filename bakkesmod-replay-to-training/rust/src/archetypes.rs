@@ -138,38 +138,52 @@ pub fn forward_speed(car: &TrCarState) -> f64 {
     }
 }
 
-/// Total speed below which no momentum warning is raised, in uu/s. A
-/// slow-moving car loses little absolute momentum whatever its direction,
-/// and near-stationary velocity direction is mostly physics noise.
+/// Default total speed below which no momentum warning is raised, in uu/s.
+/// A slow-moving car loses little absolute momentum whatever its direction,
+/// and near-stationary velocity direction is mostly physics noise. The
+/// plugin exposes this as the `replay_to_training_momentum_warn_min_speed`
+/// cvar; setting it very high effectively disables the warning entirely.
 pub const MOMENTUM_WARNING_MIN_SPEED: f64 = 300.0;
 
-/// Unrepresentable (lost) velocity magnitude above which a momentum
+/// Default unrepresentable (lost) velocity magnitude above which a momentum
 /// warning is raised, in uu/s. Roughly a third of max driving speed:
-/// enough loss to visibly change how a recreated shot plays.
+/// enough loss to visibly change how a recreated shot plays. The plugin
+/// exposes this as the `replay_to_training_momentum_warn_min_lost` cvar.
 pub const MOMENTUM_WARNING_MIN_LOST_SPEED: f64 = 400.0;
 
-/// Angle between velocity and facing above which a momentum warning is
-/// raised, in degrees. Past ~30° the car is drifting/sliding rather than
+/// Default angle between velocity and facing above which a momentum warning
+/// is raised, in degrees. Past ~20° the car is drifting/sliding rather than
 /// driving where it points, so the along-facing projection misrepresents
-/// the motion even when the lost magnitude is modest.
-pub const MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES: f64 = 30.0;
+/// the motion even when the lost magnitude is modest. At 20° the sideways
+/// component is ~34% of the car's speed while the forward projection only
+/// loses ~6% — a modest speed hit but a clearly off-axis motion, so the
+/// gate defaults tight here per user feedback. The plugin exposes this as
+/// the `replay_to_training_momentum_warn_max_angle` cvar.
+pub const MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES: f64 = 20.0;
 
 /// Capture-time diagnostic for momentum capture: a human-readable warning
 /// when a meaningful share of the car's velocity cannot be encoded in the
 /// spawn mesh's scalar `VelocityStartSpeed` (see [`forward_speed`] for why
 /// the format only stores speed-along-facing).
 ///
-/// With total speed `s`, emitted forward speed `f` ([`forward_speed`], so
-/// already clamped/flushed) and signed facing projection `p`, the lost
-/// magnitude is `sqrt(max(s² − f², 0))` (reversing ⇒ everything lost) and
-/// the off-axis angle is `acos(clamp(p / s, −1, 1))`. Warns — capture
-/// still proceeds — when `s >` [`MOMENTUM_WARNING_MIN_SPEED`] AND (lost
-/// `>` [`MOMENTUM_WARNING_MIN_LOST_SPEED`] OR angle `>`
-/// [`MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES`]). Returns `None` when the
-/// velocity is representable enough.
-pub fn momentum_warning(car: &TrCarState) -> Option<String> {
+/// The three thresholds are supplied by the caller (the plugin reads them
+/// from persisted cvars; [`momentum_warning`] wraps this with the crate
+/// defaults for tests and any caller that does not tune them). With total
+/// speed `s`, emitted forward speed `f` ([`forward_speed`], so already
+/// clamped/flushed) and signed facing projection `p`, the lost magnitude is
+/// `sqrt(max(s² − f², 0))` (reversing ⇒ everything lost) and the off-axis
+/// angle is `acos(clamp(p / s, −1, 1))`. Warns — capture still proceeds —
+/// when `s > min_speed` AND (lost `> min_lost_speed` OR angle `>
+/// max_off_axis_degrees`). Returns `None` when the velocity is
+/// representable enough.
+pub fn momentum_warning_with_thresholds(
+    car: &TrCarState,
+    min_speed: f64,
+    min_lost_speed: f64,
+    max_off_axis_degrees: f64,
+) -> Option<String> {
     let (projection, speed) = facing_projection_and_speed(car);
-    if speed <= MOMENTUM_WARNING_MIN_SPEED {
+    if speed <= min_speed {
         return None;
     }
     let representable = forward_speed(car);
@@ -177,15 +191,25 @@ pub fn momentum_warning(car: &TrCarState) -> Option<String> {
         .max(0.0)
         .sqrt();
     let off_axis_degrees = (projection / speed).clamp(-1.0, 1.0).acos().to_degrees();
-    if lost <= MOMENTUM_WARNING_MIN_LOST_SPEED
-        && off_axis_degrees <= MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES
-    {
+    if lost <= min_lost_speed && off_axis_degrees <= max_off_axis_degrees {
         return None;
     }
     Some(format!(
         "car moving {speed:.0} uu/s at {off_axis_degrees:.0}\u{b0} off facing; \
          only {representable:.0} uu/s representable as spawn momentum"
     ))
+}
+
+/// [`momentum_warning_with_thresholds`] using the crate default thresholds
+/// ([`MOMENTUM_WARNING_MIN_SPEED`], [`MOMENTUM_WARNING_MIN_LOST_SPEED`],
+/// [`MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES`]).
+pub fn momentum_warning(car: &TrCarState) -> Option<String> {
+    momentum_warning_with_thresholds(
+        car,
+        MOMENTUM_WARNING_MIN_SPEED,
+        MOMENTUM_WARNING_MIN_LOST_SPEED,
+        MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES,
+    )
 }
 
 /// Builds the spawn-point (`DynamicSpawnPointMesh`) archetype for the

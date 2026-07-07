@@ -191,6 +191,7 @@ export {
 export type {
   CapturedBallState,
   CapturedCarState,
+  MomentumWarningThresholds,
   RotatorUnits,
   TrainingCaptureOptions,
 } from "./training-capture";

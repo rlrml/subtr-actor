@@ -427,7 +427,7 @@ test("momentumLossWarning treats reversing as losing everything", () => {
 
 test("momentumLossWarning angle gate fires under the lost-speed threshold; mild angles stay quiet", () => {
   // Facing +Y (90-degree yaw); moving 45 degrees off it at 500 uu/s:
-  // lost = 500*sin(45) ~ 354 <= 400, but 45 > 30 degrees trips the gate.
+  // lost = 500*sin(45) ~ 354 <= 400, but 45 > 20 degrees trips the gate.
   const facingPlusY = axisAngle({ x: 0, y: 0, z: 1 }, Math.PI / 2);
   assert.equal(
     momentumLossWarning({
@@ -438,13 +438,53 @@ test("momentumLossWarning angle gate fires under the lost-speed threshold; mild 
     "car moving 500 uu/s at 45\u{b0} off facing; only 354 uu/s representable as spawn momentum",
   );
 
-  // 20 degrees off at 800 uu/s: lost ~274 and angle under 30 -> quiet.
-  const angle = (20 * Math.PI) / 180;
+  // 21 degrees off at 800 uu/s: lost ~287 <= 400 but angle 21 > 20 -> warns,
+  // just over the tightened gate.
+  const justOver = (21 * Math.PI) / 180;
   assert.equal(
     momentumLossWarning({
       position: { x: 0, y: 0, z: 17 },
-      linearVelocity: { x: 800 * Math.cos(angle), y: 800 * Math.sin(angle), z: 0 },
+      linearVelocity: { x: 800 * Math.cos(justOver), y: 800 * Math.sin(justOver), z: 0 },
+    }),
+    "car moving 800 uu/s at 21\u{b0} off facing; only 747 uu/s representable as spawn momentum",
+  );
+
+  // 19 degrees off at 800 uu/s: lost ~260 and angle under 20 -> quiet, just
+  // under the tightened gate.
+  const justUnder = (19 * Math.PI) / 180;
+  assert.equal(
+    momentumLossWarning({
+      position: { x: 0, y: 0, z: 17 },
+      linearVelocity: { x: 800 * Math.cos(justUnder), y: 800 * Math.sin(justUnder), z: 0 },
     }),
     null,
   );
+});
+
+test("momentumLossWarning custom thresholds change the verdict", () => {
+  // 19 degrees off at 800 uu/s: quiet under the default 20-degree gate.
+  const angle = (19 * Math.PI) / 180;
+  const mild = {
+    position: { x: 0, y: 0, z: 17 },
+    linearVelocity: { x: 800 * Math.cos(angle), y: 800 * Math.sin(angle), z: 0 },
+  };
+  assert.equal(momentumLossWarning(mild), null);
+  // Tighten the angle gate to 15 degrees: 19 > 15 now trips the warning
+  // (lost ~260 stays under the 400 lost-speed floor).
+  assert.equal(
+    momentumLossWarning(mild, { maxOffAxisDegrees: 15 }),
+    "car moving 800 uu/s at 19\u{b0} off facing; only 756 uu/s representable as spawn momentum",
+  );
+
+  // A fast sideways drift that warns under the defaults.
+  const drift = {
+    position: { x: 0, y: 0, z: 17 },
+    linearVelocity: { x: 0, y: 900, z: 0 },
+  };
+  assert.equal(
+    momentumLossWarning(drift),
+    "car moving 900 uu/s at 90\u{b0} off facing; only 0 uu/s representable as spawn momentum",
+  );
+  // Raise the speed floor above 900 uu/s: the warning is disabled.
+  assert.equal(momentumLossWarning(drift, { minSpeed: 1000 }), null);
 });

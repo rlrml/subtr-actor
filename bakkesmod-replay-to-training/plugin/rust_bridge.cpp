@@ -273,8 +273,13 @@ std::string ReplayToTrainingPlugin::momentumNoteString(const TrCarState &car) {
   // Generously sized fixed buffer: the note is one short sentence, and a
   // 0 return means "no warning" (never a partial write worth retrying).
   std::string note(512, '\0');
-  const size_t written =
-      momentumNote(&car, reinterpret_cast<uint8_t *>(note.data()), note.size());
+  const size_t written = momentumNote(
+      &car,
+      momentumWarnMinSpeed(),
+      momentumWarnMinLost(),
+      momentumWarnMaxAngle(),
+      reinterpret_cast<uint8_t *>(note.data()),
+      note.size());
   note.resize(written);
   return note;
 }

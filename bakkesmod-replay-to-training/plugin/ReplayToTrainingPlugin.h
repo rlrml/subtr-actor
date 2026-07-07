@@ -64,7 +64,8 @@ private:
   using PackStringLen = size_t (*)(const TrPack *);
   using PackWriteString = size_t (*)(const TrPack *, uint8_t *, size_t);
   using PackAddShot = int32_t (*)(TrPack *, const TrCapturedShot *);
-  using MomentumNote = size_t (*)(const TrCarState *, uint8_t *, size_t);
+  using MomentumNote =
+      size_t (*)(const TrCarState *, float, float, float, uint8_t *, size_t);
   using PackRemoveShot = int32_t (*)(TrPack *, size_t);
   using PackShotCount = size_t (*)(const TrPack *);
   using PackShotSummaryLen = size_t (*)(const TrPack *, size_t);
@@ -158,7 +159,7 @@ private:
   std::string fileGuidHexString(const std::string &path);
   // Momentum-loss warning for a captured car state (empty when the
   // velocity is representable as spawn momentum); see
-  // replay_to_training_momentum_note.
+  // replay_to_training_momentum_note. Reads the three warn-threshold cvars.
   std::string momentumNoteString(const TrCarState &car);
 
   // capture.cpp
@@ -178,6 +179,12 @@ private:
   bool autosaveEnabled();
   bool mirrorByTeamEnabled();
   bool captureMomentumEnabled();
+  // The three persisted momentum-warning thresholds (cvars
+  // replay_to_training_momentum_warn_min_speed / _min_lost / _max_angle),
+  // falling back to the Rust core defaults (300 / 400 / 20) when unset.
+  float momentumWarnMinSpeed();
+  float momentumWarnMinLost();
+  float momentumWarnMaxAngle();
   // The persisted capture-mode selection (cvar
   // replay_to_training_capture_mode: "striker" | "goalie"), used by the
   // generic replay_to_training_capture notifier; the explicit
@@ -211,6 +218,7 @@ private:
   void renderPackTypeControls();
   void renderCaptureModeSelector();
   void renderCaptureToggles();
+  void renderMomentumWarningControls();
   void renderTargetControls();
   void renderPackActions();
   void renderShotList();

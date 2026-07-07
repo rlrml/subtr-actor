@@ -348,14 +348,19 @@ pub unsafe extern "C" fn replay_to_training_pack_add_shot(
 }
 
 /// Momentum-loss diagnostic for a captured car (see
-/// `crate::archetypes::momentum_warning`): when a meaningful share of the
-/// car's velocity cannot be encoded in the spawn mesh's scalar
+/// `crate::archetypes::momentum_warning_with_thresholds`): when a meaningful
+/// share of the car's velocity cannot be encoded in the spawn mesh's scalar
 /// `VelocityStartSpeed`, writes a human-readable warning like
 /// `car moving 1320 uu/s at 74° off facing; only 338 uu/s representable
 /// as spawn momentum` into `out_bytes` (up to `max_bytes`, no NUL) and
 /// returns the number of bytes written. Returns `0` when there is no
 /// warning (velocity representable enough, or a null `car`). Stateless:
 /// does not touch any pack.
+///
+/// The three thresholds are supplied by the caller — the plugin reads them
+/// from persisted cvars; setting `min_speed` very high effectively disables
+/// the warning. They are widened to `f64` internally to match the core
+/// computation.
 ///
 /// # Safety
 ///
@@ -364,13 +369,21 @@ pub unsafe extern "C" fn replay_to_training_pack_add_shot(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_momentum_note(
     car: *const TrCarState,
+    min_speed: f32,
+    min_lost_speed: f32,
+    max_off_axis_degrees: f32,
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
     let Some(car) = (unsafe { car.as_ref() }) else {
         return 0;
     };
-    match crate::archetypes::momentum_warning(car) {
+    match crate::archetypes::momentum_warning_with_thresholds(
+        car,
+        f64::from(min_speed),
+        f64::from(min_lost_speed),
+        f64::from(max_off_axis_degrees),
+    ) {
         Some(warning) => unsafe { write_text(&warning, out_bytes, max_bytes) },
         None => 0,
     }
