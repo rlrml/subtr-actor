@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 const scriptDir = fileURLToPath(new URL(".", import.meta.url));
 const jsDir = path.resolve(scriptDir, "..");
 const repoRoot = path.resolve(jsDir, "..");
-const pkgDir = path.resolve(jsDir, "pkg");
 const sourceDirs = [path.resolve(repoRoot, "src"), path.resolve(jsDir, "src")];
 const sourceFiles = [
   path.resolve(repoRoot, "Cargo.toml"),
@@ -14,11 +13,28 @@ const sourceFiles = [
   path.resolve(jsDir, "Cargo.toml"),
   path.resolve(jsDir, "package.json"),
 ];
-const outputFiles = [
-  path.resolve(pkgDir, "rl_replay_subtr_actor.js"),
-  path.resolve(pkgDir, "rl_replay_subtr_actor_bg.wasm"),
-  path.resolve(pkgDir, "rl_replay_subtr_actor.d.ts"),
-];
+
+function outputFilesFor(pkgDirName) {
+  const pkgDir = path.resolve(jsDir, pkgDirName);
+  return [
+    path.resolve(pkgDir, "rl_replay_subtr_actor.js"),
+    path.resolve(pkgDir, "rl_replay_subtr_actor_bg.wasm"),
+    path.resolve(pkgDir, "rl_replay_subtr_actor.d.ts"),
+  ];
+}
+
+const WASM_TARGETS = {
+  web: {
+    label: "js/pkg",
+    outputFiles: outputFilesFor("pkg"),
+    buildCommand: ["npm", ["--prefix", path.resolve(jsDir, "player"), "run", "build:bindings"]],
+  },
+  node: {
+    label: "js/pkg-node",
+    outputFiles: outputFilesFor("pkg-node"),
+    buildCommand: ["npm", ["--prefix", jsDir, "run", "build:nodejs"]],
+  },
+};
 
 async function pathExists(targetPath) {
   try {
@@ -81,25 +97,21 @@ async function collectSourceFiles() {
   return [...sourceFiles, ...nestedFiles];
 }
 
-async function isWasmPackageStale() {
+async function isWasmTargetStale(target) {
   const [latestSourceMtime, earliestOutputMtime] = await Promise.all([
     latestMtime(await collectSourceFiles()),
-    earliestMtime(outputFiles),
+    earliestMtime(target.outputFiles),
   ]);
 
   return latestSourceMtime > earliestOutputMtime;
 }
 
-function runBuildScript() {
+function runBuildCommand([command, args]) {
   return new Promise((resolve, reject) => {
-    const child = spawn(
-      "npm",
-      ["--prefix", path.resolve(jsDir, "player"), "run", "build:bindings"],
-      {
-        cwd: jsDir,
-        stdio: "inherit",
-      },
-    );
+    const child = spawn(command, args, {
+      cwd: jsDir,
+      stdio: "inherit",
+    });
 
     child.on("exit", (code) => {
       if (code === 0) {
@@ -125,27 +137,47 @@ export function isWasmSourcePath(filePath) {
   );
 }
 
-export async function ensureWasmPackageFresh({ force = false, log = console.log } = {}) {
+async function ensureWasmTargetFresh(target, { force, log }) {
   if (process.env.SUBTR_ACTOR_SKIP_WASM_BUILD === "1") {
-    if ((await earliestMtime(outputFiles)) === 0) {
-      throw new Error("SUBTR_ACTOR_SKIP_WASM_BUILD=1 but js/pkg is missing");
+    if ((await earliestMtime(target.outputFiles)) === 0) {
+      throw new Error(`SUBTR_ACTOR_SKIP_WASM_BUILD=1 but ${target.label} is missing`);
     }
 
-    log("[wasm] using prebuilt js/pkg");
+    log(`[wasm] using prebuilt ${target.label}`);
     return false;
   }
 
-  if (!force && !(await isWasmPackageStale())) {
-    log("[wasm] js/pkg is up to date");
+  if (!force && !(await isWasmTargetStale(target))) {
+    log(`[wasm] ${target.label} is up to date`);
     return false;
   }
 
-  log(force ? "[wasm] rebuilding js/pkg" : "[wasm] js/pkg is stale, rebuilding");
-  await runBuildScript();
+  log(force ? `[wasm] rebuilding ${target.label}` : `[wasm] ${target.label} is stale, rebuilding`);
+  await runBuildCommand(target.buildCommand);
   return true;
+}
+
+export async function ensureWasmPackageFresh({
+  force = false,
+  log = console.log,
+  targets = ["web"],
+} = {}) {
+  let rebuilt = false;
+
+  for (const targetName of targets) {
+    const target = WASM_TARGETS[targetName];
+    if (!target) {
+      throw new Error(`unknown wasm target: ${targetName}`);
+    }
+    if (await ensureWasmTargetFresh(target, { force, log })) {
+      rebuilt = true;
+    }
+  }
+
+  return rebuilt;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const force = process.argv.includes("--force");
-  await ensureWasmPackageFresh({ force });
+  await ensureWasmPackageFresh({ force, targets: ["web", "node"] });
 }
