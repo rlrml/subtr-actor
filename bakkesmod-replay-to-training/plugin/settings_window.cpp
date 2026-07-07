@@ -228,6 +228,16 @@ void ReplayToTrainingPlugin::renderShotList() {
 }
 
 void ReplayToTrainingPlugin::renderStatusLine() {
+  // Dedicated momentum-warning line: sticks around (unlike the transient
+  // status text) until the next warning-free capture or a new pack, so a
+  // capture whose car velocity was mostly unrepresentable stays visible.
+  // PushStyleColor rather than TextColored so the text still wraps.
+  if (!momentumWarningLine.empty()) {
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.65f, 0.15f, 1.0f));
+    ImGui::TextWrapped("Momentum warning (last capture): %s",
+                       momentumWarningLine.c_str());
+    ImGui::PopStyleColor();
+  }
   ImGui::TextWrapped("Status: %s", statusLine.c_str());
 }
 

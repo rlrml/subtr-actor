@@ -18,7 +18,7 @@ use std::sync::Mutex;
 
 use subtr_actor_training::{Difficulty, TrainingType};
 
-use crate::abi::TrCapturedShot;
+use crate::abi::{TrCapturedShot, TrCarState};
 use crate::mirror::CaptureMode;
 use crate::recorder::{
     AddShotOutcome, RecorderPack, ShotOptions, TargetSaveOutcome, file_guid_hex,
@@ -344,6 +344,35 @@ pub unsafe extern "C" fn replay_to_training_pack_add_shot(
             pack.inner.record_error(error);
             1
         }
+    }
+}
+
+/// Momentum-loss diagnostic for a captured car (see
+/// `crate::archetypes::momentum_warning`): when a meaningful share of the
+/// car's velocity cannot be encoded in the spawn mesh's scalar
+/// `VelocityStartSpeed`, writes a human-readable warning like
+/// `car moving 1320 uu/s at 74° off facing; only 338 uu/s representable
+/// as spawn momentum` into `out_bytes` (up to `max_bytes`, no NUL) and
+/// returns the number of bytes written. Returns `0` when there is no
+/// warning (velocity representable enough, or a null `car`). Stateless:
+/// does not touch any pack.
+///
+/// # Safety
+///
+/// `car` must be null or point to a valid `TrCarState`; `out_bytes` must
+/// be null or valid for `max_bytes` writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn replay_to_training_momentum_note(
+    car: *const TrCarState,
+    out_bytes: *mut u8,
+    max_bytes: usize,
+) -> usize {
+    let Some(car) = (unsafe { car.as_ref() }) else {
+        return 0;
+    };
+    match crate::archetypes::momentum_warning(car) {
+        Some(warning) => unsafe { write_text(&warning, out_bytes, max_bytes) },
+        None => 0,
     }
 }
 

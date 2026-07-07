@@ -90,6 +90,8 @@ bool ReplayToTrainingPlugin::loadRustLibrary() {
       GetProcAddress(rustLibrary, "replay_to_training_pack_write_name"));
   packAddShot = reinterpret_cast<PackAddShot>(
       GetProcAddress(rustLibrary, "replay_to_training_pack_add_shot"));
+  momentumNote = reinterpret_cast<MomentumNote>(
+      GetProcAddress(rustLibrary, "replay_to_training_momentum_note"));
   packRemoveShot = reinterpret_cast<PackRemoveShot>(
       GetProcAddress(rustLibrary, "replay_to_training_pack_remove_shot"));
   packShotCount = reinterpret_cast<PackShotCount>(
@@ -133,7 +135,7 @@ bool ReplayToTrainingPlugin::loadRustLibrary() {
       packSetCode && packSetCreatorName && packSetMapName && packSetDifficulty &&
       packDifficulty && packSetTrainingType && packTrainingType &&
       packCaptureModeSync &&
-      packNameLen && packWriteName && packAddShot &&
+      packNameLen && packWriteName && packAddShot && momentumNote &&
       packRemoveShot && packShotCount && packShotSummaryLen &&
       packWriteShotSummary && packGuidHex && packSave && packSaveToTarget &&
       fileGuidHex && sanitizeTarget && targetsLen && writeTargets &&
@@ -170,6 +172,7 @@ void ReplayToTrainingPlugin::unloadRustLibrary() {
   packNameLen = nullptr;
   packWriteName = nullptr;
   packAddShot = nullptr;
+  momentumNote = nullptr;
   packRemoveShot = nullptr;
   packShotCount = nullptr;
   packShotSummaryLen = nullptr;
@@ -261,6 +264,19 @@ std::string ReplayToTrainingPlugin::fileGuidHexString(const std::string &path) {
       fileGuidHex(path.c_str(), reinterpret_cast<uint8_t *>(hex.data()), hex.size());
   hex.resize(written);
   return hex;
+}
+
+std::string ReplayToTrainingPlugin::momentumNoteString(const TrCarState &car) {
+  if (!momentumNote) {
+    return {};
+  }
+  // Generously sized fixed buffer: the note is one short sentence, and a
+  // 0 return means "no warning" (never a partial write worth retrying).
+  std::string note(512, '\0');
+  const size_t written =
+      momentumNote(&car, reinterpret_cast<uint8_t *>(note.data()), note.size());
+  note.resize(written);
+  return note;
 }
 
 std::string ReplayToTrainingPlugin::rustCoreBuildInfo() {

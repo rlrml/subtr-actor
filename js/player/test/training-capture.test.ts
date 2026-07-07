@@ -13,6 +13,7 @@ import {
   capturedTrainingPackDefaults,
   carSpawnFromReplayState,
   generateTrainingPackGuid,
+  momentumLossWarning,
   playerCarSpawnFromReplayState,
   quaternionToRotator,
   radiansToRotatorUnits,
@@ -380,5 +381,70 @@ test("captured archetype key sets match the synthetic fixture's vocabulary", () 
   assert.equal(
     keySet(capturedSpawnPoint!),
     [...fixtureSpawnKeys.split(","), "VelocityStartSpeed"].sort().join(","),
+  );
+});
+
+test("momentumLossWarning is null for along-facing motion and slow cars", () => {
+  // Fast, but straight down the facing (identity rotation faces +X).
+  assert.equal(
+    momentumLossWarning({
+      position: { x: 0, y: 0, z: 17 },
+      linearVelocity: { x: 1400, y: 0, z: 0 },
+    }),
+    null,
+  );
+  // Pure sideways drift, but under the 300 uu/s total-speed floor.
+  assert.equal(
+    momentumLossWarning({
+      position: { x: 0, y: 0, z: 17 },
+      linearVelocity: { x: 0, y: 250, z: 0 },
+    }),
+    null,
+  );
+  // No velocity sample at all.
+  assert.equal(momentumLossWarning({ position: { x: 0, y: 0, z: 17 } }), null);
+});
+
+test("momentumLossWarning fires for fast sideways drift with the plugin's wording", () => {
+  assert.equal(
+    momentumLossWarning({
+      position: { x: 0, y: 0, z: 17 },
+      linearVelocity: { x: 0, y: 900, z: 0 },
+    }),
+    "car moving 900 uu/s at 90\u{b0} off facing; only 0 uu/s representable as spawn momentum",
+  );
+});
+
+test("momentumLossWarning treats reversing as losing everything", () => {
+  assert.equal(
+    momentumLossWarning({
+      position: { x: 0, y: 0, z: 17 },
+      linearVelocity: { x: -1000, y: 0, z: 0 },
+    }),
+    "car moving 1000 uu/s at 180\u{b0} off facing; only 0 uu/s representable as spawn momentum",
+  );
+});
+
+test("momentumLossWarning angle gate fires under the lost-speed threshold; mild angles stay quiet", () => {
+  // Facing +Y (90-degree yaw); moving 45 degrees off it at 500 uu/s:
+  // lost = 500*sin(45) ~ 354 <= 400, but 45 > 30 degrees trips the gate.
+  const facingPlusY = axisAngle({ x: 0, y: 0, z: 1 }, Math.PI / 2);
+  assert.equal(
+    momentumLossWarning({
+      position: { x: 0, y: 0, z: 17 },
+      rotation: facingPlusY,
+      linearVelocity: { x: -353.5534, y: 353.5534, z: 0 },
+    }),
+    "car moving 500 uu/s at 45\u{b0} off facing; only 354 uu/s representable as spawn momentum",
+  );
+
+  // 20 degrees off at 800 uu/s: lost ~274 and angle under 30 -> quiet.
+  const angle = (20 * Math.PI) / 180;
+  assert.equal(
+    momentumLossWarning({
+      position: { x: 0, y: 0, z: 17 },
+      linearVelocity: { x: 800 * Math.cos(angle), y: 800 * Math.sin(angle), z: 0 },
+    }),
+    null,
   );
 });

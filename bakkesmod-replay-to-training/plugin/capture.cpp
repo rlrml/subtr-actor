@@ -237,6 +237,8 @@ void ReplayToTrainingPlugin::newPack() {
   // to the auto-GUID save flow and cannot overwrite a target file. setTarget
   // re-binds after calling this.
   clearTarget();
+  // The warning belongs to a capture of the previous pack.
+  momentumWarningLine.clear();
   applyMetadataToPack();
   // The fresh pack's training type is unset until the first capture
   // (capture_shot -> Striker, capture_save -> Goalie) or a manual override.
@@ -387,6 +389,23 @@ void ReplayToTrainingPlugin::captureShot(CaptureMode mode) {
   shot.mode = static_cast<uint8_t>(mode);
   shot.mirror_by_team = mirrorByTeamEnabled() ? 1 : 0;
   shot.capture_momentum = captureMomentumEnabled() ? 1 : 0;
+
+  // Momentum-loss diagnostic: with momentum capture on, warn (capture
+  // still proceeds) when a meaningful share of the shooter car's velocity
+  // cannot be encoded in the spawn mesh's scalar VelocityStartSpeed. The
+  // rule and wording live in the Rust core (replay_to_training_momentum_note).
+  // Team mirroring rotates velocity and facing together, so the numbers
+  // are the same before and after it.
+  std::string momentumWarning;
+  if (shot.capture_momentum != 0 && !cars.empty()) {
+    const auto primary =
+        std::find_if(cars.begin(), cars.end(), [](const TrCarState &car) {
+          return car.is_primary != 0;
+        });
+    momentumWarning =
+        momentumNoteString(primary != cars.end() ? *primary : cars.front());
+  }
+
   const int32_t added = packAddShot(pack, &shot);
   if (added == 1) {
     setStatus(std::format("capture failed: {}", packErrorMessage()));
@@ -408,6 +427,17 @@ void ReplayToTrainingPlugin::captureShot(CaptureMode mode) {
         modeLabel));
     return;
   }
+  // The most recent capture owns the dedicated warning line: a clean
+  // capture clears a stale warning (newPack also clears it).
+  momentumWarningLine = momentumWarning;
+  // The warning also rides the status line, which setStatus mirrors to the
+  // BakkesMod console in full.
+  const std::string warningSuffix =
+      momentumWarning.empty() ? std::string()
+                              : std::format("; warning: {}", momentumWarning);
+  // The replay timestamp is what makes replay-vs-pack forensics possible:
+  // keep it in every capture status message.
+  const float replayTime = server.GetReplayTimeElapsed();
   const size_t count = packShotCount ? packShotCount(pack) : 0;
   if (autosaveEnabled()) {
     // Run the normal save flow (target-bound with its clobber guardrails
@@ -415,21 +445,25 @@ void ReplayToTrainingPlugin::captureShot(CaptureMode mode) {
     // immediately.
     std::string saveMessage;
     if (savePackInternal(saveMessage)) {
-      // saveMessage reads "saved ..." -> "captured shot N; autosaved ...".
-      setStatus(std::format("captured {} {}; auto{}", modeLabel, count,
-                            saveMessage));
+      // saveMessage reads "saved ..." -> "captured shot N at replay time
+      // X.Xs; autosaved ...".
+      setStatus(std::format("captured {} {} at replay time {:.1f}s; auto{}{}",
+                            modeLabel, count, replayTime, saveMessage,
+                            warningSuffix));
     } else {
-      setStatus(std::format("captured {} {}; autosave failed: {}", modeLabel,
-                            count, saveMessage));
+      setStatus(std::format(
+          "captured {} {} at replay time {:.1f}s; autosave failed: {}{}",
+          modeLabel, count, replayTime, saveMessage, warningSuffix));
     }
     return;
   }
   setStatus(std::format(
       "captured {} {} at replay time {:.1f}s (unsaved; "
-      "replay_to_training_save_pack writes it)",
+      "replay_to_training_save_pack writes it){}",
       modeLabel,
       count,
-      server.GetReplayTimeElapsed()));
+      replayTime,
+      warningSuffix));
 }
 
 bool ReplayToTrainingPlugin::autosaveEnabled() {

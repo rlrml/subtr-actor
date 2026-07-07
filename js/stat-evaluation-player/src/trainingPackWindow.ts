@@ -1,7 +1,8 @@
 import type { PlayerSample, ReplayPlayerTrack } from "@rlrml/player";
-import { DEFAULT_TRAINING_SHOT_TIME_LIMIT_SECONDS } from "@rlrml/player";
+import { DEFAULT_TRAINING_SHOT_TIME_LIMIT_SECONDS, momentumLossWarning } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import { TrainingPackSession } from "./trainingPackSession.ts";
+import { captureStatusMessage } from "./trainingPackMessages.ts";
 import { formatTime } from "./statsWindows.ts";
 
 export interface TrainingPackWindowElements {
@@ -199,23 +200,30 @@ export class TrainingPackWindowController {
       return;
     }
     const session = await this.ensureSession();
+    const shooterState = {
+      position: shooter.sample.position!,
+      rotation: shooter.sample.rotation,
+      linearVelocity: shooter.sample.linearVelocity,
+    };
     const index = session.captureShot(
       {
         ball: {
           position: ballSample.position,
           linearVelocity: ballSample.linearVelocity,
         },
-        shooter: {
-          position: shooter.sample.position!,
-          rotation: shooter.sample.rotation,
-        },
+        shooter: shooterState,
         timeLimit: this.timeLimitSeconds(),
       },
       state.currentTime,
     );
     this.renderShotList();
     this.setStatus(
-      `Captured shot ${index + 1} (${shooter.track.name} at ${formatTime(state.currentTime)}).`,
+      captureStatusMessage(
+        index + 1,
+        shooter.track.name,
+        formatTime(state.currentTime),
+        momentumLossWarning(shooterState),
+      ),
     );
   }
 
