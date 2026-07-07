@@ -152,6 +152,172 @@ fn low_ball_at_ground_opener_does_not_break_before_first_qualifying_air_touch() 
 }
 
 #[test]
+fn ball_returning_to_ground_between_touches_anchors_dribble_at_second_ground_opener() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = AirDribbleCalculator::new();
+    let mut touches = Vec::new();
+
+    // First ground touch pops the ball up...
+    let first_opener_player = glam::Vec3::new(0.0, 0.0, 17.0);
+    let first_opener_ball = glam::Vec3::new(30.0, 0.0, 98.0);
+    touches.push(touch(
+        1,
+        0.0,
+        (player_id.clone(), true),
+        ("control", "ground"),
+        (first_opener_player, first_opener_ball),
+    ));
+    update(
+        &mut calculator,
+        1,
+        0.0,
+        first_opener_player,
+        first_opener_ball,
+        &touches,
+    );
+    // ...the ball peaks in the air, then falls all the way back to resting
+    // height before the player touches it again.
+    update(
+        &mut calculator,
+        3,
+        0.4,
+        glam::Vec3::new(80.0, 0.0, 17.0),
+        glam::Vec3::new(110.0, 0.0, 540.0),
+        &touches,
+    );
+    update(
+        &mut calculator,
+        5,
+        0.8,
+        glam::Vec3::new(160.0, 0.0, 17.0),
+        glam::Vec3::new(190.0, 0.0, 95.0),
+        &touches,
+    );
+
+    // A second ground opener within the max touch gap must start a fresh
+    // dribble instead of bridging across the grounded ball.
+    let second_opener_player = glam::Vec3::new(220.0, 0.0, 17.0);
+    let second_opener_ball = glam::Vec3::new(250.0, 0.0, 98.0);
+    touches.push(touch(
+        7,
+        1.2,
+        (player_id.clone(), true),
+        ("control", "ground"),
+        (second_opener_player, second_opener_ball),
+    ));
+    update(
+        &mut calculator,
+        7,
+        1.2,
+        second_opener_player,
+        second_opener_ball,
+        &touches,
+    );
+
+    for (frame_number, time, x) in [(9, 1.5, 300.0), (11, 1.9, 380.0)] {
+        let player_position = glam::Vec3::new(x, 0.0, 360.0);
+        let ball_position = glam::Vec3::new(x + 30.0, 0.0, 540.0);
+        touches.push(touch(
+            frame_number,
+            time,
+            (player_id.clone(), true),
+            ("control", "air"),
+            (player_position, ball_position),
+        ));
+        update(
+            &mut calculator,
+            frame_number,
+            time,
+            player_position,
+            ball_position,
+            &touches,
+        );
+    }
+
+    calculator.finish().unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = &calculator.events()[0];
+    assert_eq!(event.start_frame, 7);
+    assert_eq!(event.start_time, 1.2);
+    assert_eq!(event.touch_count, 3);
+    assert_eq!(event.air_touch_count, 2);
+    assert_eq!(
+        event.air_dribble_origin,
+        Some(AirDribbleOrigin::GroundToAir)
+    );
+}
+
+#[test]
+fn ground_opened_dribble_with_ball_staying_airborne_extends_across_gap() {
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = AirDribbleCalculator::new();
+    let mut touches = Vec::new();
+
+    let opener_player = glam::Vec3::new(0.0, 0.0, 17.0);
+    let opener_ball = glam::Vec3::new(30.0, 0.0, 98.0);
+    touches.push(touch(
+        1,
+        0.0,
+        (player_id.clone(), true),
+        ("control", "ground"),
+        (opener_player, opener_ball),
+    ));
+    update(
+        &mut calculator,
+        1,
+        0.0,
+        opener_player,
+        opener_ball,
+        &touches,
+    );
+    // The ball stays well above resting height across a long between-touch
+    // gap comparable to the grounded case above.
+    for (frame_number, time, ball_z) in [(10, 0.4, 500.0), (30, 1.2, 640.0), (50, 2.0, 610.0)] {
+        update(
+            &mut calculator,
+            frame_number,
+            time,
+            glam::Vec3::new(100.0, 0.0, 17.0),
+            glam::Vec3::new(130.0, 0.0, ball_z),
+            &touches,
+        );
+    }
+
+    for (frame_number, time, x) in [(63, 2.5, 300.0), (73, 2.9, 380.0)] {
+        let player_position = glam::Vec3::new(x, 0.0, 360.0);
+        let ball_position = glam::Vec3::new(x + 30.0, 0.0, 540.0);
+        touches.push(touch(
+            frame_number,
+            time,
+            (player_id.clone(), true),
+            ("control", "air"),
+            (player_position, ball_position),
+        ));
+        update(
+            &mut calculator,
+            frame_number,
+            time,
+            player_position,
+            ball_position,
+            &touches,
+        );
+    }
+
+    calculator.finish().unwrap();
+
+    assert_eq!(calculator.events().len(), 1);
+    let event = &calculator.events()[0];
+    assert_eq!(event.start_frame, 1);
+    assert_eq!(event.touch_count, 3);
+    assert_eq!(event.air_touch_count, 2);
+    assert_eq!(
+        event.air_dribble_origin,
+        Some(AirDribbleOrigin::GroundToAir)
+    );
+}
+
+#[test]
 fn low_ball_after_qualifying_air_touches_breaks_sequence() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = AirDribbleCalculator::new();
