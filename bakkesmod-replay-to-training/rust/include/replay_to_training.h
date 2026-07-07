@@ -137,15 +137,24 @@ int32_t replay_to_training_pack_add_shot(TrPack *pack, const TrCapturedShot *sho
 /* Momentum-loss diagnostic for momentum capture. The spawn mesh class has
  * only a scalar VelocityStartSpeed (no direction property, per the game's
  * class dump), so only the along-facing share of a captured car's velocity
- * is representable. When a meaningful share is lost (total speed > 300
- * uu/s AND (lost magnitude > 400 uu/s OR velocity more than 30 degrees off
- * the facing)), writes a human-readable warning like
+ * is representable. When a meaningful share is lost (total speed >
+ * `min_speed` AND (lost magnitude > `min_lost_speed` OR velocity more than
+ * `max_off_axis_degrees` off the facing)), writes a human-readable warning
+ * like
  *   "car moving 1320 uu/s at 74° off facing; only 338 uu/s representable
  *    as spawn momentum"
  * into `out_bytes` (up to `max_bytes`, no NUL) and returns bytes written.
- * Returns 0 when there is no warning (or `car` is null). Stateless. */
+ * Returns 0 when there is no warning (or `car` is null). Stateless.
+ *
+ * The three thresholds come from the plugin's persisted cvars
+ * (replay_to_training_momentum_warn_min_speed / _min_lost / _max_angle);
+ * their crate defaults are 300 / 400 / 20. Raising `min_speed` above the
+ * car's speed effectively disables the warning. */
 size_t replay_to_training_momentum_note(
     const TrCarState *car,
+    float min_speed,
+    float min_lost_speed,
+    float max_off_axis_degrees,
     uint8_t *out_bytes,
     size_t max_bytes);
 int32_t replay_to_training_pack_remove_shot(TrPack *pack, size_t index);

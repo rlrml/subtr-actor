@@ -109,6 +109,53 @@ void ReplayToTrainingPlugin::renderCaptureToggles() {
     ImGui::TextWrapped(
         "Autosave is off: captured shots stay in memory until you save.");
   }
+
+  renderMomentumWarningControls();
+}
+
+// Compact "Momentum warning" group: the three thresholds that gate the
+// capture-time momentum-loss diagnostic (shared into both the F2 settings
+// page and the standalone capture window via renderCaptureToggles).
+void ReplayToTrainingPlugin::renderMomentumWarningControls() {
+  if (!ImGui::CollapsingHeader("Momentum warning")) {
+    return;
+  }
+  float minSpeed = momentumWarnMinSpeed();
+  if (ImGui::SliderFloat("Min speed (uu/s)", &minSpeed, 0.0f, 3000.0f, "%.0f")) {
+    auto cvar = cvarManager->getCvar("replay_to_training_momentum_warn_min_speed");
+    if (static_cast<bool>(cvar)) {
+      cvar.setValue(minSpeed);
+    }
+  }
+  if (ImGui::IsItemHovered()) {
+    ImGui::SetTooltip(
+        "Total speed below which no warning is raised. Set this above the\n"
+        "fastest speed you capture at to disable the warning entirely.");
+  }
+  float minLost = momentumWarnMinLost();
+  if (ImGui::SliderFloat("Min lost (uu/s)", &minLost, 0.0f, 3000.0f, "%.0f")) {
+    auto cvar = cvarManager->getCvar("replay_to_training_momentum_warn_min_lost");
+    if (static_cast<bool>(cvar)) {
+      cvar.setValue(minLost);
+    }
+  }
+  if (ImGui::IsItemHovered()) {
+    ImGui::SetTooltip(
+        "Unrepresentable (lost) velocity magnitude above which a warning\n"
+        "is raised, whatever the off-axis angle.");
+  }
+  float maxAngle = momentumWarnMaxAngle();
+  if (ImGui::SliderFloat("Max off-axis (deg)", &maxAngle, 1.0f, 90.0f, "%.0f")) {
+    auto cvar = cvarManager->getCvar("replay_to_training_momentum_warn_max_angle");
+    if (static_cast<bool>(cvar)) {
+      cvar.setValue(maxAngle);
+    }
+  }
+  if (ImGui::IsItemHovered()) {
+    ImGui::SetTooltip(
+        "Angle between velocity and facing above which a warning is\n"
+        "raised, even when the lost magnitude is modest.");
+  }
 }
 
 // Target (persistent default save) display, set/clear, and the

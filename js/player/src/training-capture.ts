@@ -171,23 +171,42 @@ export function quaternionToRotator(rotation: Quaternion): RotatorUnits {
 export const MIN_FORWARD_SPEED = 1;
 
 /**
- * Total speed below which no momentum warning is raised, in uu/s. A
+ * Default total speed below which no momentum warning is raised, in uu/s. A
  * slow-moving car loses little absolute momentum whatever its direction.
+ * The BakkesMod plugin exposes this as a persisted cvar; setting it very
+ * high effectively disables the warning.
  */
 export const MOMENTUM_WARNING_MIN_SPEED = 300;
 
 /**
- * Unrepresentable (lost) velocity magnitude above which a momentum
+ * Default unrepresentable (lost) velocity magnitude above which a momentum
  * warning is raised, in uu/s.
  */
 export const MOMENTUM_WARNING_MIN_LOST_SPEED = 400;
 
 /**
- * Angle between velocity and facing above which a momentum warning is
- * raised, in degrees: past this the car is drifting/sliding rather than
- * driving where it points.
+ * Default angle between velocity and facing above which a momentum warning
+ * is raised, in degrees: past this the car is drifting/sliding rather than
+ * driving where it points. At 20° the sideways component is ~34% of the
+ * car's speed while the forward projection only loses ~6% — a modest speed
+ * hit but a clearly off-axis motion, so the gate defaults tight here per
+ * user feedback.
  */
-export const MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES = 30;
+export const MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES = 20;
+
+/**
+ * Tunable thresholds for {@link momentumLossWarning}, mirroring the
+ * BakkesMod plugin's three persisted cvars. Any field left undefined falls
+ * back to the corresponding exported default constant.
+ */
+export interface MomentumWarningThresholds {
+  /** {@link MOMENTUM_WARNING_MIN_SPEED} */
+  minSpeed?: number;
+  /** {@link MOMENTUM_WARNING_MIN_LOST_SPEED} */
+  minLostSpeed?: number;
+  /** {@link MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES} */
+  maxOffAxisDegrees?: number;
+}
 
 /**
  * Capture-time diagnostic for spawn momentum, mirroring the BakkesMod
@@ -199,18 +218,25 @@ export const MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES = 30;
  * below {@link MIN_FORWARD_SPEED}) and signed projection `p`, the lost
  * magnitude is `sqrt(max(s² − f², 0))` and the off-axis angle is
  * `acos(clamp(p / s, −1, 1))`. Returns the warning string when `s >`
- * {@link MOMENTUM_WARNING_MIN_SPEED} AND (lost `>`
- * {@link MOMENTUM_WARNING_MIN_LOST_SPEED} OR angle `>`
- * {@link MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES}), `null` when the
- * velocity is representable enough.
+ * `minSpeed` AND (lost `> minLostSpeed` OR angle `> maxOffAxisDegrees`),
+ * `null` when the velocity is representable enough. The three thresholds
+ * default to {@link MOMENTUM_WARNING_MIN_SPEED},
+ * {@link MOMENTUM_WARNING_MIN_LOST_SPEED} and
+ * {@link MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES}.
  */
-export function momentumLossWarning(car: CapturedCarState): string | null {
+export function momentumLossWarning(
+  car: CapturedCarState,
+  thresholds?: MomentumWarningThresholds,
+): string | null {
+  const minSpeed = thresholds?.minSpeed ?? MOMENTUM_WARNING_MIN_SPEED;
+  const minLostSpeed = thresholds?.minLostSpeed ?? MOMENTUM_WARNING_MIN_LOST_SPEED;
+  const maxOffAxisDegrees = thresholds?.maxOffAxisDegrees ?? MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES;
   const velocity = car.linearVelocity;
   const x = velocity?.x ?? 0;
   const y = velocity?.y ?? 0;
   const z = velocity?.z ?? 0;
   const speed = Math.hypot(x, y, z);
-  if (speed <= MOMENTUM_WARNING_MIN_SPEED) {
+  if (speed <= minSpeed) {
     return null;
   }
   const forward = car.rotation
@@ -220,10 +246,7 @@ export function momentumLossWarning(car: CapturedCarState): string | null {
   const representable = projection < MIN_FORWARD_SPEED ? 0 : projection;
   const lost = Math.sqrt(Math.max(speed * speed - representable * representable, 0));
   const offAxisDegrees = (Math.acos(Math.min(Math.max(projection / speed, -1), 1)) * 180) / Math.PI;
-  if (
-    lost <= MOMENTUM_WARNING_MIN_LOST_SPEED &&
-    offAxisDegrees <= MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES
-  ) {
+  if (lost <= minLostSpeed && offAxisDegrees <= maxOffAxisDegrees) {
     return null;
   }
   return (

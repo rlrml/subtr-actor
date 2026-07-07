@@ -136,6 +136,38 @@ void ReplayToTrainingPlugin::registerCvarsAndNotifiers() {
       "stationary.",
       true);
   cvarManager->registerCvar(
+      "replay_to_training_momentum_warn_min_speed",
+      "300",
+      "Momentum-loss warning: total car speed (uu/s) below which no warning "
+      "is raised. Set this above the fastest speed you capture at to disable "
+      "the warning entirely (there is no separate on/off toggle).",
+      true,
+      true,
+      0,
+      true,
+      3000);
+  cvarManager->registerCvar(
+      "replay_to_training_momentum_warn_min_lost",
+      "400",
+      "Momentum-loss warning: unrepresentable (lost) velocity magnitude "
+      "(uu/s) above which a warning is raised, whatever the off-axis angle.",
+      true,
+      true,
+      0,
+      true,
+      3000);
+  cvarManager->registerCvar(
+      "replay_to_training_momentum_warn_max_angle",
+      "20",
+      "Momentum-loss warning: angle (degrees) between velocity and facing "
+      "above which a warning is raised, even when the lost magnitude is "
+      "modest. Tighter values warn on more sideways/drifting captures.",
+      true,
+      true,
+      1,
+      true,
+      90);
+  cvarManager->registerCvar(
       "replay_to_training_capture_mode",
       "striker",
       "Capture mode used by the generic replay_to_training_capture command: "
@@ -479,6 +511,23 @@ bool ReplayToTrainingPlugin::mirrorByTeamEnabled() {
 bool ReplayToTrainingPlugin::captureMomentumEnabled() {
   auto cvar = cvarManager->getCvar("replay_to_training_capture_momentum");
   return static_cast<bool>(cvar) ? cvar.getBoolValue() : true;
+}
+
+// The three momentum-warning thresholds fall back to the Rust core defaults
+// (300 / 400 / 20) when the cvar is missing.
+float ReplayToTrainingPlugin::momentumWarnMinSpeed() {
+  auto cvar = cvarManager->getCvar("replay_to_training_momentum_warn_min_speed");
+  return static_cast<bool>(cvar) ? cvar.getFloatValue() : 300.0f;
+}
+
+float ReplayToTrainingPlugin::momentumWarnMinLost() {
+  auto cvar = cvarManager->getCvar("replay_to_training_momentum_warn_min_lost");
+  return static_cast<bool>(cvar) ? cvar.getFloatValue() : 400.0f;
+}
+
+float ReplayToTrainingPlugin::momentumWarnMaxAngle() {
+  auto cvar = cvarManager->getCvar("replay_to_training_momentum_warn_max_angle");
+  return static_cast<bool>(cvar) ? cvar.getFloatValue() : 20.0f;
 }
 
 // The persisted capture-mode selection: "goalie" selects save captures,

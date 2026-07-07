@@ -373,10 +373,17 @@ fn ffi_momentum_note_reports_unrepresentable_velocity() {
         },
         ..TrCarState::default()
     };
+    // Default thresholds, widened to the f32 ABI type.
+    let min_speed = crate::archetypes::MOMENTUM_WARNING_MIN_SPEED as f32;
+    let min_lost = crate::archetypes::MOMENTUM_WARNING_MIN_LOST_SPEED as f32;
+    let max_angle = crate::archetypes::MOMENTUM_WARNING_MAX_OFF_AXIS_DEGREES as f32;
     unsafe {
         let mut buffer = [0u8; 256];
         let written = replay_to_training_momentum_note(
             &raw const drifting,
+            min_speed,
+            min_lost,
+            max_angle,
             buffer.as_mut_ptr(),
             buffer.len(),
         );
@@ -397,11 +404,68 @@ fn ffi_momentum_note_reports_unrepresentable_velocity() {
             ..TrCarState::default()
         };
         assert_eq!(
-            replay_to_training_momentum_note(&raw const clean, buffer.as_mut_ptr(), buffer.len()),
+            replay_to_training_momentum_note(
+                &raw const clean,
+                min_speed,
+                min_lost,
+                max_angle,
+                buffer.as_mut_ptr(),
+                buffer.len()
+            ),
             0
         );
         assert_eq!(
-            replay_to_training_momentum_note(std::ptr::null(), buffer.as_mut_ptr(), buffer.len()),
+            replay_to_training_momentum_note(
+                std::ptr::null(),
+                min_speed,
+                min_lost,
+                max_angle,
+                buffer.as_mut_ptr(),
+                buffer.len()
+            ),
+            0
+        );
+    }
+}
+
+/// The momentum-note thresholds passed across the ABI actually change the
+/// verdict: the same car warns under a tight angle gate but stays quiet
+/// once the caller raises the `min_speed` floor above the car's speed
+/// (the plugin's "disable" mechanism).
+#[test]
+fn ffi_momentum_note_thresholds_change_the_verdict() {
+    // Facing +X, drifting sideways at 900 uu/s: off-axis by 90 degrees.
+    let drifting = TrCarState {
+        linear_velocity: TrVec3 {
+            x: 0.0,
+            y: 900.0,
+            z: 0.0,
+        },
+        ..TrCarState::default()
+    };
+    unsafe {
+        let mut buffer = [0u8; 256];
+        // Tight defaults: warns.
+        assert!(
+            replay_to_training_momentum_note(
+                &raw const drifting,
+                300.0,
+                400.0,
+                20.0,
+                buffer.as_mut_ptr(),
+                buffer.len(),
+            ) > 0
+        );
+        // Raise the speed floor above 900 uu/s: the warning is disabled.
+        assert_eq!(
+            replay_to_training_momentum_note(
+                &raw const drifting,
+                1000.0,
+                400.0,
+                20.0,
+                buffer.as_mut_ptr(),
+                buffer.len(),
+            ),
             0
         );
     }
