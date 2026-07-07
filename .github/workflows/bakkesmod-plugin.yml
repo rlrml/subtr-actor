@@ -7,6 +7,8 @@ on:
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'bakkesmod/**'
+      - 'bakkesmod-tem-recorder/**'
+      - 'crates/subtr-actor-training/**'
       - 'src/**'
   pull_request:
     branches: [ master, main ]
@@ -15,6 +17,8 @@ on:
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'bakkesmod/**'
+      - 'bakkesmod-tem-recorder/**'
+      - 'crates/subtr-actor-training/**'
       - 'src/**'
   workflow_dispatch:
 
@@ -31,7 +35,7 @@ jobs:
 
       - name: Validate BakkesMod helper scripts
         run: |
-          python -m py_compile bakkesmod/verify-graph-dump.py bakkesmod/verify-plugin-source.py bakkesmod/verify-rust-dll-exports.py bakkesmod/verify-plugin-dll-exports.py bakkesmod/verify-rust-dll-runtime.py
+          python -m py_compile bakkesmod/verify-graph-dump.py bakkesmod/verify-plugin-source.py bakkesmod/verify-rust-dll-exports.py bakkesmod/verify-plugin-dll-exports.py bakkesmod/verify-rust-dll-runtime.py bakkesmod-tem-recorder/verify-dll-exports.py
           python bakkesmod/verify-plugin-source.py
 
       - name: Install Rust
@@ -43,6 +47,9 @@ jobs:
       - name: Test Rust ABI crate
         run: cargo test -p subtr-actor-bakkesmod --verbose
 
+      - name: Test TEM recorder Rust ABI crate
+        run: cargo test -p subtr-actor-tem-recorder --verbose
+
       - name: Build BakkesMod plugin
         shell: pwsh
         run: .\bakkesmod\build-windows.ps1
@@ -50,6 +57,13 @@ jobs:
       - name: Verify live graph surface in plugin artifacts
         shell: pwsh
         run: .\bakkesmod\verify-plugin-artifacts.ps1
+
+      - name: Build TEM recorder plugin
+        shell: pwsh
+        run: .\bakkesmod-tem-recorder\build-windows.ps1
+
+      - name: Verify TEM recorder DLL exports
+        run: python bakkesmod-tem-recorder/verify-dll-exports.py --rust-dll bakkesmod-tem-recorder/build/Release/tem_recorder.dll --plugin-dll bakkesmod-tem-recorder/build/Release/TemRecorderPlugin.dll
 
       - name: Upload plugin artifacts
         uses: actions/upload-artifact@v4
@@ -60,3 +74,13 @@ jobs:
             bakkesmod/build/Release/SubtrActorPlugin.dll
             bakkesmod/build/Release/subtr_actor_bakkesmod.dll
             bakkesmod/build/Release/bakkesmod-install/**
+
+      - name: Upload TEM recorder plugin artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: subtr-actor-tem-recorder-plugin
+          if-no-files-found: error
+          path: |
+            bakkesmod-tem-recorder/build/Release/TemRecorderPlugin.dll
+            bakkesmod-tem-recorder/build/Release/tem_recorder.dll
+            bakkesmod-tem-recorder/build/Release/bakkesmod-install/**

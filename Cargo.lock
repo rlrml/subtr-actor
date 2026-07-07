@@ -1412,6 +1412,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "subtr-actor-tem-recorder"
+version = "1.1.0"
+dependencies = [
+ "subtr-actor-training",
+]
+
+[[package]]
 name = "subtr-actor-tools"
 version = "1.1.0"
 dependencies = [
