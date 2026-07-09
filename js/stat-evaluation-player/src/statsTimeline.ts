@@ -87,6 +87,16 @@ export type ShadowDefenseEvent = PlayerStateSpan<ShadowDefenseState>;
 export type RotationRoleEvent = PlayerStateSpan<RoleState>;
 export interface StatsFrameLookup {
   get(frameNumber: number): StatsFrame | undefined;
+  /**
+   * Eagerly materialize the next chunk of stats frames, reusing the same
+   * chunking/accumulator state as lazy {@link StatsFrameLookup.get} access.
+   * Returns `true` while more frames remain to be materialized and `false`
+   * once every frame has been materialized. Callers can drive this in a loop
+   * (yielding to the event loop between chunks) to fill a progress bar with
+   * real incremental progress during load without deferring the work to
+   * playback.
+   */
+  materializeNextChunk(): boolean;
 }
 export type {
   CeilingShotEvent,
@@ -230,7 +240,31 @@ export function createStatsFrameLookup(
       "stats timeline frames must be either all compact scaffolds or all materialized snapshots",
     );
   }
-  return createMaterializedStatsFrameLookup(statsTimeline as MaterializedStatsTimeline);
+  const materializedFrames = createMaterializedStatsFrameLookup(
+    statsTimeline as MaterializedStatsTimeline,
+  );
+  // Non-compact timelines are already fully materialized, so there is no
+  // incremental work to drive. Report immediate completion so the eager-drive
+  // loop in the loader finishes in a single step.
+  let reportedComplete = false;
+  return {
+    get(frameNumber: number) {
+      return materializedFrames.get(frameNumber);
+    },
+    materializeNextChunk() {
+      if (reportedComplete) {
+        return false;
+      }
+      reportedComplete = true;
+      onProgress?.({
+        stage: "deriving-stats",
+        processedFrames: statsTimeline.frames.length,
+        totalFrames: statsTimeline.frames.length,
+        progress: 1,
+      });
+      return false;
+    },
+  };
 }
 
 export function getStatsFrameForReplayFrame(

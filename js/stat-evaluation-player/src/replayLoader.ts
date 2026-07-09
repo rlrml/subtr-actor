@@ -199,7 +199,10 @@ export async function loadReplayBundleInWorker(
           message.statsTimelineParts,
           options.onProgress,
         );
-        const statsFrameLookup = createStatsFrameLookup(statsTimeline);
+        const statsFrameLookup = createStatsFrameLookup(statsTimeline, options.onProgress);
+        while (statsFrameLookup.materializeNextChunk()) {
+          await waitForNextPaint();
+        }
         resolve({
           replay,
           raw,

@@ -462,6 +462,21 @@ export function createEventDerivedStatsFrameLookup(
       materializeUntilIndex(frameIndex);
       return materializedFrames.get(frameNumber);
     },
+    materializeNextChunk() {
+      if (materializedUntilIndex >= scaffoldFrames.length - 1) {
+        if (scaffoldFrames.length === 0) {
+          onProgress?.({
+            stage: "deriving-stats",
+            processedFrames: 0,
+            totalFrames: 0,
+            progress: 1,
+          });
+        }
+        return false;
+      }
+      materializeUntilIndex(materializedUntilIndex + 1);
+      return materializedUntilIndex < scaffoldFrames.length - 1;
+    },
   };
 }
 
