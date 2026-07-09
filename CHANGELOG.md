@@ -4,6 +4,44 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v1.2.0 - 2026-07-09
+
+### Training packs & BakkesMod capture
+
+- Add the `subtr-actor-training` crate for Rocket League `.tem` training-pack
+  parsing and editing, plus a `training_pack` CLI in `subtr-actor-tools`.
+- Expose training packs through the WASM bindings and `@rlrml/player`, including
+  replay-frame capture support and typed serialized-archetype editing.
+- Add BakkesMod `TemRecorderPlugin` and complete the ReplayToTraining plugin
+  with typed archetypes, capture modes, team mirroring, target saves, autosave,
+  pack-type synchronization, and capture-mode validation.
+- Move both BakkesMod plugins under `bakkesmod/{subtr-actor,replay-to-training}`
+  and bump the replay-to-training plugin metadata to `0.2.0`.
+
+### Stats & replay analysis
+
+- Improve loose/team possession, player-possession gating, flick direction
+  classification, wall-aerial wall detection, flip-reset detection, backboard
+  double-tap detection, and air-dribble episode handling.
+- Add replay activity summaries to stats timeline output and expose them through
+  JS timeline parts.
+- Add momentum capture for replay-to-training exports, warn when car momentum is
+  mostly unrepresentable, and make the warning thresholds configurable.
+
+### Replay player & stats-player UI
+
+- Add the replay-frame training capture core to `@rlrml/player`.
+- Add the training-pack capture window to `@rlrml/stats-player` and mark it as
+  web-player-only in plugin source checks.
+- Add a static replay scene module to the player package.
+
+### CI / release / tooling
+
+- Ensure node-target WASM builds exist before JavaScript tests.
+- Lint every Rust workspace member with `cargo clippy --workspace`.
+- Refresh Rust, Python, JavaScript, README, package-lock, and Cargo release
+  metadata to `1.2.0`.
+
 ## v1.1.0 - 2026-06-23
 
 ### Stats & event model
