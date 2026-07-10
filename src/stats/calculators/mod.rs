@@ -41,6 +41,8 @@ pub mod air_dribble;
 pub use air_dribble::*;
 pub mod ball_carry;
 pub use ball_carry::*;
+pub mod beaten_to_ball;
+pub use beaten_to_ball::*;
 pub mod boost;
 pub use crate::boost_pad_locations::standard_soccar_boost_pad_layout;
 pub(crate) use crate::boost_pad_locations::{

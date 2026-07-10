@@ -140,6 +140,7 @@ builtin_analysis_nodes! {
     WallAerialNode,
     WallAerialShotNode,
     WhiffNode,
+    BeatenToBallNode,
     WavedashNode,
     FlipImpulseNode,
     SpeedFlipNode,

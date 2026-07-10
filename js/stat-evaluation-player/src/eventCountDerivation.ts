@@ -50,6 +50,7 @@ export const STATS_EVENT_STREAM_COUNT_TYPES = [
   "half_volley",
   "wavedash",
   "whiff",
+  "beaten_to_ball",
   "powerslide",
   "touch",
   "boost_pickups",

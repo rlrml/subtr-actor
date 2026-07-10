@@ -987,6 +987,25 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         }
 
         for (index, event) in self
+            .module_player_events("beaten_to_ball", "events", parse_beaten_to_ball_event)?
+            .into_iter()
+            .enumerate()
+        {
+            events.push(make_event(
+                "beaten_to_ball",
+                index,
+                moment(event.frame, event.time),
+                EventPayload::BeatenToBall(event.clone()),
+                Some(event.player.clone()),
+                Some(event.winner.clone()),
+                Some(event.is_team_0),
+                event.player_position,
+                None,
+                None,
+            ));
+        }
+
+        for (index, event) in self
             .module_player_events("powerslide", "events", parse_powerslide_event)?
             .into_iter()
             .enumerate()
