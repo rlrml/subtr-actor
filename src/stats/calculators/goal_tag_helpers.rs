@@ -184,9 +184,11 @@ pub(super) fn tag_goals_by_recent_attacking_y(
 }
 
 /// Tags point mechanics only while the mechanic remains part of the scoring
-/// team's uninterrupted touch sequence. A later defending-team touch breaks
-/// the causal chain even when the mechanic still falls inside the calculator's
-/// wall-clock window.
+/// team's uninterrupted touch sequence through its final scoring touch. A
+/// defending-team touch before that final touch breaks the causal chain even
+/// when the mechanic still falls inside the calculator's wall-clock window.
+/// A save attempt after the final scoring touch does not erase the mechanic
+/// when the ball still crosses the goal line.
 pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
     goals: &[GoalContextEvent],
     events: &[E],
@@ -200,6 +202,9 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
         kind,
         max_event_to_goal_seconds,
         |event, goal| {
+            let final_scoring_touch = goal.scorer_last_touch.as_ref();
+            let final_scoring_frame = final_scoring_touch.map_or(goal.frame, |touch| touch.frame);
+            let final_scoring_time = final_scoring_touch.map_or(goal.time, |touch| touch.time);
             !touch_events.iter().any(|touch| {
                 touch.is_team_0 != goal.scoring_team_is_team_0
                     && frame_time_is_after(
@@ -208,7 +213,12 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
                         event.event_frame(),
                         event.event_time(),
                     )
-                    && !frame_time_is_after(touch.frame, touch.time, goal.frame, goal.time)
+                    && !frame_time_is_after(
+                        touch.frame,
+                        touch.time,
+                        final_scoring_frame,
+                        final_scoring_time,
+                    )
             })
         },
     )
