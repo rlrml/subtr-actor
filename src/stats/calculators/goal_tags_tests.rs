@@ -786,7 +786,7 @@ fn kickoff_goal_rejects_goals_without_a_matching_kickoff_attribution() {
 fn flick_goal_tags_matching_scorer_flick_before_last_touch() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
     let events =
-        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(9.3, 93, player_id(1))]);
+        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(9.3, 93, player_id(1))], &[]);
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlickGoal]);
     assert_eq!(events[0].tag.metadata().confidence, 0.82);
@@ -809,7 +809,7 @@ fn flick_goal_carries_flick_kind_details() {
     reverse_flick.kind = "reverse".to_owned();
     reverse_flick.direction = "left".to_owned();
 
-    let events = FlickGoalCalculator::new().tag_goals(&[goal], &[reverse_flick]);
+    let events = FlickGoalCalculator::new().tag_goals(&[goal], &[reverse_flick], &[]);
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlickGoal]);
     let details = &events[0].tag.metadata().details;
@@ -829,7 +829,7 @@ fn flick_goal_carries_flick_kind_details() {
 fn flick_goal_omits_center_direction_detail() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
     let events =
-        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(9.3, 93, player_id(1))]);
+        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(9.3, 93, player_id(1))], &[]);
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlickGoal]);
     let details = &events[0].tag.metadata().details;
@@ -845,7 +845,7 @@ fn flick_goal_omits_center_direction_detail() {
 fn flick_goal_rejects_stale_flicks() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
     let events =
-        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(4.5, 45, player_id(1))]);
+        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(4.5, 45, player_id(1))], &[]);
 
     assert!(events.is_empty());
 }
@@ -854,7 +854,7 @@ fn flick_goal_rejects_stale_flicks() {
 fn flick_goal_can_be_created_by_scoring_teammate() {
     let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
     let events =
-        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(8.8, 88, player_id(2))]);
+        FlickGoalCalculator::new().tag_goals(&[goal], &[flick_event(8.8, 88, player_id(2))], &[]);
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlickGoal]);
     assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Teammate));
@@ -872,10 +872,27 @@ fn flick_goal_can_be_created_by_scoring_teammate() {
 }
 
 #[test]
+fn flick_goal_rejects_flick_before_opponent_touch() {
+    let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
+    let mut opponent_touch = touch_classification_event(9.0, 90, player_id(3), "no_dodge");
+    opponent_touch.is_team_0 = false;
+    let events = FlickGoalCalculator::new().tag_goals(
+        &[goal],
+        &[flick_event(8.8, 88, player_id(2))],
+        &[opponent_touch],
+    );
+
+    assert!(events.is_empty());
+}
+
+#[test]
 fn one_timer_goal_tags_matching_one_timer_before_last_touch() {
     let goal = goal_with_touch(true, position(0.0, 2000.0, 120.0), Vec::new());
-    let events =
-        OneTimerGoalCalculator::new().tag_goals(&[goal], &[one_timer_event(9.4, 94, player_id(1))]);
+    let events = OneTimerGoalCalculator::new().tag_goals(
+        &[goal],
+        &[one_timer_event(9.4, 94, player_id(1))],
+        &[],
+    );
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::OneTimerGoal]);
     assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Scorer));
@@ -923,8 +940,11 @@ fn passing_goal_rejects_pass_not_received_by_scorer() {
 #[test]
 fn ceiling_shot_goal_tags_matching_ceiling_shot_before_goal() {
     let goal = goal_with_touch(true, position(0.0, 2400.0, 800.0), Vec::new());
-    let events = CeilingShotGoalCalculator::new()
-        .tag_goals(&[goal], &[ceiling_shot_event(9.4, 94, player_id(1))]);
+    let events = CeilingShotGoalCalculator::new().tag_goals(
+        &[goal],
+        &[ceiling_shot_event(9.4, 94, player_id(1))],
+        &[],
+    );
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::CeilingShotGoal]);
     assert_eq!(events[0].tag.metadata().confidence, 0.84);
@@ -943,8 +963,11 @@ fn ceiling_shot_goal_tags_matching_ceiling_shot_before_goal() {
 #[test]
 fn ceiling_shot_goal_can_be_created_by_scoring_teammate() {
     let goal = goal_with_touch(true, position(0.0, 2400.0, 800.0), Vec::new());
-    let events = CeilingShotGoalCalculator::new()
-        .tag_goals(&[goal], &[ceiling_shot_event(9.4, 94, player_id(2))]);
+    let events = CeilingShotGoalCalculator::new().tag_goals(
+        &[goal],
+        &[ceiling_shot_event(9.4, 94, player_id(2))],
+        &[],
+    );
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::CeilingShotGoal]);
     assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Teammate));
@@ -957,7 +980,7 @@ fn ceiling_shot_goal_rejects_stale_events() {
     let calculator = CeilingShotGoalCalculator::with_config(CeilingShotGoalCalculatorConfig {
         max_event_to_goal_seconds: 0.3,
     });
-    let events = calculator.tag_goals(&[goal], &[ceiling_shot_event(9.4, 94, player_id(1))]);
+    let events = calculator.tag_goals(&[goal], &[ceiling_shot_event(9.4, 94, player_id(1))], &[]);
 
     assert!(events.is_empty());
 }
@@ -965,8 +988,11 @@ fn ceiling_shot_goal_rejects_stale_events() {
 #[test]
 fn double_tap_goal_tags_matching_double_tap_before_goal() {
     let goal = goal_with_touch(true, position(0.0, 2800.0, 500.0), Vec::new());
-    let events = DoubleTapGoalCalculator::new()
-        .tag_goals(&[goal], &[double_tap_event(9.4, 94, player_id(1))]);
+    let events = DoubleTapGoalCalculator::new().tag_goals(
+        &[goal],
+        &[double_tap_event(9.4, 94, player_id(1))],
+        &[],
+    );
 
     assert_eq!(tag_kinds(&events), vec![GoalTagKind::DoubleTapGoal]);
     assert_eq!(performer(&events[0]), Some(GoalTagPerformer::Scorer));

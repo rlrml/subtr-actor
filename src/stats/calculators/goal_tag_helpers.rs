@@ -183,26 +183,11 @@ pub(super) fn tag_goals_by_recent_attacking_y(
     tags
 }
 
-pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
-    goals: &[GoalContextEvent],
-    events: &[E],
-    kind: GoalTagKind,
-    max_event_to_goal_seconds: f32,
-) -> Vec<GoalTagAssignment> {
-    tag_goals_by_point_mechanic_event_matching(
-        goals,
-        events,
-        kind,
-        max_event_to_goal_seconds,
-        |_, _| true,
-    )
-}
-
 /// Tags point mechanics only while the mechanic remains part of the scoring
 /// team's uninterrupted touch sequence. A later defending-team touch breaks
 /// the causal chain even when the mechanic still falls inside the calculator's
 /// wall-clock window.
-pub(super) fn tag_goals_by_uninterrupted_point_mechanic_event<E: GoalMechanicPointEvent>(
+pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
     goals: &[GoalContextEvent],
     events: &[E],
     touch_events: &[TouchClassificationEvent],
