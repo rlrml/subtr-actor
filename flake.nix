@@ -60,6 +60,17 @@
           cargo = rustToolchain;
           rustc = rustToolchain;
         };
+        # Keep this in sync with .github/scripts/install-cargo-rdme.sh. Version
+        # 2.x requires a separate nightly toolchain to resolve intralinks.
+        cargoRdme = pkgs.rustPlatform.buildRustPackage rec {
+          pname = "cargo-rdme";
+          version = "1.5.0";
+          src = pkgs.fetchCrate {
+            inherit pname version;
+            hash = "sha256-TmV6Fc5vlc4fm9w4+iuxmnonwsEbqoJ3jvpIyQOuxjg=";
+          };
+          cargoHash = "sha256-EjIvKf1XgHubvyWPOAjysNH4nD0xqOWYg1FeiPSYh4c=";
+        };
         pythonBase = pkgs.callPackage pyproject-nix.build.packages {
           python = pkgs.python312;
         };
@@ -133,7 +144,7 @@
           pkgs.maturin
           pkgs.zlib
           rustToolchain
-          pkgs.cargo-rdme
+          cargoRdme
           pkgs.curl
           pkgs.leveldb
           pkgs.python312Packages.twine
