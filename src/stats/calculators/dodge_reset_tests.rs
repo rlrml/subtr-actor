@@ -647,6 +647,86 @@ fn same_frame_dodge_touch_uses_pending_reset_before_new_refresh_supersedes_it() 
 }
 
 #[test]
+fn double_reset_credits_both_resets_when_dodge_carries_into_second_reset() {
+    // Modeled on a real double-reset aerial: reset 1, then a dodge whose drag
+    // carries the car back into the ball about half a second later. That
+    // contact both converts reset 1 and grants reset 2, deactivating the dodge
+    // byte on the contact frame itself — so the touch samples with the byte
+    // down and lands past the onset-based continuation window. Reset 2 is then
+    // converted by an ordinary dodge touch.
+    let player_id = boxcars::RemoteId::Steam(1);
+    let mut calculator = DodgeResetCalculator::new();
+
+    update_live(
+        &mut calculator,
+        &frame_info(1.0, 10),
+        &players(player_id.clone(), false),
+        &FrameEventsState {
+            dodge_refreshed_events: vec![reset_event_at(player_id.clone(), 1.0, 10, 1)],
+            ..FrameEventsState::default()
+        },
+        &TouchState::default(),
+    );
+    // Dodge onset, using reset 1.
+    update_live(
+        &mut calculator,
+        &frame_info(1.5, 15),
+        &players(player_id.clone(), true),
+        &FrameEventsState::default(),
+        &TouchState::default(),
+    );
+    // Dodge still executing just before contact.
+    update_live(
+        &mut calculator,
+        &frame_info(1.95, 19),
+        &players(player_id.clone(), true),
+        &FrameEventsState::default(),
+        &TouchState::default(),
+    );
+    // Contact frame: the dodge byte is already down, and the touch and the
+    // superseding on-ball reset land on the same frame.
+    update_live(
+        &mut calculator,
+        &frame_info(2.0, 20),
+        &players(player_id.clone(), false),
+        &FrameEventsState {
+            dodge_refreshed_events: vec![reset_event_at(player_id.clone(), 2.0, 20, 2)],
+            ..FrameEventsState::default()
+        },
+        &touch_state(vec![touch_event(player_id.clone(), 2.0, 20)]),
+    );
+    // Reset 2 converted by a normal dodge touch.
+    update_live(
+        &mut calculator,
+        &frame_info(2.4, 24),
+        &players(player_id.clone(), true),
+        &FrameEventsState::default(),
+        &touch_state(vec![dodge_touch_event(player_id.clone(), 2.4, 24)]),
+    );
+
+    let confirmed = calculator.confirmed_flip_reset_events();
+    assert_eq!(confirmed.len(), 2, "both resets of a double reset are used");
+    assert_eq!(confirmed[0].reset_frame, 10);
+    assert_eq!(confirmed[0].frame, 20);
+    assert!((confirmed[0].time_since_reset - 1.0).abs() < 1e-5);
+    assert_eq!(confirmed[1].reset_frame, 20);
+    assert_eq!(confirmed[1].frame, 24);
+    assert!((confirmed[1].time_since_reset - 0.4).abs() < 1e-5);
+
+    let outcomes = calculator.flip_reset_outcome_events();
+    assert_eq!(outcomes.len(), 2);
+    assert!(
+        outcomes
+            .iter()
+            .all(|outcome| outcome.outcome == FlipResetOutcome::Used)
+    );
+
+    let stats = &calculator.player_stats()[&player_id];
+    assert_eq!(stats.flip_reset_used_count, 2);
+    assert_eq!(stats.flip_reset_unused_count, 0);
+}
+
+#[test]
 fn continuation_touch_on_landing_frame_uses_reset_before_landed_outcome() {
     let player_id = boxcars::RemoteId::Steam(1);
     let mut calculator = DodgeResetCalculator::new();

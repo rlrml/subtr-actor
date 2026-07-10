@@ -1445,7 +1445,77 @@ impl FlipResetGoalCalculator {
         );
         let direct_reset_tags =
             self.tag_goals_by_scoring_reset_touch(goals, dodge_reset_events, touch_events);
-        latest_goal_tag_assignments(&[&confirmed_tags, &direct_reset_tags])
+        let mut tags = latest_goal_tag_assignments(&[&confirmed_tags, &direct_reset_tags]);
+        for assignment in &mut tags {
+            let GoalTag::FlipResetGoal(metadata) = &mut assignment.tag else {
+                continue;
+            };
+            let Some(goal) = goals.get(assignment.goal_index) else {
+                continue;
+            };
+            self.attach_play_flip_resets(metadata, goal, flip_reset_events);
+        }
+        tags
+    }
+
+    /// Attach every confirmed flip reset behind a tagged goal to the tag: a
+    /// double (or triple) reset play credits all of its resets, so the tag
+    /// carries each one as a related event + evidence, plus a
+    /// `flip_reset_count` detail with the number of resets by the crediting
+    /// player.
+    fn attach_play_flip_resets(
+        &self,
+        metadata: &mut GoalTagMetadata,
+        goal: &GoalContextEvent,
+        flip_reset_events: &[FlipResetEvent],
+    ) {
+        let matching: Vec<(usize, &FlipResetEvent)> = flip_reset_events
+            .iter()
+            .enumerate()
+            .filter(|(_, event)| point_event_matches_goal(*event, goal))
+            .filter(|(_, event)| goal.time - event.time <= self.config.max_event_to_goal_seconds)
+            .collect();
+        // Count only the crediting player's resets (the player behind the
+        // latest matching reset — the one the tag already references), so a
+        // teammate's unrelated reset does not inflate the count.
+        let Some(crediting_player) = matching
+            .iter()
+            .max_by(|left, right| {
+                left.1
+                    .time
+                    .total_cmp(&right.1.time)
+                    .then_with(|| left.1.frame.cmp(&right.1.frame))
+            })
+            .map(|(_, event)| event.player.clone())
+        else {
+            return;
+        };
+        let matching: Vec<(usize, &FlipResetEvent)> = matching
+            .into_iter()
+            .filter(|(_, event)| event.player == crediting_player)
+            .collect();
+
+        metadata
+            .details
+            .retain(|detail| detail.key != "flip_reset_count");
+        metadata.details.push(GoalTagDetail {
+            key: "flip_reset_count".to_owned(),
+            value: matching.len().to_string(),
+        });
+        for (event_index, event) in matching {
+            let event_ref = event.event_ref(event_index);
+            if !metadata.related_events.contains(&event_ref) {
+                metadata.related_events.push(event_ref);
+            }
+            let evidence = point_mechanic_evidence(event);
+            let already_present = metadata
+                .evidence
+                .iter()
+                .any(|existing| existing.kind == evidence.kind && existing.frame == evidence.frame);
+            if !already_present {
+                metadata.evidence.push(evidence);
+            }
+        }
     }
 
     fn tag_goals_by_scoring_reset_touch(
