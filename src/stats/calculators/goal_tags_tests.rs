@@ -886,6 +886,20 @@ fn flick_goal_rejects_flick_before_opponent_touch() {
 }
 
 #[test]
+fn flick_goal_allows_opponent_touch_after_final_scoring_touch() {
+    let goal = goal_with_touch(true, position(0.0, 1800.0, 180.0), Vec::new());
+    let mut opponent_touch = touch_classification_event(9.7, 97, player_id(3), "no_dodge");
+    opponent_touch.is_team_0 = false;
+    let events = FlickGoalCalculator::new().tag_goals(
+        &[goal],
+        &[flick_event(9.4, 94, player_id(1))],
+        &[opponent_touch],
+    );
+
+    assert_eq!(tag_kinds(&events), vec![GoalTagKind::FlickGoal]);
+}
+
+#[test]
 fn one_timer_goal_tags_matching_one_timer_before_last_touch() {
     let goal = goal_with_touch(true, position(0.0, 2000.0, 120.0), Vec::new());
     let events = OneTimerGoalCalculator::new().tag_goals(
