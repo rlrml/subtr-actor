@@ -45,7 +45,14 @@ macro_rules! goal_tag_node {
 }
 
 macro_rules! mechanic_goal_tag_node {
-    ($node:ident, $calculator:ident, $name:literal, $dependency:ident, $dependency_type:ty) => {
+    (
+        $node:ident,
+        $calculator:ident,
+        $name:literal,
+        $dependency:ident,
+        $dependency_type:ty
+        $(, $extra_dependency:ident, $extra_dependency_type:ty)?
+    ) => {
         pub struct $node {
             calculator: $calculator,
         }
@@ -72,13 +79,18 @@ macro_rules! mechanic_goal_tag_node {
             }
 
             fn dependencies(&self) -> NodeDependencies {
-                vec![match_stats_dependency(), $dependency()]
+                vec![
+                    match_stats_dependency(),
+                    $dependency(),
+                    $($extra_dependency(),)?
+                ]
             }
 
             fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
                 self.calculator.update(
                     ctx.get::<MatchStatsCalculator>()?,
                     ctx.get::<$dependency_type>()?,
+                    $(ctx.get::<$extra_dependency_type>()?,)?
                 )
             }
 
@@ -119,28 +131,36 @@ mechanic_goal_tag_node!(
     FlickGoalCalculator,
     "flick_goal",
     flick_dependency,
-    FlickCalculator
+    FlickCalculator,
+    touch_dependency,
+    TouchCalculator
 );
 mechanic_goal_tag_node!(
     CeilingShotGoalNode,
     CeilingShotGoalCalculator,
     "ceiling_shot_goal",
     ceiling_shot_dependency,
-    CeilingShotCalculator
+    CeilingShotCalculator,
+    touch_dependency,
+    TouchCalculator
 );
 mechanic_goal_tag_node!(
     DoubleTapGoalNode,
     DoubleTapGoalCalculator,
     "double_tap_goal",
     double_tap_dependency,
-    DoubleTapCalculator
+    DoubleTapCalculator,
+    touch_dependency,
+    TouchCalculator
 );
 mechanic_goal_tag_node!(
     OneTimerGoalNode,
     OneTimerGoalCalculator,
     "one_timer_goal",
     one_timer_dependency,
-    OneTimerCalculator
+    OneTimerCalculator,
+    touch_dependency,
+    TouchCalculator
 );
 mechanic_goal_tag_node!(
     PassingGoalNode,

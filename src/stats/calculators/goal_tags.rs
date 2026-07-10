@@ -1243,10 +1243,13 @@ impl FlickGoalCalculator {
         &mut self,
         match_stats: &MatchStatsCalculator,
         flick: &FlickCalculator,
+        touch: &TouchCalculator,
     ) -> SubtrActorResult<()> {
-        self.events.replace_all_assuming_append_only(
-            self.tag_goals(match_stats.goal_context_events(), flick.events()),
-        );
+        self.events.replace_all_assuming_append_only(self.tag_goals(
+            match_stats.goal_context_events(),
+            flick.events(),
+            touch.events(),
+        ));
         Ok(())
     }
 
@@ -1254,10 +1257,12 @@ impl FlickGoalCalculator {
         &self,
         goals: &[GoalContextEvent],
         events: &[FlickEvent],
+        touch_events: &[TouchClassificationEvent],
     ) -> Vec<GoalTagAssignment> {
         tag_goals_by_point_mechanic_event(
             goals,
             events,
+            touch_events,
             GoalTagKind::FlickGoal,
             self.config.max_event_to_goal_seconds,
         )
@@ -1269,10 +1274,13 @@ impl CeilingShotGoalCalculator {
         &mut self,
         match_stats: &MatchStatsCalculator,
         ceiling_shot: &CeilingShotCalculator,
+        touch: &TouchCalculator,
     ) -> SubtrActorResult<()> {
-        self.events.replace_all_assuming_append_only(
-            self.tag_goals(match_stats.goal_context_events(), ceiling_shot.events()),
-        );
+        self.events.replace_all_assuming_append_only(self.tag_goals(
+            match_stats.goal_context_events(),
+            ceiling_shot.events(),
+            touch.events(),
+        ));
         Ok(())
     }
 
@@ -1280,10 +1288,12 @@ impl CeilingShotGoalCalculator {
         &self,
         goals: &[GoalContextEvent],
         events: &[CeilingShotEvent],
+        touch_events: &[TouchClassificationEvent],
     ) -> Vec<GoalTagAssignment> {
         tag_goals_by_point_mechanic_event(
             goals,
             events,
+            touch_events,
             GoalTagKind::CeilingShotGoal,
             self.config.max_event_to_goal_seconds,
         )
@@ -1295,10 +1305,13 @@ impl OneTimerGoalCalculator {
         &mut self,
         match_stats: &MatchStatsCalculator,
         one_timer: &OneTimerCalculator,
+        touch: &TouchCalculator,
     ) -> SubtrActorResult<()> {
-        self.events.replace_all_assuming_append_only(
-            self.tag_goals(match_stats.goal_context_events(), one_timer.events()),
-        );
+        self.events.replace_all_assuming_append_only(self.tag_goals(
+            match_stats.goal_context_events(),
+            one_timer.events(),
+            touch.events(),
+        ));
         Ok(())
     }
 
@@ -1306,10 +1319,12 @@ impl OneTimerGoalCalculator {
         &self,
         goals: &[GoalContextEvent],
         events: &[OneTimerEvent],
+        touch_events: &[TouchClassificationEvent],
     ) -> Vec<GoalTagAssignment> {
         tag_goals_by_point_mechanic_event(
             goals,
             events,
+            touch_events,
             GoalTagKind::OneTimerGoal,
             self.config.max_event_to_goal_seconds,
         )
@@ -1374,10 +1389,13 @@ impl DoubleTapGoalCalculator {
         &mut self,
         match_stats: &MatchStatsCalculator,
         double_tap: &DoubleTapCalculator,
+        touch: &TouchCalculator,
     ) -> SubtrActorResult<()> {
-        self.events.replace_all_assuming_append_only(
-            self.tag_goals(match_stats.goal_context_events(), double_tap.events()),
-        );
+        self.events.replace_all_assuming_append_only(self.tag_goals(
+            match_stats.goal_context_events(),
+            double_tap.events(),
+            touch.events(),
+        ));
         Ok(())
     }
 
@@ -1385,10 +1403,12 @@ impl DoubleTapGoalCalculator {
         &self,
         goals: &[GoalContextEvent],
         events: &[DoubleTapEvent],
+        touch_events: &[TouchClassificationEvent],
     ) -> Vec<GoalTagAssignment> {
         tag_goals_by_point_mechanic_event(
             goals,
             events,
+            touch_events,
             GoalTagKind::DoubleTapGoal,
             self.config.max_event_to_goal_seconds,
         )
@@ -1439,7 +1459,7 @@ impl FlipResetGoalCalculator {
         dodge_reset_events: &[DodgeResetEvent],
         touch_events: &[TouchClassificationEvent],
     ) -> Vec<GoalTagAssignment> {
-        let confirmed_tags = tag_goals_by_uninterrupted_point_mechanic_event(
+        let confirmed_tags = tag_goals_by_point_mechanic_event(
             goals,
             flip_reset_events,
             touch_events,
