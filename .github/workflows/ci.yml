@@ -17,6 +17,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_HTTP_MULTIPLEXING: "false"
+  RUST_TOOLCHAIN: "1.96.1"
   RUN_FULL_REPLAY_TESTS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_replay_tests) }}
 
 jobs:
@@ -37,8 +38,8 @@ jobs:
     - name: Install Rust
       shell: bash
       run: |
-        rustup toolchain install stable --profile minimal --component rustfmt --component clippy --no-self-update
-        rustup default stable
+        rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt --component clippy --no-self-update
+        rustup default "$RUST_TOOLCHAIN"
 
     - name: Check release metadata consistency
       run: python3 scripts/check_release_versions.py
@@ -75,8 +76,8 @@ jobs:
     - name: Install Rust
       shell: bash
       run: |
-        rustup toolchain install stable --profile minimal --no-self-update
-        rustup default stable
+        rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+        rustup default "$RUST_TOOLCHAIN"
 
     - name: Run Rust tests
       run: |
@@ -104,8 +105,8 @@ jobs:
     - name: Install Rust
       shell: bash
       run: |
-        rustup toolchain install stable --profile minimal --no-self-update
-        rustup default stable
+        rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+        rustup default "$RUST_TOOLCHAIN"
 
     - name: Run exhaustive Rust replay tests
       run: |
@@ -131,8 +132,8 @@ jobs:
     - name: Install Rust
       shell: bash
       run: |
-        rustup toolchain install stable --profile minimal --no-self-update
-        rustup default stable
+        rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+        rustup default "$RUST_TOOLCHAIN"
 
     - name: Build release
       shell: bash
@@ -165,8 +166,8 @@ jobs:
     - name: Install Rust
       shell: bash
       run: |
-        rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
-        rustup default stable
+        rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --target wasm32-unknown-unknown --no-self-update
+        rustup default "$RUST_TOOLCHAIN"
 
     - name: Install Node.js
       uses: actions/setup-node@v6
@@ -215,8 +216,8 @@ jobs:
     - name: Install Rust
       shell: bash
       run: |
-        rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
-        rustup default stable
+        rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --target wasm32-unknown-unknown --no-self-update
+        rustup default "$RUST_TOOLCHAIN"
 
     - name: Install Node.js
       uses: actions/setup-node@v6
@@ -268,8 +269,8 @@ jobs:
     - name: Install Rust
       shell: bash
       run: |
-        rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
-        rustup default stable
+        rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --target wasm32-unknown-unknown --no-self-update
+        rustup default "$RUST_TOOLCHAIN"
 
     - name: Install Node.js
       uses: actions/setup-node@v6
