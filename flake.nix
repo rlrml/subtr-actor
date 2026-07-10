@@ -167,7 +167,6 @@
             '';
           nativeBuildInputs = [
             pkgs.writableTmpDirAsHomeHook
-            pkgs.wasm-pack
             pkgs.wasm-bindgen-cli
             pkgs.binaryen
           ];
@@ -175,7 +174,11 @@
             runHook preBuild
             mkdir -p $out
             cd js
-            wasm-pack build --target web --out-dir "$out"
+            cargo build --release --target wasm32-unknown-unknown
+            wasm-bindgen \
+              --target web \
+              --out-dir "$out" \
+              ../target/wasm32-unknown-unknown/release/rl_replay_subtr_actor.wasm
             runHook postBuild
           '';
           installPhase = ''
