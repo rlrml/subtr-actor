@@ -189,6 +189,57 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
     kind: GoalTagKind,
     max_event_to_goal_seconds: f32,
 ) -> Vec<GoalTagAssignment> {
+    tag_goals_by_point_mechanic_event_matching(
+        goals,
+        events,
+        kind,
+        max_event_to_goal_seconds,
+        |_, _| true,
+    )
+}
+
+/// Tags point mechanics only while the mechanic remains part of the scoring
+/// team's uninterrupted touch sequence. A later defending-team touch breaks
+/// the causal chain even when the mechanic still falls inside the calculator's
+/// wall-clock window.
+pub(super) fn tag_goals_by_uninterrupted_point_mechanic_event<E: GoalMechanicPointEvent>(
+    goals: &[GoalContextEvent],
+    events: &[E],
+    touch_events: &[TouchClassificationEvent],
+    kind: GoalTagKind,
+    max_event_to_goal_seconds: f32,
+) -> Vec<GoalTagAssignment> {
+    tag_goals_by_point_mechanic_event_matching(
+        goals,
+        events,
+        kind,
+        max_event_to_goal_seconds,
+        |event, goal| {
+            !touch_events.iter().any(|touch| {
+                touch.is_team_0 != goal.scoring_team_is_team_0
+                    && frame_time_is_after(
+                        touch.frame,
+                        touch.time,
+                        event.event_frame(),
+                        event.event_time(),
+                    )
+                    && !frame_time_is_after(touch.frame, touch.time, goal.frame, goal.time)
+            })
+        },
+    )
+}
+
+fn tag_goals_by_point_mechanic_event_matching<E, F>(
+    goals: &[GoalContextEvent],
+    events: &[E],
+    kind: GoalTagKind,
+    max_event_to_goal_seconds: f32,
+    additional_match: F,
+) -> Vec<GoalTagAssignment>
+where
+    E: GoalMechanicPointEvent,
+    F: Fn(&E, &GoalContextEvent) -> bool,
+{
     let mut tags = Vec::new();
     for (goal_index, goal) in goals.iter().enumerate() {
         let ctx = GoalTaggingContext { goal_index };
@@ -197,6 +248,7 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
             .enumerate()
             .filter(|(_, event)| point_event_matches_goal(*event, goal))
             .filter(|(_, event)| goal.time - event.event_time() <= max_event_to_goal_seconds)
+            .filter(|(_, event)| additional_match(*event, goal))
             .max_by(|left, right| {
                 left.1
                     .event_time()
@@ -219,6 +271,10 @@ pub(super) fn tag_goals_by_point_mechanic_event<E: GoalMechanicPointEvent>(
         ));
     }
     tags
+}
+
+fn frame_time_is_after(frame: usize, time: f32, other_frame: usize, other_time: f32) -> bool {
+    frame > other_frame || (frame == other_frame && time > other_time)
 }
 
 pub(super) fn latest_goal_tag_assignments(

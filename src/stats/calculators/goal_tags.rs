@@ -1439,9 +1439,10 @@ impl FlipResetGoalCalculator {
         dodge_reset_events: &[DodgeResetEvent],
         touch_events: &[TouchClassificationEvent],
     ) -> Vec<GoalTagAssignment> {
-        let confirmed_tags = tag_goals_by_point_mechanic_event(
+        let confirmed_tags = tag_goals_by_uninterrupted_point_mechanic_event(
             goals,
             flip_reset_events,
+            touch_events,
             GoalTagKind::FlipResetGoal,
             self.config.max_event_to_goal_seconds,
         );
