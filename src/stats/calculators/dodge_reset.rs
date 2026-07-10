@@ -180,6 +180,12 @@ pub struct DodgeResetCalculator {
     /// Latest attributed touch per player with a pending reset, used to confirm a
     /// reset when the dodge byte replicates after the conversion touch.
     recent_confirmable_touch: HashMap<PlayerId, RecentResetTouch>,
+    /// Most recent time each player's dodge byte was observed active. A dodge
+    /// that grants a new on-ball reset is deactivated on the contact frame
+    /// itself, so its conversion touch samples with the byte already down; the
+    /// byte having been active moments before the touch is the durable signal
+    /// that the touch was dodge-powered.
+    last_dodge_active_time: HashMap<PlayerId, f32>,
     previous_dodge_active: HashMap<PlayerId, bool>,
     previous_live_play: Option<bool>,
     last_frame: Option<(f32, usize)>,
@@ -430,6 +436,10 @@ impl DodgeResetCalculator {
     fn update_pending_reset_dodges(&mut self, players: &PlayerFrameState, frame_time: f32) {
         let mut newly_started = Vec::new();
         for player in &players.players {
+            if player.dodge_active {
+                self.last_dodge_active_time
+                    .insert(player.player_id.clone(), frame_time);
+            }
             let was_dodge_active = self
                 .previous_dodge_active
                 .insert(player.player_id.clone(), player.dodge_active)
@@ -501,6 +511,29 @@ impl DodgeResetCalculator {
             && touch_time - dodge_onset_time <= FLIP_RESET_DODGE_CONTACT_CONTINUATION_SECONDS
     }
 
+    /// Whether the player's post-reset dodge (started at `dodge_onset_time`)
+    /// was still active at, or within byte-lag tolerance of, `touch_time`.
+    ///
+    /// This is what confirms the earlier reset of a double flip reset: the
+    /// dodge drags the car back into the ball, and that contact both converts
+    /// the pending reset and grants the next one — deactivating the dodge byte
+    /// on the very frame the touch is sampled, and often landing past the
+    /// fixed onset-based continuation window.
+    fn post_reset_dodge_active_near_touch(
+        &self,
+        player_id: &PlayerId,
+        dodge_onset_time: f32,
+        touch_time: f32,
+    ) -> bool {
+        self.last_dodge_active_time
+            .get(player_id)
+            .is_some_and(|&last_active_time| {
+                last_active_time >= dodge_onset_time
+                    && touch_time >= dodge_onset_time
+                    && touch_time - last_active_time <= FLIP_RESET_DODGE_TOUCH_LAG_TOLERANCE_SECONDS
+            })
+    }
+
     fn process_touch_for_flip_reset(
         &mut self,
         players: &PlayerFrameState,
@@ -524,6 +557,7 @@ impl DodgeResetCalculator {
         if let Some(&dodge_onset_time) = self.pending_reset_dodge_onset.get(player_id) {
             if touch.dodge_contact
                 || Self::touch_within_dodge_continuation(touch.time, dodge_onset_time)
+                || self.post_reset_dodge_active_near_touch(player_id, dodge_onset_time, touch.time)
             {
                 let player_id = player_id.clone();
                 return self.confirm_flip_reset(&player_id, &touch, dodge_onset_time);
@@ -625,6 +659,7 @@ impl DodgeResetCalculator {
                     || Self::player_dodge_active(players, player_id)
                     || dodge_onset_time.is_some_and(|onset| {
                         Self::touch_within_dodge_continuation(touch.time, onset)
+                            || self.post_reset_dodge_active_near_touch(player_id, onset, touch.time)
                     }))
         })?;
         let touch = Self::recent_reset_touch(players, touch_event)?;

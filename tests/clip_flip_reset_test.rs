@@ -12,13 +12,22 @@
 mod common;
 
 use subtr_actor::{
-    EventPayload, FlipResetEvent, GoalTagKind, ReplayStatsTimelineScaffold,
+    EventPayload, FlipResetEvent, GoalTagEventStream, GoalTagKind, ReplayStatsTimelineScaffold,
     StatsTimelineEventCollector, clip_replay_around,
 };
 
 const FLIP_RESET_GOAL_REPLAY: &str = "assets/calemacar-flip-reset-goal-9-2026-06-21.replay";
 const SQUISHY_FLIP_RESET_MISS_REPLAY: &str =
     "assets/squishy-ranked-doubles-flip-reset-miss-2026-03-01.replay";
+// A short rocket-sense duel clip (`019f49be-2b0e-79e3-8745-4ea9af20d6cd`) with
+// two double-reset aerials by Panzinii; the second one scores. In each aerial
+// the first reset is converted by a dodge whose drag carries the car back into
+// the ball, and that same contact grants the second reset (dropping the dodge
+// byte on the contact frame) — the case that used to resolve as Superseded.
+const DOUBLE_FLIP_RESET_REPLAY: &str = "assets/panzinii-double-flip-reset-2026-07-09.replay";
+// Reset times (absolute seconds) of the two on-ball resets in each aerial.
+const FIRST_AERIAL_RESET_TIMES: [f32; 2] = [42.765, 44.079];
+const SECOND_AERIAL_RESET_TIMES: [f32; 2] = [68.321, 69.641];
 
 // Source-replay frames: the on-ball reset lands at 6520 and the converting
 // flip-into-ball touch at 6521; the goal is scored at frame 6555. The tail must
@@ -71,6 +80,75 @@ fn clip_tags_calemacar_ninth_goal_as_flip_reset() {
             .iter()
             .any(|tag| tag.kind() == GoalTagKind::FlipResetGoal)),
         "expected the goal inside the clip to be tagged as a flip reset; got {goal_context:#?}"
+    );
+}
+
+#[test]
+fn double_reset_aerials_credit_every_reset() {
+    let replay = common::parse_replay(DOUBLE_FLIP_RESET_REPLAY);
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
+        .expect("stats timeline should build for the double flip reset replay");
+
+    let confirmed: Vec<&FlipResetEvent> =
+        common::event_payloads_by_stream(&timeline, "flip_reset", |payload| match payload {
+            EventPayload::FlipReset(event) => Some(event),
+            _ => None,
+        });
+    for reset_time in FIRST_AERIAL_RESET_TIMES
+        .iter()
+        .chain(SECOND_AERIAL_RESET_TIMES.iter())
+    {
+        assert!(
+            confirmed
+                .iter()
+                .any(|event| (event.reset_time - reset_time).abs() < 0.1),
+            "expected a confirmed flip reset from the reset at {reset_time}; got {confirmed:#?}"
+        );
+    }
+    assert_eq!(
+        confirmed.len(),
+        4,
+        "expected exactly two confirmed flip resets per double-reset aerial; got {confirmed:#?}"
+    );
+}
+
+#[test]
+fn double_reset_goal_counts_both_resets() {
+    let replay = common::parse_replay(DOUBLE_FLIP_RESET_REPLAY);
+    let timeline = StatsTimelineEventCollector::new()
+        .get_replay_stats_timeline_scaffold(&replay)
+        .expect("stats timeline should build for the double flip reset replay");
+
+    let goal_context = common::event_payloads(&timeline, |payload| match payload {
+        EventPayload::GoalContext(event) => Some(event),
+        _ => None,
+    });
+    let flip_reset_tag = goal_context
+        .iter()
+        .flat_map(|goal| goal.tags.iter())
+        .find(|tag| tag.kind() == GoalTagKind::FlipResetGoal)
+        .expect("expected the double-reset goal to carry a FlipResetGoal tag");
+
+    let metadata = flip_reset_tag.metadata();
+    let count_detail = metadata
+        .details
+        .iter()
+        .find(|detail| detail.key == "flip_reset_count")
+        .expect("expected the FlipResetGoal tag to carry a flip_reset_count detail");
+    assert_eq!(
+        count_detail.value, "2",
+        "a double-reset goal should count both flip resets; got {metadata:#?}"
+    );
+
+    let flip_reset_refs = metadata
+        .related_events
+        .iter()
+        .filter(|event_ref| event_ref.stream == GoalTagEventStream::FlipReset)
+        .count();
+    assert_eq!(
+        flip_reset_refs, 2,
+        "expected both confirmed flip resets as related events; got {metadata:#?}"
     );
 }
 
