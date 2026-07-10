@@ -122,6 +122,42 @@ test("stats frame lookup materializes compact scaffold frames from events", () =
   assert.equal(frameOne?.players[1]?.demo.demos_taken, 1);
 });
 
+test("non-compact stats frame lookup reports immediate deriving-stats completion", () => {
+  const player = { Steam: "player-a" };
+  const statsTimeline: StatsTimeline = createStatsTimeline({
+    frames: [
+      {
+        frame_number: 0,
+        time: 0,
+        dt: 0,
+        players: [{ player_id: player, name: "A", is_team_0: true }],
+      },
+      {
+        frame_number: 1,
+        time: 1,
+        dt: 1,
+        players: [{ player_id: player, name: "A", is_team_0: true }],
+      },
+    ],
+  });
+
+  assert.equal(isCompactStatsTimeline(statsTimeline), false);
+  const progress: import("./replayLoadProgress.ts").ReplayLoadProgress[] = [];
+  const lookup = createStatsFrameLookup(statsTimeline, (entry) => {
+    progress.push(entry);
+  });
+
+  assert.equal(lookup.materializeNextChunk(), false);
+  assert.deepEqual(progress, [
+    { stage: "deriving-stats", processedFrames: 2, totalFrames: 2, progress: 1 },
+  ]);
+  // Idempotent: a second drive step does not emit again.
+  assert.equal(lookup.materializeNextChunk(), false);
+  assert.equal(progress.length, 1);
+  // Lazy get() still works after driving.
+  assert.equal(getStatsFrameForReplayFrame(lookup, 1)?.frame_number, 1);
+});
+
 test("stats frame lookup rejects mixed compact and materialized frame payloads", () => {
   const player = { Steam: "player-a" };
   const statsTimeline: StatsTimeline = createStatsTimeline({

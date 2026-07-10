@@ -60,6 +60,60 @@ test("event-derived stats frame lookup does not clone scaffold payloads before f
   assert.doesNotThrow(() => createEventDerivedStatsFrameLookup(timeline));
 });
 
+test("event-derived stats frame lookup drives materialization to completion via materializeNextChunk", () => {
+  const timeline = createStatsTimeline({
+    frames: Array.from({ length: 10 }, (_, index) => ({
+      frame_number: index * 10,
+      time: index,
+      dt: 0.1,
+      players: [],
+    })),
+  });
+  const progress: ReplayLoadProgress[] = [];
+
+  const lookup = createEventDerivedStatsFrameLookup(
+    timeline,
+    (entry) => {
+      progress.push(entry);
+    },
+    { materializationChunkSize: 3 },
+  );
+
+  let chunkCount = 0;
+  while (lookup.materializeNextChunk()) {
+    chunkCount += 1;
+    assert.ok(chunkCount < 100, "materializeNextChunk should terminate");
+  }
+
+  const derivingProgress = progress.filter((entry) => entry.stage === "deriving-stats");
+  assert.ok(derivingProgress.length > 1, "should emit incremental deriving-stats progress");
+  const finalProgress = derivingProgress[derivingProgress.length - 1]!;
+  assert.equal(finalProgress.progress, 1);
+  assert.equal(finalProgress.processedFrames, 10);
+  assert.equal(finalProgress.totalFrames, 10);
+
+  // Every frame is now a cache hit and get() does not emit further progress.
+  const progressCount = progress.length;
+  for (let index = 0; index < 10; index += 1) {
+    assert.equal(lookup.get(index * 10)?.frame_number, index * 10);
+  }
+  assert.equal(progress.length, progressCount);
+});
+
+test("event-derived stats frame lookup completes immediately at progress 1 for zero frames", () => {
+  const timeline = createStatsTimeline({ frames: [] });
+  const progress: ReplayLoadProgress[] = [];
+
+  const lookup = createEventDerivedStatsFrameLookup(timeline, (entry) => {
+    progress.push(entry);
+  });
+
+  assert.equal(lookup.materializeNextChunk(), false);
+  assert.deepEqual(progress, [
+    { stage: "deriving-stats", processedFrames: 0, totalFrames: 0, progress: 1 },
+  ]);
+});
+
 test("event-derived stats frame lookup expands later materialization chunks", () => {
   const timeline = createStatsTimeline({
     frames: Array.from({ length: 20 }, (_, index) => ({
