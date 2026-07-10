@@ -47,6 +47,7 @@ pub enum FieldHalfState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
+#[allow(clippy::enum_variant_names)]
 pub enum BallDepthState {
     BehindBall,
     LevelWithBall,

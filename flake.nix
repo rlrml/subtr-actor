@@ -47,10 +47,14 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        rustToolchainManifest = {
+          channel = "1.97.0";
+          sha256 = "sha256-OATSZm98Es5kIFuqaba+UvkQtFsVgJEBMmS+t6od5/U=";
+        };
         rustToolchain = fenix.packages.${system}.combine [
-          fenix.packages.${system}.stable.toolchain
-          fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
-          fenix.packages.${system}.targets.x86_64-pc-windows-msvc.stable.rust-std
+          (fenix.packages.${system}.toolchainOf rustToolchainManifest).defaultToolchain
+          (fenix.packages.${system}.targets.wasm32-unknown-unknown.toolchainOf rustToolchainManifest).rust-std
+          (fenix.packages.${system}.targets.x86_64-pc-windows-msvc.toolchainOf rustToolchainManifest).rust-std
         ];
         rustPlatform = pkgs.makeRustPlatform {
           cargo = rustToolchain;

@@ -39,6 +39,7 @@ const KICKOFF_GOAL_TAG_MATCH_EPSILON_SECONDS: f32 = 0.05;
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
+#[allow(clippy::enum_variant_names)]
 pub enum GoalTagKind {
     AerialGoal,
     HighAerialGoal,
@@ -174,6 +175,7 @@ pub struct GoalTagMetadata {
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[serde(tag = "kind", content = "metadata", rename_all = "snake_case")]
 #[ts(export)]
+#[allow(clippy::enum_variant_names)]
 pub enum GoalTag {
     AerialGoal(GoalTagMetadata),
     HighAerialGoal(GoalTagMetadata),

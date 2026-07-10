@@ -8,14 +8,19 @@ pub(crate) use crate::stats::common::*;
 
 pub(crate) use crate::stats::accumulators::*;
 
+// These support analysis-graph and live-play integrations that do not exercise
+// every helper in the default replay pipeline.
+#[allow(dead_code)]
 mod frame_input;
 pub use frame_input::*;
 mod frame_components;
 pub use frame_components::*;
 mod event_stream;
 pub use event_stream::*;
+#[allow(dead_code)]
 mod in_flight;
 pub use in_flight::*;
+#[allow(dead_code)]
 mod event_definition;
 pub use event_definition::*;
 mod continuous_ball_control;
@@ -54,6 +59,7 @@ pub mod controlled_play;
 pub use controlled_play::*;
 pub mod demo;
 pub use demo::*;
+#[allow(dead_code)]
 mod flip_reset;
 pub use flip_reset::*;
 pub mod dodge_reset;
@@ -64,10 +70,12 @@ pub mod fifty_fifty;
 pub use fifty_fifty::*;
 pub mod fifty_fifty_state;
 pub use fifty_fifty_state::*;
+#[allow(dead_code)]
 pub mod flick;
 pub use flick::*;
 pub mod flip_impulse;
 pub use flip_impulse::*;
+#[allow(dead_code)]
 pub mod goal_tags;
 pub use goal_tags::*;
 pub mod half_flip;
@@ -86,6 +94,7 @@ pub mod one_timer;
 pub use one_timer::*;
 pub mod pass;
 pub use pass::*;
+#[allow(dead_code)]
 pub mod player_state_span;
 pub use player_state_span::*;
 pub mod positioning;

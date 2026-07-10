@@ -32,7 +32,7 @@ impl<'a> ReplayProcessor<'a> {
             .iter()
             .map(|(map_name, map)| format!("{map_name:?}: {map:?}"))
             .collect();
-        strings.push(format!("name_to_object_id: {:?}", &self.name_to_object_id));
+        strings.push(format!("name_to_object_id: {:?}", self.name_to_object_id));
         strings.join("\n")
     }
 
