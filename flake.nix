@@ -9,7 +9,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     bakkesmod-sdk = {
-      url = "github:bakkesmodorg/BakkesModSDK/479e8f571cf554b25f4eeb64d611dec4133edcaf";
+      url = "github:bakkesmodorg/BakkesModSDK";
       flake = false;
     };
     pyproject-nix = {
@@ -57,7 +57,7 @@
           rustc = rustToolchain;
         };
         pythonBase = pkgs.callPackage pyproject-nix.build.packages {
-          python = pkgs.python311;
+          python = pkgs.python312;
         };
         overlay = workspace.mkPyprojectOverlay {
           sourcePreference = "wheel";
@@ -132,7 +132,7 @@
           pkgs.cargo-rdme
           pkgs.curl
           pkgs.leveldb
-          pkgs.python311Packages.twine
+          pkgs.python312Packages.twine
         ];
       in
       {

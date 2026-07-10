@@ -17,7 +17,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_HTTP_MULTIPLEXING: "false"
-  RUST_TOOLCHAIN: "1.96.1"
+  RUST_TOOLCHAIN: stable
   RUN_FULL_REPLAY_TESTS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_replay_tests) }}
 
 jobs:
