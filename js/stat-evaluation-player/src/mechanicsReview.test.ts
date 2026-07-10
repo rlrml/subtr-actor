@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  getMechanicsReviewDecisionForKey,
+  isReviewLabelsEndpoint,
   parseMechanicsReviewPlaylist,
   resolveMechanicsReviewPerspectivePlayerTrack,
   resolveMechanicsReviewBoundTime,
@@ -166,6 +168,29 @@ test("review clip perspectives fall back to player name when ids differ", () => 
     )?.id,
     track.id,
   );
+});
+
+test("single-keystroke labels map to review decisions", () => {
+  assert.equal(getMechanicsReviewDecisionForKey("y"), "confirmed");
+  assert.equal(getMechanicsReviewDecisionForKey("1"), "confirmed");
+  assert.equal(getMechanicsReviewDecisionForKey("n"), "rejected");
+  assert.equal(getMechanicsReviewDecisionForKey("2"), "rejected");
+  assert.equal(getMechanicsReviewDecisionForKey("u"), "uncertain");
+  assert.equal(getMechanicsReviewDecisionForKey("3"), "uncertain");
+  assert.equal(getMechanicsReviewDecisionForKey("b"), "bad_candidate");
+  assert.equal(getMechanicsReviewDecisionForKey("4"), "bad_candidate");
+  assert.equal(getMechanicsReviewDecisionForKey("Y"), "confirmed");
+  assert.equal(getMechanicsReviewDecisionForKey(" "), null);
+  assert.equal(getMechanicsReviewDecisionForKey("r"), null);
+  assert.equal(getMechanicsReviewDecisionForKey("ArrowRight"), null);
+});
+
+test("review-labels endpoints are detected by pathname", () => {
+  assert.equal(isReviewLabelsEndpoint("/review-labels/flicks"), true);
+  assert.equal(isReviewLabelsEndpoint("/review-labels/flicks?candidate=3&replay=abc"), true);
+  assert.equal(isReviewLabelsEndpoint("http://localhost:5173/review-labels/flicks"), true);
+  assert.equal(isReviewLabelsEndpoint("/api/v1/events/abc/reviews"), false);
+  assert.equal(isReviewLabelsEndpoint("https://rocket-sense.example/api/reviews"), false);
 });
 
 function playerTrack(id: string, name: string): ReplayPlayerTrack {

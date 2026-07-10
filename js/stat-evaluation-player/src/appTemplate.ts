@@ -622,6 +622,9 @@ export function getAppTemplate(): string {
                 <button id="mechanics-review-confirm" type="button" disabled>Confirm</button>
                 <button id="mechanics-review-reject" type="button" disabled>Reject</button>
                 <button id="mechanics-review-uncertain" type="button" disabled>Uncertain</button>
+                <button id="mechanics-review-bad-candidate" type="button" disabled>
+                  Bad candidate
+                </button>
               </div>
               <section class="mechanics-review-replays">
                 <div class="mechanics-review-list-header">

@@ -2,6 +2,44 @@ import type { PlaylistManifestPage, ReplayPlayerTrack } from "@rlrml/player";
 import type { ReplayLoadBundle, ReplayLoadProgress } from "./replayLoader.ts";
 import { formatMechanicKind } from "./timelineMarkers.ts";
 
+export type MechanicsReviewDecision = "confirmed" | "rejected" | "uncertain" | "bad_candidate";
+
+/**
+ * Map a single keystroke to a review decision for rapid labeling:
+ * `y`/`1` confirmed, `n`/`2` rejected, `u`/`3` uncertain, `b`/`4` bad candidate.
+ */
+export function getMechanicsReviewDecisionForKey(key: string): MechanicsReviewDecision | null {
+  switch (key.toLowerCase()) {
+    case "y":
+    case "1":
+      return "confirmed";
+    case "n":
+    case "2":
+      return "rejected";
+    case "u":
+    case "3":
+      return "uncertain";
+    case "b":
+    case "4":
+      return "bad_candidate";
+    default:
+      return null;
+  }
+}
+
+/**
+ * True when a review decision endpoint targets the local flat-file label sink
+ * (the dev-server `/review-labels/<dataset>` middleware), which accepts the
+ * richer `{status, item_id, meta}` payload.
+ */
+export function isReviewLabelsEndpoint(endpoint: string): boolean {
+  try {
+    return new URL(endpoint, "http://localhost").pathname.startsWith("/review-labels/");
+  } catch {
+    return false;
+  }
+}
+
 export type MechanicsReviewPlaybackBound =
   | { kind: "time"; value: number }
   | { kind: "frame"; value: number };

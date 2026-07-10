@@ -4,9 +4,11 @@ import {
   formatMechanicsReviewClipDetails,
   formatMechanicsReviewEventDetails,
   getMechanicsReviewCategoryLabel,
+  getMechanicsReviewDecisionForKey,
   getMechanicsReviewItemLabel,
   getMechanicsReviewMechanicLabel,
   getMechanicsReviewPlayerName,
+  isReviewLabelsEndpoint,
   parseMechanicsReviewPlaylistJson,
   resolveMechanicsReviewPerspectivePlayerTrack,
   resolveMechanicsReviewBoundTime,
@@ -14,6 +16,7 @@ import {
   resolveMechanicsReviewUrl,
   type ActiveMechanicsReview,
   type MechanicsReviewBallCamMode,
+  type MechanicsReviewDecision,
   type MechanicsReviewItem,
   type MechanicsReviewPlaybackBound,
   type MechanicsReviewPlaylist,
@@ -22,8 +25,6 @@ import {
 } from "./mechanicsReview.ts";
 import type { MechanicsReviewReplayLoadsController } from "./mechanicsReviewReplayLoads.ts";
 import type { ReplayLoadBundle } from "./replayLoader.ts";
-
-type MechanicsReviewDecision = "confirmed" | "rejected" | "uncertain";
 
 export interface MechanicsReviewReplaySource {
   name: string;
@@ -49,6 +50,7 @@ export interface MechanicsReviewWindowElements {
   readonly confirm: HTMLButtonElement;
   readonly reject: HTMLButtonElement;
   readonly uncertain: HTMLButtonElement;
+  readonly badCandidate: HTMLButtonElement;
   readonly count: HTMLElement;
   readonly list: HTMLDivElement;
 }
@@ -188,6 +190,60 @@ export class MechanicsReviewWindowController {
       },
       { signal },
     );
+    elements.badCandidate.addEventListener(
+      "click",
+      () => {
+        void this.submitDecision("bad_candidate");
+      },
+      { signal },
+    );
+
+    window.addEventListener("keydown", (event) => this.handleReviewKeydown(event), { signal });
+  }
+
+  /**
+   * Rapid-labeling keyboard shortcuts, active only while a review playlist is
+   * loaded and focus is outside text entry: y/1 confirm, n/2 reject, u/3
+   * uncertain, b/4 bad candidate, r replay clip, ArrowLeft/ArrowRight navigate.
+   * Space is deliberately left alone so play/pause keeps working.
+   */
+  private handleReviewKeydown(event: KeyboardEvent): void {
+    const review = this.activeReview;
+    if (
+      !review ||
+      event.repeat ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      isReviewTextEntryFocused()
+    ) {
+      return;
+    }
+
+    const decision = getMechanicsReviewDecisionForKey(event.key);
+    if (decision) {
+      event.preventDefault();
+      if (!review.loading) {
+        void this.submitDecision(decision);
+      }
+      return;
+    }
+
+    switch (event.key) {
+      case "r":
+      case "R":
+        event.preventDefault();
+        this.replayClip();
+        return;
+      case "ArrowLeft":
+        event.preventDefault();
+        void this.activateItem(Math.max(0, review.currentIndex - 1));
+        return;
+      case "ArrowRight":
+        event.preventDefault();
+        void this.activateItem(Math.min(review.manifest.items.length - 1, review.currentIndex + 1));
+        return;
+    }
   }
 
   render(): void {
@@ -216,6 +272,7 @@ export class MechanicsReviewWindowController {
     elements.confirm.disabled = decisionDisabled;
     elements.reject.disabled = decisionDisabled;
     elements.uncertain.disabled = decisionDisabled;
+    elements.badCandidate.disabled = decisionDisabled;
     this.options.replayLoads.render(review);
 
     elements.list.replaceChildren();
@@ -246,12 +303,20 @@ export class MechanicsReviewWindowController {
           getMechanicsReviewCategoryLabel(candidate),
           getMechanicsReviewMechanicLabel(candidate),
           this.getPlayerName(candidate),
-          formatMechanicsReviewStatus(candidate.meta?.reviewStatus),
         ]
           .filter((part) => part && part !== "--")
           .join(" · ") || "--";
 
-      button.append(title, meta);
+      const reviewStatus =
+        typeof candidate.meta?.reviewStatus === "string" && candidate.meta.reviewStatus.trim()
+          ? candidate.meta.reviewStatus.trim()
+          : null;
+      const status = document.createElement("span");
+      status.className = "mechanics-review-item-status";
+      status.dataset.status = reviewStatus ?? "unreviewed";
+      status.textContent = formatMechanicsReviewStatus(reviewStatus);
+
+      button.append(title, meta, status);
       elements.list.append(button);
     });
   }
@@ -401,6 +466,13 @@ export class MechanicsReviewWindowController {
     }
 
     this.setStatus(`Submitting ${formatMechanicsReviewStatus(status)}...`);
+    const body: Record<string, unknown> = { status };
+    if (isReviewLabelsEndpoint(endpoint)) {
+      // The flat-file label sink wants enough context to make each JSONL line
+      // self-describing; remote review APIs keep the original {status} shape.
+      body.item_id = item.id ?? item.meta?.eventId ?? null;
+      body.meta = item.meta ?? null;
+    }
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -408,7 +480,7 @@ export class MechanicsReviewWindowController {
         ...mechanicsReviewAuthHeaders(),
       },
       credentials: "same-origin",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       let message = `${response.status}${response.statusText ? ` ${response.statusText}` : ""}`;
@@ -428,6 +500,13 @@ export class MechanicsReviewWindowController {
     item.meta.reviewStatus = status;
     this.setStatus(`Marked ${formatMechanicsReviewStatus(status)}.`);
     this.render();
+
+    const nextIndex = review.currentIndex + 1;
+    if (nextIndex < review.manifest.items.length) {
+      await this.activateItem(nextIndex);
+    } else {
+      this.setStatus("All items reviewed.");
+    }
   }
 
   enforceClipBoundary(state: ReplayPlayerState): boolean {
@@ -483,6 +562,18 @@ export class MechanicsReviewWindowController {
       resolveMechanicsReviewPerspectivePlayerTrack(item.perspective, replayPlayers)?.name ?? "--"
     );
   }
+}
+
+function isReviewTextEntryFocused(): boolean {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) {
+    return false;
+  }
+  if (active.isContentEditable) {
+    return true;
+  }
+  const tag = active.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
 function formatMechanicsReviewStatus(value: unknown): string {

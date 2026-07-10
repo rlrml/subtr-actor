@@ -697,7 +697,7 @@
 
 .mechanics-review-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: var(--ui-gap-sm);
   align-items: center;
   width: 100%;
@@ -722,4 +722,33 @@
 .mechanics-review-item[data-active="true"] {
   border-color: rgba(75, 148, 255, 0.42);
   background: rgba(75, 148, 255, 0.16);
+}
+
+.mechanics-review-item-status {
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mechanics-review-item-status[data-status="confirmed"] {
+  color: #7fe0a7;
+  background: rgba(76, 175, 120, 0.2);
+}
+
+.mechanics-review-item-status[data-status="rejected"] {
+  color: #ff9b9b;
+  background: rgba(220, 95, 95, 0.2);
+}
+
+.mechanics-review-item-status[data-status="uncertain"] {
+  color: #ffd27f;
+  background: rgba(230, 170, 60, 0.2);
+}
+
+.mechanics-review-item-status[data-status="bad_candidate"] {
+  color: #cfa9ff;
+  background: rgba(160, 110, 255, 0.2);
 }

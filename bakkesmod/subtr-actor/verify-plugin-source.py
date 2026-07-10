@@ -3293,7 +3293,7 @@ def main() -> int:
         )
     require_contains(
         web_player_main_source,
-        "formatMechanicsReviewStatus(candidate.meta?.reviewStatus)",
+        "status.textContent = formatMechanicsReviewStatus(reviewStatus);",
         "stats evaluation player mechanics review rows expose review status",
         errors,
     )
@@ -3317,8 +3317,8 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        "formatMechanicsReviewStatus(candidate.meta?.reviewStatus),",
-        "stats evaluation player mechanics review row meta uses dot separator",
+        'status.dataset.status = reviewStatus ?? "unreviewed";',
+        "stats evaluation player mechanics review rows expose review status badge",
         errors,
     )
     require_contains(
