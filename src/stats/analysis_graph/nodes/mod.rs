@@ -1,4 +1,6 @@
-pub(crate) use super::graph::*;
+// This is a child-module prelude, not a restricted re-export. Keeping it
+// private avoids Rust 1.97's glob effective-visibility regression.
+use super::graph::*;
 use crate::stats::calculators::{
     AerialGoalCalculator, AirDribbleCalculator, AirDribbleGoalCalculator, BackboardBounceState,
     BackboardCalculator, BallCarryCalculator, BallFrameState, BallHalfCalculator,

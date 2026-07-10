@@ -4,9 +4,10 @@ use boxcars;
 use boxcars::HeaderProp;
 use serde::{Deserialize, Serialize};
 
-pub(crate) use crate::stats::common::*;
-
-pub(crate) use crate::stats::accumulators::*;
+// Keep these prelude imports private. Rust 1.97 miscomputes effective visibility
+// when a public glob export is also reachable through a restricted glob import.
+use crate::stats::common::*;
+use crate::*;
 
 // These support analysis-graph and live-play integrations that do not exercise
 // every helper in the default replay pipeline.

@@ -18,9 +18,11 @@ pub(crate) use std::collections::HashMap;
 
 pub(crate) use serde::{Deserialize, Serialize};
 
-pub(crate) use crate::stats::calculators::*;
-pub(crate) use crate::stats::common::*;
-pub(crate) use crate::*;
+// Keep these prelude imports private. Rust 1.97 miscomputes effective visibility
+// when a public glob export is also reachable through a restricted glob import.
+use crate::stats::calculators::*;
+use crate::stats::common::*;
+use crate::*;
 
 #[cfg(test)]
 pub(crate) use test_projection::*;
