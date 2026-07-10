@@ -22,9 +22,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # Rust 1.97.0 fails to emit optimized MIR for the subtr-actor dependency
-  # while compiling the ABI test crate.
-  RUST_TOOLCHAIN: "1.96.1"
 
 jobs:
   build:
@@ -40,9 +37,7 @@ jobs:
           python bakkesmod/subtr-actor/verify-plugin-source.py
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Rust build outputs
         uses: Swatinem/rust-cache@v2
