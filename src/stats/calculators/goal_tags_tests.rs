@@ -1080,6 +1080,22 @@ fn flip_reset_goal_can_be_created_by_scoring_teammate() {
 }
 
 #[test]
+fn flip_reset_goal_rejects_reset_before_opponent_touch() {
+    let goal = goal_with_touch(true, position(0.0, 2400.0, 700.0), Vec::new());
+    let mut opponent_touch = touch_classification_event(8.0, 80, player_id(2), "no_dodge");
+    opponent_touch.is_team_0 = false;
+
+    let events = FlipResetGoalCalculator::new().tag_goals(
+        &[goal],
+        &[confirmed_flip_reset_event(7.0, 70, player_id(1))],
+        &[],
+        &[opponent_touch],
+    );
+
+    assert!(events.is_empty());
+}
+
+#[test]
 fn flip_reset_goal_tags_scoring_on_ball_reset_touch() {
     let goal = goal_with_touch(true, position(0.0, 2400.0, 700.0), Vec::new());
     let events = FlipResetGoalCalculator::new().tag_goals(
