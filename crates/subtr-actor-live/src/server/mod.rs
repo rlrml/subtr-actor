@@ -319,6 +319,10 @@ enum IngestItem {
 struct SharedState {
     seq: u64,
     match_live: bool,
+    /// Set after `MatchEnd` so postgame/podium frames cannot implicitly start
+    /// another match. A host-supplied match context explicitly rearms frame
+    /// acceptance for the next match.
+    frames_suspended_after_match_end: bool,
     roster: Option<LiveMatchMeta>,
     roster_signature: Option<RosterSignature>,
     /// Host-supplied match context, attached to every broadcast meta. Cleared
@@ -528,6 +532,7 @@ fn broadcaster_loop(core: &Arc<ServerCore>) {
                     broadcast(core, &state.clients, &message, None);
                 }
                 state.match_live = false;
+                state.frames_suspended_after_match_end = true;
                 state.roster = None;
                 state.roster_signature = None;
                 state.context = LiveMatchContext::default();
@@ -542,6 +547,11 @@ fn broadcaster_loop(core: &Arc<ServerCore>) {
 /// the roster meta (now carrying the new context) as a `RosterChange`.
 fn apply_match_context(core: &Arc<ServerCore>, context: LiveMatchContext) {
     let mut state = lock(&core.shared);
+    // MatchEnd deliberately suspends arbitrary subsequent frames because the
+    // game continues producing podium/postgame state while still reporting
+    // itself as in-game. The host calls set_match_context when a real next
+    // match begins, which is the unambiguous rearm signal.
+    state.frames_suspended_after_match_end = false;
     state.context = context;
     if !state.match_live {
         return;
@@ -564,6 +574,10 @@ fn apply_match_context(core: &Arc<ServerCore>, context: LiveMatchContext) {
 }
 
 fn process_frame(core: &Arc<ServerCore>, generator: &mut LiveEventGenerator, frame: LiveFrame) {
+    if lock(&core.shared).frames_suspended_after_match_end {
+        return;
+    }
+
     // Derive events outside the shared lock; only state updates and fan-out
     // happen under it.
     let (frame_events, live_play) = generator.frame_events(&frame);

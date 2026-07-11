@@ -75,6 +75,8 @@ void StateExportPlugin::hookGameEvents() {
         // hook lands at the true match end (before the podium/exit flow);
         // the Rust side treats a repeated call as a no-op.
         notifyMatchEndAndReset("match ended");
+        resetLiveState();
+        awaitingNextMatch = true;
       });
 }
 

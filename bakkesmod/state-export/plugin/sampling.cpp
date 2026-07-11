@@ -287,7 +287,8 @@ uint32_t StateExportPlugin::stablePlayerIndexForPri(PriWrapper pri, uint32_t fal
     return fallbackIndex;
   }
 
-  const std::string uniqueId = pri.GetbBot() != 0 ? "" : pri.GetUniqueIdWrapper().GetIdString();
+  const bool isBot = pri.GetbBot() != 0;
+  const std::string uniqueId = isBot ? "" : pri.GetUniqueIdWrapper().GetIdString();
   if (!uniqueId.empty()) {
     const auto existing = uniqueIdPlayerIndices.find(uniqueId);
     if (existing != uniqueIdPlayerIndices.end()) {
@@ -297,6 +298,28 @@ uint32_t StateExportPlugin::stablePlayerIndexForPri(PriWrapper pri, uint32_t fal
     const uint32_t playerIndex = nextPlayerIndex++;
     uniqueIdPlayerIndices[uniqueId] = playerIndex;
     return playerIndex;
+  }
+
+  if (isBot) {
+    const std::string name = pri.GetPlayerName().ToString();
+    if (!name.empty()) {
+      const std::string botKey = std::format("{}:{}", pri.GetTeamNum(), name);
+      const auto existingBot = stableBotPlayerIndices.find(botKey);
+      if (existingBot != stableBotPlayerIndices.end()) {
+        stablePriPlayerIndices[pri.memory_address] = existingBot->second;
+        return existingBot->second;
+      }
+
+      // Preserve an index already assigned while the bot's replicated name
+      // was temporarily empty, then bind the stable team/name key to it.
+      const auto existingPri = stablePriPlayerIndices.find(pri.memory_address);
+      const uint32_t playerIndex = existingPri == stablePriPlayerIndices.end()
+                                       ? nextPlayerIndex++
+                                       : existingPri->second;
+      stableBotPlayerIndices[botKey] = playerIndex;
+      stablePriPlayerIndices[pri.memory_address] = playerIndex;
+      return playerIndex;
+    }
   }
 
   const auto existing = stablePriPlayerIndices.find(pri.memory_address);

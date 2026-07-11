@@ -498,12 +498,14 @@ fn match_context_flows_through_meta() {
         other => panic!("expected RosterChange, got {other:?}"),
     }
 
-    // match_end clears the context: the next match starts without it.
+    // match_end clears the context and suspends postgame frames until the host
+    // explicitly rearms the next match with a context (which may be empty).
     handle.match_end();
     match recv(&mut client, Encoding::Json) {
         ServerMessage::MatchEnd { .. } => {}
         other => panic!("expected MatchEnd, got {other:?}"),
     }
+    handle.set_match_context(LiveMatchContext::default());
     handle.push_frame(test_frame(1));
     match recv(&mut client, Encoding::Json) {
         ServerMessage::MatchStart { meta, .. } => {
@@ -514,8 +516,8 @@ fn match_context_flows_through_meta() {
     handle.shutdown();
 }
 
-// match_end broadcasts MatchEnd, resets state, and the next frame starts a
-// fresh match with a new MatchStart.
+// match_end broadcasts MatchEnd, resets state, and ignores postgame frames
+// until a new match context explicitly rearms the stream.
 #[test]
 fn match_end_resets_and_restarts() {
     let handle = LiveExportServer::start(test_config()).unwrap();
@@ -528,7 +530,16 @@ fn match_end_resets_and_restarts() {
 
     handle.push_frame(frame_with_dodge_refresh(0, 1));
     handle.match_end();
+    // Rocket League continues exposing the ended ServerWrapper on its podium
+    // screen. This frame must not create a phantom MatchStart or contaminate
+    // the next match's history.
     handle.push_frame(frame_with_dodge_refresh(1, 1));
+    handle.set_match_context(LiveMatchContext {
+        match_guid: Some("next-match".to_owned()),
+        playlist_id: None,
+        map_name: Some("next-map".to_owned()),
+    });
+    handle.push_frame(frame_with_dodge_refresh(2, 1));
 
     let mut kinds = Vec::new();
     while kinds.len() < 5 {
@@ -544,7 +555,7 @@ fn match_end_resets_and_restarts() {
         ["match_start", "frame", "match_end", "match_start", "frame"]
     );
 
-    // A fresh joiner after the second frame sees only the new match's history
+    // A fresh joiner after the second match frame sees only the new match's history
     // (one dodge refresh, not two).
     let mut late = connect(handle.local_addr(), "/?format=json");
     expect_server_info(&recv(&mut late, Encoding::Json));

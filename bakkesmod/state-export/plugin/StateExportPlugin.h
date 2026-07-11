@@ -113,6 +113,7 @@ private:
   std::unordered_map<uintptr_t, uint32_t> carPlayerIndices;
   std::unordered_map<uintptr_t, uint32_t> priPlayerIndices;
   std::unordered_map<std::string, uint32_t> uniqueIdPlayerIndices;
+  std::unordered_map<std::string, uint32_t> stableBotPlayerIndices;
   std::unordered_map<uintptr_t, uint32_t> stablePriPlayerIndices;
   std::unordered_map<uintptr_t, PlayerStatSnapshot> lastPlayerStats;
   std::unordered_map<uintptr_t, PlayerStatSnapshot> suppressedPlayerStatDeltas;
@@ -134,6 +135,11 @@ private:
   int32_t pushedPlaylistId = 0;
   bool pushedHasPlaylistId = false;
   bool matchContextPushed = false;
+  // EventMatchEnded fires before Rocket League leaves the game server. Keep
+  // postgame frames suppressed until the server has both reset and activated
+  // a playable round for the next match. Rocket League clears bMatchEnded
+  // while displaying its empty "Choose Team" interstitial.
+  bool awaitingNextMatch = false;
 
   uintptr_t imguiContext = 0;
 
