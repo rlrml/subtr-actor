@@ -1400,6 +1400,17 @@ dependencies = [
  "flate2",
  "serde_json",
  "subtr-actor",
+ "subtr-actor-live",
+]
+
+[[package]]
+name = "subtr-actor-live"
+version = "1.2.0"
+dependencies = [
+ "boxcars",
+ "glam",
+ "serde",
+ "subtr-actor",
 ]
 
 [[package]]

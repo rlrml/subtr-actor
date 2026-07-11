@@ -22,31 +22,36 @@ use subtr_actor::BoostPickupPadZone;
 #[cfg(test)]
 use subtr_actor::ReplayFrameInputBuilder;
 use subtr_actor::{
-    BackboardBounceEvent, BallFrameState, BallSample, BoostPadEvent, BoostPadEventKind,
-    BoostPickupEvent, BumpEvent, CarHitbox, CorePlayerScoreboardEvent, DemoEventSample,
-    DemolishAttribute, DemolishInfo, DemolitionEvent, DodgeRefreshedEvent, Event, EventPayload,
-    EventTiming, FiftyFiftyEvent, FrameEventsState, FrameInfo, FrameInput, GameplayPhase,
-    GameplayState, GoalBuildupKind, GoalContextEvent, GoalEvent, GoalTagKind, LivePlayState,
-    PlayerCameraStateChange, PlayerFrameState, PlayerId, PlayerInfo, PlayerSample, PlayerStatEvent,
-    PlayerStatEventKind, ProcessorView, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline,
-    ReplayStatsTimelineEvents, RushEvent, ShotEventMetadata, StatsTimelineCollector,
-    StatsTimelineEventCollector, SubtrActorError, SubtrActorErrorVariant, SubtrActorResult,
-    TimelineEvent, TimelineEventKind, TouchEvent, TouchStateCalculator, WhiffEvent,
-    boost_amount_to_percent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
+    BackboardBounceEvent, BoostPickupEvent, BumpEvent, CorePlayerScoreboardEvent, DemolitionEvent,
+    Event, EventPayload, EventTiming, FiftyFiftyEvent, FrameInput, GoalBuildupKind,
+    GoalContextEvent, GoalTagKind, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline,
+    ReplayStatsTimelineEvents, RushEvent, StatsTimelineCollector, StatsTimelineEventCollector,
+    SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
+    WhiffEvent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
     builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
-    builtin_stats_module_names, car_hitbox_for_body_id, default_car_hitbox,
-    default_stats_timeline_config,
-    geometry::apply_velocities_to_rigid_body,
-    hitbox_family_for_body_id,
+    builtin_stats_module_names, default_stats_timeline_config,
     stats::analysis_graph::{
         AnalysisGraph, StatsTimelineEventsState, StatsTimelineFrameState,
         builtin_analysis_node_names, graph_with_all_analysis_nodes,
     },
 };
 #[cfg(test)]
-use subtr_actor::{GoalTag, GoalTagMetadata};
+use subtr_actor::{
+    BoostPadEvent, BoostPadEventKind, DemoEventSample, DemolishInfo, DodgeRefreshedEvent,
+    FrameEventsState, FrameInfo, GameplayPhase, GameplayState, GoalEvent, GoalTag, GoalTagMetadata,
+    LivePlayState, PlayerFrameState, PlayerStatEvent, PlayerStatEventKind, ProcessorView,
+    TouchEvent, boost_amount_to_percent, car_hitbox_for_body_id,
+};
+#[cfg(test)]
+use subtr_actor_live::LiveProcessorView;
+use subtr_actor_live::{
+    LiveBoostPadEvent, LiveBoostPadEventKind, LiveDemolishEvent, LiveDodgeRefreshedEvent,
+    LiveEventTiming, LiveExplicitEvents, LiveFrame, LiveGoalEvent, LiveMatchMeta, LiveMatchStats,
+    LivePlayerFrame, LivePlayerStatEvent, LivePlayerStatEventKind, LiveTouchEvent,
+};
 
 mod abi;
+mod abi_convert;
 mod ffi;
 mod ffi_graph_output;
 mod ffi_raw;
@@ -56,6 +61,7 @@ mod live_processor;
 mod timeline_drain;
 
 pub use abi::*;
+pub(crate) use abi_convert::*;
 pub use ffi::*;
 pub use ffi_graph_output::*;
 pub(crate) use ffi_raw::*;

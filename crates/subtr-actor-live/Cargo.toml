@@ -1,0 +1,16 @@
+[package]
+name = "subtr-actor-live"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Owned live-frame model, event heuristics, and processor view shared by live subtr-actor integrations"
+
+[dependencies]
+boxcars.workspace = true
+glam = ">=0.31.0, <1.0.0"
+serde = { version = "1", features = ["derive"] }
+subtr-actor = { path = "../.." }

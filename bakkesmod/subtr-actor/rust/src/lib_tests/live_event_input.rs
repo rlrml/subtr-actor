@@ -48,7 +48,7 @@ fn live_processor_view_frame_input_preserves_live_event_streams() {
         }],
     );
     let event_history = SaLiveEventHistory::default();
-    let view = SaLiveProcessorView::new(
+    let view = sa_live_processor_view(
         None,
         &frame,
         &players,
