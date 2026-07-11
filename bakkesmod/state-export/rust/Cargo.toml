@@ -1,0 +1,24 @@
+[package]
+name = "subtr-actor-state-export"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "C ABI shell that exports live Rocket League game state from a BakkesMod plugin over the subtr-actor-live WebSocket protocol"
+
+[lib]
+name = "state_export"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+boxcars.workspace = true
+subtr-actor-live = { path = "../../../crates/subtr-actor-live", features = [
+    "server",
+] }
+
+[dev-dependencies]
+serde_json = "1.0.140"
+subtr-actor-live-consumer = { path = "../../../crates/subtr-actor-live-consumer" }
