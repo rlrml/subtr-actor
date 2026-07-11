@@ -44,6 +44,7 @@ pub(crate) mod flip_impulse;
 pub(crate) mod frame_events_state;
 pub(crate) mod frame_info;
 pub(crate) mod gameplay_state;
+pub(crate) mod goal_context;
 pub(crate) mod goal_tags;
 pub(crate) mod half_flip;
 pub(crate) mod half_volley;
@@ -122,6 +123,8 @@ pub use frame_events_state::FrameEventsStateNode;
 pub use frame_info::FrameInfoNode;
 #[allow(unused_imports)]
 pub use gameplay_state::GameplayStateNode;
+#[allow(unused_imports)]
+pub use goal_context::{GoalContextNode, GoalContextState};
 #[allow(unused_imports)]
 pub use goal_tags::{
     AerialGoalNode, AirDribbleGoalNode, BumpGoalNode, CeilingShotGoalNode, CounterAttackGoalNode,
@@ -479,6 +482,10 @@ pub(crate) fn powerslide_dependency() -> AnalysisDependency {
 
 pub(crate) fn demo_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<DemoCalculator>(demo::boxed_default)
+}
+
+pub(crate) fn goal_context_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<GoalContextState>(goal_context::boxed_default)
 }
 
 pub(crate) fn stats_projection_dependency() -> AnalysisDependency {

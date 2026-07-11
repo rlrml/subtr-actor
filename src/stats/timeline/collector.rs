@@ -2,12 +2,26 @@ use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
 use crate::stats::analysis_graph::{
-    AnalysisGraph, StatsTimelineEventsNode, StatsTimelineEventsState, StatsTimelineFrameNode,
-    StatsTimelineFrameState,
+    AnalysisGraph, StatsTimelineEventsNode, StatsTimelineFrameNode, StatsTimelineFrameState,
 };
 use crate::stats::calculators::ReplayFrameInputBuilder;
 use crate::*;
 use std::collections::{BTreeMap, HashMap};
+
+/// The graph's reduced event view (the transaction log's current events,
+/// chronologically sorted), cloned into the batch transfer type. After
+/// [`AnalysisGraph::finish`] this is the finalized event list; the graph
+/// projects exactly once at finish, so there is no separate node snapshot.
+fn reduced_timeline_events(graph: &AnalysisGraph) -> ReplayStatsTimelineEvents {
+    ReplayStatsTimelineEvents {
+        events: graph
+            .event_transaction_log()
+            .current_events()
+            .into_iter()
+            .cloned()
+            .collect(),
+    }
+}
 
 const ABSENT_PLAYER_MIN_MISSING_SECONDS: f32 = 30.0;
 
@@ -157,11 +171,7 @@ impl StatsTimelineCollector {
             .replay_meta
             .clone()
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?;
-        let events = self
-            .graph
-            .state::<StatsTimelineEventsState>()
-            .map(|state| state.events.clone())
-            .unwrap_or_default();
+        let events = reduced_timeline_events(&self.graph);
         Ok(ReplayStatsTimeline {
             config: self.timeline_config(),
             replay_meta,
@@ -287,11 +297,7 @@ impl StatsTimelineEventCollector {
             .replay_meta
             .clone()
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?;
-        let events = self
-            .graph
-            .state::<StatsTimelineEventsState>()
-            .map(|state| state.events.clone())
-            .unwrap_or_default();
+        let events = reduced_timeline_events(&self.graph);
         let positioning = self.graph.state::<PositioningCalculator>();
         let positioning_summary = replay_meta
             .player_order()

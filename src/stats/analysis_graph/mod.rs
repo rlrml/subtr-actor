@@ -165,6 +165,7 @@ builtin_analysis_nodes! {
     BumpGoalNode,
     DemoGoalNode,
     HalfVolleyGoalNode, OneTimerNode,
+    GoalContextNode,
     PassNode,
     DodgeResetNode,
     BallCarryNode,

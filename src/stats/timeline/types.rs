@@ -351,6 +351,26 @@ pub enum EventScope {
     Player,
 }
 
+/// How settled an event is at the moment it was projected.
+///
+/// Batch (finish-only) projections emit everything `Finalized`. Interim
+/// projections emit an event as `Confirmed` as soon as it has definitely
+/// happened — its identity ([`EventMeta::id`]) is fixed from that point on —
+/// while its content (span end, positions, enrichment like goal-outcome
+/// upgrades) may still be revised by later projections of the same id. Once an
+/// event is `Finalized` it is immutable: no future projection may change or
+/// drop it (enforced by the timeline transaction log).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum EventLifecycle {
+    /// The event has definitely happened and its id is stable, but its
+    /// content may still be revised by a later projection.
+    Confirmed,
+    /// Immutable: no future evidence can change this event.
+    Finalized,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct EventMeta {
@@ -358,6 +378,7 @@ pub struct EventMeta {
     pub stream: String,
     pub label: String,
     pub scope: EventScope,
+    pub lifecycle: EventLifecycle,
     pub timing: EventTiming,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]

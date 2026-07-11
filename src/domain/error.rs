@@ -129,6 +129,9 @@ pub enum SubtrActorErrorVariant {
 
     #[error("Stats serialization error: {0}")]
     StatsSerializationError(String),
+
+    #[error("Stats timeline event invariant violation: {0}")]
+    TimelineEventInvariantViolation(String),
 }
 
 /// [`SubtrActorError`] struct provides an error variant

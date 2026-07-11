@@ -168,6 +168,24 @@ pub trait AnalysisNode: 'static {
         Ok(())
     }
 
+    /// The node's *current* full timeline-event set: a pure projection of the
+    /// state accumulated so far, keyed by cadence-invariant `meta.id`s and
+    /// lifecycle-annotated per event (see [`crate::EventLifecycle`]).
+    ///
+    /// Nodes never diff against prior emissions — they simply re-project on
+    /// every call, and the graph's central store
+    /// ([`AnalysisGraph::project_events_now`]) turns successive projections
+    /// into upsert/retract transactions and enforces the lifecycle
+    /// invariants. Each event stream must be projected by exactly one node
+    /// (ids embed the stream name, so distinct streams can never collide
+    /// across nodes; the store rejects duplicate ids).
+    ///
+    /// The default projects nothing, which is right for every node that only
+    /// publishes derived state.
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(Vec::new())
+    }
+
     fn state(&self) -> &Self::State;
 }
 
@@ -187,6 +205,8 @@ pub trait AnalysisNodeDyn: 'static {
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()>;
 
     fn finish(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()>;
+
+    fn project_events(&self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>>;
 
     fn state_any(&self) -> &dyn Any;
 }
@@ -227,6 +247,10 @@ where
         AnalysisNode::finish(self, ctx)
     }
 
+    fn project_events(&self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        AnalysisNode::project_events(self, ctx)
+    }
+
     fn state_any(&self) -> &dyn Any {
         self.state()
     }
@@ -248,6 +272,13 @@ pub struct AnalysisGraph {
     declared_input_states: HashMap<TypeId, &'static str>,
     root_states: HashMap<TypeId, Box<dyn Any>>,
     resolved: bool,
+    /// Central differential store over the nodes' event projections: each
+    /// [`project_events_now`](AnalysisGraph::project_events_now) (and the
+    /// final projection inside [`finish`](AnalysisGraph::finish)) diffs the
+    /// aggregated node projections against this log's previous view,
+    /// appending [`EventTransaction`]s and enforcing the lifecycle
+    /// invariants.
+    event_log: TimelineTransactionLog,
 }
 
 impl AnalysisGraph {
@@ -490,7 +521,68 @@ impl AnalysisGraph {
             let ctx = AnalysisStateContext::from_parts(&self.root_states, &[], before);
             current.finish(&ctx)?;
         }
-        Ok(())
+        // One final projection in finalize-everything mode: after the node
+        // finishes above, no future evidence exists by definition, so every
+        // projected event is upgraded to `Finalized` before the store diffs it
+        // against the last interim projection — which is exactly where the
+        // lifecycle invariants (finalized content never changed, nothing
+        // vanished) are asserted for the whole run. Finish-only consumers get
+        // a single projection here and never see an interim lifecycle.
+        let mut projection = self.collect_projected_events()?;
+        for event in &mut projection {
+            event.meta.lifecycle = EventLifecycle::Finalized;
+        }
+        self.event_log.apply_projection(&projection)
+    }
+
+    /// Projects every node's current event set into the graph's central
+    /// transaction log (see [`AnalysisNode::project_events`]).
+    ///
+    /// Cadence is owned by the caller — typically a live driver invoking this
+    /// on a game-time interval (each projection re-scans all committed
+    /// calculator events, so a ~1s cadence keeps the amortized cost
+    /// negligible; projecting every frame would be quadratic over a match).
+    /// Event ids are cadence-invariant, so the cadence only decides *when* an
+    /// event becomes observable, never which id it gets. Batch consumers can
+    /// skip this entirely: [`finish`](AnalysisGraph::finish) always performs
+    /// one final, finalize-everything projection.
+    pub fn project_events_now(&mut self) -> SubtrActorResult<()> {
+        self.resolve()?;
+        let projection = self.collect_projected_events()?;
+        self.event_log.apply_projection(&projection)
+    }
+
+    /// The central event transaction log fed by
+    /// [`project_events_now`](AnalysisGraph::project_events_now) and
+    /// [`finish`](AnalysisGraph::finish). Incremental consumers keep their own
+    /// cursor over it (e.g. `TimelineTransactionLog::transactions_since`);
+    /// reading never mutates the log.
+    pub fn event_transaction_log(&self) -> &TimelineTransactionLog {
+        &self.event_log
+    }
+
+    /// Aggregates every node's current projection, in evaluation order.
+    ///
+    /// The order is deterministic once the graph is resolved (topological
+    /// order over the same node set), and each node's own projection order is
+    /// deterministic by the id-disambiguator contract, so the aggregate is a
+    /// pure function of calculator state. Ids embed their stream name and
+    /// each stream is owned by exactly one node, so projections from
+    /// different nodes cannot collide (the store's duplicate-id check turns
+    /// any violation of that ownership assumption into a loud error).
+    fn collect_projected_events(&self) -> SubtrActorResult<Vec<Event>> {
+        let mut projection = Vec::new();
+        for &node_index in &self.evaluation_order {
+            let (before, current_and_after) = self.nodes.split_at(node_index);
+            let current = current_and_after
+                .first()
+                .expect("evaluation order should contain valid indexes");
+            let ctx = AnalysisStateContext::from_parts(&self.root_states, &[], before);
+            let node_projection = current.project_events(&ctx)?;
+            verify_projected_streams_are_declared(current.as_ref(), &node_projection)?;
+            projection.extend(node_projection);
+        }
+        Ok(projection)
     }
 
     pub fn state<T: 'static>(&self) -> Option<&T> {
@@ -758,6 +850,37 @@ fn analysis_node_graph_error(message: String) -> SubtrActorError {
     SubtrActorError::new(SubtrActorErrorVariant::CallbackError(format!(
         "analysis node graph error: {message}"
     )))
+}
+
+/// Rejects a node projection containing an event on a stream the node does
+/// not declare via [`AnalysisNode::emitted_events`].
+///
+/// Stream ownership is a static, per-node declaration
+/// ([`EmittedEvent::projected`]); this check keeps every projection site
+/// honest about it, so the declared catalog (and the finalization horizons it
+/// carries) can be trusted to describe what actually reaches the timeline.
+fn verify_projected_streams_are_declared(
+    node: &dyn AnalysisNodeDyn,
+    projection: &[Event],
+) -> SubtrActorResult<()> {
+    for event in projection {
+        let declared = node.emitted_events().iter().any(|emitted| {
+            emitted
+                .projected
+                .is_some_and(|projected| projected.stream == event.meta.stream)
+        });
+        if !declared {
+            return SubtrActorError::new_result(
+                SubtrActorErrorVariant::TimelineEventInvariantViolation(format!(
+                    "node {:?} projected event {:?} on undeclared stream {:?}",
+                    node.name(),
+                    event.meta.id,
+                    event.meta.stream,
+                )),
+            );
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, moment};
 use crate::*;
 
 /// Detects player-on-player bumps from player frame/events and 50/50 state.
@@ -52,9 +53,36 @@ impl AnalysisNode for BumpNode {
         )
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &BumpCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    for event in calculator.events() {
+        assembler.push(
+            "bump",
+            event.frame,
+            EventLifecycle::Finalized,
+            moment(event.frame, event.time),
+            EventPayload::Bump(event.clone()),
+            Some(event.initiator.clone()),
+            Some(event.victim.clone()),
+            Some(event.initiator_is_team_0),
+            Some(event.initiator_position),
+            None,
+            Some(event.confidence),
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

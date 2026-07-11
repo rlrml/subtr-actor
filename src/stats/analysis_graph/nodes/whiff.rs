@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, span};
 use crate::*;
 
 /// Detects whiffs and beaten-to-ball attempts from ball/player state and touches during live play.
@@ -57,9 +58,42 @@ impl AnalysisNode for WhiffNode {
         Ok(())
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &WhiffCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    // Whiffs commit once resolved (Whiff/BeatenToBall decided at push time).
+    for event in calculator.events() {
+        assembler.push(
+            "whiff",
+            event.frame,
+            EventLifecycle::Finalized,
+            span(
+                event.frame,
+                event.resolved_frame,
+                event.time,
+                event.resolved_time,
+            ),
+            EventPayload::Whiff(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

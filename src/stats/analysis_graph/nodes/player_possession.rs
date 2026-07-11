@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, span};
 use crate::*;
 
 /// Tracks per-player possession from ball/player/possession/touch state.
@@ -59,9 +60,43 @@ impl AnalysisNode for PlayerPossessionNode {
         Ok(())
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &PlayerPossessionCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    // Player-possession spans reach the list only via `finalize` (in-progress
+    // spans live outside it), immutable afterwards.
+    for event in calculator.events() {
+        assembler.push(
+            "player_possession",
+            event.start_frame,
+            EventLifecycle::Finalized,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::PlayerPossession(event.clone()),
+            Some(event.player_id.clone()),
+            None,
+            Some(event.is_team_0),
+            None,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

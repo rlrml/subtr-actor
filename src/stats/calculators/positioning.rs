@@ -357,6 +357,34 @@ impl PositioningCalculator {
         self.shadow_defense.projected_events()
     }
 
+    pub fn activity_events_by_player(&self) -> Vec<(PlayerActivityEvent, bool)> {
+        self.activity.projected_events_by_player()
+    }
+
+    pub fn field_third_events_by_player(&self) -> Vec<(FieldThirdEvent, bool)> {
+        self.field_third.projected_events_by_player()
+    }
+
+    pub fn field_half_events_by_player(&self) -> Vec<(FieldHalfEvent, bool)> {
+        self.field_half.projected_events_by_player()
+    }
+
+    pub fn ball_depth_events_by_player(&self) -> Vec<(BallDepthEvent, bool)> {
+        self.ball_depth.projected_events_by_player()
+    }
+
+    pub fn depth_role_events_by_player(&self) -> Vec<(DepthRoleEvent, bool)> {
+        self.depth_role.projected_events_by_player()
+    }
+
+    pub fn ball_proximity_events_by_player(&self) -> Vec<(BallProximityEvent, bool)> {
+        self.ball_proximity.projected_events_by_player()
+    }
+
+    pub fn shadow_defense_events_by_player(&self) -> Vec<(ShadowDefenseEvent, bool)> {
+        self.shadow_defense.projected_events_by_player()
+    }
+
     /// Players with a span (any facet) closed during the current frame's update.
     pub fn new_event_players(&self) -> Vec<PlayerId> {
         let mut players: Vec<PlayerId> = self

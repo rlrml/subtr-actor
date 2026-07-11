@@ -149,6 +149,7 @@ function legacyMechanicEvents(record: Record<string, unknown> | undefined): Even
         stream,
         label: titleCaseStream(stream),
         scope: eventStreamScope(stream),
+        lifecycle: "finalized",
         timing,
         primary_player:
           (record.player as Event["meta"]["primary_player"]) ??
@@ -247,6 +248,7 @@ function payloadEvent<K extends StatsEventPayloadKind>(
       stream,
       label: titleCaseStream(stream),
       scope: eventStreamScope(stream),
+      lifecycle: "finalized",
       timing,
       primary_player:
         (record.player as Event["meta"]["primary_player"]) ??
