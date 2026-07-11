@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, span};
 use crate::*;
 
 pub struct BallThirdNode {
@@ -56,9 +57,36 @@ impl AnalysisNode for BallThirdNode {
         Ok(())
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &BallThirdCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    for event in calculator.events() {
+        assembler.push(
+            "ball_third",
+            event.frame,
+            EventLifecycle::Finalized,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::BallThird(event.clone()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

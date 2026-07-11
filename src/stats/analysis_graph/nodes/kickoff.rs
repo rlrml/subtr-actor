@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, span};
 use crate::*;
 
 /// Detects and classifies kickoffs from gameplay/ball/player state, touches, speed-flips, and boost pickups.
@@ -26,6 +27,10 @@ impl AnalysisNode for KickoffNode {
 
     fn name(&self) -> &'static str {
         "kickoff"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        crate::stats::calculators::KICKOFF_EMITTED_EVENTS
     }
 
     fn dependencies(&self) -> NodeDependencies {
@@ -62,9 +67,43 @@ impl AnalysisNode for KickoffNode {
         Ok(())
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &KickoffCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    // Kickoffs commit only when their in-flight ledger finalizes (goal
+    // attribution window closes or the next kickoff begins).
+    for event in calculator.events() {
+        assembler.push(
+            "kickoff",
+            event.start_frame,
+            EventLifecycle::Finalized,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::Kickoff(Box::new(event.clone())),
+            event.first_touch_player.clone(),
+            None,
+            event.first_touch_team_is_team_0,
+            None,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

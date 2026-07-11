@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, moment};
 use crate::*;
 
 /// Accumulates match-level stats and goal contexts; attaches per-goal territorial pressure at finish.
@@ -68,9 +69,59 @@ impl AnalysisNode for MatchStatsNode {
         Ok(())
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the streams'
+/// interim lifecycle rules.
+fn projected_timeline_events(calculator: &MatchStatsCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    // Timeline scoreboard/goal moments are committed complete and never
+    // mutated afterwards (goals join the list only once attributed). The
+    // calculator re-sorts its list by time when a pending goal flushes, but
+    // same-anchor entries share a time, so the stable sort preserves their
+    // commit order (see the id-determinism notes on `EventAssembler`).
+    for event in calculator.timeline() {
+        let frame = event.frame.unwrap_or_default();
+        assembler.push(
+            "timeline",
+            frame,
+            EventLifecycle::Finalized,
+            moment(frame, event.time),
+            EventPayload::Timeline(event.clone()),
+            event.player_id.clone(),
+            None,
+            event.is_team_0,
+            event.player_position,
+            None,
+            None,
+        );
+    }
+
+    // Scoreboard-delta moments: committed complete, never revised.
+    for event in calculator.core_player_events() {
+        assembler.push(
+            "core_player",
+            event.frame,
+            EventLifecycle::Finalized,
+            moment(event.frame, event.time),
+            EventPayload::CorePlayer(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

@@ -275,6 +275,7 @@ fn event_envelope(
             stream: stream.to_owned(),
             label: stream.replace('_', " "),
             scope,
+            lifecycle: EventLifecycle::Finalized,
             timing: EventTiming::Moment { frame, time },
             primary_player,
             secondary_player: None,
@@ -735,7 +736,7 @@ fn live_graph_output_json_value(engine: *const SaEngine, output_name: &str) -> s
         std::ffi::CString::new(output_name).expect("output name should not contain nul bytes");
     let json_len =
         unsafe { subtr_actor_bakkesmod_graph_output_json_len(engine, output_name.as_ptr()) };
-    assert!(json_len > 0);
+    assert!(json_len > 0, "graph output {output_name:?} should have JSON");
     let mut bytes = vec![0; json_len];
     let written = unsafe {
         subtr_actor_bakkesmod_write_graph_output_json(

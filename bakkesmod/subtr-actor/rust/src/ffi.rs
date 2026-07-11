@@ -1,11 +1,7 @@
 use super::*;
 
 pub(crate) fn refresh_timeline_graph_state(engine: &mut SaEngine) {
-    let Some(events) = engine
-        .graph
-        .state::<StatsTimelineEventsState>()
-        .map(|state| state.events.clone())
-    else {
+    let Some(events) = current_timeline_events(&engine.graph) else {
         return;
     };
     push_drainable_events_from_timeline(

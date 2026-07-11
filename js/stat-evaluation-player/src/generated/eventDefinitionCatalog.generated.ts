@@ -310,6 +310,13 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "shadow_defense",
+    "label": "Shadow Defense",
+    "category": "positioning",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
     "key": "shot",
     "label": "Shot",
     "category": "core",

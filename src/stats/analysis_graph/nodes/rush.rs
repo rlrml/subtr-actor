@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, span};
 use crate::*;
 
 /// Detects rushes/over-commits from ball/player/possession state during live play.
@@ -33,6 +34,37 @@ impl_analysis_node! {
         possession_state_dependency() => PossessionState,
         live_play_dependency() => LivePlayState,
     ],
+    project_events = |node| { projected_timeline_events(&node.calculator) },
     call = calculator.update_parts,
     finish = calculator.finish_calculation,
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &RushCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    // Rushes commit (with a frozen end) once retained possession crosses the
+    // counting threshold, and are not revised afterwards.
+    for event in calculator.events() {
+        assembler.push(
+            "rush",
+            event.start_frame,
+            EventLifecycle::Finalized,
+            span(
+                event.start_frame,
+                event.end_frame,
+                event.start_time,
+                event.end_time,
+            ),
+            EventPayload::Rush(event.clone()),
+            None,
+            None,
+            Some(event.is_team_0),
+            None,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }

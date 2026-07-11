@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, span};
 use crate::*;
 
 /// Detects passes from touches, backboard-bounce, and 50/50 state during live play.
@@ -54,9 +55,36 @@ impl AnalysisNode for PassNode {
         )
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &PassCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    for event in calculator.events() {
+        assembler.push(
+            "pass",
+            event.start_frame,
+            EventLifecycle::Finalized,
+            span(event.start_frame, event.frame, event.start_time, event.time),
+            EventPayload::Pass(event.clone()),
+            Some(event.passer.clone()),
+            Some(event.receiver.clone()),
+            Some(event.is_team_0),
+            event.passer_position,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

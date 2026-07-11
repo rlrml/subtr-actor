@@ -41,6 +41,9 @@ fn make_event(
             stream: stream.to_owned(),
             label: stats_timeline_event_label(stream),
             scope,
+            // Playback capture is a batch-only export assembled after the
+            // fact, so every event it emits is final.
+            lifecycle: EventLifecycle::Finalized,
             timing,
             primary_player,
             secondary_player,

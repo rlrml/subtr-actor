@@ -4,8 +4,8 @@ use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::stats::analysis_graph::{
-    AnalysisGraph, StatsProjectionState, StatsTimelineEventsState, StatsTimelineFrameState,
-    builtin_analysis_node_names,
+    AnalysisGraph, GoalContextState, StatsProjectionState, StatsTimelineEventsState,
+    StatsTimelineFrameState, builtin_analysis_node_names,
 };
 use crate::*;
 use boxcars::{Quaternion, RigidBody, Vector3f};
@@ -1058,9 +1058,20 @@ pub fn builtin_analysis_node_json(
 ) -> SubtrActorResult<Value> {
     let value = match node_name {
         "core" | "match_stats" => builtin_module_json("core", graph)?,
-        "stats_timeline_events" => serialize_to_json_value(
-            &graph_state::<StatsTimelineEventsState>(graph, node_name)?.events,
-        )?,
+        "stats_timeline_events" => {
+            // The node is a marker/aggregation root; the reduced event view
+            // lives in the graph's transaction log. Requiring the state keeps
+            // the "unknown node" error behavior for graphs without the node.
+            let _ = graph_state::<StatsTimelineEventsState>(graph, node_name)?;
+            serialize_to_json_value(&ReplayStatsTimelineEvents {
+                events: graph
+                    .event_transaction_log()
+                    .current_events()
+                    .into_iter()
+                    .cloned()
+                    .collect(),
+            })?
+        }
         "stats_timeline_frame" => graph_state::<StatsTimelineFrameState>(graph, node_name)?
             .frame
             .as_ref()
@@ -1207,6 +1218,40 @@ pub fn builtin_analysis_node_json(
         "loose_possession" => serialize_to_json_value(&EventsExport {
             events: graph_state::<LoosePossessionCalculator>(graph, node_name)?.events(),
         })?,
+        "goal_context" => {
+            // Mirrors `GoalContextNode::project_events`: the composed
+            // goal-context events are match stats' per-goal contexts enriched
+            // with the union of every goal-tag calculator's assignments.
+            let _ = graph_state::<GoalContextState>(graph, node_name)?;
+            let match_stats = graph_state::<MatchStatsCalculator>(graph, node_name)?;
+            let goal_tag_assignments = combined_goal_tag_assignments(&[
+                graph_state::<AerialGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<HighAerialGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<LongDistanceGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<OwnHalfGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<EmptyNetGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<CounterAttackGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<SustainedPressureGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<FlickGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<CeilingShotGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<DoubleTapGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<OneTimerGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<PassingGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<AirDribbleGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<FlipResetGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<FlipIntoBallGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<BumpGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<DemoGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<HalfVolleyGoalCalculator>(graph, node_name)?.events(),
+                graph_state::<KickoffGoalCalculator>(graph, node_name)?.events(),
+            ]);
+            serialize_to_json_value(&EventsExport {
+                events: &goal_context_events_with_tags(
+                    match_stats.goal_context_events(),
+                    &goal_tag_assignments,
+                ),
+            })?
+        }
         module_name if builtin_stats_module_names().contains(&module_name) => {
             builtin_module_json(module_name, graph)?
         }

@@ -203,6 +203,10 @@ impl RotationCalculator {
         self.role_spans.projected_events()
     }
 
+    pub fn role_events_by_player(&self) -> Vec<(RotationRoleEvent, bool)> {
+        self.role_spans.projected_events_by_player()
+    }
+
     pub fn first_man_change_events(&self) -> &[FirstManChangeEvent] {
         self.first_man_changes.all()
     }

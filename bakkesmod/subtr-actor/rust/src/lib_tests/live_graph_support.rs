@@ -249,11 +249,8 @@ fn direct_full_graph_events_json_value(frame: &SaLiveFrame) -> serde_json::Value
         .evaluate_with_state(&frame_input)
         .expect("direct graph should evaluate live frame input");
     graph.finish().expect("direct graph should finish");
-    let events = graph
-        .state::<StatsTimelineEventsState>()
-        .expect("direct graph should expose timeline events")
-        .events
-        .clone();
+    let events = current_timeline_events(&graph)
+        .expect("direct graph should expose timeline events");
     let bytes = serde_json::to_vec(&events).expect("direct graph events should serialize");
     serde_json::from_slice(&bytes).expect("direct graph events json should be valid")
 }
@@ -293,11 +290,7 @@ fn direct_full_graph_timeline_events(frames: &[SaLiveFrame]) -> ReplayStatsTimel
     }
 
     graph.finish().expect("direct graph should finish");
-    graph
-        .state::<StatsTimelineEventsState>()
-        .expect("direct graph should expose timeline events")
-        .events
-        .clone()
+    current_timeline_events(&graph).expect("direct graph should expose timeline events")
 }
 
 fn direct_full_graph_timeline_json_value(frames: &[SaLiveFrame]) -> serde_json::Value {
@@ -329,11 +322,8 @@ fn direct_full_graph_timeline_json_value(frames: &[SaLiveFrame]) -> serde_json::
     }
 
     graph.finish().expect("direct graph should finish");
-    let events = graph
-        .state::<StatsTimelineEventsState>()
-        .expect("direct graph should expose timeline events")
-        .events
-        .clone();
+    let events = current_timeline_events(&graph)
+        .expect("direct graph should expose timeline events");
     if let Some(frame) = current_timeline_frame(&graph) {
         record_timeline_frame(&mut timeline_frames, frame);
     }

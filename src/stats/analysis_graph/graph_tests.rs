@@ -5,8 +5,9 @@ use crate::stats::analysis_graph::{
     builtin_analysis_node_names, graph_with_builtin_analysis_nodes, nodes::DoubleTapNode,
 };
 use crate::stats::calculators::{
-    ApproachConfidenceLevel, DOUBLE_TAP_EVENT_DEFINITION, EventCategory, FrameInput, StatsEvent,
-    UNKNOWN_DETECTION_CONFIDENCE,
+    ApproachConfidenceLevel, DOUBLE_TAP_EVENT_DEFINITION, EventCategory, FinalizationHorizon,
+    FrameInput, StatsEvent, TIMELINE_EVENT_DEFINITION, UNKNOWN_DETECTION_CONFIDENCE,
+    produced_event,
 };
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -363,13 +364,14 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "demolition",
         "dodge_reset",
         "double_tap",
-        "event",
         "fifty_fifty",
         "flick",
         "flip_reset",
         "dodge",
+        "goal_context",
         "half_flip",
         "half_volley",
+        "kickoff",
         "movement",
         "one_timer",
         "pass",
@@ -379,6 +381,7 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "field_third",
         "field_half",
         "depth_role",
+        "shadow_defense",
         "loose_possession",
         "player_possession",
         "possession",
@@ -403,4 +406,204 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         event.event.confidence == UNKNOWN_DETECTION_CONFIDENCE
             && event.producer.implementation_notes.is_empty()
     }));
+}
+
+/// Stream declaration shared by the toy projecting nodes below: both project
+/// the `timeline` stream (the graph rejects projections on undeclared
+/// streams). Unique cross-node ownership is a property of the builtin node
+/// catalog, asserted over `all_analysis_nodes()` in the module tests — toy
+/// nodes may share a stream to exercise the duplicate-id invariant.
+const PROJECTING_TEST_EMITTED_EVENTS: &[crate::stats::calculators::EmittedEvent] =
+    &[produced_event(
+        &TIMELINE_EVENT_DEFINITION,
+        "timeline",
+        FinalizationHorizon::EndPlus(0.0),
+        "projecting_test",
+        "ProjectingNode",
+        "test-only",
+    )];
+
+/// A toy projecting node: publishes a fixed event set through
+/// `project_events`, exercising the graph's central store without any
+/// calculator machinery.
+struct ProjectingNode {
+    name: &'static str,
+    state: BaseState,
+    events: Vec<Event>,
+}
+
+fn projected_event(id: &str, lifecycle: EventLifecycle, time: f32) -> Event {
+    projected_event_on_stream("timeline", id, lifecycle, time)
+}
+
+fn projected_event_on_stream(
+    stream: &str,
+    id: &str,
+    lifecycle: EventLifecycle,
+    time: f32,
+) -> Event {
+    Event {
+        meta: EventMeta {
+            id: id.to_owned(),
+            stream: stream.to_owned(),
+            label: stats_timeline_event_label(stream),
+            scope: EventScope::Match,
+            lifecycle,
+            timing: EventTiming::Moment { frame: 10, time },
+            primary_player: None,
+            secondary_player: None,
+            player_position: None,
+            ball_position: None,
+            team_is_team_0: None,
+            confidence: None,
+            properties: Vec::new(),
+        },
+        payload: EventPayload::Timeline(TimelineEvent {
+            time,
+            frame: Some(10),
+            kind: TimelineEventKind::Shot,
+            player_id: None,
+            player_position: None,
+            is_team_0: None,
+        }),
+    }
+}
+
+impl AnalysisNode for ProjectingNode {
+    type State = BaseState;
+
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        PROJECTING_TEST_EMITTED_EVENTS
+    }
+
+    fn evaluate(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        Ok(())
+    }
+
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(self.events.clone())
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.state
+    }
+}
+
+/// A second projecting node type: the store aggregates sets from all nodes
+/// (`State` types must be distinct, so the second node needs its own type).
+struct OtherProjectingNode {
+    state: DoubledState,
+    events: Vec<Event>,
+}
+
+impl AnalysisNode for OtherProjectingNode {
+    type State = DoubledState;
+
+    fn name(&self) -> &'static str {
+        "other_projecting"
+    }
+
+    fn emitted_events(&self) -> &'static [crate::stats::calculators::EmittedEvent] {
+        PROJECTING_TEST_EMITTED_EVENTS
+    }
+
+    fn evaluate(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        Ok(())
+    }
+
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(self.events.clone())
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.state
+    }
+}
+
+#[test]
+fn project_events_now_aggregates_sets_from_all_nodes() {
+    let mut graph = AnalysisGraph::new()
+        .with_node(ProjectingNode {
+            name: "projecting_a",
+            state: BaseState::default(),
+            events: vec![projected_event("a", EventLifecycle::Confirmed, 1.0)],
+        })
+        .with_node(OtherProjectingNode {
+            state: DoubledState::default(),
+            events: vec![projected_event("b", EventLifecycle::Confirmed, 2.0)],
+        });
+
+    graph
+        .project_events_now()
+        .expect("distinct ids from two nodes aggregate cleanly");
+    let ids: Vec<&str> = graph
+        .event_transaction_log()
+        .current_events()
+        .iter()
+        .map(|event| event.meta.id.as_str())
+        .collect();
+    assert_eq!(ids, ["a", "b"]);
+
+    // `finish` finalizes the aggregate set from all nodes.
+    graph.finish().expect("finish applies the final projection");
+    assert!(
+        graph
+            .event_transaction_log()
+            .current_events()
+            .iter()
+            .all(|event| event.meta.lifecycle == EventLifecycle::Finalized),
+        "finish must finalize every aggregated event"
+    );
+}
+
+#[test]
+fn duplicate_ids_across_nodes_violate_stream_ownership() {
+    let mut graph = AnalysisGraph::new()
+        .with_node(ProjectingNode {
+            name: "projecting_a",
+            state: BaseState::default(),
+            events: vec![projected_event("a", EventLifecycle::Confirmed, 1.0)],
+        })
+        .with_node(OtherProjectingNode {
+            state: DoubledState::default(),
+            events: vec![projected_event("a", EventLifecycle::Confirmed, 1.0)],
+        });
+
+    // Two nodes projecting the same id means two nodes claim the same
+    // stream+anchor — the store's duplicate check makes that loud.
+    let error = graph
+        .project_events_now()
+        .expect_err("duplicate ids across nodes must error");
+    assert!(matches!(
+        error.variant,
+        SubtrActorErrorVariant::TimelineEventInvariantViolation(_)
+    ));
+}
+
+#[test]
+fn projecting_an_undeclared_stream_is_rejected() {
+    // `ProjectingNode` declares only the `timeline` stream; an event on any
+    // other stream must be rejected before it reaches the store.
+    let mut graph = AnalysisGraph::new().with_node(ProjectingNode {
+        name: "projecting_a",
+        state: BaseState::default(),
+        events: vec![projected_event_on_stream(
+            "undeclared_stream",
+            "undeclared_stream:10:0",
+            EventLifecycle::Confirmed,
+            1.0,
+        )],
+    });
+
+    let error = graph
+        .project_events_now()
+        .expect_err("projecting an undeclared stream must error");
+    assert!(matches!(
+        error.variant,
+        SubtrActorErrorVariant::TimelineEventInvariantViolation(_)
+    ));
 }

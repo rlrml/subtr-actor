@@ -123,6 +123,38 @@ impl<S: Clone + PartialEq> PlayerSpanTracker<S> {
         events.extend(open);
         events
     }
+
+    /// Like [`projected_events`](Self::projected_events), but each span is
+    /// paired with whether it is closed (an open span's end/duration/position
+    /// still advance every frame), and the merged list is stable-ordered by
+    /// player.
+    ///
+    /// This ordering is a pure function of the tracker's state and is
+    /// invariant across projection cadences: within one player, closed spans
+    /// keep their per-player commit order (a player's spans close in the order
+    /// they opened) and the at-most-one open span comes last, so the stable
+    /// per-player sort yields (player, per-player commit order) whether a span
+    /// is observed while still open or only after it closed. The raw merged
+    /// order (all closed spans in cross-player close order, then open spans)
+    /// does *not* have that property, which is why identity-sensitive
+    /// consumers use this accessor.
+    pub fn projected_events_by_player(&self) -> Vec<(PlayerStateSpan<S>, bool)> {
+        let mut events: Vec<(PlayerStateSpan<S>, bool)> = self
+            .closed
+            .all()
+            .iter()
+            .map(|span| (span.clone(), true))
+            .collect();
+        let mut open: Vec<_> = self
+            .open
+            .values()
+            .map(|span| (span.clone(), false))
+            .collect();
+        open.sort_by_key(|(span, _)| player_sort_key(&span.player));
+        events.extend(open);
+        events.sort_by_key(|(span, _)| player_sort_key(&span.player));
+        events
+    }
 }
 
 /// Ordered `(state, fraction)` segments of a frame whose scalar moves linearly

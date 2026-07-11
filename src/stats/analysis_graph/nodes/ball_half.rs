@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, span};
 use crate::*;
 
 /// Tracks which half of the field the ball is in from ball-frame and live-play state.
@@ -57,9 +58,38 @@ impl AnalysisNode for BallHalfNode {
         Ok(())
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &BallHalfCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    // Ball-half/third spans commit when the label changes; the coalescing
+    // pending span is not part of `events()`.
+    for event in calculator.events() {
+        assembler.push(
+            "ball_half",
+            event.frame,
+            EventLifecycle::Finalized,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::BallHalf(event.clone()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

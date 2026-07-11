@@ -6,6 +6,7 @@ macro_rules! impl_analysis_node {
         $(emitted_events = $emitted:expr_2021,)?
         dependencies = [$($dependency:expr_2021 => $dependency_ty:ty),* $(,)?],
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
+        $(project_events = |$project_self:ident| $project_events:block,)?
         call = $field:ident.$method:ident
         $(, finish = $finish_field:ident.$finish_method:ident)?
         $(,)?
@@ -45,6 +46,16 @@ macro_rules! impl_analysis_node {
                 }
             )?
 
+            $(
+                fn project_events(
+                    &self,
+                    _ctx: &AnalysisStateContext<'_>,
+                ) -> SubtrActorResult<Vec<$crate::Event>> {
+                    let $project_self = self;
+                    Ok($project_events)
+                }
+            )?
+
             fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
                 let _ = ctx;
                 self.$field.$method($(ctx.get::<$dependency_ty>()?),*)
@@ -77,6 +88,7 @@ macro_rules! impl_analysis_node {
         $(emitted_events = $emitted:expr_2021,)?
         dependencies = [$($dependency:expr_2021 => $dependency_ty:ty),* $(,)?],
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
+        $(project_events = |$project_self:ident| $project_events:block,)?
         update_state = $field:ident.$method:ident
         $(, finish = $finish_field:ident.$finish_method:ident)?
         $(,)?
@@ -116,6 +128,16 @@ macro_rules! impl_analysis_node {
                 }
             )?
 
+            $(
+                fn project_events(
+                    &self,
+                    _ctx: &AnalysisStateContext<'_>,
+                ) -> SubtrActorResult<Vec<$crate::Event>> {
+                    let $project_self = self;
+                    Ok($project_events)
+                }
+            )?
+
             fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
                 let _ = ctx;
                 self.state = self.$field.$method($(ctx.get::<$dependency_ty>()?),*);
@@ -150,6 +172,7 @@ macro_rules! impl_analysis_node {
         dependencies = [$($dependency:expr_2021),* $(,)?],
         inputs = {$($binding:ident : $binding_ty:ty),* $(,)?},
         $(on_replay_meta = |$meta_self:ident, $meta:ident| $on_replay_meta:block,)?
+        $(project_events = |$project_self:ident| $project_events:block,)?
         evaluate = |$eval_self:ident| $evaluate:block,
         $(finish = |$finish_self:ident| $finish:block,)?
         state_ref = |$state_self:ident| $state_ref:expr_2021 $(,)?
@@ -186,6 +209,16 @@ macro_rules! impl_analysis_node {
                 ) -> SubtrActorResult<()> {
                     let $meta_self = self;
                     $on_replay_meta
+                }
+            )?
+
+            $(
+                fn project_events(
+                    &self,
+                    _ctx: &AnalysisStateContext<'_>,
+                ) -> SubtrActorResult<Vec<$crate::Event>> {
+                    let $project_self = self;
+                    Ok($project_events)
                 }
             )?
 

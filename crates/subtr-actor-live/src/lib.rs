@@ -8,6 +8,7 @@
 
 #![allow(clippy::result_large_err)]
 
+mod drain;
 mod generator;
 mod meta;
 mod model;
@@ -17,6 +18,7 @@ pub mod server;
 mod view;
 mod wire;
 
+pub use drain::*;
 pub use generator::*;
 pub use meta::*;
 pub use model::*;

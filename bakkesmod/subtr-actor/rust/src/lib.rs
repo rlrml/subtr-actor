@@ -20,6 +20,8 @@ use flate2::{
 #[cfg(test)]
 use subtr_actor::BoostPickupPadZone;
 #[cfg(test)]
+use subtr_actor::EventLifecycle;
+#[cfg(test)]
 use subtr_actor::ReplayFrameInputBuilder;
 use subtr_actor::{
     BackboardBounceEvent, BoostPickupEvent, BumpEvent, CorePlayerScoreboardEvent, DemolitionEvent,

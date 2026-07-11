@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, span};
 use crate::*;
 
 /// Derives loose team possession (last team to touch owns the ball until the
@@ -54,9 +55,37 @@ impl AnalysisNode for LoosePossessionNode {
         Ok(())
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &LoosePossessionCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    // Same emission discipline as `possession`.
+    for event in calculator.events() {
+        assembler.push(
+            "loose_possession",
+            event.frame,
+            EventLifecycle::Finalized,
+            span(event.frame, event.end_frame, event.time, event.end_time),
+            EventPayload::LoosePossession(event.clone()),
+            event.player_id.clone(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

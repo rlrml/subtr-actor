@@ -98,6 +98,7 @@ fn test_event_envelope(stream: &str, index: usize, payload: EventPayload) -> Eve
             stream: stream.to_owned(),
             label: stats_timeline_event_label(stream),
             scope,
+            lifecycle: EventLifecycle::Finalized,
             timing: EventTiming::Moment {
                 frame: 0,
                 time: 0.0,

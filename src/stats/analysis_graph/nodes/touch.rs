@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, moment, span};
 use crate::*;
 
 /// Classifies ball touches (with rotation/possession/50-50/vertical context) into touch events/stats.
@@ -68,9 +69,53 @@ impl AnalysisNode for TouchNode {
         Ok(())
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &TouchCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    // Touches keep accreting evidence long after the contact: ball-movement
+    // credit merges/extends until it finalizes (retiming the presented span),
+    // and intention/outcome tags upgrade promote-only as late as a goal many
+    // seconds on. The touch moment itself — the id anchor — never moves, so
+    // the touch is Confirmed at commit and only finalizes at finish.
+    for event in calculator.events() {
+        let timing =
+            event
+                .ball_movement
+                .as_ref()
+                .map_or(moment(event.frame, event.time), |movement| {
+                    span(
+                        movement.start_frame,
+                        movement.end_frame,
+                        movement.start_time,
+                        movement.end_time,
+                    )
+                });
+        assembler.push(
+            "touch",
+            event.frame,
+            EventLifecycle::Confirmed,
+            timing,
+            EventPayload::Touch(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

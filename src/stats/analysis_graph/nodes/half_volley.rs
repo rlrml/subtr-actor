@@ -1,5 +1,6 @@
 use super::*;
 use crate::stats::calculators::*;
+use crate::stats::timeline::projection::{EventAssembler, moment};
 use crate::*;
 
 /// Detects half-volleys from ball/player state and touches during live play.
@@ -52,9 +53,36 @@ impl AnalysisNode for HalfVolleyNode {
         )
     }
 
+    fn project_events(&self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        Ok(projected_timeline_events(&self.calculator))
+    }
+
     fn state(&self) -> &Self::State {
         &self.calculator
     }
+}
+
+/// Projects this node's committed events for the stats timeline (see
+/// `AnalysisNode::project_events`). The inline comments state the stream's
+/// interim lifecycle rule.
+fn projected_timeline_events(calculator: &HalfVolleyCalculator) -> Vec<Event> {
+    let mut assembler = EventAssembler::new();
+    for event in calculator.events() {
+        assembler.push(
+            "half_volley",
+            event.frame,
+            EventLifecycle::Finalized,
+            moment(event.frame, event.time),
+            EventPayload::HalfVolley(event.clone()),
+            Some(event.player.clone()),
+            None,
+            Some(event.is_team_0),
+            event.player_position,
+            None,
+            None,
+        );
+    }
+    assembler.into_events()
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {

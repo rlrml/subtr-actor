@@ -178,9 +178,20 @@ pub(crate) fn serialize_live_event_history(engine: &SaEngine) -> Vec<u8> {
 }
 
 pub(crate) fn current_timeline_events(graph: &AnalysisGraph) -> Option<ReplayStatsTimelineEvents> {
+    // The reduced event view lives in the graph's transaction log (populated
+    // by `AnalysisGraph::finish`'s single projection; this engine performs no
+    // interim projections). The marker state gates on the timeline root node
+    // being part of the graph, preserving the previous None behavior.
     graph
         .state::<StatsTimelineEventsState>()
-        .map(|state| state.events.clone())
+        .map(|_| ReplayStatsTimelineEvents {
+            events: graph
+                .event_transaction_log()
+                .current_events()
+                .into_iter()
+                .cloned()
+                .collect(),
+        })
 }
 
 pub(crate) fn serialize_live_graph_output(engine: &SaEngine, output_name: &str) -> Option<Vec<u8>> {

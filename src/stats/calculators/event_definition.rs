@@ -17,6 +17,7 @@ use super::{
     RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent,
     WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
 };
+use crate::ShadowDefenseEvent;
 use crate::stats::timeline::{Event, EventPayload, EventScope};
 
 /// Static, English-language metadata for a stat event type.
@@ -101,9 +102,7 @@ impl EventPayload {
             Self::BallDepth(_) => BallDepthEvent::DEFINITION.scope,
             Self::DepthRole(_) => DepthRoleEvent::DEFINITION.scope,
             Self::BallProximity(_) => BallProximityEvent::DEFINITION.scope,
-            // ShadowDefenseEvent has no `define_stats_event!` definition; it is a
-            // per-player positioning span like its sibling positioning streams.
-            Self::ShadowDefense(_) => EventScope::Player,
+            Self::ShadowDefense(_) => ShadowDefenseEvent::DEFINITION.scope,
             Self::RotationRole(_) => RotationRoleEvent::DEFINITION.scope,
             Self::FirstManChange(_) => FirstManChangeEvent::DEFINITION.scope,
             Self::GoalContext(_) => GOAL_CONTEXT_EVENT_DEFINITION.scope,
@@ -277,14 +276,50 @@ pub const fn event_definition(
     }
 }
 
+/// When a projected stream's events are guaranteed to be finalized, relative
+/// to each event's end timing, under incremental (interim) projection.
+///
+/// Declared per stream next to the stream's [`EmittedEvent`] entry so the
+/// promise is statically auditable; the real-replay corpus instrumentation
+/// test enforces it empirically (observed finalization lag must stay within
+/// the declared horizon, modulo one projection interval of slack).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum FinalizationHorizon {
+    /// Finalized within this many seconds of game time after the event's end
+    /// (its commit-lag bound; `0.0` for streams whose events commit fully
+    /// formed at their end frame).
+    EndPlus(f32),
+    /// Finalized by the time live play next resumes after the first stoppage
+    /// (any non-`ActivePlay` gameplay phase) following the event's end — or by
+    /// match end, if play never resumes.
+    NextStoppage,
+    /// Only the finish projection finalizes this stream. The documented
+    /// exception: every `MatchEnd` declaration carries a justification
+    /// comment at its declaration site.
+    MatchEnd,
+}
+
+/// A timeline event stream as projected by exactly one analysis node, with
+/// its declared finalization horizon.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct ProjectedStream {
+    /// The `EventMeta::stream` name this node's projection emits.
+    pub stream: &'static str,
+    pub horizon: FinalizationHorizon,
+}
+
 pub const fn produced_event(
     event: &'static EventDefinition,
+    stream: &'static str,
+    horizon: FinalizationHorizon,
     node_name: &'static str,
     node_type: &'static str,
     calculator_type: &'static str,
 ) -> EmittedEvent {
     EmittedEvent {
         event,
+        projected: Some(ProjectedStream { stream, horizon }),
         producer: ProducerDefinition {
             node_name,
             node_type,
@@ -294,12 +329,24 @@ pub const fn produced_event(
     }
 }
 
-pub const fn produced_event_for<E: StatsEvent>(
+/// An [`EmittedEvent`] entry for a node that contributes to an event's
+/// detection state without projecting a timeline stream of its own.
+pub const fn contributed_event(
+    event: &'static EventDefinition,
     node_name: &'static str,
     node_type: &'static str,
     calculator_type: &'static str,
 ) -> EmittedEvent {
-    produced_event(&E::DEFINITION, node_name, node_type, calculator_type)
+    EmittedEvent {
+        event,
+        projected: None,
+        producer: ProducerDefinition {
+            node_name,
+            node_type,
+            calculator_type,
+            implementation_notes: &[],
+        },
+    }
 }
 
 /// Trait implemented by typed stat event payloads.
@@ -317,9 +364,15 @@ pub struct ProducerDefinition {
 }
 
 /// Link between an event definition and the graph node that emits it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct EmittedEvent {
     pub event: &'static EventDefinition,
+    /// The timeline stream this node projects for this event (with its
+    /// finalization horizon), or `None` for detection-state contributions
+    /// that project nothing themselves. Each stream is owned by exactly one
+    /// node; the graph enforces that a node only projects streams it
+    /// declares.
+    pub projected: Option<ProjectedStream>,
     pub producer: ProducerDefinition,
 }
 
@@ -1040,6 +1093,14 @@ define_stats_event!(
     scope = EventScope::Player
 );
 define_stats_event!(
+    ShadowDefenseEvent,
+    SHADOW_DEFENSE_EVENT_DEFINITION,
+    "shadow_defense",
+    "Shadow Defense",
+    EventCategory::Positioning,
+    scope = EventScope::Player
+);
+define_stats_event!(
     RotationRoleEvent,
     ROTATION_ROLE_EVENT_DEFINITION,
     "rotation_role",
@@ -1090,13 +1151,21 @@ define_stats_event!(
 
 pub(crate) const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
+        // Scoreboard deltas commit at their frame; goal rows appear once the
+        // scoreboard attributes the goal, which happens during the post-goal
+        // stoppage.
         &TIMELINE_EVENT_DEFINITION,
+        "timeline",
+        FinalizationHorizon::NextStoppage,
         "match_stats",
         "MatchStatsNode",
         "MatchStatsCalculator",
     ),
     produced_event(
+        // Same attribution path as `timeline` goal rows.
         &CORE_PLAYER_SCOREBOARD_EVENT_DEFINITION,
+        "core_player",
+        FinalizationHorizon::NextStoppage,
         "match_stats",
         "MatchStatsNode",
         "MatchStatsCalculator",
@@ -1105,20 +1174,48 @@ pub(crate) const MATCH_STATS_EMITTED_EVENTS: &[EmittedEvent] = &[
 
 pub(crate) const DEMO_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &DEMOLITION_EVENT_DEFINITION,
+    "demolition",
+    FinalizationHorizon::EndPlus(0.0),
     "demo",
     "DemoNode",
     "DemoCalculator",
 )];
 
-pub(crate) const BACKBOARD_BOUNCE_STATE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+pub(crate) const BACKBOARD_BOUNCE_STATE_EMITTED_EVENTS: &[EmittedEvent] = &[contributed_event(
     &BACKBOARD_BOUNCE_EVENT_DEFINITION,
     "backboard_bounce_state",
     "BackboardBounceStateNode",
     "BackboardBounceCalculator",
 )];
 
+// The `backboard` stream is projected by the backboard node (which attributes
+// bounces to players), not by the raw bounce-state node above.
+pub(crate) const BACKBOARD_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &BACKBOARD_BOUNCE_EVENT_DEFINITION,
+    "backboard",
+    FinalizationHorizon::EndPlus(0.0),
+    "backboard",
+    "BackboardNode",
+    "BackboardCalculator",
+)];
+
+pub(crate) const KICKOFF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // A kickoff's presented end freezes when the kickoff concludes, but the
+    // event only commits once its in-flight goal-attribution window closes
+    // (`KICKOFF_GOAL_MAX_SECONDS` = 12s from first touch) or the next
+    // kickoff begins.
+    &KICKOFF_EVENT_DEFINITION,
+    "kickoff",
+    FinalizationHorizon::EndPlus(12.0),
+    "kickoff",
+    "KickoffNode",
+    "KickoffCalculator",
+)];
+
 pub(crate) const CEILING_SHOT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &CEILING_SHOT_EVENT_DEFINITION,
+    "ceiling_shot",
+    FinalizationHorizon::EndPlus(0.0),
     "ceiling_shot",
     "CeilingShotNode",
     "CeilingShotCalculator",
@@ -1127,12 +1224,16 @@ pub(crate) const CEILING_SHOT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event
 pub(crate) const WALL_AERIAL_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &WALL_AERIAL_EVENT_DEFINITION,
     "wall_aerial",
+    FinalizationHorizon::EndPlus(0.0),
+    "wall_aerial",
     "WallAerialNode",
     "WallAerialCalculator",
 )];
 
 pub(crate) const WALL_AERIAL_SHOT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &WALL_AERIAL_SHOT_EVENT_DEFINITION,
+    "wall_aerial_shot",
+    FinalizationHorizon::EndPlus(0.0),
     "wall_aerial_shot",
     "WallAerialShotNode",
     "WallAerialShotCalculator",
@@ -1141,6 +1242,8 @@ pub(crate) const WALL_AERIAL_SHOT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_e
 pub(crate) const CENTER_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &CENTER_EVENT_DEFINITION,
     "center",
+    FinalizationHorizon::EndPlus(0.0),
+    "center",
     "CenterNode",
     "CenterCalculator",
 )];
@@ -1148,13 +1251,21 @@ pub(crate) const CENTER_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const FLICK_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &FLICK_EVENT_DEFINITION,
     "flick",
+    FinalizationHorizon::EndPlus(0.0),
+    "flick",
     "FlickNode",
     "FlickCalculator",
 )];
 
 pub(crate) const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
+        // A pending reset's outcome usually resolves within the 2s
+        // reset-to-touch window or on landing, but landing has no time bound;
+        // every pending outcome force-resolves at the next live-play boundary
+        // (goal / play end).
         &DODGE_RESET_EVENT_DEFINITION,
+        "dodge_reset",
+        FinalizationHorizon::NextStoppage,
         "dodge_reset",
         "DodgeResetNode",
         "DodgeResetCalculator",
@@ -1162,6 +1273,8 @@ pub(crate) const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
         &FLIP_RESET_EVENT_DEFINITION,
         "flip_reset",
+        FinalizationHorizon::EndPlus(0.0),
+        "dodge_reset",
         "DodgeResetNode",
         "DodgeResetCalculator",
     ),
@@ -1170,12 +1283,16 @@ pub(crate) const DODGE_RESET_EMITTED_EVENTS: &[EmittedEvent] = &[
 pub(crate) const DOUBLE_TAP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &DOUBLE_TAP_EVENT_DEFINITION,
     "double_tap",
+    FinalizationHorizon::EndPlus(0.0),
+    "double_tap",
     "DoubleTapNode",
     "DoubleTapCalculator",
 )];
 
 pub(crate) const ONE_TIMER_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &ONE_TIMER_EVENT_DEFINITION,
+    "one_timer",
+    FinalizationHorizon::EndPlus(0.0),
     "one_timer",
     "OneTimerNode",
     "OneTimerCalculator",
@@ -1184,6 +1301,8 @@ pub(crate) const ONE_TIMER_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const PASS_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &PASS_EVENT_DEFINITION,
     "pass",
+    FinalizationHorizon::EndPlus(0.0),
+    "pass",
     "PassNode",
     "PassCalculator",
 )];
@@ -1191,12 +1310,19 @@ pub(crate) const PASS_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const BALL_CARRY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &BALL_CARRY_EVENT_DEFINITION,
     "ball_carry",
+    FinalizationHorizon::EndPlus(0.0),
+    "ball_carry",
     "BallCarryNode",
     "BallCarryCalculator",
 )];
 
 pub(crate) const AIR_DRIBBLE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // A sequence commits when the ball drops out of the air-dribble
+    // envelope: the 3s touch-gap cap (`AIR_DRIBBLE_TOUCH_MAX_GAP_SECONDS`)
+    // plus the ball's fall time to the 300uu floor.
     &BALL_CARRY_EVENT_DEFINITION,
+    "air_dribble",
+    FinalizationHorizon::EndPlus(4.0),
     "air_dribble",
     "AirDribbleNode",
     "AirDribbleCalculator",
@@ -1205,12 +1331,16 @@ pub(crate) const AIR_DRIBBLE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const CONTROLLED_PLAY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &CONTROLLED_PLAY_EVENT_DEFINITION,
     "controlled_play",
+    FinalizationHorizon::EndPlus(0.0),
+    "controlled_play",
     "ControlledPlayNode",
     "ControlledPlayCalculator",
 )];
 
 pub(crate) const FIFTY_FIFTY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &FIFTY_FIFTY_EVENT_DEFINITION,
+    "fifty_fifty",
+    FinalizationHorizon::EndPlus(0.0),
     "fifty_fifty",
     "FiftyFiftyNode",
     "FiftyFiftyCalculator",
@@ -1219,12 +1349,18 @@ pub(crate) const FIFTY_FIFTY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const RUSH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &RUSH_EVENT_DEFINITION,
     "rush",
+    FinalizationHorizon::EndPlus(0.0),
+    "rush",
     "RushNode",
     "RushCalculator",
 )];
 
 pub(crate) const DODGE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // The resolved end freezes inside the 0.18s impulse window while the
+    // push waits out the 0.45s rotation window (~0.27s residual lag).
     &DODGE_EVENT_DEFINITION,
+    "dodge",
+    FinalizationHorizon::EndPlus(0.5),
     "dodge",
     "FlipImpulseNode",
     "FlipImpulseCalculator",
@@ -1233,12 +1369,16 @@ pub(crate) const DODGE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const SPEED_FLIP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &SPEED_FLIP_EVENT_DEFINITION,
     "speed_flip",
+    FinalizationHorizon::EndPlus(0.0),
+    "speed_flip",
     "SpeedFlipNode",
     "SpeedFlipCalculator",
 )];
 
 pub(crate) const HALF_FLIP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &HALF_FLIP_EVENT_DEFINITION,
+    "half_flip",
+    FinalizationHorizon::EndPlus(0.0),
     "half_flip",
     "HalfFlipNode",
     "HalfFlipCalculator",
@@ -1247,12 +1387,16 @@ pub(crate) const HALF_FLIP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const HALF_VOLLEY_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &HALF_VOLLEY_EVENT_DEFINITION,
     "half_volley",
+    FinalizationHorizon::EndPlus(0.0),
+    "half_volley",
     "HalfVolleyNode",
     "HalfVolleyCalculator",
 )];
 
 pub(crate) const WAVEDASH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &WAVEDASH_EVENT_DEFINITION,
+    "wavedash",
+    FinalizationHorizon::EndPlus(0.0),
     "wavedash",
     "WavedashNode",
     "WavedashCalculator",
@@ -1261,6 +1405,8 @@ pub(crate) const WAVEDASH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const WHIFF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &WHIFF_EVENT_DEFINITION,
     "whiff",
+    FinalizationHorizon::EndPlus(0.0),
+    "whiff",
     "WhiffNode",
     "WhiffCalculator",
 )];
@@ -1268,12 +1414,22 @@ pub(crate) const WHIFF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const POWERSLIDE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &POWERSLIDE_EVENT_DEFINITION,
     "powerslide",
+    FinalizationHorizon::EndPlus(0.0),
+    "powerslide",
     "PowerslideNode",
     "PowerslideCalculator",
 )];
 
 pub(crate) const TOUCH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // MatchEnd justification: touch enrichment cannot be soundly bounded
+    // by the next stoppage — the goal-shot attribution window
+    // (`GOAL_SHOT_ATTRIBUTION_WINDOW_SECONDS` = 10s) deliberately crosses
+    // the goal boundary to upgrade the scorer's pre-goal touch, and
+    // ball-movement credit finalizes on supersession (event-driven, no
+    // timer), so promotion runs until finish.
     &TOUCH_CLASSIFICATION_EVENT_DEFINITION,
+    "touch",
+    FinalizationHorizon::MatchEnd,
     "touch",
     "TouchNode",
     "TouchCalculator",
@@ -1281,13 +1437,23 @@ pub(crate) const TOUCH_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 
 pub(crate) const BOOST_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
+        // Pickup detection reconciles reported pad events with inferred
+        // boost-amount jumps across chained `PICKUP_MATCH_FRAME_WINDOW`
+        // (3-frame) deferrals, and the committed event is backdated to the
+        // observed jump — so a pickup can commit a handful of frames after
+        // its stamped time (0.5s covers the chain with low-frame-rate
+        // headroom).
         &BOOST_PICKUP_EVENT_DEFINITION,
+        "boost_pickups",
+        FinalizationHorizon::EndPlus(0.5),
         "boost",
         "BoostNode",
         "BoostCalculator",
     ),
     produced_event(
         &BOOST_RESPAWN_EVENT_DEFINITION,
+        "boost_respawn",
+        FinalizationHorizon::EndPlus(0.0),
         "boost",
         "BoostNode",
         "BoostCalculator",
@@ -1297,40 +1463,64 @@ pub(crate) const BOOST_EMITTED_EVENTS: &[EmittedEvent] = &[
 pub(crate) const BUMP_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &BUMP_EVENT_DEFINITION,
     "bump",
+    FinalizationHorizon::EndPlus(0.0),
+    "bump",
     "BumpNode",
     "BumpCalculator",
 )];
 
 pub(crate) const POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // A segment's terminating boundary can chain two 3s resolution windows
+    // (`POSSESSION_RESOLUTION_WINDOW_SECONDS`) before it commits.
     &POSSESSION_EVENT_DEFINITION,
+    "possession",
+    FinalizationHorizon::EndPlus(6.0),
     "possession",
     "PossessionNode",
     "PossessionCalculator",
 )];
 
 pub(crate) const PLAYER_POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // A suspended span commits once the 2s merge gap
+    // (`PLAYER_POSSESSION_MERGE_GAP_SECONDS`) elapses without the same
+    // player re-establishing control.
     &PLAYER_POSSESSION_EVENT_DEFINITION,
+    "player_possession",
+    FinalizationHorizon::EndPlus(2.0),
     "player_possession",
     "PlayerPossessionNode",
     "PlayerPossessionCalculator",
 )];
 
 pub(crate) const LOOSE_POSSESSION_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // Bounded by the single 1.5s challenge-resolution window
+    // (`LOOSE_RESOLUTION_WINDOW_SECONDS`).
     &LOOSE_POSSESSION_EVENT_DEFINITION,
+    "loose_possession",
+    FinalizationHorizon::EndPlus(1.5),
     "loose_possession",
     "LoosePossessionNode",
     "LoosePossessionCalculator",
 )];
 
 pub(crate) const BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // The inactive span covering a stoppage keeps its recorded end at the
+    // stoppage's first frame (nothing extends it while play is dead) and only
+    // commits when the state next changes — i.e. when live play resumes.
     &PRESSURE_EVENT_DEFINITION,
+    "ball_half",
+    FinalizationHorizon::NextStoppage,
     "ball_half",
     "BallHalfNode",
     "BallHalfCalculator",
 )];
 
 pub(crate) const BALL_THIRD_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // Same shape as `ball_half`: the stoppage-covering inactive span's end
+    // freezes at the stoppage start and commits at play resumption.
     &BALL_THIRD_EVENT_DEFINITION,
+    "ball_third",
+    FinalizationHorizon::NextStoppage,
     "ball_third",
     "BallThirdNode",
     "BallThirdCalculator",
@@ -1339,12 +1529,16 @@ pub(crate) const BALL_THIRD_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const TERRITORIAL_BALL_HALF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &TERRITORIAL_PRESSURE_EVENT_DEFINITION,
     "territorial_pressure",
+    FinalizationHorizon::EndPlus(0.0),
+    "territorial_pressure",
     "TerritorialPressureNode",
     "TerritorialPressureCalculator",
 )];
 
 pub(crate) const MOVEMENT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     &MOVEMENT_EVENT_DEFINITION,
+    "movement",
+    FinalizationHorizon::EndPlus(0.0),
     "movement",
     "MovementNode",
     "MovementCalculator",
@@ -1353,36 +1547,56 @@ pub(crate) const MOVEMENT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
 pub(crate) const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
         &PLAYER_ACTIVITY_EVENT_DEFINITION,
+        "player_activity",
+        FinalizationHorizon::EndPlus(0.0),
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
         &FIELD_THIRD_EVENT_DEFINITION,
+        "field_third",
+        FinalizationHorizon::EndPlus(0.0),
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
         &FIELD_HALF_EVENT_DEFINITION,
+        "field_half",
+        FinalizationHorizon::EndPlus(0.0),
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
         &BALL_DEPTH_EVENT_DEFINITION,
+        "ball_depth",
+        FinalizationHorizon::EndPlus(0.0),
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
         &DEPTH_ROLE_EVENT_DEFINITION,
+        "depth_role",
+        FinalizationHorizon::EndPlus(0.0),
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
     ),
     produced_event(
         &BALL_PROXIMITY_EVENT_DEFINITION,
+        "ball_proximity",
+        FinalizationHorizon::EndPlus(0.0),
+        "positioning",
+        "PositioningNode",
+        "PositioningCalculator",
+    ),
+    produced_event(
+        &SHADOW_DEFENSE_EVENT_DEFINITION,
+        "shadow_defense",
+        FinalizationHorizon::EndPlus(0.0),
         "positioning",
         "PositioningNode",
         "PositioningCalculator",
@@ -1392,23 +1606,32 @@ pub(crate) const POSITIONING_EMITTED_EVENTS: &[EmittedEvent] = &[
 pub(crate) const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
     produced_event(
         &ROTATION_ROLE_EVENT_DEFINITION,
+        "rotation_role",
+        FinalizationHorizon::EndPlus(0.0),
         "rotation",
         "RotationNode",
         "RotationCalculator",
     ),
     produced_event(
         &FIRST_MAN_CHANGE_EVENT_DEFINITION,
+        "first_man_change",
+        FinalizationHorizon::EndPlus(0.0),
         "rotation",
         "RotationNode",
         "RotationCalculator",
     ),
 ];
 
-pub(crate) const STATS_TIMELINE_EVENTS_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
-    &TIMELINE_ENVELOPE_EVENT_DEFINITION,
-    "stats_timeline_events",
-    "StatsTimelineEventsNode",
-    "StatsTimelineEventsState",
+pub(crate) const GOAL_CONTEXT_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    // MatchEnd justification: `pressure_duration_before_goal` attaches
+    // only at finish (it reads the finalized territorial-pressure
+    // sessions), and scorer reconciliation has no in-code time bound.
+    &GOAL_CONTEXT_EVENT_DEFINITION,
+    "goal_context",
+    FinalizationHorizon::MatchEnd,
+    "goal_context",
+    "GoalContextNode",
+    "MatchStatsCalculator",
 )];
 
 #[cfg(test)]

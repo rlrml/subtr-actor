@@ -1,18 +1,21 @@
 use super::*;
+use crate::stats::calculators::{FinalizationHorizon, LivePlayState};
 use crate::{
     AerialGoalCalculator, AirDribbleCalculator, AirDribbleGoalCalculator, BackboardCalculator,
     BallCarryCalculator, BumpCalculator, CenterCalculator, CounterAttackGoalCalculator,
-    DoubleTapGoalCalculator, EmptyNetGoalCalculator, FlickCalculator, FlickGoalCalculator,
-    FlipIntoBallGoalCalculator, FlipResetGoalCalculator, HalfVolleyCalculator,
-    HalfVolleyGoalCalculator, HighAerialGoalCalculator, LongDistanceGoalCalculator,
-    MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
-    PassCalculator, PassingGoalCalculator, PlayerVerticalState, PossessionState,
-    RotationCalculator, StatsTimelineCollector, SustainedPressureGoalCalculator,
-    TerritorialPressureCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
-    builtin_analysis_node_json, builtin_analysis_nodes_json, builtin_stats_module_names,
+    DoubleTapGoalCalculator, EmptyNetGoalCalculator, EventLifecycle, EventTransaction,
+    FlickCalculator, FlickGoalCalculator, FlipIntoBallGoalCalculator, FlipResetGoalCalculator,
+    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator,
+    LongDistanceGoalCalculator, MatchStatsCalculator, OneTimerCalculator, OneTimerGoalCalculator,
+    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerVerticalState,
+    PossessionState, ReplayStatsTimelineEvents, RotationCalculator, StatsTimelineCollector,
+    SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchState,
+    WallAerialCalculator, WallAerialShotCalculator, builtin_analysis_node_json,
+    builtin_analysis_nodes_json, builtin_stats_module_names,
 };
+use crate::{ProcessorView, TimeAdvance};
 use std::any::TypeId;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 const ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
@@ -48,6 +51,42 @@ fn every_emitted_event_has_a_registered_definition() {
             );
         }
     }
+}
+
+/// Stream ownership is statically auditable: every projected timeline stream
+/// is declared (with its finalization horizon) by exactly one analysis node,
+/// and the declaration's producer names that node. The graph separately
+/// rejects, at projection time, any event on a stream its node did not
+/// declare, so the declarations walked here describe exactly what can reach
+/// the timeline.
+#[test]
+fn every_projected_stream_is_declared_by_exactly_one_node() {
+    let mut owner_by_stream: HashMap<&'static str, &'static str> = HashMap::new();
+    for node in all_analysis_nodes() {
+        for emitted in node.emitted_events() {
+            let Some(projected) = emitted.projected else {
+                continue;
+            };
+            assert_eq!(
+                emitted.producer.node_name,
+                node.name(),
+                "stream {:?} declaration must name its own node",
+                projected.stream,
+            );
+            if let Some(previous_owner) = owner_by_stream.insert(projected.stream, node.name()) {
+                panic!(
+                    "stream {:?} is declared by both {previous_owner:?} and {:?}",
+                    projected.stream,
+                    node.name(),
+                );
+            }
+        }
+    }
+    assert!(
+        owner_by_stream.len() >= 40,
+        "the stream catalog should be non-trivial, got {} streams",
+        owner_by_stream.len(),
+    );
 }
 
 fn builtin_analysis_node_name_set() -> HashSet<&'static str> {
@@ -291,16 +330,290 @@ fn evaluates_all_reducer_nodes_against_a_real_replay() {
 }
 
 #[test]
+#[ignore = "full-graph real-replay parity is slow; run explicitly when changing interim event projection"]
+fn interim_event_projection_matches_finish_only_on_real_replay() {
+    let replay = parse_replay(ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE);
+    let finish_only = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
+        .expect("finish-only graph should evaluate a real replay");
+    // Interim run: same node set, but with a ~1s driver-owned projection
+    // cadence layered on by the collector. Any lifecycle-invariant violation
+    // during an interim projection (a finalized event changing or any event
+    // vanishing) propagates out of the graph as an error in debug builds, so
+    // this `expect` doubles as the zero-violations assertion for the whole
+    // interim run.
+    let interim = collector::AnalysisNodeCollector::new(graph_with_all_analysis_nodes())
+        .with_projection_interval(1.0)
+        .process_replay(&replay)
+        .expect(
+            "interim-projection graph should evaluate a real replay without invariant violations",
+        )
+        .into_graph();
+
+    // Ids are cadence-invariant, so the final event sets — ids included —
+    // must be identical whether events were projected throughout the match or
+    // only at finish. The reduced view is the graph store's current events
+    // (finish's single projection is the only batch surface).
+    let finish_only_events: Vec<crate::Event> = finish_only
+        .event_transaction_log()
+        .current_events()
+        .into_iter()
+        .cloned()
+        .collect();
+    let interim_events: Vec<crate::Event> = interim
+        .event_transaction_log()
+        .current_events()
+        .into_iter()
+        .cloned()
+        .collect();
+    assert_eq!(
+        finish_only_events, interim_events,
+        "interim projections must not change the final event set"
+    );
+
+    // After finish, every event in the reduced view is finalized.
+    assert!(
+        interim_events
+            .iter()
+            .all(|event| event.meta.lifecycle == EventLifecycle::Finalized),
+        "every event must be finalized after finish"
+    );
+
+    // Replaying the transaction log: seq strictly increasing, no retracts,
+    // and per-id lifecycle only ever moves Confirmed -> Confirmed/Finalized
+    // (never away from Finalized; the store also enforces this, so this is a
+    // belt-and-braces readback of what a live consumer would have observed).
+    let mut lifecycle_by_id: std::collections::HashMap<&str, EventLifecycle> =
+        std::collections::HashMap::new();
+    let mut last_seq = None;
+    for transaction in interim.event_transaction_log().transactions() {
+        assert!(
+            last_seq.is_none_or(|last| transaction.seq() > last),
+            "transaction seq must be strictly increasing"
+        );
+        last_seq = Some(transaction.seq());
+        match transaction {
+            EventTransaction::Retract { id, .. } => {
+                panic!("no event should be retracted during a normal match, got {id}")
+            }
+            EventTransaction::Upsert { event, .. } => {
+                let previous = lifecycle_by_id.insert(&event.meta.id, event.meta.lifecycle);
+                assert_ne!(
+                    previous,
+                    Some(EventLifecycle::Finalized),
+                    "revision of already-finalized event {}",
+                    event.meta.id
+                );
+            }
+        }
+    }
+    assert!(
+        lifecycle_by_id
+            .values()
+            .all(|lifecycle| *lifecycle == EventLifecycle::Finalized),
+        "every id observed mid-run must end finalized"
+    );
+    assert_eq!(
+        lifecycle_by_id.len(),
+        interim_events.len(),
+        "the transaction log must cover exactly the final event set"
+    );
+}
+
+/// Observation harness for the finalization-horizon test: wraps the
+/// interim-projection collector, samples the live-play signal each frame, and
+/// records the game time at which each event id was first observed
+/// `Finalized` in the graph's transaction log.
+struct HorizonProbe {
+    inner: collector::AnalysisNodeCollector,
+    log_cursor: usize,
+    first_finalized_at: HashMap<String, f32>,
+    /// Live-play transitions as chronological `(time, is_live_play)` samples;
+    /// each entry's state holds until the next entry's time.
+    live_play_transitions: Vec<(f32, bool)>,
+    last_frame_time: f32,
+}
+
+impl HorizonProbe {
+    fn new(inner: collector::AnalysisNodeCollector) -> Self {
+        Self {
+            inner,
+            log_cursor: 0,
+            first_finalized_at: HashMap::new(),
+            live_play_transitions: Vec::new(),
+            last_frame_time: 0.0,
+        }
+    }
+
+    fn drain_new_transactions(&mut self, observed_at: f32) {
+        let log = self.inner.graph().event_transaction_log();
+        for transaction in log.transactions_since(self.log_cursor) {
+            if let EventTransaction::Upsert { event, .. } = transaction
+                && event.meta.lifecycle == EventLifecycle::Finalized
+            {
+                self.first_finalized_at
+                    .entry(event.meta.id.clone())
+                    .or_insert(observed_at);
+            }
+        }
+        self.log_cursor = log.transaction_count();
+    }
+}
+
+impl Collector for HorizonProbe {
+    fn process_frame(
+        &mut self,
+        processor: &dyn ProcessorView,
+        frame: &boxcars::Frame,
+        frame_number: usize,
+        current_time: f32,
+    ) -> SubtrActorResult<TimeAdvance> {
+        let advance = self
+            .inner
+            .process_frame(processor, frame, frame_number, current_time)?;
+        self.last_frame_time = current_time;
+        let is_live = self
+            .inner
+            .graph()
+            .state::<LivePlayState>()
+            .is_some_and(|state| state.is_live_play);
+        if self.live_play_transitions.last().map(|&(_, live)| live) != Some(is_live) {
+            self.live_play_transitions.push((current_time, is_live));
+        }
+        self.drain_new_transactions(current_time);
+        Ok(advance)
+    }
+
+    fn finish_replay(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
+        self.inner.finish_replay(processor)?;
+        // Whatever the finish projection finalizes is only guaranteed
+        // observable at match end.
+        self.drain_new_transactions(self.last_frame_time);
+        Ok(())
+    }
+}
+
+/// The `NextStoppage` deadline for an event ending at `end_time`: the moment
+/// live play resumes after the first stoppage at or after the event's end (if
+/// the event ends during a stoppage, that stoppage counts), or match end if
+/// play never resumes.
+fn next_stoppage_resumption(transitions: &[(f32, bool)], end_time: f32, match_end: f32) -> f32 {
+    if transitions.is_empty() {
+        return match_end;
+    }
+    let mut index = transitions
+        .partition_point(|&(time, _)| time <= end_time)
+        .saturating_sub(1);
+    if transitions[index].1 {
+        // Live at the event's end: advance to the first stoppage after it.
+        match transitions[index + 1..].iter().position(|&(_, live)| !live) {
+            Some(offset) => index += 1 + offset,
+            None => return match_end,
+        }
+    }
+    transitions[index + 1..]
+        .iter()
+        .find(|&&(_, live)| live)
+        .map(|&(time, _)| time)
+        .unwrap_or(match_end)
+}
+
+/// Empirical enforcement of the declared per-stream finalization horizons
+/// (see [`FinalizationHorizon`]): drives the full graph over a real replay at
+/// a 1s projection cadence, records when each event first became `Finalized`,
+/// and fails if any event finalized later than its stream's declared horizon.
+///
+/// Slack: one projection interval — an event can settle immediately after a
+/// projection ran and only be observed at the next one — plus a small epsilon
+/// for frame-time granularity. The per-stream max observed lag is printed so
+/// drift toward a horizon stays visible before it becomes a failure.
+#[test]
+#[ignore = "real-replay horizon instrumentation is slow; run explicitly when changing stream horizons or projection lifecycles"]
+fn declared_finalization_horizons_hold_on_real_replay() {
+    const PROJECTION_INTERVAL_SECONDS: f32 = 1.0;
+    const SLACK_SECONDS: f32 = PROJECTION_INTERVAL_SECONDS + 0.1;
+
+    let horizon_by_stream: HashMap<&'static str, FinalizationHorizon> = all_analysis_nodes()
+        .iter()
+        .flat_map(|node| node.emitted_events())
+        .filter_map(|emitted| emitted.projected)
+        .map(|projected| (projected.stream, projected.horizon))
+        .collect();
+
+    let replay = parse_replay(ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE);
+    let probe = HorizonProbe::new(
+        collector::AnalysisNodeCollector::new(graph_with_all_analysis_nodes())
+            .with_projection_interval(PROJECTION_INTERVAL_SECONDS),
+    )
+    .process_replay(&replay)
+    .expect("horizon probe should evaluate a real replay");
+
+    let match_end = probe.last_frame_time;
+    let transitions = &probe.live_play_transitions;
+
+    let mut max_lag_by_stream: std::collections::BTreeMap<String, f32> =
+        std::collections::BTreeMap::new();
+    let mut violations: Vec<String> = Vec::new();
+    for event in probe.inner.graph().event_transaction_log().current_events() {
+        let stream = event.meta.stream.as_str();
+        let horizon = *horizon_by_stream
+            .get(stream)
+            .unwrap_or_else(|| panic!("stream {stream:?} has no declared horizon"));
+        let (_, end_time) = event.meta.timing.end();
+        let finalized_at = *probe
+            .first_finalized_at
+            .get(&event.meta.id)
+            .unwrap_or_else(|| panic!("event {:?} was never observed finalized", event.meta.id));
+        let lag = finalized_at - end_time;
+        let stream_max = max_lag_by_stream
+            .entry(stream.to_owned())
+            .or_insert(f32::NEG_INFINITY);
+        *stream_max = stream_max.max(lag);
+
+        let deadline = match horizon {
+            FinalizationHorizon::EndPlus(seconds) => Some(end_time + seconds),
+            FinalizationHorizon::NextStoppage => {
+                Some(next_stoppage_resumption(transitions, end_time, match_end))
+            }
+            FinalizationHorizon::MatchEnd => None,
+        };
+        if let Some(deadline) = deadline
+            && finalized_at > deadline + SLACK_SECONDS
+        {
+            violations.push(format!(
+                "{id} ({stream}, {horizon:?}): end={end_time:.2}s deadline={deadline:.2}s \
+                 finalized={finalized_at:.2}s (lag {lag:.2}s)",
+                id = event.meta.id,
+            ));
+        }
+    }
+
+    println!("per-stream max observed finalization lag (finalized - end, seconds):");
+    for (stream, lag) in &max_lag_by_stream {
+        let horizon = horizon_by_stream[stream.as_str()];
+        println!("  {stream:<22} {lag:>8.2}  (declared {horizon:?})");
+    }
+
+    assert!(
+        violations.is_empty(),
+        "finalization horizon violations:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
 #[ignore = "full graph versus legacy timeline replay parity is slow; run explicitly when changing graph/timeline transfer"]
 fn full_analysis_graph_matches_stats_timeline_events_on_real_replay() {
     let replay = parse_replay(ANALYSIS_GRAPH_REAL_REPLAY_FIXTURE);
     let graph = collect_analysis_graph_for_replay(&replay, graph_with_all_analysis_nodes())
         .expect("full graph should evaluate a real replay");
-    let graph_events = graph
-        .state::<StatsTimelineEventsState>()
-        .expect("full graph should expose stats timeline events")
-        .events
-        .clone();
+    let graph_events = ReplayStatsTimelineEvents {
+        events: graph
+            .event_transaction_log()
+            .current_events()
+            .into_iter()
+            .cloned()
+            .collect(),
+    };
 
     let timeline = StatsTimelineCollector::new()
         .get_legacy_replay_stats_timeline(&replay)
