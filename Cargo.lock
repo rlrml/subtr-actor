@@ -1570,6 +1570,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "subtr-actor-live-consumer"
+version = "1.2.0"
+dependencies = [
+ "boxcars",
+ "clap",
+ "serde_json",
+ "subtr-actor",
+ "subtr-actor-live",
+ "tungstenite",
+]
+
+[[package]]
 name = "subtr-actor-py"
 version = "1.2.0"
 dependencies = [
