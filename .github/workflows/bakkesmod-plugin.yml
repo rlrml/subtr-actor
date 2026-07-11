@@ -33,7 +33,7 @@ jobs:
 
       - name: Validate BakkesMod helper scripts
         run: |
-          python -m py_compile bakkesmod/subtr-actor/verify-graph-dump.py bakkesmod/subtr-actor/verify-plugin-source.py bakkesmod/subtr-actor/verify-rust-dll-exports.py bakkesmod/subtr-actor/verify-plugin-dll-exports.py bakkesmod/subtr-actor/verify-rust-dll-runtime.py bakkesmod/replay-to-training/verify-dll-exports.py
+          python -m py_compile bakkesmod/subtr-actor/verify-graph-dump.py bakkesmod/subtr-actor/verify-plugin-source.py bakkesmod/subtr-actor/verify-rust-dll-exports.py bakkesmod/subtr-actor/verify-plugin-dll-exports.py bakkesmod/subtr-actor/verify-rust-dll-runtime.py bakkesmod/replay-to-training/verify-dll-exports.py bakkesmod/state-export/verify-dll-exports.py
           python bakkesmod/subtr-actor/verify-plugin-source.py
 
       - name: Install Rust
@@ -47,6 +47,9 @@ jobs:
 
       - name: Test replay-to-training Rust ABI crate
         run: cargo test -p subtr-actor-replay-to-training --verbose
+
+      - name: Test state-export Rust ABI crate
+        run: cargo test -p subtr-actor-state-export --verbose
 
       - name: Build BakkesMod plugin
         shell: pwsh
@@ -62,6 +65,13 @@ jobs:
 
       - name: Verify replay-to-training DLL exports
         run: python bakkesmod/replay-to-training/verify-dll-exports.py --rust-dll bakkesmod/replay-to-training/build/Release/replay_to_training.dll --plugin-dll bakkesmod/replay-to-training/build/Release/ReplayToTrainingPlugin.dll
+
+      - name: Build state-export plugin
+        shell: pwsh
+        run: .\bakkesmod\state-export\build-windows.ps1
+
+      - name: Verify state-export DLL exports
+        run: python bakkesmod/state-export/verify-dll-exports.py --rust-dll bakkesmod/state-export/build/Release/state_export.dll --plugin-dll bakkesmod/state-export/build/Release/StateExportPlugin.dll
 
       - name: Upload plugin artifacts
         uses: actions/upload-artifact@v4
@@ -82,3 +92,13 @@ jobs:
             bakkesmod/replay-to-training/build/Release/ReplayToTrainingPlugin.dll
             bakkesmod/replay-to-training/build/Release/replay_to_training.dll
             bakkesmod/replay-to-training/build/Release/bakkesmod-install/**
+
+      - name: Upload state-export plugin artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: subtr-actor-state-export-plugin
+          if-no-files-found: error
+          path: |
+            bakkesmod/state-export/build/Release/StateExportPlugin.dll
+            bakkesmod/state-export/build/Release/state_export.dll
+            bakkesmod/state-export/build/Release/bakkesmod-install/**

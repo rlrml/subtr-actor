@@ -377,6 +377,45 @@
           dontCargoInstall = true;
         };
 
+        packages.bakkesmod-state-export = rustPlatform.buildRustPackage {
+          pname = "subtr-actor-state-export-plugin";
+          version = projectVersion;
+          src = ./.;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            allowBuiltinFetchGit = true;
+          };
+          nativeBuildInputs = [
+            pkgs.cmake
+            pkgs.llvmPackages_21.clang-unwrapped
+            pkgs.llvmPackages_21.llvm
+            pkgs.lld
+            pkgs.ninja
+            pkgs.python3
+          ];
+          buildPhase = ''
+            runHook preBuild
+            export HOME="$TMPDIR"
+            export BUILD_DIR="$TMPDIR/bakkesmod-state-export-build"
+            export XWIN_SYSROOT="${xwinMsvcSysroot}"
+            export BAKKESMODSDK_DIR="${bakkesmod-sdk}"
+            export BAKKESMOD_SDK_DIR="$BAKKESMODSDK_DIR"
+            export STATE_EXPORT_GIT_HASH="${buildGitHash}"
+            export STATE_EXPORT_GIT_DIRTY="${buildGitDirty}"
+            export STATE_EXPORT_COMMIT_DATE="${buildCommitDate}"
+            bash bakkesmod/state-export/build-linux-msvc.sh
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            mkdir -p "$out"
+            cp -r "$BUILD_DIR/Release/." "$out/"
+            runHook postInstall
+          '';
+          doCheck = false;
+          dontCargoInstall = true;
+        };
+
         devShells.default = pkgs.mkShell {
           packages = shellPackages;
 
