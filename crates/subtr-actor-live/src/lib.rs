@@ -11,12 +11,20 @@
 mod generator;
 mod meta;
 mod model;
+mod protocol;
+#[cfg(feature = "server")]
+pub mod server;
 mod view;
+mod wire;
 
 pub use generator::*;
 pub use meta::*;
 pub use model::*;
+pub use protocol::*;
+#[cfg(feature = "server")]
+pub use server::*;
 pub use view::*;
+pub use wire::*;
 
 use subtr_actor::{FrameEventsState, FrameInput, LivePlayState, ReplayMeta};
 
