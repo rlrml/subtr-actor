@@ -370,6 +370,11 @@ fn two_consumers_converge_over_a_scripted_match() {
     );
     assert!(early.store.latest().is_none(), "store resets at match end");
 
+    handle.set_match_context(subtr_actor_live::LiveMatchContext {
+        match_guid: Some("second-scripted-match".to_owned()),
+        playlist_id: None,
+        map_name: Some("second-scripted-map".to_owned()),
+    });
     for frame_number in 0..5 {
         handle.push_frame(scripted_frame(frame_number));
     }

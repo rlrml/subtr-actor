@@ -46,12 +46,37 @@ void StateExportPlugin::tick() {
       resetLiveState();
     }
     wasInGame = false;
+    awaitingNextMatch = false;
     clearPendingFrameEvents();
     return;
   }
-  if (!wasInGame) {
+
+  ServerWrapper server = gameWrapper->GetGameEventAsServer();
+  if (!server.IsNull() && server.GetbMatchEnded() != 0) {
+    if (!awaitingNextMatch) {
+      notifyMatchEndAndReset("match-ended state");
+      resetLiveState();
+    }
+    awaitingNextMatch = true;
+    wasInGame = true;
+    clearPendingFrameEvents();
+    return;
+  }
+
+  // After an Exhibition ends, Rocket League clears bMatchEnded and creates an
+  // empty replacement server while it is still showing "Choose Team". Do not
+  // mistake that interstitial for the next match; bRoundActive becomes true
+  // once a player has joined and the next kickoff is actually playable.
+  if (awaitingNextMatch &&
+      (server.IsNull() || server.GetbRoundActive() == 0)) {
+    clearPendingFrameEvents();
+    return;
+  }
+
+  if (!wasInGame || awaitingNextMatch) {
     resetLiveState();
-    pushMatchContext(gameWrapper->GetGameEventAsServer());
+    pushMatchContext(server);
+    awaitingNextMatch = false;
   }
   wasInGame = true;
   maybeRefreshMatchContext();
@@ -64,7 +89,6 @@ void StateExportPlugin::tick() {
     return;
   }
 
-  ServerWrapper server = gameWrapper->GetGameEventAsServer();
   if (!server.IsNull()) {
     const float now = server.GetSecondsElapsed();
     if (lastProcessedGameTime && now >= *lastProcessedGameTime &&
@@ -100,6 +124,7 @@ void StateExportPlugin::resetLiveState() {
   carPlayerIndices.clear();
   priPlayerIndices.clear();
   uniqueIdPlayerIndices.clear();
+  stableBotPlayerIndices.clear();
   stablePriPlayerIndices.clear();
   lastPlayerStats.clear();
   suppressedPlayerStatDeltas.clear();
