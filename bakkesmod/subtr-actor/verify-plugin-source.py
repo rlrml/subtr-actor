@@ -17,6 +17,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUST_SOURCE = REPO_ROOT / "bakkesmod/subtr-actor/rust/src/lib.rs"
 RUST_SOURCE_DIR = REPO_ROOT / "bakkesmod/subtr-actor/rust/src"
+LIVE_SOURCE_DIR = REPO_ROOT / "crates/subtr-actor-live/src"
 PLUGIN_SOURCE = REPO_ROOT / "bakkesmod/subtr-actor/plugin/SubtrActorPlugin.cpp"
 PLUGIN_HEADER = REPO_ROOT / "bakkesmod/subtr-actor/plugin/SubtrActorPlugin.h"
 PLUGIN_README = REPO_ROOT / "bakkesmod/subtr-actor/README.md"
@@ -225,10 +226,11 @@ def read_web_player_styles() -> str:
 
 def read_rust_sources() -> str:
     sources: list[str] = []
-    for path in sorted(RUST_SOURCE_DIR.rglob("*.rs")):
-        if "lib_tests" in path.parts:
-            continue
-        sources.append(path.read_text(encoding="utf-8"))
+    for source_dir in (RUST_SOURCE_DIR, LIVE_SOURCE_DIR):
+        for path in sorted(source_dir.rglob("*.rs")):
+            if "lib_tests" in path.parts:
+                continue
+            sources.append(path.read_text(encoding="utf-8"))
     return "\n".join(sources)
 
 

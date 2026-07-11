@@ -14,6 +14,7 @@ Generated from static Rust metadata. Do not edit by hand.
   - False negative evidence: `not_evaluated`
   - Testing: `untested`
 - Producers:
+  - `backboard` via `BackboardNode` / `BackboardCalculator`
   - `backboard_bounce_state` via `BackboardBounceStateNode` / `BackboardBounceCalculator`
 
 **Summary**
@@ -526,36 +527,6 @@ _None documented._
 
 _None documented._
 
-### Event (`event`)
-
-- Category: `basic`
-- Confidence:
-  - Approach: `unknown`
-  - True positive evidence: `not_evaluated`
-  - False positive evidence: `not_evaluated`
-  - False negative evidence: `not_evaluated`
-  - Testing: `untested`
-- Producers:
-  - `stats_timeline_events` via `StatsTimelineEventsNode` / `StatsTimelineEventsState`
-
-**Summary**
-
-A shared event envelope with common metadata and a typed event payload.
-
-**Approach**
-
-- Collect completed events from the analysis graph at finish time.
-- Wrap each typed event payload with common timing, participant, team, position, confidence, and stream metadata.
-- Serialize timeline events as a single heterogeneous event list for playback and analysis consumers.
-
-**Limitations**
-
-_None documented._
-
-**Known Issues**
-
-_None documented._
-
 ### Field Half (`field_half`)
 
 - Category: `positioning`
@@ -712,7 +683,7 @@ _None documented._
   - False negative evidence: `not_evaluated`
   - Testing: `untested`
 - Producers:
-  - `flip_reset` via `DodgeResetNode` / `DodgeResetCalculator`
+  - `dodge_reset` via `DodgeResetNode` / `DodgeResetCalculator`
 
 **Summary**
 
@@ -723,6 +694,34 @@ An on-ball dodge refresh that is confirmed when the player uses the gained dodge
 - Consume on-ball dodge refreshes detected from replay state as pending flip-reset candidates.
 - Require a later dodge start by the same player while the reset is still pending.
 - Confirm only when that player touches the ball while dodge-active before landing and within the reset-to-touch window.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Goal Context (`goal_context`)
+
+- Category: `context`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `goal_context` via `GoalContextNode` / `MatchStatsCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
 
 **Limitations**
 
@@ -783,6 +782,34 @@ A fast touch shortly after the ball bounces off the floor, paired with a recent 
 - Detect floor bounces from ball height and vertical velocity reversal when no touch occurs on the bounce frame.
 - Track each player's recent ground contact and dodge start.
 - Emit on a same-player touch shortly after the floor bounce and dodge when the post-touch ball speed clears the configured threshold.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Kickoff (`kickoff`)
+
+- Category: `core`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `kickoff` via `KickoffNode` / `KickoffCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
 
 **Limitations**
 
@@ -1075,6 +1102,34 @@ A quick possession transition where the attacking team has numbers moving out of
 - Start from a possession change when the ball is still in the new attacking team's defensive half.
 - Count non-demoed attackers near or ahead of the ball and defenders between the ball and their own goal.
 - Emit once the new attacking team retains possession long enough with at least two attackers and at least one defender in the rush shape.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Shadow Defense (`shadow_defense`)
+
+- Category: `positioning`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `positioning` via `PositioningNode` / `PositioningCalculator`
+
+**Summary**
+
+Definition pending.
+
+**Approach**
+
+_None documented._
 
 **Limitations**
 
