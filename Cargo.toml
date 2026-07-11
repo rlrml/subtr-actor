@@ -2,6 +2,7 @@
 members = [
     ".",
     "bakkesmod/replay-to-training/rust",
+    "bakkesmod/state-export/rust",
     "bakkesmod/subtr-actor/rust",
     "crates/subtr-actor-live",
     "crates/subtr-actor-live-consumer",

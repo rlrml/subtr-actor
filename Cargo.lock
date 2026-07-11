@@ -1600,6 +1600,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "subtr-actor-state-export"
+version = "1.2.0"
+dependencies = [
+ "boxcars",
+ "serde_json",
+ "subtr-actor-live",
+ "subtr-actor-live-consumer",
+]
+
+[[package]]
 name = "subtr-actor-tools"
 version = "1.2.0"
 dependencies = [
