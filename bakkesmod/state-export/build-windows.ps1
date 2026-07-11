@@ -1,0 +1,120 @@
+param(
+    [string]$BuildDir = "",
+    [string]$Configuration = "Release",
+    [string]$BakkesModSdkDir = "",
+    [switch]$Install,
+    [switch]$EnableAutoload,
+    [string]$BakkesModRoot = ""
+)
+
+$ErrorActionPreference = "Stop"
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = Resolve-Path (Join-Path $ScriptDir "../..")
+
+if ($BuildDir -eq "") {
+    $BuildDir = Join-Path $ScriptDir "build"
+}
+
+if ($BakkesModRoot -eq "") {
+    $BakkesModRoot = Join-Path $env:APPDATA "bakkesmod\bakkesmod"
+}
+
+Push-Location $RepoRoot
+try {
+    # The crate's [lib] name is "state_export", so the built cdylib is
+    # target/release/state_export.dll (the short name the plugin loads).
+    # Build identification (STATE_EXPORT_GIT_HASH / _GIT_DIRTY /
+    # _COMMIT_DATE) needs no plumbing here: build.rs and the CMake configure
+    # both derive it from git when the env vars are unset, and this script
+    # always runs from a checkout. Set the env vars to override.
+    cargo build -p subtr-actor-state-export --release
+    if ($LASTEXITCODE -ne 0) {
+        throw "cargo build failed with exit code $LASTEXITCODE"
+    }
+
+    $cmakeArgs = @(
+        "-S", $ScriptDir,
+        "-B", $BuildDir,
+        "-G", "Visual Studio 17 2022",
+        "-A", "x64"
+    )
+
+    if ($BakkesModSdkDir -ne "") {
+        $cmakeArgs += "-DBAKKESMOD_SDK_DIR=$BakkesModSdkDir"
+    }
+
+    cmake @cmakeArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "cmake configure failed with exit code $LASTEXITCODE"
+    }
+
+    cmake --build $BuildDir --config $Configuration
+    if ($LASTEXITCODE -ne 0) {
+        throw "cmake build failed with exit code $LASTEXITCODE"
+    }
+
+    $PluginOutDir = Join-Path $BuildDir $Configuration
+    New-Item -ItemType Directory -Force -Path $PluginOutDir | Out-Null
+    Copy-Item `
+        -Force `
+        -Path (Join-Path $RepoRoot "target/release/state_export.dll") `
+        -Destination (Join-Path $PluginOutDir "state_export.dll")
+
+    $InstallLayoutDir = Join-Path $PluginOutDir "bakkesmod-install"
+    $InstallLayoutPluginsDir = Join-Path $InstallLayoutDir "plugins"
+    $InstallLayoutDataDir = Join-Path $InstallLayoutDir "data\state-export"
+    New-Item -ItemType Directory -Force -Path $InstallLayoutPluginsDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $InstallLayoutDataDir | Out-Null
+    Copy-Item `
+        -Force `
+        -Path (Join-Path $PluginOutDir "StateExportPlugin.dll") `
+        -Destination (Join-Path $InstallLayoutPluginsDir "StateExportPlugin.dll")
+    Copy-Item `
+        -Force `
+        -Path (Join-Path $PluginOutDir "state_export.dll") `
+        -Destination (Join-Path $InstallLayoutDataDir "state_export.dll")
+
+    Write-Host "Built plugin artifacts in $PluginOutDir"
+    Write-Host "Prepared install layout in $InstallLayoutDir"
+
+    if ($Install) {
+        $BakkesModPluginsDir = Join-Path $BakkesModRoot "plugins"
+        $BakkesModDataDir = Join-Path $BakkesModRoot "data\state-export"
+        $BakkesModPluginsCfg = Join-Path $BakkesModRoot "cfg\plugins.cfg"
+        if (-not (Test-Path $BakkesModPluginsDir)) {
+            throw "BakkesMod plugins directory not found: $BakkesModPluginsDir"
+        }
+
+        New-Item -ItemType Directory -Force -Path $BakkesModDataDir | Out-Null
+        Copy-Item `
+            -Force `
+            -Path (Join-Path $PluginOutDir "StateExportPlugin.dll") `
+            -Destination (Join-Path $BakkesModPluginsDir "StateExportPlugin.dll")
+        Copy-Item `
+            -Force `
+            -Path (Join-Path $PluginOutDir "state_export.dll") `
+            -Destination (Join-Path $BakkesModDataDir "state_export.dll")
+
+        Write-Host "Installed StateExportPlugin.dll to $BakkesModPluginsDir"
+        Write-Host "Installed state_export.dll to $BakkesModDataDir"
+
+        if ($EnableAutoload) {
+            if (-not (Test-Path $BakkesModPluginsCfg)) {
+                New-Item -ItemType File -Force -Path $BakkesModPluginsCfg | Out-Null
+            }
+
+            $AutoloadCommand = "plugin load StateExportPlugin"
+            $ExistingAutoload = Get-Content $BakkesModPluginsCfg | Where-Object {
+                $_.Trim().ToLowerInvariant() -eq $AutoloadCommand.ToLowerInvariant()
+            }
+            if (-not $ExistingAutoload) {
+                Add-Content -Path $BakkesModPluginsCfg -Value $AutoloadCommand
+                Write-Host "Added StateExportPlugin to $BakkesModPluginsCfg"
+            }
+        }
+    }
+}
+finally {
+    Pop-Location
+}
