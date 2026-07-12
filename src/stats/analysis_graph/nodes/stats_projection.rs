@@ -42,6 +42,7 @@ pub struct StatsProjectionState {
     pub demo: DemoStatsAccumulator,
     pub center: CenterStatsAccumulator,
     pub controlled_play: ControlledPlayStatsAccumulator,
+    pub expected_goals: ExpectedGoalsStatsAccumulator,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -214,6 +215,8 @@ struct StatsProjectionCursors {
     demo_timeline: usize,
     center: usize,
     controlled_play: usize,
+    expected_goals_touch: usize,
+    expected_goals_episode: usize,
 }
 
 impl StatsProjectionNode {
@@ -644,6 +647,19 @@ impl StatsProjectionNode {
         {
             self.state.controlled_play.apply_event(event);
         }
+        let expected_goals = ctx.get::<ExpectedGoalsCalculator>()?;
+        for event in Self::events_since(
+            &mut self.cursors.expected_goals_touch,
+            expected_goals.touch_events(),
+        ) {
+            self.state.expected_goals.apply_touch_event(event);
+        }
+        for event in Self::events_since(
+            &mut self.cursors.expected_goals_episode,
+            expected_goals.episode_events(),
+        ) {
+            self.state.expected_goals.apply_episode_event(event);
+        }
 
         self.finish_sample();
         self.previous_live_play = Some(live_play);
@@ -698,6 +714,7 @@ impl AnalysisNode for StatsProjectionNode {
             demo_dependency(),
             center_dependency(),
             controlled_play_dependency(),
+            expected_goals_dependency(),
         ]
     }
 

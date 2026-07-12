@@ -8,15 +8,16 @@ use crate::stats::calculators::{
     BumpGoalCalculator, CeilingShotCalculator, CeilingShotGoalCalculator, CenterCalculator,
     ContinuousBallControlState, ControlledPlayCalculator, CounterAttackGoalCalculator,
     DemoCalculator, DemoGoalCalculator, DodgeResetCalculator, DoubleTapCalculator,
-    DoubleTapGoalCalculator, EmptyNetGoalCalculator, FiftyFiftyCalculator, FiftyFiftyState,
-    FlickCalculator, FlickGoalCalculator, FlipImpulseCalculator, FlipIntoBallGoalCalculator,
-    FlipResetGoalCalculator, FrameEventsState, FrameInfo, GameplayState, HalfFlipCalculator,
-    HalfVolleyCalculator, HalfVolleyGoalCalculator, HighAerialGoalCalculator, KickoffCalculator,
-    KickoffGoalCalculator, LivePlayState, LongDistanceGoalCalculator, LoosePossessionCalculator,
-    MatchStatsCalculator, MovementCalculator, OneTimerCalculator, OneTimerGoalCalculator,
-    OwnHalfGoalCalculator, PassCalculator, PassingGoalCalculator, PlayerFrameState,
-    PlayerPossessionCalculator, PlayerVerticalState, PositioningCalculator, PossessionCalculator,
-    PossessionState, PowerslideCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
+    DoubleTapGoalCalculator, EmptyNetGoalCalculator, ExpectedGoalsCalculator, FiftyFiftyCalculator,
+    FiftyFiftyState, FlickCalculator, FlickGoalCalculator, FlipImpulseCalculator,
+    FlipIntoBallGoalCalculator, FlipResetGoalCalculator, FrameEventsState, FrameInfo,
+    GameplayState, HalfFlipCalculator, HalfVolleyCalculator, HalfVolleyGoalCalculator,
+    HighAerialGoalCalculator, KickoffCalculator, KickoffGoalCalculator, LivePlayState,
+    LongDistanceGoalCalculator, LoosePossessionCalculator, MatchStatsCalculator,
+    MovementCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
+    PassCalculator, PassingGoalCalculator, PlayerFrameState, PlayerPossessionCalculator,
+    PlayerVerticalState, PositioningCalculator, PossessionCalculator, PossessionState,
+    PowerslideCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
     SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchCalculator, TouchState,
     WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
 };
@@ -38,6 +39,7 @@ pub(crate) mod controlled_play;
 pub(crate) mod demo;
 pub(crate) mod dodge_reset;
 pub(crate) mod double_tap;
+pub(crate) mod expected_goals;
 pub(crate) mod fifty_fifty;
 pub(crate) mod fifty_fifty_state;
 pub(crate) mod flick;
@@ -112,6 +114,8 @@ pub use demo::DemoNode;
 pub use dodge_reset::DodgeResetNode;
 #[allow(unused_imports)]
 pub use double_tap::DoubleTapNode;
+#[allow(unused_imports)]
+pub use expected_goals::ExpectedGoalsNode;
 #[allow(unused_imports)]
 pub use fifty_fifty::FiftyFiftyNode;
 #[allow(unused_imports)]
@@ -367,6 +371,10 @@ pub(crate) fn center_dependency() -> AnalysisDependency {
 
 pub(crate) fn double_tap_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<DoubleTapCalculator>(double_tap::boxed_default)
+}
+
+pub(crate) fn expected_goals_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<ExpectedGoalsCalculator>(expected_goals::boxed_default)
 }
 
 pub(crate) fn fifty_fifty_dependency() -> AnalysisDependency {

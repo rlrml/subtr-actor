@@ -1227,6 +1227,65 @@ _None documented._
 
 _None documented._
 
+### Threat Episode (`threat_episode`)
+
+- Category: `other`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `expected_goals` via `ExpectedGoalsNode` / `ExpectedGoalsCalculator`
+
+**Summary**
+
+A contiguous span where one team's continuous threat value exceeds the episode threshold; its xG is the span's peak value, credited to the attacking team's most recent toucher.
+
+**Approach**
+
+- Open an episode when a team's threat value V rises above the episode threshold during live play, and track the peak V and the team's most recent toucher.
+- Close on V dropping back under the threshold, a goal for the team (always a goal-outcome close), or a stoppage.
+- Hold stoppage-closed episodes pending until the goal that caused the stoppage is attributed (or the next kickoff/grace window passes), so goal outcomes are not lost to attribution lag.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
+### Threat Touch Delta (`threat_touch`)
+
+- Category: `other`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `expected_goals` via `ExpectedGoalsNode` / `ExpectedGoalsCalculator`
+
+**Summary**
+
+The change in the touching team's continuous threat value (expected-goals state value) across one touch.
+
+**Approach**
+
+- Evaluate the versioned logistic threat model V(state) for both teams on every live-play frame from full ball and player physics state.
+- On each attributed touch, emit the toucher's team's V just before the touch (previous live frame) and just after (the touch's frame).
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Replay Timeline Event (`timeline`)
 
 - Category: `core`

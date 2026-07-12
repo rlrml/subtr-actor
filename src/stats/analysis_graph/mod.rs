@@ -52,7 +52,8 @@
 //! - **Play & contest detection** — [`TouchNode`], [`PassNode`], [`CenterNode`],
 //!   [`KickoffNode`], [`BumpNode`], [`DemoNode`], [`RushNode`],
 //!   [`ControlledPlayNode`], [`TerritorialPressureNode`], [`WhiffNode`],
-//!   [`FiftyFiftyNode`], [`BackboardNode`], [`MovementNode`], [`BoostNode`].
+//!   [`FiftyFiftyNode`], [`BackboardNode`], [`MovementNode`], [`BoostNode`],
+//!   [`ExpectedGoalsNode`].
 //! - **Match-level & projection** — [`MatchStatsNode`], goal-tag nodes (e.g.
 //!   [`HalfVolleyGoalNode`] plus the `*_goal` registry names),
 //!   [`StatsProjectionNode`], [`StatsTimelineEventsNode`],
@@ -123,6 +124,7 @@ builtin_analysis_nodes! {
     ControlledPlayNode,
     ContinuousBallControlNode,
     DoubleTapNode,
+    ExpectedGoalsNode,
     FiftyFiftyNode,
     FiftyFiftyStateNode,
     KickoffNode,

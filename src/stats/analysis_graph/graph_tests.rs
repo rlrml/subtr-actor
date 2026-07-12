@@ -394,6 +394,8 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "rush",
         "speed_flip",
         "territorial_pressure",
+        "threat_episode",
+        "threat_touch",
         "timeline",
         "touch",
         "wall_aerial",

@@ -51,6 +51,8 @@ pub mod dodge_reset;
 pub use dodge_reset::*;
 pub mod double_tap;
 pub use double_tap::*;
+pub mod expected_goals;
+pub use expected_goals::*;
 pub mod fifty_fifty;
 pub use fifty_fifty::*;
 pub mod flick;
