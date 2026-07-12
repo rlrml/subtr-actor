@@ -13,7 +13,7 @@ exact code path, so train and inference can never diverge.
 1. **Fetch a corpus** (optional — any manifest of local replays works):
 
    ```sh
-   python3 fetch_corpus.py   # stdlib only
+   python3 fetch_corpus.py --seed 7   # stdlib only
    ```
 
    Downloads a rank-stratified sample of processed replays from a
@@ -22,7 +22,14 @@ exact code path, so train and inference can never diverge.
    `ROCKET_SENSE_API_TOKEN` (or `ROCKET_SENSE_TOKEN_COMMAND`, defaulting to
    `pass show rocket-sense/token`), `ROCKET_SENSE_BASE_URL`,
    `THREAT_CORPUS_CACHE` (default `~/.cache/subtr-actor-threat-corpus`), and
-   `PER_STRATUM` (default 150 per playlist × rank tier).
+   `PER_STRATUM` (default 150 per playlist × rank tier),
+   `THREAT_CORPUS_SEED` (default 7), and `THREAT_CORPUS_PLAYLISTS` (default
+   `ranked-duels,ranked-doubles`). Repeat `--playlist` to override the playlist
+   set explicitly; 3v3 is supported but intentionally not part of the default
+   corpus. Selection shuffles each rank stratum with the recorded seed instead
+   of biasing toward low replay IDs. The fetcher writes
+   `manifest.provenance.json` with the seed, playlist set, and SHA-256 hashes of
+   both the cached listing and resulting manifest.
 
 2. **Export the dataset** through the shared Rust feature path:
 
@@ -35,20 +42,27 @@ exact code path, so train and inference can never diverge.
    Two attacking-normalized rows per sampled live-play frame (one per team),
    with τ-agnostic goal-time columns for downstream labeling/censoring.
 
-3. **Train and evaluate**:
+3. **Train and evaluate** (from the repository root):
 
    ```sh
-   uv run --script train_threat_model.py threat_dataset.csv --tau 5.0 --gbt \
-       --out-dir threat_model_out
+   nix run .#train-threat-model -- scripts/threat_model/threat_dataset.csv \
+       --tau 5.0 --gbt \
+       --manifest ~/.cache/subtr-actor-threat-corpus/manifest.jsonl \
+       --out-dir scripts/threat_model/threat_model_out
    ```
 
-   Dependencies (numpy/pandas/scikit-learn) are declared in the script's
-   PEP 723 block and pinned by `train_threat_model.py.lock`, so training runs
-   in a reproducible environment and coefficient provenance is auditable.
+   Dependencies (numpy/pandas/scikit-learn) are isolated from the published
+   Python bindings in this directory's `pyproject.toml` and pinned by
+   `uv.lock`. The repository flake builds the same lock as
+   `packages.threat-model-env` and exposes it through the command above and
+   `nix develop .#threat-model`. Without Nix, run `uv sync --locked` followed
+   by `uv run --locked train_threat_model.py ...` from this directory.
 
    Grouped train/test split by replay. Writes `metrics.txt` (log-loss, Brier,
-   AUC, calibration table, per-rank-tier calibration), `coefficients.json`,
-   `model_coefficients.rs`, and `parity_fixture.rs`. `--gbt` also fits a
+   AUC, calibration table, per-median-rank-tier calibration),
+   `training_provenance.json` (dataset/manifest and split hashes, seed, Python
+   and package versions), `coefficients.json`, `model_coefficients.rs`, and
+   `parity_fixture.rs`. `--gbt` also fits a
    gradient-boosted reference to quantify what the linear model leaves behind.
 
 4. **Embed**: paste `model_coefficients.rs` into the GENERATED COEFFICIENTS

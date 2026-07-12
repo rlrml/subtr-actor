@@ -208,6 +208,10 @@ pub struct StatsTimelineEventCollector {
     last_replay_meta_player_count: Option<usize>,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
+    expected_goals: ExpectedGoalsStatsAccumulator,
+    expected_goals_touch_cursor: usize,
+    expected_goals_episode_cursor: usize,
+    expected_goals_tracks: ExpectedGoalsTimelineTracks,
 }
 
 impl Default for StatsTimelineEventCollector {
@@ -226,6 +230,22 @@ impl StatsTimelineEventCollector {
             last_replay_meta_player_count: None,
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
+            expected_goals: ExpectedGoalsStatsAccumulator::new(),
+            expected_goals_touch_cursor: 0,
+            expected_goals_episode_cursor: 0,
+            expected_goals_tracks: ExpectedGoalsTimelineTracks {
+                teams: vec![
+                    ExpectedGoalsTeamTimelineTrack {
+                        is_team_0: true,
+                        points: Vec::new(),
+                    },
+                    ExpectedGoalsTeamTimelineTrack {
+                        is_team_0: false,
+                        points: Vec::new(),
+                    },
+                ],
+                players: Vec::new(),
+            },
         }
     }
 
@@ -290,6 +310,99 @@ impl StatsTimelineEventCollector {
         })
     }
 
+    fn refresh_expected_goals(&mut self) -> SubtrActorResult<()> {
+        let calculator = self
+            .graph
+            .state::<ExpectedGoalsCalculator>()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                    "missing ExpectedGoalsCalculator while building compact stats timeline"
+                        .to_owned(),
+                ))
+            })?;
+        let touch_events = calculator.touch_events()[self.expected_goals_touch_cursor..].to_vec();
+        let episode_events =
+            calculator.episode_events()[self.expected_goals_episode_cursor..].to_vec();
+        let team_xg_integrals = calculator.team_xg_integrals();
+        self.expected_goals_touch_cursor = calculator.touch_events().len();
+        self.expected_goals_episode_cursor = calculator.episode_events().len();
+
+        for event in &touch_events {
+            self.expected_goals.apply_touch_event(event);
+        }
+        for event in &episode_events {
+            self.expected_goals.apply_episode_event(event);
+        }
+        self.expected_goals.set_team_xg_integrals(team_xg_integrals);
+        Ok(())
+    }
+
+    fn record_expected_goals_tracks(&mut self, frame: usize) -> SubtrActorResult<()> {
+        self.refresh_expected_goals()?;
+
+        for (index, is_team_0) in [true, false].into_iter().enumerate() {
+            let stats = self.expected_goals.team_stats(is_team_0).clone();
+            let track = &mut self.expected_goals_tracks.teams[index];
+            if track
+                .points
+                .last()
+                .is_some_and(|point| point.frame == frame)
+            {
+                track.points.last_mut().expect("point exists").stats = stats;
+            } else if track.points.last().is_none_or(|point| point.stats != stats) {
+                track
+                    .points
+                    .push(ExpectedGoalsTeamTimelinePoint { frame, stats });
+            }
+        }
+
+        let replay_meta = self.replay_meta()?.clone();
+        for player in replay_meta.player_order() {
+            let Some(stats) = self
+                .expected_goals
+                .player_stats()
+                .get(&player.remote_id)
+                .cloned()
+            else {
+                continue;
+            };
+            let is_team_0 = Self::is_team_zero_player(&replay_meta, player);
+            let track = match self
+                .expected_goals_tracks
+                .players
+                .iter_mut()
+                .find(|track| track.player_id == player.remote_id)
+            {
+                Some(track) => track,
+                None => {
+                    self.expected_goals_tracks
+                        .players
+                        .push(ExpectedGoalsPlayerTimelineTrack {
+                            player_id: player.remote_id.clone(),
+                            is_team_0,
+                            points: Vec::new(),
+                        });
+                    self.expected_goals_tracks
+                        .players
+                        .last_mut()
+                        .expect("just pushed player track")
+                }
+            };
+            if track
+                .points
+                .last()
+                .is_some_and(|point| point.frame == frame)
+            {
+                track.points.last_mut().expect("point exists").stats = stats;
+            } else if track.points.last().is_none_or(|point| point.stats != stats) {
+                track
+                    .points
+                    .push(ExpectedGoalsPlayerTimelinePoint { frame, stats });
+            }
+        }
+        Ok(())
+    }
+
     pub fn into_replay_stats_timeline_scaffold(
         self,
     ) -> SubtrActorResult<ReplayStatsTimelineScaffold> {
@@ -328,6 +441,7 @@ impl StatsTimelineEventCollector {
             activity_summary,
             positioning_summary,
             accumulation_tracks,
+            expected_goals_tracks: self.expected_goals_tracks,
         })
     }
 
@@ -488,6 +602,7 @@ impl Collector for StatsTimelineEventCollector {
         if let Some(emitted_dt) = self.frame_persistence.on_frame(frame_number, current_time) {
             let mut frame = self.snapshot_frame_scaffold()?;
             frame.dt = emitted_dt;
+            self.record_expected_goals_tracks(frame.frame_number)?;
             self.frames.push(frame);
         }
 
@@ -503,6 +618,7 @@ impl Collector for StatsTimelineEventCollector {
             return Ok(());
         };
         let mut final_snapshot = self.snapshot_frame_scaffold()?;
+        self.record_expected_goals_tracks(final_snapshot.frame_number)?;
         match self
             .frame_persistence
             .final_frame_action(final_snapshot.frame_number, final_snapshot.time)

@@ -79,6 +79,14 @@ ballchasing-fixture replay_id name:
 test-python:
     {{nix_shell_bash}} 'cd python && pytest'
 
+# Recreate the threat-model virtual environment exactly from its lockfile.
+threat-model-sync:
+    nix develop .#threat-model -c uv sync --locked --project scripts/threat_model
+
+# Train using the Nix-built uv lock environment. Pass training arguments after `--`.
+threat-model-train *args:
+    nix run .#train-threat-model -- {{args}}
+
 # Publish main Rust crate to crates.io
 publish-rust:
     {{nix_develop}} cargo publish -p subtr-actor
@@ -134,7 +142,7 @@ check-readme:
 # ---------------------------------------------------------------------------
 
 # Fast quality gate: Rust quality + JS style. Run this clean before every commit.
-check: check-rust check-style
+check: check-rust check-style check-threat-model
 
 # Rust quality gate (mirrors CI "Rust quality" job, minus tests/release build)
 check-rust:
@@ -147,6 +155,10 @@ check-rust:
 # JS/TS style gate (prettier + eslint; mirrors CI "Check JS/TS style")
 check-style:
     cd js && npm run check:style
+
+# Offline threat-model tooling: lock drift and Python style/lint.
+check-threat-model:
+    nix develop .#threat-model -c bash -lc 'cd scripts/threat_model && uv lock --check && ruff check . && ruff format --check .'
 
 # Heavy JS/TS gate: ts-rs binding drift + typecheck. Run when you change JS/TS or an exported (ts-rs) Rust type. Needs built wasm pkg + JS deps.
 check-types:

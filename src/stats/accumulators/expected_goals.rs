@@ -22,8 +22,10 @@ pub(crate) fn threat_team_label(is_team_0: bool) -> StatLabel {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ExpectedGoalsPlayerStats {
-    /// Sum of positive touch threat deltas (V after minus V before, from the
-    /// toucher's team's perspective) over the player's touches.
+    /// Sum of positive detection-frame threat deltas (detection-frame V minus
+    /// preceding-live-frame V, from the toucher's team's perspective) over the
+    /// player's touches. This is an observed one-frame delta, not a causal
+    /// estimate of each touch's multi-frame impulse.
     pub threat_added: f32,
     /// Sum of episode xG time integrals (`sum(V * dt) / tau` per episode)
     /// over episodes credited to this player.
@@ -105,9 +107,9 @@ impl ExpectedGoalsStatsAccumulator {
         &self.team_stats[usize::from(!is_team_0)]
     }
 
-    /// Fold one touch threat delta: only positive deltas count toward the
-    /// toucher's threat-added sum (giving the ball away is not negative
-    /// threat creation).
+    /// Fold one detection-frame touch threat delta: only positive deltas count
+    /// toward the toucher's threat-added sum. The delta is an observed
+    /// one-frame state change, not a causal multi-frame impulse estimate.
     pub fn apply_touch_event(&mut self, event: &ThreatTouchEvent) {
         let delta = event.delta();
         if delta <= 0.0 {

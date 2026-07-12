@@ -8,8 +8,10 @@ import type { LabeledFloatSums } from "./LabeledFloatSums.ts";
  */
 export type ExpectedGoalsPlayerStats = {
 /**
- * Sum of positive touch threat deltas (V after minus V before, from the
- * toucher's team's perspective) over the player's touches.
+ * Sum of positive detection-frame threat deltas (detection-frame V minus
+ * preceding-live-frame V, from the toucher's team's perspective) over the
+ * player's touches. This is an observed one-frame delta, not a causal
+ * estimate of each touch's multi-frame impulse.
  */
 threat_added: number,
 /**

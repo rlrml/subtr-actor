@@ -635,6 +635,28 @@ fn episode_opens_above_threshold_and_closes_on_value_drop() {
     assert_eq!(episode.credited_player, Some(player_id(1)));
 }
 
+/// Player credit follows the toucher associated with the episode's peak, not
+/// simply the last teammate to touch before the episode closes.
+#[test]
+fn later_lower_value_touch_does_not_steal_episode_credit_from_peak_toucher() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    calculator.team_states[0].last_toucher = Some(player_id(1));
+
+    calculator.update_episodes(&frame(1, 1.0), [0.5, 0.0]);
+    calculator.emit_touch_events(
+        &frame(2, 1.1),
+        &touch_state(vec![touch(2, 1.1, 2, true)]),
+        [0.3, 0.0],
+    );
+    calculator.update_episodes(&frame(2, 1.1), [0.3, 0.0]);
+    calculator.update_episodes(&frame(3, 1.2), [0.0, 0.0]);
+
+    let episodes = calculator.episode_events();
+    assert_eq!(episodes.len(), 1);
+    assert_eq!(episodes[0].peak_value, 0.5);
+    assert_eq!(episodes[0].credited_player, Some(player_id(1)));
+}
+
 #[test]
 fn goal_closes_episode_with_goal_outcome() {
     let mut calculator = ExpectedGoalsCalculator::new();

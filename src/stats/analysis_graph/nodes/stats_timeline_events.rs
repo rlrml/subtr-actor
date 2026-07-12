@@ -121,6 +121,10 @@ impl StatsTimelineEventsNode {
             powerslide_dependency(),
             demo_dependency(),
             center_dependency(),
+            // Expected goals includes a continuous team integral that the
+            // compact timeline exports as a change-point track rather than a
+            // full partial-sum frame snapshot.
+            expected_goals_dependency(),
             // The goal-context composition node (which itself pulls match
             // stats plus every goal-tag calculator).
             goal_context_dependency(),

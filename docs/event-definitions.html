@@ -147,8 +147,8 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="possession possession other definition pending."><td><a href="#event-possession">Possession</a></td><td><code>possession</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="rush rush other a quick possession transition where the attacking team has numbers moving out of its defensive half."><td><a href="#event-rush">Rush</a></td><td><code>rush</code></td><td class="summary">A quick possession transition where the attacking team has numbers moving out of its defensive half.</td></tr>
 <tr data-search="territorial pressure territorial_pressure other definition pending."><td><a href="#event-territorial_pressure">Territorial Pressure</a></td><td><code>territorial_pressure</code></td><td class="summary">Definition pending.</td></tr>
-<tr data-search="threat episode threat_episode other a contiguous span where one team&#39;s continuous threat value exceeds the episode threshold; its xg is the goal-calibrated time integral of v over the span (peak v is kept separately for intensity), credited to the attacking team&#39;s most recent toucher."><td><a href="#event-threat_episode">Threat Episode</a></td><td><code>threat_episode</code></td><td class="summary">A contiguous span where one team&#39;s continuous threat value exceeds the episode threshold; its xG is the goal-calibrated time integral of V over the span (peak V is kept separately for intensity), credited to the attacking team&#39;s most recent toucher.</td></tr>
-<tr data-search="threat touch delta threat_touch other the change in the touching team&#39;s continuous threat value (expected-goals state value) across one touch."><td><a href="#event-threat_touch">Threat Touch Delta</a></td><td><code>threat_touch</code></td><td class="summary">The change in the touching team&#39;s continuous threat value (expected-goals state value) across one touch.</td></tr>
+<tr data-search="threat episode threat_episode other a contiguous span where one team&#39;s continuous threat value exceeds the episode threshold; its xg is the goal-calibrated time integral of v over the span (peak v is kept separately for intensity), credited to the attacking toucher associated with the peak."><td><a href="#event-threat_episode">Threat Episode</a></td><td><code>threat_episode</code></td><td class="summary">A contiguous span where one team&#39;s continuous threat value exceeds the episode threshold; its xG is the goal-calibrated time integral of V over the span (peak V is kept separately for intensity), credited to the attacking toucher associated with the peak.</td></tr>
+<tr data-search="threat touch delta threat_touch other the positive detection-frame change in the touching team&#39;s continuous threat value (expected-goals state value), not a causal estimate of the touch&#39;s multi-frame impulse."><td><a href="#event-threat_touch">Threat Touch Delta</a></td><td><code>threat_touch</code></td><td class="summary">The positive detection-frame change in the touching team&#39;s continuous threat value (expected-goals state value), not a causal estimate of the touch&#39;s multi-frame impulse.</td></tr>
 <tr data-search="whiff whiff other a committed attempt near the ball that does not result in that player touching it."><td><a href="#event-whiff">Whiff</a></td><td><code>whiff</code></td><td class="summary">A committed attempt near the ball that does not result in that player touching it.</td></tr>
 </tbody></table></div>
 <div class="cat-group" data-group><div class="cat-head">Positioning</div>
@@ -1099,9 +1099,9 @@ ul.tight li { margin: .15rem 0; }
 <li><code>territorial_pressure</code> via <code>TerritorialPressureNode</code> / <code>TerritorialPressureCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-threat_episode" data-search="threat episode threat_episode other a contiguous span where one team&#39;s continuous threat value exceeds the episode threshold; its xg is the goal-calibrated time integral of v over the span (peak v is kept separately for intensity), credited to the attacking team&#39;s most recent toucher.">
+<div class="event" id="event-threat_episode" data-search="threat episode threat_episode other a contiguous span where one team&#39;s continuous threat value exceeds the episode threshold; its xg is the goal-calibrated time integral of v over the span (peak v is kept separately for intensity), credited to the attacking toucher associated with the peak.">
 <div class="head"><h3>Threat Episode</h3><code class="id">threat_episode</code><span class="badge">Other</span><span class="badge">hidden from review</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A contiguous span where one team&#39;s continuous threat value exceeds the episode threshold; its xG is the goal-calibrated time integral of V over the span (peak V is kept separately for intensity), credited to the attacking team&#39;s most recent toucher.</p>
+<p class="summary">A contiguous span where one team&#39;s continuous threat value exceeds the episode threshold; its xG is the goal-calibrated time integral of V over the span (peak V is kept separately for intensity), credited to the attacking toucher associated with the peak.</p>
 <div class="section-label">Confidence</div>
 <div class="conf">
 <span class="badge">Approach <b>Unknown</b></span>
@@ -1112,7 +1112,7 @@ ul.tight li { margin: .15rem 0; }
 </div>
 <div class="section-label">Approach</div>
 <ul class="tight">
-<li>Open an episode when a team&#39;s threat value V rises above the episode threshold during live play, accumulating the time integral sum(V * dt) / tau alongside the peak V and the team&#39;s most recent toucher.</li>
+<li>Open an episode when a team&#39;s threat value V rises above the episode threshold during live play, accumulating the time integral sum(V * dt) / tau alongside the peak V and the most recent attacking toucher when that peak was established.</li>
 <li>Close on V dropping back under the threshold, a goal for the team (always a goal-outcome close), or a stoppage.</li>
 <li>Hold stoppage-closed episodes pending until the goal that caused the stoppage is attributed (or the next kickoff/grace window passes), so goal outcomes are not lost to attribution lag.</li>
 </ul>
@@ -1125,9 +1125,9 @@ ul.tight li { margin: .15rem 0; }
 <li><code>expected_goals</code> via <code>ExpectedGoalsNode</code> / <code>ExpectedGoalsCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-threat_touch" data-search="threat touch delta threat_touch other the change in the touching team&#39;s continuous threat value (expected-goals state value) across one touch.">
+<div class="event" id="event-threat_touch" data-search="threat touch delta threat_touch other the positive detection-frame change in the touching team&#39;s continuous threat value (expected-goals state value), not a causal estimate of the touch&#39;s multi-frame impulse.">
 <div class="head"><h3>Threat Touch Delta</h3><code class="id">threat_touch</code><span class="badge">Other</span><span class="badge">hidden from review</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">The change in the touching team&#39;s continuous threat value (expected-goals state value) across one touch.</p>
+<p class="summary">The positive detection-frame change in the touching team&#39;s continuous threat value (expected-goals state value), not a causal estimate of the touch&#39;s multi-frame impulse.</p>
 <div class="section-label">Confidence</div>
 <div class="conf">
 <span class="badge">Approach <b>Unknown</b></span>
@@ -1139,7 +1139,7 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Approach</div>
 <ul class="tight">
 <li>Evaluate the versioned logistic threat model V(state) for both teams on every live-play frame from full ball and player physics state.</li>
-<li>On each attributed touch, emit the toucher&#39;s team&#39;s V just before the touch (previous live frame) and just after (the touch&#39;s frame).</li>
+<li>On each attributed touch, emit the toucher&#39;s team&#39;s V on the preceding live frame and on the detection frame; positive deltas contribute to threat_added.</li>
 </ul>
 <div class="section-label">Limitations</div>
 <p class="muted">None documented.</p>

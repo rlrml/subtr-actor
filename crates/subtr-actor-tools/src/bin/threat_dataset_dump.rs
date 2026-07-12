@@ -10,7 +10,8 @@
 //!
 //! Manifest rows are JSON objects, one per line:
 //! `{"path": ..., "ballchasing_id": ..., "playlist": ...,
-//!   "min_rank_tier": ..., "max_rank_tier": ..., "team_size": ..., ...}`.
+//!   "min_rank_tier": ..., "max_rank_tier": ..., "median_rank_tier": ...,
+//!   "team_size": ..., ...}`.
 //! Unknown keys are ignored.
 
 use std::io::{BufRead, Write};
@@ -69,6 +70,8 @@ struct ManifestRow {
     min_rank_tier: Option<i64>,
     #[serde(default)]
     max_rank_tier: Option<i64>,
+    #[serde(default)]
+    median_rank_tier: Option<f64>,
     #[serde(default)]
     team_size: Option<u32>,
 }
@@ -218,6 +221,7 @@ fn header() -> String {
         "playlist",
         "min_rank_tier",
         "max_rank_tier",
+        "median_rank_tier",
         "team_size",
         "is_team0",
         "time",
@@ -253,11 +257,14 @@ fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<Rep
     let replay_end_time = calculator.last_frame_time().unwrap_or(0.0);
     let replay_id = row.replay_id();
     let metadata_prefix = format!(
-        "{},{},{},{},{}",
+        "{},{},{},{},{},{}",
         csv_field(&replay_id),
         csv_field(row.playlist.as_deref().unwrap_or("")),
         optional_int(row.min_rank_tier),
         optional_int(row.max_rank_tier),
+        row.median_rank_tier
+            .map(|value| value.to_string())
+            .unwrap_or_default(),
         row.team_size
             .map(|value| value.to_string())
             .unwrap_or_default(),

@@ -1,20 +1,12 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#     "numpy>=1.26",
-#     "pandas>=2.1",
-#     "scikit-learn>=1.4",
-# ]
-# ///
 """Train the subtr-actor expected-goals threat model.
 
-Run with `uv run train_threat_model.py ...` — the PEP 723 block above (and
-the adjacent uv lock) pin the training environment so published coefficients
-have reproducible provenance.
+Run from this directory with `uv run --locked train_threat_model.py ...`, or
+from the repository root with `nix run .#train-threat-model -- ...`.
 
 Input: CSV from `threat_dataset_dump` with columns
-  replay_id, playlist, min_rank_tier, max_rank_tier, team_size, is_team0, time,
+  replay_id, playlist, min_rank_tier, max_rank_tier, median_rank_tier,
+  team_size, is_team0, time,
   <feature columns...>, time_to_next_goal_for, time_to_next_goal_against,
   time_to_replay_end
 
@@ -28,9 +20,11 @@ Outputs (to --out-dir):
 """
 
 import argparse
+import hashlib
+import importlib.metadata
 import json
 import pathlib
-import sys
+import platform
 
 import numpy as np
 import pandas as pd
@@ -45,6 +39,7 @@ META_COLS = [
     "playlist",
     "min_rank_tier",
     "max_rank_tier",
+    "median_rank_tier",
     "team_size",
     "is_team0",
     "time",
@@ -59,13 +54,27 @@ parser.add_argument("--tau", type=float, default=5.0)
 parser.add_argument("--out-dir", default="threat_model_out")
 parser.add_argument("--test-frac", type=float, default=0.2)
 parser.add_argument("--seed", type=int, default=7)
+parser.add_argument(
+    "--manifest",
+    help="source replay manifest; its SHA-256 is recorded in training provenance",
+)
 parser.add_argument("--gbt", action="store_true", help="also fit a GBT ceiling reference")
 args = parser.parse_args()
+
+
+def sha256_file(path: pathlib.Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
 
 out_dir = pathlib.Path(args.out_dir)
 out_dir.mkdir(parents=True, exist_ok=True)
 
-df = pd.read_csv(args.csv)
+csv_path = pathlib.Path(args.csv)
+df = pd.read_csv(csv_path)
 feature_cols = [c for c in df.columns if c not in META_COLS]
 print(f"rows={len(df)} features={feature_cols}")
 
@@ -87,13 +96,39 @@ print(f"kept={len(df)} censored_dropped={int(censored.sum())} base_rate={y.mean(
 
 bad = ~np.isfinite(X).all(axis=0)
 if bad.any():
-    print("WARNING: non-finite feature columns:", [feature_cols[i] for i in np.where(bad)[0]])
+    print(
+        "WARNING: non-finite feature columns:",
+        [feature_cols[i] for i in np.where(bad)[0]],
+    )
     X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
 
 splitter = GroupShuffleSplit(n_splits=1, test_size=args.test_frac, random_state=args.seed)
 train_idx, test_idx = next(splitter.split(X, y, groups))
 Xtr, Xte, ytr, yte = X[train_idx], X[test_idx], y[train_idx], y[test_idx]
 print(f"train={len(train_idx)} test={len(test_idx)} (grouped by replay)")
+
+
+def replay_set_hash(indices) -> str:
+    replay_ids = sorted({str(groups[index]) for index in indices})
+    return hashlib.sha256("\n".join(replay_ids).encode()).hexdigest()
+
+
+provenance = {
+    "dataset": str(csv_path),
+    "dataset_sha256": sha256_file(csv_path),
+    "manifest": args.manifest,
+    "manifest_sha256": sha256_file(pathlib.Path(args.manifest)) if args.manifest else None,
+    "seed": args.seed,
+    "test_fraction": args.test_frac,
+    "tau_seconds": tau,
+    "train_replay_ids_sha256": replay_set_hash(train_idx),
+    "test_replay_ids_sha256": replay_set_hash(test_idx),
+    "python": platform.python_version(),
+    "packages": {
+        name: importlib.metadata.version(name) for name in ("numpy", "pandas", "scikit-learn")
+    },
+}
+(out_dir / "training_provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
 
 scaler = StandardScaler().fit(Xtr)
 Xtr_s, Xte_s = scaler.transform(Xtr), scaler.transform(Xte)
@@ -102,7 +137,12 @@ lr = LogisticRegression(max_iter=2000, C=1.0)
 lr.fit(Xtr_s, ytr)
 p_lr = lr.predict_proba(Xte_s)[:, 1]
 
-lines = []
+lines = [
+    "provenance:",
+    *(f"  {key}={value}" for key, value in provenance.items() if key != "packages"),
+    *(f"  {name}={version}" for name, version in provenance["packages"].items()),
+    "",
+]
 
 
 def report(name, p, yt):
@@ -144,14 +184,14 @@ for pred, obs, n in calibration_table(p_lr, yte):
 # Per-rank calibration on test set
 test_df = df.iloc[test_idx]
 lines.append("\nper-rank-tier test metrics (logistic):")
-tiers = test_df["min_rank_tier"].to_numpy()
+tiers = test_df["median_rank_tier"].to_numpy()
 for tier in sorted(pd.unique(tiers[~pd.isna(tiers)])):
     m = tiers == tier
     if m.sum() < 2000 or yte[m].sum() < 20:
         lines.append(f"  tier={tier}: n={int(m.sum())} (too small, skipped)")
         continue
     lines.append(
-        f"  tier={int(tier)}: n={int(m.sum())} base={yte[m].mean():.5f} pred_mean={p_lr[m].mean():.5f} "
+        f"  tier={tier:g}: n={int(m.sum())} base={yte[m].mean():.5f} pred_mean={p_lr[m].mean():.5f} "
         f"log_loss={log_loss(yte[m], p_lr[m]):.5f} brier={brier_score_loss(yte[m], p_lr[m]):.5f}"
     )
 
@@ -166,7 +206,10 @@ b_raw = float(lr.intercept_[0] - np.sum(w_z * mu / sigma))
 
 coeffs = {name: float(w) for name, w in zip(feature_cols, w_raw)}
 (out_dir / "coefficients.json").write_text(
-    json.dumps({"bias": b_raw, "weights": coeffs, "tau": tau}, indent=1)
+    json.dumps(
+        {"bias": b_raw, "weights": coeffs, "tau": tau, "provenance": provenance},
+        indent=1,
+    )
 )
 
 # Emitted in the exact shape of the GENERATED COEFFICIENTS section of
@@ -190,7 +233,14 @@ rust.append("];")
 
 # Parity fixture: 6 test rows spanning the prediction range
 order = np.argsort(p_lr)
-picks = [order[0], order[len(order) // 4], order[len(order) // 2], order[3 * len(order) // 4], order[-2], order[-1]]
+picks = [
+    order[0],
+    order[len(order) // 4],
+    order[len(order) // 2],
+    order[3 * len(order) // 4],
+    order[-2],
+    order[-1],
+]
 fix = ["// (features in FEATURE_NAMES order, expected_v)"]
 for i in picks:
     raw = Xte[i]
@@ -198,4 +248,7 @@ for i in picks:
     fix.append(f"(&[{vals}], {f32(p_lr[i])}),")
 (out_dir / "parity_fixture.rs").write_text("\n".join(fix) + "\n")
 
-print(f"wrote {out_dir}/metrics.txt, coefficients.json, model_coefficients.rs, parity_fixture.rs")
+print(
+    f"wrote {out_dir}/metrics.txt, training_provenance.json, coefficients.json, "
+    "model_coefficients.rs, parity_fixture.rs"
+)

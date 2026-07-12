@@ -1155,10 +1155,10 @@ define_stats_event!(
     "threat_touch",
     "Threat Touch Delta",
     EventCategory::Other,
-    summary = "The change in the touching team's continuous threat value (expected-goals state value) across one touch.",
+    summary = "The positive detection-frame change in the touching team's continuous threat value (expected-goals state value), not a causal estimate of the touch's multi-frame impulse.",
     approach = [
         "Evaluate the versioned logistic threat model V(state) for both teams on every live-play frame from full ball and player physics state.",
-        "On each attributed touch, emit the toucher's team's V just before the touch (previous live frame) and just after (the touch's frame).",
+        "On each attributed touch, emit the toucher's team's V on the preceding live frame and on the detection frame; positive deltas contribute to threat_added.",
     ],
     hidden = true,
     scope = EventScope::Player
@@ -1169,9 +1169,9 @@ define_stats_event!(
     "threat_episode",
     "Threat Episode",
     EventCategory::Other,
-    summary = "A contiguous span where one team's continuous threat value exceeds the episode threshold; its xG is the goal-calibrated time integral of V over the span (peak V is kept separately for intensity), credited to the attacking team's most recent toucher.",
+    summary = "A contiguous span where one team's continuous threat value exceeds the episode threshold; its xG is the goal-calibrated time integral of V over the span (peak V is kept separately for intensity), credited to the attacking toucher associated with the peak.",
     approach = [
-        "Open an episode when a team's threat value V rises above the episode threshold during live play, accumulating the time integral sum(V * dt) / tau alongside the peak V and the team's most recent toucher.",
+        "Open an episode when a team's threat value V rises above the episode threshold during live play, accumulating the time integral sum(V * dt) / tau alongside the peak V and the most recent attacking toucher when that peak was established.",
         "Close on V dropping back under the threshold, a goal for the team (always a goal-outcome close), or a stoppage.",
         "Hold stoppage-closed episodes pending until the goal that caused the stoppage is attributed (or the next kickoff/grace window passes), so goal outcomes are not lost to attribution lag.",
     ],

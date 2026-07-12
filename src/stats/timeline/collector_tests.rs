@@ -64,6 +64,29 @@ fn event_set_counts(events: &ReplayStatsTimelineEvents) -> BTreeMap<String, usiz
     counts
 }
 
+fn expected_goals_team_at(
+    track: &ExpectedGoalsTeamTimelineTrack,
+    frame: usize,
+) -> ExpectedGoalsTeamStats {
+    track
+        .points
+        .iter()
+        .rev()
+        .find(|point| point.frame <= frame)
+        .map(|point| point.stats.clone())
+        .unwrap_or_default()
+}
+
+fn expected_goals_player_at(
+    track: Option<&ExpectedGoalsPlayerTimelineTrack>,
+    frame: usize,
+) -> ExpectedGoalsPlayerStats {
+    track
+        .and_then(|track| track.points.iter().rev().find(|point| point.frame <= frame))
+        .map(|point| point.stats.clone())
+        .unwrap_or_default()
+}
+
 fn canonical_event_sets(events: &ReplayStatsTimelineEvents) -> BTreeMap<String, Vec<String>> {
     let value = serde_json::to_value(events).expect("events should serialize");
     value
@@ -225,6 +248,23 @@ fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(r
             "{replay_path} scaffold live-play flag should match"
         );
 
+        for (is_team_0, full_stats) in [
+            (true, &full_frame.team_zero.expected_goals),
+            (false, &full_frame.team_one.expected_goals),
+        ] {
+            let track = scaffold_timeline
+                .expected_goals_tracks
+                .teams
+                .iter()
+                .find(|track| track.is_team_0 == is_team_0)
+                .expect("compact timeline should include both expected-goals team tracks");
+            assert_eq!(
+                expected_goals_team_at(track, scaffold_frame.frame_number),
+                *full_stats,
+                "{replay_path} compact team expected goals should match full frame"
+            );
+        }
+
         assert!(
             scaffold_frame.team_zero.is_empty(),
             "{replay_path} event scaffold should not carry team-zero stat modules"
@@ -251,6 +291,16 @@ fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(r
             assert_eq!(
                 scaffold_player.is_team_0, full_player.is_team_0,
                 "{replay_path} scaffold player team should match"
+            );
+            let track = scaffold_timeline
+                .expected_goals_tracks
+                .players
+                .iter()
+                .find(|track| track.player_id == scaffold_player.player_id);
+            assert_eq!(
+                expected_goals_player_at(track, scaffold_frame.frame_number),
+                full_player.expected_goals,
+                "{replay_path} compact player expected goals should match full frame"
             );
         }
     }

@@ -41,6 +41,7 @@ declare module "@rlrml/subtr-actor" {
       activitySummary: Uint8Array;
       positioningSummary: Uint8Array;
       accumulationTracks: Uint8Array;
+      expectedGoalsTracks: Uint8Array;
       frameChunks: Uint8Array[];
     };
   };
@@ -63,6 +64,7 @@ declare module "@rlrml/subtr-actor" {
     activitySummary: Uint8Array;
     positioningSummary: Uint8Array;
     accumulationTracks: Uint8Array;
+    expectedGoalsTracks: Uint8Array;
     frameChunks: Uint8Array[];
   };
 }

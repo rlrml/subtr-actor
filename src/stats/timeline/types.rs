@@ -91,6 +91,49 @@ pub struct ReplayStatsTimelineScaffold {
     /// alongside the event-only frames so the player can show a value growing during playback
     /// without re-deriving it from events. See [`AccumulationTrack`].
     pub accumulation_tracks: Vec<AccumulationTrack>,
+    /// Change-point-compressed expected-goals snapshots. Team xG is a
+    /// continuous full-play integral and therefore cannot be reconstructed
+    /// from the discrete threat episodes alone; these tracks preserve that
+    /// value together with the sparse player and episode counters.
+    pub expected_goals_tracks: ExpectedGoalsTimelineTracks,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ExpectedGoalsTimelineTracks {
+    pub teams: Vec<ExpectedGoalsTeamTimelineTrack>,
+    pub players: Vec<ExpectedGoalsPlayerTimelineTrack>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ExpectedGoalsTeamTimelineTrack {
+    pub is_team_0: bool,
+    pub points: Vec<ExpectedGoalsTeamTimelinePoint>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ExpectedGoalsTeamTimelinePoint {
+    pub frame: usize,
+    pub stats: ExpectedGoalsTeamStats,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ExpectedGoalsPlayerTimelineTrack {
+    #[serde(rename = "player_id")]
+    #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
+    pub player_id: PlayerId,
+    pub is_team_0: bool,
+    pub points: Vec<ExpectedGoalsPlayerTimelinePoint>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct ExpectedGoalsPlayerTimelinePoint {
+    pub frame: usize,
+    pub stats: ExpectedGoalsPlayerStats,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]

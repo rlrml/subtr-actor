@@ -7,14 +7,16 @@
 //! seconds, computed from full ball + player physics state. Shots are *not* a
 //! gating event -- threat is continuous. Derived observations:
 //!
-//! - [`ThreatTouchEvent`]: the change in the touching team's V across each
-//!   touch (V just after minus V just before, both from the toucher's team's
-//!   perspective).
+//! - [`ThreatTouchEvent`]: the detection-frame change in the touching team's V
+//!   (detection-frame V minus the preceding live-frame V, both from the
+//!   toucher's team's perspective). This is an observed one-frame delta, not a
+//!   causal estimate of a touch's multi-frame impulse.
 //! - [`ThreatEpisodeEvent`]: a contiguous span where one team's V exceeds
 //!   [`THREAT_EPISODE_THRESHOLD`]; the episode's xG is the time integral
 //!   `sum(V * dt) / tau` over the span (`tau` =
 //!   [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS)),
-//!   credited to the attacking team's most recent toucher. Corpus-calibrated:
+//!   credited to the attacking toucher associated with the episode's peak V.
+//!   Corpus-calibrated:
 //!   the full-match integral matches actual goals per team-game within ~1%,
 //!   whereas summing episode *peak* V over-counts goals ~2.7x; the peak
 //!   survives on the event as `peak_value` for display/intensity.
@@ -349,7 +351,7 @@ pub fn compute_threat_features(
     }
 }
 
-/// The change in the touching team's V across one touch.
+/// The detection-frame change in the touching team's V for one touch.
 ///
 /// A touch recovered from the candidate cache can be *backdated*: its contact
 /// moment precedes the frame the stats pipeline detected it on. Fields
@@ -363,7 +365,9 @@ pub fn compute_threat_features(
 ///   on the detection frame itself. The ΔV bracketing deliberately anchors on
 ///   detection rather than contact: V is only evaluated on processed live
 ///   frames, and the detection frame is the first frame whose ball/player
-///   state reflects the touch.
+///   state reflects the touch. Consequently, [`Self::delta`] is an observed
+///   one-frame state-value change, not a causal estimate of the touch's full
+///   multi-frame impulse.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ThreatTouchEvent {
     /// Contact time of the underlying touch (can precede `detection_time`).
@@ -406,9 +410,10 @@ pub enum ThreatEpisodeEndReason {
 }
 
 /// A contiguous span where one team's V exceeded the episode threshold.
-/// `credited_player` is the attacking team's most recent toucher (within the
-/// same live stretch) at close time, `None` when the team never touched --
-/// team-only credit.
+/// `credited_player` is the attacking team's most recent toucher when the
+/// episode reached `peak_value`, `None` when the team had not touched during
+/// the live stretch by that point -- team-only credit. Later touches at lower
+/// V do not take credit for threat accumulated before them.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ThreatEpisodeEvent {
     pub start_time: f32,
@@ -481,6 +486,7 @@ struct ActiveThreatEpisode {
     peak_value: f32,
     /// Running `sum(V * dt) / tau` over the episode's evaluated live frames.
     xg_integral: f64,
+    /// Most recent attacking toucher when `peak_value` was established.
     credited_player: Option<PlayerId>,
 }
 
@@ -775,10 +781,7 @@ impl ExpectedGoalsCalculator {
             });
             if let Some(player) = touch.player.clone() {
                 let state = &mut self.team_states[index];
-                state.last_toucher = Some(player.clone());
-                if let Some(active) = state.active_episode.as_mut() {
-                    active.credited_player = Some(player);
-                }
+                state.last_toucher = Some(player);
             }
         }
     }
@@ -792,9 +795,13 @@ impl ExpectedGoalsCalculator {
     fn update_episodes(&mut self, frame: &FrameInfo, values: [f32; 2]) {
         for (team_index, state) in self.team_states.iter_mut().enumerate() {
             let value = values[team_index];
+            let last_toucher = state.last_toucher.clone();
             match state.active_episode.as_mut() {
                 Some(active) => {
-                    active.peak_value = active.peak_value.max(value);
+                    if value > active.peak_value {
+                        active.peak_value = value;
+                        active.credited_player = last_toucher;
+                    }
                     active.xg_integral += Self::integral_contribution(value, frame.dt);
                     if value <= self.config.episode_threshold {
                         let active = state
@@ -818,7 +825,7 @@ impl ExpectedGoalsCalculator {
                             start_frame: frame.frame_number,
                             peak_value: value,
                             xg_integral: Self::integral_contribution(value, frame.dt),
-                            credited_player: state.last_toucher.clone(),
+                            credited_player: last_toucher,
                         });
                     }
                 }
