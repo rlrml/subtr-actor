@@ -1241,11 +1241,11 @@ _None documented._
 
 **Summary**
 
-A contiguous span where one team's continuous threat value exceeds the episode threshold; its xG is the span's peak value, credited to the attacking team's most recent toucher.
+A contiguous span where one team's continuous threat value exceeds the episode threshold; its xG is the goal-calibrated time integral of V over the span (peak V is kept separately for intensity), credited to the attacking team's most recent toucher.
 
 **Approach**
 
-- Open an episode when a team's threat value V rises above the episode threshold during live play, and track the peak V and the team's most recent toucher.
+- Open an episode when a team's threat value V rises above the episode threshold during live play, accumulating the time integral sum(V * dt) / tau alongside the peak V and the team's most recent toucher.
 - Close on V dropping back under the threshold, a goal for the team (always a goal-outcome close), or a stoppage.
 - Hold stoppage-closed episodes pending until the goal that caused the stoppage is attributed (or the next kickoff/grace window passes), so goal outcomes are not lost to attribution lag.
 
