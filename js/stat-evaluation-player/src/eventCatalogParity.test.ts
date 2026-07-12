@@ -29,10 +29,6 @@ const CORE_AGGREGATED = new Set(["assist", "goal", "save", "shot"]);
 // timeline stream.
 const NOT_SURFACED = new Set([
   "event", // the generic timeline envelope, not a concrete event type
-  // Expected-goals events remain hidden until the threat-curve timeline UI is
-  // implemented; the Rust registry still documents them in the meantime.
-  "threat_episode",
-  "threat_touch",
 ]);
 
 test("every registry event is represented in the player (or explicitly excepted)", () => {
