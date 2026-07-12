@@ -1146,6 +1146,21 @@ pub fn builtin_analysis_node_json(
                 "last_touch_team_is_team_0": state.last_touch_team_is_team_0,
             })
         }
+        "expected_goals" => {
+            let state = graph_state::<ExpectedGoalsCalculator>(graph, node_name)?;
+            json!({
+                "config": {
+                    "episode_threshold": state.config().episode_threshold,
+                    "sample_interval_seconds": state.config().sample_interval_seconds,
+                },
+                "current_values": state.current_values(),
+                "touch_events": state.touch_events(),
+                "episode_events": state.episode_events(),
+                "samples": state.samples(),
+                "goal_records": state.goal_records(),
+                "last_frame_time": state.last_frame_time(),
+            })
+        }
         "possession_state" => {
             let state = graph_state::<PossessionState>(graph, node_name)?;
             json!({
