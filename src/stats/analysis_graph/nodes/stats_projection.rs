@@ -660,6 +660,11 @@ impl StatsProjectionNode {
         ) {
             self.state.expected_goals.apply_episode_event(event);
         }
+        // Team xG is the calculator's full-match integral (absolute totals,
+        // not an event fold), refreshed every projection step.
+        self.state
+            .expected_goals
+            .set_team_xg_integrals(expected_goals.team_xg_integrals());
 
         self.finish_sample();
         self.previous_live_play = Some(live_play);

@@ -158,6 +158,19 @@ const STATS_FRAME_MATERIALIZATION_CHUNK_GROWTH_FACTOR = 2;
 
 export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventDerivedApplier[] = [
   {
+    // The threat events behind expected_goals (threat_touch / threat_episode)
+    // are hidden registry entries that are not projected onto the stats
+    // timeline event stream yet, so the module cannot be event-derived:
+    // hydrated frames keep the zeroed factory defaults until a threat-event
+    // timeline projection ships. Full values are available through the Rust
+    // stats-module surfaces (builtin module JSON / ReplayStatsFrame).
+    id: "expected-goals",
+    playerModules: ["expected_goals"],
+    teamModules: ["expected_goals"],
+    apply: (timeline) => timeline,
+    createFrameAccumulator: () => ({ applyFrame: () => {} }),
+  },
+  {
     id: "event-counts",
     playerModules: ["event_counts"],
     teamModules: ["event_counts"],

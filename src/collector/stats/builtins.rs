@@ -419,6 +419,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "ball_carry",
         "controlled_play",
         "air_dribble",
+        "expected_goals",
         "boost",
         "bump",
         "movement",
@@ -843,6 +844,17 @@ pub(crate) fn builtin_module_json(
                 ),
                 events: calculator.events(),
             })
+        }
+        "expected_goals" => {
+            let calculator = graph_state::<ExpectedGoalsCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&serde_json::json!({
+                "team_zero": projection.expected_goals.team_stats(true),
+                "team_one": projection.expected_goals.team_stats(false),
+                "player_stats": player_stats_entries(projection.expected_goals.player_stats()),
+                "touch_events": calculator.touch_events(),
+                "episode_events": calculator.episode_events(),
+            }))
         }
         "boost" => {
             let calculator = graph_state::<BoostCalculator>(graph, module_name)?;
@@ -1544,6 +1556,14 @@ pub(crate) fn builtin_snapshot_frame_json(
                 ),
             })?
         }
+        "expected_goals" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.expected_goals.team_stats(true),
+                team_one: projection.expected_goals.team_stats(false),
+                player_stats: player_stats_entries(projection.expected_goals.player_stats()),
+            })?
+        }
         "boost" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsExport {
@@ -1767,6 +1787,12 @@ pub(crate) fn builtin_snapshot_config_json(
             Some(serialize_to_json_value(&serde_json::json!({
                 "half_volley_max_bounce_to_touch_seconds": calculator.config().max_bounce_to_touch_seconds,
                 "half_volley_min_ball_speed": calculator.config().min_ball_speed,
+            }))?)
+        }
+        "expected_goals" => {
+            let calculator = graph_state::<ExpectedGoalsCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "expected_goals_episode_threshold": calculator.config().episode_threshold,
             }))?)
         }
         "core"

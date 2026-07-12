@@ -513,6 +513,7 @@ pub struct TeamStatsSnapshot {
     pub positioning: PositioningTeamStats,
     pub powerslide: PowerslideStats,
     pub demo: DemoTeamStats,
+    pub expected_goals: ExpectedGoalsTeamStats,
 }
 
 /// Player-owned fields in the materialized stats timeline export.
@@ -555,4 +556,5 @@ pub struct PlayerStatsSnapshot {
     pub rotation: RotationPlayerStats,
     pub powerslide: PowerslideStats,
     pub demo: DemoPlayerStats,
+    pub expected_goals: ExpectedGoalsPlayerStats,
 }

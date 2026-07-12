@@ -25,44 +25,46 @@ pub const THREAT_HORIZON_SECONDS: f32 = 5.0;
 // Everything between these markers is replaced wholesale when the offline
 // training script publishes a fitted model.
 //
-// trained-v1 provenance: logistic regression fit by
-// scripts/threat_model/train_threat_model.py on 10.3M live-play rows sampled
-// at 4 Hz from 5,280 rank-stratified ranked-duels/-doubles replays
-// (rocket-sense production corpus, rank tiers 1-22, 2026-07-12). Grouped
-// train/test split by replay. Held-out: log_loss 0.169, Brier 0.0468,
-// AUC 0.885 (constant-rate baseline log_loss 0.252); GBT reference ceiling
-// log_loss 0.154. Calibration tracks observed frequency within ~10% relative
-// across all 15 prediction-quantile bins and across rank tiers.
-// Standardization is folded in; weights apply to raw features.
+// trained-v2 provenance: logistic regression fit by
+// scripts/threat_model/train_threat_model.py (uv-locked environment) on
+// 10.3M live-play rows sampled at 4 Hz from 5,280 rank-stratified
+// ranked-duels/-doubles replays (rocket-sense production corpus, rank tiers
+// 1-22, 2026-07-12). Retrained after fixing defenders_goalside to normalize
+// by the defending roster. Grouped train/test split by replay. Held-out:
+// log_loss 0.169, Brier 0.0468, AUC 0.885 (constant-rate baseline log_loss
+// 0.252); GBT reference ceiling log_loss 0.154. Calibration tracks observed
+// frequency within ~10% relative across all 15 prediction-quantile bins and
+// across rank tiers. Standardization is folded in; weights apply to raw
+// features.
 // ---------------------------------------------------------------------------
 
 /// Identifies the coefficient set embedded below. `heuristic-v0` marks the
 /// hand-tuned placeholder; trained models use `trained-v<N>` stamps.
-pub const THREAT_MODEL_VERSION: &str = "trained-v1";
+pub const THREAT_MODEL_VERSION: &str = "trained-v2";
 
-pub const THREAT_MODEL_BIAS: f32 = -0.441_601_53;
+pub const THREAT_MODEL_BIAS: f32 = -0.44989115;
 
 /// One weight per [`ThreatFeatures::FEATURE_NAMES`] entry, in that exact
 /// order. The pairing is enforced by `weights_cover_every_feature` in the
 /// adjacent test module.
 pub const THREAT_MODEL_WEIGHTS: [(&str, f32); THREAT_FEATURE_COUNT] = [
-    ("ball_forward_y", -0.030_214_028),
-    ("ball_dist_to_goal", -4.603_913),
-    ("ball_height", -0.096_484_2),
-    ("ball_speed", -2.722_955_2),
-    ("ball_speed_toward_goal", 5.354_401_5),
-    ("goal_open_angle", 1.949_296_7),
-    ("on_target", 1.312_370_6),
-    ("time_to_goal_line", -0.260_346_38),
-    ("nearest_attacker_dist", -2.061_250_7),
-    ("attackers_ahead_of_ball", -0.552_131_2),
-    ("attackers_behind_ball", 0.387_900_9),
-    ("nearest_defender_dist", 1.003_443_6),
-    ("nearest_defender_to_goal_dist", 1.805_623),
-    ("defenders_goalside", -0.772_091_76),
-    ("defender_in_net", -0.183_698_83),
-    ("nearest_defender_boost", -0.404_413_3),
-    ("attacking_team_size", -0.265_604_6),
+    ("ball_forward_y", -0.030237095),
+    ("ball_dist_to_goal", -4.582302),
+    ("ball_height", -0.095492415),
+    ("ball_speed", -2.7069197),
+    ("ball_speed_toward_goal", 5.3320007),
+    ("goal_open_angle", 1.945358),
+    ("on_target", 1.3097814),
+    ("time_to_goal_line", -0.25473773),
+    ("nearest_attacker_dist", -2.0624259),
+    ("attackers_ahead_of_ball", -0.54946756),
+    ("attackers_behind_ball", 0.38570327),
+    ("nearest_defender_dist", 1.0084612),
+    ("nearest_defender_to_goal_dist", 1.7910457),
+    ("defenders_goalside", -0.7728923),
+    ("defender_in_net", -0.18298395),
+    ("nearest_defender_boost", -0.4043592),
+    ("attacking_team_size", -0.25949645),
 ];
 
 // ---------------------------------------------------------------------------

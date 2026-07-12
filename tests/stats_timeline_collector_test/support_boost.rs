@@ -174,6 +174,7 @@ fn default_team_stats_snapshot() -> TeamStatsSnapshot {
         positioning: PositioningTeamStats::default(),
         powerslide: PowerslideStats::default(),
         demo: DemoTeamStats::default(),
+        expected_goals: ExpectedGoalsTeamStats::default(),
     }
 }
 
@@ -215,6 +216,7 @@ fn default_player_stats_snapshot(
         rotation: RotationPlayerStats::default(),
         powerslide: PowerslideStats::default(),
         demo: DemoPlayerStats::default(),
+        expected_goals: ExpectedGoalsPlayerStats::default(),
     }
 }
 

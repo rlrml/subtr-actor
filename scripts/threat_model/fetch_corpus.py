@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
-"""Fetch a rank-stratified replay corpus from the rocket-sense production API.
+"""Fetch a rank-stratified replay corpus from a rocket-sense instance.
 
 Phase 1: paginate /api/v1/replays (processed) and cache the listing.
 Phase 2: stratified sample by (playlist, median rank tier), download files.
 Writes manifest.jsonl compatible with threat_dataset_dump.
+
+Configuration (environment variables):
+  ROCKET_SENSE_API_TOKEN         bearer token for the API
+  ROCKET_SENSE_TOKEN_COMMAND     shell command printing the token on stdout
+                                 (default: `pass show rocket-sense/token`)
+  ROCKET_SENSE_BASE_URL          API base (default the production instance)
+  THREAT_CORPUS_CACHE            cache directory
+                                 (default ~/.cache/subtr-actor-threat-corpus)
+  PER_STRATUM                    replays per (playlist, tier) stratum (150)
 """
 
 import concurrent.futures
@@ -15,17 +24,33 @@ import subprocess
 import sys
 import urllib.request
 
-BASE = "https://rocket-sense.duckdns.org/api/v1"
-CACHE = pathlib.Path.home() / ".cache/subtr-actor-threat-corpus"
+BASE = os.environ.get("ROCKET_SENSE_BASE_URL", "https://rocket-sense.duckdns.org/api/v1")
+CACHE = pathlib.Path(
+    os.environ.get("THREAT_CORPUS_CACHE", pathlib.Path.home() / ".cache/subtr-actor-threat-corpus")
+)
 LISTING = CACHE / "listing.jsonl"
 MANIFEST = CACHE / "manifest.jsonl"
 REPLAYS = CACHE / "replays"
 PER_STRATUM = int(os.environ.get("PER_STRATUM", "150"))  # per (playlist, tier)
 PLAYLISTS = {"ranked-doubles", "ranked-duels", "ranked-standard"}
 
-TOKEN = subprocess.run(
-    ["pass", "show", "rocket-sense/token"], capture_output=True, text=True, check=True
-).stdout.splitlines()[0].strip()
+
+def resolve_token() -> str:
+    token = os.environ.get("ROCKET_SENSE_API_TOKEN")
+    if token:
+        return token.strip()
+    command = os.environ.get("ROCKET_SENSE_TOKEN_COMMAND", "pass show rocket-sense/token")
+    result = subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
+    token = result.stdout.splitlines()[0].strip() if result.stdout else ""
+    if not token:
+        raise SystemExit(
+            "no API token: set ROCKET_SENSE_API_TOKEN or make "
+            "ROCKET_SENSE_TOKEN_COMMAND print one"
+        )
+    return token
+
+
+TOKEN: str | None = None
 
 
 def api(path):
@@ -107,6 +132,8 @@ def download(r):
 
 
 def main():
+    global TOKEN
+    TOKEN = resolve_token()
     REPLAYS.mkdir(parents=True, exist_ok=True)
     rows = fetch_listing()
     picked = stratify(rows)

@@ -83,6 +83,19 @@ fn touch(frame_number: usize, time: f32, id: u64, is_team_0: bool) -> TouchEvent
     }
 }
 
+fn touch_with_id(
+    frame_number: usize,
+    time: f32,
+    id: u64,
+    is_team_0: bool,
+    touch_id: Option<u64>,
+) -> TouchEvent {
+    TouchEvent {
+        touch_id,
+        ..touch(frame_number, time, id, is_team_0)
+    }
+}
+
 fn touch_state(touches: Vec<TouchEvent>) -> TouchState {
     TouchState {
         touch_events: touches,
@@ -359,6 +372,195 @@ fn touch_delta_event_carries_before_and_after_values() {
     );
 }
 
+/// Two same-team touches on one frame share a single previous-frame ->
+/// current-frame V transition; only the team's primary (latest,
+/// best-evidence) touch may be credited or the accumulator double-counts it.
+#[test]
+fn simultaneous_same_team_touches_credit_one_event_for_the_frame_transition() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    let (neutral_ball, neutral_players) = neutral_state();
+    let (danger_ball, danger_players) = dangerous_state();
+
+    update(
+        &mut calculator,
+        1,
+        1.0,
+        &neutral_ball,
+        &neutral_players,
+        FrameEventsState::default(),
+        vec![],
+        live_play(),
+    );
+    let neutral_value = calculator.current_values().unwrap()[0];
+
+    // Player 5's contact is backdated a frame; player 1's is the latest
+    // contact and therefore the team's primary touch.
+    update(
+        &mut calculator,
+        2,
+        1.1,
+        &danger_ball,
+        &danger_players,
+        FrameEventsState::default(),
+        vec![touch(1, 1.05, 5, true), touch(2, 1.1, 1, true)],
+        live_play(),
+    );
+
+    let events = calculator.touch_events();
+    assert_eq!(
+        events.len(),
+        1,
+        "one frame transition must be credited exactly once per team"
+    );
+    let event = &events[0];
+    assert_eq!(event.player, Some(player_id(1)));
+    assert!((event.value_before - neutral_value).abs() < 1e-6);
+    assert_eq!(event.value_after, calculator.current_values().unwrap()[0]);
+}
+
+/// A cache-recovered touch is backdated: contact fields keep the touch's own
+/// frame/time/id while the detection fields (which the ΔV brackets) carry the
+/// processing frame.
+#[test]
+fn backdated_touch_keeps_contact_fields_and_detection_fields_separate() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    let (neutral_ball, neutral_players) = neutral_state();
+    let (danger_ball, danger_players) = dangerous_state();
+
+    update(
+        &mut calculator,
+        2,
+        1.1,
+        &neutral_ball,
+        &neutral_players,
+        FrameEventsState::default(),
+        vec![],
+        live_play(),
+    );
+    let neutral_value = calculator.current_values().unwrap()[0];
+
+    update(
+        &mut calculator,
+        3,
+        1.2,
+        &danger_ball,
+        &danger_players,
+        FrameEventsState::default(),
+        vec![touch_with_id(1, 0.95, 1, true, Some(42))],
+        live_play(),
+    );
+
+    let events = calculator.touch_events();
+    assert_eq!(events.len(), 1);
+    let event = &events[0];
+    assert_eq!(event.frame, 1, "contact frame comes from the touch");
+    assert!(
+        (event.time - 0.95).abs() < 1e-6,
+        "contact time comes from the touch"
+    );
+    assert_eq!(event.touch_id, Some(42));
+    assert_eq!(
+        event.detection_frame, 3,
+        "detection frame is the processing frame"
+    );
+    assert!((event.detection_time - 1.2).abs() < 1e-6);
+    assert!(
+        (event.value_before - neutral_value).abs() < 1e-6,
+        "value_before brackets the detection frame, not the contact frame"
+    );
+    assert_eq!(event.value_after, calculator.current_values().unwrap()[0]);
+}
+
+/// `defenders_goalside` normalizes by the DEFENDING team's eligible roster:
+/// on a 2v1 the lone goalside defender is 1/1, not 1/2.
+#[test]
+fn defenders_goalside_normalizes_by_defending_team_size() {
+    let players = PlayerFrameState {
+        players: vec![
+            player(1, true, glam::Vec3::new(0.0, 2000.0, 17.0), Some(100.0)),
+            player(2, true, glam::Vec3::new(500.0, 1500.0, 17.0), Some(100.0)),
+            player(3, false, glam::Vec3::new(0.0, 4000.0, 17.0), Some(50.0)),
+        ],
+    };
+    let features = compute_threat_features(
+        glam::Vec3::new(0.0, 3000.0, 93.0),
+        glam::Vec3::ZERO,
+        &players,
+        &no_demoed(),
+        true,
+    );
+    assert_eq!(features.attacking_team_size, 2.0);
+    assert_eq!(
+        features.defenders_goalside, 1.0,
+        "one of one eligible defenders is goalside"
+    );
+
+    // The same frame with the defender demoed: no eligible defenders, and the
+    // zero-roster guard keeps the feature finite.
+    let demoed: HashSet<PlayerId> = [player_id(3)].into_iter().collect();
+    let features_demoed = compute_threat_features(
+        glam::Vec3::new(0.0, 3000.0, 93.0),
+        glam::Vec3::ZERO,
+        &players,
+        &demoed,
+        true,
+    );
+    assert_eq!(features_demoed.defenders_goalside, 0.0);
+}
+
+/// A same-team goal arriving after the pending episode's goal grace has
+/// passed must NOT upgrade the stale episode: it closes as the stoppage it
+/// already was.
+#[test]
+fn goal_after_pending_grace_expiry_does_not_upgrade_episode() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    let (danger_ball, danger_players) = dangerous_state();
+
+    update(
+        &mut calculator,
+        1,
+        1.0,
+        &danger_ball,
+        &danger_players,
+        FrameEventsState::default(),
+        vec![],
+        live_play(),
+    );
+    update(
+        &mut calculator,
+        2,
+        1.1,
+        &danger_ball,
+        &danger_players,
+        FrameEventsState::default(),
+        vec![],
+        stoppage(),
+    );
+    assert!(calculator.episode_events().is_empty());
+
+    // Goal detection runs before stale-pending expiry within a frame, so
+    // this goal (well past closed_at + grace) sees the pending episode.
+    update(
+        &mut calculator,
+        3,
+        20.0,
+        &danger_ball,
+        &danger_players,
+        FrameEventsState {
+            goal_events: vec![goal_event(3, 20.0, true)],
+            ..FrameEventsState::default()
+        },
+        vec![],
+        stoppage(),
+    );
+
+    let episodes = calculator.episode_events();
+    assert_eq!(episodes.len(), 1);
+    assert!(!episodes[0].ended_in_goal);
+    assert_eq!(episodes[0].end_reason, ThreatEpisodeEndReason::Stoppage);
+    assert_eq!(calculator.goal_records().len(), 1);
+}
+
 #[test]
 fn episode_opens_above_threshold_and_closes_on_value_drop() {
     let mut calculator = ExpectedGoalsCalculator::new();
@@ -412,6 +614,7 @@ fn episode_opens_above_threshold_and_closes_on_value_drop() {
         vec![],
         live_play(),
     );
+    let neutral_value = calculator.current_values().unwrap()[0];
 
     let episodes = calculator.episode_events();
     assert_eq!(episodes.len(), 1);
@@ -421,7 +624,14 @@ fn episode_opens_above_threshold_and_closes_on_value_drop() {
     assert_eq!(episode.end_frame, 4);
     assert_eq!(episode.end_reason, ThreatEpisodeEndReason::ValueDropped);
     assert!(!episode.ended_in_goal);
-    assert!((episode.xg - peak).abs() < 1e-6);
+    assert!((episode.peak_value - peak).abs() < 1e-6);
+    // xg is the time integral over the episode's evaluated frames: the two
+    // danger frames plus the sub-threshold frame that closed it, each
+    // contributing V * dt / tau with dt = 0.1.
+    let expected_integral =
+        (2.0 * peak + neutral_value) * 0.1 / expected_goals_model::THREAT_HORIZON_SECONDS;
+    assert!((episode.xg - expected_integral).abs() < 1e-6);
+    assert!(episode.xg < episode.peak_value);
     assert_eq!(episode.credited_player, Some(player_id(1)));
 }
 
@@ -617,6 +827,81 @@ fn sampling_records_two_attacking_normalized_rows_per_sampled_frame() {
     }
 }
 
+/// Constant V over N evaluated frames of known dt integrates to exactly
+/// N * V * dt / tau (replay-end close: no extra closing-frame contribution).
+#[test]
+fn episode_xg_is_the_time_integral_of_v_over_the_episode() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    let (danger_ball, danger_players) = dangerous_state();
+
+    let frame_count = 3usize;
+    for step in 0..frame_count {
+        update(
+            &mut calculator,
+            step + 1,
+            1.0 + step as f32 * 0.1,
+            &danger_ball,
+            &danger_players,
+            FrameEventsState::default(),
+            vec![],
+            live_play(),
+        );
+    }
+    let value = calculator.current_values().unwrap()[0];
+    calculator.finish_calculation().unwrap();
+
+    let episodes = calculator.episode_events();
+    assert_eq!(episodes.len(), 1);
+    let episode = &episodes[0];
+    let expected = frame_count as f32 * value * 0.1 / expected_goals_model::THREAT_HORIZON_SECONDS;
+    assert!(
+        (episode.xg - expected).abs() < 1e-6,
+        "episode xg {} != N * V * dt / tau = {}",
+        episode.xg,
+        expected
+    );
+    assert!((episode.peak_value - value).abs() < 1e-6);
+}
+
+/// The team's full-match integral accumulates on every evaluated live frame,
+/// including sub-threshold ones where no episode ever opens.
+#[test]
+fn team_xg_integral_accumulates_sub_threshold_frames_without_episodes() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    let (neutral_ball, neutral_players) = neutral_state();
+
+    let frame_count = 4usize;
+    for step in 0..frame_count {
+        update(
+            &mut calculator,
+            step + 1,
+            1.0 + step as f32 * 0.1,
+            &neutral_ball,
+            &neutral_players,
+            FrameEventsState::default(),
+            vec![],
+            live_play(),
+        );
+    }
+    let value = calculator.current_values().unwrap()[0];
+    assert!(value < THREAT_EPISODE_THRESHOLD);
+    calculator.finish_calculation().unwrap();
+
+    assert!(calculator.episode_events().is_empty());
+    let integrals = calculator.team_xg_integrals();
+    let expected =
+        f64::from(frame_count as f32 * value * 0.1 / expected_goals_model::THREAT_HORIZON_SECONDS);
+    assert!(integrals[0] > 0.0);
+    assert!((integrals[0] - expected).abs() < 1e-6);
+    assert!(integrals[1] > 0.0);
+
+    // The accumulator's team xg is fed from exactly this state.
+    let mut accumulator = ExpectedGoalsStatsAccumulator::new();
+    accumulator.set_team_xg_integrals(integrals);
+    assert!((f64::from(accumulator.team_stats(true).xg) - integrals[0]).abs() < 1e-6);
+    assert!((f64::from(accumulator.team_stats(false).xg) - integrals[1]).abs() < 1e-6);
+}
+
 #[test]
 fn accumulator_folds_touch_deltas_and_episode_xg() {
     let mut accumulator = ExpectedGoalsStatsAccumulator::new();
@@ -624,6 +909,9 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
     accumulator.apply_touch_event(&ThreatTouchEvent {
         time: 1.0,
         frame: 1,
+        touch_id: None,
+        detection_frame: 1,
+        detection_time: 1.0,
         team_is_team_0: true,
         player: Some(player_id(1)),
         value_before: 0.05,
@@ -633,6 +921,9 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
     accumulator.apply_touch_event(&ThreatTouchEvent {
         time: 2.0,
         frame: 2,
+        touch_id: None,
+        detection_frame: 2,
+        detection_time: 2.0,
         team_is_team_0: true,
         player: Some(player_id(1)),
         value_before: 0.30,
@@ -645,11 +936,12 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
         end_frame: 2,
         team_is_team_0: true,
         xg: 0.4,
+        peak_value: 0.6,
         credited_player: Some(player_id(1)),
         ended_in_goal: true,
         end_reason: ThreatEpisodeEndReason::Goal,
     });
-    // Team-only credit still counts toward the team total.
+    // Team-only credit still advances the team's episode counters.
     accumulator.apply_episode_event(&ThreatEpisodeEvent {
         start_time: 3.0,
         start_frame: 3,
@@ -657,10 +949,15 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
         end_frame: 4,
         team_is_team_0: true,
         xg: 0.2,
+        peak_value: 0.3,
         credited_player: None,
         ended_in_goal: false,
         end_reason: ThreatEpisodeEndReason::ValueDropped,
     });
+    // Team xG comes from the full-match integral, not the episode sum; the
+    // gap (1.0 vs the 0.6 of episode xg) is the diffuse sub-threshold threat
+    // that is never attributed to any player.
+    accumulator.set_team_xg_integrals([1.0, 0.25]);
 
     let player_stats = accumulator.player_stats().get(&player_id(1)).unwrap();
     assert!((player_stats.threat_added - 0.25).abs() < 1e-6);
@@ -669,8 +966,10 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
     assert_eq!(player_stats.credited_goal_episode_count, 1);
 
     let team = accumulator.team_stats(true);
-    assert!((team.xg - 0.6).abs() < 1e-6);
+    assert!((team.xg - 1.0).abs() < 1e-6);
     assert_eq!(team.episode_count, 2);
     assert_eq!(team.goal_episode_count, 1);
-    assert_eq!(accumulator.team_stats(false).episode_count, 0);
+    let other_team = accumulator.team_stats(false);
+    assert_eq!(other_team.episode_count, 0);
+    assert!((other_team.xg - 0.25).abs() < 1e-6);
 }

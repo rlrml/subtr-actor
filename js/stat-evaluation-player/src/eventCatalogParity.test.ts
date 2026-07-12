@@ -42,6 +42,12 @@ test("every registry event is represented in the player (or explicitly excepted)
   ]);
 
   const missing = EVENT_DEFINITION_CATALOG.filter((entry) => {
+    // Registry entries hidden from the review picker are, by declaration,
+    // not surfaced as player streams; the Rust `hidden` flag is the single
+    // source of truth, so they need no per-key exception here.
+    if (entry.hidden_from_review) {
+      return false;
+    }
     if (CORE_AGGREGATED.has(entry.key) || NOT_SURFACED.has(entry.key)) {
       return false;
     }

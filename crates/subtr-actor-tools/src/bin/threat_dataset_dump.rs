@@ -46,6 +46,16 @@ struct Args {
     /// Worker threads (defaults to available parallelism).
     #[arg(long)]
     threads: Option<usize>,
+    /// When set, also write one CSV row per (replay, team) summarizing the
+    /// episode state machine's output against actual goals. Columns:
+    /// `replay_id,is_team0,episode_count,episode_xg_sum,full_integral_xg,peak_sum,goals`.
+    /// `episode_xg_sum` sums the episode xG time integrals exactly as emitted
+    /// by `ExpectedGoalsCalculator`'s episode events; `full_integral_xg` is
+    /// the team's full-match `sum(V * dt) / tau` (the same state the stats
+    /// accumulator reads); `peak_sum` sums episode peak V (the uncalibrated
+    /// legacy estimator, kept for comparison).
+    #[arg(long)]
+    episode_summary: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -80,6 +90,8 @@ struct ReplayRows {
     value_min: f32,
     value_max: f32,
     goal_count: usize,
+    /// One summary row per team, in `episode_summary_header` column order.
+    episode_summary_lines: Vec<String>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -107,6 +119,19 @@ fn main() -> anyhow::Result<()> {
             .with_context(|| format!("failed to create {}", args.out.display()))?,
     );
     writeln!(out, "{}", header())?;
+
+    let mut episode_summary_out = args
+        .episode_summary
+        .as_ref()
+        .map(|path| -> anyhow::Result<_> {
+            let mut writer = std::io::BufWriter::new(
+                std::fs::File::create(path)
+                    .with_context(|| format!("failed to create {}", path.display()))?,
+            );
+            writeln!(writer, "{}", episode_summary_header())?;
+            Ok(writer)
+        })
+        .transpose()?;
 
     let sample_interval = 1.0 / args.sample_hz;
     let threads = args
@@ -153,6 +178,11 @@ fn main() -> anyhow::Result<()> {
                     for line in &replay_rows.lines {
                         writeln!(out, "{line}")?;
                     }
+                    if let Some(writer) = episode_summary_out.as_mut() {
+                        for line in &replay_rows.episode_summary_lines {
+                            writeln!(writer, "{line}")?;
+                        }
+                    }
                     eprintln!(
                         "ok {}: {} rows, {} goals, V in [{:.4}, {:.4}]",
                         replay_rows.replay_id,
@@ -171,6 +201,9 @@ fn main() -> anyhow::Result<()> {
         Ok(())
     })?;
     out.flush()?;
+    if let Some(writer) = episode_summary_out.as_mut() {
+        writer.flush()?;
+    }
 
     eprintln!(
         "done: {processed} replays processed, {skipped} skipped, {total_rows} rows -> {}",
@@ -196,6 +229,10 @@ fn header() -> String {
         "time_to_replay_end",
     ]);
     columns.join(",")
+}
+
+fn episode_summary_header() -> &'static str {
+    "replay_id,is_team0,episode_count,episode_xg_sum,full_integral_xg,peak_sum,goals"
 }
 
 fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<ReplayRows> {
@@ -249,6 +286,41 @@ fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<Rep
         lines.push(line);
     }
 
+    // Per-team episode summary through the exact shipping episode state
+    // machine: counts, episode xG integrals, and peak sums come straight off
+    // the calculator's emitted episode events (and its full-match integral
+    // state), never recomputed here.
+    let full_integrals = calculator.team_xg_integrals();
+    let episode_summary_lines = [true, false]
+        .into_iter()
+        .map(|is_team_0| {
+            let episodes = calculator
+                .episode_events()
+                .iter()
+                .filter(|episode| episode.team_is_team_0 == is_team_0);
+            let (episode_count, episode_xg_sum, peak_sum) = episodes.fold(
+                (0usize, 0.0f64, 0.0f64),
+                |(count, xg_sum, peak_sum), episode| {
+                    (
+                        count + 1,
+                        xg_sum + f64::from(episode.xg),
+                        peak_sum + f64::from(episode.peak_value),
+                    )
+                },
+            );
+            let full_integral_xg = full_integrals[usize::from(!is_team_0)];
+            let goal_count = goals
+                .iter()
+                .filter(|goal| goal.scoring_team_is_team_0 == is_team_0)
+                .count();
+            format!(
+                "{},{},{episode_count},{episode_xg_sum:.6},{full_integral_xg:.6},{peak_sum:.6},{goal_count}",
+                csv_field(&replay_id),
+                u8::from(is_team_0),
+            )
+        })
+        .collect();
+
     Ok(ReplayRows {
         replay_id,
         lines,
@@ -263,6 +335,7 @@ fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<Rep
             0.0
         },
         goal_count: goals.len(),
+        episode_summary_lines,
     })
 }
 

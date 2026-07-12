@@ -11,8 +11,17 @@
 //!   touch (V just after minus V just before, both from the toucher's team's
 //!   perspective).
 //! - [`ThreatEpisodeEvent`]: a contiguous span where one team's V exceeds
-//!   [`THREAT_EPISODE_THRESHOLD`]; the episode's xG is the peak V over the
-//!   span, credited to the attacking team's most recent toucher.
+//!   [`THREAT_EPISODE_THRESHOLD`]; the episode's xG is the time integral
+//!   `sum(V * dt) / tau` over the span (`tau` =
+//!   [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS)),
+//!   credited to the attacking team's most recent toucher. Corpus-calibrated:
+//!   the full-match integral matches actual goals per team-game within ~1%,
+//!   whereas summing episode *peak* V over-counts goals ~2.7x; the peak
+//!   survives on the event as `peak_value` for display/intensity.
+//! - The per-team full-match integral (over ALL evaluated live frames, not
+//!   just above-threshold ones) is exposed via
+//!   [`ExpectedGoalsCalculator::team_xg_integrals`] and is the team's
+//!   accumulated xG.
 
 use super::*;
 
@@ -106,8 +115,9 @@ pub struct ThreatFeatures {
     /// Nearest defender distance to their own goal center, normalized by
     /// [`GOAL_DISTANCE_NORM`] (1.0 when no defender is on the field).
     pub nearest_defender_to_goal_dist: f32,
-    /// Defenders goalside of the ball (attacking y beyond the ball's) / team
-    /// size.
+    /// Defenders goalside of the ball (attacking y beyond the ball's) /
+    /// defending-team roster size (non-demoed, the same eligibility used to
+    /// iterate defenders).
     pub defenders_goalside: f32,
     /// 1.0 when any defender occupies the net region in front of their goal
     /// mouth.
@@ -270,6 +280,12 @@ pub fn compute_threat_features(
         .filter(|position| position.y < ball.y)
         .count();
 
+    // Defender-count features normalize by the DEFENDING team's eligible
+    // roster (the same non-demoed filter the iteration below uses), not the
+    // attacking team's: on uneven-team / leaver frames the two differ.
+    let defending_team_size = positioned(false).count();
+    let defending_team_size_norm = (defending_team_size as f32).max(1.0);
+
     let mut nearest_defender_dist = f32::INFINITY;
     let mut nearest_defender_boost = 0.0;
     let mut nearest_defender_to_goal = f32::INFINITY;
@@ -326,20 +342,42 @@ pub fn compute_threat_features(
         } else {
             1.0
         },
-        defenders_goalside: (defenders_goalside as f32 / team_size_norm).clamp(0.0, 1.0),
+        defenders_goalside: (defenders_goalside as f32 / defending_team_size_norm).clamp(0.0, 1.0),
         defender_in_net: f32::from(u8::from(defender_in_net)),
         nearest_defender_boost,
         attacking_team_size: team_size as f32,
     }
 }
 
-/// The change in the touching team's V across one touch. `value_before` is
-/// the toucher's team's V on the previous live frame; `value_after` is the V
-/// on the frame the touch registered.
+/// The change in the touching team's V across one touch.
+///
+/// A touch recovered from the candidate cache can be *backdated*: its contact
+/// moment precedes the frame the stats pipeline detected it on. Fields
+/// therefore split into two groups:
+///
+/// - Contact-time fields, copied from the underlying [`TouchEvent`]: `time`,
+///   `frame`, and `touch_id` (the touch's stable join key, when assigned).
+/// - Detection-time fields: `detection_frame` / `detection_time` are the live
+///   processing frame the touch surfaced on. `value_before` is the toucher's
+///   team's V on the live frame *before* detection and `value_after` is the V
+///   on the detection frame itself. The ΔV bracketing deliberately anchors on
+///   detection rather than contact: V is only evaluated on processed live
+///   frames, and the detection frame is the first frame whose ball/player
+///   state reflects the touch.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ThreatTouchEvent {
+    /// Contact time of the underlying touch (can precede `detection_time`).
     pub time: f32,
+    /// Contact frame of the underlying touch (can precede `detection_frame`).
     pub frame: usize,
+    /// Stable id of the underlying attributed touch, `None` when the touch
+    /// pipeline had not assigned one.
+    pub touch_id: Option<u64>,
+    /// Frame the touch was detected on; `value_before`/`value_after` bracket
+    /// this frame.
+    pub detection_frame: usize,
+    /// Time of the detection frame.
+    pub detection_time: f32,
     pub team_is_team_0: bool,
     pub player: Option<PlayerId>,
     pub value_before: f32,
@@ -367,10 +405,10 @@ pub enum ThreatEpisodeEndReason {
     ReplayEnd,
 }
 
-/// A contiguous span where one team's V exceeded the episode threshold. `xg`
-/// is the peak V over the span; `credited_player` is the attacking team's
-/// most recent toucher (within the same live stretch) at close time, `None`
-/// when the team never touched -- team-only credit.
+/// A contiguous span where one team's V exceeded the episode threshold.
+/// `credited_player` is the attacking team's most recent toucher (within the
+/// same live stretch) at close time, `None` when the team never touched --
+/// team-only credit.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ThreatEpisodeEvent {
     pub start_time: f32,
@@ -378,7 +416,19 @@ pub struct ThreatEpisodeEvent {
     pub end_time: f32,
     pub end_frame: usize,
     pub team_is_team_0: bool,
+    /// The episode's xG: the time integral `sum(V * dt) / tau` over the
+    /// span, where `tau` is
+    /// [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS).
+    /// Frames that count: every evaluated live-play frame from the frame that
+    /// opens the episode through the frame that closes it (for value-drop
+    /// closes the final sub-threshold frame contributes too; stoppage /
+    /// replay-end closes end at the last evaluated live frame). This is the
+    /// calibrated goal-scale estimator -- summing episode peaks over-counts
+    /// goals ~2.7x.
     pub xg: f32,
+    /// Peak V over the span (the pre-calibration `xg`), kept for
+    /// display/intensity ranking.
+    pub peak_value: f32,
     pub credited_player: Option<PlayerId>,
     pub ended_in_goal: bool,
     pub end_reason: ThreatEpisodeEndReason,
@@ -429,6 +479,8 @@ struct ActiveThreatEpisode {
     start_time: f32,
     start_frame: usize,
     peak_value: f32,
+    /// Running `sum(V * dt) / tau` over the episode's evaluated live frames.
+    xg_integral: f64,
     credited_player: Option<PlayerId>,
 }
 
@@ -459,6 +511,10 @@ pub struct ExpectedGoalsCalculator {
     samples: Vec<ThreatFrameSample>,
     goal_records: Vec<ThreatGoalRecord>,
     team_states: [TeamThreatState; 2],
+    /// Per-team full-match `sum(V * dt) / tau`, accumulated over EVERY
+    /// evaluated live-play frame (sub-threshold frames included), indexed
+    /// `[team zero, team one]`. This is the calibrated team xG.
+    team_xg_integrals: [f64; 2],
     /// Both teams' V on the previous live frame, if it was live.
     previous_values: Option<[f32; 2]>,
     last_score: Option<(i32, i32)>,
@@ -512,6 +568,14 @@ impl ExpectedGoalsCalculator {
         &self.goal_records
     }
 
+    /// Per-team full-match `sum(V * dt) / tau` over every evaluated live-play
+    /// frame (`[team zero, team one]`). Corpus-calibrated to actual goals per
+    /// team-game within ~1%; this is the team's accumulated xG. Episodes
+    /// capture only the above-threshold portion of it (empirically ~62%).
+    pub fn team_xg_integrals(&self) -> [f64; 2] {
+        self.team_xg_integrals
+    }
+
     /// Both teams' V on the most recent live frame (`[team zero, team one]`),
     /// `None` outside live play.
     pub fn current_values(&self) -> Option<[f32; 2]> {
@@ -537,10 +601,15 @@ impl ExpectedGoalsCalculator {
             frame: frame.frame_number,
             scoring_team_is_team_0,
         });
-        self.close_episode_as_goal(frame, scoring_team_is_team_0);
+        self.close_episode_as_goal(frame, time, scoring_team_is_team_0);
     }
 
-    fn close_episode_as_goal(&mut self, frame: &FrameInfo, scoring_team_is_team_0: bool) {
+    fn close_episode_as_goal(
+        &mut self,
+        frame: &FrameInfo,
+        time: f32,
+        scoring_team_is_team_0: bool,
+    ) {
         let state = &mut self.team_states[team_index(scoring_team_is_team_0)];
         if let Some(active) = state.active_episode.take() {
             let event = Self::event_from_active(
@@ -556,8 +625,16 @@ impl ExpectedGoalsCalculator {
         }
         if let Some(pending) = state.pending_episode.take() {
             let mut event = pending.event;
-            event.ended_in_goal = true;
-            event.end_reason = ThreatEpisodeEndReason::Goal;
+            // Enforce the goal grace inside attribution too: goal detection
+            // runs before stale-pending expiry within a frame, so without
+            // this bound a goal arriving long after the stoppage (a later,
+            // unrelated attack on a quiet scoreboard) would still upgrade the
+            // stale episode. A goal past the grace resolves it as the plain
+            // stoppage it already was.
+            if time - pending.closed_at <= PENDING_EPISODE_GOAL_GRACE_SECONDS {
+                event.ended_in_goal = true;
+                event.end_reason = ThreatEpisodeEndReason::Goal;
+            }
             self.episode_events.push(event);
         }
     }
@@ -576,11 +653,17 @@ impl ExpectedGoalsCalculator {
             end_time,
             end_frame,
             team_is_team_0,
-            xg: active.peak_value,
+            xg: active.xg_integral as f32,
+            peak_value: active.peak_value,
             credited_player: active.credited_player.clone(),
             ended_in_goal,
             end_reason,
         }
+    }
+
+    /// One frame's contribution to an xG time integral: `V * dt / tau`.
+    fn integral_contribution(value: f32, dt: f32) -> f64 {
+        f64::from(value) * f64::from(dt) / f64::from(expected_goals_model::THREAT_HORIZON_SECONDS)
     }
 
     fn detect_goals(
@@ -658,17 +741,34 @@ impl ExpectedGoalsCalculator {
         }
     }
 
+    /// Emit at most one [`ThreatTouchEvent`] per team per frame.
+    ///
+    /// [`TouchState`] can report several simultaneous contacts on one frame
+    /// (contested 50/50s, same-team double commits), but the change from the
+    /// previous live frame's V to this frame's V is a single transition:
+    /// crediting it to every same-team touch would count it once per toucher
+    /// in the accumulator. The team's *primary* touch -- the latest,
+    /// best-evidence contact per
+    /// [`TouchState::primary_touch_event_for_team`], the same notion of "the"
+    /// decisive touch that `TouchState` already encodes for the rest of the
+    /// stats pipeline -- receives the whole transition.
     fn emit_touch_events(&mut self, frame: &FrameInfo, touch_state: &TouchState, values: [f32; 2]) {
-        for touch in &touch_state.touch_events {
-            let index = team_index(touch.team_is_team_0);
+        for is_team_0 in [true, false] {
+            let Some(touch) = touch_state.primary_touch_event_for_team(is_team_0) else {
+                continue;
+            };
+            let index = team_index(is_team_0);
             let value_before = self
                 .previous_values
                 .map(|previous| previous[index])
                 .unwrap_or(values[index]);
             self.touch_events.push(ThreatTouchEvent {
                 time: touch.time,
-                frame: frame.frame_number,
-                team_is_team_0: touch.team_is_team_0,
+                frame: touch.frame,
+                touch_id: touch.touch_id,
+                detection_frame: frame.frame_number,
+                detection_time: frame.time,
+                team_is_team_0: is_team_0,
                 player: touch.player.clone(),
                 value_before,
                 value_after: values[index],
@@ -683,12 +783,19 @@ impl ExpectedGoalsCalculator {
         }
     }
 
+    /// Track episode state for one evaluated live frame. Episodes integrate
+    /// `V * dt / tau` over exactly these frames -- the same live-play frames
+    /// where V is evaluated -- from the frame that opens the episode through
+    /// the frame that closes it (a value-drop close's final sub-threshold
+    /// frame contributes too; stoppage/replay-end closes end at the last
+    /// evaluated live frame, since non-live frames are never evaluated).
     fn update_episodes(&mut self, frame: &FrameInfo, values: [f32; 2]) {
         for (team_index, state) in self.team_states.iter_mut().enumerate() {
             let value = values[team_index];
             match state.active_episode.as_mut() {
                 Some(active) => {
                     active.peak_value = active.peak_value.max(value);
+                    active.xg_integral += Self::integral_contribution(value, frame.dt);
                     if value <= self.config.episode_threshold {
                         let active = state
                             .active_episode
@@ -710,6 +817,7 @@ impl ExpectedGoalsCalculator {
                             start_time: frame.time,
                             start_frame: frame.frame_number,
                             peak_value: value,
+                            xg_integral: Self::integral_contribution(value, frame.dt),
                             credited_player: state.last_toucher.clone(),
                         });
                     }
@@ -795,6 +903,13 @@ impl ExpectedGoalsCalculator {
             expected_goals_model::threat_value(&features[0]),
             expected_goals_model::threat_value(&features[1]),
         ];
+
+        // The full-match team integral covers EVERY evaluated live frame,
+        // sub-threshold ones included -- diffuse below-threshold threat is
+        // ~38% of the calibrated total.
+        for (team_index, value) in values.iter().enumerate() {
+            self.team_xg_integrals[team_index] += Self::integral_contribution(*value, frame.dt);
+        }
 
         self.emit_touch_events(frame, touch_state, values);
         self.update_episodes(frame, values);

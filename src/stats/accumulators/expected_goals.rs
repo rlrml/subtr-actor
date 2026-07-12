@@ -19,12 +19,14 @@ pub(crate) fn threat_team_label(is_team_0: bool) -> StatLabel {
 /// Per-player accumulated threat stats. The labeled sums are the canonical
 /// record (`metric=threat_added` / `metric=xg`); the plain fields are
 /// convenience projections kept in sync.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ExpectedGoalsPlayerStats {
     /// Sum of positive touch threat deltas (V after minus V before, from the
     /// toucher's team's perspective) over the player's touches.
     pub threat_added: f32,
-    /// Sum of episode peak values (xG) for episodes credited to this player.
+    /// Sum of episode xG time integrals (`sum(V * dt) / tau` per episode)
+    /// over episodes credited to this player.
     pub xg: f32,
     pub credited_episode_count: u32,
     pub credited_goal_episode_count: u32,
@@ -67,10 +69,16 @@ impl ExpectedGoalsPlayerStats {
     }
 }
 
-/// Per-team accumulated threat stats: total xG over all episodes (including
-/// player-uncredited ones).
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+/// Per-team accumulated threat stats.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ExpectedGoalsTeamStats {
+    /// The team's full-match xG time integral (`sum(V * dt) / tau` over every
+    /// evaluated live frame, sub-threshold frames included), fed from
+    /// [`ExpectedGoalsCalculator::team_xg_integrals`]. NOT a sum of episode
+    /// xG: per-player `xg` sums to LESS than this, because diffuse
+    /// sub-threshold threat is not attributed to any player (empirically only
+    /// ~62% of the integral falls inside above-threshold episodes).
     pub xg: f32,
     pub episode_count: u32,
     pub goal_episode_count: u32,
@@ -114,9 +122,11 @@ impl ExpectedGoalsStatsAccumulator {
             .record_touch(event.team_is_team_0, delta);
     }
 
-    /// Fold one closed threat episode: the peak V is the episode's xG,
-    /// credited to the episode's player when one is known and always to the
-    /// team.
+    /// Fold one closed threat episode: its xG (the within-episode time
+    /// integral) is credited to the episode's player when one is known, and
+    /// the team's episode counters advance. Team `xg` is NOT summed from
+    /// episodes -- it is the full-match integral set through
+    /// [`Self::set_team_xg_integrals`].
     pub fn apply_episode_event(&mut self, event: &ThreatEpisodeEvent) {
         if let Some(player) = event.credited_player.as_ref() {
             self.player_stats
@@ -125,10 +135,17 @@ impl ExpectedGoalsStatsAccumulator {
                 .record_episode(event);
         }
         let team = &mut self.team_stats[usize::from(!event.team_is_team_0)];
-        team.xg += event.xg;
         team.episode_count += 1;
         if event.ended_in_goal {
             team.goal_episode_count += 1;
         }
+    }
+
+    /// Overwrite both teams' accumulated xG with the calculator's full-match
+    /// integrals (`[team zero, team one]`). Called with the current absolute
+    /// totals each projection step, so it is idempotent per frame.
+    pub fn set_team_xg_integrals(&mut self, integrals: [f64; 2]) {
+        self.team_stats[0].xg = integrals[0] as f32;
+        self.team_stats[1].xg = integrals[1] as f32;
     }
 }
