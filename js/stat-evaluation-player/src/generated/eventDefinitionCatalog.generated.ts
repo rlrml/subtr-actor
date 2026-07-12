@@ -59,6 +59,13 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "beaten_to_ball",
+    "label": "Beaten to ball",
+    "category": "other",
+    "hidden_from_review": false,
+    "variants": []
+  },
+  {
     "key": "boost_pickups",
     "label": "Boost Pickup",
     "category": "other",

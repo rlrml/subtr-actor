@@ -8,7 +8,7 @@ use linkme::distributed_slice;
 
 use super::{
     BackboardBounceEvent, BallCarryEvent, BallDepthEvent, BallHalfEvent, BallProximityEvent,
-    BallThirdEvent, BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent,
+    BallThirdEvent, BeatenToBallEvent, BoostPickupEvent, BumpEvent, CeilingShotEvent, CenterEvent,
     ControlledPlayEvent, CorePlayerScoreboardEvent, DemolitionEvent, DepthRoleEvent, DodgeEvent,
     DodgeResetEvent, DoubleTapEvent, FieldHalfEvent, FieldThirdEvent, FiftyFiftyEvent,
     FirstManChangeEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent,
@@ -128,6 +128,7 @@ impl EventPayload {
             Self::HalfVolley(_) => HalfVolleyEvent::DEFINITION.scope,
             Self::Wavedash(_) => WavedashEvent::DEFINITION.scope,
             Self::Whiff(_) => WhiffEvent::DEFINITION.scope,
+            Self::BeatenToBall(_) => BeatenToBallEvent::DEFINITION.scope,
             Self::Powerslide(_) => PowerslideEvent::DEFINITION.scope,
             Self::Touch(_) => TouchClassificationEvent::DEFINITION.scope,
             Self::BoostPickup(_) => BoostPickupEvent::DEFINITION.scope,
@@ -911,6 +912,20 @@ define_stats_event!(
     scope = EventScope::Player
 );
 define_stats_event!(
+    BeatenToBallEvent,
+    BEATEN_TO_BALL_EVENT_DEFINITION,
+    "beaten_to_ball",
+    "Beaten to ball",
+    EventCategory::Other,
+    summary = "A player who was actively challenging for the ball when an opponent beat them to the touch.",
+    approach = [
+        "Keep a short rolling motion history for every player relative to the ball during live play.",
+        "At each confirmed touch, evaluate every non-touching opponent's lookback window for sustained convergence toward the ball and commitment (approach speed or a dodge toward the ball).",
+        "Emit when the loss margin at the touch is narrow: small estimated time-to-ball or close hitbox distance, hard-capped on distance.",
+    ],
+    scope = EventScope::Player
+);
+define_stats_event!(
     PowerslideEvent,
     POWERSLIDE_EVENT_DEFINITION,
     "powerslide",
@@ -1409,6 +1424,15 @@ pub(crate) const WHIFF_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
     "whiff",
     "WhiffNode",
     "WhiffCalculator",
+)];
+
+pub(crate) const BEATEN_TO_BALL_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(
+    &BEATEN_TO_BALL_EVENT_DEFINITION,
+    "beaten_to_ball",
+    FinalizationHorizon::EndPlus(0.0),
+    "beaten_to_ball",
+    "BeatenToBallNode",
+    "BeatenToBallCalculator",
 )];
 
 pub(crate) const POWERSLIDE_EMITTED_EVENTS: &[EmittedEvent] = &[produced_event(

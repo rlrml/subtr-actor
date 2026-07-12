@@ -178,6 +178,36 @@ _None documented._
 
 _None documented._
 
+### Beaten to ball (`beaten_to_ball`)
+
+- Category: `other`
+- Confidence:
+  - Approach: `unknown`
+  - True positive evidence: `not_evaluated`
+  - False positive evidence: `not_evaluated`
+  - False negative evidence: `not_evaluated`
+  - Testing: `untested`
+- Producers:
+  - `beaten_to_ball` via `BeatenToBallNode` / `BeatenToBallCalculator`
+
+**Summary**
+
+A player who was actively challenging for the ball when an opponent beat them to the touch.
+
+**Approach**
+
+- Keep a short rolling motion history for every player relative to the ball during live play.
+- At each confirmed touch, evaluate every non-touching opponent's lookback window for sustained convergence toward the ball and commitment (approach speed or a dodge toward the ball).
+- Emit when the loss margin at the touch is narrow: small estimated time-to-ball or close hitbox distance, hard-capped on distance.
+
+**Limitations**
+
+_None documented._
+
+**Known Issues**
+
+_None documented._
+
 ### Boost Pickup (`boost_pickups`)
 
 - Category: `other`

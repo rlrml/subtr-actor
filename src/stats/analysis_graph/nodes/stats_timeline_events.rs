@@ -104,6 +104,7 @@ impl StatsTimelineEventsNode {
             rush_dependency(),
             touch_dependency(),
             whiff_dependency(),
+            beaten_to_ball_dependency(),
             wavedash_dependency(),
             flip_impulse_dependency(),
             speed_flip_dependency(),

@@ -692,6 +692,7 @@ export function mountStatEvaluationPlayer(
       confirm: mustElement<HTMLButtonElement>(root, "#mechanics-review-confirm"),
       reject: mustElement<HTMLButtonElement>(root, "#mechanics-review-reject"),
       uncertain: mustElement<HTMLButtonElement>(root, "#mechanics-review-uncertain"),
+      badCandidate: mustElement<HTMLButtonElement>(root, "#mechanics-review-bad-candidate"),
       count: mustElement<HTMLElement>(root, "#mechanics-review-count"),
       list: mustElement<HTMLDivElement>(root, "#mechanics-review-list"),
     },

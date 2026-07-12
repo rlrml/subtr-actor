@@ -409,6 +409,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "dodge",
         "touch",
         "whiff",
+        "beaten_to_ball",
         "wavedash",
         "speed_flip",
         "half_flip",
@@ -754,6 +755,12 @@ pub(crate) fn builtin_module_json(
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&PlayerStatsWithEventsExport {
                 player_stats: player_stats_entries(projection.whiff.player_stats()),
+                events: calculator.events(),
+            })
+        }
+        "beaten_to_ball" => {
+            let calculator = graph_state::<BeatenToBallCalculator>(graph, module_name)?;
+            serialize_to_json_value(&EventsExport {
                 events: calculator.events(),
             })
         }
@@ -1438,7 +1445,7 @@ pub(crate) fn builtin_snapshot_frame_json(
                 stats: projection.rush.stats(),
             })?
         }
-        "dodge" | "flip_impulse" | "player_possession" => {
+        "dodge" | "flip_impulse" | "player_possession" | "beaten_to_ball" => {
             serialize_to_json_value(&serde_json::json!({}))?
         }
         "touch" => {
@@ -1764,6 +1771,7 @@ pub(crate) fn builtin_snapshot_config_json(
         | "flip_impulse"
         | "touch"
         | "whiff"
+        | "beaten_to_ball"
         | "wavedash"
         | "speed_flip"
         | "half_flip"

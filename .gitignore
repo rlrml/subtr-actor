@@ -26,3 +26,8 @@ flamegraph.svg
 !assets/reverse-flick-vs-backflip-2026-06-26.replay
 !assets/wall-aerial-ground-jump-2026-07-03.replay
 /crates/subtr-actor-training/bindings
+
+# Generated review-playlist artifacts: regenerable from replays via
+# `event_rate_audit --emit-playlist` and contain machine-local absolute paths.
+# Human labels (labels/<dataset>/labels.jsonl) stay trackable.
+/labels/**/playlists/

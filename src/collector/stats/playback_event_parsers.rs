@@ -1216,6 +1216,26 @@ pub(in crate::collector::stats::playback) fn parse_whiff_event(
     })
 }
 
+pub(in crate::collector::stats::playback) fn parse_beaten_to_ball_event(
+    value: &Value,
+) -> SubtrActorResult<BeatenToBallEvent> {
+    let object = json_object(value, "beaten to ball event")?;
+    Ok(BeatenToBallEvent {
+        time: json_required_f32(object, "time")?,
+        frame: json_required_usize(object, "frame")?,
+        player: json_required_remote_id(object, "player")?,
+        winner: json_required_remote_id(object, "winner")?,
+        is_team_0: json_required_bool(object, "is_team_0")?,
+        player_position: json_optional_vec3(object.get("player_position"))?,
+        distance_at_touch: json_required_f32(object, "distance_at_touch")?,
+        margin_seconds: json_required_f32(object, "margin_seconds")?,
+        approach_speed: json_required_f32(object, "approach_speed")?,
+        velocity_alignment: json_required_f32(object, "velocity_alignment")?,
+        dodge_active: json_required_bool(object, "dodge_active")?,
+        aerial: json_required_bool(object, "aerial")?,
+    })
+}
+
 pub(in crate::collector::stats::playback) fn parse_bump_event(
     value: &Value,
 ) -> SubtrActorResult<BumpEvent> {

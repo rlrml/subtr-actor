@@ -24,6 +24,7 @@ fn current_event_payloads_implement_stats_event() {
     assert_stats_event::<HalfVolleyEvent>();
     assert_stats_event::<WavedashEvent>();
     assert_stats_event::<WhiffEvent>();
+    assert_stats_event::<BeatenToBallEvent>();
     assert_stats_event::<PowerslideEvent>();
     assert_stats_event::<TouchClassificationEvent>();
     assert_stats_event::<BoostPickupEvent>();

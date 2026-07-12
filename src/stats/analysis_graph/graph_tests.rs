@@ -378,6 +378,7 @@ fn builtin_event_metadata_contains_emitted_event_payloads() {
         "player_activity",
         "ball_proximity",
         "ball_depth",
+        "beaten_to_ball",
         "field_third",
         "field_half",
         "depth_role",
