@@ -4,13 +4,14 @@ Offline pipeline that fits the expected-goals threat model embedded in
 `src/stats/calculators/expected_goals_model.rs`. The model is
 `V = sigmoid(bias + w · features)`: the probability that the attacking team
 scores within `THREAT_HORIZON_SECONDS` (5s), evaluated per frame on the
-`ThreatFeatures` vector. Feature extraction lives only in Rust
-(`compute_threat_features`); training consumes rows exported through that
-exact code path, so train and inference can never diverge.
+`ThreatFeatures` vector. Feature extraction lives only in the Rust ndarray
+feature layer (`ThreatFeatures` / `ThreatModelValues`); the runtime model and
+training exporter consume that same analysis-backed row state, so train and
+inference cannot diverge.
 
 ## Steps
 
-1. **Fetch a corpus** (optional — any manifest of local replays works):
+1. **Fetch a corpus** (optional — a ranked-doubles manifest of local replays works):
 
    ```sh
    python3 fetch_corpus.py --seed 7   # stdlib only
@@ -23,15 +24,15 @@ exact code path, so train and inference can never diverge.
    `pass show rocket-sense/token`), `ROCKET_SENSE_BASE_URL`,
    `THREAT_CORPUS_CACHE` (default `~/.cache/subtr-actor-threat-corpus`), and
    `PER_STRATUM` (default 150 per playlist × rank tier),
-   `THREAT_CORPUS_SEED` (default 7), and `THREAT_CORPUS_PLAYLISTS` (default
-   `ranked-duels,ranked-doubles`). Repeat `--playlist` to override the playlist
-   set explicitly; 3v3 is supported but intentionally not part of the default
-   corpus. Selection shuffles each rank stratum with the recorded seed instead
+   `THREAT_CORPUS_SEED` (default 7), and `THREAT_CORPUS_PLAYLISTS` (fixed to
+   `ranked-doubles`). The model and exporter intentionally reject 1v1 and 3v3;
+   team formats are not mixed into one coefficient set. Selection shuffles
+   each rank stratum with the recorded seed instead
    of biasing toward low replay IDs. The fetcher writes
    `manifest.provenance.json` with the seed, playlist set, and SHA-256 hashes of
    both the cached listing and resulting manifest.
 
-2. **Export the dataset** through the shared Rust feature path:
+2. **Export the dataset** through `NDArrayCollector`:
 
    ```sh
    cargo run --release -p subtr-actor-tools --bin threat_dataset_dump -- \
@@ -39,8 +40,21 @@ exact code path, so train and inference can never diverge.
        --out threat_dataset.csv --sample-hz 4
    ```
 
-   Two attacking-normalized rows per sampled live-play frame (one per team),
-   with τ-agnostic goal-time columns for downstream labeling/censoring.
+   The collector evaluates its analysis graph on every replay frame, then an
+   analysis-aware filter materializes one matrix row at the requested cadence
+   during live play. Each matrix row contains both teams' attacking-normalized
+   72-value feature vectors and their streaming model values; the exporter
+   splits it into one CSV row per team and joins τ-agnostic goal-time columns
+   for downstream labeling/censoring. The feature row has eight ball/shot
+   values followed by permutation-invariant summaries of the perspective's
+   own-team and opponent-team player sets. Every player first receives the
+   same 16 position, velocity, facing, ball/goal distance, boost,
+   goal-side/net, dodge-available, and demo inputs. Each two-player set is then
+   represented by the component-wise mean and absolute spread, so swapping
+   either pair cannot change the row and no near/far player role exists.
+
+   This dataset path is separate from normal stats collection. Expected goals
+   is an opt-in stats/timeline module and is not evaluated by default.
 
 3. **Train and evaluate** (from the repository root):
 
@@ -58,8 +72,14 @@ exact code path, so train and inference can never diverge.
    `nix develop .#threat-model`. Without Nix, run `uv sync --locked` followed
    by `uv run --locked train_threat_model.py ...` from this directory.
 
-   Grouped train/test split by replay. Writes `metrics.txt` (log-loss, Brier,
-   AUC, calibration table, per-median-rank-tier calibration),
+   The newest 20% of replays are held out by replay date for evaluation; after
+   metrics are frozen, the publishable coefficients are refit on the complete
+   corpus. `metrics.txt` reports log-loss, Brier score, AUC, equal-frequency
+   calibration, feature-family knockouts, per-rank calibration, and integrated
+   xG versus actual goals per held-out replay/team. This combination measures
+   probability accuracy, ranking, forward generalization, feature usefulness,
+   and count-scale behavior rather than relying on one headline score.
+   The command also writes
    `training_provenance.json` (dataset/manifest and split hashes, seed, Python
    and package versions), `coefficients.json`, `model_coefficients.rs`, and
    `parity_fixture.rs`. `--gbt` also fits a
@@ -71,24 +91,29 @@ exact code path, so train and inference can never diverge.
    the parity fixture in `expected_goals_model_tests.rs` from
    `parity_fixture.rs`, and run `cargo test --lib expected_goals`.
 
-## trained-v2
+## trained-v4
 
-Fit 2026-07-12 on 10.3M rows from 5,280 rank-stratified ranked-duels/-doubles
-replays (rocket-sense production, tiers 1–22, ~150 per playlist × tier where
-available), after fixing `defenders_goalside` to normalize by the defending
-roster. Held-out: log-loss 0.169 / Brier 0.0468 / AUC 0.885 vs 0.252
-baseline log-loss; GBT ceiling 0.154. Calibration tracks observed frequency
-across all 15 prediction-quantile bins and across rank tiers (drift ≲10%
-relative for mid/high tiers), supporting a single rank-blind model as v1.
+Fit 2026-07-12 on 5.22M team rows from 2,544 rank-stratified ranked-doubles
+replays (rocket-sense production, tiers 3–22, ~150 per tier where available).
+Every player receives the same 16 inputs, including boost, inferred dodge
+availability, and demo state; each team pair is aggregated without ordering.
+On the newest 509 replays (1.04M rows), logistic log-loss is 0.1355 versus
+0.1964 for the constant-rate baseline, Brier score is 0.0359, AUC is 0.8837,
+and 15-bin expected calibration error is 0.0015. The nonlinear GBT ceiling is
+0.1287 log-loss, so the deployable linear model captures most—but not all—of
+the available signal. Removing all player state worsens log-loss by 0.0180;
+mean-substitution knockouts for boost and dodge availability worsen it by
+0.00038 and 0.00031 respectively. Demo state is currently neutral after the
+other physical inputs are present. On 1,018 held-out replay/team outcomes, the
+time-integrated model averages 2.781 xG against 2.834 goals (0.981 ratio), with
+0.594 per-team-game correlation. The aggregate count scale is good; individual
+match totals remain noisy and should not be treated as precise forecasts.
 
 ## xG aggregation (why the integral)
 
-`V` is calibrated per 5s-window, so summing episode *peaks* over-counts goals
-badly (measured 2.7× on this corpus: 9.87 peak-sum vs 3.68 goals per
-team-game). The calibrated estimator is the time integral `Σ V·dt/τ`: the
-full-match integral recovers 3.37 mean goals per team-game vs 3.33 actual
-(within 1%, per-replay corr 0.75), and the within-episode portion of that
-integral (what gets player-attributed) captures ~62% of it. This is why
-`ThreatEpisodeEvent.xg` is the within-episode integral, team xg is the
-full-match integral, and the old peak lives in `peak_value`. Validate any
-estimator change with `threat_dataset_dump --episode-summary`.
+`V` is calibrated per overlapping 5s window. Summing frame or episode peaks
+would repeatedly count the same sustained chance, so the count-scale estimator
+is the time integral `Σ V·dt/τ`. `ThreatEpisodeEvent.xg` is the within-episode
+integral, team xg is the full-match integral, and the peak remains available as
+`peak_value` for display/intensity. Validate any estimator change on the full
+corpus with `threat_dataset_dump --episode-summary`.

@@ -15,11 +15,12 @@ use crate::stats::calculators::{
     HighAerialGoalCalculator, KickoffCalculator, KickoffGoalCalculator, LivePlayState,
     LongDistanceGoalCalculator, LoosePossessionCalculator, MatchStatsCalculator,
     MovementCalculator, OneTimerCalculator, OneTimerGoalCalculator, OwnHalfGoalCalculator,
-    PassCalculator, PassingGoalCalculator, PlayerFrameState, PlayerPossessionCalculator,
-    PlayerVerticalState, PositioningCalculator, PossessionCalculator, PossessionState,
-    PowerslideCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
-    SustainedPressureGoalCalculator, TerritorialPressureCalculator, TouchCalculator, TouchState,
-    WallAerialCalculator, WallAerialShotCalculator, WavedashCalculator, WhiffCalculator,
+    PassCalculator, PassingGoalCalculator, PlayerControlState, PlayerFrameState,
+    PlayerPossessionCalculator, PlayerVerticalState, PositioningCalculator, PossessionCalculator,
+    PossessionState, PowerslideCalculator, RotationCalculator, RushCalculator, SpeedFlipCalculator,
+    SustainedPressureGoalCalculator, TerritorialPressureCalculator, ThreatFeaturesState,
+    TouchCalculator, TouchState, WallAerialCalculator, WallAerialShotCalculator,
+    WavedashCalculator, WhiffCalculator,
 };
 
 pub(crate) mod air_dribble;
@@ -58,6 +59,7 @@ pub(crate) mod match_stats;
 pub(crate) mod movement;
 pub(crate) mod one_timer;
 pub(crate) mod pass;
+pub(crate) mod player_control_state;
 pub(crate) mod player_frame_state;
 pub(crate) mod player_possession;
 pub(crate) mod player_vertical_state;
@@ -73,6 +75,7 @@ pub(crate) mod stats_projection;
 pub(crate) mod stats_timeline_events;
 pub(crate) mod stats_timeline_frame;
 pub(crate) mod territorial_pressure;
+pub(crate) mod threat_features;
 pub(crate) mod touch;
 pub(crate) mod touch_state;
 pub(crate) mod wall_aerial;
@@ -159,6 +162,8 @@ pub use one_timer::OneTimerNode;
 #[allow(unused_imports)]
 pub use pass::PassNode;
 #[allow(unused_imports)]
+pub use player_control_state::PlayerControlStateNode;
+#[allow(unused_imports)]
 pub use player_frame_state::PlayerFrameStateNode;
 #[allow(unused_imports)]
 pub use player_possession::PlayerPossessionNode;
@@ -191,6 +196,8 @@ pub use stats_timeline_frame::{StatsTimelineFrameNode, StatsTimelineFrameState};
 #[allow(unused_imports)]
 pub use territorial_pressure::TerritorialPressureNode;
 #[allow(unused_imports)]
+pub use threat_features::ThreatFeaturesNode;
+#[allow(unused_imports)]
 pub use touch::TouchNode;
 #[allow(unused_imports)]
 pub use touch_state::TouchStateNode;
@@ -219,6 +226,10 @@ pub(crate) fn ball_frame_state_dependency() -> AnalysisDependency {
 
 pub(crate) fn player_frame_state_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<PlayerFrameState>(player_frame_state::boxed_default)
+}
+
+pub(crate) fn player_control_state_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<PlayerControlState>(player_control_state::boxed_default)
 }
 
 pub(crate) fn player_vertical_state_dependency() -> AnalysisDependency {
@@ -375,6 +386,10 @@ pub(crate) fn double_tap_dependency() -> AnalysisDependency {
 
 pub(crate) fn expected_goals_dependency() -> AnalysisDependency {
     AnalysisDependency::with_default::<ExpectedGoalsCalculator>(expected_goals::boxed_default)
+}
+
+pub(crate) fn threat_features_dependency() -> AnalysisDependency {
+    AnalysisDependency::with_default::<ThreatFeaturesState>(threat_features::boxed_default)
 }
 
 pub(crate) fn fifty_fifty_dependency() -> AnalysisDependency {

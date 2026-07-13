@@ -429,6 +429,19 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
     ]
 }
 
+/// Builtin modules calculated by [`StatsCollector::new`](crate::StatsCollector::new).
+/// Model-backed expected goals remains available by name but is opt-in.
+pub fn default_stats_module_names() -> &'static [&'static str] {
+    static NAMES: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| {
+        builtin_stats_module_names()
+            .iter()
+            .copied()
+            .filter(|name| *name != "expected_goals")
+            .collect()
+    })
+}
+
 fn graph_state<'a, T: 'static>(
     graph: &'a AnalysisGraph,
     module_name: &str,
@@ -1163,15 +1176,21 @@ pub fn builtin_analysis_node_json(
             json!({
                 "config": {
                     "episode_threshold": state.config().episode_threshold,
-                    "sample_interval_seconds": state.config().sample_interval_seconds,
                 },
                 "current_values": state.current_values(),
                 "touch_events": state.touch_events(),
                 "episode_events": state.episode_events(),
-                "samples": state.samples(),
                 "goal_records": state.goal_records(),
                 "last_frame_time": state.last_frame_time(),
             })
+        }
+        "threat_features" => {
+            let state = graph_state::<ThreatFeaturesState>(graph, node_name)?;
+            json!({ "current": state.current() })
+        }
+        "player_control_state" => {
+            let state = graph_state::<PlayerControlState>(graph, node_name)?;
+            json!({ "players": state.players })
         }
         "possession_state" => {
             let state = graph_state::<PossessionState>(graph, node_name)?;

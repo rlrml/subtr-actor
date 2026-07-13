@@ -2,14 +2,14 @@
 //!
 //! For each replay, samples both teams' attacking-normalized
 //! `ThreatFeatures` rows at `--sample-hz` during live play (through the same
-//! `ExpectedGoalsCalculator` the stats pipeline runs -- the feature
+//! ndarray threat feature adder the runtime model consumes -- the feature
 //! computation is shared, never reimplemented) and joins each row with the
 //! replay-time distance to the next goal for/against that side plus the time
 //! to replay end, so the Python training pipeline can compute
 //! scored-within-tau labels with censoring downstream.
 //!
 //! Manifest rows are JSON objects, one per line:
-//! `{"path": ..., "ballchasing_id": ..., "playlist": ...,
+//! `{"path": ..., "ballchasing_id": ..., "playlist": ..., "date": ...,
 //!   "min_rank_tier": ..., "max_rank_tier": ..., "median_rank_tier": ...,
 //!   "team_size": ..., ...}`.
 //! Unknown keys are ignored.
@@ -22,11 +22,9 @@ use std::sync::mpsc;
 use anyhow::Context;
 use clap::Parser;
 use serde::Deserialize;
-use subtr_actor::analysis_graph::{
-    AnalysisGraph, ExpectedGoalsNode, collect_analysis_graph_for_replay,
-};
 use subtr_actor::{
-    ExpectedGoalsCalculator, ExpectedGoalsCalculatorConfig, ThreatFeatures, ThreatGoalRecord,
+    Collector, ExpectedGoalsCalculator, LiveThreatSampleFilter, NDArrayCollector, ThreatFeatures,
+    ThreatGoalRecord,
 };
 
 #[derive(Debug, Parser)]
@@ -66,6 +64,8 @@ struct ManifestRow {
     ballchasing_id: Option<String>,
     #[serde(default)]
     playlist: Option<String>,
+    #[serde(default)]
+    date: Option<String>,
     #[serde(default)]
     min_rank_tier: Option<i64>,
     #[serde(default)]
@@ -219,6 +219,7 @@ fn header() -> String {
     let mut columns = vec![
         "replay_id",
         "playlist",
+        "date",
         "min_rank_tier",
         "max_rank_tier",
         "median_rank_tier",
@@ -240,26 +241,39 @@ fn episode_summary_header() -> &'static str {
 }
 
 fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<ReplayRows> {
+    anyhow::ensure!(
+        row.team_size.is_none_or(|team_size| team_size == 2),
+        "threat model only supports 2v2 replays"
+    );
     let replay = parse_replay(&row.path)?;
-    let graph = AnalysisGraph::new().with_node(ExpectedGoalsNode::with_config(
-        ExpectedGoalsCalculatorConfig {
-            sample_interval_seconds: Some(sample_interval),
-            ..ExpectedGoalsCalculatorConfig::default()
-        },
-    ));
-    let graph = collect_analysis_graph_for_replay(&replay, graph)
-        .map_err(|error| anyhow::anyhow!("failed to process replay: {error:?}"))?;
-    let calculator = graph
-        .state::<ExpectedGoalsCalculator>()
+    let collector = NDArrayCollector::<f32>::from_strings(
+        &["CurrentTime", "ThreatFeatures", "ThreatModelValues"],
+        &[],
+    )
+    .map_err(|error| anyhow::anyhow!("failed to configure threat ndarray: {error:?}"))?
+    .with_analysis_frame_filter(LiveThreatSampleFilter::new(sample_interval))
+    .process_replay(&replay)
+    .map_err(|error| anyhow::anyhow!("failed to process replay: {error:?}"))?;
+    let calculator = collector
+        .analysis_state::<ExpectedGoalsCalculator>()
         .context("expected_goals state missing from graph")?;
-
-    let goals = calculator.goal_records();
+    let goals = calculator.goal_records().to_vec();
+    let episodes = calculator.episode_events().to_vec();
+    let full_integrals = calculator.team_xg_integrals();
     let replay_end_time = calculator.last_frame_time().unwrap_or(0.0);
+    let (_, matrix) = collector
+        .get_meta_and_ndarray()
+        .map_err(|error| anyhow::anyhow!("failed to build threat ndarray: {error:?}"))?;
+    anyhow::ensure!(
+        matrix.nrows() > 0,
+        "replay did not produce any valid 2v2 live-play threat rows"
+    );
     let replay_id = row.replay_id();
     let metadata_prefix = format!(
-        "{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{}",
         csv_field(&replay_id),
         csv_field(row.playlist.as_deref().unwrap_or("")),
+        csv_field(row.date.as_deref().unwrap_or("")),
         optional_int(row.min_rank_tier),
         optional_int(row.max_rank_tier),
         row.median_rank_tier
@@ -270,40 +284,39 @@ fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<Rep
             .unwrap_or_default(),
     );
 
-    let mut lines = Vec::with_capacity(calculator.samples().len());
+    let mut lines = Vec::with_capacity(matrix.nrows() * 2);
     let mut value_min = f32::INFINITY;
     let mut value_max = f32::NEG_INFINITY;
-    for sample in calculator.samples() {
-        value_min = value_min.min(sample.value);
-        value_max = value_max.max(sample.value);
-        let mut line = format!(
-            "{metadata_prefix},{},{:.4}",
-            u8::from(sample.is_team_0),
-            sample.time,
-        );
-        for value in sample.features.to_array() {
-            line.push_str(&format!(",{value:.6}"));
+    for matrix_row in matrix.rows() {
+        let sample_time = matrix_row[0];
+        for (team_index, is_team_0) in [true, false].into_iter().enumerate() {
+            let feature_start = 1 + team_index * subtr_actor::THREAT_FEATURE_COUNT;
+            let feature_end = feature_start + subtr_actor::THREAT_FEATURE_COUNT;
+            let threat_value = matrix_row[1 + 2 * subtr_actor::THREAT_FEATURE_COUNT + team_index];
+            value_min = value_min.min(threat_value);
+            value_max = value_max.max(threat_value);
+            let mut line = format!("{metadata_prefix},{},{sample_time:.4}", u8::from(is_team_0),);
+            for value in matrix_row.slice(ndarray::s![feature_start..feature_end]) {
+                line.push_str(&format!(",{value:.6}"));
+            }
+            line.push_str(&format!(
+                ",{},{},{:.4}",
+                time_to_next_goal(&goals, sample_time, is_team_0),
+                time_to_next_goal(&goals, sample_time, !is_team_0),
+                (replay_end_time - sample_time).max(0.0),
+            ));
+            lines.push(line);
         }
-        line.push_str(&format!(
-            ",{},{},{:.4}",
-            time_to_next_goal(goals, sample.time, sample.is_team_0),
-            time_to_next_goal(goals, sample.time, !sample.is_team_0),
-            (replay_end_time - sample.time).max(0.0),
-        ));
-        lines.push(line);
     }
 
     // Per-team episode summary through the exact shipping episode state
     // machine: counts, episode xG integrals, and peak sums come straight off
     // the calculator's emitted episode events (and its full-match integral
     // state), never recomputed here.
-    let full_integrals = calculator.team_xg_integrals();
     let episode_summary_lines = [true, false]
         .into_iter()
         .map(|is_team_0| {
-            let episodes = calculator
-                .episode_events()
-                .iter()
+            let episodes = episodes.iter()
                 .filter(|episode| episode.team_is_team_0 == is_team_0);
             let (episode_count, episode_xg_sum, peak_sum) = episodes.fold(
                 (0usize, 0.0f64, 0.0f64),

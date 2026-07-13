@@ -68,17 +68,24 @@ pub const STATS_TIMELINE_MECHANIC_KINDS: &[&str] = &[
 /// (finalized events never change or vanish, confirmed events never vanish).
 pub struct StatsTimelineEventsNode {
     state: StatsTimelineEventsState,
+    include_expected_goals: bool,
 }
 
 impl StatsTimelineEventsNode {
     pub fn new() -> Self {
         Self {
             state: StatsTimelineEventsState,
+            include_expected_goals: false,
         }
     }
 
-    fn dependencies() -> NodeDependencies {
-        vec![
+    pub fn with_expected_goals(mut self) -> Self {
+        self.include_expected_goals = true;
+        self
+    }
+
+    fn configured_dependencies(&self) -> NodeDependencies {
+        let mut dependencies = vec![
             frame_info_dependency(),
             gameplay_state_dependency(),
             live_play_dependency(),
@@ -121,14 +128,14 @@ impl StatsTimelineEventsNode {
             powerslide_dependency(),
             demo_dependency(),
             center_dependency(),
-            // Expected goals includes a continuous team integral that the
-            // compact timeline exports as a change-point track rather than a
-            // full partial-sum frame snapshot.
-            expected_goals_dependency(),
             // The goal-context composition node (which itself pulls match
             // stats plus every goal-tag calculator).
             goal_context_dependency(),
-        ]
+        ];
+        if self.include_expected_goals {
+            dependencies.push(expected_goals_dependency());
+        }
+        dependencies
     }
 }
 
@@ -146,7 +153,7 @@ impl AnalysisNode for StatsTimelineEventsNode {
     }
 
     fn dependencies(&self) -> Vec<AnalysisDependency> {
-        Self::dependencies()
+        self.configured_dependencies()
     }
 
     fn evaluate(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {

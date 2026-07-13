@@ -2,7 +2,8 @@ use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
 use crate::stats::analysis_graph::{
-    AnalysisGraph, StatsTimelineEventsNode, StatsTimelineFrameNode, StatsTimelineFrameState,
+    AnalysisGraph, StatsProjectionNode, StatsTimelineEventsNode, StatsTimelineFrameNode,
+    StatsTimelineFrameState,
 };
 use crate::stats::calculators::ReplayFrameInputBuilder;
 use crate::*;
@@ -26,15 +27,43 @@ fn reduced_timeline_events(graph: &AnalysisGraph) -> ReplayStatsTimelineEvents {
 const ABSENT_PLAYER_MIN_MISSING_SECONDS: f32 = 30.0;
 
 pub fn build_legacy_timeline_graph() -> AnalysisGraph {
+    build_legacy_timeline_graph_with_expected_goals(false)
+}
+
+pub fn build_legacy_timeline_graph_with_expected_goals(
+    include_expected_goals: bool,
+) -> AnalysisGraph {
     let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
+    let projection = if include_expected_goals {
+        StatsProjectionNode::new().with_expected_goals()
+    } else {
+        StatsProjectionNode::new()
+    };
+    graph.push_boxed_node(Box::new(projection));
     graph.push_boxed_node(Box::new(StatsTimelineFrameNode::new()));
-    graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
+    let events = if include_expected_goals {
+        StatsTimelineEventsNode::new().with_expected_goals()
+    } else {
+        StatsTimelineEventsNode::new()
+    };
+    graph.push_boxed_node(Box::new(events));
     graph
 }
 
 pub fn build_timeline_event_graph() -> AnalysisGraph {
+    build_timeline_event_graph_with_expected_goals(false)
+}
+
+pub fn build_timeline_event_graph_with_expected_goals(
+    include_expected_goals: bool,
+) -> AnalysisGraph {
     let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
-    graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
+    let node = if include_expected_goals {
+        StatsTimelineEventsNode::new().with_expected_goals()
+    } else {
+        StatsTimelineEventsNode::new()
+    };
+    graph.push_boxed_node(Box::new(node));
     graph
 }
 
@@ -151,6 +180,11 @@ impl StatsTimelineCollector {
         }
     }
 
+    pub fn with_expected_goals(mut self) -> Self {
+        self.graph = build_legacy_timeline_graph_with_expected_goals(true);
+        self
+    }
+
     fn timeline_config(&self) -> StatsTimelineConfig {
         default_stats_timeline_config()
     }
@@ -208,6 +242,7 @@ pub struct StatsTimelineEventCollector {
     last_replay_meta_player_count: Option<usize>,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
+    include_expected_goals: bool,
     expected_goals: ExpectedGoalsStatsAccumulator,
     expected_goals_touch_cursor: usize,
     expected_goals_episode_cursor: usize,
@@ -230,6 +265,7 @@ impl StatsTimelineEventCollector {
             last_replay_meta_player_count: None,
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
+            include_expected_goals: false,
             expected_goals: ExpectedGoalsStatsAccumulator::new(),
             expected_goals_touch_cursor: 0,
             expected_goals_episode_cursor: 0,
@@ -247,6 +283,15 @@ impl StatsTimelineEventCollector {
                 players: Vec::new(),
             },
         }
+    }
+
+    /// Enables model-backed expected-goals calculation and compact tracks.
+    /// It is disabled by default because it evaluates an ML feature/model path
+    /// on every live replay frame.
+    pub fn with_expected_goals(mut self) -> Self {
+        self.graph = build_timeline_event_graph_with_expected_goals(true);
+        self.include_expected_goals = true;
+        self
     }
 
     pub fn with_frame_resolution(mut self, resolution: StatsFrameResolution) -> Self {
@@ -602,7 +647,9 @@ impl Collector for StatsTimelineEventCollector {
         if let Some(emitted_dt) = self.frame_persistence.on_frame(frame_number, current_time) {
             let mut frame = self.snapshot_frame_scaffold()?;
             frame.dt = emitted_dt;
-            self.record_expected_goals_tracks(frame.frame_number)?;
+            if self.include_expected_goals {
+                self.record_expected_goals_tracks(frame.frame_number)?;
+            }
             self.frames.push(frame);
         }
 
@@ -618,7 +665,9 @@ impl Collector for StatsTimelineEventCollector {
             return Ok(());
         };
         let mut final_snapshot = self.snapshot_frame_scaffold()?;
-        self.record_expected_goals_tracks(final_snapshot.frame_number)?;
+        if self.include_expected_goals {
+            self.record_expected_goals_tracks(final_snapshot.frame_number)?;
+        }
         match self
             .frame_persistence
             .final_frame_action(final_snapshot.frame_number, final_snapshot.time)

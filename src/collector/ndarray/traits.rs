@@ -72,6 +72,23 @@ pub trait AnalysisFeatureAdder<F> {
     ) -> SubtrActorResult<()>;
 }
 
+/// Stateful predicate that decides which fully evaluated analysis frames
+/// become ndarray rows. The analysis graph still runs on every replay frame,
+/// which is essential for temporal calculators; only matrix materialization is
+/// filtered.
+pub trait AnalysisFrameFilter {
+    fn analysis_dependencies(&self) -> Vec<AnalysisDependency>;
+
+    fn include_frame(
+        &mut self,
+        context: &AnalysisFeatureContext<'_>,
+        processor: &dyn ProcessorView,
+        frame: &boxcars::Frame,
+        frame_count: usize,
+        current_time: f32,
+    ) -> SubtrActorResult<bool>;
+}
+
 /// Fixed-width analysis-backed feature extractor with compile-time column count validation.
 pub trait LengthCheckedAnalysisFeatureAdder<F, const N: usize> {
     fn get_column_headers_array(&self) -> &[&str; N];

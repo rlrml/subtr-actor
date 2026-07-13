@@ -69,6 +69,7 @@ pub struct NDArrayCollector<F> {
     feature_adders: NDArrayFeatureAdders<F>,
     player_feature_adders: NDArrayPlayerFeatureAdders<F>,
     analysis_runtime: Option<NDArrayAnalysisRuntime>,
+    analysis_frame_filter: Option<Box<dyn AnalysisFrameFilter + Send>>,
     data: Vec<F>,
     replay_meta: Option<ReplayMeta>,
     frames_added: usize,
@@ -156,10 +157,40 @@ impl<F> NDArrayCollector<F> {
             player_feature_adders,
             analysis_runtime: uses_analysis
                 .then(|| NDArrayAnalysisRuntime::new(analysis_dependencies)),
+            analysis_frame_filter: None,
             data: Vec::new(),
             replay_meta: None,
             frames_added: 0,
         }
+    }
+
+    /// Filters materialized rows using analysis state while continuing to
+    /// evaluate the analysis graph on every input frame.
+    pub fn with_analysis_frame_filter(
+        mut self,
+        filter: impl AnalysisFrameFilter + Send + 'static,
+    ) -> Self {
+        let mut dependencies = self
+            .feature_adders
+            .iter()
+            .flat_map(NDArrayFeatureAdder::analysis_dependencies)
+            .chain(
+                self.player_feature_adders
+                    .iter()
+                    .flat_map(NDArrayPlayerFeatureAdder::analysis_dependencies),
+            )
+            .collect::<Vec<_>>();
+        dependencies.extend(filter.analysis_dependencies());
+        self.analysis_runtime = Some(NDArrayAnalysisRuntime::new(dependencies));
+        self.analysis_frame_filter = Some(Box::new(filter));
+        self
+    }
+
+    /// Reads analysis state accumulated by analysis-backed feature adders.
+    pub fn analysis_state<T: 'static>(&self) -> Option<&T> {
+        self.analysis_runtime
+            .as_ref()
+            .and_then(|runtime| runtime.graph.state::<T>())
     }
 
     /// Returns the column headers implied by the configured feature adders.
@@ -276,6 +307,21 @@ impl<F> Collector for NDArrayCollector<F> {
             .as_ref()
             .map(NDArrayAnalysisRuntime::context);
 
+        if let Some(filter) = self.analysis_frame_filter.as_mut() {
+            let include = filter.include_frame(
+                analysis_context
+                    .as_ref()
+                    .expect("analysis runtime exists for analysis frame filters"),
+                processor,
+                frame,
+                frame_number,
+                current_time,
+            )?;
+            if !include {
+                return Ok(TimeAdvance::NextFrame);
+            }
+        }
+
         for feature_adder in &self.feature_adders {
             match feature_adder {
                 NDArrayFeatureAdder::Plain(adder) => adder.add_features(
@@ -377,6 +423,12 @@ where
             ReplicatedGameStateTimeRemaining::<F>::arc_new(),
         )),
         "BallHasBeenHit" => Some(NDArrayFeatureAdder::plain(BallHasBeenHit::<F>::arc_new())),
+        "ThreatFeatures" => Some(NDArrayFeatureAdder::analysis(
+            ThreatFeaturesBothTeams::<F>::arc_new(),
+        )),
+        "ThreatModelValues" => Some(NDArrayFeatureAdder::analysis(
+            ThreatModelValues::<F>::arc_new(),
+        )),
         _ => None,
     }
 }

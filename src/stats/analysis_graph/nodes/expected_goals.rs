@@ -29,11 +29,9 @@ impl_analysis_node! {
     dependencies = [
         frame_info_dependency() => FrameInfo,
         gameplay_state_dependency() => GameplayState,
-        ball_frame_state_dependency() => BallFrameState,
-        player_frame_state_dependency() => PlayerFrameState,
         frame_events_state_dependency() => FrameEventsState,
         touch_state_dependency() => TouchState,
-        live_play_dependency() => LivePlayState,
+        threat_features_dependency() => ThreatFeaturesState,
     ],
     call = calculator.update_parts,
     finish = calculator.finish_calculation,

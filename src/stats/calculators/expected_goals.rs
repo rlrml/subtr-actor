@@ -16,10 +16,10 @@
 //!   `sum(V * dt) / tau` over the span (`tau` =
 //!   [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS)),
 //!   credited to the attacking toucher associated with the episode's peak V.
-//!   Corpus-calibrated:
-//!   the full-match integral matches actual goals per team-game within ~1%,
-//!   whereas summing episode *peak* V over-counts goals ~2.7x; the peak
-//!   survives on the event as `peak_value` for display/intensity.
+//!   Dividing the time integral by the prediction horizon corrects for the
+//!   overlapping windows evaluated on adjacent frames; summing episode peaks
+//!   would count the same sustained chance repeatedly. The peak survives on
+//!   the event as `peak_value` for display/intensity.
 //! - The per-team full-match integral (over ALL evaluated live frames, not
 //!   just above-threshold ones) is exposed via
 //!   [`ExpectedGoalsCalculator::team_xg_integrals`] and is the team's
@@ -27,11 +27,8 @@
 
 use super::*;
 
-/// Episode threshold on V. The heuristic model's neutral-midfield baseline
-/// sits around 0.02-0.04, so 0.15 is roughly 4x baseline: episodes open only
-/// on genuinely elevated scoring probability (an on-target ball, a breakaway
-/// toward an under-defended net) rather than ordinary offensive-half
-/// possession.
+/// Episode threshold on V. This keeps episodes focused on elevated scoring
+/// probability rather than ordinary offensive-half possession.
 pub const THREAT_EPISODE_THRESHOLD: f32 = 0.15;
 
 /// A ballistic trajectory must cross the goal line within this many seconds
@@ -46,17 +43,14 @@ const ON_TARGET_MAX_SECONDS: f32 = 3.0;
 const PLAYER_DISTANCE_NORM: f32 = 4000.0;
 
 /// Maximum in-field distance to the goal center (far corner at ceiling
-/// height), used to normalize `ball_dist_to_goal` and
-/// `nearest_defender_to_goal_dist` into [0, 1].
+/// height), used to normalize ball/player goal distances into [0, 1].
 const GOAL_DISTANCE_NORM: f32 = 11_200.0;
 
 /// Ball-center height of a ball resting on the goal line; the aim point used
 /// for goal-center distances and radial speed.
 const GOAL_CENTER_Z: f32 = BALL_RADIUS_Z;
 
-/// Net-region box for the `defender_in_net` feature: a defender inside the
-/// mouth (or just in front of it, within this depth) and under crossbar
-/// height (plus a car-sized margin) is covering the net.
+/// Net-region box for each player's `in_net` feature.
 const NET_REGION_DEPTH_Y: f32 = 650.0;
 const NET_REGION_MARGIN: f32 = 150.0;
 
@@ -71,15 +65,139 @@ const PENDING_EPISODE_GOAL_GRACE_SECONDS: f32 = 10.0;
 /// goal (a replicated goal event plus the scoreboard increment).
 const GOAL_RECORD_DEDUPE_SECONDS: f32 = 2.0;
 
-pub const THREAT_FEATURE_COUNT: usize = 17;
+pub const PLAYER_THREAT_FEATURE_COUNT: usize = 16;
+pub const TEAM_THREAT_FEATURE_COUNT: usize = 2 * PLAYER_THREAT_FEATURE_COUNT;
+pub const THREAT_FEATURE_COUNT: usize = 8 + 2 * TEAM_THREAT_FEATURE_COUNT;
+
+/// Identically shaped state computed for every player before any team
+/// aggregation. No player receives a positional role or a distinct schema.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+pub struct PlayerThreatFeatures {
+    pub position_x: f32,
+    pub position_y: f32,
+    pub position_z: f32,
+    pub velocity_x: f32,
+    pub velocity_y: f32,
+    pub velocity_z: f32,
+    pub forward_x: f32,
+    pub forward_y: f32,
+    pub forward_z: f32,
+    pub distance_to_ball: f32,
+    pub distance_to_goal: f32,
+    pub boost: f32,
+    pub is_goalside: f32,
+    pub in_net: f32,
+    pub dodge_available: f32,
+    pub demoed: f32,
+}
+
+impl PlayerThreatFeatures {
+    pub const FEATURE_NAMES: [&'static str; PLAYER_THREAT_FEATURE_COUNT] = [
+        "position_x",
+        "position_y",
+        "position_z",
+        "velocity_x",
+        "velocity_y",
+        "velocity_z",
+        "forward_x",
+        "forward_y",
+        "forward_z",
+        "distance_to_ball",
+        "distance_to_goal",
+        "boost",
+        "is_goalside",
+        "in_net",
+        "dodge_available",
+        "demoed",
+    ];
+
+    pub fn to_array(self) -> [f32; PLAYER_THREAT_FEATURE_COUNT] {
+        [
+            self.position_x,
+            self.position_y,
+            self.position_z,
+            self.velocity_x,
+            self.velocity_y,
+            self.velocity_z,
+            self.forward_x,
+            self.forward_y,
+            self.forward_z,
+            self.distance_to_ball,
+            self.distance_to_goal,
+            self.boost,
+            self.is_goalside,
+            self.in_net,
+            self.dodge_available,
+            self.demoed,
+        ]
+    }
+
+    fn from_array(values: [f32; PLAYER_THREAT_FEATURE_COUNT]) -> Self {
+        Self {
+            position_x: values[0],
+            position_y: values[1],
+            position_z: values[2],
+            velocity_x: values[3],
+            velocity_y: values[4],
+            velocity_z: values[5],
+            forward_x: values[6],
+            forward_y: values[7],
+            forward_z: values[8],
+            distance_to_ball: values[9],
+            distance_to_goal: values[10],
+            boost: values[11],
+            is_goalside: values[12],
+            in_net: values[13],
+            dodge_available: values[14],
+            demoed: values[15],
+        }
+    }
+}
+
+/// Permutation-invariant representation of one two-player team. `mean`
+/// captures the team's center state and `spread` is the component-wise
+/// absolute difference between its players. Both are unchanged when the two
+/// players are swapped.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+pub struct TeamThreatFeatures {
+    pub mean: PlayerThreatFeatures,
+    pub spread: PlayerThreatFeatures,
+}
+
+impl TeamThreatFeatures {
+    fn from_players(first: PlayerThreatFeatures, second: PlayerThreatFeatures) -> Self {
+        let first = first.to_array();
+        let second = second.to_array();
+        Self {
+            mean: PlayerThreatFeatures::from_array(std::array::from_fn(|index| {
+                (first[index] + second[index]) * 0.5
+            })),
+            spread: PlayerThreatFeatures::from_array(std::array::from_fn(|index| {
+                (first[index] - second[index]).abs()
+            })),
+        }
+    }
+
+    fn to_array(self) -> [f32; TEAM_THREAT_FEATURE_COUNT] {
+        let mut values = [0.0; TEAM_THREAT_FEATURE_COUNT];
+        values[..PLAYER_THREAT_FEATURE_COUNT].copy_from_slice(&self.mean.to_array());
+        values[PLAYER_THREAT_FEATURE_COUNT..].copy_from_slice(&self.spread.to_array());
+        values
+    }
+}
 
 /// Per-frame, per-team threat features, normalized so the team under
 /// evaluation always attacks +Y (team one's world is rotated 180 degrees
-/// about the z axis). All values are bounded; everything except
-/// `attacking_team_size` is normalized into [-1, 1] or [0, 1].
+/// about the z axis). Ball and per-player values are normalized into [-1, 1]
+/// or [0, 1]; absolute pair spreads are therefore bounded by [0, 2].
 ///
 /// [`ThreatFeatures::FEATURE_NAMES`] and [`ThreatFeatures::to_array`] share
 /// one order -- that contract is what the offline training pipeline joins on.
+/// This schema is defined only for 2v2. Every player passes through the same
+/// feature transform, then each perspective-relative team pair is aggregated
+/// without ordering. Team affiliation remains explicit because the output is
+/// conditioned on which side is trying to score; there are no learned
+/// near/far or first/second-player roles.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ThreatFeatures {
     /// Ball y in the attacking frame / 5120: -1 at own goal line, +1 at the
@@ -104,37 +222,68 @@ pub struct ThreatFeatures {
     /// 1 / (1 + seconds until the ball crosses the goal-line plane), or 0
     /// when it is not moving toward the plane. Higher = sooner.
     pub time_to_goal_line: f32,
-    /// Nearest attacker distance to the ball, clamped to
-    /// [`PLAYER_DISTANCE_NORM`] and normalized.
-    pub nearest_attacker_dist: f32,
-    /// Attackers at or beyond the ball's attacking y / team size.
-    pub attackers_ahead_of_ball: f32,
-    /// Attackers behind the ball's attacking y / team size.
-    pub attackers_behind_ball: f32,
-    /// Nearest defender distance to the ball, clamped and normalized (1.0
-    /// when no defender is on the field).
-    pub nearest_defender_dist: f32,
-    /// Nearest defender distance to their own goal center, normalized by
-    /// [`GOAL_DISTANCE_NORM`] (1.0 when no defender is on the field).
-    pub nearest_defender_to_goal_dist: f32,
-    /// Defenders goalside of the ball (attacking y beyond the ball's) /
-    /// defending-team roster size (non-demoed, the same eligibility used to
-    /// iterate defenders).
-    pub defenders_goalside: f32,
-    /// 1.0 when any defender occupies the net region in front of their goal
-    /// mouth.
-    pub defender_in_net: f32,
-    /// Boost of the defender nearest the ball, raw 0-255 scaled to [0, 1]
-    /// (0.0 when unknown or no defender).
-    pub nearest_defender_boost: f32,
-    /// Raw attacking-team roster count this frame (the corpus is mostly 2s).
-    pub attacking_team_size: f32,
+    pub own_team: TeamThreatFeatures,
+    pub opponent_team: TeamThreatFeatures,
+}
+
+/// Canonical per-frame threat feature rows published for ndarray extraction
+/// and consumed by the expected-goals model. `current` is `None` outside live
+/// play or when the ball state is unavailable.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ThreatFeaturesState {
+    current: Option<[ThreatFeatures; 2]>,
+}
+
+impl ThreatFeaturesState {
+    pub fn current(&self) -> Option<&[ThreatFeatures; 2]> {
+        self.current.as_ref()
+    }
+
+    pub(crate) fn update(
+        &mut self,
+        is_doubles: bool,
+        ball: &BallFrameState,
+        players: &PlayerFrameState,
+        events: &FrameEventsState,
+        dodge_available: &HashMap<PlayerId, bool>,
+        live_play_state: &LivePlayState,
+    ) {
+        let Some(ball_sample) = ball
+            .sample()
+            .filter(|_| live_play_state.is_live_play && is_doubles)
+        else {
+            self.current = None;
+            return;
+        };
+        let demoed_players: HashSet<PlayerId> = events
+            .active_demos
+            .iter()
+            .map(|demo| demo.victim.clone())
+            .collect();
+        self.current = compute_threat_features(
+            ball_sample.position(),
+            ball_sample.velocity(),
+            players,
+            &demoed_players,
+            dodge_available,
+            true,
+        )
+        .zip(compute_threat_features(
+            ball_sample.position(),
+            ball_sample.velocity(),
+            players,
+            &demoed_players,
+            dodge_available,
+            false,
+        ))
+        .map(|(team_zero, team_one)| [team_zero, team_one]);
+    }
 }
 
 impl ThreatFeatures {
     /// Column names for [`Self::to_array`], in the same order. The offline
     /// training pipeline joins on these names.
-    pub const FEATURE_NAMES: &'static [&'static str] = &[
+    pub const FEATURE_NAMES: [&'static str; THREAT_FEATURE_COUNT] = [
         "ball_forward_y",
         "ball_dist_to_goal",
         "ball_height",
@@ -143,20 +292,76 @@ impl ThreatFeatures {
         "goal_open_angle",
         "on_target",
         "time_to_goal_line",
-        "nearest_attacker_dist",
-        "attackers_ahead_of_ball",
-        "attackers_behind_ball",
-        "nearest_defender_dist",
-        "nearest_defender_to_goal_dist",
-        "defenders_goalside",
-        "defender_in_net",
-        "nearest_defender_boost",
-        "attacking_team_size",
+        "own_team_mean_position_x",
+        "own_team_mean_position_y",
+        "own_team_mean_position_z",
+        "own_team_mean_velocity_x",
+        "own_team_mean_velocity_y",
+        "own_team_mean_velocity_z",
+        "own_team_mean_forward_x",
+        "own_team_mean_forward_y",
+        "own_team_mean_forward_z",
+        "own_team_mean_distance_to_ball",
+        "own_team_mean_distance_to_goal",
+        "own_team_mean_boost",
+        "own_team_mean_is_goalside",
+        "own_team_mean_in_net",
+        "own_team_mean_dodge_available",
+        "own_team_mean_demoed",
+        "own_team_spread_position_x",
+        "own_team_spread_position_y",
+        "own_team_spread_position_z",
+        "own_team_spread_velocity_x",
+        "own_team_spread_velocity_y",
+        "own_team_spread_velocity_z",
+        "own_team_spread_forward_x",
+        "own_team_spread_forward_y",
+        "own_team_spread_forward_z",
+        "own_team_spread_distance_to_ball",
+        "own_team_spread_distance_to_goal",
+        "own_team_spread_boost",
+        "own_team_spread_is_goalside",
+        "own_team_spread_in_net",
+        "own_team_spread_dodge_available",
+        "own_team_spread_demoed",
+        "opponent_team_mean_position_x",
+        "opponent_team_mean_position_y",
+        "opponent_team_mean_position_z",
+        "opponent_team_mean_velocity_x",
+        "opponent_team_mean_velocity_y",
+        "opponent_team_mean_velocity_z",
+        "opponent_team_mean_forward_x",
+        "opponent_team_mean_forward_y",
+        "opponent_team_mean_forward_z",
+        "opponent_team_mean_distance_to_ball",
+        "opponent_team_mean_distance_to_goal",
+        "opponent_team_mean_boost",
+        "opponent_team_mean_is_goalside",
+        "opponent_team_mean_in_net",
+        "opponent_team_mean_dodge_available",
+        "opponent_team_mean_demoed",
+        "opponent_team_spread_position_x",
+        "opponent_team_spread_position_y",
+        "opponent_team_spread_position_z",
+        "opponent_team_spread_velocity_x",
+        "opponent_team_spread_velocity_y",
+        "opponent_team_spread_velocity_z",
+        "opponent_team_spread_forward_x",
+        "opponent_team_spread_forward_y",
+        "opponent_team_spread_forward_z",
+        "opponent_team_spread_distance_to_ball",
+        "opponent_team_spread_distance_to_goal",
+        "opponent_team_spread_boost",
+        "opponent_team_spread_is_goalside",
+        "opponent_team_spread_in_net",
+        "opponent_team_spread_dodge_available",
+        "opponent_team_spread_demoed",
     ];
 
     /// The feature vector, ordered exactly as [`Self::FEATURE_NAMES`].
     pub fn to_array(&self) -> [f32; THREAT_FEATURE_COUNT] {
-        [
+        let mut values = [0.0; THREAT_FEATURE_COUNT];
+        values[..8].copy_from_slice(&[
             self.ball_forward_y,
             self.ball_dist_to_goal,
             self.ball_height,
@@ -165,16 +370,10 @@ impl ThreatFeatures {
             self.goal_open_angle,
             self.on_target,
             self.time_to_goal_line,
-            self.nearest_attacker_dist,
-            self.attackers_ahead_of_ball,
-            self.attackers_behind_ball,
-            self.nearest_defender_dist,
-            self.nearest_defender_to_goal_dist,
-            self.defenders_goalside,
-            self.defender_in_net,
-            self.nearest_defender_boost,
-            self.attacking_team_size,
-        ]
+        ]);
+        values[8..8 + TEAM_THREAT_FEATURE_COUNT].copy_from_slice(&self.own_team.to_array());
+        values[8 + TEAM_THREAT_FEATURE_COUNT..].copy_from_slice(&self.opponent_team.to_array());
+        values
     }
 }
 
@@ -242,8 +441,9 @@ pub fn compute_threat_features(
     ball_velocity: glam::Vec3,
     players: &PlayerFrameState,
     demoed_players: &HashSet<PlayerId>,
+    dodge_available: &HashMap<PlayerId, bool>,
     attacking_team_is_team_0: bool,
-) -> ThreatFeatures {
+) -> Option<ThreatFeatures> {
     let ball = attacking_frame(ball_position, attacking_team_is_team_0);
     let ball_vel = attacking_frame(ball_velocity, attacking_team_is_team_0);
     let goal_center = glam::Vec3::new(0.0, STANDARD_GOAL_LINE_Y, GOAL_CENTER_Z);
@@ -251,72 +451,70 @@ pub fn compute_threat_features(
     let ball_dist_to_goal = to_goal.length();
     let ball_speed_toward_goal = ball_vel.dot(to_goal.normalize_or_zero());
 
-    let team_size = players
-        .players
-        .iter()
-        .filter(|player| player.is_team_0 == attacking_team_is_team_0)
-        .count();
-    let team_size_norm = (team_size as f32).max(1.0);
-
-    let positioned = |same_team: bool| {
-        players.players.iter().filter(move |player| {
-            (player.is_team_0 == attacking_team_is_team_0) == same_team
-                && !demoed_players.contains(&player.player_id)
-        })
+    let team = |same_team: bool| {
+        let team = players
+            .players
+            .iter()
+            .filter(|player| (player.is_team_0 == attacking_team_is_team_0) == same_team)
+            .collect::<Vec<_>>();
+        (team.len() == 2).then_some(team)
     };
-    let positions = |same_team: bool| {
-        positioned(same_team).filter_map(|player| {
-            player
-                .position()
-                .map(|position| attacking_frame(position, attacking_team_is_team_0))
-        })
-    };
+    let own_team = team(true)?;
+    let opponent_team = team(false)?;
 
-    let nearest_attacker_dist = positions(true)
-        .map(|position| (position - ball).length())
-        .fold(f32::INFINITY, f32::min);
-    let attackers_ahead = positions(true)
-        .filter(|position| position.y >= ball.y)
-        .count();
-    let attackers_behind = positions(true)
-        .filter(|position| position.y < ball.y)
-        .count();
-
-    // Defender-count features normalize by the DEFENDING team's eligible
-    // roster (the same non-demoed filter the iteration below uses), not the
-    // attacking team's: on uneven-team / leaver frames the two differ.
-    let defending_team_size = positioned(false).count();
-    let defending_team_size_norm = (defending_team_size as f32).max(1.0);
-
-    let mut nearest_defender_dist = f32::INFINITY;
-    let mut nearest_defender_boost = 0.0;
-    let mut nearest_defender_to_goal = f32::INFINITY;
-    let mut defenders_goalside = 0usize;
-    let mut defender_in_net = false;
-    for defender in positioned(false) {
-        let Some(position) = defender.position() else {
-            continue;
-        };
-        let position = attacking_frame(position, attacking_team_is_team_0);
-        let ball_dist = (position - ball).length();
-        if ball_dist < nearest_defender_dist {
-            nearest_defender_dist = ball_dist;
-            nearest_defender_boost =
-                (defender.boost_amount.unwrap_or(0.0) / BOOST_MAX_AMOUNT).clamp(0.0, 1.0);
-        }
-        nearest_defender_to_goal = nearest_defender_to_goal.min((position - goal_center).length());
-        if position.y > ball.y {
-            defenders_goalside += 1;
-        }
-        if position.y >= STANDARD_GOAL_LINE_Y - NET_REGION_DEPTH_Y
+    let player_features = |player: &PlayerSample| {
+        let demoed = demoed_players.contains(&player.player_id);
+        let position = player
+            .position()
+            .map(|value| attacking_frame(value, attacking_team_is_team_0));
+        let velocity = player
+            .velocity()
+            .map(|value| attacking_frame(value, attacking_team_is_team_0))
+            .unwrap_or(glam::Vec3::ZERO);
+        let forward = player
+            .rigid_body
+            .as_ref()
+            .map(|body| quat_to_glam(&body.rotation) * glam::Vec3::X)
+            .map(|value| attacking_frame(value, attacking_team_is_team_0))
+            .unwrap_or(glam::Vec3::ZERO);
+        let distance_to_ball = position
+            .map(|value| normalized_distance((value - ball).length(), PLAYER_DISTANCE_NORM))
+            .unwrap_or(1.0);
+        let distance_to_goal = position
+            .map(|value| normalized_distance((value - goal_center).length(), GOAL_DISTANCE_NORM))
+            .unwrap_or(1.0);
+        let position = position.unwrap_or(glam::Vec3::ZERO);
+        let in_net = !demoed
+            && position.y >= STANDARD_GOAL_LINE_Y - NET_REGION_DEPTH_Y
             && position.x.abs() <= STANDARD_GOAL_MOUTH_HALF_WIDTH_X + NET_REGION_MARGIN
-            && position.z <= STANDARD_GOAL_MOUTH_HEIGHT_Z + NET_REGION_MARGIN
-        {
-            defender_in_net = true;
-        }
-    }
+            && position.z <= STANDARD_GOAL_MOUTH_HEIGHT_Z + NET_REGION_MARGIN;
 
-    ThreatFeatures {
+        PlayerThreatFeatures {
+            position_x: (position.x / 4096.0).clamp(-1.0, 1.0),
+            position_y: (position.y / STANDARD_GOAL_LINE_Y).clamp(-1.0, 1.0),
+            position_z: (position.z / SOCCAR_CEILING_Z).clamp(0.0, 1.0),
+            velocity_x: (velocity.x / CAR_MAX_SPEED).clamp(-1.0, 1.0),
+            velocity_y: (velocity.y / CAR_MAX_SPEED).clamp(-1.0, 1.0),
+            velocity_z: (velocity.z / CAR_MAX_SPEED).clamp(-1.0, 1.0),
+            forward_x: forward.x.clamp(-1.0, 1.0),
+            forward_y: forward.y.clamp(-1.0, 1.0),
+            forward_z: forward.z.clamp(-1.0, 1.0),
+            distance_to_ball,
+            distance_to_goal,
+            boost: (player.boost_amount.unwrap_or(0.0) / BOOST_MAX_AMOUNT).clamp(0.0, 1.0),
+            is_goalside: f32::from(u8::from(!demoed && position.y >= ball.y)),
+            in_net: f32::from(u8::from(in_net)),
+            dodge_available: f32::from(u8::from(
+                dodge_available
+                    .get(&player.player_id)
+                    .copied()
+                    .unwrap_or(false),
+            )),
+            demoed: f32::from(u8::from(demoed)),
+        }
+    };
+
+    Some(ThreatFeatures {
         ball_forward_y: (ball.y / STANDARD_GOAL_LINE_Y).clamp(-1.0, 1.0),
         ball_dist_to_goal: normalized_distance(ball_dist_to_goal, GOAL_DISTANCE_NORM),
         ball_height: (ball.z / SOCCAR_CEILING_Z).clamp(0.0, 1.0),
@@ -327,28 +525,15 @@ pub fn compute_threat_features(
         time_to_goal_line: seconds_to_goal_plane(ball, ball_vel)
             .map(|time| 1.0 / (1.0 + time))
             .unwrap_or(0.0),
-        nearest_attacker_dist: if nearest_attacker_dist.is_finite() {
-            normalized_distance(nearest_attacker_dist, PLAYER_DISTANCE_NORM)
-        } else {
-            1.0
-        },
-        attackers_ahead_of_ball: (attackers_ahead as f32 / team_size_norm).clamp(0.0, 1.0),
-        attackers_behind_ball: (attackers_behind as f32 / team_size_norm).clamp(0.0, 1.0),
-        nearest_defender_dist: if nearest_defender_dist.is_finite() {
-            normalized_distance(nearest_defender_dist, PLAYER_DISTANCE_NORM)
-        } else {
-            1.0
-        },
-        nearest_defender_to_goal_dist: if nearest_defender_to_goal.is_finite() {
-            normalized_distance(nearest_defender_to_goal, GOAL_DISTANCE_NORM)
-        } else {
-            1.0
-        },
-        defenders_goalside: (defenders_goalside as f32 / defending_team_size_norm).clamp(0.0, 1.0),
-        defender_in_net: f32::from(u8::from(defender_in_net)),
-        nearest_defender_boost,
-        attacking_team_size: team_size as f32,
-    }
+        own_team: TeamThreatFeatures::from_players(
+            player_features(own_team[0]),
+            player_features(own_team[1]),
+        ),
+        opponent_team: TeamThreatFeatures::from_players(
+            player_features(opponent_team[0]),
+            player_features(opponent_team[1]),
+        ),
+    })
 }
 
 /// The detection-frame change in the touching team's V for one touch.
@@ -439,17 +624,6 @@ pub struct ThreatEpisodeEvent {
     pub end_reason: ThreatEpisodeEndReason,
 }
 
-/// One sampled feature/value row recorded when dataset sampling is enabled
-/// via [`ExpectedGoalsCalculatorConfig::sample_interval_seconds`].
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ThreatFrameSample {
-    pub time: f32,
-    pub frame: usize,
-    pub is_team_0: bool,
-    pub features: ThreatFeatures,
-    pub value: f32,
-}
-
 /// A goal observed while processing (from replicated goal events, with a
 /// scoreboard-increment fallback), kept for episode outcomes and dataset
 /// labeling.
@@ -464,17 +638,12 @@ pub struct ThreatGoalRecord {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExpectedGoalsCalculatorConfig {
     pub episode_threshold: f32,
-    /// When set, record a [`ThreatFrameSample`] per team at most once per
-    /// this many seconds of live play (for dataset export). `None` (the
-    /// default) records nothing.
-    pub sample_interval_seconds: Option<f32>,
 }
 
 impl Default for ExpectedGoalsCalculatorConfig {
     fn default() -> Self {
         Self {
             episode_threshold: THREAT_EPISODE_THRESHOLD,
-            sample_interval_seconds: None,
         }
     }
 }
@@ -514,7 +683,6 @@ pub struct ExpectedGoalsCalculator {
     config: ExpectedGoalsCalculatorConfig,
     touch_events: EventStream<ThreatTouchEvent>,
     episode_events: EventStream<ThreatEpisodeEvent>,
-    samples: Vec<ThreatFrameSample>,
     goal_records: Vec<ThreatGoalRecord>,
     team_states: [TeamThreatState; 2],
     /// Per-team full-match `sum(V * dt) / tau`, accumulated over EVERY
@@ -524,7 +692,6 @@ pub struct ExpectedGoalsCalculator {
     /// Both teams' V on the previous live frame, if it was live.
     previous_values: Option<[f32; 2]>,
     last_score: Option<(i32, i32)>,
-    last_sample_time: Option<f32>,
     last_frame: Option<(usize, f32)>,
     was_live: bool,
 }
@@ -563,11 +730,6 @@ impl ExpectedGoalsCalculator {
 
     pub fn new_episode_events(&self) -> &[ThreatEpisodeEvent] {
         self.episode_events.new_events()
-    }
-
-    /// Sampled dataset rows (empty unless sampling is enabled in the config).
-    pub fn samples(&self) -> &[ThreatFrameSample] {
-        &self.samples
     }
 
     pub fn goal_records(&self) -> &[ThreatGoalRecord] {
@@ -833,43 +995,13 @@ impl ExpectedGoalsCalculator {
         }
     }
 
-    fn record_samples(
-        &mut self,
-        frame: &FrameInfo,
-        features: [ThreatFeatures; 2],
-        values: [f32; 2],
-    ) {
-        let Some(interval) = self.config.sample_interval_seconds else {
-            return;
-        };
-        let due = self
-            .last_sample_time
-            .is_none_or(|last| frame.time - last >= interval || frame.time < last);
-        if !due {
-            return;
-        }
-        for team_index in 0..2 {
-            self.samples.push(ThreatFrameSample {
-                time: frame.time,
-                frame: frame.frame_number,
-                is_team_0: team_index == 0,
-                features: features[team_index],
-                value: values[team_index],
-            });
-        }
-        self.last_sample_time = Some(frame.time);
-    }
-
-    #[allow(clippy::too_many_arguments)]
     pub fn update_parts(
         &mut self,
         frame: &FrameInfo,
         gameplay: &GameplayState,
-        ball: &BallFrameState,
-        players: &PlayerFrameState,
         events: &FrameEventsState,
         touch_state: &TouchState,
-        live_play_state: &LivePlayState,
+        threat_features: &ThreatFeaturesState,
     ) -> SubtrActorResult<()> {
         self.touch_events.begin_update();
         self.episode_events.begin_update();
@@ -878,9 +1010,7 @@ impl ExpectedGoalsCalculator {
         self.detect_goals(frame, gameplay, events);
         self.resolve_stale_pending_episodes(frame, gameplay.kickoff_phase_active());
 
-        let is_live = live_play_state.is_live_play && !gameplay.kickoff_phase_active();
-        let ball_sample = ball.sample();
-        let (Some(ball_sample), true) = (ball_sample, is_live) else {
+        let Some(features) = threat_features.current().copied() else {
             self.suspend_active_episodes(frame);
             if self.was_live {
                 for state in self.team_states.iter_mut() {
@@ -891,21 +1021,6 @@ impl ExpectedGoalsCalculator {
             self.was_live = false;
             return Ok(());
         };
-
-        let demoed_players: HashSet<PlayerId> = events
-            .active_demos
-            .iter()
-            .map(|demo| demo.victim.clone())
-            .collect();
-        let features = [true, false].map(|is_team_0| {
-            compute_threat_features(
-                ball_sample.position(),
-                ball_sample.velocity(),
-                players,
-                &demoed_players,
-                is_team_0,
-            )
-        });
         let values = [
             expected_goals_model::threat_value(&features[0]),
             expected_goals_model::threat_value(&features[1]),
@@ -920,8 +1035,6 @@ impl ExpectedGoalsCalculator {
 
         self.emit_touch_events(frame, touch_state, values);
         self.update_episodes(frame, values);
-        self.record_samples(frame, features, values);
-
         self.previous_values = Some(values);
         self.was_live = true;
         Ok(())

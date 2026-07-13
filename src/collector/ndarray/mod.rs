@@ -34,6 +34,12 @@
 //! `BallRigidBodyNoVelocities`, `BallRigidBodyQuaternions`,
 //! `BallRigidBodyBasis`, `InterpolatedBallRigidBodyNoVelocities`,
 //! `CurrentTime`, `FrameTime`, `SecondsRemaining`, and `BallHasBeenHit`.
+//! Model-oriented global names include `ThreatFeatures` (both teams' 17
+//! attacking-normalized inputs) and `ThreatModelValues`. Use
+//! [`LiveThreatSampleFilter`] with
+//! [`NDArrayCollector::with_analysis_frame_filter`] to keep the analysis graph
+//! streaming on every replay frame while materializing only sampled live-play
+//! rows.
 //! Recognized per-player names include `PlayerRigidBody`,
 //! `PlayerRigidBodyNoVelocities`, `PlayerRelativeBallPosition`,
 //! `PlayerLocalRelativeBallVelocity`, `PlayerBoost`, `PlayerJump`,

@@ -6,7 +6,8 @@ use crate::stats::analysis_graph::{AnalysisNode, AnalysisStateContext};
 use crate::{Collector, FrameRateDecorator};
 use std::path::Path;
 
-const NDARRAY_ANALYSIS_FIXTURE: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
+const NDARRAY_ANALYSIS_FIXTURE: &str = "assets/post-eac-ranked-doubles-2026-04-28.replay";
+const NDARRAY_DUEL_FIXTURE: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
 
 #[derive(Default)]
 struct SharedAnalysisState {
@@ -172,6 +173,68 @@ fn string_feature_names_can_create_analysis_backed_touch_adders() {
         touch_event_count > 0,
         "fixture should produce at least one string-created player touch event"
     );
+}
+
+#[test]
+fn threat_training_rows_use_ndarray_features_with_streaming_model_parity() {
+    let replay = parse_replay(NDARRAY_ANALYSIS_FIXTURE);
+    let collector = NDArrayCollector::<f32>::from_strings(
+        &["CurrentTime", "ThreatFeatures", "ThreatModelValues"],
+        &[],
+    )
+    .expect("threat ndarray features should be registered")
+    .with_analysis_frame_filter(LiveThreatSampleFilter::new(0.25))
+    .process_replay(&replay)
+    .expect("threat ndarray should process replay");
+
+    assert!(
+        collector
+            .analysis_state::<ExpectedGoalsCalculator>()
+            .is_some(),
+        "requesting model values should wire the opt-in expected-goals node"
+    );
+    let (meta, matrix) = collector
+        .get_meta_and_ndarray()
+        .expect("threat ndarray should materialize");
+    assert!(matrix.nrows() > 5);
+    assert_eq!(matrix.ncols(), 1 + 2 * THREAT_FEATURE_COUNT + 2);
+    for (team_index, team_name) in ["team_zero", "team_one"].into_iter().enumerate() {
+        for (feature_index, feature_name) in ThreatFeatures::FEATURE_NAMES.iter().enumerate() {
+            assert_eq!(
+                meta.column_headers.global_headers
+                    [1 + team_index * THREAT_FEATURE_COUNT + feature_index],
+                format!("{team_name}_threat_{feature_name}")
+            );
+        }
+    }
+
+    for row in matrix.rows().into_iter().take(8) {
+        for team_index in 0..2 {
+            let start = 1 + team_index * THREAT_FEATURE_COUNT;
+            let values: [f32; THREAT_FEATURE_COUNT] =
+                std::array::from_fn(|index| row[start + index]);
+            let model_value = row[1 + 2 * THREAT_FEATURE_COUNT + team_index];
+            assert!((threat_value_from_array(&values) - model_value).abs() < 1e-6);
+        }
+    }
+}
+
+#[test]
+fn threat_ndarray_rejects_non_doubles_replays_by_producing_no_rows() {
+    let replay = parse_replay(NDARRAY_DUEL_FIXTURE);
+    let collector = NDArrayCollector::<f32>::from_strings(
+        &["CurrentTime", "ThreatFeatures", "ThreatModelValues"],
+        &[],
+    )
+    .expect("threat ndarray features should be registered")
+    .with_analysis_frame_filter(LiveThreatSampleFilter::new(0.25))
+    .process_replay(&replay)
+    .expect("non-doubles replay traversal itself should remain valid");
+    let (_, matrix) = collector
+        .get_meta_and_ndarray()
+        .expect("empty threat matrix should still have a valid schema");
+    assert_eq!(matrix.nrows(), 0);
+    assert_eq!(matrix.ncols(), 1 + 2 * THREAT_FEATURE_COUNT + 2);
 }
 
 #[test]

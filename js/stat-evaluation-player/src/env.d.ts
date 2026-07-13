@@ -22,6 +22,7 @@ declare module "@rlrml/subtr-actor" {
     data: Uint8Array,
     callback: (progress: unknown) => void,
     reportEveryNFrames?: number,
+    includeExpectedGoals?: boolean,
   ): {
     rawReplayData: Uint8Array;
     /** Compact event-backed stats timeline JSON bytes. */
@@ -32,6 +33,7 @@ declare module "@rlrml/subtr-actor" {
     callback: (progress: unknown) => void,
     reportEveryNFrames?: number,
     maxFrameChunkBytes?: number,
+    includeExpectedGoals?: boolean,
   ): {
     rawReplayData: Uint8Array;
     statsTimelineParts: {
@@ -49,14 +51,19 @@ declare module "@rlrml/subtr-actor" {
   /** Returns the compact event-backed timeline with scaffold frames. */
   export function get_stats_timeline(
     data: Uint8Array,
+    includeExpectedGoals?: boolean,
   ): import("./generated/ReplayStatsTimelineScaffold.ts").ReplayStatsTimelineScaffold;
   /** Returns the compact event-backed timeline as JSON bytes. */
-  export function get_stats_timeline_json(data: Uint8Array): Uint8Array;
+  export function get_stats_timeline_json(
+    data: Uint8Array,
+    includeExpectedGoals?: boolean,
+  ): Uint8Array;
   /** Returns the legacy full partial-sum timeline as JSON bytes. */
   export function get_legacy_stats_timeline_json(data: Uint8Array): Uint8Array;
   export function get_stats_timeline_json_parts(
     data: Uint8Array,
     maxFrameChunkBytes?: number,
+    includeExpectedGoals?: boolean,
   ): {
     config: Uint8Array;
     replayMeta: Uint8Array;

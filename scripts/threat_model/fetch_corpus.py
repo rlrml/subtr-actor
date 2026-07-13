@@ -15,7 +15,7 @@ Configuration (command-line flags, with environment-variable defaults):
   PER_STRATUM                    replays per (playlist, tier) stratum (150)
   THREAT_CORPUS_SEED             deterministic sampling seed (7)
   THREAT_CORPUS_PLAYLISTS        comma-separated playlists
-                                 (ranked-duels,ranked-doubles)
+                                 (ranked-doubles)
 """
 
 import argparse
@@ -37,8 +37,8 @@ CACHE = pathlib.Path(
 LISTING = CACHE / "listing.jsonl"
 MANIFEST = CACHE / "manifest.jsonl"
 REPLAYS = CACHE / "replays"
-DEFAULT_PLAYLISTS = "ranked-duels,ranked-doubles"
-ALLOWED_PLAYLISTS = {"ranked-doubles", "ranked-duels", "ranked-standard"}
+DEFAULT_PLAYLISTS = "ranked-doubles"
+ALLOWED_PLAYLISTS = {"ranked-doubles"}
 
 
 def resolve_token() -> str:
@@ -150,7 +150,7 @@ def parse_args():
         action="append",
         dest="playlists",
         choices=sorted(ALLOWED_PLAYLISTS),
-        help="playlist to include; repeat for multiple (default: duels and doubles)",
+        help="playlist to include (fixed to ranked doubles)",
     )
     parser.add_argument(
         "--per-stratum", type=int, default=int(os.environ.get("PER_STRATUM", "150"))

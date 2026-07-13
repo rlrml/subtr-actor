@@ -106,7 +106,7 @@ Get header information for the configured ndarray layout.
 
 Get structured frame-by-frame game state data with no FPS resampling.
 
-### `get_stats_events(filepath, frame_step_seconds=None) -> dict`
+### `get_stats_events(filepath, frame_step_seconds=None, include_expected_goals=False) -> dict`
 
 Get the compact modern stats event streams for a replay.
 
@@ -116,6 +116,8 @@ Parameters:
 - `frame_step_seconds`: optional positive sampling interval in seconds for the
   accompanying timeline collector. Events are still emitted as compact stat
   change streams.
+- `include_expected_goals`: opt in to the model-backed expected-goals event
+  streams. It is disabled by default.
 
 ### `get_summed_stats(filepath, module_names=None) -> dict`
 
@@ -124,8 +126,9 @@ Get aggregate summed stats for the selected builtin modules.
 Parameters:
 
 - `filepath`: path to the replay file
-- `module_names`: optional list of builtin stats module names. By default all
-  builtin modules are included.
+- `module_names`: optional list of builtin stats module names. By default the
+  non-model-backed modules are included; select `expected_goals` explicitly
+  to enable it.
 
 ### `get_stats_module_names() -> list[str]`
 
@@ -143,12 +146,13 @@ Get the raw stats snapshot payload produced by `StatsCollector`, including:
 Parameters:
 
 - `filepath`: path to the replay file
-- `module_names`: optional list of builtin stats module names. By default all
-  builtin modules are included.
+- `module_names`: optional list of builtin stats module names. By default the
+  non-model-backed modules are included; select `expected_goals` explicitly
+  to enable it.
 - `frame_step_seconds`: optional positive sampling interval in seconds. By
   default every replay frame is captured.
 
-### `get_stats_timeline(filepath, frame_step_seconds=None) -> dict`
+### `get_stats_timeline(filepath, frame_step_seconds=None, include_expected_goals=False) -> dict`
 
 Get the compact event-backed stats timeline for each replay sample.
 
@@ -161,6 +165,8 @@ Parameters:
 - `filepath`: path to the replay file
 - `frame_step_seconds`: optional positive sampling interval in seconds. By
   default every replay frame is captured.
+- `include_expected_goals`: opt in to the model-backed expected-goals tracks.
+  It is disabled by default.
 
 `module_names` filtering is not supported for compact event timelines. Passing
 it raises `ValueError`; use `get_legacy_stats_timeline` if filtered full

@@ -130,7 +130,9 @@ fn dangerous_state() -> (BallFrameState, PlayerFrameState) {
         PlayerFrameState {
             players: vec![
                 player(1, true, glam::Vec3::new(0.0, 4000.0, 17.0), Some(100.0)),
+                player(5, true, glam::Vec3::new(-900.0, 2600.0, 17.0), Some(25.0)),
                 player(2, false, glam::Vec3::new(2500.0, 1000.0, 17.0), Some(50.0)),
+                player(6, false, glam::Vec3::new(-2500.0, 800.0, 17.0), Some(75.0)),
             ],
         },
     )
@@ -143,7 +145,9 @@ fn neutral_state() -> (BallFrameState, PlayerFrameState) {
         PlayerFrameState {
             players: vec![
                 player(1, true, glam::Vec3::new(0.0, -1000.0, 17.0), Some(100.0)),
+                player(5, true, glam::Vec3::new(-1500.0, -2200.0, 17.0), Some(25.0)),
                 player(2, false, glam::Vec3::new(0.0, 2000.0, 17.0), Some(50.0)),
+                player(6, false, glam::Vec3::new(1200.0, 3200.0, 17.0), Some(75.0)),
             ],
         },
     )
@@ -160,15 +164,16 @@ fn update(
     touches: Vec<TouchEvent>,
     live: LivePlayState,
 ) {
+    let gameplay = GameplayState::default();
+    let mut threat_features = ThreatFeaturesState::default();
+    threat_features.update(true, ball, players, &events, &HashMap::new(), &live);
     calculator
         .update_parts(
             &frame(frame_number, time),
-            &GameplayState::default(),
-            ball,
-            players,
+            &gameplay,
             &events,
             &touch_state(touches),
-            &live,
+            &threat_features,
         )
         .unwrap();
 }
@@ -182,8 +187,10 @@ fn feature_names_and_array_agree() {
         ball.velocity().unwrap(),
         &players,
         &no_demoed(),
+        &HashMap::new(),
         true,
-    );
+    )
+    .unwrap();
     assert_eq!(
         features.to_array().len(),
         ThreatFeatures::FEATURE_NAMES.len()
@@ -206,22 +213,23 @@ fn features_are_bounded() {
         ball.velocity().unwrap(),
         &players,
         &no_demoed(),
+        &HashMap::new(),
         true,
-    );
+    )
+    .unwrap();
     for (name, value) in ThreatFeatures::FEATURE_NAMES
         .iter()
         .zip(features.to_array())
     {
+        let bounds = if name.contains("_spread_") {
+            0.0..=2.0
+        } else {
+            -1.0..=1.0
+        };
         assert!(
-            (-1.0..=4.0).contains(&value),
+            bounds.contains(&value),
             "feature {name} out of bounds: {value}"
         );
-        if *name != "attacking_team_size" {
-            assert!(
-                (-1.0..=1.0).contains(&value),
-                "normalized feature {name} out of [-1, 1]: {value}"
-            );
-        }
     }
 }
 
@@ -247,7 +255,7 @@ fn mirrored_state_yields_identical_features_for_the_other_team() {
             .players
             .iter()
             .map(|sample| {
-                player(
+                let mut mirrored = player(
                     match sample.player_id {
                         boxcars::RemoteId::Steam(id) => id,
                         _ => unreachable!(),
@@ -255,7 +263,14 @@ fn mirrored_state_yields_identical_features_for_the_other_team() {
                     !sample.is_team_0,
                     mirror(sample.position().unwrap()),
                     sample.boost_amount,
-                )
+                );
+                mirrored.rigid_body.as_mut().unwrap().rotation = boxcars::Quaternion {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 1.0,
+                    w: 0.0,
+                };
+                mirrored
             })
             .collect(),
     };
@@ -265,68 +280,55 @@ fn mirrored_state_yields_identical_features_for_the_other_team() {
         ball_velocity,
         &players_team_zero_attacking,
         &no_demoed(),
+        &HashMap::new(),
         true,
-    );
+    )
+    .unwrap();
     let features_team_one = compute_threat_features(
         mirror(ball_position),
         mirror(ball_velocity),
         &players_mirrored,
         &no_demoed(),
+        &HashMap::new(),
         false,
-    );
+    )
+    .unwrap();
 
     assert_eq!(features_team_zero.to_array(), features_team_one.to_array());
 }
 
 #[test]
 fn ballistic_on_target_hand_computed_fixture() {
-    let empty_players = PlayerFrameState::default();
     // 820 uu from the goal line at 1400 uu/s: crosses at t = 0.5857s with
     // z = 100 + 250 t + 0.5 * (-650) t^2 = 100 + 146.4 - 111.5 = 134.9 -- in
     // the mouth, dead center.
-    let on_target = compute_threat_features(
-        glam::Vec3::new(0.0, 4300.0, 100.0),
-        glam::Vec3::new(0.0, 1400.0, 250.0),
-        &empty_players,
-        &no_demoed(),
-        true,
-    );
-    assert_eq!(on_target.on_target, 1.0);
+    let position = glam::Vec3::new(0.0, 4300.0, 100.0);
+    let velocity = glam::Vec3::new(0.0, 1400.0, 250.0);
+    assert!(ballistic_on_target(position, velocity));
     let expected_time = (STANDARD_GOAL_LINE_Y - 4300.0) / 1400.0;
-    assert!((on_target.time_to_goal_line - 1.0 / (1.0 + expected_time)).abs() < 1e-6);
+    assert!((seconds_to_goal_plane(position, velocity).unwrap() - expected_time).abs() < 1e-6);
 
     // Same shot hit much higher: z at the line = 100 + 1200 * 0.5857 - 111.5
     // = 691.4 -- over the 642.775 crossbar.
-    let over_the_bar = compute_threat_features(
+    assert!(!ballistic_on_target(
         glam::Vec3::new(0.0, 4300.0, 100.0),
         glam::Vec3::new(0.0, 1400.0, 1200.0),
-        &empty_players,
-        &no_demoed(),
-        true,
-    );
-    assert_eq!(over_the_bar.on_target, 0.0);
-    assert!(over_the_bar.time_to_goal_line > 0.0);
+    ));
 
     // Crossing x = 2000: wide of the 892.755 post.
-    let wide = compute_threat_features(
+    assert!(!ballistic_on_target(
         glam::Vec3::new(2000.0, 4300.0, 100.0),
         glam::Vec3::new(0.0, 1400.0, 250.0),
-        &empty_players,
-        &no_demoed(),
-        true,
-    );
-    assert_eq!(wide.on_target, 0.0);
+    ));
 
     // Moving away from the goal: no crossing, no time-to-goal-line.
-    let away = compute_threat_features(
-        glam::Vec3::new(0.0, 4300.0, 100.0),
-        glam::Vec3::new(0.0, -1400.0, 250.0),
-        &empty_players,
-        &no_demoed(),
-        true,
+    assert!(
+        seconds_to_goal_plane(
+            glam::Vec3::new(0.0, 4300.0, 100.0),
+            glam::Vec3::new(0.0, -1400.0, 250.0),
+        )
+        .is_none()
     );
-    assert_eq!(away.on_target, 0.0);
-    assert_eq!(away.time_to_goal_line, 0.0);
 }
 
 #[test]
@@ -471,29 +473,53 @@ fn backdated_touch_keeps_contact_fields_and_detection_fields_separate() {
     assert_eq!(event.value_after, calculator.current_values().unwrap()[0]);
 }
 
-/// `defenders_goalside` normalizes by the DEFENDING team's eligible roster:
-/// on a 2v1 the lone goalside defender is 1/1, not 1/2.
 #[test]
-fn defenders_goalside_normalizes_by_defending_team_size() {
+fn player_features_are_permutation_invariant_within_each_team() {
     let players = PlayerFrameState {
         players: vec![
-            player(1, true, glam::Vec3::new(0.0, 2000.0, 17.0), Some(100.0)),
-            player(2, true, glam::Vec3::new(500.0, 1500.0, 17.0), Some(100.0)),
-            player(3, false, glam::Vec3::new(0.0, 4000.0, 17.0), Some(50.0)),
+            player(1, true, glam::Vec3::new(0.0, 2800.0, 17.0), Some(25.5)),
+            player(2, true, glam::Vec3::new(500.0, 500.0, 17.0), Some(51.0)),
+            player(3, false, glam::Vec3::new(0.0, 3600.0, 17.0), Some(76.5)),
+            player(4, false, glam::Vec3::new(500.0, 4800.0, 17.0), Some(102.0)),
         ],
     };
+    let dodge_available = HashMap::from([
+        (player_id(1), true),
+        (player_id(2), false),
+        (player_id(3), true),
+        (player_id(4), false),
+    ]);
     let features = compute_threat_features(
         glam::Vec3::new(0.0, 3000.0, 93.0),
         glam::Vec3::ZERO,
         &players,
         &no_demoed(),
+        &dodge_available,
         true,
-    );
-    assert_eq!(features.attacking_team_size, 2.0);
-    assert_eq!(
-        features.defenders_goalside, 1.0,
-        "one of one eligible defenders is goalside"
-    );
+    )
+    .unwrap();
+    assert_eq!(features.own_team.mean.boost, 0.15);
+    assert!((features.own_team.spread.boost - 0.1).abs() < 1e-6);
+    assert!((features.opponent_team.mean.boost - 0.35).abs() < 1e-6);
+    assert!((features.opponent_team.spread.boost - 0.1).abs() < 1e-6);
+    assert_eq!(features.own_team.mean.dodge_available, 0.5);
+    assert_eq!(features.own_team.spread.dodge_available, 1.0);
+    assert_eq!(features.opponent_team.mean.dodge_available, 0.5);
+    assert_eq!(features.opponent_team.spread.dodge_available, 1.0);
+
+    let reordered_players = PlayerFrameState {
+        players: players.players.iter().rev().cloned().collect(),
+    };
+    let reordered = compute_threat_features(
+        glam::Vec3::new(0.0, 3000.0, 93.0),
+        glam::Vec3::ZERO,
+        &reordered_players,
+        &no_demoed(),
+        &dodge_available,
+        true,
+    )
+    .unwrap();
+    assert_eq!(features, reordered);
 
     // The same frame with the defender demoed: no eligible defenders, and the
     // zero-roster guard keeps the feature finite.
@@ -503,9 +529,12 @@ fn defenders_goalside_normalizes_by_defending_team_size() {
         glam::Vec3::ZERO,
         &players,
         &demoed,
+        &dodge_available,
         true,
-    );
-    assert_eq!(features_demoed.defenders_goalside, 0.0);
+    )
+    .unwrap();
+    assert_eq!(features_demoed.opponent_team.mean.demoed, 0.5);
+    assert_eq!(features_demoed.opponent_team.spread.demoed, 1.0);
 }
 
 /// A same-team goal arriving after the pending episode's goal grace has
@@ -815,38 +844,6 @@ fn finish_closes_active_episode_as_replay_end() {
     let episodes = calculator.episode_events();
     assert_eq!(episodes.len(), 1);
     assert_eq!(episodes[0].end_reason, ThreatEpisodeEndReason::ReplayEnd);
-}
-
-#[test]
-fn sampling_records_two_attacking_normalized_rows_per_sampled_frame() {
-    let mut calculator = ExpectedGoalsCalculator::with_config(ExpectedGoalsCalculatorConfig {
-        sample_interval_seconds: Some(0.25),
-        ..ExpectedGoalsCalculatorConfig::default()
-    });
-    let (neutral_ball, neutral_players) = neutral_state();
-
-    for step in 0..4 {
-        update(
-            &mut calculator,
-            step + 1,
-            1.0 + step as f32 * 0.1,
-            &neutral_ball,
-            &neutral_players,
-            FrameEventsState::default(),
-            vec![],
-            live_play(),
-        );
-    }
-
-    // Sampled at t=1.0 and t=1.3 (0.25s cadence over 0.1s frames).
-    let samples = calculator.samples();
-    assert_eq!(samples.len(), 4);
-    assert!(samples[0].is_team_0);
-    assert!(!samples[1].is_team_0);
-    assert_eq!(samples[0].time, samples[1].time);
-    for sample in samples {
-        assert!(sample.value > 0.0 && sample.value < 1.0);
-    }
 }
 
 /// Constant V over N evaluated frames of known dt integrates to exactly

@@ -161,13 +161,50 @@ fn event_timeline_graph_does_not_build_full_stats_frame_snapshots() {
         !node_names.contains(&"stats_projection"),
         "event timeline transfer should not evaluate full partial-sum projections"
     );
+    assert!(
+        !node_names.contains(&"expected_goals"),
+        "model-backed expected goals should be off in the default timeline graph"
+    );
+
+    let mut opt_in_graph = build_timeline_event_graph_with_expected_goals(true);
+    opt_in_graph
+        .resolve()
+        .expect("opt-in expected-goals graph should resolve");
+    assert!(
+        opt_in_graph
+            .node_names()
+            .any(|name| name == "expected_goals")
+    );
+}
+
+#[test]
+fn legacy_timeline_graph_also_requires_expected_goals_opt_in() {
+    let mut default_graph = build_legacy_timeline_graph();
+    default_graph
+        .resolve()
+        .expect("default legacy graph should resolve");
+    assert!(
+        !default_graph
+            .node_names()
+            .any(|name| name == "expected_goals")
+    );
+
+    let mut opt_in_graph = build_legacy_timeline_graph_with_expected_goals(true);
+    opt_in_graph
+        .resolve()
+        .expect("opt-in legacy graph should resolve");
+    assert!(
+        opt_in_graph
+            .node_names()
+            .any(|name| name == "expected_goals")
+    );
 }
 
 fn assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(replay_path: &str) {
     let replay = parse_replay(replay_path);
     let mut processor = ReplayProcessor::new(&replay).expect("replay processor should initialize");
-    let mut full_collector = StatsTimelineCollector::new();
-    let mut scaffold_collector = StatsTimelineEventCollector::new();
+    let mut full_collector = StatsTimelineCollector::new().with_expected_goals();
+    let mut scaffold_collector = StatsTimelineEventCollector::new().with_expected_goals();
     processor
         .process_all(&mut [&mut full_collector, &mut scaffold_collector])
         .expect("full and event stats timelines should collect from the same processor");

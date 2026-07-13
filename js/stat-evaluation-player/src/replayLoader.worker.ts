@@ -103,6 +103,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       },
       event.data.reportEveryNFrames,
       32 * 1024 * 1024,
+      true,
     );
 
     postMessageToMain({

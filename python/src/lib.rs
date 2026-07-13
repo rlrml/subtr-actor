@@ -169,9 +169,15 @@ fn build_stats_collector(
 
 fn build_stats_timeline_event_collector(
     frame_step_seconds: Option<f32>,
+    include_expected_goals: bool,
 ) -> PyResult<subtr_actor::StatsTimelineEventCollector> {
-    Ok(subtr_actor::StatsTimelineEventCollector::new()
-        .with_frame_resolution(parse_stats_frame_resolution(frame_step_seconds)?))
+    let collector = subtr_actor::StatsTimelineEventCollector::new();
+    let collector = if include_expected_goals {
+        collector.with_expected_goals()
+    } else {
+        collector
+    };
+    Ok(collector.with_frame_resolution(parse_stats_frame_resolution(frame_step_seconds)?))
 }
 
 fn get_ndarray_with_info_for_type<'p, F>(
@@ -396,16 +402,18 @@ fn get_stats_module_names<'p>(py: Python<'p>) -> PyResult<Py<PyAny>> {
 
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
-#[pyo3(signature = (filepath, frame_step_seconds=None))]
+#[pyo3(signature = (filepath, frame_step_seconds=None, include_expected_goals=false))]
 fn get_stats_events<'p>(
     py: Python<'p>,
     filepath: PathBuf,
     frame_step_seconds: Option<f32>,
+    include_expected_goals: bool,
 ) -> PyResult<Py<PyAny>> {
     let replay = replay_from_filepath(&filepath)?;
-    let timeline = build_stats_timeline_event_collector(frame_step_seconds)?
-        .get_replay_stats_timeline_scaffold(&replay)
-        .map_err(handle_subtr_actor_exception)?;
+    let timeline =
+        build_stats_timeline_event_collector(frame_step_seconds, include_expected_goals)?
+            .get_replay_stats_timeline_scaffold(&replay)
+            .map_err(handle_subtr_actor_exception)?;
     let events = serde_json::to_value(timeline.events).map_err(to_py_error)?;
 
     Ok(convert_to_py(py, &events))
@@ -452,12 +460,13 @@ fn get_stats_snapshot_data<'p>(
 
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
-#[pyo3(signature = (filepath, module_names=None, frame_step_seconds=None))]
+#[pyo3(signature = (filepath, module_names=None, frame_step_seconds=None, include_expected_goals=false))]
 fn get_stats_timeline<'p>(
     py: Python<'p>,
     filepath: PathBuf,
     module_names: Option<Vec<String>>,
     frame_step_seconds: Option<f32>,
+    include_expected_goals: bool,
 ) -> PyResult<Py<PyAny>> {
     if module_names.is_some() {
         return Err(PyErr::new::<exceptions::PyValueError, _>(
@@ -466,9 +475,10 @@ fn get_stats_timeline<'p>(
     }
 
     let replay = replay_from_filepath(&filepath)?;
-    let timeline = build_stats_timeline_event_collector(frame_step_seconds)?
-        .get_replay_stats_timeline_scaffold(&replay)
-        .map_err(handle_subtr_actor_exception)?;
+    let timeline =
+        build_stats_timeline_event_collector(frame_step_seconds, include_expected_goals)?
+            .get_replay_stats_timeline_scaffold(&replay)
+            .map_err(handle_subtr_actor_exception)?;
 
     Ok(convert_to_py(
         py,
