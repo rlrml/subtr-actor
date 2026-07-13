@@ -59,7 +59,12 @@ export class ModuleControlsController {
 
     for (const mod of this.options.modules) {
       const hasRenderEffect = RENDER_EFFECT_MODULE_IDS.has(mod.id);
-      if (!mod.getTimelineEvents && !mod.getTimelineRanges && !hasRenderEffect) {
+      if (
+        !mod.getTimelineEvents &&
+        !mod.getTimelineRanges &&
+        !mod.getTimelineGraphs &&
+        !hasRenderEffect
+      ) {
         continue;
       }
 
@@ -68,13 +73,16 @@ export class ModuleControlsController {
           this.renderCapabilityToggle(mod.id, getCapabilityLabel(mod, "events"), "events"),
         );
       }
-      if (mod.getTimelineRanges) {
+      if (mod.getTimelineRanges || mod.getTimelineGraphs) {
+        const timelineViewCount = ctx
+          ? (mod.getTimelineRanges?.(ctx).length ?? 0) + (mod.getTimelineGraphs?.(ctx).length ?? 0)
+          : undefined;
         rangeToggles.push(
           this.renderCapabilityToggle(
             mod.id,
             getCapabilityLabel(mod, "ranges"),
             "ranges",
-            ctx ? mod.getTimelineRanges(ctx).length : undefined,
+            timelineViewCount,
           ),
         );
       }
@@ -89,7 +97,7 @@ export class ModuleControlsController {
 
     summary.append(
       renderModuleSummaryGroup("Timeline markers", markerToggles),
-      renderModuleSummaryGroup("Timeline ranges", rangeToggles),
+      renderModuleSummaryGroup("Timeline views", rangeToggles),
       renderModuleSummaryGroup("In-game visualizations", inGameVisualizationToggles),
     );
   }
@@ -253,6 +261,7 @@ function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string
     "fifty-fifty:events": "50/50",
     "fifty-fifty:ranges": "50/50",
     "dodge:events": "Dodge",
+    "expected_goals:ranges": "Instantaneous xG graph",
     "half-flip:events": "Half flip",
     "possession:ranges": "Possession",
     "powerslide:events": "Powerslide",

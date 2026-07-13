@@ -101,8 +101,13 @@ pub struct ReplayStatsTimelineScaffold {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ExpectedGoalsTimelineTracks {
+    pub config: ExpectedGoalsCalculatorConfig,
     pub teams: Vec<ExpectedGoalsTeamTimelineTrack>,
     pub players: Vec<ExpectedGoalsPlayerTimelineTrack>,
+    /// Finalized threshold-delimited incidents, including peak timing and any
+    /// scoring-touch exclusion applied to incident xG.
+    #[serde(default)]
+    pub episodes: Vec<ThreatEpisodeEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]

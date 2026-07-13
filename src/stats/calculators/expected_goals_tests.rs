@@ -664,6 +664,66 @@ fn episode_opens_above_threshold_and_closes_on_value_drop() {
     assert_eq!(episode.credited_player, Some(player_id(1)));
 }
 
+#[test]
+fn episode_hysteresis_keeps_small_threat_dips_in_one_incident() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+
+    calculator.update_episodes(&frame(1, 1.0), [0.30, 0.0]);
+    calculator.update_episodes(
+        &frame(2, 1.1),
+        [
+            (THREAT_EPISODE_THRESHOLD + THREAT_EPISODE_END_THRESHOLD) * 0.5,
+            0.0,
+        ],
+    );
+    assert!(
+        calculator.episode_events().is_empty(),
+        "a dip inside the hysteresis band must not split the incident"
+    );
+
+    calculator.update_episodes(&frame(3, 1.2), [THREAT_EPISODE_END_THRESHOLD, 0.0]);
+    let episodes = calculator.episode_events();
+    assert_eq!(episodes.len(), 1);
+    assert_eq!(episodes[0].start_frame, 1);
+    assert_eq!(episodes[0].end_frame, 3);
+    assert!((episodes[0].incident_xg - 0.30 * INCIDENT_XG_CALIBRATION_FACTOR).abs() < 1e-6);
+}
+
+#[test]
+fn goal_incident_uses_peak_before_final_touch_exclusion_window() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    calculator.update_episodes(&frame(1, 1.0), [0.30, 0.0]);
+    calculator.update_episodes(&frame(2, 1.3), [0.45, 0.0]);
+    calculator.update_episodes(&frame(3, 1.8), [0.80, 0.0]);
+    calculator.team_states[0].last_touch_time = Some(1.8);
+
+    calculator.close_episode_as_goal(&frame(4, 2.0), 2.0, true);
+
+    let episode = &calculator.episode_events()[0];
+    assert!(episode.ended_in_goal);
+    assert!((episode.peak_value - 0.80).abs() < 1e-6);
+    assert_eq!(episode.peak_frame, 3);
+    assert!((episode.goal_exclusion_start_time.unwrap() - 1.3).abs() < 1e-6);
+    assert!((episode.incident_peak_value - 0.30).abs() < 1e-6);
+    assert!((episode.incident_xg - 0.30 * INCIDENT_XG_CALIBRATION_FACTOR).abs() < 1e-6);
+    assert_eq!(episode.incident_xg_frame, Some(1));
+    assert_eq!(episode.incident_xg_time, Some(1.0));
+}
+
+#[test]
+fn goal_incident_contributes_zero_when_it_opens_inside_exclusion_window() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    calculator.update_episodes(&frame(1, 1.5), [0.80, 0.0]);
+    calculator.team_states[0].last_touch_time = Some(1.8);
+
+    calculator.close_episode_as_goal(&frame(2, 2.0), 2.0, true);
+
+    let episode = &calculator.episode_events()[0];
+    assert_eq!(episode.incident_xg, 0.0);
+    assert_eq!(episode.incident_xg_frame, None);
+    assert_eq!(episode.incident_xg_time, None);
+}
+
 /// Player credit follows the toucher associated with the episode's peak, not
 /// simply the last teammate to touch before the episode closes.
 #[test]
@@ -742,7 +802,7 @@ fn late_goal_attribution_resolves_pending_stoppage_episode_as_goal() {
         &danger_ball,
         &danger_players,
         FrameEventsState::default(),
-        vec![],
+        vec![touch(1, 1.0, 1, true)],
         live_play(),
     );
     update(
@@ -778,6 +838,8 @@ fn late_goal_attribution_resolves_pending_stoppage_episode_as_goal() {
     assert_eq!(episodes.len(), 1);
     assert!(episodes[0].ended_in_goal);
     assert_eq!(episodes[0].end_reason, ThreatEpisodeEndReason::Goal);
+    assert_eq!(episodes[0].incident_xg, 0.0);
+    assert_eq!(episodes[0].goal_exclusion_start_time, Some(0.5));
 }
 
 /// A stoppage with no following goal emits the episode as a plain stoppage
@@ -958,6 +1020,13 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
         team_is_team_0: true,
         xg: 0.4,
         peak_value: 0.6,
+        peak_frame: 2,
+        peak_time: 2.0,
+        incident_peak_value: 0.2,
+        incident_xg: 0.2,
+        incident_xg_frame: Some(1),
+        incident_xg_time: Some(1.0),
+        goal_exclusion_start_time: Some(1.5),
         credited_player: Some(player_id(1)),
         ended_in_goal: true,
         end_reason: ThreatEpisodeEndReason::Goal,
@@ -971,6 +1040,13 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
         team_is_team_0: true,
         xg: 0.2,
         peak_value: 0.3,
+        peak_frame: 3,
+        peak_time: 3.0,
+        incident_peak_value: 0.3,
+        incident_xg: 0.3,
+        incident_xg_frame: Some(3),
+        incident_xg_time: Some(3.0),
+        goal_exclusion_start_time: None,
         credited_player: None,
         ended_in_goal: false,
         end_reason: ThreatEpisodeEndReason::ValueDropped,
@@ -989,6 +1065,7 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
 
     let team = accumulator.team_stats(true);
     assert!((team.xg - 1.0).abs() < 1e-6);
+    assert!((team.incident_xg - 0.5).abs() < 1e-6);
     assert_eq!(team.current_threat, Some(0.4));
     assert_eq!(team.episode_count, 2);
     assert_eq!(team.goal_episode_count, 1);

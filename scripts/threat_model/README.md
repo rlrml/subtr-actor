@@ -109,11 +109,22 @@ time-integrated model averages 2.781 xG against 2.834 goals (0.981 ratio), with
 0.594 per-team-game correlation. The aggregate count scale is good; individual
 match totals remain noisy and should not be treated as precise forecasts.
 
-## xG aggregation (why the integral)
+## xG aggregation
 
 `V` is calibrated per overlapping 5s window. Summing frame or episode peaks
 would repeatedly count the same sustained chance, so the count-scale estimator
 is the time integral `Σ V·dt/τ`. `ThreatEpisodeEvent.xg` is the within-episode
 integral, team xg is the full-match integral, and the peak remains available as
-`peak_value` for display/intensity. Validate any estimator change on the full
-corpus with `threat_dataset_dump --episode-summary`.
+`peak_value` for display/intensity.
+
+The calculator also exposes an incident-based team total. An incident opens
+above 15% V, remains open until V falls to 5%, and contributes one selected
+peak. For goal-ending incidents, samples from 0.5 seconds before the scoring
+team's final touch onward are excluded so nearly determined ball trajectories
+do not leak into the total. The selected raw peak is multiplied by 0.629475,
+fit on the oldest 80% of the ranked-doubles corpus. On the newest 509 held-out
+replays (1,018 team-games), incident xG averages 2.905 against 2.797 goals
+(3.9% high). This alternate total has weaker per-game correlation than the
+continuous integral, so both remain available rather than conflating their
+semantics. Revalidate either estimator with
+`threat_dataset_dump --episode-summary`.

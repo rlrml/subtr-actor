@@ -47,12 +47,14 @@ struct Args {
     threads: Option<usize>,
     /// When set, also write one CSV row per (replay, team) summarizing the
     /// episode state machine's output against actual goals. Columns:
-    /// `replay_id,is_team0,episode_count,episode_xg_sum,full_integral_xg,peak_sum,goals`.
+    /// `replay_id,is_team0,episode_count,episode_xg_sum,full_integral_xg,peak_sum,incident_peak_sum,incident_xg_sum,goals`.
     /// `episode_xg_sum` sums the episode xG time integrals exactly as emitted
     /// by `ExpectedGoalsCalculator`'s episode events; `full_integral_xg` is
     /// the team's full-match `sum(V * dt) / tau` (the same state the stats
     /// accumulator reads); `peak_sum` sums episode peak V (the uncalibrated
-    /// legacy estimator, kept for comparison).
+    /// legacy estimator, kept for comparison); `incident_peak_sum` sums the
+    /// raw hysteresis-delimited, goal-touch-censored incident peaks and
+    /// `incident_xg_sum` includes their count calibration.
     #[arg(long)]
     episode_summary: Option<PathBuf>,
 }
@@ -237,7 +239,7 @@ fn header() -> String {
 }
 
 fn episode_summary_header() -> &'static str {
-    "replay_id,is_team0,episode_count,episode_xg_sum,full_integral_xg,peak_sum,goals"
+    "replay_id,is_team0,episode_count,episode_xg_sum,full_integral_xg,peak_sum,incident_peak_sum,incident_xg_sum,goals"
 }
 
 fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<ReplayRows> {
@@ -318,13 +320,15 @@ fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<Rep
         .map(|is_team_0| {
             let episodes = episodes.iter()
                 .filter(|episode| episode.team_is_team_0 == is_team_0);
-            let (episode_count, episode_xg_sum, peak_sum) = episodes.fold(
-                (0usize, 0.0f64, 0.0f64),
-                |(count, xg_sum, peak_sum), episode| {
+            let (episode_count, episode_xg_sum, peak_sum, incident_peak_sum, incident_xg_sum) = episodes.fold(
+                (0usize, 0.0f64, 0.0f64, 0.0f64, 0.0f64),
+                |(count, xg_sum, peak_sum, incident_peak_sum, incident_xg_sum), episode| {
                     (
                         count + 1,
                         xg_sum + f64::from(episode.xg),
                         peak_sum + f64::from(episode.peak_value),
+                        incident_peak_sum + f64::from(episode.incident_peak_value),
+                        incident_xg_sum + f64::from(episode.incident_xg),
                     )
                 },
             );
@@ -334,7 +338,7 @@ fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<Rep
                 .filter(|goal| goal.scoring_team_is_team_0 == is_team_0)
                 .count();
             format!(
-                "{},{},{episode_count},{episode_xg_sum:.6},{full_integral_xg:.6},{peak_sum:.6},{goal_count}",
+                "{},{},{episode_count},{episode_xg_sum:.6},{full_integral_xg:.6},{peak_sum:.6},{incident_peak_sum:.6},{incident_xg_sum:.6},{goal_count}",
                 csv_field(&replay_id),
                 u8::from(is_team_0),
             )

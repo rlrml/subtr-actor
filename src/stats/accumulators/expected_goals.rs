@@ -79,6 +79,12 @@ pub struct ExpectedGoalsTeamStats {
     /// prediction horizon on the current live-play frame. `None` outside live
     /// play or when the replay is not a supported 2v2 match.
     pub current_threat: Option<f32>,
+    /// Sum of count-calibrated, one-peak contributions from threshold-delimited
+    /// incidents. For an incident ending in a goal, samples from shortly before
+    /// the scoring team's final touch onward are excluded to avoid outcome
+    /// leakage. Raw selected probabilities remain available on the incident
+    /// events.
+    pub incident_xg: f32,
     /// The team's full-match xG time integral (`sum(V * dt) / tau` over every
     /// evaluated live frame, sub-threshold frames included), fed from
     /// [`ExpectedGoalsCalculator::team_xg_integrals`]. NOT a sum of episode
@@ -141,6 +147,7 @@ impl ExpectedGoalsStatsAccumulator {
                 .record_episode(event);
         }
         let team = &mut self.team_stats[usize::from(!event.team_is_team_0)];
+        team.incident_xg += event.incident_xg;
         team.episode_count += 1;
         if event.ended_in_goal {
             team.goal_episode_count += 1;

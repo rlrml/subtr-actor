@@ -262,6 +262,7 @@ export function createTeamStatsSnapshot(
       },
       expected_goals: {
         current_threat: null,
+        incident_xg: 0,
         xg: 0,
         episode_count: 0,
         goal_episode_count: 0,

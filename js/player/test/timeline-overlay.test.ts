@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { projectedRangeTimelineBounds, timelineEventSeekTime } from "../src/timeline-overlay";
+import {
+  buildTimelineGraphPath,
+  projectedRangeTimelineBounds,
+  timelineEventSeekTime,
+} from "../src/timeline-overlay";
 import type { ReplayPlayerTimelineProjection } from "../src/types";
 
 function projection(timelineTime: number, hiddenBySkip: boolean): ReplayPlayerTimelineProjection {
@@ -38,4 +42,21 @@ test("timeline event seek targets include lead-in while preserving event timesta
 
 test("timeline event seek targets honor explicit seek times", () => {
   assert.equal(timelineEventSeekTime({ kind: "shot", time: 12, seekTime: 6.5 }), 6.5);
+});
+
+test("timeline graph paths preserve stoppage gaps and clamp probabilities", () => {
+  assert.equal(
+    buildTimelineGraphPath(
+      [
+        { time: 0, value: 0 },
+        { time: 5, value: 0.5 },
+        { time: 6, value: null },
+        { time: 10, value: 2 },
+      ],
+      10,
+      0,
+      1,
+    ),
+    "M0.00,100.00 L500.00,50.00 M1000.00,0.00",
+  );
 });

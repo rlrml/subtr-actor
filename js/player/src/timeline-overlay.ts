@@ -6,6 +6,9 @@ import type {
   ReplayTimelineEvent,
   ReplayTimelineEventKind,
   ReplayTimelineEventSource,
+  ReplayTimelineGraph,
+  ReplayTimelineGraphPoint,
+  ReplayTimelineGraphSource,
   ReplayTimelineRange,
   ReplayTimelineRangeSource,
 } from "./types";
@@ -20,6 +23,7 @@ export interface TimelineOverlayPluginOptions {
   eventsLabel?: string;
   events?: ReplayTimelineEventSource;
   ranges?: ReplayTimelineRangeSource;
+  graphs?: ReplayTimelineGraphSource;
 }
 
 export interface TimelineOverlayEventSourceOptions {
@@ -37,6 +41,9 @@ export interface TimelineOverlayPlugin extends ReplayPlayerPlugin {
   addRangeSource(source: ReplayTimelineRangeSource): () => void;
   removeRangeSource(source: ReplayTimelineRangeSource): boolean;
   refreshRanges(): void;
+  addGraphSource(source: ReplayTimelineGraphSource): () => void;
+  removeGraphSource(source: ReplayTimelineGraphSource): boolean;
+  refreshGraphs(): void;
 }
 
 interface TimelineEventBucket {
@@ -72,6 +79,11 @@ interface TimelineRangeRecord {
 
 interface TimelineRangeLanePlayhead {
   element: HTMLDivElement;
+}
+
+interface TimelineGraphPlayhead {
+  element: SVGLineElement;
+  track: HTMLDivElement;
 }
 
 interface TimelineEventLanePlayhead {
@@ -339,6 +351,36 @@ function resolveRangeSources(
   return ranges;
 }
 
+function resolveCustomGraphs(
+  source: ReplayTimelineGraphSource | undefined,
+  context: ReplayPlayerPluginContext,
+): ReplayTimelineGraph[] {
+  if (!source) {
+    return [];
+  }
+  return typeof source === "function" ? source(context) : source;
+}
+
+function resolveGraphSources(
+  sources: Iterable<ReplayTimelineGraphSource>,
+  context: ReplayPlayerPluginContext,
+): ReplayTimelineGraph[] {
+  const graphIds = new Set<string>();
+  const graphs: ReplayTimelineGraph[] = [];
+  for (const source of sources) {
+    for (const graph of resolveCustomGraphs(source, context)) {
+      if (graph.id !== undefined) {
+        if (graphIds.has(graph.id)) {
+          continue;
+        }
+        graphIds.add(graph.id);
+      }
+      graphs.push(graph);
+    }
+  }
+  return graphs;
+}
+
 function groupRanges(ranges: ReplayTimelineRange[]): TimelineRangeLane[] {
   const lanes = new Map<string, TimelineRangeLane>();
   for (const range of ranges) {
@@ -410,6 +452,41 @@ function markerLeftPercent(timelineTime: number, duration: number): string {
   return `${(timelineTime / Math.max(duration, 0.0001)) * 100}%`;
 }
 
+const TIMELINE_GRAPH_WIDTH = 1000;
+const TIMELINE_GRAPH_HEIGHT = 100;
+
+function timelineGraphY(value: number, minValue: number, maxValue: number): number {
+  const span = Math.max(maxValue - minValue, Number.EPSILON);
+  const normalized = Math.max(0, Math.min(1, (value - minValue) / span));
+  return (1 - normalized) * TIMELINE_GRAPH_HEIGHT;
+}
+
+/** Build an SVG path for timeline-projected points, preserving null gaps. */
+export function buildTimelineGraphPath(
+  points: readonly ReplayTimelineGraphPoint[],
+  duration: number,
+  minValue: number,
+  maxValue: number,
+): string {
+  const safeDuration = Math.max(duration, 0.0001);
+  let needsMove = true;
+  const commands: string[] = [];
+  for (const point of points) {
+    if (point.value === null || !Number.isFinite(point.time) || !Number.isFinite(point.value)) {
+      needsMove = true;
+      continue;
+    }
+    const x = Math.max(
+      0,
+      Math.min(TIMELINE_GRAPH_WIDTH, (point.time / safeDuration) * TIMELINE_GRAPH_WIDTH),
+    );
+    const y = timelineGraphY(point.value, minValue, maxValue);
+    commands.push(`${needsMove ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`);
+    needsMove = false;
+  }
+  return commands.join(" ");
+}
+
 export function projectedRangeTimelineBounds(
   startProjection: ReplayPlayerTimelineProjection,
   endProjection: ReplayPlayerTimelineProjection,
@@ -451,10 +528,12 @@ export function createTimelineOverlayPlugin(
       ]
     : [];
   const extraRangeSources = options.ranges ? [options.ranges] : [];
+  const extraGraphSources = options.graphs ? [options.graphs] : [];
 
   let root: HTMLDivElement | null = null;
   let shell: HTMLDivElement | null = null;
   let rangesRoot: HTMLDivElement | null = null;
+  let graphsRoot: HTMLDivElement | null = null;
   let range: HTMLInputElement | null = null;
   let toggleButton: HTMLButtonElement | null = null;
   let toggleButtonIcon: HTMLSpanElement | null = null;
@@ -476,6 +555,7 @@ export function createTimelineOverlayPlugin(
   const timelineMarkers: TimelineMarkerRecord[] = [];
   const rangeElements: TimelineRangeRecord[] = [];
   const rangeLanePlayheads: TimelineRangeLanePlayhead[] = [];
+  const graphPlayheads: TimelineGraphPlayhead[] = [];
   const eventLanePlayheads: TimelineEventLanePlayhead[] = [];
   let passedMarkerEndIndex = 0;
   let activeMarkers = new Set<TimelineMarkerRecord>();
@@ -498,6 +578,17 @@ export function createTimelineOverlayPlugin(
     }
 
     buildRanges(playerContext);
+    syncState({
+      ...playerContext,
+      state: playerContext.player.getState(),
+    });
+  }
+
+  function refreshGraphLanes(): void {
+    if (!playerContext) {
+      return;
+    }
+    buildGraphs(playerContext);
     syncState({
       ...playerContext,
       state: playerContext.player.getState(),
@@ -527,6 +618,7 @@ export function createTimelineOverlayPlugin(
     if (projectionCacheKey !== nextProjectionCacheKey) {
       buildMarkers(context);
       buildRanges(context);
+      buildGraphs(context);
       projectionCacheKey = nextProjectionCacheKey;
     }
     range.min = "0";
@@ -565,6 +657,13 @@ export function createTimelineOverlayPlugin(
     }
     for (const playhead of rangeLanePlayheads) {
       playhead.element.style.left = playheadLeft;
+    }
+    const graphPlayheadX = `${(Math.min(currentTime, duration) / Math.max(duration, 0.0001)) * TIMELINE_GRAPH_WIDTH}`;
+    for (const playhead of graphPlayheads) {
+      playhead.element.setAttribute("x1", graphPlayheadX);
+      playhead.element.setAttribute("x2", graphPlayheadX);
+      playhead.track.setAttribute("aria-valuenow", `${Math.min(currentTime, duration)}`);
+      playhead.track.setAttribute("aria-valuetext", formatPlaybackTime(currentTime));
     }
   }
 
@@ -843,6 +942,194 @@ export function createTimelineOverlayPlugin(
     }
   }
 
+  function buildGraphs(context: ReplayPlayerPluginContext): void {
+    if (!graphsRoot) {
+      return;
+    }
+
+    graphsRoot.replaceChildren();
+    graphPlayheads.splice(0, graphPlayheads.length);
+    const graphs = resolveGraphSources(extraGraphSources, context);
+    if (graphs.length === 0) {
+      graphsRoot.hidden = true;
+      return;
+    }
+
+    graphsRoot.hidden = false;
+    const duration = Math.max(context.player.getTimelineDuration(), 0.0001);
+    const svgNamespace = "http://www.w3.org/2000/svg";
+
+    for (const graph of graphs) {
+      const minValue = graph.minValue ?? 0;
+      const maxValue = graph.maxValue ?? 1;
+      if (!Number.isFinite(minValue) || !Number.isFinite(maxValue) || maxValue <= minValue) {
+        continue;
+      }
+
+      const lane = document.createElement("div");
+      lane.className = "sap-tl-graph-lane";
+      lane.dataset.label = graph.label;
+
+      const label = document.createElement("span");
+      label.className = "sap-tl-graph-lane-label";
+      label.textContent = graph.label;
+      label.setAttribute("aria-label", graph.label);
+
+      const track = document.createElement("div");
+      track.className = "sap-tl-graph-lane-track";
+      track.tabIndex = 0;
+      track.setAttribute("role", "slider");
+      track.setAttribute("aria-label", `${graph.label} timeline; click or drag to seek`);
+      track.setAttribute("aria-valuemin", "0");
+      track.setAttribute("aria-valuemax", `${duration}`);
+
+      const svg = document.createElementNS(svgNamespace, "svg");
+      svg.classList.add("sap-tl-graph-svg");
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("viewBox", `0 0 ${TIMELINE_GRAPH_WIDTH} ${TIMELINE_GRAPH_HEIGHT}`);
+      svg.setAttribute("preserveAspectRatio", "none");
+
+      for (const highlight of graph.highlights ?? []) {
+        if (
+          !Number.isFinite(highlight.startTime) ||
+          !Number.isFinite(highlight.endTime) ||
+          highlight.endTime <= highlight.startTime
+        ) {
+          continue;
+        }
+        const bounds = projectedRangeTimelineBounds(
+          context.player.projectReplayTimeToTimeline(highlight.startTime),
+          context.player.projectReplayTimeToTimeline(highlight.endTime),
+          duration,
+        );
+        const rect = document.createElementNS(svgNamespace, "rect");
+        rect.classList.add("sap-tl-graph-highlight");
+        if (highlight.className) rect.classList.add(highlight.className);
+        rect.setAttribute("x", `${(bounds.startTimelineTime / duration) * TIMELINE_GRAPH_WIDTH}`);
+        rect.setAttribute("y", "0");
+        rect.setAttribute(
+          "width",
+          `${Math.max(0, ((bounds.endTimelineTime - bounds.startTimelineTime) / duration) * TIMELINE_GRAPH_WIDTH)}`,
+        );
+        rect.setAttribute("height", `${TIMELINE_GRAPH_HEIGHT}`);
+        rect.setAttribute("fill", highlight.color ?? "rgba(255,255,255,0.08)");
+        if (highlight.label) {
+          const title = document.createElementNS(svgNamespace, "title");
+          title.textContent = highlight.label;
+          rect.append(title);
+        }
+        svg.append(rect);
+      }
+
+      for (const reference of graph.references ?? []) {
+        if (!Number.isFinite(reference.value)) continue;
+        const y = timelineGraphY(reference.value, minValue, maxValue);
+        const line = document.createElementNS(svgNamespace, "line");
+        line.classList.add("sap-tl-graph-reference");
+        if (reference.className) line.classList.add(reference.className);
+        line.setAttribute("x1", "0");
+        line.setAttribute("x2", `${TIMELINE_GRAPH_WIDTH}`);
+        line.setAttribute("y1", `${y}`);
+        line.setAttribute("y2", `${y}`);
+        line.setAttribute("stroke", reference.color ?? "rgba(255,255,255,0.32)");
+        svg.append(line);
+        if (reference.label) {
+          const text = document.createElementNS(svgNamespace, "text");
+          text.classList.add("sap-tl-graph-reference-label");
+          text.setAttribute("x", "6");
+          text.setAttribute("y", `${Math.max(8, y - 3)}`);
+          text.setAttribute("fill", reference.color ?? "rgba(255,255,255,0.62)");
+          text.textContent = reference.label;
+          svg.append(text);
+        }
+      }
+
+      for (const series of graph.series) {
+        const projectedPoints = series.points.map((point) => ({
+          time: context.player.projectReplayTimeToTimeline(point.time).timelineTime,
+          value: point.value,
+        }));
+        const path = document.createElementNS(svgNamespace, "path");
+        path.classList.add("sap-tl-graph-series");
+        path.setAttribute(
+          "d",
+          buildTimelineGraphPath(projectedPoints, duration, minValue, maxValue),
+        );
+        path.setAttribute("stroke", series.color);
+        if (series.label) {
+          const title = document.createElementNS(svgNamespace, "title");
+          title.textContent = series.label;
+          path.append(title);
+        }
+        svg.append(path);
+      }
+
+      for (const marker of graph.markers ?? []) {
+        if (!Number.isFinite(marker.time) || !Number.isFinite(marker.value)) continue;
+        const projection = context.player.projectReplayTimeToTimeline(marker.time);
+        const circle = document.createElementNS(svgNamespace, "circle");
+        circle.classList.add("sap-tl-graph-marker");
+        if (marker.className) circle.classList.add(marker.className);
+        circle.setAttribute("cx", `${(projection.timelineTime / duration) * TIMELINE_GRAPH_WIDTH}`);
+        circle.setAttribute("cy", `${timelineGraphY(marker.value, minValue, maxValue)}`);
+        circle.setAttribute("r", "5");
+        circle.setAttribute("fill", marker.color ?? "#ffffff");
+        if (marker.label) {
+          const title = document.createElementNS(svgNamespace, "title");
+          title.textContent = marker.label;
+          circle.append(title);
+        }
+        svg.append(circle);
+      }
+
+      const playhead = document.createElementNS(svgNamespace, "line");
+      playhead.classList.add("sap-tl-graph-playhead");
+      playhead.setAttribute("x1", "0");
+      playhead.setAttribute("x2", "0");
+      playhead.setAttribute("y1", "0");
+      playhead.setAttribute("y2", `${TIMELINE_GRAPH_HEIGHT}`);
+      svg.append(playhead);
+      graphPlayheads.push({ element: playhead, track });
+
+      const seekFromPointer = (event: PointerEvent): void => {
+        const rect = track.getBoundingClientRect();
+        const ratio = Math.max(
+          0,
+          Math.min(1, (event.clientX - rect.left) / Math.max(rect.width, 1)),
+        );
+        context.player.seek(context.player.projectTimelineTimeToReplay(ratio * duration));
+      };
+      track.addEventListener("pointerdown", (event) => {
+        track.setPointerCapture(event.pointerId);
+        seekFromPointer(event);
+      });
+      track.addEventListener("pointermove", (event) => {
+        if (track.hasPointerCapture(event.pointerId)) seekFromPointer(event);
+      });
+      track.addEventListener("keydown", (event) => {
+        const current = context.player.getTimelineCurrentTime();
+        const increments: Partial<Record<string, number>> = {
+          ArrowLeft: -1,
+          ArrowRight: 1,
+          PageDown: -10,
+          PageUp: 10,
+        };
+        let next = increments[event.key] === undefined ? null : current + increments[event.key]!;
+        if (event.key === "Home") next = 0;
+        if (event.key === "End") next = duration;
+        if (next === null) return;
+        event.preventDefault();
+        context.player.seek(
+          context.player.projectTimelineTimeToReplay(Math.max(0, Math.min(duration, next))),
+        );
+      });
+
+      track.append(svg);
+      lane.append(label, track);
+      graphsRoot.append(lane);
+    }
+  }
+
   function endScrub(): void {
     if (!scrubbing) {
       return;
@@ -924,6 +1211,25 @@ export function createTimelineOverlayPlugin(
     refreshRanges(): void {
       refreshRangeLanes();
     },
+    addGraphSource(source): () => void {
+      extraGraphSources.push(source);
+      refreshGraphLanes();
+      return () => {
+        this.removeGraphSource(source);
+      };
+    },
+    removeGraphSource(source): boolean {
+      const index = extraGraphSources.indexOf(source);
+      if (index < 0) {
+        return false;
+      }
+      extraGraphSources.splice(index, 1);
+      refreshGraphLanes();
+      return true;
+    },
+    refreshGraphs(): void {
+      refreshGraphLanes();
+    },
     setup(context): void {
       playerContext = context;
       ensureTimelineOverlayStyles();
@@ -979,6 +1285,10 @@ export function createTimelineOverlayPlugin(
       rangesRoot.className = "sap-tl-ranges";
       rangesRoot.hidden = true;
 
+      graphsRoot = document.createElement("div");
+      graphsRoot.className = "sap-tl-graphs";
+      graphsRoot.hidden = true;
+
       eventLanesRoot = document.createElement("div");
       eventLanesRoot.className = "sap-tl-event-lanes";
       eventLanesRoot.hidden = true;
@@ -1028,12 +1338,13 @@ export function createTimelineOverlayPlugin(
       };
 
       trackRail.append(mainRail, markers, range);
-      trackWrap.append(rangesRoot, eventLanesRoot, toggleButton, trackRail);
+      trackWrap.append(graphsRoot, rangesRoot, eventLanesRoot, toggleButton, trackRail);
       shell.append(topLine, trackWrap);
       root.append(shell);
       context.container.append(root);
       buildMarkers(context);
       buildRanges(context);
+      buildGraphs(context);
       syncState({
         ...context,
         state: context.player.getState(),
@@ -1051,6 +1362,7 @@ export function createTimelineOverlayPlugin(
       root = null;
       shell = null;
       rangesRoot = null;
+      graphsRoot = null;
       eventLanesRoot = null;
       range = null;
       toggleButton = null;
@@ -1067,6 +1379,7 @@ export function createTimelineOverlayPlugin(
       timelineMarkers.splice(0, timelineMarkers.length);
       rangeElements.splice(0, rangeElements.length);
       rangeLanePlayheads.splice(0, rangeLanePlayheads.length);
+      graphPlayheads.splice(0, graphPlayheads.length);
       eventLanePlayheads.splice(0, eventLanePlayheads.length);
       passedMarkerEndIndex = 0;
       activeMarkers = new Set<TimelineMarkerRecord>();

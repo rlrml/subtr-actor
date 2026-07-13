@@ -11,6 +11,14 @@ export type ExpectedGoalsTeamStats = {
  */
 current_threat: number | null,
 /**
+ * Sum of count-calibrated, one-peak contributions from threshold-delimited
+ * incidents. For an incident ending in a goal, samples from shortly before
+ * the scoring team's final touch onward are excluded to avoid outcome
+ * leakage. Raw selected probabilities remain available on the incident
+ * events.
+ */
+incident_xg: number,
+/**
  * The team's full-match xG time integral (`sum(V * dt) / tau` over every
  * evaluated live frame, sub-threshold frames included), fed from
  * [`ExpectedGoalsCalculator::team_xg_integrals`]. NOT a sum of episode

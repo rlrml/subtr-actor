@@ -11,15 +11,17 @@
 //!   (detection-frame V minus the preceding live-frame V, both from the
 //!   toucher's team's perspective). This is an observed one-frame delta, not a
 //!   causal estimate of a touch's multi-frame impulse.
-//! - [`ThreatEpisodeEvent`]: a contiguous span where one team's V exceeds
-//!   [`THREAT_EPISODE_THRESHOLD`]; the episode's xG is the time integral
+//! - [`ThreatEpisodeEvent`]: a threat incident that opens when one team's V
+//!   exceeds [`THREAT_EPISODE_THRESHOLD`] and remains open until V falls to
+//!   [`THREAT_EPISODE_END_THRESHOLD`]. The event retains both the time
+//!   integral
 //!   `sum(V * dt) / tau` over the span (`tau` =
 //!   [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS)),
-//!   credited to the attacking toucher associated with the episode's peak V.
-//!   Dividing the time integral by the prediction horizon corrects for the
-//!   overlapping windows evaluated on adjacent frames; summing episode peaks
-//!   would count the same sustained chance repeatedly. The peak survives on
-//!   the event as `peak_value` for display/intensity.
+//!   and one incident xG peak. Goal-ending incidents exclude samples from
+//!   shortly before the scoring team's final touch onward, preventing the
+//!   model from receiving credit for a result its physics inputs already make
+//!   nearly inevitable. The ordinary peak survives as `peak_value` for
+//!   display/intensity.
 //! - The per-team full-match integral (over ALL evaluated live frames, not
 //!   just above-threshold ones) is exposed via
 //!   [`ExpectedGoalsCalculator::team_xg_integrals`] and is the team's
@@ -30,6 +32,22 @@ use super::*;
 /// Episode threshold on V. This keeps episodes focused on elevated scoring
 /// probability rather than ordinary offensive-half possession.
 pub const THREAT_EPISODE_THRESHOLD: f32 = 0.15;
+
+/// Release threshold for an open threat incident. Keeping this below the
+/// opening threshold provides hysteresis: a small dip no longer fragments one
+/// developing chance into multiple incidents.
+pub const THREAT_EPISODE_END_THRESHOLD: f32 = 0.05;
+
+/// Multiplicative count calibration applied after selecting one raw peak per
+/// incident. Updated only from a replay-grouped, date-held-out corpus audit;
+/// the timeline retains the raw selected probability alongside the calibrated
+/// contribution so the transformation remains inspectable.
+pub const INCIDENT_XG_CALIBRATION_FACTOR: f32 = 0.629_475;
+
+/// Goal-ending incidents ignore model samples from this long before the
+/// scoring team's final touch onward. This removes immediate pre-contact and
+/// post-contact outcome leakage while preserving earlier chance development.
+pub const GOAL_TOUCH_EXCLUSION_SECONDS: f32 = 0.5;
 
 /// A ballistic trajectory must cross the goal line within this many seconds
 /// for the `on_target` feature to fire. Slightly looser than the shot
@@ -580,7 +598,8 @@ impl ThreatTouchEvent {
 }
 
 /// Why a threat episode closed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum ThreatEpisodeEndReason {
     /// V dropped back to/under the threshold during live play.
@@ -599,26 +618,45 @@ pub enum ThreatEpisodeEndReason {
 /// episode reached `peak_value`, `None` when the team had not touched during
 /// the live stretch by that point -- team-only credit. Later touches at lower
 /// V do not take credit for threat accumulated before them.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ThreatEpisodeEvent {
     pub start_time: f32,
     pub start_frame: usize,
     pub end_time: f32,
     pub end_frame: usize,
     pub team_is_team_0: bool,
-    /// The episode's xG: the time integral `sum(V * dt) / tau` over the
+    /// The episode's continuous threat integral: `sum(V * dt) / tau` over the
     /// span, where `tau` is
     /// [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS).
     /// Frames that count: every evaluated live-play frame from the frame that
     /// opens the episode through the frame that closes it (for value-drop
     /// closes the final sub-threshold frame contributes too; stoppage /
-    /// replay-end closes end at the last evaluated live frame). This is the
-    /// calibrated goal-scale estimator -- summing episode peaks over-counts
-    /// goals ~2.7x.
+    /// replay-end closes end at the last evaluated live frame). This is kept
+    /// for attribution and comparison with the full-match integral; the
+    /// incident-based goal-count estimator is [`Self::incident_xg`].
     pub xg: f32,
-    /// Peak V over the span (the pre-calibration `xg`), kept for
-    /// display/intensity ranking.
+    /// Peak V over the span, kept for display and intensity ranking.
     pub peak_value: f32,
+    /// Frame/time where [`Self::peak_value`] occurred.
+    pub peak_frame: usize,
+    pub peak_time: f32,
+    /// One peak probability contributed to the team's incident-based xG.
+    /// For ordinary incidents this equals `peak_value`. For a goal-ending
+    /// incident it is the largest value strictly before
+    /// `goal_exclusion_start_time`, or zero when the incident only became
+    /// dangerous inside the excluded window.
+    pub incident_peak_value: f32,
+    /// Count-calibrated contribution derived from `incident_peak_value`.
+    pub incident_xg: f32,
+    /// Frame/time of the sample selected for [`Self::incident_xg`]. `None`
+    /// when a goal-ending incident has no eligible pre-touch sample.
+    pub incident_xg_frame: Option<usize>,
+    pub incident_xg_time: Option<f32>,
+    /// Start of the excluded goal-result window. `None` for non-goal
+    /// incidents or when no scoring-team touch was available.
+    pub goal_exclusion_start_time: Option<f32>,
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub credited_player: Option<PlayerId>,
     pub ended_in_goal: bool,
     pub end_reason: ThreatEpisodeEndReason,
@@ -635,17 +673,37 @@ pub struct ThreatGoalRecord {
 }
 
 /// Configuration for [`ExpectedGoalsCalculator`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ExpectedGoalsCalculatorConfig {
+    /// V required to open an incident.
     pub episode_threshold: f32,
+    /// V at or below which an open incident closes. This is deliberately
+    /// lower than `episode_threshold` to avoid splitting on small dips.
+    pub episode_end_threshold: f32,
+    /// Seconds before the scoring team's final touch at which a goal-ending
+    /// incident stops being eligible for incident xG.
+    pub goal_touch_exclusion_seconds: f32,
+    /// Count-scale calibration applied to the selected incident peak.
+    pub incident_xg_calibration_factor: f32,
 }
 
 impl Default for ExpectedGoalsCalculatorConfig {
     fn default() -> Self {
         Self {
             episode_threshold: THREAT_EPISODE_THRESHOLD,
+            episode_end_threshold: THREAT_EPISODE_END_THRESHOLD,
+            goal_touch_exclusion_seconds: GOAL_TOUCH_EXCLUSION_SECONDS,
+            incident_xg_calibration_factor: INCIDENT_XG_CALIBRATION_FACTOR,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ThreatPeakCandidate {
+    frame: usize,
+    time: f32,
+    value: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -653,6 +711,12 @@ struct ActiveThreatEpisode {
     start_time: f32,
     start_frame: usize,
     peak_value: f32,
+    peak_frame: usize,
+    peak_time: f32,
+    /// Monotonically increasing running maxima. The last candidate before a
+    /// goal-exclusion cutoff is the incident's censored peak without retaining
+    /// every frame in memory.
+    peak_candidates: Vec<ThreatPeakCandidate>,
     /// Running `sum(V * dt) / tau` over the episode's evaluated live frames.
     xg_integral: f64,
     /// Most recent attacking toucher when `peak_value` was established.
@@ -665,6 +729,8 @@ struct ActiveThreatEpisode {
 #[derive(Debug, Clone, PartialEq)]
 struct PendingThreatEpisode {
     event: ThreatEpisodeEvent,
+    peak_candidates: Vec<ThreatPeakCandidate>,
+    scoring_team_last_touch_time: Option<f32>,
     closed_at: f32,
 }
 
@@ -674,6 +740,9 @@ struct TeamThreatState {
     pending_episode: Option<PendingThreatEpisode>,
     /// Most recent toucher on this team within the current live stretch.
     last_toucher: Option<PlayerId>,
+    /// Contact time of that team's most recent touch in the live stretch,
+    /// retained separately because some authoritative touches lack a player.
+    last_touch_time: Option<f32>,
 }
 
 /// Evaluates the continuous threat value for both teams each live-play frame
@@ -706,6 +775,25 @@ impl ExpectedGoalsCalculator {
     }
 
     pub fn with_config(config: ExpectedGoalsCalculatorConfig) -> Self {
+        assert!(
+            config.episode_threshold.is_finite() && (0.0..=1.0).contains(&config.episode_threshold),
+            "episode_threshold must be a finite probability"
+        );
+        assert!(
+            config.episode_end_threshold.is_finite()
+                && (0.0..=config.episode_threshold).contains(&config.episode_end_threshold),
+            "episode_end_threshold must be finite and no greater than episode_threshold"
+        );
+        assert!(
+            config.goal_touch_exclusion_seconds.is_finite()
+                && config.goal_touch_exclusion_seconds >= 0.0,
+            "goal_touch_exclusion_seconds must be finite and non-negative"
+        );
+        assert!(
+            config.incident_xg_calibration_factor.is_finite()
+                && config.incident_xg_calibration_factor >= 0.0,
+            "incident_xg_calibration_factor must be finite and non-negative"
+        );
         Self {
             config,
             ..Self::default()
@@ -780,13 +868,17 @@ impl ExpectedGoalsCalculator {
     ) {
         let state = &mut self.team_states[team_index(scoring_team_is_team_0)];
         if let Some(active) = state.active_episode.take() {
+            let goal_exclusion_start_time = state
+                .last_touch_time
+                .map(|time| time - self.config.goal_touch_exclusion_seconds);
             let event = Self::event_from_active(
                 &active,
                 frame.frame_number,
                 frame.time,
                 scoring_team_is_team_0,
-                true,
                 ThreatEpisodeEndReason::Goal,
+                goal_exclusion_start_time,
+                self.config.incident_xg_calibration_factor,
             );
             self.episode_events.push(event);
             return;
@@ -802,6 +894,15 @@ impl ExpectedGoalsCalculator {
             if time - pending.closed_at <= PENDING_EPISODE_GOAL_GRACE_SECONDS {
                 event.ended_in_goal = true;
                 event.end_reason = ThreatEpisodeEndReason::Goal;
+                let goal_exclusion_start_time = pending
+                    .scoring_team_last_touch_time
+                    .map(|time| time - self.config.goal_touch_exclusion_seconds);
+                Self::apply_goal_exclusion(
+                    &mut event,
+                    &pending.peak_candidates,
+                    goal_exclusion_start_time,
+                    self.config.incident_xg_calibration_factor,
+                );
             }
             self.episode_events.push(event);
         }
@@ -812,10 +913,11 @@ impl ExpectedGoalsCalculator {
         end_frame: usize,
         end_time: f32,
         team_is_team_0: bool,
-        ended_in_goal: bool,
         end_reason: ThreatEpisodeEndReason,
+        goal_exclusion_start_time: Option<f32>,
+        incident_xg_calibration_factor: f32,
     ) -> ThreatEpisodeEvent {
-        ThreatEpisodeEvent {
+        let mut event = ThreatEpisodeEvent {
             start_time: active.start_time,
             start_frame: active.start_frame,
             end_time,
@@ -823,9 +925,51 @@ impl ExpectedGoalsCalculator {
             team_is_team_0,
             xg: active.xg_integral as f32,
             peak_value: active.peak_value,
+            peak_frame: active.peak_frame,
+            peak_time: active.peak_time,
+            incident_peak_value: active.peak_value,
+            incident_xg: active.peak_value * incident_xg_calibration_factor,
+            incident_xg_frame: Some(active.peak_frame),
+            incident_xg_time: Some(active.peak_time),
+            goal_exclusion_start_time: None,
             credited_player: active.credited_player.clone(),
-            ended_in_goal,
+            ended_in_goal: end_reason == ThreatEpisodeEndReason::Goal,
             end_reason,
+        };
+        if event.ended_in_goal {
+            Self::apply_goal_exclusion(
+                &mut event,
+                &active.peak_candidates,
+                goal_exclusion_start_time,
+                incident_xg_calibration_factor,
+            );
+        }
+        event
+    }
+
+    fn apply_goal_exclusion(
+        event: &mut ThreatEpisodeEvent,
+        peak_candidates: &[ThreatPeakCandidate],
+        goal_exclusion_start_time: Option<f32>,
+        incident_xg_calibration_factor: f32,
+    ) {
+        event.goal_exclusion_start_time = goal_exclusion_start_time;
+        let candidate = goal_exclusion_start_time.and_then(|cutoff| {
+            peak_candidates
+                .iter()
+                .rev()
+                .find(|sample| sample.time < cutoff)
+        });
+        if let Some(candidate) = candidate {
+            event.incident_peak_value = candidate.value;
+            event.incident_xg = candidate.value * incident_xg_calibration_factor;
+            event.incident_xg_frame = Some(candidate.frame);
+            event.incident_xg_time = Some(candidate.time);
+        } else if goal_exclusion_start_time.is_some() {
+            event.incident_peak_value = 0.0;
+            event.incident_xg = 0.0;
+            event.incident_xg_frame = None;
+            event.incident_xg_time = None;
         }
     }
 
@@ -894,8 +1038,9 @@ impl ExpectedGoalsCalculator {
                 frame.frame_number,
                 frame.time,
                 team_index == 0,
-                false,
                 ThreatEpisodeEndReason::Stoppage,
+                None,
+                self.config.incident_xg_calibration_factor,
             );
             // A newer stoppage-closed episode supersedes an unresolved older
             // one; flush the older one un-goaled first.
@@ -904,8 +1049,26 @@ impl ExpectedGoalsCalculator {
             }
             state.pending_episode = Some(PendingThreatEpisode {
                 event,
+                peak_candidates: active.peak_candidates,
+                scoring_team_last_touch_time: state.last_touch_time,
                 closed_at: frame.time,
             });
+        }
+    }
+
+    /// Observe primary touches before goal detection. A goal and its final
+    /// touch can surface on the same processing frame, and the contact time is
+    /// what anchors the exclusion window even though V is evaluated later.
+    fn observe_touches(&mut self, touch_state: &TouchState) {
+        for is_team_0 in [true, false] {
+            let Some(touch) = touch_state.primary_touch_event_for_team(is_team_0) else {
+                continue;
+            };
+            let state = &mut self.team_states[team_index(is_team_0)];
+            state.last_touch_time = Some(touch.time);
+            if let Some(player) = touch.player.clone() {
+                state.last_toucher = Some(player);
+            }
         }
     }
 
@@ -941,10 +1104,6 @@ impl ExpectedGoalsCalculator {
                 value_before,
                 value_after: values[index],
             });
-            if let Some(player) = touch.player.clone() {
-                let state = &mut self.team_states[index];
-                state.last_toucher = Some(player);
-            }
         }
     }
 
@@ -962,10 +1121,17 @@ impl ExpectedGoalsCalculator {
                 Some(active) => {
                     if value > active.peak_value {
                         active.peak_value = value;
+                        active.peak_frame = frame.frame_number;
+                        active.peak_time = frame.time;
+                        active.peak_candidates.push(ThreatPeakCandidate {
+                            frame: frame.frame_number,
+                            time: frame.time,
+                            value,
+                        });
                         active.credited_player = last_toucher;
                     }
                     active.xg_integral += Self::integral_contribution(value, frame.dt);
-                    if value <= self.config.episode_threshold {
+                    if value <= self.config.episode_end_threshold {
                         let active = state
                             .active_episode
                             .take()
@@ -975,8 +1141,9 @@ impl ExpectedGoalsCalculator {
                             frame.frame_number,
                             frame.time,
                             team_index == 0,
-                            false,
                             ThreatEpisodeEndReason::ValueDropped,
+                            None,
+                            self.config.incident_xg_calibration_factor,
                         ));
                     }
                 }
@@ -986,6 +1153,13 @@ impl ExpectedGoalsCalculator {
                             start_time: frame.time,
                             start_frame: frame.frame_number,
                             peak_value: value,
+                            peak_frame: frame.frame_number,
+                            peak_time: frame.time,
+                            peak_candidates: vec![ThreatPeakCandidate {
+                                frame: frame.frame_number,
+                                time: frame.time,
+                                value,
+                            }],
                             xg_integral: Self::integral_contribution(value, frame.dt),
                             credited_player: last_toucher,
                         });
@@ -1007,6 +1181,7 @@ impl ExpectedGoalsCalculator {
         self.episode_events.begin_update();
         self.last_frame = Some((frame.frame_number, frame.time));
 
+        self.observe_touches(touch_state);
         self.detect_goals(frame, gameplay, events);
         self.resolve_stale_pending_episodes(frame, gameplay.kickoff_phase_active());
 
@@ -1015,6 +1190,7 @@ impl ExpectedGoalsCalculator {
             if self.was_live {
                 for state in self.team_states.iter_mut() {
                     state.last_toucher = None;
+                    state.last_touch_time = None;
                 }
             }
             self.previous_values = None;
@@ -1051,8 +1227,9 @@ impl ExpectedGoalsCalculator {
                     end_frame,
                     end_time,
                     team_index == 0,
-                    false,
                     ThreatEpisodeEndReason::ReplayEnd,
+                    None,
+                    self.config.incident_xg_calibration_factor,
                 );
                 self.episode_events.push(event);
             }

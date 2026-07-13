@@ -53,8 +53,8 @@ export class ScoreboardWindowController {
         createThreatReadout(
           frame.team_zero?.expected_goals.current_threat,
           frame.team_one?.expected_goals.current_threat,
-          frame.team_zero?.expected_goals.xg,
-          frame.team_one?.expected_goals.xg,
+          frame.team_zero?.expected_goals.incident_xg,
+          frame.team_one?.expected_goals.incident_xg,
         ),
       );
     }
@@ -64,14 +64,15 @@ export class ScoreboardWindowController {
 function createThreatReadout(
   teamZeroThreat: number | null | undefined,
   teamOneThreat: number | null | undefined,
-  teamZeroIntegratedThreat: number | null | undefined,
-  teamOneIntegratedThreat: number | null | undefined,
+  teamZeroIncidentXg: number | null | undefined,
+  teamOneIncidentXg: number | null | undefined,
 ): HTMLElement {
   const readout = document.createElement("section");
   readout.className = "scoreboard-threat";
   readout.title =
     "Current values are each team's probability of scoring within five seconds. " +
-    "Integrated threat is the continuous full-match time integral, not incident xG.";
+    "Incident xG counts one calibrated peak per dangerous incident and excludes the " +
+    "goal-result window beginning shortly before the scoring team's final touch.";
 
   const values = document.createElement("div");
   values.className = "scoreboard-threat-values";
@@ -92,9 +93,9 @@ function createThreatReadout(
   const accumulated = document.createElement("div");
   accumulated.className = "scoreboard-threat-accumulated";
   accumulated.append(
-    createIntegratedThreatValue(teamZeroIntegratedThreat, true),
-    createIntegratedThreatLabel(),
-    createIntegratedThreatValue(teamOneIntegratedThreat, false),
+    createIncidentXgValue(teamZeroIncidentXg, true),
+    createIncidentXgLabel(),
+    createIncidentXgValue(teamOneIncidentXg, false),
   );
 
   readout.append(values, meter, accumulated);
@@ -129,24 +130,21 @@ function createThreatMeterHalf(value: number | null | undefined, isTeamZero: boo
   return half;
 }
 
-function createIntegratedThreatLabel(): HTMLElement {
+function createIncidentXgLabel(): HTMLElement {
   const label = document.createElement("span");
   label.className = "scoreboard-threat-accumulated-label";
-  label.textContent = "Integrated threat";
+  label.textContent = "Incident xG";
   return label;
 }
 
-function createIntegratedThreatValue(
-  value: number | null | undefined,
-  isTeamZero: boolean,
-): HTMLElement {
+function createIncidentXgValue(value: number | null | undefined, isTeamZero: boolean): HTMLElement {
   const output = document.createElement("span");
   output.className = `scoreboard-threat-accumulated-value ${getTeamClass(isTeamZero)}`;
-  output.textContent = formatIntegratedThreat(value);
+  output.textContent = formatIncidentXg(value);
   return output;
 }
 
-function formatIntegratedThreat(value: number | null | undefined): string {
+export function formatIncidentXg(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "--";
 }
 

@@ -270,6 +270,7 @@ impl StatsTimelineEventCollector {
             expected_goals_touch_cursor: 0,
             expected_goals_episode_cursor: 0,
             expected_goals_tracks: ExpectedGoalsTimelineTracks {
+                config: ExpectedGoalsCalculatorConfig::default(),
                 teams: vec![
                     ExpectedGoalsTeamTimelineTrack {
                         is_team_0: true,
@@ -281,6 +282,7 @@ impl StatsTimelineEventCollector {
                     },
                 ],
                 players: Vec::new(),
+                episodes: Vec::new(),
             },
         }
     }
@@ -370,6 +372,7 @@ impl StatsTimelineEventCollector {
             calculator.episode_events()[self.expected_goals_episode_cursor..].to_vec();
         let team_xg_integrals = calculator.team_xg_integrals();
         let current_values = calculator.current_values();
+        self.expected_goals_tracks.config = calculator.config().clone();
         self.expected_goals_touch_cursor = calculator.touch_events().len();
         self.expected_goals_episode_cursor = calculator.episode_events().len();
 
@@ -379,6 +382,7 @@ impl StatsTimelineEventCollector {
         for event in &episode_events {
             self.expected_goals.apply_episode_event(event);
         }
+        self.expected_goals_tracks.episodes.extend(episode_events);
         self.expected_goals.set_team_xg_integrals(team_xg_integrals);
         self.expected_goals.set_current_values(current_values);
         Ok(())

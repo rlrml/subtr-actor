@@ -1176,6 +1176,9 @@ pub fn builtin_analysis_node_json(
             json!({
                 "config": {
                     "episode_threshold": state.config().episode_threshold,
+                    "episode_end_threshold": state.config().episode_end_threshold,
+                    "goal_touch_exclusion_seconds": state.config().goal_touch_exclusion_seconds,
+                    "incident_xg_calibration_factor": state.config().incident_xg_calibration_factor,
                 },
                 "current_values": state.current_values(),
                 "touch_events": state.touch_events(),
@@ -1812,6 +1815,9 @@ pub(crate) fn builtin_snapshot_config_json(
             let calculator = graph_state::<ExpectedGoalsCalculator>(graph, module_name)?;
             Some(serialize_to_json_value(&serde_json::json!({
                 "expected_goals_episode_threshold": calculator.config().episode_threshold,
+                "expected_goals_episode_end_threshold": calculator.config().episode_end_threshold,
+                "expected_goals_goal_touch_exclusion_seconds": calculator.config().goal_touch_exclusion_seconds,
+                "expected_goals_incident_xg_calibration_factor": calculator.config().incident_xg_calibration_factor,
             }))?)
         }
         "core"

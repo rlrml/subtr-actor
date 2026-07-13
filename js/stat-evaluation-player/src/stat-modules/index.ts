@@ -37,6 +37,7 @@ import {
   createRelativePositioningModule,
 } from "./positioningModules.ts";
 import type { BoostPickupFilterController } from "../boostPickupFilters.ts";
+import { createExpectedGoalsModule } from "./expectedGoalsModule.ts";
 
 export { hasBoostPickupAnimationTimelineMatch } from "../boostPickupFilters.ts";
 export {
@@ -68,6 +69,7 @@ export function createStatModules(
     createBallHalfModule(),
     createBallThirdModule(),
     createRushModule(),
+    createExpectedGoalsModule(),
     createRelativePositioningModule(),
     createAbsolutePositioningModule(),
     createRotationModule(),
