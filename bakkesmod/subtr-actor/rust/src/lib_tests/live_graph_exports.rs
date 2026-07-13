@@ -1,5 +1,5 @@
 #[test]
-fn live_abi_exposes_every_builtin_stats_module_frame_and_config_by_name() {
+fn live_abi_exposes_every_default_stats_module_frame_and_config_by_name() {
     let engine = subtr_actor_bakkesmod_engine_create();
     let touches = [SaTouchEvent {
         timing: SaEventTiming::default(),
@@ -56,7 +56,7 @@ fn live_abi_exposes_every_builtin_stats_module_frame_and_config_by_name() {
     let frame_modules = stats["frame"]["modules"]
         .as_object()
         .expect("stats json should expose frame modules");
-    for module_name in builtin_stats_module_names() {
+    for module_name in default_stats_module_names() {
         assert_eq!(
             live_stats_module_frame_json_value(engine, module_name),
             frame_modules

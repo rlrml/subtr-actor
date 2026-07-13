@@ -1193,7 +1193,7 @@ pub fn builtin_analysis_node_json(
         }
         "player_control_state" => {
             let state = graph_state::<PlayerControlState>(graph, node_name)?;
-            json!({ "players": state.players })
+            json!({ "players": player_stats_entries(&state.players) })
         }
         "possession_state" => {
             let state = graph_state::<PossessionState>(graph, node_name)?;

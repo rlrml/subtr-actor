@@ -23,6 +23,8 @@ use subtr_actor::BoostPickupPadZone;
 use subtr_actor::EventLifecycle;
 #[cfg(test)]
 use subtr_actor::ReplayFrameInputBuilder;
+#[cfg(test)]
+use subtr_actor::default_stats_module_names;
 use subtr_actor::{
     BackboardBounceEvent, BoostPickupEvent, BumpEvent, CorePlayerScoreboardEvent, DemolitionEvent,
     Event, EventPayload, EventTiming, FiftyFiftyEvent, FrameInput, GoalBuildupKind,
