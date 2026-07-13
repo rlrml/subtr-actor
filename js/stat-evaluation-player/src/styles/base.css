@@ -271,6 +271,10 @@ input {
   border-radius: 999px;
 }
 
+.scoreboard-window:has(.scoreboard-threat) {
+  min-width: 15rem;
+}
+
 .scoreboard-window-body {
   display: grid;
   gap: 0.42rem;
@@ -308,6 +312,82 @@ input {
   text-align: center;
 }
 
+.scoreboard-threat {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 13.6rem;
+  padding-top: 0.34rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scoreboard-threat-values,
+.scoreboard-threat-accumulated {
+  display: grid;
+  grid-template-columns: minmax(3.3rem, 1fr) auto minmax(3.3rem, 1fr);
+  align-items: baseline;
+  gap: 0.45rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreboard-threat-value {
+  color: var(--team-accent);
+  font-size: 0.88rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.scoreboard-threat-value:first-child,
+.scoreboard-threat-accumulated-value:first-child {
+  text-align: left;
+}
+
+.scoreboard-threat-value:last-child,
+.scoreboard-threat-accumulated-value:last-child {
+  text-align: right;
+}
+
+.scoreboard-threat-label,
+.scoreboard-threat-accumulated-label {
+  color: var(--muted);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.scoreboard-threat-meter {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.18rem;
+}
+
+.scoreboard-threat-meter-half {
+  display: flex;
+  height: 0.28rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.scoreboard-threat-meter-half:first-child {
+  justify-content: flex-end;
+}
+
+.scoreboard-threat-meter-fill {
+  width: calc(var(--threat-value, 0) * 100%);
+  border-radius: inherit;
+  background: var(--team-accent);
+  box-shadow: 0 0 0.5rem color-mix(in srgb, var(--team-accent) 60%, transparent);
+  transition: width 100ms linear;
+}
+
+.scoreboard-threat-accumulated-value {
+  color: color-mix(in srgb, var(--team-accent) 72%, #ffffff);
+  font-size: 0.65rem;
+  font-weight: 750;
+}
+
 @media (max-width: 900px) {
   .scoreboard-window {
     top: 3.25rem;
@@ -320,11 +400,19 @@ input {
     padding: 0.32rem 0.56rem;
   }
 
+  .scoreboard-window:has(.scoreboard-threat) {
+    min-width: 13.8rem;
+  }
+
   .scoreboard-scoreline {
     gap: 0.24rem;
   }
 
   .scoreboard-goal-value {
     font-size: 0.92rem;
+  }
+
+  .scoreboard-threat {
+    min-width: 12.4rem;
   }
 }

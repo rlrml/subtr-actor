@@ -369,6 +369,7 @@ impl StatsTimelineEventCollector {
         let episode_events =
             calculator.episode_events()[self.expected_goals_episode_cursor..].to_vec();
         let team_xg_integrals = calculator.team_xg_integrals();
+        let current_values = calculator.current_values();
         self.expected_goals_touch_cursor = calculator.touch_events().len();
         self.expected_goals_episode_cursor = calculator.episode_events().len();
 
@@ -379,6 +380,7 @@ impl StatsTimelineEventCollector {
             self.expected_goals.apply_episode_event(event);
         }
         self.expected_goals.set_team_xg_integrals(team_xg_integrals);
+        self.expected_goals.set_current_values(current_values);
         Ok(())
     }
 

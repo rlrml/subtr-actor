@@ -672,6 +672,9 @@ impl StatsProjectionNode {
             self.state
                 .expected_goals
                 .set_team_xg_integrals(expected_goals.team_xg_integrals());
+            self.state
+                .expected_goals
+                .set_current_values(expected_goals.current_values());
         }
 
         self.finish_sample();

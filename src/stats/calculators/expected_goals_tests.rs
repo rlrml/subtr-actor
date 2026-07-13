@@ -917,8 +917,10 @@ fn team_xg_integral_accumulates_sub_threshold_frames_without_episodes() {
     // The accumulator's team xg is fed from exactly this state.
     let mut accumulator = ExpectedGoalsStatsAccumulator::new();
     accumulator.set_team_xg_integrals(integrals);
+    accumulator.set_current_values(calculator.current_values());
     assert!((f64::from(accumulator.team_stats(true).xg) - integrals[0]).abs() < 1e-6);
     assert!((f64::from(accumulator.team_stats(false).xg) - integrals[1]).abs() < 1e-6);
+    assert_eq!(accumulator.team_stats(true).current_threat, Some(value));
 }
 
 #[test]
@@ -977,6 +979,7 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
     // gap (1.0 vs the 0.6 of episode xg) is the diffuse sub-threshold threat
     // that is never attributed to any player.
     accumulator.set_team_xg_integrals([1.0, 0.25]);
+    accumulator.set_current_values(Some([0.4, 0.1]));
 
     let player_stats = accumulator.player_stats().get(&player_id(1)).unwrap();
     assert!((player_stats.threat_added - 0.25).abs() < 1e-6);
@@ -986,9 +989,15 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
 
     let team = accumulator.team_stats(true);
     assert!((team.xg - 1.0).abs() < 1e-6);
+    assert_eq!(team.current_threat, Some(0.4));
     assert_eq!(team.episode_count, 2);
     assert_eq!(team.goal_episode_count, 1);
     let other_team = accumulator.team_stats(false);
+    assert_eq!(other_team.current_threat, Some(0.1));
     assert_eq!(other_team.episode_count, 0);
     assert!((other_team.xg - 0.25).abs() < 1e-6);
+
+    accumulator.set_current_values(None);
+    assert_eq!(accumulator.team_stats(true).current_threat, None);
+    assert_eq!(accumulator.team_stats(false).current_threat, None);
 }

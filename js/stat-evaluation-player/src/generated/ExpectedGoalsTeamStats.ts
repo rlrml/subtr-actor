@@ -5,6 +5,12 @@
  */
 export type ExpectedGoalsTeamStats = {
 /**
+ * Instantaneous probability that this team scores within the model's
+ * prediction horizon on the current live-play frame. `None` outside live
+ * play or when the replay is not a supported 2v2 match.
+ */
+current_threat: number | null,
+/**
  * The team's full-match xG time integral (`sum(V * dt) / tau` over every
  * evaluated live frame, sub-threshold frames included), fed from
  * [`ExpectedGoalsCalculator::team_xg_integrals`]. NOT a sum of episode

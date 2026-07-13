@@ -30,11 +30,21 @@ function fixture() {
         points: [
           {
             frame: 10,
-            stats: { xg: 0.25, episode_count: 1, goal_episode_count: 0 },
+            stats: {
+              current_threat: 0.35,
+              xg: 0.25,
+              episode_count: 1,
+              goal_episode_count: 0,
+            },
           },
           {
             frame: 20,
-            stats: { xg: 0.6, episode_count: 1, goal_episode_count: 1 },
+            stats: {
+              current_threat: null,
+              xg: 0.6,
+              episode_count: 1,
+              goal_episode_count: 1,
+            },
           },
         ],
       },
@@ -43,7 +53,12 @@ function fixture() {
         points: [
           {
             frame: 20,
-            stats: { xg: 0.1, episode_count: 0, goal_episode_count: 0 },
+            stats: {
+              current_threat: 0.08,
+              xg: 0.1,
+              episode_count: 0,
+              goal_episode_count: 0,
+            },
           },
         ],
       },
@@ -83,13 +98,16 @@ function assertHydrated(timeline: ReturnType<typeof fixture>): void {
   assert.equal(timeline.frames[0]?.players[0]?.expected_goals.threat_added, 0);
 
   assert.equal(timeline.frames[1]?.team_zero.expected_goals.xg, 0.25);
+  assert.equal(timeline.frames[1]?.team_zero.expected_goals.current_threat, 0.35);
   assert.equal(timeline.frames[1]?.team_zero.expected_goals.episode_count, 1);
   assert.equal(timeline.frames[1]?.players[0]?.expected_goals.threat_added, 0.4);
   assert.equal(timeline.frames[1]?.players[0]?.expected_goals.xg, 0.2);
 
   assert.equal(timeline.frames[2]?.team_zero.expected_goals.xg, 0.6);
+  assert.equal(timeline.frames[2]?.team_zero.expected_goals.current_threat, null);
   assert.equal(timeline.frames[2]?.team_zero.expected_goals.goal_episode_count, 1);
   assert.equal(timeline.frames[2]?.team_one.expected_goals.xg, 0.1);
+  assert.equal(timeline.frames[2]?.team_one.expected_goals.current_threat, 0.08);
   assert.equal(timeline.frames[2]?.players[0]?.expected_goals.credited_goal_episode_count, 1);
 }
 
@@ -112,5 +130,6 @@ test("missing expected-goals tracks preserve zero defaults for older compact pay
   });
   applyExpectedGoalsTrackDerivedStats(timeline);
   assert.equal(timeline.frames[0]?.team_zero.expected_goals.xg, 0);
+  assert.equal(timeline.frames[0]?.team_zero.expected_goals.current_threat, null);
   assert.equal(timeline.frames[0]?.players[0]?.expected_goals.xg, 0);
 });

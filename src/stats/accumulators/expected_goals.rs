@@ -75,6 +75,10 @@ impl ExpectedGoalsPlayerStats {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ExpectedGoalsTeamStats {
+    /// Instantaneous probability that this team scores within the model's
+    /// prediction horizon on the current live-play frame. `None` outside live
+    /// play or when the replay is not a supported 2v2 match.
+    pub current_threat: Option<f32>,
     /// The team's full-match xG time integral (`sum(V * dt) / tau` over every
     /// evaluated live frame, sub-threshold frames included), fed from
     /// [`ExpectedGoalsCalculator::team_xg_integrals`]. NOT a sum of episode
@@ -149,5 +153,13 @@ impl ExpectedGoalsStatsAccumulator {
     pub fn set_team_xg_integrals(&mut self, integrals: [f64; 2]) {
         self.team_stats[0].xg = integrals[0] as f32;
         self.team_stats[1].xg = integrals[1] as f32;
+    }
+
+    /// Overwrite both teams' current live threat values. The calculator uses
+    /// `[team zero, team one]`; `None` clears both values during stoppages and
+    /// for unsupported replay shapes.
+    pub fn set_current_values(&mut self, values: Option<[f32; 2]>) {
+        self.team_stats[0].current_threat = values.map(|values| values[0]);
+        self.team_stats[1].current_threat = values.map(|values| values[1]);
     }
 }
