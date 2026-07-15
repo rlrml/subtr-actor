@@ -3,7 +3,7 @@ use crate::stats::calculators::*;
 use crate::stats::timeline::projection::{EventAssembler, span};
 use crate::*;
 
-/// Detects whiffs and beaten-to-ball attempts from ball/player state and touches during live play.
+/// Detects whiffs from ball/player state and touches during live play.
 pub struct WhiffNode {
     calculator: WhiffCalculator,
 }
@@ -72,30 +72,38 @@ impl AnalysisNode for WhiffNode {
 /// interim lifecycle rule.
 fn projected_timeline_events(calculator: &WhiffCalculator) -> Vec<Event> {
     let mut assembler = EventAssembler::new();
-    // Whiffs commit once resolved (Whiff/BeatenToBall decided at push time).
+    // Whiffs commit once separation resolves the speculative attempt.
     for event in calculator.events() {
-        assembler.push(
-            "whiff",
-            event.frame,
-            EventLifecycle::Finalized,
-            span(
-                event.frame,
-                event.resolved_frame,
-                event.time,
-                event.resolved_time,
-            ),
-            EventPayload::Whiff(event.clone()),
-            Some(event.player.clone()),
-            None,
-            Some(event.is_team_0),
-            event.player_position,
-            None,
-            None,
-        );
+        push_projected_whiff(&mut assembler, event);
     }
     assembler.into_events()
+}
+
+fn push_projected_whiff(assembler: &mut EventAssembler, event: &WhiffEvent) {
+    assembler.push(
+        "whiff",
+        event.start_frame,
+        EventLifecycle::Finalized,
+        span(
+            event.start_frame,
+            event.resolved_frame,
+            event.start_time,
+            event.resolved_time,
+        ),
+        EventPayload::Whiff(event.clone()),
+        Some(event.player.clone()),
+        None,
+        Some(event.is_team_0),
+        event.player_position,
+        None,
+        None,
+    );
 }
 
 pub(crate) fn boxed_default() -> Box<dyn AnalysisNodeDyn> {
     Box::new(WhiffNode::new())
 }
+
+#[cfg(test)]
+#[path = "whiff_tests.rs"]
+mod tests;
