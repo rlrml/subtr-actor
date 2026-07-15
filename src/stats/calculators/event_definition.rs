@@ -903,11 +903,11 @@ define_stats_event!(
     "whiff",
     "Whiff",
     EventCategory::Other,
-    summary = "A committed attempt near the ball that does not result in that player touching it.",
+    summary = "A committed attempt near the ball that resolves as a clear miss.",
     approach = [
         "Start candidates when a player gets within hitbox distance of the ball while moving or dodging toward it with sufficient alignment and closing speed.",
-        "Track the closest approach while the candidate remains near the ball.",
-        "Resolve as a whiff when the player exits the candidate window without touching, or as beaten-to-ball when an opponent touches first.",
+        "Track the full attempt span and closest-approach evidence while the candidate remains near the ball.",
+        "Resolve as a whiff only when the player separates beyond the candidate window without any touch; touches, expiry, missing players, and play boundaries discard the candidate.",
     ],
     scope = EventScope::Player
 );

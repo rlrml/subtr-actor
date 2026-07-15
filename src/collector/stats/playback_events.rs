@@ -971,9 +971,9 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 "whiff",
                 index,
                 span(
-                    event.frame,
+                    event.start_frame,
                     event.resolved_frame,
-                    event.time,
+                    event.start_time,
                     event.resolved_time,
                 ),
                 EventPayload::Whiff(event.clone()),

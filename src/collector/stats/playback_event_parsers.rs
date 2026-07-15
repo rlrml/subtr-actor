@@ -1201,16 +1201,37 @@ pub(in crate::collector::stats::playback) fn parse_whiff_event(
                 );
             }
         },
+        start_time: json_optional_f32(object.get("start_time"))?.unwrap_or(time),
+        start_frame: json_optional_usize(object.get("start_frame"))?.unwrap_or(frame),
         time,
         frame,
         resolved_time: json_optional_f32(object.get("resolved_time"))?.unwrap_or(time),
         resolved_frame: json_optional_usize(object.get("resolved_frame"))?.unwrap_or(frame),
+        resolution_reason: match object.get("resolution_reason").and_then(Value::as_str) {
+            None | Some("legacy_unknown") => WhiffResolutionReason::LegacyUnknown,
+            Some("separated_from_ball") => WhiffResolutionReason::SeparatedFromBall,
+            Some(reason) => {
+                return SubtrActorError::new_result(
+                    SubtrActorErrorVariant::StatsSerializationError(format!(
+                        "Unknown whiff resolution reason '{reason}'"
+                    )),
+                );
+            }
+        },
         player: json_required_remote_id(object, "player")?,
         player_position: json_optional_vec3(object.get("player_position"))?,
         is_team_0: json_required_bool(object, "is_team_0")?,
         closest_approach_distance: json_required_f32(object, "closest_approach_distance")?,
         forward_alignment: json_required_f32(object, "forward_alignment")?,
         approach_speed: json_required_f32(object, "approach_speed")?,
+        closing_speed_at_closest: json_optional_f32(object.get("closing_speed_at_closest"))?,
+        velocity_alignment_at_closest: json_optional_f32(
+            object.get("velocity_alignment_at_closest"),
+        )?,
+        local_ball_position_at_closest: json_optional_vec3(
+            object.get("local_ball_position_at_closest"),
+        )?,
+        resolved_distance: json_optional_f32(object.get("resolved_distance"))?,
         dodge_active: json_required_bool(object, "dodge_active")?,
         aerial: json_required_bool(object, "aerial")?,
     })
@@ -1317,3 +1338,7 @@ pub(in crate::collector::stats::playback) fn parse_boost_respawn_event(
         boost_granted: json_optional_f32(object.get("boost_granted"))?,
     })
 }
+
+#[cfg(test)]
+#[path = "playback_event_parsers_tests.rs"]
+mod tests;

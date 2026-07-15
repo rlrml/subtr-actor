@@ -147,7 +147,7 @@ ul.tight li { margin: .15rem 0; }
 <tr data-search="possession possession other definition pending."><td><a href="#event-possession">Possession</a></td><td><code>possession</code></td><td class="summary">Definition pending.</td></tr>
 <tr data-search="rush rush other a quick possession transition where the attacking team has numbers moving out of its defensive half."><td><a href="#event-rush">Rush</a></td><td><code>rush</code></td><td class="summary">A quick possession transition where the attacking team has numbers moving out of its defensive half.</td></tr>
 <tr data-search="territorial pressure territorial_pressure other definition pending."><td><a href="#event-territorial_pressure">Territorial Pressure</a></td><td><code>territorial_pressure</code></td><td class="summary">Definition pending.</td></tr>
-<tr data-search="whiff whiff other a committed attempt near the ball that does not result in that player touching it."><td><a href="#event-whiff">Whiff</a></td><td><code>whiff</code></td><td class="summary">A committed attempt near the ball that does not result in that player touching it.</td></tr>
+<tr data-search="whiff whiff other a committed attempt near the ball that resolves as a clear miss."><td><a href="#event-whiff">Whiff</a></td><td><code>whiff</code></td><td class="summary">A committed attempt near the ball that resolves as a clear miss.</td></tr>
 </tbody></table></div>
 <div class="cat-group" data-group><div class="cat-head">Positioning</div>
 <table class="toc"><thead><tr><th>Event</th><th>ID</th><th>Summary</th></tr></thead><tbody>
@@ -1097,9 +1097,9 @@ ul.tight li { margin: .15rem 0; }
 <li><code>territorial_pressure</code> via <code>TerritorialPressureNode</code> / <code>TerritorialPressureCalculator</code></li>
 </ul>
 </div>
-<div class="event" id="event-whiff" data-search="whiff whiff other a committed attempt near the ball that does not result in that player touching it.">
+<div class="event" id="event-whiff" data-search="whiff whiff other a committed attempt near the ball that resolves as a clear miss.">
 <div class="head"><h3>Whiff</h3><code class="id">whiff</code><span class="badge">Other</span><a class="toplink" href="#contents">top ↑</a></div>
-<p class="summary">A committed attempt near the ball that does not result in that player touching it.</p>
+<p class="summary">A committed attempt near the ball that resolves as a clear miss.</p>
 <div class="section-label">Confidence</div>
 <div class="conf">
 <span class="badge">Approach <b>Unknown</b></span>
@@ -1111,8 +1111,8 @@ ul.tight li { margin: .15rem 0; }
 <div class="section-label">Approach</div>
 <ul class="tight">
 <li>Start candidates when a player gets within hitbox distance of the ball while moving or dodging toward it with sufficient alignment and closing speed.</li>
-<li>Track the closest approach while the candidate remains near the ball.</li>
-<li>Resolve as a whiff when the player exits the candidate window without touching, or as beaten-to-ball when an opponent touches first.</li>
+<li>Track the full attempt span and closest-approach evidence while the candidate remains near the ball.</li>
+<li>Resolve as a whiff only when the player separates beyond the candidate window without any touch; touches, expiry, missing players, and play boundaries discard the candidate.</li>
 </ul>
 <div class="section-label">Limitations</div>
 <p class="muted">None documented.</p>

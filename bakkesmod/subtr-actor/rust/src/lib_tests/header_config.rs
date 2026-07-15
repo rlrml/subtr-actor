@@ -5,7 +5,7 @@ use std::ffi::CString;
 use subtr_actor::stats::analysis_graph::STATS_TIMELINE_MECHANIC_KINDS;
 use subtr_actor::{
     BoostPickupActivity, BoostPickupDetection, BoostPickupFieldHalf, BoostPickupPadType,
-    DemoCalculator, EventMeta, HalfFlipEvent, TouchState, WhiffEventKind,
+    DemoCalculator, EventMeta, HalfFlipEvent, TouchState, WhiffEventKind, WhiffResolutionReason,
 };
 
 fn checked_in_header_text() -> String {
