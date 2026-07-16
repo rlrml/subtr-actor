@@ -1,13 +1,14 @@
 # Threat model training pipeline
 
 Offline pipeline that fits the expected-goals threat model embedded in
-`src/stats/calculators/expected_goals_model.rs`. The model is
-`V = sigmoid(bias + w · features)`: the probability that the attacking team
-scores within `THREAT_HORIZON_SECONDS` (5s), evaluated per frame on the
+`src/stats/calculators/expected_goals_model.rs`. The deployed model is a compact
+eight-hidden-unit tanh MLP that estimates the probability that the attacking
+team scores within `THREAT_HORIZON_SECONDS` (5s), evaluated per frame on the
 `ThreatFeatures` vector. Feature extraction lives only in the Rust ndarray
 feature layer (`ThreatFeatures` / `ThreatModelValues`); the runtime model and
 training exporter consume that same analysis-backed row state, so train and
-inference cannot diverge.
+inference cannot diverge. A logistic model remains the transparent baseline,
+and a gradient-boosted tree remains the nonlinear reference ceiling.
 
 ## Steps
 
@@ -82,32 +83,33 @@ inference cannot diverge.
    The command also writes
    `training_provenance.json` (dataset/manifest and split hashes, seed, Python
    and package versions), `coefficients.json`, `model_coefficients.rs`, and
-   `parity_fixture.rs`. `--gbt` also fits a
-   gradient-boosted reference to quantify what the linear model leaves behind.
+   `parity_fixture.rs`. The script evaluates the logistic baseline and smooth
+   nonlinear model, then refits the MLP on the full corpus and emits its folded
+   raw-feature weights. `--gbt` also fits a gradient-boosted reference ceiling.
 
-4. **Embed**: paste `model_coefficients.rs` into the GENERATED COEFFICIENTS
-   section of `src/stats/calculators/expected_goals_model.rs`, bump
-   `THREAT_MODEL_VERSION` (`trained-v<N>`), refresh the provenance comment and
-   the parity fixture in `expected_goals_model_tests.rs` from
-   `parity_fixture.rs`, and run `cargo test --lib expected_goals`.
+4. **Embed**: replace
+   `src/stats/calculators/expected_goals_model_weights.rs` with
+   `model_coefficients.rs`, bump `THREAT_MODEL_VERSION` (`trained-v<N>`),
+   refresh the provenance comment and the parity fixture in
+   `expected_goals_model_tests.rs` from `parity_fixture.rs`, and run
+   `cargo test --lib expected_goals`.
 
-## trained-v4
+## trained-v5
 
-Fit 2026-07-12 on 5.22M team rows from 2,544 rank-stratified ranked-doubles
+Fit 2026-07-15 on 5.22M team rows from 2,544 rank-stratified ranked-doubles
 replays (rocket-sense production, tiers 3–22, ~150 per tier where available).
 Every player receives the same 16 inputs, including boost, inferred dodge
 availability, and demo state; each team pair is aggregated without ordering.
-On the newest 509 replays (1.04M rows), logistic log-loss is 0.1355 versus
-0.1964 for the constant-rate baseline, Brier score is 0.0359, AUC is 0.8837,
-and 15-bin expected calibration error is 0.0015. The nonlinear GBT ceiling is
-0.1287 log-loss, so the deployable linear model captures most—but not all—of
-the available signal. Removing all player state worsens log-loss by 0.0180;
-mean-substitution knockouts for boost and dodge availability worsen it by
-0.00038 and 0.00031 respectively. Demo state is currently neutral after the
-other physical inputs are present. On 1,018 held-out replay/team outcomes, the
-time-integrated model averages 2.781 xG against 2.834 goals (0.981 ratio), with
-0.594 per-team-game correlation. The aggregate count scale is good; individual
-match totals remain noisy and should not be treated as precise forecasts.
+On the newest 509 replays (1.04M rows), the eight-unit tanh MLP reaches 0.13005
+log-loss, 0.03456 Brier score, 0.8936 AUC, and 0.00129 15-bin expected
+calibration error. The logistic baseline is 0.13548 log-loss and the GBT
+reference ceiling is 0.12816, so the compact smooth model captures roughly
+three quarters of the measured nonlinear gap. At 4 Hz it crosses the 15%
+incident threshold 6.740 times per live minute versus 6.544 for logistic.
+On 1,018 held-out replay/team outcomes, the time-integrated MLP averages 2.795
+xG against 2.834 goals (0.986 ratio), with 0.626 per-team-game correlation
+versus 0.594 for logistic. Individual match totals remain noisy and should not
+be treated as precise forecasts.
 
 ## xG aggregation
 
@@ -121,10 +123,10 @@ The calculator also exposes an incident-based team total. An incident opens
 above 15% V, remains open until V falls to 5%, and contributes one selected
 peak. For goal-ending incidents, samples from 0.5 seconds before the scoring
 team's final touch onward are excluded so nearly determined ball trajectories
-do not leak into the total. The selected raw peak is multiplied by 0.629475,
+do not leak into the total. The selected raw peak is multiplied by 0.583503,
 fit on the oldest 80% of the ranked-doubles corpus. On the newest 509 held-out
-replays (1,018 team-games), incident xG averages 2.905 against 2.797 goals
-(3.9% high). This alternate total has weaker per-game correlation than the
-continuous integral, so both remain available rather than conflating their
-semantics. Revalidate either estimator with
+replays (1,018 team-games), incident xG averages 2.891 against 2.797 goals
+(3.4% high), with 0.356 per-team-game correlation. The continuous integral
+averages 2.827 xG with 0.641 correlation on the same full-replay evaluation.
+Both remain available rather than conflating their semantics. Revalidate with
 `threat_dataset_dump --episode-summary`.

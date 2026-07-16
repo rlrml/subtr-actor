@@ -1275,7 +1275,7 @@ The positive detection-frame change in the touching team's continuous threat val
 
 **Approach**
 
-- Evaluate the versioned logistic threat model V(state) for both teams on every live-play frame from full ball and player physics state.
+- Evaluate the versioned compact nonlinear threat model V(state) for both teams on every live-play frame from full ball and player physics state.
 - On each attributed touch, emit the toucher's team's V on the preceding live frame and on the detection frame; positive deltas contribute to threat_added.
 
 **Limitations**
@@ -1719,4 +1719,3 @@ A goal flowing directly from the kickoff exchange.
 - Require the goal to land within the kickoff-goal timing window of the first touch.
 - Reject goals where the conceding team settled possession or the play reset through the scoring team's own half.
 - Attach goal-context evidence so the tag appears with the goal label.
-

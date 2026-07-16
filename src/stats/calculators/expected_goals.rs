@@ -42,7 +42,7 @@ pub const THREAT_EPISODE_END_THRESHOLD: f32 = 0.05;
 /// incident. Updated only from a replay-grouped, date-held-out corpus audit;
 /// the timeline retains the raw selected probability alongside the calibrated
 /// contribution so the transformation remains inspectable.
-pub const INCIDENT_XG_CALIBRATION_FACTOR: f32 = 0.629_475;
+pub const INCIDENT_XG_CALIBRATION_FACTOR: f32 = 0.583_503;
 
 /// Goal-ending incidents ignore model samples from this long before the
 /// scoring team's final touch onward. This removes immediate pre-contact and

@@ -1157,7 +1157,7 @@ define_stats_event!(
     EventCategory::Other,
     summary = "The positive detection-frame change in the touching team's continuous threat value (expected-goals state value), not a causal estimate of the touch's multi-frame impulse.",
     approach = [
-        "Evaluate the versioned logistic threat model V(state) for both teams on every live-play frame from full ball and player physics state.",
+        "Evaluate the versioned compact nonlinear threat model V(state) for both teams on every live-play frame from full ball and player physics state.",
         "On each attributed touch, emit the toucher's team's V on the preceding live frame and on the detection frame; positive deltas contribute to threat_added.",
     ],
     hidden = true,

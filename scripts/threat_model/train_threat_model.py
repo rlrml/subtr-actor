@@ -15,7 +15,7 @@ than TAU seconds of remaining observation are censored (dropped).
 
 Outputs (to --out-dir):
   - metrics.txt: log-loss/Brier/AUC vs baseline, overall + per rank tier calibration
-  - model_coefficients.rs: raw-feature logistic coefficients (standardization folded)
+  - model_coefficients.rs: generated Rust coefficients for the selected model
   - parity_fixture.rs: feature rows + expected V for a Rust parity test
 """
 
@@ -32,6 +32,7 @@ import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
+from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 
 META_COLS = [
@@ -61,9 +62,25 @@ parser.add_argument(
     help="source replay manifest; its SHA-256 is recorded in training provenance",
 )
 parser.add_argument("--gbt", action="store_true", help="also fit a GBT ceiling reference")
+parser.add_argument(
+    "--mlp-hidden-units",
+    type=int,
+    default=8,
+    help="hidden width of the smooth model published for Rust",
+)
+parser.add_argument(
+    "--mlp-epochs",
+    type=int,
+    default=16,
+    help="fixed MLP training budget (also acts as regularization)",
+)
 args = parser.parse_args()
 if args.sample_hz <= 0:
     parser.error("--sample-hz must be positive")
+if args.mlp_hidden_units <= 0:
+    parser.error("--mlp-hidden-units must be positive")
+if args.mlp_epochs <= 0:
+    parser.error("--mlp-epochs must be positive")
 
 
 def sha256_file(path: pathlib.Path) -> str:
@@ -200,6 +217,9 @@ provenance = {
     "temporal_test_cutoff": temporal_cutoff,
     "tau_seconds": tau,
     "sample_hz": args.sample_hz,
+    "publish_model": "mlp-tanh",
+    "mlp_hidden_units": args.mlp_hidden_units,
+    "mlp_epochs": args.mlp_epochs,
     "train_replay_ids_sha256": replay_set_hash(train_idx),
     "test_replay_ids_sha256": replay_set_hash(test_idx),
     "python": platform.python_version(),
@@ -211,6 +231,24 @@ provenance = {
 
 scaler = StandardScaler().fit(Xtr)
 Xtr_s, Xte_s = scaler.transform(Xtr), scaler.transform(Xte)
+
+
+def new_mlp():
+    return MLPClassifier(
+        hidden_layer_sizes=(args.mlp_hidden_units,),
+        activation="tanh",
+        solver="adam",
+        alpha=1e-4,
+        batch_size=4096,
+        learning_rate_init=1e-3,
+        max_iter=args.mlp_epochs,
+        shuffle=True,
+        random_state=args.seed,
+        tol=1e-5,
+        n_iter_no_change=3,
+        verbose=True,
+    )
+
 
 lr = LogisticRegression(max_iter=2000, C=1.0)
 lr.fit(Xtr_s, ytr)
@@ -236,6 +274,7 @@ def report(name, p, yt):
 
 
 report("logistic", p_lr, yte)
+predictions = {"logistic": p_lr}
 
 
 def feature_knockout(name, predicate, standardized_test):
@@ -260,8 +299,15 @@ if args.gbt:
     gbt.fit(Xtr, ytr)
     p_gbt = gbt.predict_proba(Xte)[:, 1]
     report("gbt-ceiling", p_gbt, yte)
-    del gbt, p_gbt
+    predictions["gbt-ceiling"] = p_gbt
+    del gbt
     gc.collect()
+
+mlp = new_mlp()
+mlp.fit(Xtr_s, ytr)
+p_mlp = mlp.predict_proba(Xte_s)[:, 1]
+report(f"mlp-tanh-{args.mlp_hidden_units}", p_mlp, yte)
+predictions[f"mlp-tanh-{args.mlp_hidden_units}"] = p_mlp
 
 
 def calibration_table(p, yt, n_bins=15):
@@ -276,92 +322,123 @@ def calibration_table(p, yt, n_bins=15):
     return rows
 
 
-calibration = calibration_table(p_lr, yte)
-ece = sum(abs(pred - obs) * n for pred, obs, n in calibration) / len(yte)
-lines.append(f"\nexpected calibration error (15 equal-frequency bins): {ece:.5f}")
-lines.append("calibration (predicted, observed, n):")
-for pred, obs, n in calibration:
-    lines.append(f"  {pred:.4f}  {obs:.4f}  n={n}")
+for model_name, model_predictions in predictions.items():
+    calibration = calibration_table(model_predictions, yte)
+    ece = sum(abs(pred - obs) * n for pred, obs, n in calibration) / len(yte)
+    lines.append(f"\n{model_name} expected calibration error (15 equal-frequency bins): {ece:.5f}")
+    lines.append("calibration (predicted, observed, n):")
+    for pred, obs, n in calibration:
+        lines.append(f"  {pred:.4f}  {obs:.4f}  n={n}")
+
+
+def temporal_stability(p, indices):
+    samples = df.iloc[indices][["replay_id", "is_team0", "time"]].copy()
+    samples["prediction"] = p
+    samples = samples.sort_values(["replay_id", "is_team0", "time"])
+    group_keys = ["replay_id", "is_team0"]
+    dt = samples.groupby(group_keys, sort=False)["time"].diff().to_numpy()
+    delta = samples.groupby(group_keys, sort=False)["prediction"].diff().abs().to_numpy()
+    max_live_sample_gap = 2.0 / args.sample_hz
+    contiguous = np.isfinite(dt) & (dt > 0.0) & (dt <= max_live_sample_gap)
+    contiguous_delta = delta[contiguous]
+    live_minutes = float(dt[contiguous].sum() / 60.0)
+    previous = samples.groupby(group_keys, sort=False)["prediction"].shift().to_numpy()
+    current = samples["prediction"].to_numpy()
+    crossings = {}
+    for threshold in (0.05, 0.15):
+        crossed = contiguous & (
+            ((previous <= threshold) & (current > threshold))
+            | ((previous > threshold) & (current <= threshold))
+        )
+        crossings[threshold] = float(crossed.sum() / live_minutes)
+    return {
+        "mean_abs_step": float(contiguous_delta.mean()),
+        "p95_abs_step": float(np.quantile(contiguous_delta, 0.95)),
+        "p99_abs_step": float(np.quantile(contiguous_delta, 0.99)),
+        "crossings_005_per_minute": crossings[0.05],
+        "crossings_015_per_minute": crossings[0.15],
+    }
+
+
+for model_name, model_predictions in predictions.items():
+    stability = temporal_stability(model_predictions, test_idx)
+    lines.append(f"\n{model_name} held-out temporal stability (contiguous 4 Hz samples):")
+    lines.append(
+        "  mean_abs_step={mean_abs_step:.5f} p95_abs_step={p95_abs_step:.5f} "
+        "p99_abs_step={p99_abs_step:.5f}".format(**stability)
+    )
+    lines.append(
+        "  crossings/min: 0.05={crossings_005_per_minute:.3f} "
+        "0.15={crossings_015_per_minute:.3f}".format(**stability)
+    )
 
 # Count-scale validation: integrate overlapping five-second probabilities for
 # each held-out replay/team, then compare against distinct observed goal times.
-count_scale = df.iloc[test_idx].copy()
-count_scale["prediction"] = p_lr
-count_scale = count_scale.sort_values(["replay_id", "is_team0", "time"])
+count_scale_base = df.iloc[test_idx].copy()
 group_keys = ["replay_id", "is_team0"]
-count_scale["dt"] = count_scale.groupby(group_keys, sort=False)["time"].diff()
-# Rows exist only during live play. A large replay-time gap crosses a kickoff
-# or goal stoppage and must contribute zero rather than integrating through
-# time in which the model was not evaluated.
-max_live_sample_gap = 2.0 / args.sample_hz
-count_scale["dt"] = count_scale["dt"].where(
-    count_scale["dt"].between(0.0, max_live_sample_gap), 0.0
-)
-count_scale["xg_contribution"] = count_scale["prediction"] * count_scale["dt"].fillna(0.0) / tau
-count_scale["goal_time"] = (count_scale["time"] + count_scale["time_to_next_goal_for"]).round(2)
-team_games = count_scale.groupby(group_keys, sort=False).agg(
-    predicted_xg=("xg_contribution", "sum"),
-    goals=("goal_time", lambda values: values.dropna().nunique()),
-)
-goal_mean = float(team_games["goals"].mean())
-xg_mean = float(team_games["predicted_xg"].mean())
-count_mae = float((team_games["predicted_xg"] - team_games["goals"]).abs().mean())
-count_rmse = float(np.sqrt(np.mean((team_games["predicted_xg"] - team_games["goals"]) ** 2)))
-count_correlation = float(team_games["predicted_xg"].corr(team_games["goals"]))
-lines.extend(
-    [
-        "\nheld-out replay/team count-scale validation:",
-        f"  team_games={len(team_games)} mean_xg={xg_mean:.4f} mean_goals={goal_mean:.4f} "
-        f"ratio={xg_mean / goal_mean:.4f}",
-        f"  mae={count_mae:.4f} rmse={count_rmse:.4f} correlation={count_correlation:.4f}",
-    ]
-)
+for model_name, model_predictions in predictions.items():
+    count_scale = count_scale_base.copy()
+    count_scale["prediction"] = model_predictions
+    count_scale = count_scale.sort_values(["replay_id", "is_team0", "time"])
+    count_scale["dt"] = count_scale.groupby(group_keys, sort=False)["time"].diff()
+    # Rows exist only during live play. A large replay-time gap crosses a kickoff
+    # or goal stoppage and must contribute zero rather than integrating through
+    # time in which the model was not evaluated.
+    max_live_sample_gap = 2.0 / args.sample_hz
+    count_scale["dt"] = count_scale["dt"].where(
+        count_scale["dt"].between(0.0, max_live_sample_gap), 0.0
+    )
+    count_scale["goal_time"] = (count_scale["time"] + count_scale["time_to_next_goal_for"]).round(2)
+    count_scale["xg_contribution"] = count_scale["prediction"] * count_scale["dt"].fillna(0.0) / tau
+    team_games = count_scale.groupby(group_keys, sort=False).agg(
+        predicted_xg=("xg_contribution", "sum"),
+        goals=("goal_time", lambda values: values.dropna().nunique()),
+    )
+    goal_mean = float(team_games["goals"].mean())
+    xg_mean = float(team_games["predicted_xg"].mean())
+    count_mae = float((team_games["predicted_xg"] - team_games["goals"]).abs().mean())
+    count_rmse = float(np.sqrt(np.mean((team_games["predicted_xg"] - team_games["goals"]) ** 2)))
+    count_correlation = float(team_games["predicted_xg"].corr(team_games["goals"]))
+    lines.extend(
+        [
+            f"\n{model_name} held-out replay/team count-scale validation:",
+            f"  team_games={len(team_games)} mean_xg={xg_mean:.4f} mean_goals={goal_mean:.4f} "
+            f"ratio={xg_mean / goal_mean:.4f}",
+            f"  mae={count_mae:.4f} rmse={count_rmse:.4f} correlation={count_correlation:.4f}",
+        ]
+    )
 
 # Per-rank calibration on test set
 test_df = df.iloc[test_idx]
-lines.append("\nper-rank-tier test metrics (logistic):")
 tiers = test_df["median_rank_tier"].to_numpy()
-for tier in sorted(pd.unique(tiers[~pd.isna(tiers)])):
-    m = tiers == tier
-    if m.sum() < 2000 or yte[m].sum() < 20:
-        lines.append(f"  tier={tier}: n={int(m.sum())} (too small, skipped)")
-        continue
-    lines.append(
-        f"  tier={tier:g}: n={int(m.sum())} base={yte[m].mean():.5f} pred_mean={p_lr[m].mean():.5f} "
-        f"log_loss={log_loss(yte[m], p_lr[m]):.5f} brier={brier_score_loss(yte[m], p_lr[m]):.5f}"
-    )
+for model_name, model_predictions in predictions.items():
+    lines.append(f"\nper-rank-tier test metrics ({model_name}):")
+    for tier in sorted(pd.unique(tiers[~pd.isna(tiers)])):
+        m = tiers == tier
+        if m.sum() < 2000 or yte[m].sum() < 20:
+            lines.append(f"  tier={tier}: n={int(m.sum())} (too small, skipped)")
+            continue
+        lines.append(
+            f"  tier={tier:g}: n={int(m.sum())} base={yte[m].mean():.5f} "
+            f"pred_mean={model_predictions[m].mean():.5f} "
+            f"log_loss={log_loss(yte[m], model_predictions[m]):.5f} "
+            f"brier={brier_score_loss(yte[m], model_predictions[m]):.5f}"
+        )
 
 (out_dir / "metrics.txt").write_text("\n".join(lines) + "\n")
 del count_scale, team_games, Xtr_s, Xte_s
 gc.collect()
 
-# After the frozen temporal evaluation, refit the publishable coefficients on
-# the full corpus. Held-out metrics above always come from `lr`; generated
-# coefficients and parity values below always come from `publish_lr`.
+# After the frozen temporal evaluation, refit the MLP on the full corpus.
+# Held-out metrics above always come from models fit only
+# on `Xtr`; generated coefficients and parity values below come from this
+# full-corpus refit.
 publish_scaler = StandardScaler().fit(X)
 X_publish = publish_scaler.transform(X)
-publish_lr = LogisticRegression(max_iter=2000, C=1.0)
-publish_lr.fit(X_publish, y)
-
-# Fold standardization into raw-feature coefficients:
-# z = (x - mu) / sigma ; w_z . z + b = (w_z / sigma) . x + (b - w_z . mu / sigma)
-w_z = publish_lr.coef_[0]
 mu, sigma = publish_scaler.mean_, publish_scaler.scale_
-w_raw = w_z / sigma
-b_raw = float(publish_lr.intercept_[0] - np.sum(w_z * mu / sigma))
 
-coeffs = {name: float(w) for name, w in zip(feature_cols, w_raw)}
-(out_dir / "coefficients.json").write_text(
-    json.dumps(
-        {"bias": b_raw, "weights": coeffs, "tau": tau, "provenance": provenance},
-        indent=1,
-    )
-)
-
-# Emitted in the exact shape of the GENERATED COEFFICIENTS section of
-# src/stats/calculators/expected_goals_model.rs; paste between the markers and
-# bump THREAT_MODEL_VERSION. Literals are shortest-f32 so clippy's
-# excessive_precision lint stays quiet.
+# Emitted in the exact shape of expected_goals_model_weights.rs. Literals are
+# shortest-f32 so clippy's excessive_precision lint stays quiet.
 
 
 def f32(x) -> str:
@@ -370,15 +447,53 @@ def f32(x) -> str:
 
 
 rust = ["// Generated by scripts/threat_model/train_threat_model.py — do not hand-edit values.\n"]
-rust.append(f"pub const THREAT_MODEL_BIAS: f32 = {f32(b_raw)};")
-rust.append("pub const THREAT_MODEL_WEIGHTS: [(&str, f32); THREAT_FEATURE_COUNT] = [")
+published_estimator = new_mlp()
+published_estimator.fit(X_publish, y)
+hidden_weights_z = published_estimator.coefs_[0]
+hidden_weights_raw = hidden_weights_z / sigma[:, np.newaxis]
+hidden_biases_raw = published_estimator.intercepts_[0] - ((mu / sigma) @ hidden_weights_z)
+output_weights = published_estimator.coefs_[1][:, 0]
+output_bias = float(published_estimator.intercepts_[1][0])
+input_weights = {
+    name: [float(weight) for weight in weights]
+    for name, weights in zip(feature_cols, hidden_weights_raw)
+}
+artifact = {
+    "model": "mlp-tanh",
+    "hidden_units": args.mlp_hidden_units,
+    "hidden_biases": [float(value) for value in hidden_biases_raw],
+    "input_weights": input_weights,
+    "output_bias": output_bias,
+    "output_weights": [float(value) for value in output_weights],
+    "tau": tau,
+    "provenance": provenance,
+}
+rust.append(f"pub const THREAT_MODEL_HIDDEN_UNITS: usize = {args.mlp_hidden_units};")
+rust.append(
+    "pub const THREAT_MODEL_HIDDEN_BIASES: [f32; THREAT_MODEL_HIDDEN_UNITS] = ["
+    + ", ".join(f32(value) for value in hidden_biases_raw)
+    + "];"
+)
+rust.append(
+    "pub const THREAT_MODEL_INPUT_WEIGHTS: "
+    "[(&str, [f32; THREAT_MODEL_HIDDEN_UNITS]); THREAT_FEATURE_COUNT] = ["
+)
 for name in feature_cols:
-    rust.append(f'    ("{name}", {f32(coeffs[name])}),')
+    weights = ", ".join(f32(value) for value in input_weights[name])
+    rust.append(f'    ("{name}", [{weights}]),')
 rust.append("];")
+rust.append(f"pub const THREAT_MODEL_OUTPUT_BIAS: f32 = {f32(output_bias)};")
+rust.append(
+    "pub const THREAT_MODEL_OUTPUT_WEIGHTS: [f32; THREAT_MODEL_HIDDEN_UNITS] = ["
+    + ", ".join(f32(value) for value in output_weights)
+    + "];"
+)
+
+(out_dir / "coefficients.json").write_text(json.dumps(artifact, indent=1) + "\n")
 (out_dir / "model_coefficients.rs").write_text("\n".join(rust) + "\n")
 
 # Parity fixture: 6 temporal-test rows spanning the published model's range.
-p_publish_test = publish_lr.predict_proba(publish_scaler.transform(Xte))[:, 1]
+p_publish_test = published_estimator.predict_proba(publish_scaler.transform(Xte))[:, 1]
 order = np.argsort(p_publish_test)
 picks = [
     order[0],

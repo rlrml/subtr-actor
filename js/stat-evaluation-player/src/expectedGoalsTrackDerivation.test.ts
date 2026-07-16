@@ -28,7 +28,7 @@ function fixture() {
       episode_threshold: 0.15,
       episode_end_threshold: 0.05,
       goal_touch_exclusion_seconds: 0.5,
-      incident_xg_calibration_factor: 0.629475,
+      incident_xg_calibration_factor: 0.583503,
     },
     teams: [
       {
