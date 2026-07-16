@@ -12,10 +12,13 @@ test("whiff event derivation can populate compacted whiff stats", () => {
       whiff: [
         {
           kind: "whiff",
+          start_time: 1.5,
+          start_frame: 15,
           time: 2,
           frame: 20,
           resolved_time: 3.5,
           resolved_frame: 35,
+          resolution_reason: "separated_from_ball",
           player: playerId,
           is_team_0: true,
           closest_approach_distance: 128,
@@ -26,10 +29,13 @@ test("whiff event derivation can populate compacted whiff stats", () => {
         },
         {
           kind: "beaten_to_ball",
+          start_time: 4,
+          start_frame: 40,
           time: 4,
           frame: 40,
           resolved_time: 4,
           resolved_frame: 40,
+          resolution_reason: "legacy_unknown",
           player: playerId,
           is_team_0: true,
           closest_approach_distance: 160,
