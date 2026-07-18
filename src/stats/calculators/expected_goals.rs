@@ -4,8 +4,9 @@
 //! live-play frame: the probability (per the versioned model in
 //! [`super::expected_goals_model`]) that the team scores within the next
 //! [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS)
-//! seconds, computed from full ball + player physics state. Shots are *not* a
-//! gating event -- threat is continuous. Derived observations:
+//! seconds, computed from full ball + player physics state plus short causal
+//! history. Shots are *not* a gating event -- threat is continuous. Derived
+//! observations:
 //!
 //! - [`ThreatTouchEvent`]: the detection-frame change in the touching team's V
 //!   (detection-frame V minus the preceding live-frame V, both from the
@@ -42,7 +43,7 @@ pub const THREAT_EPISODE_END_THRESHOLD: f32 = 0.05;
 /// incident. Updated only from a replay-grouped, date-held-out corpus audit;
 /// the timeline retains the raw selected probability alongside the calibrated
 /// contribution so the transformation remains inspectable.
-pub const INCIDENT_XG_CALIBRATION_FACTOR: f32 = 0.583_503;
+pub const INCIDENT_XG_CALIBRATION_FACTOR: f32 = 0.518_152;
 
 /// Goal-ending incidents ignore model samples from this long before the
 /// scoring team's final touch onward. This removes immediate pre-contact and
@@ -86,6 +87,23 @@ const GOAL_RECORD_DEDUPE_SECONDS: f32 = 2.0;
 pub const PLAYER_THREAT_FEATURE_COUNT: usize = 16;
 pub const TEAM_THREAT_FEATURE_COUNT: usize = 2 * PLAYER_THREAT_FEATURE_COUNT;
 pub const THREAT_FEATURE_COUNT: usize = 8 + 2 * TEAM_THREAT_FEATURE_COUNT;
+pub const THREAT_HISTORY_FEATURE_COUNT: usize = 40;
+pub const THREAT_HISTORY_LAGS_SECONDS: [f32; 2] = [0.5, 1.0];
+pub const THREAT_MODEL_FEATURE_COUNT: usize =
+    THREAT_FEATURE_COUNT + THREAT_HISTORY_LAGS_SECONDS.len() * (THREAT_HISTORY_FEATURE_COUNT + 1);
+
+/// Instantaneous fields whose causal changes give the model motion context
+/// that cannot be recovered from one state alone. The selection preserves the
+/// permutation-invariant team mean/spread representation.
+const THREAT_HISTORY_FEATURE_INDICES: [usize; THREAT_HISTORY_FEATURE_COUNT] = [
+    0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 13, 15, 17, 18, 19, 22, 23, 25, 26, 28, 29, 33, 35, 41, 42,
+    44, 45, 47, 49, 50, 51, 54, 55, 57, 58, 60, 61, 65, 67,
+];
+
+/// History samples must land near the requested lag. This is deliberately
+/// narrower than one 4 Hz training interval, while full-frame replay updates
+/// normally make the actual error much smaller.
+const THREAT_HISTORY_TOLERANCE_SECONDS: f32 = 0.1875;
 
 /// Identically shaped state computed for every player before any team
 /// aggregation. No player receives a positional role or a distinct schema.
@@ -244,12 +262,90 @@ pub struct ThreatFeatures {
     pub opponent_team: TeamThreatFeatures,
 }
 
-/// Canonical per-frame threat feature rows published for ndarray extraction
-/// and consumed by the expected-goals model. `current` is `None` outside live
-/// play or when the ball state is unavailable.
+/// Exact causal input to the trained threat model. It retains the canonical
+/// instantaneous row and appends selected changes over 0.5 and 1.0 seconds,
+/// each followed by an availability flag. Unavailable history is represented
+/// by zero deltas plus a zero flag, never by a sample across a live-play gap.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ThreatModelFeatures {
+    current: ThreatFeatures,
+    history_deltas: [[f32; THREAT_HISTORY_FEATURE_COUNT]; 2],
+    history_available: [f32; 2],
+}
+
+impl ThreatModelFeatures {
+    pub(crate) fn new(current: ThreatFeatures, history: [Option<ThreatFeatures>; 2]) -> Self {
+        let current_values = current.to_array();
+        let mut history_deltas = [[0.0; THREAT_HISTORY_FEATURE_COUNT]; 2];
+        let mut history_available = [0.0; 2];
+        for (lag_index, previous) in history.into_iter().enumerate() {
+            let Some(previous) = previous else {
+                continue;
+            };
+            let previous_values = previous.to_array();
+            for (output_index, feature_index) in
+                THREAT_HISTORY_FEATURE_INDICES.into_iter().enumerate()
+            {
+                history_deltas[lag_index][output_index] =
+                    current_values[feature_index] - previous_values[feature_index];
+            }
+            history_available[lag_index] = 1.0;
+        }
+        Self {
+            current,
+            history_deltas,
+            history_available,
+        }
+    }
+
+    /// Column names for [`Self::to_array`], in the same order.
+    pub fn feature_names() -> &'static [&'static str] {
+        static NAMES: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+        NAMES.get_or_init(|| {
+            let mut names = ThreatFeatures::FEATURE_NAMES.to_vec();
+            for lag_label in ["0.5", "1"] {
+                names.extend(THREAT_HISTORY_FEATURE_INDICES.iter().map(|&index| {
+                    let name: &'static mut str = Box::leak(
+                        format!(
+                            "delta_{lag_label}s_{}",
+                            ThreatFeatures::FEATURE_NAMES[index]
+                        )
+                        .into_boxed_str(),
+                    );
+                    &*name
+                }));
+                let availability: &'static mut str =
+                    Box::leak(format!("history_{lag_label}s_available").into_boxed_str());
+                names.push(&*availability);
+            }
+            names
+        })
+    }
+
+    /// The feature vector, ordered exactly as [`Self::feature_names`].
+    pub fn to_array(&self) -> [f32; THREAT_MODEL_FEATURE_COUNT] {
+        let mut values = [0.0; THREAT_MODEL_FEATURE_COUNT];
+        values[..THREAT_FEATURE_COUNT].copy_from_slice(&self.current.to_array());
+        let mut offset = THREAT_FEATURE_COUNT;
+        for lag_index in 0..THREAT_HISTORY_LAGS_SECONDS.len() {
+            values[offset..offset + THREAT_HISTORY_FEATURE_COUNT]
+                .copy_from_slice(&self.history_deltas[lag_index]);
+            offset += THREAT_HISTORY_FEATURE_COUNT;
+            values[offset] = self.history_available[lag_index];
+            offset += 1;
+        }
+        values
+    }
+}
+
+/// Canonical per-frame threat state published for ndarray extraction and model
+/// evaluation. `current` preserves the instantaneous schema for general
+/// consumers; `current_model` is the exact causal input used by inference.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ThreatFeaturesState {
     current: Option<[ThreatFeatures; 2]>,
+    current_model: Option<[ThreatModelFeatures; 2]>,
+    history: std::collections::VecDeque<(f32, [ThreatFeatures; 2])>,
 }
 
 impl ThreatFeaturesState {
@@ -257,28 +353,54 @@ impl ThreatFeaturesState {
         self.current.as_ref()
     }
 
+    pub fn current_model(&self) -> Option<&[ThreatModelFeatures; 2]> {
+        self.current_model.as_ref()
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.current = None;
+        self.current_model = None;
+        self.history.clear();
+    }
+
+    fn history_at(&self, target_time: f32) -> Option<[ThreatFeatures; 2]> {
+        self.history
+            .iter()
+            .min_by(|(left_time, _), (right_time, _)| {
+                (left_time - target_time)
+                    .abs()
+                    .total_cmp(&(right_time - target_time).abs())
+            })
+            .filter(|(time, _)| (time - target_time).abs() <= THREAT_HISTORY_TOLERANCE_SECONDS)
+            .map(|(_, features)| *features)
+    }
+
     pub(crate) fn update(
         &mut self,
-        is_doubles: bool,
+        current_time: f32,
         ball: &BallFrameState,
         players: &PlayerFrameState,
         events: &FrameEventsState,
         dodge_available: &HashMap<PlayerId, bool>,
         live_play_state: &LivePlayState,
     ) {
-        let Some(ball_sample) = ball
-            .sample()
-            .filter(|_| live_play_state.is_live_play && is_doubles)
-        else {
-            self.current = None;
+        let Some(ball_sample) = ball.sample().filter(|_| live_play_state.is_live_play) else {
+            self.clear();
             return;
         };
+        if self
+            .history
+            .back()
+            .is_some_and(|(time, _)| current_time < *time)
+        {
+            self.clear();
+        }
         let demoed_players: HashSet<PlayerId> = events
             .active_demos
             .iter()
             .map(|demo| demo.victim.clone())
             .collect();
-        self.current = compute_threat_features(
+        let current = compute_threat_features(
             ball_sample.position(),
             ball_sample.velocity(),
             players,
@@ -295,6 +417,29 @@ impl ThreatFeaturesState {
             false,
         ))
         .map(|(team_zero, team_one)| [team_zero, team_one]);
+        let Some(current) = current else {
+            self.clear();
+            return;
+        };
+        let history = THREAT_HISTORY_LAGS_SECONDS.map(|lag| self.history_at(current_time - lag));
+        self.current_model = Some(std::array::from_fn(|team_index| {
+            ThreatModelFeatures::new(
+                current[team_index],
+                history.map(|snapshot| snapshot.map(|features| features[team_index])),
+            )
+        }));
+        self.current = Some(current);
+        self.history.push_back((current_time, current));
+        let oldest_time = current_time
+            - THREAT_HISTORY_LAGS_SECONDS[THREAT_HISTORY_LAGS_SECONDS.len() - 1]
+            - THREAT_HISTORY_TOLERANCE_SECONDS;
+        while self
+            .history
+            .front()
+            .is_some_and(|(time, _)| *time < oldest_time)
+        {
+            self.history.pop_front();
+        }
     }
 }
 
@@ -1185,7 +1330,7 @@ impl ExpectedGoalsCalculator {
         self.detect_goals(frame, gameplay, events);
         self.resolve_stale_pending_episodes(frame, gameplay.kickoff_phase_active());
 
-        let Some(features) = threat_features.current().copied() else {
+        let Some(features) = threat_features.current_model().copied() else {
             self.suspend_active_episodes(frame);
             if self.was_live {
                 for state in self.team_states.iter_mut() {

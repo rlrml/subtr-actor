@@ -166,7 +166,7 @@ fn update(
 ) {
     let gameplay = GameplayState::default();
     let mut threat_features = ThreatFeaturesState::default();
-    threat_features.update(true, ball, players, &events, &HashMap::new(), &live);
+    threat_features.update(time, ball, players, &events, &HashMap::new(), &live);
     calculator
         .update_parts(
             &frame(frame_number, time),
@@ -202,6 +202,114 @@ fn feature_names_and_array_agree() {
         names.len(),
         THREAT_FEATURE_COUNT,
         "feature names must be unique"
+    );
+}
+
+#[test]
+fn temporal_model_features_append_selected_causal_deltas_and_availability() {
+    let base = ThreatFeatures {
+        ball_forward_y: 0.0,
+        ball_dist_to_goal: 0.46,
+        ball_height: 0.05,
+        ball_speed: 0.0,
+        ball_speed_toward_goal: 0.0,
+        goal_open_angle: 0.11,
+        on_target: 0.0,
+        time_to_goal_line: 0.0,
+        own_team: TeamThreatFeatures::default(),
+        opponent_team: TeamThreatFeatures::default(),
+    };
+    let previous = ThreatFeatures {
+        ball_speed: 0.2,
+        own_team: TeamThreatFeatures {
+            mean: PlayerThreatFeatures {
+                boost: 0.25,
+                ..PlayerThreatFeatures::default()
+            },
+            ..TeamThreatFeatures::default()
+        },
+        ..base
+    };
+    let current = ThreatFeatures {
+        ball_speed: 0.5,
+        own_team: TeamThreatFeatures {
+            mean: PlayerThreatFeatures {
+                boost: 0.75,
+                ..PlayerThreatFeatures::default()
+            },
+            ..TeamThreatFeatures::default()
+        },
+        ..base
+    };
+    let model = ThreatModelFeatures::new(current, [Some(previous), None]);
+    let values = model.to_array();
+    let names = ThreatModelFeatures::feature_names();
+
+    assert_eq!(names.len(), THREAT_MODEL_FEATURE_COUNT);
+    assert_eq!(&values[..THREAT_FEATURE_COUNT], &current.to_array());
+    assert_eq!(
+        values[names
+            .iter()
+            .position(|name| *name == "delta_0.5s_ball_speed")
+            .unwrap()],
+        0.3
+    );
+    assert_eq!(
+        values[names
+            .iter()
+            .position(|name| *name == "delta_0.5s_own_team_mean_boost")
+            .unwrap()],
+        0.5
+    );
+    assert_eq!(
+        values[names
+            .iter()
+            .position(|name| *name == "history_0.5s_available")
+            .unwrap()],
+        1.0
+    );
+    let second_lag_start = THREAT_FEATURE_COUNT + THREAT_HISTORY_FEATURE_COUNT + 1;
+    assert!(
+        values[second_lag_start..THREAT_MODEL_FEATURE_COUNT - 1]
+            .iter()
+            .all(|value| *value == 0.0)
+    );
+    assert_eq!(values[THREAT_MODEL_FEATURE_COUNT - 1], 0.0);
+
+    let mut unique_names = names.to_vec();
+    unique_names.sort_unstable();
+    unique_names.dedup();
+    assert_eq!(unique_names.len(), THREAT_MODEL_FEATURE_COUNT);
+}
+
+#[test]
+fn temporal_history_is_causal_and_resets_across_stoppages() {
+    let (ball, players) = dangerous_state();
+    let events = FrameEventsState::default();
+    let mut state = ThreatFeaturesState::default();
+    let availability_index = ThreatModelFeatures::feature_names()
+        .iter()
+        .position(|name| *name == "history_0.5s_available")
+        .unwrap();
+
+    state.update(0.0, &ball, &players, &events, &HashMap::new(), &live_play());
+    assert_eq!(
+        state.current_model().unwrap()[0].to_array()[availability_index],
+        0.0
+    );
+    state.update(0.5, &ball, &players, &events, &HashMap::new(), &live_play());
+    assert_eq!(
+        state.current_model().unwrap()[0].to_array()[availability_index],
+        1.0
+    );
+
+    state.update(0.6, &ball, &players, &events, &HashMap::new(), &stoppage());
+    assert!(state.current_model().is_none());
+    state.update(1.0, &ball, &players, &events, &HashMap::new(), &live_play());
+    assert_eq!(
+        state.current_model().unwrap()[0].to_array()[availability_index],
+        0.0,
+        "history from before the stoppage must not be reused"
     );
 }
 

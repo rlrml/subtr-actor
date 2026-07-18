@@ -1,9 +1,9 @@
 //! Dump a threat-model training dataset from a manifest of replays.
 //!
 //! For each replay, samples both teams' attacking-normalized
-//! `ThreatFeatures` rows at `--sample-hz` during live play (through the same
-//! ndarray threat feature adder the runtime model consumes -- the feature
-//! computation is shared, never reimplemented) and joins each row with the
+//! `ThreatModelFeatures` rows at `--sample-hz` during live play (through the
+//! same ndarray threat feature adder the runtime model consumes -- including
+//! causal history, never reimplemented) and joins each row with the
 //! replay-time distance to the next goal for/against that side plus the time
 //! to replay end, so the Python training pipeline can compute
 //! scored-within-tau labels with censoring downstream.
@@ -23,8 +23,8 @@ use anyhow::Context;
 use clap::Parser;
 use serde::Deserialize;
 use subtr_actor::{
-    Collector, ExpectedGoalsCalculator, LiveThreatSampleFilter, NDArrayCollector, ThreatFeatures,
-    ThreatGoalRecord,
+    Collector, ExpectedGoalsCalculator, LiveThreatSampleFilter, NDArrayCollector, ThreatGoalRecord,
+    ThreatModelFeatures,
 };
 
 #[derive(Debug, Parser)]
@@ -229,7 +229,7 @@ fn header() -> String {
         "is_team0",
         "time",
     ];
-    columns.extend(ThreatFeatures::FEATURE_NAMES);
+    columns.extend(ThreatModelFeatures::feature_names());
     columns.extend([
         "time_to_next_goal_for",
         "time_to_next_goal_against",
@@ -249,7 +249,7 @@ fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<Rep
     );
     let replay = parse_replay(&row.path)?;
     let collector = NDArrayCollector::<f32>::from_strings(
-        &["CurrentTime", "ThreatFeatures", "ThreatModelValues"],
+        &["CurrentTime", "ThreatModelFeatures", "ThreatModelValues"],
         &[],
     )
     .map_err(|error| anyhow::anyhow!("failed to configure threat ndarray: {error:?}"))?
@@ -292,9 +292,10 @@ fn process_replay(row: &ManifestRow, sample_interval: f32) -> anyhow::Result<Rep
     for matrix_row in matrix.rows() {
         let sample_time = matrix_row[0];
         for (team_index, is_team_0) in [true, false].into_iter().enumerate() {
-            let feature_start = 1 + team_index * subtr_actor::THREAT_FEATURE_COUNT;
-            let feature_end = feature_start + subtr_actor::THREAT_FEATURE_COUNT;
-            let threat_value = matrix_row[1 + 2 * subtr_actor::THREAT_FEATURE_COUNT + team_index];
+            let feature_start = 1 + team_index * subtr_actor::THREAT_MODEL_FEATURE_COUNT;
+            let feature_end = feature_start + subtr_actor::THREAT_MODEL_FEATURE_COUNT;
+            let threat_value =
+                matrix_row[1 + 2 * subtr_actor::THREAT_MODEL_FEATURE_COUNT + team_index];
             value_min = value_min.min(threat_value);
             value_max = value_max.max(threat_value);
             let mut line = format!("{metadata_prefix},{},{sample_time:.4}", u8::from(is_team_0),);

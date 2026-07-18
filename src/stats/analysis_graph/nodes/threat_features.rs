@@ -124,18 +124,24 @@ impl AnalysisNode for ThreatFeaturesNode {
     fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
         self.is_doubles = meta.team_zero.len() == 2 && meta.team_one.len() == 2;
         self.dodge_trackers.clear();
+        self.state = ThreatFeaturesState::default();
         Ok(())
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        if !self.is_doubles {
+            self.state.clear();
+            return Ok(());
+        }
+        let frame = ctx.get::<FrameInfo>()?;
         let availability = self.update_dodge_availability(
-            ctx.get::<FrameInfo>()?,
+            frame,
             ctx.get::<PlayerFrameState>()?,
             ctx.get::<PlayerControlState>()?,
             ctx.get::<FrameEventsState>()?,
         );
         self.state.update(
-            self.is_doubles,
+            frame.time,
             ctx.get::<BallFrameState>()?,
             ctx.get::<PlayerFrameState>()?,
             ctx.get::<FrameEventsState>()?,

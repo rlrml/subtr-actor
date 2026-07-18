@@ -140,6 +140,45 @@ expected_feature_cols = ball_fields + [
     for aggregate in aggregates
     for field in player_fields
 ]
+history_fields = [
+    *ball_fields,
+    *[
+        f"{team}_{aggregate}_{field}"
+        for team in team_sets
+        for aggregate, fields in (
+            (
+                "mean",
+                (
+                    "position_y",
+                    "position_z",
+                    "velocity_y",
+                    "velocity_z",
+                    "forward_y",
+                    "distance_to_ball",
+                    "distance_to_goal",
+                    "boost",
+                    "dodge_available",
+                    "demoed",
+                ),
+            ),
+            (
+                "spread",
+                (
+                    "position_y",
+                    "position_z",
+                    "velocity_y",
+                    "velocity_z",
+                    "distance_to_ball",
+                    "boost",
+                ),
+            ),
+        )
+        for field in fields
+    ],
+]
+for lag in ("0.5", "1"):
+    expected_feature_cols.extend(f"delta_{lag}s_{field}" for field in history_fields)
+    expected_feature_cols.append(f"history_{lag}s_available")
 if feature_cols != expected_feature_cols:
     raise ValueError(
         "unexpected or out-of-order threat feature schema:\n"
@@ -289,10 +328,21 @@ def feature_knockout(name, predicate, standardized_test):
     lines.append(msg)
 
 
-feature_knockout("all-player-state", lambda column: column not in ball_fields, Xte_s)
+feature_knockout(
+    "all-player-state",
+    lambda column: (
+        not any(column == field or column.endswith(f"s_{field}") for field in ball_fields)
+    ),
+    Xte_s,
+)
 feature_knockout("boost", lambda column: column.endswith("_boost"), Xte_s)
 feature_knockout("dodge-available", lambda column: column.endswith("_dodge_available"), Xte_s)
 feature_knockout("demo-state", lambda column: column.endswith("_demoed"), Xte_s)
+feature_knockout(
+    "all-history",
+    lambda column: column.startswith("delta_") or column.startswith("history_"),
+    Xte_s,
+)
 
 if args.gbt:
     gbt = HistGradientBoostingClassifier(max_iter=300, learning_rate=0.1, random_state=args.seed)
@@ -329,6 +379,17 @@ for model_name, model_predictions in predictions.items():
     lines.append("calibration (predicted, observed, n):")
     for pred, obs, n in calibration:
         lines.append(f"  {pred:.4f}  {obs:.4f}  n={n}")
+    lines.append("fixed probability bands (range, predicted, observed, n):")
+    for low, high in zip(
+        (0.0, 0.01, 0.02, 0.05, 0.10, 0.15, 0.25, 0.50, 0.75),
+        (0.01, 0.02, 0.05, 0.10, 0.15, 0.25, 0.50, 0.75, 1.01),
+    ):
+        mask = (model_predictions >= low) & (model_predictions < high)
+        if mask.any():
+            lines.append(
+                f"  [{low:.2f},{high:.2f}) {model_predictions[mask].mean():.4f} "
+                f"{yte[mask].mean():.4f} n={mask.sum()}"
+            )
 
 
 def temporal_stability(p, indices):
@@ -476,7 +537,7 @@ rust.append(
 )
 rust.append(
     "pub const THREAT_MODEL_INPUT_WEIGHTS: "
-    "[(&str, [f32; THREAT_MODEL_HIDDEN_UNITS]); THREAT_FEATURE_COUNT] = ["
+    "[(&str, [f32; THREAT_MODEL_HIDDEN_UNITS]); THREAT_MODEL_FEATURE_COUNT] = ["
 )
 for name in feature_cols:
     weights = ", ".join(f32(value) for value in input_weights[name])
@@ -503,11 +564,12 @@ picks = [
     order[-2],
     order[-1],
 ]
-fix = ["// (features in FEATURE_NAMES order, expected_v)"]
+fix = ["&[", "    // (features in ThreatModelFeatures::feature_names() order, expected_v)"]
 for i in picks:
     raw = Xte[i]
     vals = ", ".join(f32(x) for x in raw)
-    fix.append(f"(&[{vals}], {f32(p_publish_test[i])}),")
+    fix.append(f"    (&[{vals}], {f32(p_publish_test[i])}),")
+fix.append("]")
 (out_dir / "parity_fixture.rs").write_text("\n".join(fix) + "\n")
 
 print(
