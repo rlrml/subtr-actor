@@ -41,7 +41,10 @@
       pyproject-build-systems,
     }:
     let
-      workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./python; };
+      pythonWorkspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./python; };
+      threatModelWorkspace = uv2nix.lib.workspace.loadWorkspace {
+        workspaceRoot = ./scripts/threat_model;
+      };
     in
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -74,14 +77,14 @@
         pythonBase = pkgs.callPackage pyproject-nix.build.packages {
           python = pkgs.python312;
         };
-        overlay = workspace.mkPyprojectOverlay {
+        pythonOverlay = pythonWorkspace.mkPyprojectOverlay {
           sourcePreference = "wheel";
         };
         pythonSet = (
           pythonBase.overrideScope (
             pkgs.lib.composeManyExtensions [
               pyproject-build-systems.overlays.wheel
-              overlay
+              pythonOverlay
             ]
           )
         );
@@ -89,6 +92,28 @@
           numpy = [ ];
           pytest = [ ];
           wheel = [ ];
+        };
+        threatModelOverlay = threatModelWorkspace.mkPyprojectOverlay {
+          sourcePreference = "wheel";
+        };
+        threatModelPythonSet = (
+          pythonBase.overrideScope (
+            pkgs.lib.composeManyExtensions [
+              pyproject-build-systems.overlays.wheel
+              threatModelOverlay
+            ]
+          )
+        );
+        threatModelEnv = threatModelPythonSet.mkVirtualEnv "subtr-actor-threat-model-env"
+          threatModelWorkspace.deps.default;
+        threatModelDevEnv = threatModelPythonSet.mkVirtualEnv "subtr-actor-threat-model-dev-env"
+          threatModelWorkspace.deps.all;
+        trainThreatModel = pkgs.writeShellApplication {
+          name = "train-threat-model";
+          runtimeInputs = [ threatModelEnv ];
+          text = ''
+            exec python ${./scripts/threat_model/train_threat_model.py} "$@"
+          '';
         };
         projectVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
         # Build identification for the replay-to-training plugin: the nix
@@ -152,6 +177,12 @@
       in
       {
         packages.python-env = pythonEnv;
+        packages.threat-model-env = threatModelEnv;
+        packages.train-threat-model = trainThreatModel;
+        apps.train-threat-model = {
+          type = "app";
+          program = "${trainThreatModel}/bin/train-threat-model";
+        };
         packages.js-web-wasm = rustPlatform.buildRustPackage {
           pname = "subtr-actor-js-web-wasm";
           version = projectVersion;
@@ -438,6 +469,21 @@
             unset PYTHONPATH
             export REPO_ROOT=$(git rev-parse --show-toplevel)
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath shellPackages}:${pkgs.stdenv.cc.cc.lib.outPath}/lib:/run/opengl-driver/lib/:''${LD_LIBRARY_PATH:-}"
+          '';
+        };
+        devShells.threat-model = pkgs.mkShell {
+          packages = [
+            threatModelDevEnv
+            pkgs.uv
+          ];
+
+          env = {
+            UV_PYTHON_DOWNLOADS = "never";
+          };
+
+          shellHook = ''
+            unset PYTHONPATH
+            echo "subtr-actor threat-model shell (from scripts/threat_model/uv.lock)"
           '';
         };
         devShells.bakkesmod = pkgs.mkShell {

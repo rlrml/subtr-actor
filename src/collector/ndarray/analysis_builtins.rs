@@ -2,6 +2,238 @@ use crate::stats::analysis_graph::*;
 use crate::stats::calculators::*;
 use crate::*;
 use boxcars;
+use std::marker::PhantomData;
+use std::sync::{Arc, OnceLock};
+
+fn threat_feature_headers() -> &'static [&'static str] {
+    static HEADERS: OnceLock<Vec<&'static str>> = OnceLock::new();
+    HEADERS.get_or_init(|| {
+        ["team_zero", "team_one"]
+            .into_iter()
+            .flat_map(|team| {
+                ThreatFeatures::FEATURE_NAMES.iter().map(move |feature| {
+                    let header: &'static mut str =
+                        Box::leak(format!("{team}_threat_{feature}").into_boxed_str());
+                    &*header
+                })
+            })
+            .collect()
+    })
+}
+
+fn threat_model_feature_headers() -> &'static [&'static str] {
+    static HEADERS: OnceLock<Vec<&'static str>> = OnceLock::new();
+    HEADERS.get_or_init(|| {
+        ["team_zero", "team_one"]
+            .into_iter()
+            .flat_map(|team| {
+                ThreatModelFeatures::feature_names()
+                    .iter()
+                    .map(move |feature| {
+                        let header: &'static mut str =
+                            Box::leak(format!("{team}_threat_model_{feature}").into_boxed_str());
+                        &*header
+                    })
+            })
+            .collect()
+    })
+}
+
+/// Both teams' attacking-normalized threat inputs as one ndarray row.
+pub struct ThreatFeaturesBothTeams<F>(PhantomData<F>);
+
+impl<F> ThreatFeaturesBothTeams<F> {
+    pub fn arc_new() -> Arc<dyn AnalysisFeatureAdder<F> + Send + Sync>
+    where
+        F: TryFrom<f32> + Send + Sync + 'static,
+        <F as TryFrom<f32>>::Error: std::fmt::Debug,
+    {
+        Arc::new(Self(PhantomData))
+    }
+}
+
+impl<F> AnalysisFeatureAdder<F> for ThreatFeaturesBothTeams<F>
+where
+    F: TryFrom<f32> + Send + Sync,
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    fn get_column_headers(&self) -> &[&str] {
+        threat_feature_headers()
+    }
+
+    fn analysis_dependencies(&self) -> Vec<AnalysisDependency> {
+        vec![threat_features_dependency()]
+    }
+
+    fn add_features(
+        &self,
+        context: &AnalysisFeatureContext<'_>,
+        _processor: &dyn ProcessorView,
+        _frame: &boxcars::Frame,
+        _frame_count: usize,
+        _current_time: f32,
+        vector: &mut Vec<F>,
+    ) -> SubtrActorResult<()> {
+        let features = context
+            .state::<ThreatFeaturesState>()?
+            .current()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                    "threat features requested outside live play".to_owned(),
+                ))
+            })?;
+        for value in features.iter().flat_map(ThreatFeatures::to_array) {
+            vector.push(F::try_from(value).map_err(convert_float_conversion_error)?);
+        }
+        Ok(())
+    }
+}
+
+/// Both teams' exact causal model inputs as one ndarray row. This is separate
+/// from [`ThreatFeaturesBothTeams`] so consumers that want only instantaneous
+/// physics retain the stable 72-column schema.
+pub struct ThreatModelFeaturesBothTeams<F>(PhantomData<F>);
+
+impl<F> ThreatModelFeaturesBothTeams<F> {
+    pub fn arc_new() -> Arc<dyn AnalysisFeatureAdder<F> + Send + Sync>
+    where
+        F: TryFrom<f32> + Send + Sync + 'static,
+        <F as TryFrom<f32>>::Error: std::fmt::Debug,
+    {
+        Arc::new(Self(PhantomData))
+    }
+}
+
+impl<F> AnalysisFeatureAdder<F> for ThreatModelFeaturesBothTeams<F>
+where
+    F: TryFrom<f32> + Send + Sync,
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    fn get_column_headers(&self) -> &[&str] {
+        threat_model_feature_headers()
+    }
+
+    fn analysis_dependencies(&self) -> Vec<AnalysisDependency> {
+        vec![threat_features_dependency()]
+    }
+
+    fn add_features(
+        &self,
+        context: &AnalysisFeatureContext<'_>,
+        _processor: &dyn ProcessorView,
+        _frame: &boxcars::Frame,
+        _frame_count: usize,
+        _current_time: f32,
+        vector: &mut Vec<F>,
+    ) -> SubtrActorResult<()> {
+        let features = context
+            .state::<ThreatFeaturesState>()?
+            .current_model()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                    "threat model features requested outside live play".to_owned(),
+                ))
+            })?;
+        for value in features.iter().flat_map(ThreatModelFeatures::to_array) {
+            vector.push(F::try_from(value).map_err(convert_float_conversion_error)?);
+        }
+        Ok(())
+    }
+}
+
+/// Current model values for both teams. Including this adder also requests the
+/// expected-goals analysis node, allowing dataset callers to inspect its goal
+/// and episode state after matrix collection.
+pub struct ThreatModelValues<F>(PhantomData<F>);
+
+impl<F> ThreatModelValues<F> {
+    pub fn arc_new() -> Arc<dyn AnalysisFeatureAdder<F> + Send + Sync>
+    where
+        F: TryFrom<f32> + Send + Sync + 'static,
+        <F as TryFrom<f32>>::Error: std::fmt::Debug,
+    {
+        Arc::new(Self(PhantomData))
+    }
+}
+
+impl<F> AnalysisFeatureAdder<F> for ThreatModelValues<F>
+where
+    F: TryFrom<f32> + Send + Sync,
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    fn get_column_headers(&self) -> &[&str] {
+        &["team_zero_threat_value", "team_one_threat_value"]
+    }
+
+    fn analysis_dependencies(&self) -> Vec<AnalysisDependency> {
+        vec![expected_goals_dependency()]
+    }
+
+    fn add_features(
+        &self,
+        context: &AnalysisFeatureContext<'_>,
+        _processor: &dyn ProcessorView,
+        _frame: &boxcars::Frame,
+        _frame_count: usize,
+        _current_time: f32,
+        vector: &mut Vec<F>,
+    ) -> SubtrActorResult<()> {
+        let values = context
+            .state::<ExpectedGoalsCalculator>()?
+            .current_values()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                    "threat values requested outside live play".to_owned(),
+                ))
+            })?;
+        for value in values {
+            vector.push(F::try_from(value).map_err(convert_float_conversion_error)?);
+        }
+        Ok(())
+    }
+}
+
+/// Selects live threat frames at a fixed interval while the backing ndarray
+/// analysis graph continues evaluating every replay frame.
+pub struct LiveThreatSampleFilter {
+    sample_interval_seconds: f32,
+    last_sample_time: Option<f32>,
+}
+
+impl LiveThreatSampleFilter {
+    pub fn new(sample_interval_seconds: f32) -> Self {
+        Self {
+            sample_interval_seconds,
+            last_sample_time: None,
+        }
+    }
+}
+
+impl AnalysisFrameFilter for LiveThreatSampleFilter {
+    fn analysis_dependencies(&self) -> Vec<AnalysisDependency> {
+        vec![threat_features_dependency()]
+    }
+
+    fn include_frame(
+        &mut self,
+        context: &AnalysisFeatureContext<'_>,
+        _processor: &dyn ProcessorView,
+        _frame: &boxcars::Frame,
+        _frame_count: usize,
+        current_time: f32,
+    ) -> SubtrActorResult<bool> {
+        if context.state::<ThreatFeaturesState>()?.current().is_none() {
+            return Ok(false);
+        }
+        let due = self.last_sample_time.is_none_or(|last| {
+            current_time - last >= self.sample_interval_seconds || current_time < last
+        });
+        if due {
+            self.last_sample_time = Some(current_time);
+        }
+        Ok(due)
+    }
+}
 
 macro_rules! build_analysis_player_event_indicator {
     (

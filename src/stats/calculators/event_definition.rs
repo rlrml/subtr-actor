@@ -14,8 +14,9 @@ use super::{
     FirstManChangeEvent, FlickEvent, FlipResetEvent, HalfFlipEvent, HalfVolleyEvent,
     LoosePossessionEvent, MovementEvent, OneTimerEvent, PassEvent, PlayerActivityEvent,
     PlayerPossessionEvent, PossessionEvent, PowerslideEvent, RespawnEvent, RotationRoleEvent,
-    RushEvent, SpeedFlipEvent, TerritorialPressureEvent, TimelineEvent, TouchClassificationEvent,
-    WallAerialEvent, WallAerialShotEvent, WavedashEvent, WhiffEvent,
+    RushEvent, SpeedFlipEvent, TerritorialPressureEvent, ThreatEpisodeEvent, ThreatTouchEvent,
+    TimelineEvent, TouchClassificationEvent, WallAerialEvent, WallAerialShotEvent, WavedashEvent,
+    WhiffEvent,
 };
 use crate::ShadowDefenseEvent;
 use crate::stats::timeline::{Event, EventPayload, EventScope};
@@ -1145,6 +1146,38 @@ define_stats_event!(
     ],
     scope = EventScope::Player
 );
+// The threat streams are calculator/accumulator observations (and dataset
+// export rows) that do not project a timeline stream yet, so they are hidden
+// from the review picker until a projection ships.
+define_stats_event!(
+    ThreatTouchEvent,
+    THREAT_TOUCH_EVENT_DEFINITION,
+    "threat_touch",
+    "Threat Touch Delta",
+    EventCategory::Other,
+    summary = "The positive detection-frame change in the touching team's continuous threat value (expected-goals state value), not a causal estimate of the touch's multi-frame impulse.",
+    approach = [
+        "Evaluate the versioned compact nonlinear threat model V(state) for both teams on every live-play frame from full ball and player physics state.",
+        "On each attributed touch, emit the toucher's team's V on the preceding live frame and on the detection frame; positive deltas contribute to threat_added.",
+    ],
+    hidden = true,
+    scope = EventScope::Player
+);
+define_stats_event!(
+    ThreatEpisodeEvent,
+    THREAT_EPISODE_EVENT_DEFINITION,
+    "threat_episode",
+    "Threat Episode",
+    EventCategory::Other,
+    summary = "A contiguous span where one team's continuous threat value exceeds the episode threshold; its xG is the goal-calibrated time integral of V over the span (peak V is kept separately for intensity), credited to the attacking toucher associated with the peak.",
+    approach = [
+        "Open an episode when a team's threat value V rises above the episode threshold during live play, accumulating the time integral sum(V * dt) / tau alongside the peak V and the most recent attacking toucher when that peak was established.",
+        "Close on V dropping back under the threshold, a goal for the team (always a goal-outcome close), or a stoppage.",
+        "Hold stoppage-closed episodes pending until the goal that caused the stoppage is attributed (or the next kickoff/grace window passes), so goal outcomes are not lost to attribution lag.",
+    ],
+    hidden = true,
+    scope = EventScope::Player
+);
 define_stats_event!(
     Event,
     TIMELINE_ENVELOPE_EVENT_DEFINITION,
@@ -1643,6 +1676,24 @@ pub(crate) const ROTATION_EMITTED_EVENTS: &[EmittedEvent] = &[
         "rotation",
         "RotationNode",
         "RotationCalculator",
+    ),
+];
+
+// Threat events are consumed by the stats projection (accumulators) and the
+// dataset export tooling but are not projected onto the stats timeline, so
+// these are detection-state contributions with no owned stream.
+pub(crate) const EXPECTED_GOALS_EMITTED_EVENTS: &[EmittedEvent] = &[
+    contributed_event(
+        &THREAT_TOUCH_EVENT_DEFINITION,
+        "expected_goals",
+        "ExpectedGoalsNode",
+        "ExpectedGoalsCalculator",
+    ),
+    contributed_event(
+        &THREAT_EPISODE_EVENT_DEFINITION,
+        "expected_goals",
+        "ExpectedGoalsNode",
+        "ExpectedGoalsCalculator",
     ),
 ];
 

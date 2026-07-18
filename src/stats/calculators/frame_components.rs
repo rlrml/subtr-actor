@@ -103,6 +103,27 @@ pub struct PlayerFrameState {
     pub players: Vec<PlayerSample>,
 }
 
+/// Per-player replicated second-jump/dodge action bytes used by stateful feature
+/// extraction. These are kept separate from physical player samples so
+/// callers constructing synthetic physics fixtures do not need to provide
+/// controller-state details.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct PlayerControlSample {
+    pub double_jump_active: bool,
+    pub dodge_active: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PlayerControlState {
+    pub players: HashMap<PlayerId, PlayerControlSample>,
+}
+
+impl PlayerControlState {
+    pub fn sample(&self, player_id: &PlayerId) -> PlayerControlSample {
+        self.players.get(player_id).copied().unwrap_or_default()
+    }
+}
+
 impl PlayerFrameState {
     pub fn player(&self, player_id: &PlayerId) -> Option<&PlayerSample> {
         self.players

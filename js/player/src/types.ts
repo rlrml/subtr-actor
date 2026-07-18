@@ -195,6 +195,53 @@ export interface ReplayTimelineRange {
   className?: string;
 }
 
+export interface ReplayTimelineGraphPoint {
+  time: number;
+  value: number | null;
+}
+
+export interface ReplayTimelineGraphSeries {
+  id?: string;
+  label?: string;
+  color: string;
+  points: ReplayTimelineGraphPoint[];
+}
+
+export interface ReplayTimelineGraphReference {
+  value: number;
+  label?: string;
+  color?: string;
+  className?: string;
+}
+
+export interface ReplayTimelineGraphHighlight {
+  startTime: number;
+  endTime: number;
+  label?: string;
+  color?: string;
+  className?: string;
+}
+
+export interface ReplayTimelineGraphMarker {
+  time: number;
+  value: number;
+  label?: string;
+  color?: string;
+  className?: string;
+}
+
+/** A numeric graph lane aligned to the replay timeline and shared playhead. */
+export interface ReplayTimelineGraph {
+  id?: string;
+  label: string;
+  minValue?: number;
+  maxValue?: number;
+  series: ReplayTimelineGraphSeries[];
+  references?: ReplayTimelineGraphReference[];
+  highlights?: ReplayTimelineGraphHighlight[];
+  markers?: ReplayTimelineGraphMarker[];
+}
+
 export interface ReplayPlayerTimelineSegment {
   startTime: number;
   endTime: number;
@@ -437,6 +484,10 @@ export type ReplayTimelineEventSource =
 export type ReplayTimelineRangeSource =
   | ReplayTimelineRange[]
   | ((context: ReplayPlayerPluginContext) => ReplayTimelineRange[]);
+
+export type ReplayTimelineGraphSource =
+  | ReplayTimelineGraph[]
+  | ((context: ReplayPlayerPluginContext) => ReplayTimelineGraph[]);
 
 export interface ReplayPlayerOptions {
   autoplay?: boolean;

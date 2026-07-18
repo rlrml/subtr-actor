@@ -260,6 +260,13 @@ export function createTeamStatsSnapshot(
         bumps_inflicted: 0,
         team_bumps_inflicted: 0,
       },
+      expected_goals: {
+        current_threat: null,
+        incident_xg: 0,
+        xg: 0,
+        episode_count: 0,
+        goal_episode_count: 0,
+      },
     },
     overrides,
   );
@@ -624,6 +631,12 @@ export function createPlayerStatsSnapshot(
         last_bump_strength: null,
         max_bump_strength: 0,
         cumulative_bump_strength: 0,
+      },
+      expected_goals: {
+        threat_added: 0,
+        xg: 0,
+        credited_episode_count: 0,
+        credited_goal_episode_count: 0,
       },
     },
     overrides,

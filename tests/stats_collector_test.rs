@@ -1,6 +1,8 @@
 mod common;
 
-use subtr_actor::{StatsCollector, StatsFrameResolution, builtin_stats_module_names};
+use subtr_actor::{
+    StatsCollector, StatsFrameResolution, builtin_stats_module_names, default_stats_module_names,
+};
 
 const SMALL_STATS_FIXTURE: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
 
@@ -32,7 +34,7 @@ fn stats_collector_serializes_selected_modules_and_aliases_by_name() {
 
 #[test]
 #[ignore = "broad all-module aggregate replay pass is slow; selected-module replay coverage runs in CI"]
-fn stats_collector_processes_all_builtin_modules() {
+fn stats_collector_processes_all_default_modules() {
     let replay = common::parse_replay(SMALL_STATS_FIXTURE);
     let collected = StatsCollector::new()
         .get_stats(&replay)
@@ -44,13 +46,31 @@ fn stats_collector_processes_all_builtin_modules() {
         .and_then(|value| value.as_object())
         .expect("modules should serialize as an object");
 
-    assert_eq!(modules.len(), builtin_stats_module_names().len());
-    for module_name in builtin_stats_module_names() {
+    assert_eq!(modules.len(), default_stats_module_names().len());
+    for module_name in default_stats_module_names() {
         assert!(
             modules.contains_key(*module_name),
             "expected serialized modules to include {module_name}"
         );
     }
+}
+
+#[test]
+fn expected_goals_is_available_but_not_a_default_stats_module() {
+    assert!(builtin_stats_module_names().contains(&"expected_goals"));
+    assert!(!default_stats_module_names().contains(&"expected_goals"));
+
+    let replay = common::parse_replay(SMALL_STATS_FIXTURE);
+    let collected = StatsCollector::with_builtin_module_names(["expected_goals"])
+        .expect("expected goals should remain selectable")
+        .get_stats(&replay)
+        .expect("opt-in expected-goals collection should succeed");
+    let value = serde_json::to_value(collected).expect("stats should serialize");
+    let modules = value["modules"]
+        .as_object()
+        .expect("modules should be an object");
+    assert_eq!(modules.len(), 1);
+    assert!(modules.contains_key("expected_goals"));
 }
 
 #[test]

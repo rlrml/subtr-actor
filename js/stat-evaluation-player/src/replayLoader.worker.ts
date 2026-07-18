@@ -103,6 +103,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
       },
       event.data.reportEveryNFrames,
       32 * 1024 * 1024,
+      true,
     );
 
     postMessageToMain({
@@ -149,6 +150,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
           activitySummaryBuffer: replayBundle.statsTimelineParts.activitySummary.buffer,
           positioningSummaryBuffer: replayBundle.statsTimelineParts.positioningSummary.buffer,
           accumulationTracksBuffer: replayBundle.statsTimelineParts.accumulationTracks.buffer,
+          expectedGoalsTracksBuffer: replayBundle.statsTimelineParts.expectedGoalsTracks.buffer,
           frameChunkBuffers,
         },
       },
@@ -161,6 +163,7 @@ self.onmessage = async (event: MessageEvent<ReplayLoadRequest>) => {
         replayBundle.statsTimelineParts.activitySummary.buffer,
         replayBundle.statsTimelineParts.positioningSummary.buffer,
         replayBundle.statsTimelineParts.accumulationTracks.buffer,
+        replayBundle.statsTimelineParts.expectedGoalsTracks.buffer,
         ...frameChunkBuffers,
       ],
     );

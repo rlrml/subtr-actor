@@ -43,6 +43,10 @@ import {
   createDemoEventDerivedStatsAccumulator,
 } from "./demoEventDerivation.ts";
 import {
+  applyExpectedGoalsTrackDerivedStats,
+  createExpectedGoalsTrackDerivedStatsAccumulator,
+} from "./expectedGoalsTrackDerivation.ts";
+import {
   applyFiftyFiftyEventDerivedStats,
   createFiftyFiftyEventDerivedStatsAccumulator,
 } from "./fiftyFiftyEventDerivation.ts";
@@ -157,6 +161,13 @@ const DEFAULT_STATS_FRAME_MAX_MATERIALIZATION_CHUNK_SIZE = 1_200;
 const STATS_FRAME_MATERIALIZATION_CHUNK_GROWTH_FACTOR = 2;
 
 export const STATS_TIMELINE_EVENT_DERIVED_APPLIERS: readonly StatsTimelineEventDerivedApplier[] = [
+  {
+    id: "expected-goals",
+    playerModules: ["expected_goals"],
+    teamModules: ["expected_goals"],
+    apply: applyExpectedGoalsTrackDerivedStats,
+    createFrameAccumulator: createExpectedGoalsTrackDerivedStatsAccumulator,
+  },
   {
     id: "event-counts",
     playerModules: ["event_counts"],

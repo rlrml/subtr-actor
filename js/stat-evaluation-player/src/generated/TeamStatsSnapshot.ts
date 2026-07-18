@@ -10,6 +10,7 @@ import type { ControlledPlayStats } from "./ControlledPlayStats.ts";
 import type { CoreTeamStats } from "./CoreTeamStats.ts";
 import type { DemoTeamStats } from "./DemoTeamStats.ts";
 import type { DoubleTapTeamStats } from "./DoubleTapTeamStats.ts";
+import type { ExpectedGoalsTeamStats } from "./ExpectedGoalsTeamStats.ts";
 import type { FiftyFiftyTeamStats } from "./FiftyFiftyTeamStats.ts";
 import type { HalfVolleyTeamStats } from "./HalfVolleyTeamStats.ts";
 import type { KickoffTeamStats } from "./KickoffTeamStats.ts";
@@ -35,4 +36,4 @@ import type { TerritorialPressureTeamStats } from "./TerritorialPressureTeamStat
  * timelines. It is not the authoritative registry of team analysis outputs;
  * use the module-keyed stats/graph surfaces when callers need discoverability.
  */
-export type TeamStatsSnapshot = { fifty_fifty: FiftyFiftyTeamStats, possession: PossessionTeamStats, ball_half: BallHalfTeamStats, ball_third: BallThirdTeamStats, territorial_pressure: TerritorialPressureTeamStats, rotation: RotationTeamStats, rush: RushTeamStats, core: CoreTeamStats, backboard: BackboardTeamStats, double_tap: DoubleTapTeamStats, one_timer: OneTimerTeamStats, pass: PassTeamStats, kickoff: KickoffTeamStats, ball_carry: BallCarryStats, controlled_play: ControlledPlayStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpTeamStats, half_volley: HalfVolleyTeamStats, movement: MovementStats, positioning: PositioningTeamStats, powerslide: PowerslideStats, demo: DemoTeamStats, };
+export type TeamStatsSnapshot = { fifty_fifty: FiftyFiftyTeamStats, possession: PossessionTeamStats, ball_half: BallHalfTeamStats, ball_third: BallThirdTeamStats, territorial_pressure: TerritorialPressureTeamStats, rotation: RotationTeamStats, rush: RushTeamStats, core: CoreTeamStats, backboard: BackboardTeamStats, double_tap: DoubleTapTeamStats, one_timer: OneTimerTeamStats, pass: PassTeamStats, kickoff: KickoffTeamStats, ball_carry: BallCarryStats, controlled_play: ControlledPlayStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpTeamStats, half_volley: HalfVolleyTeamStats, movement: MovementStats, positioning: PositioningTeamStats, powerslide: PowerslideStats, demo: DemoTeamStats, expected_goals: ExpectedGoalsTeamStats, };

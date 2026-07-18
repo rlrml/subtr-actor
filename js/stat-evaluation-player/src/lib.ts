@@ -9,6 +9,7 @@ export * from "./ceilingShotOverlay.ts";
 export * from "./ceilingShotEventDerivation.ts";
 export * from "./coreEventDerivation.ts";
 export * from "./demoEventDerivation.ts";
+export * from "./expectedGoalsTrackDerivation.ts";
 export * from "./dodgeResetEventDerivation.ts";
 export * from "./doubleTapEventDerivation.ts";
 export * from "./fiftyFiftyFormatting.ts";

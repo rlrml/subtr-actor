@@ -54,6 +54,7 @@ interface TransferableStatsTimelineParts {
   activitySummaryBuffer: ArrayBuffer;
   positioningSummaryBuffer: ArrayBuffer;
   accumulationTracksBuffer: ArrayBuffer;
+  expectedGoalsTracksBuffer: ArrayBuffer;
   frameChunkBuffers: ArrayBuffer[];
 }
 
@@ -92,6 +93,10 @@ async function parseStatsTimelineParts(
     decoder,
     parts.accumulationTracksBuffer,
   );
+  const expectedGoalsTracks = parseJsonBuffer<CompactStatsTimeline["expected_goals_tracks"]>(
+    decoder,
+    parts.expectedGoalsTracksBuffer,
+  );
   onProgress?.({ stage: "decoding-stats", progress: 0.15 });
   await waitForNextPaint();
 
@@ -121,6 +126,7 @@ async function parseStatsTimelineParts(
     frames,
     positioning_summary: positioningSummary,
     accumulation_tracks: accumulationTracks,
+    expected_goals_tracks: expectedGoalsTracks,
   };
 }
 

@@ -2,7 +2,7 @@ use crate::*;
 
 use super::{
     BallFrameState, BallSample, DemoEventSample, FrameEventsState, FrameInfo, GameplayState,
-    LivePlayState, PlayerFrameState, PlayerSample,
+    LivePlayState, PlayerControlSample, PlayerControlState, PlayerFrameState, PlayerSample,
 };
 
 /// Builds the per-frame input fed into the analysis graph from replay state.
@@ -83,6 +83,7 @@ pub struct FrameInput {
     gameplay_state: GameplayState,
     ball_frame_state: BallFrameState,
     player_frame_state: PlayerFrameState,
+    player_control_state: PlayerControlState,
     frame_events_state: FrameEventsState,
     live_play_state: Option<LivePlayState>,
 }
@@ -105,6 +106,7 @@ impl FrameInput {
             gameplay_state,
             ball_frame_state,
             player_frame_state,
+            player_control_state: PlayerControlState::default(),
             frame_events_state,
             live_play_state: None,
         }
@@ -128,6 +130,7 @@ impl FrameInput {
             gameplay_state,
             ball_frame_state,
             player_frame_state,
+            player_control_state: PlayerControlState::default(),
             frame_events_state,
             live_play_state: Some(live_play_state),
         }
@@ -161,6 +164,7 @@ impl FrameInput {
             gameplay_state: Self::build_gameplay_state(processor),
             ball_frame_state: Self::build_ball_frame_state(processor, current_time),
             player_frame_state: Self::build_player_frame_state(processor, current_time),
+            player_control_state: Self::build_player_control_state(processor),
             frame_events_state,
             live_play_state: None,
         }
@@ -268,6 +272,26 @@ impl FrameInput {
         PlayerFrameState { players }
     }
 
+    fn build_player_control_state(processor: &dyn ProcessorView) -> PlayerControlState {
+        let players = processor
+            .iter_player_ids_in_order()
+            .map(|player_id| {
+                (
+                    player_id.clone(),
+                    PlayerControlSample {
+                        double_jump_active: processor
+                            .get_double_jump_active(player_id)
+                            .unwrap_or(0)
+                            % 2
+                            == 1,
+                        dodge_active: processor.get_dodge_active(player_id).unwrap_or(0) % 2 == 1,
+                    },
+                )
+            })
+            .collect();
+        PlayerControlState { players }
+    }
+
     fn build_active_demo_events(processor: &dyn ProcessorView) -> Vec<DemoEventSample> {
         let active_demo_events = processor.current_frame_active_demo_events();
         if !active_demo_events.is_empty() {
@@ -339,6 +363,10 @@ impl FrameInput {
 
     pub fn player_frame_state(&self) -> PlayerFrameState {
         self.player_frame_state.clone()
+    }
+
+    pub fn player_control_state(&self) -> PlayerControlState {
+        self.player_control_state.clone()
     }
 
     pub fn frame_events_state(&self) -> FrameEventsState {

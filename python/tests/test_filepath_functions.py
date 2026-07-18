@@ -31,9 +31,8 @@ def test_get_stats_module_names():
 def test_get_stats_events():
     events = subtr_actor.get_stats_events(REPLAY_PATH)
 
-    assert "timeline" in events
-    assert "boost_ledger" in events
-    assert "core_player" in events
+    assert events["events"]
+    assert all("meta" in event and "payload" in event for event in events["events"])
 
 
 def test_get_summed_stats_with_module_selection():
@@ -78,9 +77,7 @@ def test_get_stats_timeline_with_sampling():
         assert frame["team_one"] == {}
         for player in frame["players"]:
             assert set(player) == {"player_id", "name", "is_team_0"}
-    assert "timeline" in sampled_timeline["events"]
-    assert "boost_ledger" in sampled_timeline["events"]
-    assert "core_player" in sampled_timeline["events"]
+    assert sampled_timeline["events"]["events"]
 
 
 def test_get_legacy_stats_timeline_with_module_filtering():

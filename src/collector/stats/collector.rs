@@ -6,13 +6,15 @@ use serde_json::{Map, Value};
 use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
-use crate::stats::analysis_graph::{AnalysisGraph, graph_with_builtin_analysis_nodes};
+use crate::stats::analysis_graph::{
+    AnalysisGraph, StatsProjectionNode, graph_with_builtin_analysis_nodes,
+};
 use crate::stats::calculators::ReplayFrameInputBuilder;
 use crate::*;
 
 use super::builtins::{
     builtin_module_json, builtin_snapshot_config_json, builtin_snapshot_frame_json,
-    builtin_stats_module_names,
+    builtin_stats_module_names, default_stats_module_names,
 };
 use super::playback::{
     CapturedStatsData, CapturedStatsFrame, StatsSnapshotData, StatsSnapshotFrame,
@@ -48,7 +50,7 @@ struct BuiltinModuleSelection {
 impl BuiltinModuleSelection {
     fn all() -> Self {
         Self {
-            module_names: builtin_stats_module_names().to_vec(),
+            module_names: default_stats_module_names().to_vec(),
         }
     }
 
@@ -80,16 +82,23 @@ impl BuiltinModuleSelection {
     }
 
     fn graph(&self) -> SubtrActorResult<AnalysisGraph> {
-        if self.module_names == builtin_stats_module_names() {
+        if self.module_names == default_stats_module_names() {
             return Ok(build_legacy_timeline_graph());
         }
-        let mut node_names: Vec<&str> = self
+        let node_names: Vec<&str> = self
             .module_names
             .iter()
             .map(|module_name| stats_module_analysis_node_name(module_name))
             .collect();
-        node_names.push("stats_projection");
-        graph_with_builtin_analysis_nodes(node_names)
+        let include_expected_goals = self.module_names.contains(&"expected_goals");
+        let mut graph = graph_with_builtin_analysis_nodes(node_names)?;
+        let projection = if include_expected_goals {
+            StatsProjectionNode::new().with_expected_goals()
+        } else {
+            StatsProjectionNode::new()
+        };
+        graph.push_node(projection);
+        Ok(graph)
     }
 
     fn collected_modules(
@@ -319,6 +328,10 @@ impl Default for StatsCollector<StatsSnapshotFrame, IdentityFrameTransform> {
 }
 
 impl StatsCollector<StatsSnapshotFrame, IdentityFrameTransform> {
+    /// Creates a collector with the default non-model-backed stats modules.
+    /// `expected_goals` remains available through
+    /// [`with_builtin_module_names`](Self::with_builtin_module_names), but is
+    /// deliberately opt-in.
     pub fn new() -> Self {
         Self::with_selection_and_frame_transform(
             BuiltinModuleSelection::all(),

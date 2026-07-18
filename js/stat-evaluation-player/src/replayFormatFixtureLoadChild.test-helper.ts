@@ -68,6 +68,10 @@ function parseStatsTimelineParts(
       decoder,
       parts.accumulationTracks,
     ),
+    expected_goals_tracks: parseJsonBuffer<CompactStatsTimeline["expected_goals_tracks"]>(
+      decoder,
+      parts.expectedGoalsTracks,
+    ),
   } satisfies StatsTimeline;
   const statsFrameLookup = createStatsFrameLookup(statsTimeline, undefined, {
     materializationChunkSize: Math.max(1, statsTimeline.frames.length),
@@ -361,7 +365,7 @@ async function main(): Promise<void> {
   progressStages.push("stats-timeline");
   const statsTimelineStartedAt = process.hrtime.bigint();
   logProgress(`${fixture}: loading compact stats timeline`);
-  const statsTimelineParts = get_stats_timeline_json_parts(bytes, 32 * 1024 * 1024);
+  const statsTimelineParts = get_stats_timeline_json_parts(bytes, 32 * 1024 * 1024, true);
   logProgress(
     `${fixture}: compact stats timeline loaded in ${elapsedMs(statsTimelineStartedAt)}ms`,
   );

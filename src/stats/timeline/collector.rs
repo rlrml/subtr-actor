@@ -2,7 +2,8 @@ use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
 use crate::stats::analysis_graph::{
-    AnalysisGraph, StatsTimelineEventsNode, StatsTimelineFrameNode, StatsTimelineFrameState,
+    AnalysisGraph, StatsProjectionNode, StatsTimelineEventsNode, StatsTimelineFrameNode,
+    StatsTimelineFrameState,
 };
 use crate::stats::calculators::ReplayFrameInputBuilder;
 use crate::*;
@@ -26,15 +27,43 @@ fn reduced_timeline_events(graph: &AnalysisGraph) -> ReplayStatsTimelineEvents {
 const ABSENT_PLAYER_MIN_MISSING_SECONDS: f32 = 30.0;
 
 pub fn build_legacy_timeline_graph() -> AnalysisGraph {
+    build_legacy_timeline_graph_with_expected_goals(false)
+}
+
+pub fn build_legacy_timeline_graph_with_expected_goals(
+    include_expected_goals: bool,
+) -> AnalysisGraph {
     let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
+    let projection = if include_expected_goals {
+        StatsProjectionNode::new().with_expected_goals()
+    } else {
+        StatsProjectionNode::new()
+    };
+    graph.push_boxed_node(Box::new(projection));
     graph.push_boxed_node(Box::new(StatsTimelineFrameNode::new()));
-    graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
+    let events = if include_expected_goals {
+        StatsTimelineEventsNode::new().with_expected_goals()
+    } else {
+        StatsTimelineEventsNode::new()
+    };
+    graph.push_boxed_node(Box::new(events));
     graph
 }
 
 pub fn build_timeline_event_graph() -> AnalysisGraph {
+    build_timeline_event_graph_with_expected_goals(false)
+}
+
+pub fn build_timeline_event_graph_with_expected_goals(
+    include_expected_goals: bool,
+) -> AnalysisGraph {
     let mut graph = AnalysisGraph::new().with_input_state_type::<FrameInput>();
-    graph.push_boxed_node(Box::new(StatsTimelineEventsNode::new()));
+    let node = if include_expected_goals {
+        StatsTimelineEventsNode::new().with_expected_goals()
+    } else {
+        StatsTimelineEventsNode::new()
+    };
+    graph.push_boxed_node(Box::new(node));
     graph
 }
 
@@ -151,6 +180,11 @@ impl StatsTimelineCollector {
         }
     }
 
+    pub fn with_expected_goals(mut self) -> Self {
+        self.graph = build_legacy_timeline_graph_with_expected_goals(true);
+        self
+    }
+
     fn timeline_config(&self) -> StatsTimelineConfig {
         default_stats_timeline_config()
     }
@@ -208,6 +242,11 @@ pub struct StatsTimelineEventCollector {
     last_replay_meta_player_count: Option<usize>,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
+    include_expected_goals: bool,
+    expected_goals: ExpectedGoalsStatsAccumulator,
+    expected_goals_touch_cursor: usize,
+    expected_goals_episode_cursor: usize,
+    expected_goals_tracks: ExpectedGoalsTimelineTracks,
 }
 
 impl Default for StatsTimelineEventCollector {
@@ -226,7 +265,35 @@ impl StatsTimelineEventCollector {
             last_replay_meta_player_count: None,
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
+            include_expected_goals: false,
+            expected_goals: ExpectedGoalsStatsAccumulator::new(),
+            expected_goals_touch_cursor: 0,
+            expected_goals_episode_cursor: 0,
+            expected_goals_tracks: ExpectedGoalsTimelineTracks {
+                config: ExpectedGoalsCalculatorConfig::default(),
+                teams: vec![
+                    ExpectedGoalsTeamTimelineTrack {
+                        is_team_0: true,
+                        points: Vec::new(),
+                    },
+                    ExpectedGoalsTeamTimelineTrack {
+                        is_team_0: false,
+                        points: Vec::new(),
+                    },
+                ],
+                players: Vec::new(),
+                episodes: Vec::new(),
+            },
         }
+    }
+
+    /// Enables model-backed expected-goals calculation and compact tracks.
+    /// It is disabled by default because it evaluates an ML feature/model path
+    /// on every live replay frame.
+    pub fn with_expected_goals(mut self) -> Self {
+        self.graph = build_timeline_event_graph_with_expected_goals(true);
+        self.include_expected_goals = true;
+        self
     }
 
     pub fn with_frame_resolution(mut self, resolution: StatsFrameResolution) -> Self {
@@ -290,6 +357,103 @@ impl StatsTimelineEventCollector {
         })
     }
 
+    fn refresh_expected_goals(&mut self) -> SubtrActorResult<()> {
+        let calculator = self
+            .graph
+            .state::<ExpectedGoalsCalculator>()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                    "missing ExpectedGoalsCalculator while building compact stats timeline"
+                        .to_owned(),
+                ))
+            })?;
+        let touch_events = calculator.touch_events()[self.expected_goals_touch_cursor..].to_vec();
+        let episode_events =
+            calculator.episode_events()[self.expected_goals_episode_cursor..].to_vec();
+        let team_xg_integrals = calculator.team_xg_integrals();
+        let current_values = calculator.current_values();
+        self.expected_goals_tracks.config = calculator.config().clone();
+        self.expected_goals_touch_cursor = calculator.touch_events().len();
+        self.expected_goals_episode_cursor = calculator.episode_events().len();
+
+        for event in &touch_events {
+            self.expected_goals.apply_touch_event(event);
+        }
+        for event in &episode_events {
+            self.expected_goals.apply_episode_event(event);
+        }
+        self.expected_goals_tracks.episodes.extend(episode_events);
+        self.expected_goals.set_team_xg_integrals(team_xg_integrals);
+        self.expected_goals.set_current_values(current_values);
+        Ok(())
+    }
+
+    fn record_expected_goals_tracks(&mut self, frame: usize) -> SubtrActorResult<()> {
+        self.refresh_expected_goals()?;
+
+        for (index, is_team_0) in [true, false].into_iter().enumerate() {
+            let stats = self.expected_goals.team_stats(is_team_0).clone();
+            let track = &mut self.expected_goals_tracks.teams[index];
+            if track
+                .points
+                .last()
+                .is_some_and(|point| point.frame == frame)
+            {
+                track.points.last_mut().expect("point exists").stats = stats;
+            } else if track.points.last().is_none_or(|point| point.stats != stats) {
+                track
+                    .points
+                    .push(ExpectedGoalsTeamTimelinePoint { frame, stats });
+            }
+        }
+
+        let replay_meta = self.replay_meta()?.clone();
+        for player in replay_meta.player_order() {
+            let Some(stats) = self
+                .expected_goals
+                .player_stats()
+                .get(&player.remote_id)
+                .cloned()
+            else {
+                continue;
+            };
+            let is_team_0 = Self::is_team_zero_player(&replay_meta, player);
+            let track = match self
+                .expected_goals_tracks
+                .players
+                .iter_mut()
+                .find(|track| track.player_id == player.remote_id)
+            {
+                Some(track) => track,
+                None => {
+                    self.expected_goals_tracks
+                        .players
+                        .push(ExpectedGoalsPlayerTimelineTrack {
+                            player_id: player.remote_id.clone(),
+                            is_team_0,
+                            points: Vec::new(),
+                        });
+                    self.expected_goals_tracks
+                        .players
+                        .last_mut()
+                        .expect("just pushed player track")
+                }
+            };
+            if track
+                .points
+                .last()
+                .is_some_and(|point| point.frame == frame)
+            {
+                track.points.last_mut().expect("point exists").stats = stats;
+            } else if track.points.last().is_none_or(|point| point.stats != stats) {
+                track
+                    .points
+                    .push(ExpectedGoalsPlayerTimelinePoint { frame, stats });
+            }
+        }
+        Ok(())
+    }
+
     pub fn into_replay_stats_timeline_scaffold(
         self,
     ) -> SubtrActorResult<ReplayStatsTimelineScaffold> {
@@ -328,6 +492,7 @@ impl StatsTimelineEventCollector {
             activity_summary,
             positioning_summary,
             accumulation_tracks,
+            expected_goals_tracks: self.expected_goals_tracks,
         })
     }
 
@@ -488,6 +653,9 @@ impl Collector for StatsTimelineEventCollector {
         if let Some(emitted_dt) = self.frame_persistence.on_frame(frame_number, current_time) {
             let mut frame = self.snapshot_frame_scaffold()?;
             frame.dt = emitted_dt;
+            if self.include_expected_goals {
+                self.record_expected_goals_tracks(frame.frame_number)?;
+            }
             self.frames.push(frame);
         }
 
@@ -503,6 +671,9 @@ impl Collector for StatsTimelineEventCollector {
             return Ok(());
         };
         let mut final_snapshot = self.snapshot_frame_scaffold()?;
+        if self.include_expected_goals {
+            self.record_expected_goals_tracks(final_snapshot.frame_number)?;
+        }
         match self
             .frame_persistence
             .final_frame_action(final_snapshot.frame_number, final_snapshot.time)

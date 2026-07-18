@@ -140,6 +140,7 @@ impl StatsTimelineFrameNode {
             } else {
                 projection.demo.team_one_stats().clone()
             },
+            expected_goals: projection.expected_goals.team_stats(is_team_zero).clone(),
         })
     }
 
@@ -325,6 +326,12 @@ impl StatsTimelineFrameNode {
                 .unwrap_or_default(),
             demo: projection
                 .demo
+                .player_stats()
+                .get(player_id)
+                .cloned()
+                .unwrap_or_default(),
+            expected_goals: projection
+                .expected_goals
                 .player_stats()
                 .get(player_id)
                 .cloned()

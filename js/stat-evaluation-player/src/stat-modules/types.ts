@@ -4,6 +4,7 @@ import type {
   BoostPickupAnimationPickup,
   ReplayModel,
   ReplayTimelineEvent,
+  ReplayTimelineGraph,
   ReplayTimelineRange,
 } from "@rlrml/player";
 import { getStatsFrameForReplayFrame } from "../statsTimeline.ts";
@@ -26,6 +27,7 @@ export interface StatModule {
   onBeforeRender(info: FrameRenderInfo): void;
   getTimelineEvents?(ctx: StatModuleContext): ReplayTimelineEvent[];
   getTimelineRanges?(ctx: StatModuleContext): ReplayTimelineRange[];
+  getTimelineGraphs?(ctx: StatModuleContext): ReplayTimelineGraph[];
   getConfig?(): unknown;
   applyConfig?(config: unknown): void;
   includeBoostPickupAnimationPickup?(pickup: BoostPickupAnimationPickup): boolean;

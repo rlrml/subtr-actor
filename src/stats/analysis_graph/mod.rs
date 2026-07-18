@@ -36,13 +36,14 @@
 //! is another way to browse them. By role:
 //!
 //! - **Per-frame source state** — [`FrameInfoNode`], [`GameplayStateNode`],
-//!   [`BallFrameStateNode`], [`PlayerFrameStateNode`], [`FrameEventsStateNode`],
-//!   [`LivePlayNode`], [`SettingsNode`].
+//!   [`BallFrameStateNode`], [`PlayerFrameStateNode`],
+//!   [`PlayerControlStateNode`], [`FrameEventsStateNode`], [`LivePlayNode`],
+//!   [`SettingsNode`].
 //! - **Shared derived state** — [`TouchStateNode`], [`PossessionStateNode`],
 //!   [`PlayerPossessionNode`], [`PossessionNode`], [`BallHalfNode`],
 //!   [`PlayerVerticalStateNode`], [`PositioningNode`], [`RotationNode`],
 //!   [`BackboardBounceStateNode`], [`FiftyFiftyStateNode`],
-//!   [`ContinuousBallControlNode`].
+//!   [`ContinuousBallControlNode`], [`ThreatFeaturesNode`].
 //! - **Mechanic detection** — [`FlickNode`], [`HalfFlipNode`],
 //!   [`SpeedFlipNode`], [`WavedashNode`], [`PowerslideNode`],
 //!   [`FlipImpulseNode`], [`DodgeResetNode`], [`WallAerialNode`],
@@ -52,7 +53,8 @@
 //! - **Play & contest detection** — [`TouchNode`], [`PassNode`], [`CenterNode`],
 //!   [`KickoffNode`], [`BumpNode`], [`DemoNode`], [`RushNode`],
 //!   [`ControlledPlayNode`], [`TerritorialPressureNode`], [`WhiffNode`],
-//!   [`FiftyFiftyNode`], [`BackboardNode`], [`MovementNode`], [`BoostNode`].
+//!   [`FiftyFiftyNode`], [`BackboardNode`], [`MovementNode`], [`BoostNode`],
+//!   [`ExpectedGoalsNode`].
 //! - **Match-level & projection** — [`MatchStatsNode`], goal-tag nodes (e.g.
 //!   [`HalfVolleyGoalNode`] plus the `*_goal` registry names),
 //!   [`StatsProjectionNode`], [`StatsTimelineEventsNode`],
@@ -113,6 +115,7 @@ builtin_analysis_nodes! {
     GameplayStateNode,
     BallFrameStateNode,
     PlayerFrameStateNode,
+    PlayerControlStateNode,
     FrameEventsStateNode,
     LivePlayNode,
     MatchStatsNode,
@@ -123,6 +126,8 @@ builtin_analysis_nodes! {
     ControlledPlayNode,
     ContinuousBallControlNode,
     DoubleTapNode,
+    ThreatFeaturesNode,
+    ExpectedGoalsNode,
     FiftyFiftyNode,
     FiftyFiftyStateNode,
     KickoffNode,

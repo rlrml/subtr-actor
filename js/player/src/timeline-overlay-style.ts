@@ -146,6 +146,127 @@ export function ensureTimelineOverlayStyles(): void {
       margin-bottom: 0;
     }
 
+    .sap-tl-graphs {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.34rem;
+      margin-bottom: 0.34rem;
+    }
+
+    .sap-tl-graph-lane {
+      position: relative;
+      display: grid;
+      grid-template-columns: var(--sap-tl-gutter-width) minmax(0, 1fr);
+      column-gap: var(--sap-tl-gutter-gap);
+      align-items: center;
+    }
+
+    .sap-tl-graph-lane-track {
+      position: relative;
+      grid-column: 2;
+      height: 4.6rem;
+      margin: 0 calc(var(--sap-tl-thumb-size) / 2);
+      overflow: hidden;
+      border: 1px solid rgba(184, 214, 236, 0.13);
+      border-radius: 0.48rem;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+      cursor: crosshair;
+    }
+
+    .sap-tl-graph-lane-track:focus-visible {
+      outline: 2px solid rgba(123, 180, 255, 0.9);
+      outline-offset: 2px;
+    }
+
+    .sap-tl-graph-lane-label {
+      display: block;
+      max-width: 100%;
+      padding: 0.08rem 0.38rem;
+      border: 1px solid rgba(184, 214, 236, 0.18);
+      border-radius: 999px;
+      background: rgba(10, 16, 23, 0.82);
+      color: #c8d7e4;
+      font-size: 0.54rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+      text-transform: uppercase;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sap-tl-graph-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .sap-tl-graph-series {
+      fill: none;
+      stroke-width: 2.2;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 2px currentColor);
+    }
+
+    .sap-tl-graph-reference {
+      stroke-width: 1;
+      stroke-dasharray: 5 4;
+      vector-effect: non-scaling-stroke;
+      opacity: 0.88;
+    }
+
+    .sap-tl-graph-reference-label {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      paint-order: stroke;
+      stroke: rgba(7, 12, 18, 0.94);
+      stroke-width: 2px;
+    }
+
+    .sap-tl-graph-highlight {
+      opacity: 0.13;
+    }
+
+    .sap-tl-graph-highlight.excluded {
+      opacity: 0.3;
+      stroke: rgba(255, 255, 255, 0.46);
+      stroke-width: 1;
+      stroke-dasharray: 4 3;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .sap-tl-graph-marker {
+      stroke: rgba(6, 12, 18, 0.94);
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.45));
+    }
+
+    .sap-tl-graph-marker.selected {
+      stroke: #ffffff;
+      stroke-width: 2.5;
+    }
+
+    .sap-tl-graph-marker.excluded-peak {
+      fill: transparent;
+      stroke: #ef4444;
+      stroke-width: 2.5;
+      stroke-dasharray: 3 2;
+    }
+
+    .sap-tl-graph-playhead {
+      stroke: rgba(245, 251, 255, 0.88);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+      pointer-events: none;
+    }
+
     .sap-tl-event-lanes {
       grid-column: 1 / -1;
       display: flex;
@@ -232,7 +353,8 @@ export function ensureTimelineOverlayStyles(): void {
     }
 
     .sap-tl-event-lane[data-label]::after,
-    .sap-tl-range-lane[data-label]::after {
+    .sap-tl-range-lane[data-label]::after,
+    .sap-tl-graph-lane[data-label]::after {
       content: attr(data-label);
       position: absolute;
       left: calc(var(--sap-tl-gutter-width) + var(--sap-tl-gutter-gap) + calc(var(--sap-tl-thumb-size) / 2));
@@ -262,7 +384,9 @@ export function ensureTimelineOverlayStyles(): void {
     .sap-tl-event-lane[data-label]:hover::after,
     .sap-tl-event-lane[data-label]:focus-within::after,
     .sap-tl-range-lane[data-label]:hover::after,
-    .sap-tl-range-lane[data-label]:focus-within::after {
+    .sap-tl-range-lane[data-label]:focus-within::after,
+    .sap-tl-graph-lane[data-label]:hover::after,
+    .sap-tl-graph-lane[data-label]:focus-within::after {
       opacity: 1;
       transform: translateY(0);
     }

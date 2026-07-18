@@ -2078,8 +2078,8 @@ def main() -> int:
     )
     require_contains(
         web_player_main_source,
-        'renderModuleSummaryGroup("Timeline ranges", rangeToggles)',
-        "stats evaluation player launcher module summary timeline range group",
+        'renderModuleSummaryGroup("Timeline views", rangeToggles)',
+        "stats evaluation player launcher module summary timeline view group",
         errors,
     )
     require_contains(

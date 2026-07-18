@@ -11,7 +11,19 @@ pub struct TouchState {
 
 impl TouchState {
     pub fn primary_touch_event(&self) -> Option<&TouchEvent> {
-        primary_touch_event(&self.touch_events)
+        primary_touch_event(self.touch_events.iter())
+    }
+
+    /// The primary touch among this frame's touches for one team: the latest
+    /// contact (by frame, then time), tie-broken by the same evidence ordering
+    /// as [`Self::primary_touch_event`] (contact score, then contact gap,
+    /// dodge evidence, and stable player identity).
+    pub fn primary_touch_event_for_team(&self, is_team_0: bool) -> Option<&TouchEvent> {
+        primary_touch_event(
+            self.touch_events
+                .iter()
+                .filter(|event| event.team_is_team_0 == is_team_0),
+        )
     }
 }
 
@@ -114,12 +126,13 @@ fn touch_event_chronological_ordering(left: &TouchEvent, right: &TouchEvent) -> 
     TouchEvent::timestamp_ordering(left, right).then_with(|| touch_event_ordering(left, right))
 }
 
-fn primary_touch_event(touch_events: &[TouchEvent]) -> Option<&TouchEvent> {
+fn primary_touch_event<'a>(
+    touch_events: impl Iterator<Item = &'a TouchEvent> + Clone,
+) -> Option<&'a TouchEvent> {
     let latest_touch = touch_events
-        .iter()
+        .clone()
         .max_by(|left, right| TouchEvent::timestamp_ordering(left, right))?;
     touch_events
-        .iter()
         .filter(|event| TouchEvent::timestamp_ordering(event, latest_touch).is_eq())
         .min_by(|left, right| touch_event_ordering(left, right))
 }
@@ -829,7 +842,7 @@ impl TouchStateCalculator {
             Vec::new()
         };
 
-        if let Some(last_touch) = primary_touch_event(&touch_events) {
+        if let Some(last_touch) = primary_touch_event(touch_events.iter()) {
             self.current_last_touch = Some(last_touch.clone());
         }
         self.previous_ball_rigid_body = ball.sample().map(|sample| (sample.rigid_body, frame.time));

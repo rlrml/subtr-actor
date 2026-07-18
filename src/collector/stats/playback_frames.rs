@@ -159,6 +159,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             positioning: self.frame_team_stat_or_default_typed(frame, "positioning", team_key)?,
             powerslide: self.frame_team_stat_or_default_typed(frame, "powerslide", team_key)?,
             demo: self.frame_team_stat_or_default_typed(frame, "demo", team_key)?,
+            expected_goals: self.frame_team_stat_or_default_typed(
+                frame,
+                "expected_goals",
+                team_key,
+            )?,
         })
     }
 
@@ -292,6 +297,11 @@ impl CapturedStatsData<StatsSnapshotFrame> {
                 &player_key,
             )?,
             demo: self.frame_player_stat_or_default_typed_by_key(frame, "demo", &player_key)?,
+            expected_goals: self.frame_player_stat_or_default_typed_by_key(
+                frame,
+                "expected_goals",
+                &player_key,
+            )?,
         })
     }
 

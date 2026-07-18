@@ -101,8 +101,8 @@ fn exposes_stats_collector_module_json_after_processing_frame() {
     let module_names = value["module_names"]
         .as_array()
         .expect("module names should be an array");
-    assert_eq!(module_names.len(), builtin_stats_module_names().len());
-    for module_name in builtin_stats_module_names() {
+    assert_eq!(module_names.len(), default_stats_module_names().len());
+    for module_name in default_stats_module_names() {
         assert!(
             module_names.iter().any(|name| name == module_name),
             "stats json should expose stats module {module_name}"
@@ -127,7 +127,7 @@ fn exposes_stats_collector_module_json_after_processing_frame() {
     let frame_modules = value["frame"]["modules"]
         .as_object()
         .expect("frame modules should be an object");
-    for module_name in builtin_stats_module_names() {
+    for module_name in default_stats_module_names() {
         assert!(
             frame_modules.contains_key(*module_name),
             "stats frame should include module payload for {module_name}"

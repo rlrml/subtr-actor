@@ -29,6 +29,7 @@ export class ActiveModulesRuntime {
   private removeRenderHook: (() => void) | null = null;
   private readonly timelineSourceRemovers = new Map<string, () => void>();
   private readonly timelineRangeSourceRemovers = new Map<string, () => void>();
+  private readonly timelineGraphSourceRemovers = new Map<string, () => void>();
 
   constructor(private readonly options: ActiveModulesRuntimeOptions) {}
 
@@ -194,6 +195,10 @@ export class ActiveModulesRuntime {
       removeSource();
     }
     this.timelineRangeSourceRemovers.clear();
+    for (const removeSource of this.timelineGraphSourceRemovers.values()) {
+      removeSource();
+    }
+    this.timelineGraphSourceRemovers.clear();
   }
 
   clearStandalonePlugins(): void {
@@ -249,14 +254,21 @@ export class ActiveModulesRuntime {
     }
 
     for (const mod of this.activeModules) {
-      if (!this.activeTimelineRangeModuleIds.has(mod.id) || !mod.getTimelineRanges) {
+      if (!this.activeTimelineRangeModuleIds.has(mod.id)) {
         continue;
       }
-
-      this.timelineRangeSourceRemovers.set(
-        mod.id,
-        timelineOverlay.addRangeSource(() => mod.getTimelineRanges?.(ctx) ?? []),
-      );
+      if (mod.getTimelineRanges) {
+        this.timelineRangeSourceRemovers.set(
+          mod.id,
+          timelineOverlay.addRangeSource(() => mod.getTimelineRanges?.(ctx) ?? []),
+        );
+      }
+      if (mod.getTimelineGraphs) {
+        this.timelineGraphSourceRemovers.set(
+          mod.id,
+          timelineOverlay.addGraphSource(() => mod.getTimelineGraphs?.(ctx) ?? []),
+        );
+      }
     }
 
     for (const source of this.options.getEventTimelineSources(ctx)) {
@@ -272,6 +284,7 @@ export class ActiveModulesRuntime {
     }
 
     timelineOverlay.refreshRanges();
+    timelineOverlay.refreshGraphs();
   }
 
   private getActiveModuleIds(): Set<string> {

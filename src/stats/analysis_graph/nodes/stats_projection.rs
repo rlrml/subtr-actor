@@ -42,6 +42,7 @@ pub struct StatsProjectionState {
     pub demo: DemoStatsAccumulator,
     pub center: CenterStatsAccumulator,
     pub controlled_play: ControlledPlayStatsAccumulator,
+    pub expected_goals: ExpectedGoalsStatsAccumulator,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -155,6 +156,7 @@ impl IncrementalMovementProjection {
 /// Folds every mechanic/state calculator's events into per-frame cumulative stat accumulators.
 #[derive(Debug, Clone, Default)]
 pub struct StatsProjectionNode {
+    include_expected_goals: bool,
     state: StatsProjectionState,
     cursors: StatsProjectionCursors,
     movement_projection: IncrementalMovementProjection,
@@ -214,11 +216,18 @@ struct StatsProjectionCursors {
     demo_timeline: usize,
     center: usize,
     controlled_play: usize,
+    expected_goals_touch: usize,
+    expected_goals_episode: usize,
 }
 
 impl StatsProjectionNode {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn with_expected_goals(mut self) -> Self {
+        self.include_expected_goals = true;
+        self
     }
 
     /// Fold buffered possession frames up to (and including) `end_frame` into the
@@ -644,6 +653,29 @@ impl StatsProjectionNode {
         {
             self.state.controlled_play.apply_event(event);
         }
+        if self.include_expected_goals {
+            let expected_goals = ctx.get::<ExpectedGoalsCalculator>()?;
+            for event in Self::events_since(
+                &mut self.cursors.expected_goals_touch,
+                expected_goals.touch_events(),
+            ) {
+                self.state.expected_goals.apply_touch_event(event);
+            }
+            for event in Self::events_since(
+                &mut self.cursors.expected_goals_episode,
+                expected_goals.episode_events(),
+            ) {
+                self.state.expected_goals.apply_episode_event(event);
+            }
+            // Team xG is the calculator's full-match integral (absolute totals,
+            // not an event fold), refreshed every projection step.
+            self.state
+                .expected_goals
+                .set_team_xg_integrals(expected_goals.team_xg_integrals());
+            self.state
+                .expected_goals
+                .set_current_values(expected_goals.current_values());
+        }
 
         self.finish_sample();
         self.previous_live_play = Some(live_play);
@@ -659,7 +691,7 @@ impl AnalysisNode for StatsProjectionNode {
     }
 
     fn dependencies(&self) -> NodeDependencies {
-        vec![
+        let mut dependencies = vec![
             frame_info_dependency(),
             gameplay_state_dependency(),
             live_play_dependency(),
@@ -698,7 +730,11 @@ impl AnalysisNode for StatsProjectionNode {
             demo_dependency(),
             center_dependency(),
             controlled_play_dependency(),
-        ]
+        ];
+        if self.include_expected_goals {
+            dependencies.push(expected_goals_dependency());
+        }
+        dependencies
     }
 
     fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {

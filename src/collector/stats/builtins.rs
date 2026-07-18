@@ -419,6 +419,7 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "ball_carry",
         "controlled_play",
         "air_dribble",
+        "expected_goals",
         "boost",
         "bump",
         "movement",
@@ -426,6 +427,19 @@ pub fn builtin_stats_module_names() -> &'static [&'static str] {
         "powerslide",
         "demo",
     ]
+}
+
+/// Builtin modules calculated by [`StatsCollector::new`](crate::StatsCollector::new).
+/// Model-backed expected goals remains available by name but is opt-in.
+pub fn default_stats_module_names() -> &'static [&'static str] {
+    static NAMES: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| {
+        builtin_stats_module_names()
+            .iter()
+            .copied()
+            .filter(|name| *name != "expected_goals")
+            .collect()
+    })
 }
 
 fn graph_state<'a, T: 'static>(
@@ -844,6 +858,17 @@ pub(crate) fn builtin_module_json(
                 events: calculator.events(),
             })
         }
+        "expected_goals" => {
+            let calculator = graph_state::<ExpectedGoalsCalculator>(graph, module_name)?;
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&serde_json::json!({
+                "team_zero": projection.expected_goals.team_stats(true),
+                "team_one": projection.expected_goals.team_stats(false),
+                "player_stats": player_stats_entries(projection.expected_goals.player_stats()),
+                "touch_events": calculator.touch_events(),
+                "episode_events": calculator.episode_events(),
+            }))
+        }
         "boost" => {
             let calculator = graph_state::<BoostCalculator>(graph, module_name)?;
             let projection = projected_stats(graph, module_name)?;
@@ -1145,6 +1170,30 @@ pub fn builtin_analysis_node_json(
                 "last_touch_player": state.last_touch_player,
                 "last_touch_team_is_team_0": state.last_touch_team_is_team_0,
             })
+        }
+        "expected_goals" => {
+            let state = graph_state::<ExpectedGoalsCalculator>(graph, node_name)?;
+            json!({
+                "config": {
+                    "episode_threshold": state.config().episode_threshold,
+                    "episode_end_threshold": state.config().episode_end_threshold,
+                    "goal_touch_exclusion_seconds": state.config().goal_touch_exclusion_seconds,
+                    "incident_xg_calibration_factor": state.config().incident_xg_calibration_factor,
+                },
+                "current_values": state.current_values(),
+                "touch_events": state.touch_events(),
+                "episode_events": state.episode_events(),
+                "goal_records": state.goal_records(),
+                "last_frame_time": state.last_frame_time(),
+            })
+        }
+        "threat_features" => {
+            let state = graph_state::<ThreatFeaturesState>(graph, node_name)?;
+            json!({ "current": state.current() })
+        }
+        "player_control_state" => {
+            let state = graph_state::<PlayerControlState>(graph, node_name)?;
+            json!({ "players": player_stats_entries(&state.players) })
         }
         "possession_state" => {
             let state = graph_state::<PossessionState>(graph, node_name)?;
@@ -1529,6 +1578,14 @@ pub(crate) fn builtin_snapshot_frame_json(
                 ),
             })?
         }
+        "expected_goals" => {
+            let projection = projected_stats(graph, module_name)?;
+            serialize_to_json_value(&TeamPlayerStatsExport {
+                team_zero: projection.expected_goals.team_stats(true),
+                team_one: projection.expected_goals.team_stats(false),
+                player_stats: player_stats_entries(projection.expected_goals.player_stats()),
+            })?
+        }
         "boost" => {
             let projection = projected_stats(graph, module_name)?;
             serialize_to_json_value(&TeamPlayerStatsExport {
@@ -1752,6 +1809,15 @@ pub(crate) fn builtin_snapshot_config_json(
             Some(serialize_to_json_value(&serde_json::json!({
                 "half_volley_max_bounce_to_touch_seconds": calculator.config().max_bounce_to_touch_seconds,
                 "half_volley_min_ball_speed": calculator.config().min_ball_speed,
+            }))?)
+        }
+        "expected_goals" => {
+            let calculator = graph_state::<ExpectedGoalsCalculator>(graph, module_name)?;
+            Some(serialize_to_json_value(&serde_json::json!({
+                "expected_goals_episode_threshold": calculator.config().episode_threshold,
+                "expected_goals_episode_end_threshold": calculator.config().episode_end_threshold,
+                "expected_goals_goal_touch_exclusion_seconds": calculator.config().goal_touch_exclusion_seconds,
+                "expected_goals_incident_xg_calibration_factor": calculator.config().incident_xg_calibration_factor,
             }))?)
         }
         "core"

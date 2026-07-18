@@ -345,6 +345,20 @@ export const EVENT_DEFINITION_CATALOG: EventDefinitionCatalogEntry[] = [
     "variants": []
   },
   {
+    "key": "threat_episode",
+    "label": "Threat Episode",
+    "category": "other",
+    "hidden_from_review": true,
+    "variants": []
+  },
+  {
+    "key": "threat_touch",
+    "label": "Threat Touch Delta",
+    "category": "other",
+    "hidden_from_review": true,
+    "variants": []
+  },
+  {
     "key": "timeline",
     "label": "Replay Timeline Event",
     "category": "core",

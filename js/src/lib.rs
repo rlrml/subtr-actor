@@ -154,12 +154,18 @@ fn collect_replay_data_with_optional_progress(
 fn collect_replay_bundle_with_optional_progress(
     replay: &boxcars::Replay,
     progress: Option<(&Function, usize)>,
+    include_expected_goals: bool,
 ) -> Result<(ReplayData, subtr_actor::ReplayStatsTimelineScaffold), JsValue> {
     let total_frames = get_total_frames(replay)?;
     let mut processor = ReplayProcessor::new(replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
     let mut replay_data_collector = ReplayDataCollector::new();
-    let mut stats_collector = StatsTimelineEventCollector::new();
+    let stats_collector = StatsTimelineEventCollector::new();
+    let mut stats_collector = if include_expected_goals {
+        stats_collector.with_expected_goals()
+    } else {
+        stats_collector
+    };
     let mut last_reported_frames = 0usize;
     let mut progress_collector = progress
         .map(|(callback, frame_interval)| {
@@ -251,6 +257,11 @@ fn stats_timeline_json_parts(
     set_json_bytes(&result, "activitySummary", &timeline.activity_summary)?;
     set_json_bytes(&result, "positioningSummary", &timeline.positioning_summary)?;
     set_json_bytes(&result, "accumulationTracks", &timeline.accumulation_tracks)?;
+    set_json_bytes(
+        &result,
+        "expectedGoalsTracks",
+        &timeline.expected_goals_tracks,
+    )?;
     if let Some((callback, _, start, end)) = progress {
         emit_stats_timeline_progress(callback, start + ((end - start) * 0.15))
             .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
@@ -443,11 +454,13 @@ pub fn get_replay_bundle_json_with_progress(
     data: &[u8],
     callback: Function,
     report_every_n_frames: Option<usize>,
+    include_expected_goals: Option<bool>,
 ) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
     let (replay_data, stats_timeline) = collect_replay_bundle_with_optional_progress(
         &replay,
         Some((&callback, report_every_n_frames.unwrap_or(1000))),
+        include_expected_goals.unwrap_or(false),
     )?;
 
     let result = Object::new();
@@ -488,11 +501,13 @@ pub fn get_replay_bundle_json_parts_with_progress(
     callback: Function,
     report_every_n_frames: Option<usize>,
     max_frame_chunk_bytes: Option<usize>,
+    include_expected_goals: Option<bool>,
 ) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
     let (replay_data, stats_timeline) = collect_replay_bundle_with_optional_progress(
         &replay,
         Some((&callback, report_every_n_frames.unwrap_or(1000))),
+        include_expected_goals.unwrap_or(false),
     )?;
 
     let result = Object::new();
@@ -529,10 +544,19 @@ pub fn get_replay_bundle_json_parts_with_progress(
 
 /// Get compact event-backed stats frames for each replay sample.
 #[wasm_bindgen]
-pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
+pub fn get_stats_timeline(
+    data: &[u8],
+    include_expected_goals: Option<bool>,
+) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = StatsTimelineEventCollector::new()
+    let collector = StatsTimelineEventCollector::new();
+    let collector = if include_expected_goals.unwrap_or(false) {
+        collector.with_expected_goals()
+    } else {
+        collector
+    };
+    let stats_timeline = collector
         .get_replay_stats_timeline_scaffold(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
@@ -541,10 +565,19 @@ pub fn get_stats_timeline(data: &[u8]) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn get_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
+pub fn get_stats_timeline_json(
+    data: &[u8],
+    include_expected_goals: Option<bool>,
+) -> Result<Vec<u8>, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = StatsTimelineEventCollector::new()
+    let collector = StatsTimelineEventCollector::new();
+    let collector = if include_expected_goals.unwrap_or(false) {
+        collector.with_expected_goals()
+    } else {
+        collector
+    };
+    let stats_timeline = collector
         .get_replay_stats_timeline_scaffold(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 
@@ -568,10 +601,17 @@ pub fn get_legacy_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
 pub fn get_stats_timeline_json_parts(
     data: &[u8],
     max_frame_chunk_bytes: Option<usize>,
+    include_expected_goals: Option<bool>,
 ) -> Result<JsValue, JsValue> {
     let replay = parse_replay_from_data(data)?;
 
-    let stats_timeline = StatsTimelineEventCollector::new()
+    let collector = StatsTimelineEventCollector::new();
+    let collector = if include_expected_goals.unwrap_or(false) {
+        collector.with_expected_goals()
+    } else {
+        collector
+    };
+    let stats_timeline = collector
         .get_replay_stats_timeline_scaffold(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
 

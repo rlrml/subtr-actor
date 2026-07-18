@@ -10,6 +10,7 @@ import type { CorePlayerStats } from "./CorePlayerStats.ts";
 import type { DemoPlayerStats } from "./DemoPlayerStats.ts";
 import type { DodgeResetStats } from "./DodgeResetStats.ts";
 import type { DoubleTapPlayerStats } from "./DoubleTapPlayerStats.ts";
+import type { ExpectedGoalsPlayerStats } from "./ExpectedGoalsPlayerStats.ts";
 import type { FiftyFiftyPlayerStats } from "./FiftyFiftyPlayerStats.ts";
 import type { FlickStats } from "./FlickStats.ts";
 import type { FlipResetStats } from "./FlipResetStats.ts";
@@ -36,4 +37,4 @@ import type { WhiffStats } from "./WhiffStats.ts";
  * Like `TeamStatsSnapshot`, this is a serialization/client DTO. It should not
  * be used as an upstream data dependency between analysis nodes.
  */
-export type PlayerStatsSnapshot = { player_id: RemoteIdTs, name: string, is_team_0: boolean, core: CorePlayerStats, backboard: BackboardPlayerStats, ceiling_shot: CeilingShotStats, wall_aerial: WallAerialStats, wall_aerial_shot: WallAerialShotStats, double_tap: DoubleTapPlayerStats, one_timer: OneTimerPlayerStats, pass: PassPlayerStats, fifty_fifty: FiftyFiftyPlayerStats, kickoff: KickoffPlayerStats, speed_flip: SpeedFlipStats, half_flip: HalfFlipStats, half_volley: HalfVolleyPlayerStats, wavedash: WavedashStats, touch: TouchStats, whiff: WhiffStats, flick: FlickStats, dodge_reset: DodgeResetStats, flip_reset: FlipResetStats, ball_carry: BallCarryStats, controlled_play: ControlledPlayStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpPlayerStats, movement: MovementStats, positioning: PositioningStats, rotation: RotationPlayerStats, powerslide: PowerslideStats, demo: DemoPlayerStats, };
+export type PlayerStatsSnapshot = { player_id: RemoteIdTs, name: string, is_team_0: boolean, core: CorePlayerStats, backboard: BackboardPlayerStats, ceiling_shot: CeilingShotStats, wall_aerial: WallAerialStats, wall_aerial_shot: WallAerialShotStats, double_tap: DoubleTapPlayerStats, one_timer: OneTimerPlayerStats, pass: PassPlayerStats, fifty_fifty: FiftyFiftyPlayerStats, kickoff: KickoffPlayerStats, speed_flip: SpeedFlipStats, half_flip: HalfFlipStats, half_volley: HalfVolleyPlayerStats, wavedash: WavedashStats, touch: TouchStats, whiff: WhiffStats, flick: FlickStats, dodge_reset: DodgeResetStats, flip_reset: FlipResetStats, ball_carry: BallCarryStats, controlled_play: ControlledPlayStats, air_dribble: AirDribbleStats, boost: BoostStats, bump: BumpPlayerStats, movement: MovementStats, positioning: PositioningStats, rotation: RotationPlayerStats, powerslide: PowerslideStats, demo: DemoPlayerStats, expected_goals: ExpectedGoalsPlayerStats, };
