@@ -60,3 +60,21 @@ test("timeline graph paths preserve stoppage gaps and clamp probabilities", () =
     "M0.00,100.00 L500.00,50.00 M1000.00,0.00",
   );
 });
+
+test("timeline graph paths use the rendered graph dimensions", () => {
+  assert.equal(
+    buildTimelineGraphPath(
+      [
+        { time: 0, value: 0 },
+        { time: 5, value: 0.5 },
+        { time: 10, value: 1 },
+      ],
+      10,
+      0,
+      1,
+      1200,
+      120,
+    ),
+    "M0.00,120.00 L600.00,60.00 L1200.00,0.00",
+  );
+});

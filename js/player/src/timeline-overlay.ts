@@ -84,6 +84,11 @@ interface TimelineRangeLanePlayhead {
 interface TimelineGraphPlayhead {
   element: SVGLineElement;
   track: HTMLDivElement;
+  coordinateWidth: number;
+}
+
+interface TimelineGraphLayout {
+  resize(width: number, height: number): void;
 }
 
 interface TimelineEventLanePlayhead {
@@ -452,13 +457,13 @@ function markerLeftPercent(timelineTime: number, duration: number): string {
   return `${(timelineTime / Math.max(duration, 0.0001)) * 100}%`;
 }
 
-const TIMELINE_GRAPH_WIDTH = 1000;
-const TIMELINE_GRAPH_HEIGHT = 100;
+const DEFAULT_TIMELINE_GRAPH_WIDTH = 1000;
+const DEFAULT_TIMELINE_GRAPH_HEIGHT = 100;
 
-function timelineGraphY(value: number, minValue: number, maxValue: number): number {
+function timelineGraphY(value: number, minValue: number, maxValue: number, height: number): number {
   const span = Math.max(maxValue - minValue, Number.EPSILON);
   const normalized = Math.max(0, Math.min(1, (value - minValue) / span));
-  return (1 - normalized) * TIMELINE_GRAPH_HEIGHT;
+  return (1 - normalized) * height;
 }
 
 /** Build an SVG path for timeline-projected points, preserving null gaps. */
@@ -467,6 +472,8 @@ export function buildTimelineGraphPath(
   duration: number,
   minValue: number,
   maxValue: number,
+  width = DEFAULT_TIMELINE_GRAPH_WIDTH,
+  height = DEFAULT_TIMELINE_GRAPH_HEIGHT,
 ): string {
   const safeDuration = Math.max(duration, 0.0001);
   let needsMove = true;
@@ -476,11 +483,8 @@ export function buildTimelineGraphPath(
       needsMove = true;
       continue;
     }
-    const x = Math.max(
-      0,
-      Math.min(TIMELINE_GRAPH_WIDTH, (point.time / safeDuration) * TIMELINE_GRAPH_WIDTH),
-    );
-    const y = timelineGraphY(point.value, minValue, maxValue);
+    const x = Math.max(0, Math.min(width, (point.time / safeDuration) * width));
+    const y = timelineGraphY(point.value, minValue, maxValue, height);
     commands.push(`${needsMove ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`);
     needsMove = false;
   }
@@ -556,6 +560,8 @@ export function createTimelineOverlayPlugin(
   const rangeElements: TimelineRangeRecord[] = [];
   const rangeLanePlayheads: TimelineRangeLanePlayhead[] = [];
   const graphPlayheads: TimelineGraphPlayhead[] = [];
+  const graphLayouts = new Map<Element, TimelineGraphLayout>();
+  let graphResizeObserver: ResizeObserver | null = null;
   const eventLanePlayheads: TimelineEventLanePlayhead[] = [];
   let passedMarkerEndIndex = 0;
   let activeMarkers = new Set<TimelineMarkerRecord>();
@@ -658,8 +664,8 @@ export function createTimelineOverlayPlugin(
     for (const playhead of rangeLanePlayheads) {
       playhead.element.style.left = playheadLeft;
     }
-    const graphPlayheadX = `${(Math.min(currentTime, duration) / Math.max(duration, 0.0001)) * TIMELINE_GRAPH_WIDTH}`;
     for (const playhead of graphPlayheads) {
+      const graphPlayheadX = `${(Math.min(currentTime, duration) / Math.max(duration, 0.0001)) * playhead.coordinateWidth}`;
       playhead.element.setAttribute("x1", graphPlayheadX);
       playhead.element.setAttribute("x2", graphPlayheadX);
       playhead.track.setAttribute("aria-valuenow", `${Math.min(currentTime, duration)}`);
@@ -947,6 +953,9 @@ export function createTimelineOverlayPlugin(
       return;
     }
 
+    graphResizeObserver?.disconnect();
+    graphResizeObserver = null;
+    graphLayouts.clear();
     graphsRoot.replaceChildren();
     graphPlayheads.splice(0, graphPlayheads.length);
     const graphs = resolveGraphSources(extraGraphSources, context);
@@ -958,6 +967,15 @@ export function createTimelineOverlayPlugin(
     graphsRoot.hidden = false;
     const duration = Math.max(context.player.getTimelineDuration(), 0.0001);
     const svgNamespace = "http://www.w3.org/2000/svg";
+    if (typeof ResizeObserver !== "undefined") {
+      graphResizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          graphLayouts
+            .get(entry.target)
+            ?.resize(Math.max(1, entry.contentRect.width), Math.max(1, entry.contentRect.height));
+        }
+      });
+    }
 
     for (const graph of graphs) {
       const minValue = graph.minValue ?? 0;
@@ -986,8 +1004,25 @@ export function createTimelineOverlayPlugin(
       const svg = document.createElementNS(svgNamespace, "svg");
       svg.classList.add("sap-tl-graph-svg");
       svg.setAttribute("aria-hidden", "true");
-      svg.setAttribute("viewBox", `0 0 ${TIMELINE_GRAPH_WIDTH} ${TIMELINE_GRAPH_HEIGHT}`);
-      svg.setAttribute("preserveAspectRatio", "none");
+      const highlightLayouts: Array<{
+        element: SVGRectElement;
+        startRatio: number;
+        widthRatio: number;
+      }> = [];
+      const referenceLayouts: Array<{
+        element: SVGLineElement;
+        label: SVGTextElement | null;
+        value: number;
+      }> = [];
+      const seriesLayouts: Array<{
+        element: SVGPathElement;
+        points: ReplayTimelineGraphPoint[];
+      }> = [];
+      const markerLayouts: Array<{
+        element: SVGCircleElement;
+        timeRatio: number;
+        value: number;
+      }> = [];
 
       for (const highlight of graph.highlights ?? []) {
         if (
@@ -1005,13 +1040,6 @@ export function createTimelineOverlayPlugin(
         const rect = document.createElementNS(svgNamespace, "rect");
         rect.classList.add("sap-tl-graph-highlight");
         if (highlight.className) rect.classList.add(highlight.className);
-        rect.setAttribute("x", `${(bounds.startTimelineTime / duration) * TIMELINE_GRAPH_WIDTH}`);
-        rect.setAttribute("y", "0");
-        rect.setAttribute(
-          "width",
-          `${Math.max(0, ((bounds.endTimelineTime - bounds.startTimelineTime) / duration) * TIMELINE_GRAPH_WIDTH)}`,
-        );
-        rect.setAttribute("height", `${TIMELINE_GRAPH_HEIGHT}`);
         rect.setAttribute("fill", highlight.color ?? "rgba(255,255,255,0.08)");
         if (highlight.label) {
           const title = document.createElementNS(svgNamespace, "title");
@@ -1019,29 +1047,31 @@ export function createTimelineOverlayPlugin(
           rect.append(title);
         }
         svg.append(rect);
+        highlightLayouts.push({
+          element: rect,
+          startRatio: bounds.startTimelineTime / duration,
+          widthRatio: Math.max(0, (bounds.endTimelineTime - bounds.startTimelineTime) / duration),
+        });
       }
 
       for (const reference of graph.references ?? []) {
         if (!Number.isFinite(reference.value)) continue;
-        const y = timelineGraphY(reference.value, minValue, maxValue);
         const line = document.createElementNS(svgNamespace, "line");
         line.classList.add("sap-tl-graph-reference");
         if (reference.className) line.classList.add(reference.className);
         line.setAttribute("x1", "0");
-        line.setAttribute("x2", `${TIMELINE_GRAPH_WIDTH}`);
-        line.setAttribute("y1", `${y}`);
-        line.setAttribute("y2", `${y}`);
         line.setAttribute("stroke", reference.color ?? "rgba(255,255,255,0.32)");
         svg.append(line);
+        let referenceLabel: SVGTextElement | null = null;
         if (reference.label) {
           const text = document.createElementNS(svgNamespace, "text");
           text.classList.add("sap-tl-graph-reference-label");
-          text.setAttribute("x", "6");
-          text.setAttribute("y", `${Math.max(8, y - 3)}`);
           text.setAttribute("fill", reference.color ?? "rgba(255,255,255,0.62)");
           text.textContent = reference.label;
           svg.append(text);
+          referenceLabel = text;
         }
+        referenceLayouts.push({ element: line, label: referenceLabel, value: reference.value });
       }
 
       for (const series of graph.series) {
@@ -1051,10 +1081,6 @@ export function createTimelineOverlayPlugin(
         }));
         const path = document.createElementNS(svgNamespace, "path");
         path.classList.add("sap-tl-graph-series");
-        path.setAttribute(
-          "d",
-          buildTimelineGraphPath(projectedPoints, duration, minValue, maxValue),
-        );
         path.setAttribute("stroke", series.color);
         if (series.label) {
           const title = document.createElementNS(svgNamespace, "title");
@@ -1062,6 +1088,7 @@ export function createTimelineOverlayPlugin(
           path.append(title);
         }
         svg.append(path);
+        seriesLayouts.push({ element: path, points: projectedPoints });
       }
 
       for (const marker of graph.markers ?? []) {
@@ -1070,8 +1097,6 @@ export function createTimelineOverlayPlugin(
         const circle = document.createElementNS(svgNamespace, "circle");
         circle.classList.add("sap-tl-graph-marker");
         if (marker.className) circle.classList.add(marker.className);
-        circle.setAttribute("cx", `${(projection.timelineTime / duration) * TIMELINE_GRAPH_WIDTH}`);
-        circle.setAttribute("cy", `${timelineGraphY(marker.value, minValue, maxValue)}`);
         circle.setAttribute("r", "5");
         circle.setAttribute("fill", marker.color ?? "#ffffff");
         if (marker.label) {
@@ -1080,6 +1105,11 @@ export function createTimelineOverlayPlugin(
           circle.append(title);
         }
         svg.append(circle);
+        markerLayouts.push({
+          element: circle,
+          timeRatio: projection.timelineTime / duration,
+          value: marker.value,
+        });
       }
 
       const playhead = document.createElementNS(svgNamespace, "line");
@@ -1087,9 +1117,13 @@ export function createTimelineOverlayPlugin(
       playhead.setAttribute("x1", "0");
       playhead.setAttribute("x2", "0");
       playhead.setAttribute("y1", "0");
-      playhead.setAttribute("y2", `${TIMELINE_GRAPH_HEIGHT}`);
       svg.append(playhead);
-      graphPlayheads.push({ element: playhead, track });
+      const playheadLayout: TimelineGraphPlayhead = {
+        element: playhead,
+        track,
+        coordinateWidth: DEFAULT_TIMELINE_GRAPH_WIDTH,
+      };
+      graphPlayheads.push(playheadLayout);
 
       const seekFromPointer = (event: PointerEvent): void => {
         const rect = track.getBoundingClientRect();
@@ -1127,6 +1161,58 @@ export function createTimelineOverlayPlugin(
       track.append(svg);
       lane.append(label, track);
       graphsRoot.append(lane);
+
+      const layout: TimelineGraphLayout = {
+        resize(width, height): void {
+          const coordinateWidth = Math.max(1, width);
+          const coordinateHeight = Math.max(1, height);
+          svg.setAttribute("viewBox", `0 0 ${coordinateWidth} ${coordinateHeight}`);
+
+          for (const highlight of highlightLayouts) {
+            highlight.element.setAttribute("x", `${highlight.startRatio * coordinateWidth}`);
+            highlight.element.setAttribute("y", "0");
+            highlight.element.setAttribute("width", `${highlight.widthRatio * coordinateWidth}`);
+            highlight.element.setAttribute("height", `${coordinateHeight}`);
+          }
+
+          for (const reference of referenceLayouts) {
+            const y = timelineGraphY(reference.value, minValue, maxValue, coordinateHeight);
+            reference.element.setAttribute("x2", `${coordinateWidth}`);
+            reference.element.setAttribute("y1", `${y}`);
+            reference.element.setAttribute("y2", `${y}`);
+            reference.label?.setAttribute("x", "8");
+            reference.label?.setAttribute("y", `${Math.max(12, y - 5)}`);
+          }
+
+          for (const series of seriesLayouts) {
+            series.element.setAttribute(
+              "d",
+              buildTimelineGraphPath(
+                series.points,
+                duration,
+                minValue,
+                maxValue,
+                coordinateWidth,
+                coordinateHeight,
+              ),
+            );
+          }
+
+          for (const marker of markerLayouts) {
+            marker.element.setAttribute("cx", `${marker.timeRatio * coordinateWidth}`);
+            marker.element.setAttribute(
+              "cy",
+              `${timelineGraphY(marker.value, minValue, maxValue, coordinateHeight)}`,
+            );
+          }
+
+          playhead.setAttribute("y2", `${coordinateHeight}`);
+          playheadLayout.coordinateWidth = coordinateWidth;
+        },
+      };
+      graphLayouts.set(track, layout);
+      graphResizeObserver?.observe(track);
+      layout.resize(track.clientWidth, track.clientHeight);
     }
   }
 
@@ -1357,6 +1443,9 @@ export function createTimelineOverlayPlugin(
     teardown(context): void {
       removeWindowListeners?.();
       removeWindowListeners = null;
+      graphResizeObserver?.disconnect();
+      graphResizeObserver = null;
+      graphLayouts.clear();
       endScrub();
       root?.remove();
       root = null;

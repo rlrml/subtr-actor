@@ -220,7 +220,7 @@ export function ensureTimelineOverlayStyles(): void {
     }
 
     .sap-tl-graph-reference-label {
-      font-size: 7px;
+      font-size: 0.62rem;
       font-weight: 800;
       letter-spacing: 0.04em;
       paint-order: stroke;
