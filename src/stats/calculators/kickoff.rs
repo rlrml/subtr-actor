@@ -1086,9 +1086,7 @@ impl KickoffCalculator {
             {
                 active.speed_flip_directions.insert(
                     event.player.clone(),
-                    KickoffFlipDirection::from_local_side_component(
-                        event.estimated_dodge_impulse_side_component,
-                    ),
+                    KickoffFlipDirection::from_local_side_component(event.dodge_side_component),
                 );
             }
         }

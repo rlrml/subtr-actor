@@ -49,14 +49,15 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let is_speed_flip = |dodge: &DodgeEvent| -> bool {
+    let matching_speed_flip = |dodge: &DodgeEvent| -> Option<&SpeedFlipEvent> {
         speed_flips
             .iter()
-            .any(|sf| sf.player == dodge.player && (sf.time - dodge.time).abs() <= 0.15)
+            .copied()
+            .find(|sf| sf.player == dodge.player && (sf.time - dodge.time).abs() <= 0.15)
     };
 
     println!(
-        "idx\tclock\tabs_time\tframe\tplayer\tteam\tz\tspeed\tdspeed\timpulse_mag\tfwd\tright\tup\tdir_label\tconf\tonset_pitch\tonset_roll\tmin_fwd_z\tmax_fwd_dev\tmax_up_dev\tmin_up_z\ttq_x\ttq_y\ttq_hmag\tcurrent\ttrue_label"
+        "idx\tclock\tabs_time\tframe\tplayer\tteam\tz\tspeed\tdspeed\timpulse_mag\tfwd\tright\tup\tdir_label\tconf\tonset_pitch\tonset_roll\tmin_fwd_z\tmax_fwd_dev\tmax_up_dev\tmin_up_z\ttq_x\ttq_y\ttq_hmag\tcurrent\tsf_conf\tsf_align\tsf_nose_sweep\tsf_roll_sweep\ttrue_label"
     );
     let mut idx = 0;
     for dodge in &dodges {
@@ -102,8 +103,9 @@ fn main() -> anyhow::Result<()> {
             Some([x, y, _]) => (Some(x), Some(y), Some((x * x + y * y).sqrt())),
             None => (None, None, None),
         };
+        let speed_flip = matching_speed_flip(dodge);
         println!(
-            "{idx}\t{clock}\t{:.3}\t{}\t{}\t{}\t{}\t{:.0}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{idx}\t{clock}\t{:.3}\t{}\t{}\t{}\t{}\t{:.0}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             dodge.time,
             dodge.frame,
             player_name(&names, &dodge.player),
@@ -126,11 +128,18 @@ fn main() -> anyhow::Result<()> {
             opt(tq_x, 2),
             opt(tq_y, 2),
             opt(tq_hmag, 2),
-            if is_speed_flip(dodge) {
+            if speed_flip.is_some() {
                 "SPEED_FLIP"
             } else {
                 ""
             },
+            opt(speed_flip.map(|event| event.confidence), 3),
+            opt(speed_flip.map(|event| event.min_travel_alignment), 3),
+            opt(
+                speed_flip.map(|event| event.max_forward_deviation_degrees),
+                1,
+            ),
+            opt(speed_flip.map(|event| event.roll_sweep_degrees), 1),
         );
     }
     eprintln!(

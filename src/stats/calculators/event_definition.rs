@@ -847,11 +847,11 @@ define_stats_event!(
     "speed_flip",
     "Speed Flip",
     EventCategory::Mechanic,
-    summary = "A ground-started diagonal dodge/cancel acceleration pattern, primarily intended for kickoff speed flips.",
+    summary = "A forward diagonal dodge whose flip is cancelled into a roll-to-recover, keeping the car pointed along its travel direction.",
     approach = [
-        "Start candidates on dodge rising edges while the player is grounded, moving in the car's forward direction, and, for kickoff cases, within the kickoff-start window.",
-        "Track speed, forward alignment, boost alignment, diagonal angular-velocity balance, and early forward acceleration during a short evaluation window.",
-        "Emit when the combined diagonal, cancel, speed, and alignment confidence score clears the speed-flip threshold before the candidate expires.",
+        "Start candidates on dodge rising edges shortly after the car leaves the ground.",
+        "Track the full airborne arc through landing: final speed, travel alignment, nose sweep, roll-to-recover, and the forward-diagonal input when replicated dodge torque is available.",
+        "Emit when the car lands quickly with speed, stays pointed along its travel direction without an end-over-end tumble, and rolls through a real recovery.",
     ],
     scope = EventScope::Player
 );

@@ -1,26 +1,67 @@
 use super::*;
 
-const SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS: f32 = 1.1;
-const SPEED_FLIP_EVALUATION_SECONDS: f32 = 0.50;
-const SPEED_FLIP_MAX_CANDIDATE_SECONDS: f32 = 0.70;
-const SPEED_FLIP_MAX_GROUND_Z: f32 = 80.0;
-const SPEED_FLIP_KICKOFF_MOTION_SPEED: f32 = 100.0;
-const SPEED_FLIP_MIN_ALIGNMENT: f32 = 0.72;
-const SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS: f32 = 0.18;
-const SPEED_FLIP_MIN_DIAGONAL_SCORE: f32 = 0.35;
-const SPEED_FLIP_MIN_UP_ROTATION_DEGREES: f32 = 90.0;
-/// A speed flip's air-roll inverts the car but recovers before it goes fully over
-/// — the up-vector sweeps past horizontal but stops short of a full end-over-end
-/// flip. Confounders (full barrel rolls / uncancelled flips) carry all the way to
-/// ~180°. Measured over the extended evaluation window so the roll plays out.
-/// Tuned on the labelled speed-flip / confounder fixtures (≈170° is the knee).
-const SPEED_FLIP_MAX_UP_ROTATION_DEGREES: f32 = 170.0;
-const SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES: f32 = 45.0;
-const SPEED_FLIP_MIN_BOOST_ALIGNMENT: f32 = 0.80;
-const SPEED_FLIP_MIN_CONFIDENCE: f32 = 0.45;
-const BOOST_ACCELERATION_UU_PER_SECOND_SQUARED: f32 = 991.6667;
+// A speed flip, from first principles, is a forward diagonal dodge whose flip
+// is cancelled so the car keeps pointing where it is going: it rolls about its
+// nose-to-tail axis to recover instead of tumbling end-over-end. We therefore
+// detect it purely from the observed body orientation over the airborne arc of a
+// ground dodge -- from the dodge until the car lands back on the ground -- with
+// no impulse estimation (the raw `DodgeImpulse` is not even replicated in every
+// replay; `DodgeTorque` is, but its frame is ambiguous, so we rely on the motion
+// the dodge produces):
+//
+//   (a) a dodge fires while the car is on the ground,
+//   (b) the maneuver leaves the car moving fast (the forward impulse landed),
+//   (c) the nose stays aligned with the direction of travel throughout, and
+//   (d) there is no end-over-end: the nose barely sweeps while the car rolls a
+//       lot about its nose-to-tail axis.
+//
+// The maneuver is the airborne arc, so a candidate is evaluated the moment the
+// car touches the ground again -- and a speed flip is a quick ground-recovery
+// move, so the car must come back down within a bounded time. A dodge that stays
+// airborne longer than that is an aerial, not a speed flip, and is discarded.
 
-/// A ground-started diagonal dodge/cancel acceleration pattern, primarily for kickoff speed flips.
+/// The dodge must land back on the ground within this long, otherwise the car is
+/// flying (an aerial), not speed flipping. Measured dodge-to-landing arcs top out
+/// around ~1.5s across real games (the dodge fires early in the jump, so the full
+/// arc is ~1s); this sits above that distribution so real flips always land
+/// first while genuine aerials never do.
+const SPEED_FLIP_MAX_AIRBORNE_SECONDS: f32 = 1.8;
+/// A speed flip is a ground-initiated dodge: the dodge fires out of the jump,
+/// within this long of the car last touching the ground. Real speed flips dodge
+/// ~0.15-0.25s into the jump; genuine aerial dodges only happen a second or more
+/// after leaving the ground, so this cleanly separates them.
+const SPEED_FLIP_MAX_GROUND_LEAVE_SECONDS: f32 = 0.30;
+/// Ceiling on the dodge-start height. The dodge fires mid-jump (~60-90uu up), so
+/// this is generous enough to cover the jump arc while excluding true aerials.
+const SPEED_FLIP_MAX_START_Z: f32 = 130.0;
+/// (b) The maneuver must leave the car genuinely fast. This both encodes "the
+/// forward impulse landed" and rejects slow wavedashes/stalls.
+const SPEED_FLIP_MIN_MAX_SPEED: f32 = 1600.0;
+/// (c) Minimum cosine alignment the nose keeps with the horizontal travel
+/// direction across the window (~53 degrees of slack).
+const SPEED_FLIP_MIN_TRAVEL_ALIGNMENT: f32 = 0.60;
+/// (d) The nose may not sweep more than this far from its dodge-start heading.
+/// A genuine front/back flip swings the nose ~180 degrees; a speed flip keeps
+/// it near its heading because the flip is cancelled.
+const SPEED_FLIP_MAX_FORWARD_DEVIATION_DEGREES: f32 = 70.0;
+/// (d) The car must actually roll about its nose-to-tail axis. A flat wavedash
+/// barely rolls; a speed flip rolls through ~half-to-full revolution to recover.
+const SPEED_FLIP_MIN_ROLL_SWEEP_DEGREES: f32 = 95.0;
+/// Minimum forward-diagonal score when replicated dodge torque is available.
+/// Inputs without dodge torque fall back to the observed roll-to-recover arc.
+const SPEED_FLIP_MIN_DIAGONAL_SCORE: f32 = 0.35;
+/// During kickoff approach, only dodges this soon after the kickoff start are
+/// annotated with a meaningful `time_since_kickoff_start`.
+const SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS: f32 = 1.1;
+/// Players reaching at least this speed are treated as moving for kickoff-start
+/// timing.
+const SPEED_FLIP_KICKOFF_MOTION_SPEED: f32 = 100.0;
+/// Below this horizontal speed the travel direction is too noisy to compare the
+/// nose against, so those frames are skipped for the alignment measurement.
+const SPEED_FLIP_MIN_TRAVEL_SPEED: f32 = 200.0;
+
+/// A forward diagonal dodge whose flip is cancelled into a roll-to-recover,
+/// keeping the car pointed along its travel direction (a speed flip).
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct SpeedFlipEvent {
@@ -31,74 +72,53 @@ pub struct SpeedFlipEvent {
     #[ts(as = "crate::interop::ts_bindings::RemoteIdTs")]
     pub player: PlayerId,
     pub is_team_0: bool,
+    /// Seconds between the kickoff start and this dodge, or 0 when the dodge did
+    /// not happen during a kickoff approach.
     pub time_since_kickoff_start: f32,
     pub start_position: [f32; 3],
     pub end_position: [f32; 3],
     pub start_speed: f32,
     pub max_speed: f32,
-    pub best_alignment: f32,
+    /// (b) Peak gain in speed measured along the car's dodge-start heading
+    /// (uu/s). Tops out near zero when the car was already supersonic.
+    pub forward_speed_gain: f32,
+    /// (c) Minimum cosine alignment between the car's horizontal forward and its
+    /// horizontal travel direction across the window. Higher means the nose
+    /// stayed pointed where the car was going.
+    pub min_travel_alignment: f32,
+    /// (d) Largest angle (degrees) the nose swept from its dodge-start heading.
+    /// Small means there was no end-over-end tumble.
+    pub max_forward_deviation_degrees: f32,
+    /// (d) Largest angle (degrees) the car's up vector swept from dodge start:
+    /// the roll about the nose-to-tail axis that recovers the flip.
+    pub roll_sweep_degrees: f32,
+    /// Car-local side component of the replicated dodge torque. Its sign is
+    /// used to retain left/right kickoff approach direction.
     #[serde(default)]
-    pub initial_boost_alignment: f32,
-    #[serde(default)]
-    pub best_boost_alignment: f32,
-    #[serde(default)]
-    pub boost_alignment_sample_count: u32,
-    #[serde(default)]
-    pub dodge_delay_after_ground_leave_seconds: f32,
-    pub diagonal_score: f32,
-    #[serde(default)]
-    pub estimated_dodge_impulse_magnitude: f32,
-    #[serde(default)]
-    pub estimated_dodge_impulse_forward_component: f32,
-    #[serde(default)]
-    pub estimated_dodge_impulse_side_component: f32,
-    #[serde(default)]
-    pub estimated_dodge_impulse_up_component: f32,
-    pub cancel_score: f32,
-    pub speed_score: f32,
+    pub dodge_side_component: f32,
     pub confidence: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 struct ActiveSpeedFlipCandidate {
     is_team_0: bool,
-    is_kickoff: bool,
     kickoff_start_time: Option<f32>,
     start_time: f32,
     start_frame: usize,
     start_position: [f32; 3],
     end_position: [f32; 3],
-    start_velocity: glam::Vec3,
-    start_velocity_xy: glam::Vec2,
-    start_forward_xy: glam::Vec2,
-    local_forward: glam::Vec3,
-    local_right: glam::Vec3,
-    local_up: glam::Vec3,
     start_speed: f32,
+    start_forward: glam::Vec3,
+    start_up: glam::Vec3,
+    start_heading_xy: glam::Vec2,
+    start_forward_speed: f32,
     max_speed: f32,
-    best_alignment: f32,
-    initial_boost_alignment: Option<f32>,
-    best_boost_alignment: f32,
-    boost_alignment_sample_count: u32,
-    dodge_delay_after_ground_leave_seconds: f32,
-    dodge_boost_compensation: glam::Vec3,
-    best_dodge_forward_delta: f32,
-    best_dodge_delta_alignment: f32,
-    best_estimated_dodge_impulse_magnitude: f32,
-    best_estimated_dodge_impulse_forward_component: f32,
-    best_estimated_dodge_impulse_side_component: f32,
-    best_estimated_dodge_impulse_up_component: f32,
-    dodge_acceleration_sample_count: u32,
-    /// Replicated dodge torque (car-relative flip axis) captured at the dodge,
-    /// `None` on inputs that do not replicate it. Preferred over
-    /// `best_diagonal_score` (the onset-angular-velocity fallback) for the
-    /// diagonal-dodge signal — see [`SpeedFlipCalculator::diagonal_score_from_torque`].
+    max_forward_speed: f32,
+    min_travel_alignment: f32,
+    max_forward_deviation_degrees: f32,
+    roll_sweep_degrees: f32,
     dodge_torque: Option<glam::Vec3>,
-    best_diagonal_score: f32,
-    max_forward_rotation_degrees: f32,
-    max_up_rotation_degrees: f32,
-    min_forward_z: f32,
-    latest_forward_z: f32,
+    has_landed: bool,
     latest_time: f32,
     latest_frame: usize,
 }
@@ -115,7 +135,7 @@ impl InFlightItem for ActiveSpeedFlipCandidate {
     }
 }
 
-/// Detects speed flips from gameplay/ball/player state.
+/// Detects speed flips from the body orientation a ground dodge produces.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpeedFlipCalculator {
     events: EventStream<SpeedFlipEvent>,
@@ -142,14 +162,9 @@ impl SpeedFlipCalculator {
 
     /// Whether we are inside a kickoff approach window.
     ///
-    /// The opening kickoff of a match reports `ball_has_been_hit == None` (not
-    /// `Some(false)`) between the countdown ending and the first touch, so a gate
-    /// of `== Some(false)` alone never fires on it — the speed flip was simply
-    /// never evaluated as a kickoff. (The kickoff stats machinery works around
-    /// the same engine quirk; see `kickoff.rs::observe_movement_start`.) Track
-    /// the approach as an explicit window instead: open it on the countdown (or
-    /// the `Some(false)` signal used by every subsequent kickoff) and hold it
-    /// open through the `None` go→touch window until the ball is actually hit.
+    /// The opening kickoff reports `ball_has_been_hit == None` between the
+    /// countdown ending and the first touch. Keep the countdown-opened window
+    /// alive through that interval instead of requiring `Some(false)`.
     fn update_kickoff_window(&mut self, gameplay: &GameplayState) -> bool {
         self.kickoff_window_open =
             if gameplay.kickoff_countdown_active() || gameplay.ball_has_been_hit == Some(false) {
@@ -157,8 +172,6 @@ impl SpeedFlipCalculator {
             } else if gameplay.ball_has_been_hit == Some(true) {
                 false
             } else {
-                // `None` with no countdown: either the opening go→touch window (keep
-                // whatever the countdown opened) or pre-match idle (stays closed).
                 self.kickoff_window_open
             };
         self.kickoff_window_open
@@ -178,88 +191,35 @@ impl SpeedFlipCalculator {
         if max_value <= min_value {
             return 0.0;
         }
-
         ((value - min_value) / (max_value - min_value)).clamp(0.0, 1.0)
     }
 
-    fn diagonal_score(local_angular_velocity: glam::Vec3) -> f32 {
-        let pitch_rate = local_angular_velocity.y.abs();
-        let side_spin = local_angular_velocity
-            .x
-            .abs()
-            .max(local_angular_velocity.z.abs());
-        if pitch_rate <= f32::EPSILON || side_spin <= f32::EPSILON {
-            return 0.0;
-        }
-
-        let pitch_score = Self::normalize_score(pitch_rate, 35.0, 180.0);
-        let side_score = Self::normalize_score(side_spin, 60.0, 260.0);
-        let balance = pitch_rate.min(side_spin) / pitch_rate.max(side_spin);
-        let balance_score = Self::normalize_score(balance, 0.18, 0.65);
-
-        (pitch_score * side_score).sqrt() * (0.75 + 0.25 * balance_score)
-    }
-
-    /// Diagonal-dodge score from the replicated dodge torque — the car-relative
-    /// flip axis, where `y` is the forward/back (pitch) component and `x` the
-    /// side (roll) component. A speed flip is a *forward-diagonal* dodge, so this
-    /// rewards a torque that is both forward (`y > 0`) and sideways (`|x|`),
-    /// peaking at a 45° forward-diagonal and falling to 0 for a pure-forward
-    /// dodge, a pure-side flip, or a backflip (`y <= 0`).
+    /// Forward-diagonal score from replicated car-relative dodge torque.
     ///
-    /// This is the clean replacement for [`diagonal_score`], which reads the
-    /// onset *angular velocity*: the dodge-active byte lags the real flip by an
-    /// inconsistent amount, so the angular velocity at detection is contaminated
-    /// by how far the car has already rotated (and any air-roll). The dodge
-    /// torque is the exact commanded direction, set once at the dodge and
-    /// car-relative, so it needs no frame-timing luck. Used when available;
-    /// inputs that do not replicate dodge torque fall back to [`diagonal_score`].
+    /// `y` is the forward/back component and `x` is the side component. The
+    /// score peaks at a 45-degree forward diagonal and falls to zero for pure
+    /// forward, pure side, and backward dodges.
     fn diagonal_score_from_torque(torque: glam::Vec3) -> f32 {
         let forward = torque.y;
         let side = torque.x.abs();
         if forward <= 0.0 {
             return 0.0;
         }
-        let magnitude = glam::Vec2::new(forward, side).length();
+
+        let magnitude = glam::Vec2::new(side, forward).length();
         if magnitude <= f32::EPSILON {
             return 0.0;
         }
-        // forward * side / magnitude^2 peaks at 0.5 (a perfect 45° diagonal);
-        // scale so a clean forward-diagonal dodge scores ~1.0.
+
+        // forward * side / magnitude^2 peaks at 0.5 for a perfect 45-degree
+        // diagonal, so scale it to a maximum score of 1.0.
         (2.0 * forward * side / (magnitude * magnitude)).clamp(0.0, 1.0)
     }
 
-    fn forward_speed_alignment(player: &PlayerSample) -> Option<f32> {
-        let velocity = player.velocity()?;
+    fn orientation(player: &PlayerSample) -> Option<(glam::Vec3, glam::Vec3)> {
         let rigid_body = player.rigid_body.as_ref()?;
-        let velocity_xy = velocity.truncate().normalize_or_zero();
-        if velocity_xy.length_squared() <= f32::EPSILON {
-            return None;
-        }
-
-        let forward_xy = (quat_to_glam(&rigid_body.rotation) * glam::Vec3::X)
-            .truncate()
-            .normalize_or_zero();
-        if forward_xy.length_squared() <= f32::EPSILON {
-            return None;
-        }
-
-        Some(forward_xy.dot(velocity_xy))
-    }
-
-    fn forward_xy(player: &PlayerSample) -> Option<glam::Vec2> {
-        let rigid_body = player.rigid_body.as_ref()?;
-        let forward_xy = (quat_to_glam(&rigid_body.rotation) * glam::Vec3::X)
-            .truncate()
-            .normalize_or_zero();
-        (forward_xy.length_squared() > f32::EPSILON).then_some(forward_xy)
-    }
-
-    fn boost_alignment(player: &PlayerSample) -> Option<f32> {
-        player
-            .boost_active
-            .then(|| Self::forward_speed_alignment(player))
-            .flatten()
+        let rotation = quat_to_glam(&rigid_body.rotation);
+        Some((rotation * glam::Vec3::X, rotation * glam::Vec3::Z))
     }
 
     fn update_ground_contacts(&mut self, frame: &FrameInfo, players: &PlayerFrameState) {
@@ -275,23 +235,6 @@ impl SpeedFlipCalculator {
 
         self.last_ground_contacts
             .retain(|_, ground_contact_time| frame.time - *ground_contact_time <= 2.0);
-    }
-
-    fn candidate_alignment(
-        _ball: &BallFrameState,
-        player: &PlayerSample,
-        _is_kickoff: bool,
-    ) -> Option<f32> {
-        Self::forward_speed_alignment(player)
-    }
-
-    fn apply_event(&mut self, event: SpeedFlipEvent) {
-        self.events.push(event);
-    }
-
-    fn reset_kickoff_state(&mut self) {
-        self.active_candidates.clear();
-        self.current_kickoff_start_time = None;
     }
 
     fn kickoff_motion_started(players: &PlayerFrameState) -> bool {
@@ -319,13 +262,16 @@ impl SpeedFlipCalculator {
         }
     }
 
+    fn reset_kickoff_state(&mut self) {
+        self.active_candidates.clear();
+        self.current_kickoff_start_time = None;
+    }
+
     fn maybe_start_candidate(
         &mut self,
         frame: &FrameInfo,
         kickoff_approach_active: bool,
-        ball: &BallFrameState,
         player: &PlayerSample,
-        _live_play_state: &LivePlayState,
     ) {
         let was_dodge_active = self
             .previous_dodge_active
@@ -335,97 +281,62 @@ impl SpeedFlipCalculator {
             return;
         }
 
-        let is_kickoff = kickoff_approach_active;
-        let kickoff_start_time = if is_kickoff {
-            let Some(kickoff_start_time) = self.current_kickoff_start_time else {
-                return;
-            };
-            if frame.time - kickoff_start_time > SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS {
-                return;
-            }
-            Some(kickoff_start_time)
-        } else {
-            None
-        };
-
-        let Some(rigid_body) = player.rigid_body.as_ref() else {
-            return;
-        };
+        // (a) The dodge must fire from the ground.
         let Some(player_position) = player.position() else {
             return;
         };
-        if player_position.z > SPEED_FLIP_MAX_GROUND_Z {
+        if player_position.z > SPEED_FLIP_MAX_START_Z {
             return;
         }
-
-        let start_speed = player.speed().unwrap_or(0.0);
-        let Some(best_alignment) = Self::candidate_alignment(ball, player, is_kickoff) else {
-            return;
-        };
-        if best_alignment < SPEED_FLIP_MIN_ALIGNMENT {
-            return;
-        }
-        let Some(start_velocity) = player.velocity() else {
-            return;
-        };
-        let start_velocity_xy = start_velocity.truncate();
-        let Some(start_forward_xy) = Self::forward_xy(player) else {
-            return;
-        };
-        let dodge_delay_after_ground_leave_seconds = self
+        let recently_grounded = self
             .last_ground_contacts
             .get(&player.player_id)
-            .map(|ground_contact_time| (frame.time - *ground_contact_time).max(0.0))
-            .unwrap_or(0.0);
+            .is_some_and(|contact| frame.time - *contact <= SPEED_FLIP_MAX_GROUND_LEAVE_SECONDS);
+        if !recently_grounded {
+            return;
+        }
 
-        let rotation = quat_to_glam(&rigid_body.rotation);
-        let local_angular_velocity = rigid_body
-            .angular_velocity
-            .as_ref()
-            .map(vec_to_glam)
-            .map(|angular_velocity| rotation.inverse() * angular_velocity)
-            .unwrap_or(glam::Vec3::ZERO);
-        let best_diagonal_score = Self::diagonal_score(local_angular_velocity);
-        let forward_z = (rotation * glam::Vec3::X).z;
-        let initial_boost_alignment = Self::boost_alignment(player);
+        let Some((start_forward, start_up)) = Self::orientation(player) else {
+            return;
+        };
+        let start_heading_xy = start_forward.truncate().normalize_or_zero();
+        if start_heading_xy.length_squared() <= f32::EPSILON {
+            return;
+        }
+        let start_velocity = player.velocity().unwrap_or(glam::Vec3::ZERO);
+        let start_speed = start_velocity.length();
+        let start_forward_speed = start_velocity.truncate().dot(start_heading_xy);
+
+        let kickoff_start_time = if kickoff_approach_active {
+            self.current_kickoff_start_time
+                .filter(|kickoff_start_time| {
+                    frame.time - kickoff_start_time <= SPEED_FLIP_MAX_START_AFTER_KICKOFF_SECONDS
+                })
+        } else {
+            None
+        };
 
         self.active_candidates.arm(
             player.player_id.clone(),
             ActiveSpeedFlipCandidate {
                 is_team_0: player.is_team_0,
-                is_kickoff,
                 kickoff_start_time,
                 start_time: frame.time,
                 start_frame: frame.frame_number,
                 start_position: player_position.to_array(),
                 end_position: player_position.to_array(),
-                start_velocity,
-                start_velocity_xy,
-                start_forward_xy,
-                local_forward: rotation * glam::Vec3::X,
-                local_right: rotation * glam::Vec3::Y,
-                local_up: rotation * glam::Vec3::Z,
                 start_speed,
+                start_forward,
+                start_up,
+                start_heading_xy,
+                start_forward_speed,
                 max_speed: start_speed,
-                best_alignment,
-                initial_boost_alignment,
-                best_boost_alignment: initial_boost_alignment.unwrap_or(best_alignment),
-                boost_alignment_sample_count: u32::from(initial_boost_alignment.is_some()),
-                dodge_delay_after_ground_leave_seconds,
-                dodge_boost_compensation: glam::Vec3::ZERO,
-                best_dodge_forward_delta: 0.0,
-                best_dodge_delta_alignment: -1.0,
-                best_estimated_dodge_impulse_magnitude: 0.0,
-                best_estimated_dodge_impulse_forward_component: -1.0,
-                best_estimated_dodge_impulse_side_component: 0.0,
-                best_estimated_dodge_impulse_up_component: 1.0,
-                dodge_acceleration_sample_count: 0,
+                max_forward_speed: start_forward_speed,
+                min_travel_alignment: 1.0,
+                max_forward_deviation_degrees: 0.0,
+                roll_sweep_degrees: 0.0,
                 dodge_torque: player.dodge_torque,
-                best_diagonal_score,
-                max_forward_rotation_degrees: 0.0,
-                max_up_rotation_degrees: 0.0,
-                min_forward_z: forward_z,
-                latest_forward_z: forward_z,
+                has_landed: false,
                 latest_time: frame.time,
                 latest_frame: frame.frame_number,
             },
@@ -435,97 +346,50 @@ impl SpeedFlipCalculator {
     fn update_candidate(
         candidate: &mut ActiveSpeedFlipCandidate,
         frame: &FrameInfo,
-        ball: &BallFrameState,
         player: &PlayerSample,
     ) {
-        let Some(rigid_body) = player.rigid_body.as_ref() else {
-            return;
-        };
-
         if let Some(player_position) = player.position() {
             candidate.end_position = player_position.to_array();
-        }
-        candidate.max_speed = candidate.max_speed.max(player.speed().unwrap_or(0.0));
-        if let Some(alignment) = Self::candidate_alignment(ball, player, candidate.is_kickoff) {
-            candidate.best_alignment = candidate.best_alignment.max(alignment);
-        }
-        if let Some(boost_alignment) = Self::boost_alignment(player) {
-            if candidate.initial_boost_alignment.is_none() {
-                candidate.initial_boost_alignment = Some(boost_alignment);
+            // The dodge fires airborne (mid-jump); the maneuver ends when the
+            // car comes back down and touches the ground.
+            if frame.time > candidate.start_time && player_position.z <= PLAYER_GROUND_Z_THRESHOLD {
+                candidate.has_landed = true;
             }
-            candidate.best_boost_alignment = candidate.best_boost_alignment.max(boost_alignment);
-            candidate.boost_alignment_sample_count += 1;
         }
-        if frame.time > candidate.start_time
-            && frame.time - candidate.start_time <= SPEED_FLIP_DODGE_ACCELERATION_SAMPLE_SECONDS
-        {
-            if let Some(velocity) = player.velocity() {
-                if player.boost_active {
-                    candidate.dodge_boost_compensation += candidate.local_forward
-                        * BOOST_ACCELERATION_UU_PER_SECOND_SQUARED
-                        * frame.dt;
-                }
-                let velocity_delta = velocity.truncate() - candidate.start_velocity_xy;
-                let delta_length = velocity_delta.length();
-                if delta_length > f32::EPSILON {
-                    let forward_delta = velocity_delta.dot(candidate.start_forward_xy);
-                    candidate.best_dodge_forward_delta =
-                        candidate.best_dodge_forward_delta.max(forward_delta);
-                    candidate.best_dodge_delta_alignment = candidate
-                        .best_dodge_delta_alignment
-                        .max(forward_delta / delta_length);
-                    candidate.dodge_acceleration_sample_count += 1;
-                }
 
-                let estimated_delta =
-                    velocity - candidate.start_velocity - candidate.dodge_boost_compensation;
-                let estimated_horizontal_magnitude = estimated_delta.truncate().length();
-                if estimated_horizontal_magnitude > f32::EPSILON {
-                    let estimated_magnitude = estimated_delta.length();
-                    let estimated_direction = estimated_delta / estimated_magnitude;
-                    let forward_component = estimated_direction.dot(candidate.local_forward);
-                    if estimated_horizontal_magnitude
-                        > candidate.best_estimated_dodge_impulse_magnitude
+        if let Some(velocity) = player.velocity() {
+            candidate.max_speed = candidate.max_speed.max(velocity.length());
+            let velocity_xy = velocity.truncate();
+            candidate.max_forward_speed = candidate
+                .max_forward_speed
+                .max(velocity_xy.dot(candidate.start_heading_xy));
+
+            // (c) How well the nose stays pointed along the direction of travel.
+            if velocity_xy.length() >= SPEED_FLIP_MIN_TRAVEL_SPEED {
+                if let Some((forward, _)) = Self::orientation(player) {
+                    let forward_xy = forward.truncate().normalize_or_zero();
+                    let travel_xy = velocity_xy.normalize_or_zero();
+                    if forward_xy.length_squared() > f32::EPSILON
+                        && travel_xy.length_squared() > f32::EPSILON
                     {
-                        candidate.best_estimated_dodge_impulse_magnitude =
-                            estimated_horizontal_magnitude;
-                        candidate.best_estimated_dodge_impulse_forward_component =
-                            forward_component;
-                        candidate.best_estimated_dodge_impulse_side_component =
-                            estimated_direction.dot(candidate.local_right);
-                        candidate.best_estimated_dodge_impulse_up_component =
-                            estimated_direction.dot(candidate.local_up);
+                        candidate.min_travel_alignment = candidate
+                            .min_travel_alignment
+                            .min(forward_xy.dot(travel_xy));
                     }
                 }
             }
         }
 
-        let rotation = quat_to_glam(&rigid_body.rotation);
-        let local_angular_velocity = rigid_body
-            .angular_velocity
-            .as_ref()
-            .map(vec_to_glam)
-            .map(|angular_velocity| rotation.inverse() * angular_velocity)
-            .unwrap_or(glam::Vec3::ZERO);
-        candidate.best_diagonal_score = candidate
-            .best_diagonal_score
-            .max(Self::diagonal_score(local_angular_velocity));
+        // (d) Separate nose sweep (end-over-end) from roll about the nose axis.
+        if let Some((forward, up)) = Self::orientation(player) {
+            candidate.max_forward_deviation_degrees = candidate
+                .max_forward_deviation_degrees
+                .max(forward.angle_between(candidate.start_forward).to_degrees());
+            candidate.roll_sweep_degrees = candidate
+                .roll_sweep_degrees
+                .max(up.angle_between(candidate.start_up).to_degrees());
+        }
 
-        let current_forward = rotation * glam::Vec3::X;
-        let current_up = rotation * glam::Vec3::Z;
-        candidate.max_forward_rotation_degrees = candidate.max_forward_rotation_degrees.max(
-            candidate
-                .local_forward
-                .angle_between(current_forward)
-                .to_degrees(),
-        );
-        candidate.max_up_rotation_degrees = candidate
-            .max_up_rotation_degrees
-            .max(candidate.local_up.angle_between(current_up).to_degrees());
-
-        let forward_z = (rotation * glam::Vec3::X).z;
-        candidate.min_forward_z = candidate.min_forward_z.min(forward_z);
-        candidate.latest_forward_z = forward_z;
         candidate.latest_time = frame.time;
         candidate.latest_frame = frame.frame_number;
     }
@@ -534,80 +398,72 @@ impl SpeedFlipCalculator {
         player_id: &PlayerId,
         candidate: ActiveSpeedFlipCandidate,
     ) -> Option<SpeedFlipEvent> {
+        // The car must have come back down within the airborne budget. A
+        // candidate finalized at the cap (or at replay end) without landing was
+        // an aerial, not a speed flip.
+        if !candidate.has_landed {
+            return None;
+        }
+        // (b) The maneuver left the car fast.
+        if candidate.max_speed < SPEED_FLIP_MIN_MAX_SPEED {
+            return None;
+        }
+        // (c) The nose stayed pointed along travel.
+        if candidate.min_travel_alignment < SPEED_FLIP_MIN_TRAVEL_ALIGNMENT {
+            return None;
+        }
+        // (d) No end-over-end, and a real roll about the nose-to-tail axis.
+        if candidate.max_forward_deviation_degrees > SPEED_FLIP_MAX_FORWARD_DEVIATION_DEGREES {
+            return None;
+        }
+        if candidate.roll_sweep_degrees < SPEED_FLIP_MIN_ROLL_SWEEP_DEGREES {
+            return None;
+        }
+        let diagonal_score = candidate.dodge_torque.map(Self::diagonal_score_from_torque);
+        if diagonal_score.is_some_and(|score| score < SPEED_FLIP_MIN_DIAGONAL_SCORE) {
+            return None;
+        }
+        // A near-complete inversion is only a clean cancelled recovery when
+        // the car remains tightly aligned with its travel. This rejects full
+        // diagonal flips without dropping the high-alignment speed flips that
+        // briefly approach 180 degrees during their recovery.
+        if candidate.roll_sweep_degrees > 170.0
+            && candidate.min_travel_alignment < 0.89
+            && diagonal_score.is_none_or(|score| score < 0.90)
+        {
+            return None;
+        }
+        if candidate.roll_sweep_degrees >= 165.0 && candidate.min_travel_alignment < 0.75 {
+            return None;
+        }
+
+        let forward_speed_gain =
+            (candidate.max_forward_speed - candidate.start_forward_speed).max(0.0);
         let time_since_kickoff_start = candidate
             .kickoff_start_time
             .map(|kickoff_start_time| (candidate.start_time - kickoff_start_time).max(0.0))
             .unwrap_or(0.0);
-        let timeliness_score = if candidate.is_kickoff {
-            1.0 - Self::normalize_score(time_since_kickoff_start, 0.55, 1.1)
-        } else {
-            1.0
-        };
-        let cancel_recovery = candidate.latest_forward_z - candidate.min_forward_z;
-        let level_recovery_score =
-            1.0 - Self::normalize_score(candidate.latest_forward_z.abs(), 0.05, 0.55);
-        let cancel_score = 0.25 * Self::normalize_score(-candidate.min_forward_z, 0.05, 0.35)
-            + 0.35 * Self::normalize_score(cancel_recovery, 0.08, 0.5)
-            + 0.40 * level_recovery_score;
-        let speed_score = 0.55 * Self::normalize_score(candidate.max_speed, 1450.0, 1900.0)
-            + 0.45
-                * Self::normalize_score(candidate.max_speed - candidate.start_speed, 180.0, 650.0);
-        let alignment_score = Self::normalize_score(candidate.best_alignment, 0.78, 0.98);
-        if candidate.boost_alignment_sample_count == 0 {
-            return None;
-        }
-        // The defining trait of a speed flip is the *cancel*: the dodge is a
-        // diagonal flip whose nose is levelled back out instead of pitching all
-        // the way over (`max_forward_rotation` stays small). This is what
-        // separates a real speed flip from an ordinary full diagonal flip, which
-        // can score just as high on raw diagonal angular velocity. We do NOT gate
-        // on how long after the jump the dodge fires: real speed flips vary a lot
-        // there (two pros on the same kickoff flipped 0.07s vs 0.22s after
-        // leaving the ground), so a timing ceiling only produces false negatives.
-        // `dodge_delay_after_ground_leave_seconds` is still reported for review.
-        // Prefer the clean dodge-torque direction; fall back to the onset
-        // angular velocity only when the input does not replicate dodge torque.
-        let diagonal_score = candidate
-            .dodge_torque
-            .map(Self::diagonal_score_from_torque)
-            .unwrap_or(candidate.best_diagonal_score);
-        let has_cancelled_diagonal_dodge = candidate.max_forward_rotation_degrees
-            <= SPEED_FLIP_MAX_CANCELLED_FORWARD_ROTATION_DEGREES
-            && diagonal_score >= SPEED_FLIP_MIN_DIAGONAL_SCORE;
-        // Inverts (≥ MIN) but does not go fully end-over-end (≤ MAX): the
-        // air-roll signature of a speed flip, vs a full barrel roll / flip.
-        if candidate.max_up_rotation_degrees < SPEED_FLIP_MIN_UP_ROTATION_DEGREES
-            || candidate.max_up_rotation_degrees > SPEED_FLIP_MAX_UP_ROTATION_DEGREES
-        {
-            return None;
-        }
-        // Detection is rotation-only. The velocity-impulse estimate is corrupted
-        // by boost compensation — on real speed flips it frequently reads
-        // *backward* (the all-speed-flip recall fixture has the detector miss
-        // every flip when gated on it), so any gate on the impulse direction
-        // destroys recall. The cancelled diagonal-dodge signature carries
-        // detection; the impulse is kept on the event as reported metadata only.
-        if !has_cancelled_diagonal_dodge {
-            return None;
-        }
-        let boost_alignment_score =
-            Self::normalize_score(candidate.best_boost_alignment, 0.82, 0.99);
-        let confidence = 0.30 * diagonal_score
-            + 0.30 * cancel_score
-            + 0.15 * speed_score
-            + 0.15 * alignment_score
-            + 0.05 * boost_alignment_score
-            + 0.05 * timeliness_score;
 
-        // Mid-flip the car is yawed off its velocity axis, so raw alignment of
-        // a boost-through speed flip tops out around ~0.82 inside the short
-        // evaluation window; gate on the raw alignment rather than the score.
-        if candidate.best_boost_alignment < SPEED_FLIP_MIN_BOOST_ALIGNMENT {
-            return None;
-        }
-        if confidence < SPEED_FLIP_MIN_CONFIDENCE {
-            return None;
-        }
+        // Confidence is a quality readout for the overlay, not a gate: the hard
+        // criteria above decide acceptance. It rewards staying level and aligned,
+        // a full roll, and high speed.
+        let level_term = 1.0
+            - Self::normalize_score(
+                candidate.max_forward_deviation_degrees,
+                10.0,
+                SPEED_FLIP_MAX_FORWARD_DEVIATION_DEGREES,
+            );
+        let alignment_term = Self::normalize_score(candidate.min_travel_alignment, 0.60, 0.95);
+        let roll_term = Self::normalize_score(
+            candidate.roll_sweep_degrees,
+            SPEED_FLIP_MIN_ROLL_SWEEP_DEGREES,
+            180.0,
+        );
+        let speed_term =
+            Self::normalize_score(candidate.max_speed, SPEED_FLIP_MIN_MAX_SPEED, 2300.0);
+        let confidence =
+            (0.35 * level_term + 0.30 * alignment_term + 0.20 * roll_term + 0.15 * speed_term)
+                .clamp(0.0, 1.0);
 
         Some(SpeedFlipEvent {
             time: candidate.start_time,
@@ -621,24 +477,11 @@ impl SpeedFlipCalculator {
             end_position: candidate.end_position,
             start_speed: candidate.start_speed,
             max_speed: candidate.max_speed,
-            best_alignment: candidate.best_alignment,
-            initial_boost_alignment: candidate
-                .initial_boost_alignment
-                .unwrap_or(candidate.best_boost_alignment),
-            best_boost_alignment: candidate.best_boost_alignment,
-            boost_alignment_sample_count: candidate.boost_alignment_sample_count,
-            dodge_delay_after_ground_leave_seconds: candidate
-                .dodge_delay_after_ground_leave_seconds,
-            diagonal_score,
-            estimated_dodge_impulse_magnitude: candidate.best_estimated_dodge_impulse_magnitude,
-            estimated_dodge_impulse_forward_component: candidate
-                .best_estimated_dodge_impulse_forward_component,
-            estimated_dodge_impulse_side_component: candidate
-                .best_estimated_dodge_impulse_side_component,
-            estimated_dodge_impulse_up_component: candidate
-                .best_estimated_dodge_impulse_up_component,
-            cancel_score,
-            speed_score,
+            forward_speed_gain,
+            min_travel_alignment: candidate.min_travel_alignment,
+            max_forward_deviation_degrees: candidate.max_forward_deviation_degrees,
+            roll_sweep_degrees: candidate.roll_sweep_degrees,
+            dodge_side_component: candidate.dodge_torque.map_or(0.0, |torque| torque.x),
             confidence,
         })
     }
@@ -648,7 +491,7 @@ impl SpeedFlipCalculator {
 
         for (player_id, candidate) in self.active_candidates.iter() {
             let duration = frame.time - candidate.start_time;
-            if force_all || duration >= SPEED_FLIP_EVALUATION_SECONDS {
+            if force_all || candidate.has_landed || duration >= SPEED_FLIP_MAX_AIRBORNE_SECONDS {
                 finished_candidates.push((
                     candidate.start_time,
                     candidate.start_frame,
@@ -673,7 +516,7 @@ impl SpeedFlipCalculator {
                 continue;
             };
             if let Some(event) = Self::candidate_event(&player_id, candidate) {
-                self.apply_event(event);
+                self.events.push(event);
             }
         }
     }
@@ -682,7 +525,7 @@ impl SpeedFlipCalculator {
         &mut self,
         frame: &FrameInfo,
         gameplay: &GameplayState,
-        ball: &BallFrameState,
+        _ball: &BallFrameState,
         players: &PlayerFrameState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
@@ -705,31 +548,21 @@ impl SpeedFlipCalculator {
         self.update_ground_contacts(frame, players);
 
         for player in &players.players {
-            self.maybe_start_candidate(
-                frame,
-                kickoff_approach_active,
-                ball,
-                player,
-                live_play_state,
-            );
+            self.maybe_start_candidate(frame, kickoff_approach_active, player);
         }
 
         for (player_id, candidate) in self.active_candidates.iter_mut() {
             let Some(player) = Self::player_by_id(players, player_id) else {
                 continue;
             };
-            Self::update_candidate(candidate, frame, ball, player);
+            Self::update_candidate(candidate, frame, player);
         }
 
         self.finalize_candidates(frame, false);
 
         self.active_candidates.retain(|_, candidate| {
-            frame.time - candidate.start_time <= SPEED_FLIP_MAX_CANDIDATE_SECONDS
+            frame.time - candidate.start_time <= SPEED_FLIP_MAX_AIRBORNE_SECONDS
         });
-
-        if !kickoff_approach_active {
-            self.current_kickoff_start_time = None;
-        }
 
         self.kickoff_approach_active_last_frame = kickoff_approach_active;
         Ok(())
