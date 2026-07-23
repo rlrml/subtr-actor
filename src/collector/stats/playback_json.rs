@@ -382,23 +382,6 @@ pub(in crate::collector::stats::playback) fn json_optional_u64(
     }
 }
 
-pub(in crate::collector::stats::playback) fn json_optional_u32(
-    value: Option<&Value>,
-) -> SubtrActorResult<Option<u32>> {
-    match value {
-        None | Some(Value::Null) => Ok(None),
-        Some(value) => value
-            .as_u64()
-            .and_then(|number| u32::try_from(number).ok())
-            .map(Some)
-            .ok_or_else(|| {
-                SubtrActorError::new(SubtrActorErrorVariant::StatsSerializationError(
-                    "Expected optional JSON value to be an unsigned 32-bit integer".to_owned(),
-                ))
-            }),
-    }
-}
-
 pub(in crate::collector::stats::playback) fn json_goal_context_position(
     value: &Value,
 ) -> SubtrActorResult<GoalContextPosition> {

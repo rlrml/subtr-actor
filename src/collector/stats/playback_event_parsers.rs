@@ -1105,37 +1105,14 @@ pub(in crate::collector::stats::playback) fn parse_speed_flip_event(
         end_position: json_required_vec3(object, "end_position")?,
         start_speed: json_required_f32(object, "start_speed")?,
         max_speed: json_required_f32(object, "max_speed")?,
-        best_alignment: json_required_f32(object, "best_alignment")?,
-        initial_boost_alignment: json_optional_f32(object.get("initial_boost_alignment"))?
-            .unwrap_or(0.0),
-        best_boost_alignment: json_optional_f32(object.get("best_boost_alignment"))?.unwrap_or(0.0),
-        boost_alignment_sample_count: json_optional_u32(
-            object.get("boost_alignment_sample_count"),
-        )?
-        .unwrap_or(0),
-        dodge_delay_after_ground_leave_seconds: json_optional_f32(
-            object.get("dodge_delay_after_ground_leave_seconds"),
+        forward_speed_gain: json_optional_f32(object.get("forward_speed_gain"))?.unwrap_or(0.0),
+        min_travel_alignment: json_optional_f32(object.get("min_travel_alignment"))?.unwrap_or(0.0),
+        max_forward_deviation_degrees: json_optional_f32(
+            object.get("max_forward_deviation_degrees"),
         )?
         .unwrap_or(0.0),
-        diagonal_score: json_required_f32(object, "diagonal_score")?,
-        estimated_dodge_impulse_magnitude: json_optional_f32(
-            object.get("estimated_dodge_impulse_magnitude"),
-        )?
-        .unwrap_or(0.0),
-        estimated_dodge_impulse_forward_component: json_optional_f32(
-            object.get("estimated_dodge_impulse_forward_component"),
-        )?
-        .unwrap_or(0.0),
-        estimated_dodge_impulse_side_component: json_optional_f32(
-            object.get("estimated_dodge_impulse_side_component"),
-        )?
-        .unwrap_or(0.0),
-        estimated_dodge_impulse_up_component: json_optional_f32(
-            object.get("estimated_dodge_impulse_up_component"),
-        )?
-        .unwrap_or(0.0),
-        cancel_score: json_required_f32(object, "cancel_score")?,
-        speed_score: json_required_f32(object, "speed_score")?,
+        roll_sweep_degrees: json_optional_f32(object.get("roll_sweep_degrees"))?.unwrap_or(0.0),
+        dodge_side_component: json_optional_f32(object.get("dodge_side_component"))?.unwrap_or(0.0),
         confidence: json_required_f32(object, "confidence")?,
     })
 }

@@ -234,11 +234,12 @@ pub(super) fn extract_candidates(
                         end_time: event.time,
                         confidence: Some(confidence),
                         reason: format!(
-                            "{}% confidence; max speed {:.0}; diagonal {:.2}; cancel {:.2}",
+                            "{}% confidence; max speed {:.0}; travel align {:.2}; nose sweep {:.0}deg; roll {:.0}deg",
                             confidence_pct(confidence),
                             event.max_speed,
-                            event.diagonal_score,
-                            event.cancel_score
+                            event.min_travel_alignment,
+                            event.max_forward_deviation_degrees,
+                            event.roll_sweep_degrees
                         ),
                         event: event_json(event),
                     }

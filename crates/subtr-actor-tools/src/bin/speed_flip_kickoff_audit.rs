@@ -43,9 +43,10 @@ struct DetectedSpeedFlip {
     time: f32,
     time_since_kickoff_start: f32,
     confidence: f32,
-    diagonal_score: f32,
-    cancel_score: f32,
-    speed_score: f32,
+    min_travel_alignment: f32,
+    max_forward_deviation_degrees: f32,
+    roll_sweep_degrees: f32,
+    forward_speed_gain: f32,
     max_speed: f32,
 }
 
@@ -100,9 +101,10 @@ fn audit_replay(path: &str) -> anyhow::Result<ReplayAudit> {
                 time: event.time,
                 time_since_kickoff_start: event.time - start_time,
                 confidence: event.confidence,
-                diagonal_score: event.diagonal_score,
-                cancel_score: event.cancel_score,
-                speed_score: event.speed_score,
+                min_travel_alignment: event.min_travel_alignment,
+                max_forward_deviation_degrees: event.max_forward_deviation_degrees,
+                roll_sweep_degrees: event.roll_sweep_degrees,
+                forward_speed_gain: event.forward_speed_gain,
                 max_speed: event.max_speed,
             })
             .collect();
@@ -115,9 +117,10 @@ fn audit_replay(path: &str) -> anyhow::Result<ReplayAudit> {
                 time: event.time,
                 time_since_kickoff_start: event.time - start_time,
                 confidence: event.confidence,
-                diagonal_score: event.diagonal_score,
-                cancel_score: event.cancel_score,
-                speed_score: event.speed_score,
+                min_travel_alignment: event.min_travel_alignment,
+                max_forward_deviation_degrees: event.max_forward_deviation_degrees,
+                roll_sweep_degrees: event.roll_sweep_degrees,
+                forward_speed_gain: event.forward_speed_gain,
                 max_speed: event.max_speed,
             })
             .collect();

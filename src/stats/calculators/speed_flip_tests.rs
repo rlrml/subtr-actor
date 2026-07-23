@@ -1,29 +1,40 @@
 use super::*;
 
-fn rigid_body(position: glam::Vec3, velocity: glam::Vec3) -> boxcars::RigidBody {
+fn quat_from_axis_angle(axis: glam::Vec3, degrees: f32) -> boxcars::Quaternion {
+    let q = glam::Quat::from_axis_angle(axis.normalize(), degrees.to_radians());
+    boxcars::Quaternion {
+        x: q.x,
+        y: q.y,
+        z: q.z,
+        w: q.w,
+    }
+}
+
+fn rigid_body(
+    position: glam::Vec3,
+    velocity: glam::Vec3,
+    rotation: boxcars::Quaternion,
+) -> boxcars::RigidBody {
     boxcars::RigidBody {
         sleeping: false,
         location: glam_to_vec(&position),
-        rotation: boxcars::Quaternion {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-        },
+        rotation,
         linear_velocity: Some(glam_to_vec(&velocity)),
         angular_velocity: Some(glam_to_vec(&glam::Vec3::ZERO)),
     }
 }
 
-fn player(velocity: glam::Vec3, dodge_active: bool) -> PlayerSample {
+fn player(
+    position: glam::Vec3,
+    velocity: glam::Vec3,
+    rotation: boxcars::Quaternion,
+    dodge_active: bool,
+) -> PlayerSample {
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(1),
         is_team_0: true,
         hitbox: default_car_hitbox(),
-        rigid_body: Some(rigid_body(
-            glam::Vec3::new(-2048.0, -2560.0, 17.0),
-            velocity,
-        )),
+        rigid_body: Some(rigid_body(position, velocity, rotation)),
         boost_amount: None,
         last_boost_amount: None,
         boost_active: false,
@@ -38,357 +49,396 @@ fn player(velocity: glam::Vec3, dodge_active: bool) -> PlayerSample {
     }
 }
 
-fn strong_candidate(boost_alignment_sample_count: u32) -> ActiveSpeedFlipCandidate {
-    ActiveSpeedFlipCandidate {
-        is_team_0: true,
-        is_kickoff: false,
-        kickoff_start_time: None,
-        start_time: 1.0,
-        start_frame: 10,
-        start_position: [0.0, 0.0, 17.0],
-        end_position: [450.0, 0.0, 50.0],
-        start_velocity: glam::Vec3::new(900.0, 0.0, 0.0),
-        start_velocity_xy: glam::Vec2::new(900.0, 0.0),
-        start_forward_xy: glam::Vec2::X,
-        local_forward: glam::Vec3::X,
-        local_right: glam::Vec3::Y,
-        local_up: glam::Vec3::Z,
-        start_speed: 900.0,
-        max_speed: 1800.0,
-        best_alignment: 0.98,
-        initial_boost_alignment: (boost_alignment_sample_count > 0).then_some(0.91),
-        best_boost_alignment: 0.98,
-        boost_alignment_sample_count,
-        dodge_delay_after_ground_leave_seconds: 0.045,
-        dodge_boost_compensation: glam::Vec3::ZERO,
-        best_dodge_forward_delta: 320.0,
-        best_dodge_delta_alignment: 0.72,
-        best_estimated_dodge_impulse_magnitude: 340.0,
-        best_estimated_dodge_impulse_forward_component: 0.72,
-        best_estimated_dodge_impulse_side_component: 0.42,
-        best_estimated_dodge_impulse_up_component: 0.08,
-        dodge_acceleration_sample_count: 2,
-        dodge_torque: None,
-        best_diagonal_score: 1.0,
-        max_forward_rotation_degrees: 24.0,
-        max_up_rotation_degrees: 120.0,
-        min_forward_z: -0.16,
-        latest_forward_z: 0.02,
-        latest_time: 1.32,
-        latest_frame: 20,
+fn frame(frame_number: usize, time: f32) -> FrameInfo {
+    FrameInfo {
+        frame_number,
+        time,
+        dt: 0.05,
+        seconds_remaining: None,
+    }
+}
+
+fn live() -> LivePlayState {
+    LivePlayState {
+        is_live_play: true,
+        ..Default::default()
+    }
+}
+
+fn step(
+    calculator: &mut SpeedFlipCalculator,
+    frame_number: usize,
+    time: f32,
+    sample: PlayerSample,
+) {
+    calculator
+        .update_parts(
+            &frame(frame_number, time),
+            &GameplayState::default(),
+            &BallFrameState::default(),
+            &PlayerFrameState {
+                players: vec![sample],
+            },
+            &live(),
+        )
+        .unwrap();
+}
+
+const GROUND_Z: f32 = 17.0;
+const FAST: f32 = 2000.0;
+
+/// Drive a player forward on the ground, jump-dodge into the air, play a
+/// maneuver described by `forward` / `up` orientations while airborne, then land
+/// back on the ground (which is what finalizes the candidate). Returns emitted
+/// events.
+fn run_maneuver(
+    orientations: &[(glam::Vec3, glam::Vec3)],
+    velocity: glam::Vec3,
+) -> Vec<SpeedFlipEvent> {
+    run_maneuver_with_torque(orientations, velocity, None)
+}
+
+fn run_maneuver_with_torque(
+    orientations: &[(glam::Vec3, glam::Vec3)],
+    velocity: glam::Vec3,
+    dodge_torque: Option<glam::Vec3>,
+) -> Vec<SpeedFlipEvent> {
+    let mut calculator = SpeedFlipCalculator::new();
+    let identity = quat_from_axis_angle(glam::Vec3::Z, 0.0);
+    let ground = glam::Vec3::new(0.0, 0.0, GROUND_Z);
+    let air = glam::Vec3::new(0.0, 0.0, 80.0);
+
+    // Two grounded, non-dodging warm-up frames to record ground contact.
+    step(
+        &mut calculator,
+        0,
+        0.0,
+        player(ground, velocity, identity, false),
+    );
+    step(
+        &mut calculator,
+        1,
+        0.05,
+        player(ground, velocity, identity, false),
+    );
+
+    // Dodge rising edge, airborne out of the jump.
+    let mut dodge_sample = player(air, velocity, identity, true);
+    dodge_sample.dodge_torque = dodge_torque;
+    step(&mut calculator, 2, 0.10, dodge_sample);
+
+    // The maneuver: rotate the body frame by frame while airborne. We
+    // approximate orientation by building a rotation whose forward/up match the
+    // requested vectors.
+    let mut t = 0.15;
+    let mut n = 3;
+    for (forward, up) in orientations {
+        let rotation = rotation_from_forward_up(*forward, *up);
+        step(&mut calculator, n, t, player(air, velocity, rotation, true));
+        t += 0.05;
+        n += 1;
+    }
+
+    // Land back on the ground: touching down ends the maneuver and finalizes.
+    step(
+        &mut calculator,
+        n,
+        t,
+        player(
+            ground,
+            velocity,
+            quat_from_axis_angle(glam::Vec3::Z, 0.0),
+            false,
+        ),
+    );
+    calculator.finalize_parts(&frame(n + 1, t + 0.1));
+    calculator.events().to_vec()
+}
+
+fn rotation_from_forward_up(forward: glam::Vec3, up: glam::Vec3) -> boxcars::Quaternion {
+    let f = forward.normalize();
+    let u = up.normalize();
+    let right = u.cross(f).normalize();
+    let up = f.cross(right).normalize();
+    let mat = glam::Mat3::from_cols(f, right, up);
+    let q = glam::Quat::from_mat3(&mat);
+    boxcars::Quaternion {
+        x: q.x,
+        y: q.y,
+        z: q.z,
+        w: q.w,
     }
 }
 
 #[test]
-fn diagonal_score_accepts_side_dominant_pitch_and_side_spin() {
-    let score = SpeedFlipCalculator::diagonal_score(glam::Vec3::new(64.0, 55.0, 186.0));
+fn accepts_forward_diagonal_roll_to_recover() {
+    // Nose stays near +X (aligned with travel) while the up vector rolls a full
+    // revolution: a clean speed flip.
+    let forward = glam::Vec3::X;
+    let orientations: Vec<(glam::Vec3, glam::Vec3)> = (0..10)
+        .map(|i| {
+            let roll = (i as f32) * 36.0_f32.to_radians();
+            // small forward dip, big roll about the nose axis
+            let up = glam::Vec3::new(-0.2, 0.0, 1.0).normalize();
+            let up = glam::Quat::from_axis_angle(glam::Vec3::X, roll) * up;
+            (forward, up)
+        })
+        .collect();
+
+    let events = run_maneuver(&orientations, glam::Vec3::new(FAST, 0.0, 0.0));
+    assert_eq!(events.len(), 1, "expected one speed flip, got {events:#?}");
+    let event = &events[0];
+    assert!(event.max_forward_deviation_degrees <= SPEED_FLIP_MAX_FORWARD_DEVIATION_DEGREES);
+    assert!(event.roll_sweep_degrees >= SPEED_FLIP_MIN_ROLL_SWEEP_DEGREES);
+    assert!(event.min_travel_alignment >= SPEED_FLIP_MIN_TRAVEL_ALIGNMENT);
+}
+
+#[test]
+fn replicated_dodge_torque_requires_a_forward_diagonal_input() {
+    let orientations: Vec<(glam::Vec3, glam::Vec3)> = (0..10)
+        .map(|i| {
+            let roll = (i as f32) * 36.0_f32.to_radians();
+            let up = glam::Quat::from_axis_angle(glam::Vec3::X, roll) * glam::Vec3::Z;
+            (glam::Vec3::X, up)
+        })
+        .collect();
+
+    let diagonal = run_maneuver_with_torque(
+        &orientations,
+        glam::Vec3::new(FAST, 0.0, 0.0),
+        Some(glam::Vec3::new(1.84, 1.84, 0.0)),
+    );
+    assert_eq!(diagonal.len(), 1);
+    assert_eq!(diagonal[0].dodge_side_component, 1.84);
+
+    for torque in [
+        glam::Vec3::new(0.0, 2.6, 0.0),
+        glam::Vec3::new(2.6, 0.0, 0.0),
+        glam::Vec3::new(1.84, -1.84, 0.0),
+    ] {
+        let events =
+            run_maneuver_with_torque(&orientations, glam::Vec3::new(FAST, 0.0, 0.0), Some(torque));
+        assert!(
+            events.is_empty(),
+            "non-forward-diagonal torque should be rejected: {torque:?}"
+        );
+    }
+}
+
+#[test]
+fn near_complete_roll_requires_alignment_or_a_strong_diagonal_input() {
+    let maneuver = |heading_degrees: f32, roll_degrees: f32| {
+        let forward = glam::Quat::from_axis_angle(glam::Vec3::Z, heading_degrees.to_radians())
+            * glam::Vec3::X;
+        (0..10)
+            .map(|i| {
+                let roll = roll_degrees * (i as f32 / 9.0);
+                let up = glam::Quat::from_axis_angle(forward, roll.to_radians()) * glam::Vec3::Z;
+                (forward, up)
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let moderately_aligned = maneuver(30.0, 175.0);
+    let strong_diagonal = run_maneuver_with_torque(
+        &moderately_aligned,
+        glam::Vec3::new(FAST, 0.0, 0.0),
+        Some(glam::Vec3::new(1.84, 1.84, 0.0)),
+    );
+    assert_eq!(strong_diagonal.len(), 1);
+
+    let weak_diagonal = run_maneuver_with_torque(
+        &moderately_aligned,
+        glam::Vec3::new(FAST, 0.0, 0.0),
+        Some(glam::Vec3::new(2.3, 1.1, 0.0)),
+    );
+    assert!(weak_diagonal.is_empty());
+
+    let poorly_aligned = run_maneuver_with_torque(
+        &maneuver(45.0, 168.0),
+        glam::Vec3::new(FAST, 0.0, 0.0),
+        Some(glam::Vec3::new(1.84, 1.84, 0.0)),
+    );
+    assert!(poorly_aligned.is_empty());
+}
+
+#[test]
+fn opening_kickoff_window_stays_open_until_the_first_ball_hit() {
+    let mut calculator = SpeedFlipCalculator::default();
+
+    assert!(calculator.update_kickoff_window(&GameplayState {
+        kickoff_countdown_time: Some(3),
+        ..Default::default()
+    }));
+    assert!(calculator.update_kickoff_window(&GameplayState::default()));
+    assert!(!calculator.update_kickoff_window(&GameplayState {
+        ball_has_been_hit: Some(true),
+        ..Default::default()
+    }));
+}
+
+#[test]
+fn rejects_front_flip_that_goes_end_over_end() {
+    // The nose pitches all the way over (end-over-end): forward sweeps ~180.
+    let orientations: Vec<(glam::Vec3, glam::Vec3)> = (0..10)
+        .map(|i| {
+            let pitch = (i as f32) * 18.0_f32.to_radians();
+            let rot = glam::Quat::from_axis_angle(glam::Vec3::Y, pitch);
+            (rot * glam::Vec3::X, rot * glam::Vec3::Z)
+        })
+        .collect();
+
+    let events = run_maneuver(&orientations, glam::Vec3::new(FAST, 0.0, 0.0));
+    assert!(
+        events.is_empty(),
+        "front flip should be rejected, got {events:#?}"
+    );
+}
+
+#[test]
+fn rejects_flat_wavedash_without_roll() {
+    // Nose stays put and the car barely rolls: a wavedash, not a speed flip.
+    let orientations: Vec<(glam::Vec3, glam::Vec3)> = (0..10)
+        .map(|i| {
+            let roll = (i as f32) * 3.0_f32.to_radians();
+            let up = glam::Quat::from_axis_angle(glam::Vec3::X, roll) * glam::Vec3::Z;
+            (glam::Vec3::X, up)
+        })
+        .collect();
+
+    let events = run_maneuver(&orientations, glam::Vec3::new(FAST, 0.0, 0.0));
+    assert!(
+        events.is_empty(),
+        "wavedash should be rejected, got {events:#?}"
+    );
+}
+
+#[test]
+fn rejects_when_nose_drifts_off_travel_direction() {
+    // The car rolls plenty, but the nose veers ~70 degrees off the travel
+    // direction: not a speed flip (criterion c).
+    let orientations: Vec<(glam::Vec3, glam::Vec3)> = (0..10)
+        .map(|i| {
+            let yaw = (i as f32) * 8.0_f32.to_radians();
+            let roll = (i as f32) * 20.0_f32.to_radians();
+            let forward = glam::Quat::from_axis_angle(glam::Vec3::Z, yaw) * glam::Vec3::X;
+            let up = glam::Quat::from_axis_angle(forward, roll) * glam::Vec3::Z;
+            (forward, up)
+        })
+        .collect();
+
+    // Travel stays along +X while the nose yaws away.
+    let events = run_maneuver(&orientations, glam::Vec3::new(FAST, 0.0, 0.0));
+    assert!(
+        events.is_empty(),
+        "nose drifting off travel should be rejected, got {events:#?}"
+    );
+}
+
+#[test]
+fn rejects_slow_dodge_that_does_not_reach_speed() {
+    let forward = glam::Vec3::X;
+    let orientations: Vec<(glam::Vec3, glam::Vec3)> = (0..10)
+        .map(|i| {
+            let roll = (i as f32) * 36.0_f32.to_radians();
+            let up = glam::Quat::from_axis_angle(glam::Vec3::X, roll) * glam::Vec3::Z;
+            (forward, up)
+        })
+        .collect();
+
+    // Below SPEED_FLIP_MIN_MAX_SPEED throughout.
+    let events = run_maneuver(&orientations, glam::Vec3::new(900.0, 0.0, 0.0));
+    assert!(
+        events.is_empty(),
+        "slow dodge should be rejected, got {events:#?}"
+    );
+}
+
+#[test]
+fn rejects_ground_dodge_that_stays_airborne_too_long() {
+    // A clean roll-to-recover orientation, but the car never comes back down
+    // within the airborne budget: an aerial, not a speed flip.
+    let mut calculator = SpeedFlipCalculator::new();
+    let identity = quat_from_axis_angle(glam::Vec3::Z, 0.0);
+    let ground = glam::Vec3::new(0.0, 0.0, GROUND_Z);
+    let air = glam::Vec3::new(0.0, 0.0, 300.0);
+    let velocity = glam::Vec3::new(FAST, 0.0, 0.0);
+
+    step(
+        &mut calculator,
+        0,
+        0.0,
+        player(ground, velocity, identity, false),
+    );
+    step(
+        &mut calculator,
+        1,
+        0.05,
+        player(ground, velocity, identity, false),
+    );
+    step(
+        &mut calculator,
+        2,
+        0.10,
+        player(air, velocity, identity, true),
+    );
+
+    // Stay airborne, rolling, well past SPEED_FLIP_MAX_AIRBORNE_SECONDS.
+    let mut t = 0.15;
+    let mut n = 3;
+    while t - 0.10 <= SPEED_FLIP_MAX_AIRBORNE_SECONDS + 0.3 {
+        let roll = (n as f32) * 18.0_f32.to_radians();
+        let up = glam::Quat::from_axis_angle(glam::Vec3::X, roll) * glam::Vec3::Z;
+        let rotation = rotation_from_forward_up(glam::Vec3::X, up);
+        step(&mut calculator, n, t, player(air, velocity, rotation, true));
+        t += 0.05;
+        n += 1;
+    }
+    calculator.finalize_parts(&frame(n + 1, t + 0.1));
 
     assert!(
-        score > 0.2,
-        "expected non-zero speed-flip-like diagonal score, got {score}"
-    );
-    assert_eq!(
-        SpeedFlipCalculator::diagonal_score(glam::Vec3::new(0.0, 0.0, 186.0)),
-        0.0
-    );
-    assert_eq!(
-        SpeedFlipCalculator::diagonal_score(glam::Vec3::new(0.0, 186.0, 0.0)),
-        0.0
+        calculator.events().is_empty(),
+        "a dodge that never lands in time should be rejected, got {:#?}",
+        calculator.events()
     );
 }
 
 #[test]
-fn candidate_event_requires_boost_aligned_sample() {
-    let player_id = boxcars::RemoteId::Steam(1);
+fn rejects_aerial_dodge_not_started_from_ground() {
+    let mut calculator = SpeedFlipCalculator::new();
+    let identity = quat_from_axis_angle(glam::Vec3::Z, 0.0);
+    let airborne = glam::Vec3::new(0.0, 0.0, 500.0);
+    let velocity = glam::Vec3::new(FAST, 0.0, 0.0);
 
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, strong_candidate(0)).is_none());
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, strong_candidate(2)).is_some());
-}
-
-#[test]
-fn candidate_event_exports_alignment_and_dodge_timing_metadata() {
-    let player_id = boxcars::RemoteId::Steam(1);
-
-    let event = SpeedFlipCalculator::candidate_event(&player_id, strong_candidate(2)).unwrap();
-
-    assert_eq!(event.initial_boost_alignment, 0.91);
-    assert_eq!(event.best_boost_alignment, 0.98);
-    assert_eq!(event.boost_alignment_sample_count, 2);
-    assert_eq!(event.dodge_delay_after_ground_leave_seconds, 0.045);
-}
-
-#[test]
-#[ignore = "tested the removed impulse-based rejection; detection is now rotation-only. \
-Side-flip/wavedash rejection needs a rotation-based gate (onset-pitch forwardness / \
-low up-rotation) — TODO, see the confounder precision fixture."]
-fn candidate_event_rejects_sideways_dodge_acceleration() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut sideways_candidate = strong_candidate(2);
-    sideways_candidate.best_dodge_forward_delta = 50.0;
-    sideways_candidate.best_dodge_delta_alignment = 0.10;
-
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, sideways_candidate).is_none());
-}
-
-#[test]
-fn candidate_event_accepts_speed_flip_regardless_of_dodge_delay_after_ground_leave() {
-    // There is intentionally no ceiling on how long after leaving the ground the
-    // dodge fires: real speed flips vary widely there. A clean cancelled flip is
-    // accepted even with a long ground-leave-to-dodge delay.
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut late_dodge_candidate = strong_candidate(2);
-    late_dodge_candidate.dodge_delay_after_ground_leave_seconds = 0.50;
-
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, late_dodge_candidate).is_some());
-}
-
-#[test]
-fn candidate_event_rejects_noncancelled_full_diagonal_flip() {
-    // A full diagonal flip (the nose pitches all the way over) can score just as
-    // high on raw diagonal angular velocity as a speed flip, but it is not one.
-    // Without the cancel (small `max_forward_rotation`) and without a clean
-    // diagonal impulse, it must be rejected.
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut full_flip_candidate = strong_candidate(2);
-    full_flip_candidate.best_diagonal_score = 0.93;
-    full_flip_candidate.max_forward_rotation_degrees = 115.0;
-    // Impulse direction is diagonal-ish but not in the tight `has_diagonal_impulse`
-    // side-component band, so the cancel is the only thing that could accept it.
-    full_flip_candidate.best_estimated_dodge_impulse_side_component = 0.70;
-
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, full_flip_candidate).is_none());
-}
-
-#[test]
-fn candidate_event_rejects_frontflip_like_candidate_without_diagonal_rotation() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut frontflip_candidate = strong_candidate(2);
-    frontflip_candidate.best_estimated_dodge_impulse_forward_component = 0.98;
-    frontflip_candidate.best_estimated_dodge_impulse_side_component = 0.04;
-    frontflip_candidate.best_estimated_dodge_impulse_up_component = 0.10;
-    frontflip_candidate.best_diagonal_score = 0.10;
-
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, frontflip_candidate).is_none());
-}
-
-#[test]
-#[ignore = "tested the removed impulse-based rejection; detection is now rotation-only. \
-Side-flip/wavedash rejection needs a rotation-based gate (onset-pitch forwardness / \
-low up-rotation) — TODO, see the confounder precision fixture."]
-fn candidate_event_rejects_sideflip_like_impulse_without_forward_component() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut sideflip_candidate = strong_candidate(2);
-    sideflip_candidate.best_estimated_dodge_impulse_forward_component = 0.12;
-    sideflip_candidate.best_estimated_dodge_impulse_side_component = 0.96;
-    sideflip_candidate.best_estimated_dodge_impulse_up_component = 0.10;
-
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, sideflip_candidate).is_none());
-}
-
-#[test]
-#[ignore = "tested the removed impulse-based rejection; detection is now rotation-only. \
-Side-flip/wavedash rejection needs a rotation-based gate (onset-pitch forwardness / \
-low up-rotation) — TODO, see the confounder precision fixture."]
-fn candidate_event_rejects_vertical_dominant_wavedash_like_impulse() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut wavedash_candidate = strong_candidate(2);
-    wavedash_candidate.best_estimated_dodge_impulse_forward_component = 0.45;
-    wavedash_candidate.best_estimated_dodge_impulse_side_component = 0.24;
-    wavedash_candidate.best_estimated_dodge_impulse_up_component = -0.86;
-
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, wavedash_candidate).is_none());
-}
-
-#[test]
-fn candidate_event_rejects_directional_weak_impulse_without_diagonal_rotation() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut weak_backward_candidate = strong_candidate(2);
-    weak_backward_candidate.best_estimated_dodge_impulse_magnitude = 43.0;
-    weak_backward_candidate.best_estimated_dodge_impulse_forward_component = -0.48;
-    weak_backward_candidate.best_estimated_dodge_impulse_side_component = 0.0;
-    weak_backward_candidate.best_estimated_dodge_impulse_up_component = -0.88;
-    // No diagonal-rotation signature to fall back on, so the weak backward
-    // impulse has nothing to vouch for it and the candidate is rejected.
-    weak_backward_candidate.best_diagonal_score = 0.2;
-    weak_backward_candidate.max_forward_rotation_degrees = 60.0;
-
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, weak_backward_candidate).is_none());
-}
-
-#[test]
-fn candidate_event_accepts_cancelled_dodge_despite_corrupted_weak_impulse() {
-    // Boost-through speed flips have their estimated dodge impulse swallowed by
-    // the boost compensation, leaving a weak (sub-`MEANINGFUL`) residual that can
-    // even point backward. When the rotation signature is an unambiguous
-    // cancelled diagonal dodge, the impulse-direction heuristic must not veto it.
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut boost_through_candidate = strong_candidate(2);
-    boost_through_candidate.best_estimated_dodge_impulse_magnitude = 43.0;
-    boost_through_candidate.best_estimated_dodge_impulse_forward_component = -0.48;
-    boost_through_candidate.best_estimated_dodge_impulse_side_component = 0.0;
-    boost_through_candidate.best_estimated_dodge_impulse_up_component = -0.88;
-    // Crisp cancelled diagonal dodge: strong diagonal spin, nose barely pitches.
-    boost_through_candidate.best_diagonal_score = 1.0;
-    boost_through_candidate.max_forward_rotation_degrees = 12.0;
-
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, boost_through_candidate).is_some());
-}
-
-#[test]
-fn candidate_event_rejects_wavedash_like_candidate_without_full_rotation_progress() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut wavedash_candidate = strong_candidate(2);
-    wavedash_candidate.max_forward_rotation_degrees = 12.0;
-    wavedash_candidate.max_up_rotation_degrees = 24.0;
-
-    assert!(SpeedFlipCalculator::candidate_event(&player_id, wavedash_candidate).is_none());
-}
-
-#[test]
-fn update_candidate_tracks_early_forward_diagonal_dodge_impulse() {
-    let mut candidate = strong_candidate(1);
-    candidate.start_velocity = glam::Vec3::new(900.0, 0.0, 0.0);
-    candidate.start_velocity_xy = glam::Vec2::new(900.0, 0.0);
-    candidate.start_forward_xy = glam::Vec2::X;
-    candidate.local_forward = glam::Vec3::X;
-    candidate.local_right = glam::Vec3::Y;
-    candidate.local_up = glam::Vec3::Z;
-    candidate.dodge_boost_compensation = glam::Vec3::ZERO;
-    candidate.best_dodge_forward_delta = 0.0;
-    candidate.best_dodge_delta_alignment = -1.0;
-    candidate.best_estimated_dodge_impulse_magnitude = 0.0;
-    candidate.best_estimated_dodge_impulse_forward_component = -1.0;
-    candidate.best_estimated_dodge_impulse_side_component = 0.0;
-    candidate.best_estimated_dodge_impulse_up_component = 1.0;
-    candidate.dodge_acceleration_sample_count = 0;
-    candidate.initial_boost_alignment = None;
-    candidate.best_boost_alignment = 0.5;
-    candidate.boost_alignment_sample_count = 0;
-    let frame = FrameInfo {
-        frame_number: 12,
-        time: candidate.start_time + 0.10,
-        dt: 0.05,
-        seconds_remaining: None,
-    };
-
-    SpeedFlipCalculator::update_candidate(
-        &mut candidate,
-        &frame,
-        &BallFrameState::default(),
-        &PlayerSample {
-            boost_active: true,
-            ..player(glam::Vec3::new(1200.0, 120.0, 0.0), true)
-        },
+    // Never grounded; dodge fires in the air.
+    step(
+        &mut calculator,
+        0,
+        0.0,
+        player(airborne, velocity, identity, false),
     );
-
-    assert_eq!(candidate.dodge_acceleration_sample_count, 1);
-    assert!(candidate.best_dodge_forward_delta >= 299.0);
-    assert!(candidate.best_dodge_delta_alignment > 0.9);
-    assert!(candidate.best_estimated_dodge_impulse_magnitude >= 270.0);
-    assert!(candidate.best_estimated_dodge_impulse_forward_component > 0.9);
-    assert!(candidate.best_estimated_dodge_impulse_side_component > 0.3);
-    assert!(candidate.initial_boost_alignment.unwrap() > 0.99);
-    assert!(candidate.best_boost_alignment > 0.99);
-    assert_eq!(candidate.boost_alignment_sample_count, 1);
-}
-
-#[test]
-fn kickoff_approach_waits_for_player_motion_even_when_not_live_play() {
-    let mut calculator = SpeedFlipCalculator::default();
-    let frame = FrameInfo {
-        frame_number: 1,
-        time: 0.5,
-        dt: 0.1,
-        seconds_remaining: None,
-    };
-    let gameplay = GameplayState {
-        ball_has_been_hit: Some(false),
-        ..Default::default()
-    };
-
-    calculator
-        .update_parts(
-            &frame,
-            &gameplay,
-            &BallFrameState::default(),
-            &PlayerFrameState::default(),
-            &LivePlayState::default(),
-        )
-        .unwrap();
-
-    assert!(calculator.kickoff_approach_active_last_frame);
-    assert_eq!(calculator.current_kickoff_start_time, None);
-
-    let motion_frame = FrameInfo {
-        frame_number: 2,
-        time: 0.6,
-        dt: 0.1,
-        seconds_remaining: None,
-    };
-    calculator
-        .update_parts(
-            &motion_frame,
-            &gameplay,
-            &BallFrameState::default(),
-            &PlayerFrameState {
-                players: vec![player(glam::Vec3::new(150.0, 0.0, 0.0), false)],
-            },
-            &LivePlayState::default(),
-        )
-        .unwrap();
-
-    assert_eq!(
-        calculator.current_kickoff_start_time,
-        Some(motion_frame.time)
+    step(
+        &mut calculator,
+        1,
+        0.05,
+        player(airborne, velocity, identity, true),
     );
-}
+    for i in 0..10 {
+        let roll = (i as f32) * 36.0_f32.to_radians();
+        let up = glam::Quat::from_axis_angle(glam::Vec3::X, roll) * glam::Vec3::Z;
+        let rotation = rotation_from_forward_up(glam::Vec3::X, up);
+        step(
+            &mut calculator,
+            2 + i,
+            0.10 + (i as f32) * 0.05,
+            player(airborne, velocity, rotation, true),
+        );
+    }
+    calculator.finalize_parts(&frame(99, 5.0));
 
-#[test]
-fn kickoff_candidate_can_start_above_supersonic_threshold() {
-    let mut calculator = SpeedFlipCalculator::default();
-    let frame = FrameInfo {
-        frame_number: 10,
-        time: 1.0,
-        dt: 0.1,
-        seconds_remaining: None,
-    };
-    let gameplay = GameplayState {
-        ball_has_been_hit: Some(false),
-        ..Default::default()
-    };
-    let player = PlayerSample {
-        boost_active: true,
-        ..player(glam::Vec3::new(1900.0, 0.0, 0.0), true)
-    };
-    let player_id = player.player_id.clone();
-
-    calculator
-        .update_parts(
-            &frame,
-            &gameplay,
-            &BallFrameState::default(),
-            &PlayerFrameState {
-                players: vec![player],
-            },
-            &LivePlayState::default(),
-        )
-        .unwrap();
-
-    assert!(calculator.active_candidates.contains(&player_id));
-}
-
-#[test]
-fn diagonal_score_from_torque_rewards_forward_diagonal_dodges() {
-    // Dodge torque is the car-relative flip axis: y = forward/back, x = side.
-    let score = SpeedFlipCalculator::diagonal_score_from_torque;
-    // A 45° forward-diagonal dodge (the speed-flip input) scores ~1.0.
-    assert!(score(glam::Vec3::new(1.84, 1.84, 0.0)) > 0.99);
-    // A real recall-drill speed flip (forward-biased diagonal) still scores high.
-    assert!(score(glam::Vec3::new(1.5, 1.85, 0.0)) > 0.9);
-    // A pure forward dodge (no diagonal) and a pure side flip score ~0.
-    assert!(score(glam::Vec3::new(0.0, 2.6, 0.0)) < 0.05);
-    assert_eq!(score(glam::Vec3::new(2.6, 0.0, 0.0)), 0.0);
-    // A backflip (y <= 0) is never a speed flip.
-    assert_eq!(score(glam::Vec3::new(0.0, -2.6, 0.0)), 0.0);
-    assert_eq!(score(glam::Vec3::new(1.84, -1.84, 0.0)), 0.0);
+    assert!(
+        calculator.events().is_empty(),
+        "aerial dodge should not be a speed flip, got {:#?}",
+        calculator.events()
+    );
 }
