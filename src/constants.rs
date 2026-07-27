@@ -14,6 +14,18 @@ pub static GAME_TYPE: &str = "Archetypes.GameEvent.GameEvent_Soccar";
 pub static JUMP_TYPE: &str = "Archetypes.CarComponents.CarComponent_Jump";
 pub static PLAYER_REPLICATION_KEY: &str = "Engine.Pawn:PlayerReplicationInfo";
 pub static PLAYER_TYPE: &str = "TAGame.Default__PRI_TA";
+// Some replays (Breakout/KnockOut/Possession game modes) spawn player-info
+// actors using a PRI_TA subclass instead of the base PLAYER_TYPE. boxcars
+// already treats these as PRI_TA subclasses for attribute-tag fallback (see
+// its parent_class table), but the archetype actually spawned in the replay
+// is the subclass, not the base - so PLAYER_TYPE alone won't resolve to an
+// object id for these replays. See ReplayProcessor::new, which aliases
+// PLAYER_TYPE to whichever of these is actually present.
+pub static PLAYER_TYPE_ALIASES: [&str; 3] = [
+    "TAGame.Default__PRI_Breakout_TA",
+    "TAGame.Default__PRI_KnockOut_TA",
+    "TAGame.Default__PRI_Possession_TA",
+];
 
 pub static BOOST_AMOUNT_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoostAmount";
 pub static BOOST_REPLICATED_KEY: &str = "TAGame.CarComponent_Boost_TA:ReplicatedBoost";
