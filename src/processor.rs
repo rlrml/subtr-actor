@@ -186,6 +186,14 @@ impl<'a> ReplayProcessor<'a> {
             object_id_to_name.insert(object_id, name.clone());
             name_to_object_id.insert(name.clone(), object_id);
         }
+        if !name_to_object_id.contains_key(PLAYER_TYPE) {
+            if let Some(&alias_object_id) = PLAYER_TYPE_ALIASES
+                .iter()
+                .find_map(|alias| name_to_object_id.get(*alias))
+            {
+                name_to_object_id.insert(PLAYER_TYPE.to_string(), alias_object_id);
+            }
+        }
         let mut processor = Self {
             actor_state: ActorStateModeler::new(),
             replay,
