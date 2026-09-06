@@ -119,8 +119,7 @@ fn no_demoed() -> HashSet<PlayerId> {
     HashSet::new()
 }
 
-/// Ball rolling in on an open team-zero net; the placeholder model rates this
-/// far above the episode threshold.
+/// Ball rolling toward an open attacking net.
 fn dangerous_state() -> (BallFrameState, PlayerFrameState) {
     (
         ball(
@@ -208,6 +207,7 @@ fn feature_names_and_array_agree() {
 #[test]
 fn temporal_model_features_append_selected_causal_deltas_and_availability() {
     let base = ThreatFeatures {
+        ball_state: [0.0; 6],
         ball_forward_y: 0.0,
         ball_dist_to_goal: 0.46,
         ball_height: 0.05,
@@ -627,7 +627,7 @@ fn player_features_are_permutation_invariant_within_each_team() {
         true,
     )
     .unwrap();
-    assert_eq!(features, reordered);
+    assert_eq!(features.to_array(), reordered.to_array());
 
     // The same frame with the defender demoed: no eligible defenders, and the
     // zero-roster guard keeps the feature finite.
@@ -762,13 +762,13 @@ fn episode_opens_above_threshold_and_closes_on_value_drop() {
     assert_eq!(episode.end_reason, ThreatEpisodeEndReason::ValueDropped);
     assert!(!episode.ended_in_goal);
     assert!((episode.peak_value - peak).abs() < 1e-6);
-    // xg is the time integral over the episode's evaluated frames: the two
+    // Threat is integrated over the episode's evaluated frames: the two
     // danger frames plus the sub-threshold frame that closed it, each
     // contributing V * dt / tau with dt = 0.1.
     let expected_integral =
         (2.0 * peak + neutral_value) * 0.1 / expected_goals_model::THREAT_HORIZON_SECONDS;
-    assert!((episode.xg - expected_integral).abs() < 1e-6);
-    assert!(episode.xg < episode.peak_value);
+    assert!((episode.threat_integral - expected_integral).abs() < 1e-6);
+    assert!(episode.threat_integral < episode.peak_value);
     assert_eq!(episode.credited_player, Some(player_id(1)));
 }
 
@@ -794,46 +794,8 @@ fn episode_hysteresis_keeps_small_threat_dips_in_one_incident() {
     assert_eq!(episodes.len(), 1);
     assert_eq!(episodes[0].start_frame, 1);
     assert_eq!(episodes[0].end_frame, 3);
-    assert!((episodes[0].incident_xg - 0.30 * INCIDENT_XG_CALIBRATION_FACTOR).abs() < 1e-6);
 }
 
-#[test]
-fn goal_incident_uses_peak_before_final_touch_exclusion_window() {
-    let mut calculator = ExpectedGoalsCalculator::new();
-    calculator.update_episodes(&frame(1, 1.0), [0.30, 0.0]);
-    calculator.update_episodes(&frame(2, 1.3), [0.45, 0.0]);
-    calculator.update_episodes(&frame(3, 1.8), [0.80, 0.0]);
-    calculator.team_states[0].last_touch_time = Some(1.8);
-
-    calculator.close_episode_as_goal(&frame(4, 2.0), 2.0, true);
-
-    let episode = &calculator.episode_events()[0];
-    assert!(episode.ended_in_goal);
-    assert!((episode.peak_value - 0.80).abs() < 1e-6);
-    assert_eq!(episode.peak_frame, 3);
-    assert!((episode.goal_exclusion_start_time.unwrap() - 1.3).abs() < 1e-6);
-    assert!((episode.incident_peak_value - 0.30).abs() < 1e-6);
-    assert!((episode.incident_xg - 0.30 * INCIDENT_XG_CALIBRATION_FACTOR).abs() < 1e-6);
-    assert_eq!(episode.incident_xg_frame, Some(1));
-    assert_eq!(episode.incident_xg_time, Some(1.0));
-}
-
-#[test]
-fn goal_incident_contributes_zero_when_it_opens_inside_exclusion_window() {
-    let mut calculator = ExpectedGoalsCalculator::new();
-    calculator.update_episodes(&frame(1, 1.5), [0.80, 0.0]);
-    calculator.team_states[0].last_touch_time = Some(1.8);
-
-    calculator.close_episode_as_goal(&frame(2, 2.0), 2.0, true);
-
-    let episode = &calculator.episode_events()[0];
-    assert_eq!(episode.incident_xg, 0.0);
-    assert_eq!(episode.incident_xg_frame, None);
-    assert_eq!(episode.incident_xg_time, None);
-}
-
-/// Player credit follows the toucher associated with the episode's peak, not
-/// simply the last teammate to touch before the episode closes.
 #[test]
 fn later_lower_value_touch_does_not_steal_episode_credit_from_peak_toucher() {
     let mut calculator = ExpectedGoalsCalculator::new();
@@ -844,6 +806,7 @@ fn later_lower_value_touch_does_not_steal_episode_credit_from_peak_toucher() {
         &frame(2, 1.1),
         &touch_state(vec![touch(2, 1.1, 2, true)]),
         [0.3, 0.0],
+        &ThreatFeaturesState::default(),
     );
     calculator.update_episodes(&frame(2, 1.1), [0.3, 0.0]);
     calculator.update_episodes(&frame(3, 1.2), [0.0, 0.0]);
@@ -946,8 +909,6 @@ fn late_goal_attribution_resolves_pending_stoppage_episode_as_goal() {
     assert_eq!(episodes.len(), 1);
     assert!(episodes[0].ended_in_goal);
     assert_eq!(episodes[0].end_reason, ThreatEpisodeEndReason::Goal);
-    assert_eq!(episodes[0].incident_xg, 0.0);
-    assert_eq!(episodes[0].goal_exclusion_start_time, Some(0.5));
 }
 
 /// A stoppage with no following goal emits the episode as a plain stoppage
@@ -1019,7 +980,7 @@ fn finish_closes_active_episode_as_replay_end() {
 /// Constant V over N evaluated frames of known dt integrates to exactly
 /// N * V * dt / tau (replay-end close: no extra closing-frame contribution).
 #[test]
-fn episode_xg_is_the_time_integral_of_v_over_the_episode() {
+fn episode_threat_is_the_time_integral_of_v() {
     let mut calculator = ExpectedGoalsCalculator::new();
     let (danger_ball, danger_players) = dangerous_state();
 
@@ -1044,9 +1005,9 @@ fn episode_xg_is_the_time_integral_of_v_over_the_episode() {
     let episode = &episodes[0];
     let expected = frame_count as f32 * value * 0.1 / expected_goals_model::THREAT_HORIZON_SECONDS;
     assert!(
-        (episode.xg - expected).abs() < 1e-6,
-        "episode xg {} != N * V * dt / tau = {}",
-        episode.xg,
+        (episode.threat_integral - expected).abs() < 1e-6,
+        "episode threat integral {} != N * V * dt / tau = {}",
+        episode.threat_integral,
         expected
     );
     assert!((episode.peak_value - value).abs() < 1e-6);
@@ -1055,7 +1016,7 @@ fn episode_xg_is_the_time_integral_of_v_over_the_episode() {
 /// The team's full-match integral accumulates on every evaluated live frame,
 /// including sub-threshold ones where no episode ever opens.
 #[test]
-fn team_xg_integral_accumulates_sub_threshold_frames_without_episodes() {
+fn team_threat_integral_accumulates_sub_threshold_frames_without_episodes() {
     let mut calculator = ExpectedGoalsCalculator::new();
     let (neutral_ball, neutral_players) = neutral_state();
 
@@ -1077,27 +1038,29 @@ fn team_xg_integral_accumulates_sub_threshold_frames_without_episodes() {
     calculator.finish_calculation().unwrap();
 
     assert!(calculator.episode_events().is_empty());
-    let integrals = calculator.team_xg_integrals();
+    let integrals = calculator.team_threat_integrals();
     let expected =
         f64::from(frame_count as f32 * value * 0.1 / expected_goals_model::THREAT_HORIZON_SECONDS);
     assert!(integrals[0] > 0.0);
     assert!((integrals[0] - expected).abs() < 1e-6);
     assert!(integrals[1] > 0.0);
 
-    // The accumulator's team xg is fed from exactly this state.
+    // The accumulator's threat integral is fed from this state.
     let mut accumulator = ExpectedGoalsStatsAccumulator::new();
-    accumulator.set_team_xg_integrals(integrals);
+    accumulator.set_team_threat_integrals(integrals);
     accumulator.set_current_values(calculator.current_values());
-    assert!((f64::from(accumulator.team_stats(true).xg) - integrals[0]).abs() < 1e-6);
-    assert!((f64::from(accumulator.team_stats(false).xg) - integrals[1]).abs() < 1e-6);
+    assert!((f64::from(accumulator.team_stats(true).threat_integral) - integrals[0]).abs() < 1e-6);
+    assert!((f64::from(accumulator.team_stats(false).threat_integral) - integrals[1]).abs() < 1e-6);
     assert_eq!(accumulator.team_stats(true).current_threat, Some(value));
 }
 
 #[test]
-fn accumulator_folds_touch_deltas_and_episode_xg() {
+fn accumulator_separates_touch_xg_deltas_and_episode_threat() {
     let mut accumulator = ExpectedGoalsStatsAccumulator::new();
 
     accumulator.apply_touch_event(&ThreatTouchEvent {
+        xg: Some(0.15),
+        pre_touch_features: None,
         time: 1.0,
         frame: 1,
         touch_id: None,
@@ -1108,8 +1071,10 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
         value_before: 0.05,
         value_after: 0.30,
     });
-    // Negative deltas do not subtract from threat added.
+    // Signed change retains harmful as well as helpful touches.
     accumulator.apply_touch_event(&ThreatTouchEvent {
+        xg: Some(0.15),
+        pre_touch_features: None,
         time: 2.0,
         frame: 2,
         touch_id: None,
@@ -1126,18 +1091,26 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
         end_time: 2.0,
         end_frame: 2,
         team_is_team_0: true,
-        xg: 0.4,
+        threat_integral: 0.4,
         peak_value: 0.6,
         peak_frame: 2,
         peak_time: 2.0,
-        incident_peak_value: 0.2,
-        incident_xg: 0.2,
-        incident_xg_frame: Some(1),
-        incident_xg_time: Some(1.0),
-        goal_exclusion_start_time: Some(1.5),
         credited_player: Some(player_id(1)),
         ended_in_goal: true,
         end_reason: ThreatEpisodeEndReason::Goal,
+    });
+    accumulator.apply_touch_event(&ThreatTouchEvent {
+        xg: None,
+        pre_touch_features: None,
+        time: 2.5,
+        frame: 3,
+        touch_id: None,
+        detection_frame: 3,
+        detection_time: 2.5,
+        team_is_team_0: true,
+        player: Some(player_id(1)),
+        value_before: 0.1,
+        value_after: 0.1,
     });
     // Team-only credit still advances the team's episode counters.
     accumulator.apply_episode_event(&ThreatEpisodeEvent {
@@ -1146,43 +1119,371 @@ fn accumulator_folds_touch_deltas_and_episode_xg() {
         end_time: 4.0,
         end_frame: 4,
         team_is_team_0: true,
-        xg: 0.2,
+        threat_integral: 0.2,
         peak_value: 0.3,
         peak_frame: 3,
         peak_time: 3.0,
-        incident_peak_value: 0.3,
-        incident_xg: 0.3,
-        incident_xg_frame: Some(3),
-        incident_xg_time: Some(3.0),
-        goal_exclusion_start_time: None,
         credited_player: None,
         ended_in_goal: false,
         end_reason: ThreatEpisodeEndReason::ValueDropped,
     });
-    // Team xG comes from the full-match integral, not the episode sum; the
-    // gap (1.0 vs the 0.6 of episode xg) is the diffuse sub-threshold threat
-    // that is never attributed to any player.
-    accumulator.set_team_xg_integrals([1.0, 0.25]);
+    // Episode closure and integral refresh must not modify pre-touch xG.
+    accumulator.set_team_threat_integrals([1.0, 0.25]);
     accumulator.set_current_values(Some([0.4, 0.1]));
 
     let player_stats = accumulator.player_stats().get(&player_id(1)).unwrap();
-    assert!((player_stats.threat_added - 0.25).abs() < 1e-6);
-    assert!((player_stats.xg - 0.4).abs() < 1e-6);
+    assert!((player_stats.threat_added - 0.05).abs() < 1e-6);
+    assert!((player_stats.xg - 0.3).abs() < 1e-6);
     assert_eq!(player_stats.credited_episode_count, 1);
     assert_eq!(player_stats.credited_goal_episode_count, 1);
 
     let team = accumulator.team_stats(true);
-    assert!((team.xg - 1.0).abs() < 1e-6);
-    assert!((team.incident_xg - 0.5).abs() < 1e-6);
+    assert!((team.xg - 0.3).abs() < 1e-6);
+    assert_eq!(team.evaluated_touch_count, 2);
+    assert_eq!(team.unavailable_touch_count, 1);
+    assert!((team.threat_integral - 1.0).abs() < 1e-6);
+    assert!((player_stats.threat_integral - 0.4).abs() < 1e-6);
     assert_eq!(team.current_threat, Some(0.4));
     assert_eq!(team.episode_count, 2);
     assert_eq!(team.goal_episode_count, 1);
     let other_team = accumulator.team_stats(false);
     assert_eq!(other_team.current_threat, Some(0.1));
     assert_eq!(other_team.episode_count, 0);
-    assert!((other_team.xg - 0.25).abs() < 1e-6);
+    assert!((other_team.threat_integral - 0.25).abs() < 1e-6);
 
     accumulator.set_current_values(None);
     assert_eq!(accumulator.team_stats(true).current_threat, None);
     assert_eq!(accumulator.team_stats(false).current_threat, None);
+}
+
+#[test]
+fn pre_contact_features_exclude_contact_frame_and_do_not_cross_stoppages() {
+    let (before, players) = neutral_state();
+    let (after, _) = dangerous_state();
+    let events = FrameEventsState::default();
+    let mut state = ThreatFeaturesState::default();
+    state.update(
+        0.8,
+        &before,
+        &players,
+        &events,
+        &HashMap::new(),
+        &live_play(),
+    );
+    let expected = state.current_model().unwrap()[0];
+    state.update(
+        0.9,
+        &before,
+        &players,
+        &events,
+        &HashMap::new(),
+        &live_play(),
+    );
+    state.update(
+        1.0,
+        &after,
+        &players,
+        &events,
+        &HashMap::new(),
+        &live_play(),
+    );
+    assert_eq!(
+        state
+            .before_touch(1.0, true)
+            .unwrap()
+            .model_features()
+            .current
+            .ball_state,
+        expected.current.ball_state
+    );
+    assert_ne!(
+        state
+            .before_touch(1.0, true)
+            .unwrap()
+            .model_features()
+            .current
+            .ball_state,
+        state.current_model().unwrap()[0].current.ball_state
+    );
+    state.update(1.1, &after, &players, &events, &HashMap::new(), &stoppage());
+    assert!(state.before_touch(1.0, true).is_some());
+    state.update(
+        1.2,
+        &after,
+        &players,
+        &events,
+        &HashMap::new(),
+        &live_play(),
+    );
+    assert!(state.before_touch(1.2, true).is_none());
+}
+
+#[test]
+fn live_segments_resolve_stoppages_but_censor_an_open_final_stretch() {
+    let (ball, players) = neutral_state();
+    let mut calculator = ExpectedGoalsCalculator::new();
+    update(
+        &mut calculator,
+        1,
+        1.0,
+        &ball,
+        &players,
+        FrameEventsState::default(),
+        vec![],
+        live_play(),
+    );
+    update(
+        &mut calculator,
+        2,
+        1.1,
+        &ball,
+        &players,
+        FrameEventsState::default(),
+        vec![],
+        stoppage(),
+    );
+    update(
+        &mut calculator,
+        3,
+        2.0,
+        &ball,
+        &players,
+        FrameEventsState::default(),
+        vec![],
+        live_play(),
+    );
+    calculator.finish_calculation().unwrap();
+    let segments = calculator.live_segments();
+    assert_eq!(segments.len(), 2);
+    assert!(segments[0].resolved);
+    assert!(!segments[1].resolved);
+    assert_eq!(segments[0].end_time, 1.1);
+}
+
+#[test]
+fn goal_resolution_does_not_change_episode_threat_measurements() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    calculator.update_episodes(&frame(1, 1.0), [0.3, 0.0]);
+    calculator.update_episodes(&frame(2, 1.1), [0.8, 0.0]);
+    let mut scored = calculator.clone();
+    scored.close_episode_as_goal(&frame(3, 1.2), 1.2, true);
+    calculator.finish_calculation().unwrap();
+    let success = &scored.episode_events()[0];
+    let unresolved = &calculator.episode_events()[0];
+    assert_eq!(success.peak_value, unresolved.peak_value);
+    assert_eq!(success.threat_integral, unresolved.threat_integral);
+}
+
+#[test]
+fn delayed_contact_after_stoppage_retains_pre_contact_features() {
+    let (ball, players) = neutral_state();
+    let mut features = ThreatFeaturesState::default();
+    let mut calculator = ExpectedGoalsCalculator::new();
+    let events = FrameEventsState::default();
+    for (number, time, live, touches) in [
+        (0, 0.8, live_play(), vec![]),
+        (1, 0.9, live_play(), vec![]),
+        (2, 1.0, stoppage(), vec![]),
+        (3, 1.1, stoppage(), vec![touch(2, 1.0, 1, true)]),
+    ] {
+        features.update(time, &ball, &players, &events, &HashMap::new(), &live);
+        calculator
+            .update_parts(
+                &frame(number, time),
+                &GameplayState::default(),
+                &events,
+                &touch_state(touches),
+                &features,
+            )
+            .unwrap();
+    }
+    let event = calculator.touch_events().last().unwrap();
+    assert_eq!(event.time, 1.0);
+    assert_eq!(event.detection_time, 1.1);
+    assert!(event.pre_touch_features.is_some());
+    assert_eq!(event.delta(), 0.0);
+}
+
+#[test]
+fn missing_roster_during_live_play_censors_the_segment() {
+    let (ball, players) = neutral_state();
+    let mut features = ThreatFeaturesState::default();
+    let mut calculator = ExpectedGoalsCalculator::new();
+    let events = FrameEventsState::default();
+    for (number, state) in [players, PlayerFrameState::default()].iter().enumerate() {
+        let time = number as f32;
+        features.update(time, &ball, state, &events, &HashMap::new(), &live_play());
+        calculator
+            .update_parts(
+                &frame(number, time),
+                &GameplayState::default(),
+                &events,
+                &TouchState::default(),
+                &features,
+            )
+            .unwrap();
+    }
+    assert!(!calculator.live_segments()[0].resolved);
+}
+
+#[test]
+fn post_goal_contact_cannot_create_another_opportunity() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    calculator.live_segments.push(ThreatLiveSegment {
+        start_time: 0.0,
+        end_time: 1.1,
+        resolved: true,
+        scoring_team_is_team_0: Some(true),
+        goal_time: Some(1.0),
+    });
+    calculator.emit_touch_events(
+        &frame(2, 1.1),
+        &touch_state(vec![touch(2, 1.1, 1, true)]),
+        [0.0; 2],
+        &ThreatFeaturesState::default(),
+    );
+    assert!(calculator.touch_events().is_empty());
+    calculator.emit_touch_events(
+        &frame(3, 1.2),
+        &touch_state(vec![touch(1, 1.0, 1, true)]),
+        [0.0; 2],
+        &ThreatFeaturesState::default(),
+    );
+    assert_eq!(calculator.touch_events().len(), 1);
+}
+
+#[test]
+fn touch_xg_uses_pre_contact_state_instead_of_the_resulting_ball_flight() {
+    let (ball, players) = neutral_state();
+    let mut history = ThreatFeaturesState::default();
+    let events = FrameEventsState::default();
+    for time in [0.8, 0.9] {
+        history.update(
+            time,
+            &ball,
+            &players,
+            &events,
+            &HashMap::new(),
+            &live_play(),
+        );
+    }
+    let (danger_ball, danger_players) = dangerous_state();
+    let mut probabilities = Vec::new();
+    for (resulting_ball, resulting_players) in [(ball, players), (danger_ball, danger_players)] {
+        let mut features = history.clone();
+        features.update(
+            1.0,
+            &resulting_ball,
+            &resulting_players,
+            &events,
+            &HashMap::new(),
+            &live_play(),
+        );
+        let mut calculator = ExpectedGoalsCalculator::new();
+        calculator
+            .update_parts(
+                &frame(3, 1.0),
+                &GameplayState::default(),
+                &events,
+                &touch_state(vec![touch(3, 1.0, 1, true)]),
+                &features,
+            )
+            .unwrap();
+        let event = calculator.touch_events().last().unwrap();
+        let probability = event.xg.expect("pre-contact history is available");
+        assert!(probability > 0.0 && probability < 1.0);
+        probabilities.push(probability);
+    }
+    assert_eq!(probabilities[0], probabilities[1]);
+}
+
+#[test]
+fn goal_after_an_unknown_feature_gap_is_not_assigned_to_the_previous_segment() {
+    let mut calculator = ExpectedGoalsCalculator::new();
+    calculator.live_segments.push(ThreatLiveSegment {
+        start_time: 0.0,
+        end_time: 1.0,
+        resolved: false,
+        scoring_team_is_team_0: None,
+        goal_time: None,
+    });
+    calculator.record_goal(&frame(3, 1.2), 1.2, true);
+    assert_eq!(calculator.goal_records().len(), 1);
+    assert_eq!(calculator.live_segments()[0].goal_time, None);
+    assert!(!calculator.live_segments()[0].resolved);
+}
+
+#[test]
+fn model_reflection_vectors_match_mirrored_world_features() {
+    let mirror = |v: glam::Vec3| glam::Vec3::new(-v.x, v.y, v.z);
+    for attacking_team in [true, false] {
+        let mut original = Vec::new();
+        let mut mirrored = Vec::new();
+        for step in 0..3 {
+            let mut players = neutral_state().1;
+            for (index, sample) in players.players.iter_mut().enumerate() {
+                let body = sample.rigid_body.as_mut().unwrap();
+                body.location.x += 57.0 * step as f32;
+                body.linear_velocity = Some(glam_to_vec(&glam::Vec3::new(
+                    90.0 * (index + 1) as f32,
+                    70.0,
+                    30.0,
+                )));
+                let yaw = 0.3 + index as f32 * 0.5;
+                body.rotation = boxcars::Quaternion {
+                    x: 0.0,
+                    y: 0.0,
+                    z: (yaw * 0.5).sin(),
+                    w: (yaw * 0.5).cos(),
+                };
+            }
+            let mut reflected_players = players.clone();
+            for sample in &mut reflected_players.players {
+                let body = sample.rigid_body.as_mut().unwrap();
+                body.location.x *= -1.0;
+                body.linear_velocity.as_mut().unwrap().x *= -1.0;
+                std::mem::swap(&mut body.rotation.z, &mut body.rotation.w);
+            }
+            let position = glam::Vec3::new(800.0 + step as f32 * 45.0, 2800.0, 200.0);
+            let velocity = glam::Vec3::new(-350.0 + step as f32 * 10.0, 900.0, 50.0);
+            original.push(
+                compute_threat_features(
+                    position,
+                    velocity,
+                    &players,
+                    &no_demoed(),
+                    &HashMap::new(),
+                    attacking_team,
+                )
+                .unwrap(),
+            );
+            mirrored.push(
+                compute_threat_features(
+                    mirror(position),
+                    mirror(velocity),
+                    &reflected_players,
+                    &no_demoed(),
+                    &HashMap::new(),
+                    attacking_team,
+                )
+                .unwrap(),
+            );
+        }
+        let values = ThreatModelFeatures::new(original[2], [Some(original[1]), Some(original[0])])
+            .to_entity_array();
+        let reflected =
+            ThreatModelFeatures::new(mirrored[2], [Some(mirrored[1]), Some(mirrored[0])])
+                .to_entity_array();
+        for signs in expected_goals_entity_model::entity_model_reflections() {
+            for (index, name) in ThreatModelFeatures::entity_feature_names()
+                .iter()
+                .enumerate()
+            {
+                assert!(
+                    (values[index] * signs[index] - reflected[index]).abs() < 2e-6,
+                    "wrong reflection for {name}"
+                );
+            }
+        }
+    }
 }

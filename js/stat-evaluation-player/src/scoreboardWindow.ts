@@ -49,14 +49,20 @@ export class ScoreboardWindowController {
 
     body.append(header);
     if (replay.players.length === 4) {
-      body.append(
-        createThreatReadout(
-          frame.team_zero?.expected_goals.current_threat,
-          frame.team_one?.expected_goals.current_threat,
-          frame.team_zero?.expected_goals.incident_xg,
-          frame.team_one?.expected_goals.incident_xg,
-        ),
+      const readout = createThreatReadout(
+        frame.team_zero?.expected_goals.current_threat,
+        frame.team_one?.expected_goals.current_threat,
+        frame.team_zero?.expected_goals.xg,
+        frame.team_one?.expected_goals.xg,
       );
+      readout.title += [frame.team_zero, frame.team_one]
+        .map((team, index) => {
+          const evaluated = team?.expected_goals.evaluated_touch_count ?? 0;
+          const unavailable = team?.expected_goals.unavailable_touch_count ?? 0;
+          return ` ${index === 0 ? "Blue" : "Orange"}: ${evaluated}/${evaluated + unavailable} touches evaluated.`;
+        })
+        .join("");
+      body.append(readout);
     }
   }
 }
@@ -64,15 +70,15 @@ export class ScoreboardWindowController {
 function createThreatReadout(
   teamZeroThreat: number | null | undefined,
   teamOneThreat: number | null | undefined,
-  teamZeroIncidentXg: number | null | undefined,
-  teamOneIncidentXg: number | null | undefined,
+  teamZeroExpectedGoals: number | null | undefined,
+  teamOneExpectedGoals: number | null | undefined,
 ): HTMLElement {
   const readout = document.createElement("section");
   readout.className = "scoreboard-threat";
   readout.title =
     "Current values are each team's probability of scoring within five seconds. " +
-    "Incident xG counts one calibrated peak per dangerous incident and excludes the " +
-    "goal-result window beginning shortly before the scoring team's final touch.";
+    "Expected goals sums scoring probabilities evaluated before each touch; " +
+    "the chance ends at the next own-team touch, a goal, a stoppage, or ten seconds.";
 
   const values = document.createElement("div");
   values.className = "scoreboard-threat-values";
@@ -93,9 +99,9 @@ function createThreatReadout(
   const accumulated = document.createElement("div");
   accumulated.className = "scoreboard-threat-accumulated";
   accumulated.append(
-    createIncidentXgValue(teamZeroIncidentXg, true),
-    createIncidentXgLabel(),
-    createIncidentXgValue(teamOneIncidentXg, false),
+    createExpectedGoalsValue(teamZeroExpectedGoals, true),
+    createExpectedGoalsLabel(),
+    createExpectedGoalsValue(teamOneExpectedGoals, false),
   );
 
   readout.append(values, meter, accumulated);
@@ -130,21 +136,24 @@ function createThreatMeterHalf(value: number | null | undefined, isTeamZero: boo
   return half;
 }
 
-function createIncidentXgLabel(): HTMLElement {
+function createExpectedGoalsLabel(): HTMLElement {
   const label = document.createElement("span");
   label.className = "scoreboard-threat-accumulated-label";
-  label.textContent = "Incident xG";
+  label.textContent = "Expected goals";
   return label;
 }
 
-function createIncidentXgValue(value: number | null | undefined, isTeamZero: boolean): HTMLElement {
+function createExpectedGoalsValue(
+  value: number | null | undefined,
+  isTeamZero: boolean,
+): HTMLElement {
   const output = document.createElement("span");
   output.className = `scoreboard-threat-accumulated-value ${getTeamClass(isTeamZero)}`;
-  output.textContent = formatIncidentXg(value);
+  output.textContent = formatExpectedGoals(value);
   return output;
 }
 
-export function formatIncidentXg(value: number | null | undefined): string {
+export function formatExpectedGoals(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "--";
 }
 

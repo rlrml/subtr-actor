@@ -1,32 +1,9 @@
-//! Continuous threat / expected-goals state value.
+//! Continuous five-second scoring threat and touch-anchored expected goals.
 //!
-//! Evaluates a state-value function `V(state)` for BOTH teams on every
-//! live-play frame: the probability (per the versioned model in
-//! [`super::expected_goals_model`]) that the team scores within the next
-//! [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS)
-//! seconds, computed from full ball + player physics state plus short causal
-//! history. Shots are *not* a gating event -- threat is continuous. Derived
-//! observations:
-//!
-//! - [`ThreatTouchEvent`]: the detection-frame change in the touching team's V
-//!   (detection-frame V minus the preceding live-frame V, both from the
-//!   toucher's team's perspective). This is an observed one-frame delta, not a
-//!   causal estimate of a touch's multi-frame impulse.
-//! - [`ThreatEpisodeEvent`]: a threat incident that opens when one team's V
-//!   exceeds [`THREAT_EPISODE_THRESHOLD`] and remains open until V falls to
-//!   [`THREAT_EPISODE_END_THRESHOLD`]. The event retains both the time
-//!   integral
-//!   `sum(V * dt) / tau` over the span (`tau` =
-//!   [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS)),
-//!   and one incident xG peak. Goal-ending incidents exclude samples from
-//!   shortly before the scoring team's final touch onward, preventing the
-//!   model from receiving credit for a result its physics inputs already make
-//!   nearly inevitable. The ordinary peak survives as `peak_value` for
-//!   display/intensity.
-//! - The per-team full-match integral (over ALL evaluated live frames, not
-//!   just above-threshold ones) is exposed via
-//!   [`ExpectedGoalsCalculator::team_xg_integrals`] and is the team's
-//!   accumulated xG.
+//! Threat episodes summarize sustained pressure. Their peaks are display
+//! intensity and their integrals are duration-weighted threat, not chance xG.
+//! Touch xG uses the state before contact and is summed independently of
+//! episode boundaries and eventual goal outcomes.
 
 use super::*;
 
@@ -38,17 +15,6 @@ pub const THREAT_EPISODE_THRESHOLD: f32 = 0.15;
 /// opening threshold provides hysteresis: a small dip no longer fragments one
 /// developing chance into multiple incidents.
 pub const THREAT_EPISODE_END_THRESHOLD: f32 = 0.05;
-
-/// Multiplicative count calibration applied after selecting one raw peak per
-/// incident. Updated only from a replay-grouped, date-held-out corpus audit;
-/// the timeline retains the raw selected probability alongside the calibrated
-/// contribution so the transformation remains inspectable.
-pub const INCIDENT_XG_CALIBRATION_FACTOR: f32 = 0.518_152;
-
-/// Goal-ending incidents ignore model samples from this long before the
-/// scoring team's final touch onward. This removes immediate pre-contact and
-/// post-contact outcome leakage while preserving earlier chance development.
-pub const GOAL_TOUCH_EXCLUSION_SECONDS: f32 = 0.5;
 
 /// A ballistic trajectory must cross the goal line within this many seconds
 /// for the `on_target` feature to fire. Slightly looser than the shot
@@ -91,6 +57,10 @@ pub const THREAT_HISTORY_FEATURE_COUNT: usize = 40;
 pub const THREAT_HISTORY_LAGS_SECONDS: [f32; 2] = [0.5, 1.0];
 pub const THREAT_MODEL_FEATURE_COUNT: usize =
     THREAT_FEATURE_COUNT + THREAT_HISTORY_LAGS_SECONDS.len() * (THREAT_HISTORY_FEATURE_COUNT + 1);
+pub const THREAT_ENTITY_GLOBAL_COUNT: usize = THREAT_MODEL_FEATURE_COUNT + 6;
+pub const THREAT_ENTITY_PLAYER_FEATURE_COUNT: usize = PLAYER_THREAT_FEATURE_COUNT + 1;
+pub const THREAT_ENTITY_FEATURE_COUNT: usize =
+    THREAT_ENTITY_GLOBAL_COUNT + 4 * THREAT_ENTITY_PLAYER_FEATURE_COUNT;
 
 /// Instantaneous fields whose causal changes give the model motion context
 /// that cannot be recovered from one state alone. The selection preserves the
@@ -109,6 +79,7 @@ const THREAT_HISTORY_TOLERANCE_SECONDS: f32 = 0.1875;
 /// aggregation. No player receives a positional role or a distinct schema.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
 pub struct PlayerThreatFeatures {
+    pub state_valid: f32,
     pub position_x: f32,
     pub position_y: f32,
     pub position_z: f32,
@@ -170,6 +141,7 @@ impl PlayerThreatFeatures {
 
     fn from_array(values: [f32; PLAYER_THREAT_FEATURE_COUNT]) -> Self {
         Self {
+            state_valid: 0.0,
             position_x: values[0],
             position_y: values[1],
             position_z: values[2],
@@ -198,13 +170,16 @@ impl PlayerThreatFeatures {
 pub struct TeamThreatFeatures {
     pub mean: PlayerThreatFeatures,
     pub spread: PlayerThreatFeatures,
+    pub players: [PlayerThreatFeatures; 2],
 }
 
 impl TeamThreatFeatures {
     fn from_players(first: PlayerThreatFeatures, second: PlayerThreatFeatures) -> Self {
+        let players = [first, second];
         let first = first.to_array();
         let second = second.to_array();
         Self {
+            players,
             mean: PlayerThreatFeatures::from_array(std::array::from_fn(|index| {
                 (first[index] + second[index]) * 0.5
             })),
@@ -236,6 +211,8 @@ impl TeamThreatFeatures {
 /// near/far or first/second-player roles.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ThreatFeatures {
+    /// Attacking-frame ball position and velocity, normalized by arena/speed scales.
+    pub ball_state: [f32; 6],
     /// Ball y in the attacking frame / 5120: -1 at own goal line, +1 at the
     /// opponent goal line.
     pub ball_forward_y: f32,
@@ -274,6 +251,56 @@ pub struct ThreatModelFeatures {
 }
 
 impl ThreatModelFeatures {
+    /// Legacy context followed by full ball physics and four complete player vectors.
+    /// Player ordering is arbitrary; the entity model pools within each team.
+    pub fn to_entity_array(&self) -> [f32; THREAT_ENTITY_FEATURE_COUNT] {
+        let mut values = [0.0; THREAT_ENTITY_FEATURE_COUNT];
+        values[..THREAT_MODEL_FEATURE_COUNT].copy_from_slice(&self.to_array());
+        values[THREAT_MODEL_FEATURE_COUNT..THREAT_ENTITY_GLOBAL_COUNT]
+            .copy_from_slice(&self.current.ball_state);
+        for (index, player) in self
+            .current
+            .own_team
+            .players
+            .iter()
+            .chain(self.current.opponent_team.players.iter())
+            .enumerate()
+        {
+            let start = THREAT_ENTITY_GLOBAL_COUNT + index * THREAT_ENTITY_PLAYER_FEATURE_COUNT;
+            values[start..start + PLAYER_THREAT_FEATURE_COUNT].copy_from_slice(&player.to_array());
+            values[start + PLAYER_THREAT_FEATURE_COUNT] = player.state_valid;
+        }
+        values
+    }
+
+    pub fn entity_feature_names() -> &'static [&'static str] {
+        static NAMES: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+        NAMES.get_or_init(|| {
+            let mut names = Self::feature_names().to_vec();
+            names.extend([
+                "ball_position_x",
+                "ball_position_y",
+                "ball_position_z",
+                "ball_velocity_x",
+                "ball_velocity_y",
+                "ball_velocity_z",
+            ]);
+            for team in ["own", "opponent"] {
+                for player in 0..2 {
+                    for field in PlayerThreatFeatures::FEATURE_NAMES
+                        .into_iter()
+                        .chain(["state_valid"])
+                    {
+                        names.push(Box::leak(
+                            format!("{team}_player_{player}_{field}").into_boxed_str(),
+                        ));
+                    }
+                }
+            }
+            names
+        })
+    }
+
     pub(crate) fn new(current: ThreatFeatures, history: [Option<ThreatFeatures>; 2]) -> Self {
         let current_values = current.to_array();
         let mut history_deltas = [[0.0; THREAT_HISTORY_FEATURE_COUNT]; 2];
@@ -338,6 +365,20 @@ impl ThreatModelFeatures {
     }
 }
 
+/// A snapshot selected from the fixed pre-contact window by [`ThreatFeaturesState`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PreContactThreatFeatures(ThreatModelFeatures);
+
+impl PreContactThreatFeatures {
+    pub fn model_features(&self) -> &ThreatModelFeatures {
+        &self.0
+    }
+
+    pub fn to_entity_array(&self) -> [f32; THREAT_ENTITY_FEATURE_COUNT] {
+        self.0.to_entity_array()
+    }
+}
+
 /// Canonical per-frame threat state published for ndarray extraction and model
 /// evaluation. `current` preserves the instantaneous schema for general
 /// consumers; `current_model` is the exact causal input used by inference.
@@ -346,6 +387,8 @@ pub struct ThreatFeaturesState {
     current: Option<[ThreatFeatures; 2]>,
     current_model: Option<[ThreatModelFeatures; 2]>,
     history: std::collections::VecDeque<(f32, [ThreatFeatures; 2])>,
+    model_history: std::collections::VecDeque<(f32, [ThreatModelFeatures; 2])>,
+    observed_stoppage: bool,
 }
 
 impl ThreatFeaturesState {
@@ -361,6 +404,16 @@ impl ThreatFeaturesState {
         self.current = None;
         self.current_model = None;
         self.history.clear();
+        self.model_history.clear();
+    }
+
+    /// The last observed live state strictly before contact, never after it.
+    pub fn before_touch(&self, time: f32, is_team_0: bool) -> Option<PreContactThreatFeatures> {
+        self.model_history
+            .iter()
+            .rev()
+            .find(|(sample_time, _)| *sample_time <= time - 0.1 && time - sample_time <= 0.2)
+            .map(|(_, features)| PreContactThreatFeatures(features[usize::from(!is_team_0)]))
     }
 
     fn history_at(&self, target_time: f32) -> Option<[ThreatFeatures; 2]> {
@@ -384,10 +437,16 @@ impl ThreatFeaturesState {
         dodge_available: &HashMap<PlayerId, bool>,
         live_play_state: &LivePlayState,
     ) {
+        self.observed_stoppage = !live_play_state.is_live_play;
         let Some(ball_sample) = ball.sample().filter(|_| live_play_state.is_live_play) else {
-            self.clear();
+            self.current = None;
+            self.current_model = None;
+            self.history.clear();
             return;
         };
+        if self.current.is_none() {
+            self.model_history.clear();
+        }
         if self
             .history
             .back()
@@ -429,6 +488,15 @@ impl ThreatFeaturesState {
             )
         }));
         self.current = Some(current);
+        self.model_history
+            .push_back((current_time, self.current_model.expect("model computed")));
+        while self
+            .model_history
+            .front()
+            .is_some_and(|(time, _)| current_time - time > 1.5)
+        {
+            self.model_history.pop_front();
+        }
         self.history.push_back((current_time, current));
         let oldest_time = current_time
             - THREAT_HISTORY_LAGS_SECONDS[THREAT_HISTORY_LAGS_SECONDS.len() - 1]
@@ -653,6 +721,7 @@ pub fn compute_threat_features(
             && position.z <= STANDARD_GOAL_MOUTH_HEIGHT_Z + NET_REGION_MARGIN;
 
         PlayerThreatFeatures {
+            state_valid: f32::from(u8::from(player.position().is_some())),
             position_x: (position.x / 4096.0).clamp(-1.0, 1.0),
             position_y: (position.y / STANDARD_GOAL_LINE_Y).clamp(-1.0, 1.0),
             position_z: (position.z / SOCCAR_CEILING_Z).clamp(0.0, 1.0),
@@ -678,6 +747,14 @@ pub fn compute_threat_features(
     };
 
     Some(ThreatFeatures {
+        ball_state: [
+            ball.x / 4096.0,
+            ball.y / STANDARD_GOAL_LINE_Y,
+            ball.z / SOCCAR_CEILING_Z,
+            ball_vel.x / STANDARD_BALL_MAX_SPEED,
+            ball_vel.y / STANDARD_BALL_MAX_SPEED,
+            ball_vel.z / STANDARD_BALL_MAX_SPEED,
+        ],
         ball_forward_y: (ball.y / STANDARD_GOAL_LINE_Y).clamp(-1.0, 1.0),
         ball_dist_to_goal: normalized_distance(ball_dist_to_goal, GOAL_DISTANCE_NORM),
         ball_height: (ball.z / SOCCAR_CEILING_Z).clamp(0.0, 1.0),
@@ -718,6 +795,13 @@ pub fn compute_threat_features(
 ///   multi-frame impulse.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ThreatTouchEvent {
+    /// Probability of scoring within ten seconds, before the next own-team
+    /// touch or live-play end, evaluated 100–200 ms before contact.
+    /// `None` when pre-contact history is unavailable.
+    pub xg: Option<f32>,
+    /// Causal training input retained only in memory for dataset export.
+    #[serde(skip)]
+    pub pre_touch_features: Option<PreContactThreatFeatures>,
     /// Contact time of the underlying touch (can precede `detection_time`).
     pub time: f32,
     /// Contact frame of the underlying touch (can precede `detection_frame`).
@@ -771,36 +855,13 @@ pub struct ThreatEpisodeEvent {
     pub end_time: f32,
     pub end_frame: usize,
     pub team_is_team_0: bool,
-    /// The episode's continuous threat integral: `sum(V * dt) / tau` over the
-    /// span, where `tau` is
-    /// [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS).
-    /// Frames that count: every evaluated live-play frame from the frame that
-    /// opens the episode through the frame that closes it (for value-drop
-    /// closes the final sub-threshold frame contributes too; stoppage /
-    /// replay-end closes end at the last evaluated live frame). This is kept
-    /// for attribution and comparison with the full-match integral; the
-    /// incident-based goal-count estimator is [`Self::incident_xg`].
-    pub xg: f32,
+    /// Duration-weighted threat over this episode: `sum(V * dt) / 5`.
+    pub threat_integral: f32,
     /// Peak V over the span, kept for display and intensity ranking.
     pub peak_value: f32,
     /// Frame/time where [`Self::peak_value`] occurred.
     pub peak_frame: usize,
     pub peak_time: f32,
-    /// One peak probability contributed to the team's incident-based xG.
-    /// For ordinary incidents this equals `peak_value`. For a goal-ending
-    /// incident it is the largest value strictly before
-    /// `goal_exclusion_start_time`, or zero when the incident only became
-    /// dangerous inside the excluded window.
-    pub incident_peak_value: f32,
-    /// Count-calibrated contribution derived from `incident_peak_value`.
-    pub incident_xg: f32,
-    /// Frame/time of the sample selected for [`Self::incident_xg`]. `None`
-    /// when a goal-ending incident has no eligible pre-touch sample.
-    pub incident_xg_frame: Option<usize>,
-    pub incident_xg_time: Option<f32>,
-    /// Start of the excluded goal-result window. `None` for non-goal
-    /// incidents or when no scoring-team touch was available.
-    pub goal_exclusion_start_time: Option<f32>,
     #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
     pub credited_player: Option<PlayerId>,
     pub ended_in_goal: bool,
@@ -817,6 +878,16 @@ pub struct ThreatGoalRecord {
     pub scoring_team_is_team_0: bool,
 }
 
+/// A contiguous observed live-play stretch. An open final stretch is censored.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ThreatLiveSegment {
+    pub start_time: f32,
+    pub end_time: f32,
+    pub resolved: bool,
+    pub scoring_team_is_team_0: Option<bool>,
+    pub goal_time: Option<f32>,
+}
+
 /// Configuration for [`ExpectedGoalsCalculator`].
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -826,11 +897,6 @@ pub struct ExpectedGoalsCalculatorConfig {
     /// V at or below which an open incident closes. This is deliberately
     /// lower than `episode_threshold` to avoid splitting on small dips.
     pub episode_end_threshold: f32,
-    /// Seconds before the scoring team's final touch at which a goal-ending
-    /// incident stops being eligible for incident xG.
-    pub goal_touch_exclusion_seconds: f32,
-    /// Count-scale calibration applied to the selected incident peak.
-    pub incident_xg_calibration_factor: f32,
 }
 
 impl Default for ExpectedGoalsCalculatorConfig {
@@ -838,17 +904,8 @@ impl Default for ExpectedGoalsCalculatorConfig {
         Self {
             episode_threshold: THREAT_EPISODE_THRESHOLD,
             episode_end_threshold: THREAT_EPISODE_END_THRESHOLD,
-            goal_touch_exclusion_seconds: GOAL_TOUCH_EXCLUSION_SECONDS,
-            incident_xg_calibration_factor: INCIDENT_XG_CALIBRATION_FACTOR,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct ThreatPeakCandidate {
-    frame: usize,
-    time: f32,
-    value: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -858,12 +915,8 @@ struct ActiveThreatEpisode {
     peak_value: f32,
     peak_frame: usize,
     peak_time: f32,
-    /// Monotonically increasing running maxima. The last candidate before a
-    /// goal-exclusion cutoff is the incident's censored peak without retaining
-    /// every frame in memory.
-    peak_candidates: Vec<ThreatPeakCandidate>,
     /// Running `sum(V * dt) / tau` over the episode's evaluated live frames.
-    xg_integral: f64,
+    threat_integral: f64,
     /// Most recent attacking toucher when `peak_value` was established.
     credited_player: Option<PlayerId>,
 }
@@ -874,8 +927,6 @@ struct ActiveThreatEpisode {
 #[derive(Debug, Clone, PartialEq)]
 struct PendingThreatEpisode {
     event: ThreatEpisodeEvent,
-    peak_candidates: Vec<ThreatPeakCandidate>,
-    scoring_team_last_touch_time: Option<f32>,
     closed_at: f32,
 }
 
@@ -898,11 +949,12 @@ pub struct ExpectedGoalsCalculator {
     touch_events: EventStream<ThreatTouchEvent>,
     episode_events: EventStream<ThreatEpisodeEvent>,
     goal_records: Vec<ThreatGoalRecord>,
+    live_segments: Vec<ThreatLiveSegment>,
     team_states: [TeamThreatState; 2],
     /// Per-team full-match `sum(V * dt) / tau`, accumulated over EVERY
     /// evaluated live-play frame (sub-threshold frames included), indexed
-    /// `[team zero, team one]`. This is the calibrated team xG.
-    team_xg_integrals: [f64; 2],
+    /// `[team zero, team one]`. This is duration-weighted pressure, separate from touch xG.
+    team_threat_integrals: [f64; 2],
     /// Both teams' V on the previous live frame, if it was live.
     previous_values: Option<[f32; 2]>,
     last_score: Option<(i32, i32)>,
@@ -928,16 +980,6 @@ impl ExpectedGoalsCalculator {
             config.episode_end_threshold.is_finite()
                 && (0.0..=config.episode_threshold).contains(&config.episode_end_threshold),
             "episode_end_threshold must be finite and no greater than episode_threshold"
-        );
-        assert!(
-            config.goal_touch_exclusion_seconds.is_finite()
-                && config.goal_touch_exclusion_seconds >= 0.0,
-            "goal_touch_exclusion_seconds must be finite and non-negative"
-        );
-        assert!(
-            config.incident_xg_calibration_factor.is_finite()
-                && config.incident_xg_calibration_factor >= 0.0,
-            "incident_xg_calibration_factor must be finite and non-negative"
         );
         Self {
             config,
@@ -969,12 +1011,14 @@ impl ExpectedGoalsCalculator {
         &self.goal_records
     }
 
-    /// Per-team full-match `sum(V * dt) / tau` over every evaluated live-play
-    /// frame (`[team zero, team one]`). Corpus-calibrated to actual goals per
-    /// team-game within ~1%; this is the team's accumulated xG. Episodes
-    /// capture only the above-threshold portion of it (empirically ~62%).
-    pub fn team_xg_integrals(&self) -> [f64; 2] {
-        self.team_xg_integrals
+    pub fn live_segments(&self) -> &[ThreatLiveSegment] {
+        &self.live_segments
+    }
+
+    /// Cumulative threat `sum(V * dt) / tau` over every evaluated live-play
+    /// frame, ordered `[team zero, team one]`.
+    pub fn team_threat_integrals(&self) -> [f64; 2] {
+        self.team_threat_integrals
     }
 
     /// Both teams' V on the most recent live frame (`[team zero, team one]`),
@@ -1002,6 +1046,15 @@ impl ExpectedGoalsCalculator {
             frame: frame.frame_number,
             scoring_team_is_team_0,
         });
+        if let Some(segment) = self.live_segments.last_mut().filter(|segment| {
+            (self.was_live || segment.resolved)
+                && time >= segment.start_time
+                && time <= segment.end_time + PENDING_EPISODE_GOAL_GRACE_SECONDS
+        }) {
+            segment.scoring_team_is_team_0 = Some(scoring_team_is_team_0);
+            segment.goal_time = Some(time);
+            segment.resolved = true;
+        }
         self.close_episode_as_goal(frame, time, scoring_team_is_team_0);
     }
 
@@ -1013,17 +1066,12 @@ impl ExpectedGoalsCalculator {
     ) {
         let state = &mut self.team_states[team_index(scoring_team_is_team_0)];
         if let Some(active) = state.active_episode.take() {
-            let goal_exclusion_start_time = state
-                .last_touch_time
-                .map(|time| time - self.config.goal_touch_exclusion_seconds);
             let event = Self::event_from_active(
                 &active,
                 frame.frame_number,
                 frame.time,
                 scoring_team_is_team_0,
                 ThreatEpisodeEndReason::Goal,
-                goal_exclusion_start_time,
-                self.config.incident_xg_calibration_factor,
             );
             self.episode_events.push(event);
             return;
@@ -1039,15 +1087,6 @@ impl ExpectedGoalsCalculator {
             if time - pending.closed_at <= PENDING_EPISODE_GOAL_GRACE_SECONDS {
                 event.ended_in_goal = true;
                 event.end_reason = ThreatEpisodeEndReason::Goal;
-                let goal_exclusion_start_time = pending
-                    .scoring_team_last_touch_time
-                    .map(|time| time - self.config.goal_touch_exclusion_seconds);
-                Self::apply_goal_exclusion(
-                    &mut event,
-                    &pending.peak_candidates,
-                    goal_exclusion_start_time,
-                    self.config.incident_xg_calibration_factor,
-                );
             }
             self.episode_events.push(event);
         }
@@ -1059,66 +1098,24 @@ impl ExpectedGoalsCalculator {
         end_time: f32,
         team_is_team_0: bool,
         end_reason: ThreatEpisodeEndReason,
-        goal_exclusion_start_time: Option<f32>,
-        incident_xg_calibration_factor: f32,
     ) -> ThreatEpisodeEvent {
-        let mut event = ThreatEpisodeEvent {
+        ThreatEpisodeEvent {
             start_time: active.start_time,
             start_frame: active.start_frame,
             end_time,
             end_frame,
             team_is_team_0,
-            xg: active.xg_integral as f32,
+            threat_integral: active.threat_integral as f32,
             peak_value: active.peak_value,
             peak_frame: active.peak_frame,
             peak_time: active.peak_time,
-            incident_peak_value: active.peak_value,
-            incident_xg: active.peak_value * incident_xg_calibration_factor,
-            incident_xg_frame: Some(active.peak_frame),
-            incident_xg_time: Some(active.peak_time),
-            goal_exclusion_start_time: None,
             credited_player: active.credited_player.clone(),
             ended_in_goal: end_reason == ThreatEpisodeEndReason::Goal,
             end_reason,
-        };
-        if event.ended_in_goal {
-            Self::apply_goal_exclusion(
-                &mut event,
-                &active.peak_candidates,
-                goal_exclusion_start_time,
-                incident_xg_calibration_factor,
-            );
-        }
-        event
-    }
-
-    fn apply_goal_exclusion(
-        event: &mut ThreatEpisodeEvent,
-        peak_candidates: &[ThreatPeakCandidate],
-        goal_exclusion_start_time: Option<f32>,
-        incident_xg_calibration_factor: f32,
-    ) {
-        event.goal_exclusion_start_time = goal_exclusion_start_time;
-        let candidate = goal_exclusion_start_time.and_then(|cutoff| {
-            peak_candidates
-                .iter()
-                .rev()
-                .find(|sample| sample.time < cutoff)
-        });
-        if let Some(candidate) = candidate {
-            event.incident_peak_value = candidate.value;
-            event.incident_xg = candidate.value * incident_xg_calibration_factor;
-            event.incident_xg_frame = Some(candidate.frame);
-            event.incident_xg_time = Some(candidate.time);
-        } else if goal_exclusion_start_time.is_some() {
-            event.incident_peak_value = 0.0;
-            event.incident_xg = 0.0;
-            event.incident_xg_frame = None;
-            event.incident_xg_time = None;
         }
     }
 
-    /// One frame's contribution to an xG time integral: `V * dt / tau`.
+    /// One frame's contribution to cumulative threat: `V * dt / tau`.
     fn integral_contribution(value: f32, dt: f32) -> f64 {
         f64::from(value) * f64::from(dt) / f64::from(expected_goals_model::THREAT_HORIZON_SECONDS)
     }
@@ -1184,8 +1181,6 @@ impl ExpectedGoalsCalculator {
                 frame.time,
                 team_index == 0,
                 ThreatEpisodeEndReason::Stoppage,
-                None,
-                self.config.incident_xg_calibration_factor,
             );
             // A newer stoppage-closed episode supersedes an unresolved older
             // one; flush the older one un-goaled first.
@@ -1194,16 +1189,14 @@ impl ExpectedGoalsCalculator {
             }
             state.pending_episode = Some(PendingThreatEpisode {
                 event,
-                peak_candidates: active.peak_candidates,
-                scoring_team_last_touch_time: state.last_touch_time,
                 closed_at: frame.time,
             });
         }
     }
 
     /// Observe primary touches before goal detection. A goal and its final
-    /// touch can surface on the same processing frame, and the contact time is
-    /// what anchors the exclusion window even though V is evaluated later.
+    /// touch can surface on the same processing frame. Contact time anchors
+    /// the pre-contact feature lookup even though V is evaluated later.
     fn observe_touches(&mut self, touch_state: &TouchState) {
         for is_team_0 in [true, false] {
             let Some(touch) = touch_state.primary_touch_event_for_team(is_team_0) else {
@@ -1228,17 +1221,33 @@ impl ExpectedGoalsCalculator {
     /// [`TouchState::primary_touch_event_for_team`], the same notion of "the"
     /// decisive touch that `TouchState` already encodes for the rest of the
     /// stats pipeline -- receives the whole transition.
-    fn emit_touch_events(&mut self, frame: &FrameInfo, touch_state: &TouchState, values: [f32; 2]) {
+    fn emit_touch_events(
+        &mut self,
+        frame: &FrameInfo,
+        touch_state: &TouchState,
+        values: [f32; 2],
+        threat_features: &ThreatFeaturesState,
+    ) {
         for is_team_0 in [true, false] {
             let Some(touch) = touch_state.primary_touch_event_for_team(is_team_0) else {
                 continue;
             };
+            if self.live_segments.last().is_some_and(|segment| {
+                segment
+                    .goal_time
+                    .is_some_and(|goal_time| touch.time > goal_time)
+            }) {
+                continue;
+            }
             let index = team_index(is_team_0);
             let value_before = self
                 .previous_values
                 .map(|previous| previous[index])
                 .unwrap_or(values[index]);
+            let pre_touch_features = threat_features.before_touch(touch.time, is_team_0);
             self.touch_events.push(ThreatTouchEvent {
+                xg: pre_touch_features.as_ref().map(touch_xg_value),
+                pre_touch_features,
                 time: touch.time,
                 frame: touch.frame,
                 touch_id: touch.touch_id,
@@ -1268,14 +1277,9 @@ impl ExpectedGoalsCalculator {
                         active.peak_value = value;
                         active.peak_frame = frame.frame_number;
                         active.peak_time = frame.time;
-                        active.peak_candidates.push(ThreatPeakCandidate {
-                            frame: frame.frame_number,
-                            time: frame.time,
-                            value,
-                        });
                         active.credited_player = last_toucher;
                     }
-                    active.xg_integral += Self::integral_contribution(value, frame.dt);
+                    active.threat_integral += Self::integral_contribution(value, frame.dt);
                     if value <= self.config.episode_end_threshold {
                         let active = state
                             .active_episode
@@ -1287,8 +1291,6 @@ impl ExpectedGoalsCalculator {
                             frame.time,
                             team_index == 0,
                             ThreatEpisodeEndReason::ValueDropped,
-                            None,
-                            self.config.incident_xg_calibration_factor,
                         ));
                     }
                 }
@@ -1300,12 +1302,7 @@ impl ExpectedGoalsCalculator {
                             peak_value: value,
                             peak_frame: frame.frame_number,
                             peak_time: frame.time,
-                            peak_candidates: vec![ThreatPeakCandidate {
-                                frame: frame.frame_number,
-                                time: frame.time,
-                                value,
-                            }],
-                            xg_integral: Self::integral_contribution(value, frame.dt),
+                            threat_integral: Self::integral_contribution(value, frame.dt),
                             credited_player: last_toucher,
                         });
                     }
@@ -1331,8 +1328,29 @@ impl ExpectedGoalsCalculator {
         self.resolve_stale_pending_episodes(frame, gameplay.kickoff_phase_active());
 
         let Some(features) = threat_features.current_model().copied() else {
+            if self.was_live
+                || [true, false].into_iter().any(|team| {
+                    touch_state
+                        .primary_touch_event_for_team(team)
+                        .is_some_and(|touch| {
+                            frame.time - touch.time <= 0.5
+                                && threat_features.before_touch(touch.time, team).is_some()
+                        })
+                })
+            {
+                self.emit_touch_events(
+                    frame,
+                    touch_state,
+                    self.previous_values.unwrap_or([0.0; 2]),
+                    threat_features,
+                );
+            }
             self.suspend_active_episodes(frame);
             if self.was_live {
+                if let Some(segment) = self.live_segments.last_mut() {
+                    segment.end_time = frame.time;
+                    segment.resolved |= threat_features.observed_stoppage;
+                }
                 for state in self.team_states.iter_mut() {
                     state.last_toucher = None;
                     state.last_touch_time = None;
@@ -1342,19 +1360,28 @@ impl ExpectedGoalsCalculator {
             self.was_live = false;
             return Ok(());
         };
+        if !self.was_live {
+            self.live_segments.push(ThreatLiveSegment {
+                start_time: frame.time,
+                end_time: frame.time,
+                resolved: false,
+                scoring_team_is_team_0: None,
+                goal_time: None,
+            });
+        } else if let Some(segment) = self.live_segments.last_mut() {
+            segment.end_time = frame.time;
+        }
         let values = [
             expected_goals_model::threat_value(&features[0]),
             expected_goals_model::threat_value(&features[1]),
         ];
 
-        // The full-match team integral covers EVERY evaluated live frame,
-        // sub-threshold ones included -- diffuse below-threshold threat is
-        // ~38% of the calibrated total.
+        // Include sub-threshold frames in cumulative threat.
         for (team_index, value) in values.iter().enumerate() {
-            self.team_xg_integrals[team_index] += Self::integral_contribution(*value, frame.dt);
+            self.team_threat_integrals[team_index] += Self::integral_contribution(*value, frame.dt);
         }
 
-        self.emit_touch_events(frame, touch_state, values);
+        self.emit_touch_events(frame, touch_state, values, threat_features);
         self.update_episodes(frame, values);
         self.previous_values = Some(values);
         self.was_live = true;
@@ -1373,8 +1400,6 @@ impl ExpectedGoalsCalculator {
                     end_time,
                     team_index == 0,
                     ThreatEpisodeEndReason::ReplayEnd,
-                    None,
-                    self.config.incident_xg_calibration_factor,
                 );
                 self.episode_events.push(event);
             }

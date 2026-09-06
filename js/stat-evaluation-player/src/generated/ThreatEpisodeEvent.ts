@@ -11,17 +11,9 @@ import type { ThreatEpisodeEndReason } from "./ThreatEpisodeEndReason.ts";
  */
 export type ThreatEpisodeEvent = { start_time: number, start_frame: number, end_time: number, end_frame: number, team_is_team_0: boolean,
 /**
- * The episode's continuous threat integral: `sum(V * dt) / tau` over the
- * span, where `tau` is
- * [`THREAT_HORIZON_SECONDS`](super::expected_goals_model::THREAT_HORIZON_SECONDS).
- * Frames that count: every evaluated live-play frame from the frame that
- * opens the episode through the frame that closes it (for value-drop
- * closes the final sub-threshold frame contributes too; stoppage /
- * replay-end closes end at the last evaluated live frame). This is kept
- * for attribution and comparison with the full-match integral; the
- * incident-based goal-count estimator is [`Self::incident_xg`].
+ * Duration-weighted threat over this episode: `sum(V * dt) / 5`.
  */
-xg: number,
+threat_integral: number,
 /**
  * Peak V over the span, kept for display and intensity ranking.
  */
@@ -29,26 +21,4 @@ peak_value: number,
 /**
  * Frame/time where [`Self::peak_value`] occurred.
  */
-peak_frame: number, peak_time: number,
-/**
- * One peak probability contributed to the team's incident-based xG.
- * For ordinary incidents this equals `peak_value`. For a goal-ending
- * incident it is the largest value strictly before
- * `goal_exclusion_start_time`, or zero when the incident only became
- * dangerous inside the excluded window.
- */
-incident_peak_value: number,
-/**
- * Count-calibrated contribution derived from `incident_peak_value`.
- */
-incident_xg: number,
-/**
- * Frame/time of the sample selected for [`Self::incident_xg`]. `None`
- * when a goal-ending incident has no eligible pre-touch sample.
- */
-incident_xg_frame: number | null, incident_xg_time: number | null,
-/**
- * Start of the excluded goal-result window. `None` for non-goal
- * incidents or when no scoring-team touch was available.
- */
-goal_exclusion_start_time: number | null, credited_player: RemoteIdTs | null, ended_in_goal: boolean, end_reason: ThreatEpisodeEndReason, };
+peak_frame: number, peak_time: number, credited_player: RemoteIdTs | null, ended_in_goal: boolean, end_reason: ThreatEpisodeEndReason, };

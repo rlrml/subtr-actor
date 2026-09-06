@@ -262,7 +262,9 @@ export function createTeamStatsSnapshot(
       },
       expected_goals: {
         current_threat: null,
-        incident_xg: 0,
+        evaluated_touch_count: 0,
+        unavailable_touch_count: 0,
+        threat_integral: 0,
         xg: 0,
         episode_count: 0,
         goal_episode_count: 0,
@@ -635,6 +637,7 @@ export function createPlayerStatsSnapshot(
       expected_goals: {
         threat_added: 0,
         xg: 0,
+        threat_integral: 0,
         credited_episode_count: 0,
         credited_goal_episode_count: 0,
       },

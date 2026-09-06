@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  formatIncidentXg,
+  formatExpectedGoals,
   formatThreatProbability,
   normalizeThreatProbability,
 } from "./scoreboardWindow.ts";
@@ -19,9 +19,9 @@ test("live threat probabilities render as bounded percentages", () => {
   assert.equal(normalizeThreatProbability(undefined), null);
 });
 
-test("incident xG renders as a goal-count total", () => {
-  assert.equal(formatIncidentXg(2.345), "2.35");
-  assert.equal(formatIncidentXg(0), "0.00");
-  assert.equal(formatIncidentXg(null), "--");
-  assert.equal(formatIncidentXg(Number.NaN), "--");
+test("expected goals renders as a goal-count total", () => {
+  assert.equal(formatExpectedGoals(2.345), "2.35");
+  assert.equal(formatExpectedGoals(0), "0.00");
+  assert.equal(formatExpectedGoals(null), "--");
+  assert.equal(formatExpectedGoals(Number.NaN), "--");
 });

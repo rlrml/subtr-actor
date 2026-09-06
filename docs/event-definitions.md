@@ -1241,7 +1241,7 @@ _None documented._
 
 **Summary**
 
-A contiguous span where one team's continuous threat value exceeds the episode threshold; its xG is the goal-calibrated time integral of V over the span (peak V is kept separately for intensity), credited to the attacking toucher associated with the peak.
+A contiguous span where one team's continuous threat value exceeds the episode threshold; its threat integral summarizes pressure over the span (peak V is display intensity), credited to the attacking toucher associated with the peak.
 
 **Approach**
 
@@ -1271,12 +1271,12 @@ _None documented._
 
 **Summary**
 
-The positive detection-frame change in the touching team's continuous threat value (expected-goals state value), not a causal estimate of the touch's multi-frame impulse.
+Pre-contact goal probability and signed observed threat change for a touch.
 
 **Approach**
 
 - Evaluate the versioned compact nonlinear threat model V(state) for both teams on every live-play frame from full ball and player physics state.
-- On each attributed touch, emit the toucher's team's V on the preceding live frame and on the detection frame; positive deltas contribute to threat_added.
+- On each attributed touch, emit the toucher's team's V on the preceding live frame and on the detection frame; signed deltas contribute to threat_added; a separate pre-contact model supplies touch xG.
 
 **Limitations**
 

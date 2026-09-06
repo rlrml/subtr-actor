@@ -33,6 +33,7 @@ fn rust_inference_matches_locked_training_pipeline() {
 
 fn neutral_features() -> ThreatFeatures {
     ThreatFeatures {
+        ball_state: [0.0; 6],
         ball_forward_y: 0.0,
         ball_dist_to_goal: 0.46,
         ball_height: 0.05,
@@ -47,7 +48,7 @@ fn neutral_features() -> ThreatFeatures {
 }
 
 #[test]
-fn threat_value_is_a_probability_and_orders_danger_over_neutral() {
+fn legacy_threat_value_orders_danger_over_neutral() {
     let neutral = neutral_features();
     let dangerous = ThreatFeatures {
         ball_forward_y: 0.8,
@@ -59,8 +60,10 @@ fn threat_value_is_a_probability_and_orders_danger_over_neutral() {
         ..neutral
     };
 
-    let neutral_value = threat_value(&ThreatModelFeatures::new(neutral, [None, None]));
-    let dangerous_value = threat_value(&ThreatModelFeatures::new(dangerous, [None, None]));
+    let neutral_value =
+        threat_value_from_array(&ThreatModelFeatures::new(neutral, [None, None]).to_array());
+    let dangerous_value =
+        threat_value_from_array(&ThreatModelFeatures::new(dangerous, [None, None]).to_array());
     assert!(neutral_value > 0.0 && neutral_value < 1.0);
     assert!(dangerous_value > 0.0 && dangerous_value < 1.0);
     assert!(

@@ -1,23 +1,15 @@
-//! Versioned nonlinear threat model for the expected-goals stat.
+//! Deployed five-second scoring threat and the retained v6 baseline.
 //!
-//! The model maps a [`ThreatModelFeatures`] vector to
-//! an eight-hidden-unit tanh MLP: the probability that the attacking team
-//! scores within the next [`THREAT_HORIZON_SECONDS`] seconds, evaluated on raw
-//! (unstandardized) features. The offline training pipeline folds input
-//! standardization into the published first-layer weights, so inference here
-//! is a pair of small matrix-vector products over
-//! [`ThreatModelFeatures::to_array`].
-//!
-//! Replacing the model is a mechanical edit confined to the generated
-//! coefficients module and version/provenance section below. The input-weight
-//! table has one named row per [`ThreatModelFeatures::feature_names`] entry, in
-//! the same order.
+//! The default path uses the calibrated entity model. The legacy 154-feature
+//! function and coefficients remain available for historical parity checks.
+//! See `scripts/threat_model/EVALUATION.md` for v7 validation and provenance.
 
 use super::expected_goals::{THREAT_MODEL_FEATURE_COUNT, ThreatModelFeatures};
 
 /// Label horizon the model is (to be) trained against: V estimates the
 /// probability of the attacking team scoring within this many seconds.
-pub const THREAT_HORIZON_SECONDS: f32 = 5.0;
+pub const THREAT_HORIZON_SECONDS: f32 =
+    super::expected_goals_entity_model::ENTITY_THREAT_HORIZON_SECONDS;
 
 // ---------------------------------------------------------------------------
 // GENERATED COEFFICIENTS -- BEGIN
@@ -34,8 +26,8 @@ pub const THREAT_HORIZON_SECONDS: f32 = 5.0;
 // apply directly to raw features.
 // ---------------------------------------------------------------------------
 
-/// Identifies the generated model embedded below.
-pub const THREAT_MODEL_VERSION: &str = "trained-v6-temporal";
+/// Identifies the deployed frame/touch model pair.
+pub const THREAT_MODEL_VERSION: &str = "trained-v7-entity-precontact";
 
 include!("expected_goals_model_weights.rs");
 
@@ -49,13 +41,11 @@ fn sigmoid(x: f32) -> f32 {
 /// Evaluate the threat model on one feature vector: the probability, in
 /// (0, 1), that the attacking team scores within [`THREAT_HORIZON_SECONDS`].
 pub fn threat_value(features: &ThreatModelFeatures) -> f32 {
-    threat_value_from_array(&features.to_array())
+    super::expected_goals_entity_model::entity_threat_value(features)
 }
 
-/// Evaluate the model on a raw feature vector in
-/// [`ThreatModelFeatures::feature_names`] order. This is the exact inference
-/// path [`threat_value`] uses; it is public so parity against the offline
-/// training pipeline's predictions can be asserted on shared fixtures.
+/// Evaluate the retained v6 baseline in [`ThreatModelFeatures::feature_names`]
+/// order. This is not the default deployed inference path.
 pub fn threat_value_from_array(values: &[f32; THREAT_MODEL_FEATURE_COUNT]) -> f32 {
     let mut hidden = THREAT_MODEL_HIDDEN_BIASES;
     for ((_, weights), value) in THREAT_MODEL_INPUT_WEIGHTS.iter().zip(values.iter()) {

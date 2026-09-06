@@ -6,7 +6,6 @@ import type { ThreatEpisodeEvent } from "./ThreatEpisodeEvent.ts";
 
 export type ExpectedGoalsTimelineTracks = { config: ExpectedGoalsCalculatorConfig, teams: Array<ExpectedGoalsTeamTimelineTrack>, players: Array<ExpectedGoalsPlayerTimelineTrack>,
 /**
- * Finalized threshold-delimited incidents, including peak timing and any
- * scoring-touch exclusion applied to incident xG.
+ * Finalized pressure episodes with peak timing and threat integrals.
  */
 episodes: Array<ThreatEpisodeEvent>, };

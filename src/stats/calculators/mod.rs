@@ -71,6 +71,8 @@ pub mod double_tap;
 pub use double_tap::*;
 pub mod expected_goals;
 pub use expected_goals::*;
+pub mod expected_goals_entity_model;
+pub use expected_goals_entity_model::*;
 pub mod expected_goals_model;
 pub use expected_goals_model::*;
 pub mod fifty_fifty;

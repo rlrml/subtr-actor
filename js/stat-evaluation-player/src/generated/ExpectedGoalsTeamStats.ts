@@ -11,19 +11,18 @@ export type ExpectedGoalsTeamStats = {
  */
 current_threat: number | null,
 /**
- * Sum of count-calibrated, one-peak contributions from threshold-delimited
- * incidents. For an incident ending in a goal, samples from shortly before
- * the scoring team's final touch onward are excluded to avoid outcome
- * leakage. Raw selected probabilities remain available on the incident
- * events.
+ * Sum of pre-contact scoring probabilities over this team's evaluated touches.
  */
-incident_xg: number,
+xg: number,
 /**
- * The team's full-match xG time integral (`sum(V * dt) / tau` over every
- * evaluated live frame, sub-threshold frames included), fed from
- * [`ExpectedGoalsCalculator::team_xg_integrals`]. NOT a sum of episode
- * xG: per-player `xg` sums to LESS than this, because diffuse
- * sub-threshold threat is not attributed to any player (empirically only
- * ~62% of the integral falls inside above-threshold episodes).
+ * Primary touches with a valid pre-contact prediction.
  */
-xg: number, episode_count: number, goal_episode_count: number, };
+evaluated_touch_count: number,
+/**
+ * Primary touches missing the required pre-contact history.
+ */
+unavailable_touch_count: number,
+/**
+ * Duration-weighted threat; independent of touch xG.
+ */
+threat_integral: number, episode_count: number, goal_episode_count: number, };

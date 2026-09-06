@@ -261,7 +261,7 @@ function getCapabilityLabel(mod: StatModule, kind: ModuleCapabilityKind): string
     "fifty-fifty:events": "50/50",
     "fifty-fifty:ranges": "50/50",
     "dodge:events": "Dodge",
-    "expected_goals:ranges": "Instantaneous xG graph",
+    "expected_goals:ranges": "Expected goals and scoring threat",
     "half-flip:events": "Half flip",
     "possession:ranges": "Possession",
     "powerslide:events": "Powerslide",

@@ -9,6 +9,17 @@ dependencies = [
     "scikit-learn>=1.5,<2",
 ]
 
+[project.optional-dependencies]
+neural = ["torch>=2.6,<3"]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
 [dependency-groups]
 dev = ["ruff>=0.15,<0.16"]
 

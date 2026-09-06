@@ -667,11 +667,10 @@ impl StatsProjectionNode {
             ) {
                 self.state.expected_goals.apply_episode_event(event);
             }
-            // Team xG is the calculator's full-match integral (absolute totals,
-            // not an event fold), refreshed every projection step.
+            // Refresh cumulative pressure independently of touch xG.
             self.state
                 .expected_goals
-                .set_team_xg_integrals(expected_goals.team_xg_integrals());
+                .set_team_threat_integrals(expected_goals.team_threat_integrals());
             self.state
                 .expected_goals
                 .set_current_values(expected_goals.current_values());

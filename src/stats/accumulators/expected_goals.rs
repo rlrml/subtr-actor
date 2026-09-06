@@ -22,14 +22,15 @@ pub(crate) fn threat_team_label(is_team_0: bool) -> StatLabel {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct ExpectedGoalsPlayerStats {
-    /// Sum of positive detection-frame threat deltas (detection-frame V minus
+    /// Sum of signed detection-frame threat deltas (detection-frame V minus
     /// preceding-live-frame V, from the toucher's team's perspective) over the
     /// player's touches. This is an observed one-frame delta, not a causal
     /// estimate of each touch's multi-frame impulse.
     pub threat_added: f32,
-    /// Sum of episode xG time integrals (`sum(V * dt) / tau` per episode)
-    /// over episodes credited to this player.
+    /// Sum of pre-contact scoring probabilities over this player's evaluated touches.
     pub xg: f32,
+    /// Duration-weighted threat; independent of touch xG.
+    pub threat_integral: f32,
     pub credited_episode_count: u32,
     pub credited_goal_episode_count: u32,
     #[serde(default, skip_serializing_if = "LabeledFloatSums::is_empty")]
@@ -37,13 +38,22 @@ pub struct ExpectedGoalsPlayerStats {
 }
 
 impl ExpectedGoalsPlayerStats {
-    fn record_touch(&mut self, is_team_0: bool, positive_delta: f32) {
+    fn record_touch(&mut self, event: &ThreatTouchEvent) {
+        if let Some(xg) = event.xg {
+            self.labeled_sums.add(
+                [
+                    threat_metric_xg_label(),
+                    threat_team_label(event.team_is_team_0),
+                ],
+                xg,
+            );
+        }
         self.labeled_sums.add(
             [
                 threat_metric_threat_added_label(),
-                threat_team_label(is_team_0),
+                threat_team_label(event.team_is_team_0),
             ],
-            positive_delta,
+            event.delta(),
         );
         self.sync_projections();
     }
@@ -51,10 +61,10 @@ impl ExpectedGoalsPlayerStats {
     fn record_episode(&mut self, event: &ThreatEpisodeEvent) {
         self.labeled_sums.add(
             [
-                threat_metric_xg_label(),
+                StatLabel::new("metric", "threat_integral"),
                 threat_team_label(event.team_is_team_0),
             ],
-            event.xg,
+            event.threat_integral,
         );
         self.credited_episode_count += 1;
         if event.ended_in_goal {
@@ -68,6 +78,9 @@ impl ExpectedGoalsPlayerStats {
             .labeled_sums
             .sum_matching(&[threat_metric_threat_added_label()]);
         self.xg = self.labeled_sums.sum_matching(&[threat_metric_xg_label()]);
+        self.threat_integral = self
+            .labeled_sums
+            .sum_matching(&[StatLabel::new("metric", "threat_integral")]);
     }
 }
 
@@ -79,19 +92,14 @@ pub struct ExpectedGoalsTeamStats {
     /// prediction horizon on the current live-play frame. `None` outside live
     /// play or when the replay is not a supported 2v2 match.
     pub current_threat: Option<f32>,
-    /// Sum of count-calibrated, one-peak contributions from threshold-delimited
-    /// incidents. For an incident ending in a goal, samples from shortly before
-    /// the scoring team's final touch onward are excluded to avoid outcome
-    /// leakage. Raw selected probabilities remain available on the incident
-    /// events.
-    pub incident_xg: f32,
-    /// The team's full-match xG time integral (`sum(V * dt) / tau` over every
-    /// evaluated live frame, sub-threshold frames included), fed from
-    /// [`ExpectedGoalsCalculator::team_xg_integrals`]. NOT a sum of episode
-    /// xG: per-player `xg` sums to LESS than this, because diffuse
-    /// sub-threshold threat is not attributed to any player (empirically only
-    /// ~62% of the integral falls inside above-threshold episodes).
+    /// Sum of pre-contact scoring probabilities over this team's evaluated touches.
     pub xg: f32,
+    /// Primary touches with a valid pre-contact prediction.
+    pub evaluated_touch_count: u32,
+    /// Primary touches missing the required pre-contact history.
+    pub unavailable_touch_count: u32,
+    /// Duration-weighted threat; independent of touch xG.
+    pub threat_integral: f32,
     pub episode_count: u32,
     pub goal_episode_count: u32,
 }
@@ -117,13 +125,14 @@ impl ExpectedGoalsStatsAccumulator {
         &self.team_stats[usize::from(!is_team_0)]
     }
 
-    /// Fold one detection-frame touch threat delta: only positive deltas count
-    /// toward the toucher's threat-added sum. The delta is an observed
-    /// one-frame state change, not a causal multi-frame impulse estimate.
+    /// Fold signed observed threat change and an independently evaluated pre-contact xG.
     pub fn apply_touch_event(&mut self, event: &ThreatTouchEvent) {
-        let delta = event.delta();
-        if delta <= 0.0 {
-            return;
+        let team = &mut self.team_stats[usize::from(!event.team_is_team_0)];
+        if let Some(xg) = event.xg {
+            team.xg += xg;
+            team.evaluated_touch_count += 1;
+        } else {
+            team.unavailable_touch_count += 1;
         }
         let Some(player) = event.player.as_ref() else {
             return;
@@ -131,14 +140,10 @@ impl ExpectedGoalsStatsAccumulator {
         self.player_stats
             .entry(player.clone())
             .or_default()
-            .record_touch(event.team_is_team_0, delta);
+            .record_touch(event);
     }
 
-    /// Fold one closed threat episode: its xG (the within-episode time
-    /// integral) is credited to the episode's player when one is known, and
-    /// the team's episode counters advance. Team `xg` is NOT summed from
-    /// episodes -- it is the full-match integral set through
-    /// [`Self::set_team_xg_integrals`].
+    /// Fold episode pressure and display counters, without changing touch xG.
     pub fn apply_episode_event(&mut self, event: &ThreatEpisodeEvent) {
         if let Some(player) = event.credited_player.as_ref() {
             self.player_stats
@@ -147,19 +152,16 @@ impl ExpectedGoalsStatsAccumulator {
                 .record_episode(event);
         }
         let team = &mut self.team_stats[usize::from(!event.team_is_team_0)];
-        team.incident_xg += event.incident_xg;
         team.episode_count += 1;
         if event.ended_in_goal {
             team.goal_episode_count += 1;
         }
     }
 
-    /// Overwrite both teams' accumulated xG with the calculator's full-match
-    /// integrals (`[team zero, team one]`). Called with the current absolute
-    /// totals each projection step, so it is idempotent per frame.
-    pub fn set_team_xg_integrals(&mut self, integrals: [f64; 2]) {
-        self.team_stats[0].xg = integrals[0] as f32;
-        self.team_stats[1].xg = integrals[1] as f32;
+    /// Refresh the full-live-play threat integrals from the calculator.
+    pub fn set_team_threat_integrals(&mut self, integrals: [f64; 2]) {
+        self.team_stats[0].threat_integral = integrals[0] as f32;
+        self.team_stats[1].threat_integral = integrals[1] as f32;
     }
 
     /// Overwrite both teams' current live threat values. The calculator uses

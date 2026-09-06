@@ -429,6 +429,9 @@ where
         "ThreatModelFeatures" => Some(NDArrayFeatureAdder::analysis(
             ThreatModelFeaturesBothTeams::<F>::arc_new(),
         )),
+        "ThreatEntityFeatures" => Some(NDArrayFeatureAdder::analysis(
+            ThreatEntityFeaturesBothTeams::<F>::arc_new(),
+        )),
         "ThreatModelValues" => Some(NDArrayFeatureAdder::analysis(
             ThreatModelValues::<F>::arc_new(),
         )),

@@ -48,6 +48,8 @@ META_COLS = [
     "time_to_next_goal_for",
     "time_to_next_goal_against",
     "time_to_replay_end",
+    "time_to_live_end",
+    "live_end_resolved",
 ]
 
 parser = argparse.ArgumentParser()
@@ -202,6 +204,8 @@ tau = args.tau
 has_goal = df["time_to_next_goal_for"].notna()
 label = has_goal & (df["time_to_next_goal_for"] <= tau)
 censored = ~has_goal & (df["time_to_replay_end"] < tau)
+if "time_to_live_end" in df:
+    censored = ~label & df["live_end_resolved"].eq(0) & (df["time_to_live_end"] < tau)
 keep = ~censored
 df = df[keep].copy()
 y = label[keep].to_numpy()

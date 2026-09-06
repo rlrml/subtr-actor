@@ -104,8 +104,7 @@ pub struct ExpectedGoalsTimelineTracks {
     pub config: ExpectedGoalsCalculatorConfig,
     pub teams: Vec<ExpectedGoalsTeamTimelineTrack>,
     pub players: Vec<ExpectedGoalsPlayerTimelineTrack>,
-    /// Finalized threshold-delimited incidents, including peak timing and any
-    /// scoring-touch exclusion applied to incident xG.
+    /// Finalized pressure episodes with peak timing and threat integrals.
     #[serde(default)]
     pub episodes: Vec<ThreatEpisodeEvent>,
 }

@@ -8,14 +8,17 @@ import type { LabeledFloatSums } from "./LabeledFloatSums.ts";
  */
 export type ExpectedGoalsPlayerStats = {
 /**
- * Sum of positive detection-frame threat deltas (detection-frame V minus
+ * Sum of signed detection-frame threat deltas (detection-frame V minus
  * preceding-live-frame V, from the toucher's team's perspective) over the
  * player's touches. This is an observed one-frame delta, not a causal
  * estimate of each touch's multi-frame impulse.
  */
 threat_added: number,
 /**
- * Sum of episode xG time integrals (`sum(V * dt) / tau` per episode)
- * over episodes credited to this player.
+ * Sum of pre-contact scoring probabilities over this player's evaluated touches.
  */
-xg: number, credited_episode_count: number, credited_goal_episode_count: number, labeled_sums?: LabeledFloatSums, };
+xg: number,
+/**
+ * Duration-weighted threat; independent of touch xG.
+ */
+threat_integral: number, credited_episode_count: number, credited_goal_episode_count: number, labeled_sums?: LabeledFloatSums, };

@@ -12,13 +12,4 @@ episode_threshold: number,
  * V at or below which an open incident closes. This is deliberately
  * lower than `episode_threshold` to avoid splitting on small dips.
  */
-episode_end_threshold: number,
-/**
- * Seconds before the scoring team's final touch at which a goal-ending
- * incident stops being eligible for incident xG.
- */
-goal_touch_exclusion_seconds: number,
-/**
- * Count-scale calibration applied to the selected incident peak.
- */
-incident_xg_calibration_factor: number, };
+episode_end_threshold: number, };

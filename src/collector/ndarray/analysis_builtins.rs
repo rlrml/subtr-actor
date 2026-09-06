@@ -141,6 +141,77 @@ where
     }
 }
 
+fn threat_entity_feature_headers() -> &'static [&'static str] {
+    static HEADERS: OnceLock<Vec<&'static str>> = OnceLock::new();
+    HEADERS.get_or_init(|| {
+        ["team_zero", "team_one"]
+            .into_iter()
+            .flat_map(|team| {
+                ThreatModelFeatures::entity_feature_names()
+                    .iter()
+                    .map(move |feature| {
+                        let header: &'static mut str =
+                            Box::leak(format!("{team}_threat_entity_{feature}").into_boxed_str());
+                        &*header
+                    })
+            })
+            .collect()
+    })
+}
+
+/// Complete player-state inputs for the permutation-invariant entity model.
+pub struct ThreatEntityFeaturesBothTeams<F>(PhantomData<F>);
+
+impl<F> ThreatEntityFeaturesBothTeams<F> {
+    pub fn arc_new() -> Arc<dyn AnalysisFeatureAdder<F> + Send + Sync>
+    where
+        F: TryFrom<f32> + Send + Sync + 'static,
+        <F as TryFrom<f32>>::Error: std::fmt::Debug,
+    {
+        Arc::new(Self(PhantomData))
+    }
+}
+
+impl<F> AnalysisFeatureAdder<F> for ThreatEntityFeaturesBothTeams<F>
+where
+    F: TryFrom<f32> + Send + Sync,
+    <F as TryFrom<f32>>::Error: std::fmt::Debug,
+{
+    fn get_column_headers(&self) -> &[&str] {
+        threat_entity_feature_headers()
+    }
+
+    fn analysis_dependencies(&self) -> Vec<AnalysisDependency> {
+        vec![threat_features_dependency()]
+    }
+
+    fn add_features(
+        &self,
+        context: &AnalysisFeatureContext<'_>,
+        _processor: &dyn ProcessorView,
+        _frame: &boxcars::Frame,
+        _frame_count: usize,
+        _current_time: f32,
+        vector: &mut Vec<F>,
+    ) -> SubtrActorResult<()> {
+        let features = context
+            .state::<ThreatFeaturesState>()?
+            .current_model()
+            .ok_or_else(|| {
+                SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
+                    "threat model features requested outside live play".to_owned(),
+                ))
+            })?;
+        for value in features
+            .iter()
+            .flat_map(ThreatModelFeatures::to_entity_array)
+        {
+            vector.push(F::try_from(value).map_err(convert_float_conversion_error)?);
+        }
+        Ok(())
+    }
+}
+
 /// Current model values for both teams. Including this adder also requests the
 /// expected-goals analysis node, allowing dataset callers to inspect its goal
 /// and episode state after matrix collection.
