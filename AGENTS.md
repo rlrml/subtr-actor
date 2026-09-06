@@ -12,7 +12,8 @@ The same core pipeline is exposed through Python and JavaScript bindings.
   modeled actor state before collectors consume the resulting processor state.
 - `src/collector/`: Output modes built on the processing pipeline.
   `replay_data.rs` emits structured frame data, `ndarray/` builds numeric
-  feature matrices, and `stats_timeline.rs` produces cumulative stat snapshots.
+  feature matrices, and `stats/` exports configurable stat reports.
+  `src/stats/timeline/` produces event scaffolds and compatibility snapshots.
 - `src/stats/`: Higher-level stat extraction modules for exported replay
   statistics. `accumulators/` contains the per-stat accumulators,
   `calculators/` and `analysis_graph/` define the stats DAG, and `labels.rs`
@@ -36,7 +37,7 @@ The same core pipeline is exposed through Python and JavaScript bindings.
 - For the current stats DAG layout, see
   [`docs/calculators-and-analysis-nodes.md`](./docs/calculators-and-analysis-nodes.md).
 - Most feature extraction work lands either in `src/collector/ndarray/`,
-  `src/collector/replay_data.rs`, `src/collector/stats_timeline.rs`, or
+  `src/collector/replay_data.rs`, `src/stats/timeline/`, or
   `src/stats/` (accumulators and the analysis DAG), depending on whether the
   output is numeric, structured, cumulative-over-time, or stat-oriented.
 - Replay-player infrastructure work usually belongs in `js/player/`. Stats UI

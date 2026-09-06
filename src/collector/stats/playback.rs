@@ -6,15 +6,10 @@ use crate::*;
 
 use super::types::serialize_to_json_value;
 
-#[path = "playback_event_parsers.rs"]
-mod playback_event_parsers;
-#[path = "playback_events.rs"]
-mod playback_events;
 #[path = "playback_frames.rs"]
 mod playback_frames;
 #[path = "playback_json.rs"]
 mod playback_json;
-use playback_event_parsers::*;
 use playback_json::*;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -38,6 +33,10 @@ pub struct CapturedStatsData<Frame> {
     pub replay_meta: ReplayMeta,
     pub config: Map<String, Value>,
     pub modules: Map<String, Value>,
+    /// Canonical graph events, including streams emitted by module dependencies.
+    /// Captures before replay completion retain interim lifecycles; completed
+    /// replay collection finalizes all events.
+    pub events: ReplayStatsTimelineEvents,
     pub frames: Vec<Frame>,
 }
 
@@ -151,7 +150,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
         Ok(ReplayStatsTimeline {
             config: self.timeline_config(),
             replay_meta: self.replay_meta.clone(),
-            events: self.timeline_event_sets_typed()?,
+            events: self.events.clone(),
             frames,
         })
     }
@@ -174,7 +173,7 @@ impl CapturedStatsData<StatsSnapshotFrame> {
             "replay_meta".to_owned(),
             serialize_to_json_value(&self.replay_meta)?,
         );
-        timeline.insert("events".to_owned(), self.timeline_event_sets_value()?);
+        timeline.insert("events".to_owned(), serialize_to_json_value(&self.events)?);
         timeline.insert(
             "frames".to_owned(),
             Value::Array(
@@ -840,12 +839,14 @@ impl CapturedStatsData<ReplayStatsFrame> {
             replay_meta,
             config,
             modules,
+            events,
             frames,
         } = self;
         CapturedStatsData::<StatsSnapshotFrame> {
             replay_meta,
             config,
             modules,
+            events,
             frames: Vec::new(),
         }
         .into_replay_stats_timeline_with_frames(frames)

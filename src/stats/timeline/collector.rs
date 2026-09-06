@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, HashMap};
 /// chronologically sorted), cloned into the batch transfer type. After
 /// [`AnalysisGraph::finish`] this is the finalized event list; the graph
 /// projects exactly once at finish, so there is no separate node snapshot.
-fn reduced_timeline_events(graph: &AnalysisGraph) -> ReplayStatsTimelineEvents {
+pub(crate) fn reduced_timeline_events(graph: &AnalysisGraph) -> ReplayStatsTimelineEvents {
     ReplayStatsTimelineEvents {
         events: graph
             .event_transaction_log()

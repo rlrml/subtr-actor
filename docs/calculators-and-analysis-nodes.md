@@ -5,11 +5,10 @@ This is the short map of the current stats runtime.
 ## Core split
 
 - `src/stats/calculators/` holds the actual stat logic and state machines.
-- `src/stats/analysis_graph/` wraps calculator logic in the DAG runtime used by
-  the newer stats timeline/export flow.
-- `src/stats/reducers/` is the older reducer pipeline. It still matters, but if
-  you are working on the analysis-node graph, treat calculators plus
-  `analysis_graph/` as the primary structure.
+- `src/stats/analysis_graph/` wraps calculator logic in the DAG runtime.
+- `src/stats/accumulators/` folds observations into report statistics.
+- `src/stats/timeline/` owns timeline collection, event projection helpers, and
+  the transaction log shared by batch and live consumers.
 
 In practice: calculators know how to compute; nodes know where a calculator fits
 in the dependency graph.
@@ -60,8 +59,8 @@ This layer owns the domain event logic.
 - Shared frame-level inputs such as `FrameInput`, `FrameInfo`,
   `GameplayState`, `BallFrameState`, `PlayerFrameState`, and
   `FrameEventsState` live in the top-level calculator modules.
-- Per-stat files such as `pressure.rs`, `rush.rs`, `positioning.rs`, and
-  `boost.rs` define calculators and the event/state types needed to detect
+- Per-stat files such as `territorial_pressure.rs`, `rush.rs`, `positioning.rs`,
+  and `boost.rs` define calculators and the event/state types needed to detect
   domain observations.
 - Some files expose intermediate state calculators rather than exported stats,
   for example `touch_state.rs`, `possession_state.rs`, and
@@ -77,13 +76,14 @@ usually belongs in an accumulator.
 
 This layer adapts calculator/state logic into a typed dependency graph.
 
-- `analysis_graph.rs` defines the runtime DAG, typed dependency lookup, default
+- `graph.rs` defines the runtime DAG, typed dependency lookup, default
   dependency factories, topological sorting, and graph evaluation.
-- `nodes.rs` defines common dependency helpers for shared frame-derived state.
-- Files like `positioning.rs`, `pressure.rs`, and `rush.rs` usually contain a
+- `nodes/mod.rs` defines common dependency helpers for shared frame-derived state.
+- Files under `nodes/`, such as `positioning.rs` and `rush.rs`, usually contain a
   thin node wrapper around a calculator.
-- Files like `frame_info.rs`, `frame_events_state.rs`, `player_frame_state.rs`,
-  and `live_play.rs` provide graph state that other nodes depend on.
+- Files under `nodes/`, such as `frame_info.rs`, `frame_events_state.rs`,
+  `player_frame_state.rs`, and `live_play.rs` provide graph state that other
+  nodes depend on.
 - `mod.rs` is the registry for built-in node names and graph construction.
 
 Rule of thumb: if the change is about wiring, dependency declarations, graph
@@ -92,22 +92,51 @@ belongs here.
 
 ## Runtime shape
 
-The current flow is:
+Replay and live sources converge on the same `FrameInput` and analysis graph:
 
-1. `AnalysisNodeCollector` builds a `FrameInput` from `ReplayProcessor`.
-2. `AnalysisGraph` resolves node dependencies and evaluates nodes in dependency
-   order.
-3. Each node pulls the states it needs from `AnalysisStateContext`.
-4. Most stat nodes call into a calculator and then expose the calculator itself
-   as the node state.
-5. Collectors/export code read calculator state back out of the graph.
+1. `ReplayProcessor` reconstructs replay actor state; `LiveProcessorView` adapts
+   live state. Both implement `ProcessorView`.
+2. Replay collectors use `ReplayFrameInputBuilder`; live drivers construct a
+   `FrameInput` with the host's live-play state.
+3. `AnalysisGraph` resolves dependencies and evaluates source and detector nodes
+   in topological order. Each node exposes typed state to downstream nodes.
+4. Report consumers can include `StatsProjectionNode`, which feeds Rust
+   accumulators, and `StatsTimelineFrameNode`, which creates full snapshots.
+5. Event consumers use each detector node's `project_events` method. The graph
+   diffs their combined projection into its `TimelineTransactionLog`.
 
-That means a node often looks like:
+`StatsTimelineEventsNode` is an aggregation root: its dependencies select the
+producer nodes. Its state is a marker; event data lives in the graph's log.
 
-- declare dependencies
-- fetch shared frame/intermediate state from the context
-- call `calculator.update(...)`
-- return `&calculator` as the node state
+### Event lifecycle and collection cadence
+
+A projection returns the full current event set, with stable IDs independent of
+projection frequency. `Confirmed` events may be revised; `Finalized` events
+must stay unchanged. Neither may disappear under the strict invariant policy.
+`project_events_now` turns changes into upsert/retract transactions. `finish`
+finishes nodes in dependency order and then finalizes the last projection.
+
+Batch collectors can project only at finish. Live drivers project periodically.
+Frame evaluation, event projection, and persistence of output snapshots are
+separate cadences: lowering output frequency must not skip detector input.
+Full-history projection still revisits historical events, so lowering projection
+frequency reduces cost without changing its asymptotic growth.
+
+### Compact playback and compatibility snapshots
+
+`StatsTimelineEventCollector` exports a frame scaffold plus events and auxiliary
+tracks. `js/stat-evaluation-player/src/*EventDerivation.ts` materializes report
+statistics from those events. `StatsTimelineCollector` retains the Rust
+full-snapshot path for compatibility and parity comparisons. These are two
+projections of the same domain observations; changes to accumulation semantics
+need Rust/TypeScript parity coverage.
+
+`StatsCollector` captures the same canonical graph events in
+`CapturedStatsData.events`; its legacy conversions reuse them directly. Module
+JSON remains the report/snapshot representation, rather than an event source.
+Custom module selections also include events emitted by graph dependencies.
+Callers constructing `CapturedStatsData` directly must supply its typed `events`
+field; complete replay collection populates and finalizes it automatically.
 
 ## Naming pattern
 
@@ -115,26 +144,28 @@ There are two common node shapes:
 
 - Intermediate state nodes: `TouchStateNode -> TouchState`,
   `PossessionStateNode -> PossessionState`, `LivePlayNode -> LivePlayState`
-- Stat nodes: `PressureNode -> PressureCalculator`,
+- Stat nodes: `TerritorialPressureNode -> TerritorialPressureCalculator`,
   `PositioningNode -> PositioningCalculator`,
   `MatchStatsNode -> MatchStatsCalculator`
 
-For exported stats, the node state is often the calculator itself because later
-code wants the calculator's accumulated stats, config, and event lists.
+Detector nodes often publish their calculator so downstream nodes can read
+events, configuration, and detection state. Report totals belong in
+accumulators and are exposed through `StatsProjectionState`.
 
 ## Adding or changing a stat
 
 - Add or modify the core logic in `src/stats/calculators/<stat>.rs`.
 - If the stat participates in the DAG runtime, add or update the matching node
-  in `src/stats/analysis_graph/<stat>.rs`.
+  in `src/stats/analysis_graph/nodes/<stat>.rs`.
 - Register the node in `src/stats/analysis_graph/mod.rs`.
 - If shared frame-derived state is missing, add that as a dedicated dependency
   node instead of recomputing it inside each stat node.
 - If output wiring changes, update the relevant collector
   (`src/stats/timeline/` or `src/collector/stats/`).
 
-## Legacy note
+## Compatibility note
 
-`src/stats/reducers/analysis.rs` contains the older derived-signal graph. It is
-helpful for historical context, but the analysis-node graph is the cleaner
-structure to follow for new dependency-driven stat work.
+The legacy path is the full-snapshot timeline collector and its projection
+nodes. There is no `src/stats/reducers/` pipeline in the current tree. Keep the
+legacy collector while it serves external callers and verifies compact playback
+parity; remove it only with an explicit compatibility migration.

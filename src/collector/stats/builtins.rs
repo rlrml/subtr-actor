@@ -203,6 +203,7 @@ struct CorePlayerStatsSnapshot {
     goals_conceded_while_last_defender: u32,
     goals_for_while_most_back: u32,
     goals_against_while_most_back: u32,
+    caught_ahead_of_play_on_conceded_goals: u32,
     goal_against_boost_sample_count: u32,
     cumulative_boost_on_goals_against: f32,
     average_boost_on_goals_against: f32,
@@ -259,6 +260,9 @@ impl From<&CorePlayerStats> for CorePlayerStatsSnapshot {
                 .goals_conceded_while_last_defender,
             goals_for_while_most_back: stats.scoring_context.goals_for_while_most_back,
             goals_against_while_most_back: stats.scoring_context.goals_against_while_most_back,
+            caught_ahead_of_play_on_conceded_goals: stats
+                .scoring_context
+                .caught_ahead_of_play_on_conceded_goals,
             goal_against_boost_sample_count: stats.scoring_context.goal_against_boost_sample_count,
             cumulative_boost_on_goals_against: stats
                 .scoring_context
@@ -1859,3 +1863,7 @@ pub(crate) fn builtin_snapshot_config_json(
     };
     Ok(value)
 }
+
+#[cfg(test)]
+#[path = "builtins_tests.rs"]
+mod tests;

@@ -37,6 +37,13 @@ impl StatsFramePersistenceController {
 
     pub(crate) fn on_frame(&mut self, frame_number: usize, current_time: f32) -> Option<f32> {
         if self.last_emitted_time.is_none() {
+            if let StatsFrameResolution::TimeStep { seconds } = self.resolution
+                && seconds.is_finite()
+                && seconds > 0.0
+            {
+                let cutoff = current_time + FRAME_RESOLUTION_EPSILON_SECONDS;
+                self.next_emit_time = Some((current_time + seconds).max(cutoff.next_up()));
+            }
             return Some(self.record_emit(frame_number, current_time));
         }
 
@@ -54,11 +61,14 @@ impl StatsFramePersistenceController {
                 }
 
                 let dt = self.record_emit(frame_number, current_time);
-                let mut advanced_next_emit_time = next_emit_time;
-                while advanced_next_emit_time <= current_time + FRAME_RESOLUTION_EPSILON_SECONDS {
-                    advanced_next_emit_time += seconds;
-                }
-                self.next_emit_time = Some(advanced_next_emit_time);
+                let cutoff = current_time + FRAME_RESOLUTION_EPSILON_SECONDS;
+                let steps = ((f64::from(cutoff) - f64::from(next_emit_time)) / f64::from(seconds))
+                    .floor()
+                    + 1.0;
+                let next = (f64::from(next_emit_time) + steps * f64::from(seconds)) as f32;
+                // Advance in constant time, even when the step is smaller
+                // than the timestamp's precision or many intervals were missed.
+                self.next_emit_time = Some(next.max(cutoff.next_up()));
                 Some(dt)
             }
         }
@@ -92,13 +102,6 @@ impl StatsFramePersistenceController {
         self.last_emitted_frame_number = Some(frame_number);
         self.last_emitted_time = Some(current_time);
         self.last_emitted_dt = dt;
-        self.next_emit_time = match self.resolution {
-            StatsFrameResolution::EveryFrame => None,
-            StatsFrameResolution::TimeStep { seconds } if seconds.is_finite() && seconds > 0.0 => {
-                Some(current_time + seconds)
-            }
-            StatsFrameResolution::TimeStep { .. } => None,
-        };
         dt
     }
 }

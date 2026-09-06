@@ -266,6 +266,50 @@ fn rejects_duplicate_state_providers() {
 }
 
 #[test]
+fn rejects_root_provider_added_after_resolution() {
+    let mut graph = AnalysisGraph::new()
+        .with_root_state_type::<usize>()
+        .with_node(DoubledNode::default());
+    graph.set_root_state(3usize);
+    graph.evaluate().unwrap();
+
+    graph.set_root_state(BaseState(99));
+    let error = graph
+        .evaluate()
+        .expect_err("late root conflicts with BaseNode");
+    assert!(format!("{error:?}").contains("Duplicate providers for root state"));
+}
+
+#[test]
+fn rejects_input_provider_added_after_resolution() {
+    let mut graph = AnalysisGraph::new()
+        .with_root_state_type::<usize>()
+        .with_node(DoubledNode::default());
+    graph.set_root_state(3usize);
+    graph.evaluate().unwrap();
+
+    graph.register_input_state::<BaseState>();
+    let error = graph
+        .evaluate_with_state(&BaseState(99))
+        .expect_err("late input conflicts with BaseNode");
+    assert!(format!("{error:?}").contains("Duplicate providers for input state"));
+}
+
+#[test]
+fn updating_registered_root_preserves_resolved_graph() {
+    let mut graph = AnalysisGraph::new()
+        .with_root_state_type::<usize>()
+        .with_node(DoubledNode::default());
+    graph.set_root_state(3usize);
+    graph.evaluate().unwrap();
+
+    graph.set_root_state(5usize);
+    assert!(graph.resolved);
+    graph.evaluate().unwrap();
+    assert_eq!(graph.state::<DoubledState>(), Some(&DoubledState(10)));
+}
+
+#[test]
 fn rejects_dependency_cycles() {
     let resolution = AnalysisGraph::new()
         .with_node(CycleANode::default())
@@ -609,4 +653,176 @@ fn projecting_an_undeclared_stream_is_rejected() {
         error.variant,
         SubtrActorErrorVariant::TimelineEventInvariantViolation(_)
     ));
+}
+
+#[derive(Default)]
+struct TraversalSource(BaseState);
+
+impl AnalysisNode for TraversalSource {
+    type State = BaseState;
+
+    fn name(&self) -> &'static str {
+        "traversal_source"
+    }
+
+    fn dependencies(&self) -> Vec<AnalysisDependency> {
+        vec![AnalysisDependency::required::<usize>()]
+    }
+
+    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        assert!(ctx.maybe_get::<BaseState>().is_none());
+        assert!(ctx.maybe_get::<DoubledState>().is_none());
+        self.0.0 = *ctx.get::<usize>()?;
+        Ok(())
+    }
+
+    fn finish(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        assert!(ctx.maybe_get::<BaseState>().is_none());
+        assert!(ctx.maybe_get::<DoubledState>().is_none());
+        self.0.0 += *ctx.get::<usize>()?;
+        Ok(())
+    }
+
+    fn project_events(&self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        assert!(ctx.maybe_get::<BaseState>().is_none());
+        assert!(ctx.maybe_get::<DoubledState>().is_none());
+        Ok(Vec::new())
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.0
+    }
+}
+
+#[derive(Default)]
+struct TraversalConsumer(DoubledState);
+
+impl AnalysisNode for TraversalConsumer {
+    type State = DoubledState;
+
+    fn name(&self) -> &'static str {
+        "traversal_consumer"
+    }
+
+    fn dependencies(&self) -> Vec<AnalysisDependency> {
+        vec![AnalysisDependency::required::<BaseState>()]
+    }
+
+    fn evaluate(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        assert!(ctx.maybe_get::<DoubledState>().is_none());
+        self.0.0 = ctx.get::<BaseState>()?.0 * 2;
+        Ok(())
+    }
+
+    fn finish(&mut self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        AnalysisNode::evaluate(self, ctx)
+    }
+
+    fn project_events(&self, ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<Vec<Event>> {
+        assert!(ctx.maybe_get::<DoubledState>().is_none());
+        assert_eq!(self.0.0, ctx.get::<BaseState>()?.0 * 2);
+        Ok(Vec::new())
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.0
+    }
+}
+
+#[test]
+fn traversal_exposes_only_preceding_nodes_and_rebuilds_context_between_phases() {
+    let mut graph = AnalysisGraph::new()
+        .with_root_state_type::<usize>()
+        .with_node(TraversalConsumer::default())
+        .with_node(TraversalSource::default());
+    graph.set_root_state(10usize);
+    graph.evaluate_with_state(&20usize).unwrap();
+    assert_eq!(graph.state::<DoubledState>(), Some(&DoubledState(40)));
+    graph.project_events_now().unwrap();
+
+    graph.evaluate_with_state(&30usize).unwrap();
+    assert_eq!(graph.state::<DoubledState>(), Some(&DoubledState(60)));
+    graph.finish().unwrap();
+    assert_eq!(graph.state::<BaseState>(), Some(&BaseState(40)));
+    assert_eq!(graph.state::<DoubledState>(), Some(&DoubledState(80)));
+}
+
+#[test]
+fn preceding_node_state_overrides_undeclared_input_of_same_type() {
+    // Preserve existing precedence while changing context construction.
+    let mut graph = AnalysisGraph::new()
+        .with_root_state_type::<usize>()
+        .with_node(DoubledNode::default());
+    graph.set_root_state(3usize);
+    graph.evaluate_with_state(&BaseState(99)).unwrap();
+    assert_eq!(graph.state::<DoubledState>(), Some(&DoubledState(6)));
+}
+
+#[test]
+fn required_dependency_can_use_another_nodes_transitive_default() {
+    let mut graph = AnalysisGraph::new()
+        .with_root_state_type::<usize>()
+        .with_node(TraversalConsumer::default())
+        .with_node(QuadrupledNode::default());
+    graph.set_root_state(3usize);
+    graph.evaluate().unwrap();
+    assert_eq!(graph.state::<DoubledState>(), Some(&DoubledState(6)));
+    assert_eq!(graph.state::<QuadrupledState>(), Some(&QuadrupledState(12)));
+}
+
+#[derive(Default)]
+struct WrongDefaultNode(QuadrupledState);
+
+impl AnalysisNode for WrongDefaultNode {
+    type State = QuadrupledState;
+
+    fn name(&self) -> &'static str {
+        "wrong_default"
+    }
+
+    fn dependencies(&self) -> Vec<AnalysisDependency> {
+        vec![AnalysisDependency::with_default::<BaseState>(|| {
+            Box::new(DoubledNode::default())
+        })]
+    }
+
+    fn evaluate(&mut self, _ctx: &AnalysisStateContext<'_>) -> SubtrActorResult<()> {
+        Ok(())
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.0
+    }
+}
+
+#[test]
+fn mismatched_default_factory_is_rejected_before_inserting_provider() {
+    let mut graph = AnalysisGraph::new().with_node(WrongDefaultNode::default());
+    let error = graph
+        .resolve()
+        .expect_err("factory provides the wrong state");
+    let message = format!("{error:?}");
+    assert!(message.contains("Default factory"));
+    assert!(message.contains("BaseState"));
+    assert!(message.contains("DoubledState"));
+    assert_eq!(graph.node_names().collect::<Vec<_>>(), ["wrong_default"]);
+
+    let mut graph = AnalysisGraph::new();
+    graph
+        .ensure_dependency(AnalysisDependency::with_default::<BaseState>(|| {
+            Box::new(DoubledNode::default())
+        }))
+        .expect_err("explicit dependency insertion must validate too");
+    assert_eq!(graph.node_names().count(), 0);
+}
+
+#[test]
+fn unresolved_required_dependency_still_reports_missing_state() {
+    let mut graph = AnalysisGraph::new().with_node(TraversalConsumer::default());
+    let error = graph
+        .resolve()
+        .expect_err("no default or explicit provider exists");
+    let message = format!("{error:?}");
+    assert!(message.contains("traversal_consumer"));
+    assert!(message.contains("BaseState"));
 }

@@ -42,14 +42,23 @@ impl AnalysisDependency {
         self.state_type_name
     }
 
-    fn default_factory(&self) -> fn() -> Box<dyn AnalysisNodeDyn> {
-        match self.source {
-            AnalysisDependencySource::DefaultFactory(default_factory) => default_factory,
-            AnalysisDependencySource::External => panic!(
-                "analysis dependency for {} has no default factory",
-                self.state_type_name
-            ),
+    fn build_default(&self) -> SubtrActorResult<Box<dyn AnalysisNodeDyn>> {
+        let AnalysisDependencySource::DefaultFactory(factory) = self.source else {
+            return Err(analysis_node_graph_error(format!(
+                "Required state {} has no default factory",
+                self.state_type_name,
+            )));
+        };
+        let node = factory();
+        if node.provides_state_type_id() != self.state_type_id {
+            return Err(analysis_node_graph_error(format!(
+                "Default factory for {} returned node '{}' providing {}",
+                self.state_type_name,
+                node.name(),
+                node.provides_state_type_name(),
+            )));
         }
+        Ok(node)
     }
 
     fn is_external(&self) -> bool {
@@ -93,20 +102,22 @@ impl<'a> AnalysisStateContext<'a> {
     fn from_parts(
         root_states: &'a HashMap<TypeId, Box<dyn Any>>,
         input_states: &'a [AnalysisStateRef<'a>],
-        before: &'a [Box<dyn AnalysisNodeDyn>],
+        node_count: usize,
     ) -> Self {
         let mut states =
-            HashMap::with_capacity(root_states.len() + input_states.len() + before.len());
+            HashMap::with_capacity(root_states.len() + input_states.len() + node_count);
         for (type_id, state) in root_states {
             states.insert(*type_id, state.as_ref());
         }
         for input_state in input_states {
             states.insert(input_state.type_id(), input_state.state());
         }
-        for node in before {
-            states.insert(node.provides_state_type_id(), node.state_any());
-        }
         Self { states }
+    }
+
+    fn insert_node(&mut self, node: &'a dyn AnalysisNodeDyn) {
+        self.states
+            .insert(node.provides_state_type_id(), node.state_any());
     }
 
     pub fn get<T: 'static>(&self) -> SubtrActorResult<&'a T> {
@@ -267,7 +278,6 @@ where
 #[derive(Default)]
 pub struct AnalysisGraph {
     nodes: Vec<Box<dyn AnalysisNodeDyn>>,
-    evaluation_order: Vec<usize>,
     declared_root_states: HashMap<TypeId, &'static str>,
     declared_input_states: HashMap<TypeId, &'static str>,
     root_states: HashMap<TypeId, Box<dyn Any>>,
@@ -292,8 +302,13 @@ impl AnalysisGraph {
     }
 
     pub fn register_root_state<T: 'static>(&mut self) {
-        self.declared_root_states
-            .insert(TypeId::of::<T>(), type_name::<T>());
+        if self
+            .declared_root_states
+            .insert(TypeId::of::<T>(), type_name::<T>())
+            .is_none()
+        {
+            self.resolved = false;
+        }
     }
 
     pub fn with_input_state_type<T: 'static>(mut self) -> Self {
@@ -302,8 +317,13 @@ impl AnalysisGraph {
     }
 
     pub fn register_input_state<T: 'static>(&mut self) {
-        self.declared_input_states
-            .insert(TypeId::of::<T>(), type_name::<T>());
+        if self
+            .declared_input_states
+            .insert(TypeId::of::<T>(), type_name::<T>())
+            .is_none()
+        {
+            self.resolved = false;
+        }
     }
 
     pub fn set_root_state<T: 'static>(&mut self, value: T) {
@@ -355,7 +375,7 @@ impl AnalysisGraph {
             )));
         }
 
-        self.push_boxed_node((dependency.default_factory())());
+        self.push_boxed_node(dependency.build_default()?);
         Ok(())
     }
 
@@ -392,15 +412,11 @@ impl AnalysisGraph {
                         continue;
                     }
                     if dependency.is_external() {
-                        return Err(analysis_node_graph_error(format!(
-                            "Node '{}' requires state {} with no provider",
-                            node.name(),
-                            dependency.state_type_name(),
-                        )));
+                        // Another node's default dependencies may supply this state.
+                        continue;
                     }
-                    let default_factory = dependency.default_factory();
                     if queued_types.insert(dependency.state_type_id()) {
-                        additions.push(default_factory());
+                        additions.push(dependency.build_default()?);
                     }
                 }
             }
@@ -443,7 +459,6 @@ impl AnalysisGraph {
         }
 
         self.nodes = ordered_nodes;
-        self.evaluation_order = (0..self.nodes.len()).collect();
         self.resolved = true;
         Ok(())
     }
@@ -499,13 +514,11 @@ impl AnalysisGraph {
             }
         }
 
-        for node_index in self.evaluation_order.clone() {
-            let (before, current_and_after) = self.nodes.split_at_mut(node_index);
-            let (current, _) = current_and_after
-                .split_first_mut()
-                .expect("evaluation order should contain valid indexes");
-            let ctx = AnalysisStateContext::from_parts(&self.root_states, input_states, before);
-            current.evaluate(&ctx)?;
+        let mut ctx =
+            AnalysisStateContext::from_parts(&self.root_states, input_states, self.nodes.len());
+        for node in &mut self.nodes {
+            node.evaluate(&ctx)?;
+            ctx.insert_node(&**node);
         }
 
         Ok(())
@@ -513,13 +526,10 @@ impl AnalysisGraph {
 
     pub fn finish(&mut self) -> SubtrActorResult<()> {
         self.resolve()?;
-        for node_index in self.evaluation_order.clone() {
-            let (before, current_and_after) = self.nodes.split_at_mut(node_index);
-            let (current, _) = current_and_after
-                .split_first_mut()
-                .expect("evaluation order should contain valid indexes");
-            let ctx = AnalysisStateContext::from_parts(&self.root_states, &[], before);
-            current.finish(&ctx)?;
+        let mut ctx = AnalysisStateContext::from_parts(&self.root_states, &[], self.nodes.len());
+        for node in &mut self.nodes {
+            node.finish(&ctx)?;
+            ctx.insert_node(&**node);
         }
         // One final projection in finalize-everything mode: after the node
         // finishes above, no future evidence exists by definition, so every
@@ -572,15 +582,12 @@ impl AnalysisGraph {
     /// any violation of that ownership assumption into a loud error).
     fn collect_projected_events(&self) -> SubtrActorResult<Vec<Event>> {
         let mut projection = Vec::new();
-        for &node_index in &self.evaluation_order {
-            let (before, current_and_after) = self.nodes.split_at(node_index);
-            let current = current_and_after
-                .first()
-                .expect("evaluation order should contain valid indexes");
-            let ctx = AnalysisStateContext::from_parts(&self.root_states, &[], before);
-            let node_projection = current.project_events(&ctx)?;
-            verify_projected_streams_are_declared(current.as_ref(), &node_projection)?;
+        let mut ctx = AnalysisStateContext::from_parts(&self.root_states, &[], self.nodes.len());
+        for node in &self.nodes {
+            let node_projection = node.project_events(&ctx)?;
+            verify_projected_streams_are_declared(node.as_ref(), &node_projection)?;
             projection.extend(node_projection);
+            ctx.insert_node(node.as_ref());
         }
         Ok(projection)
     }

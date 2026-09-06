@@ -301,6 +301,7 @@ impl FrameTransform for ReplayStatsFrameTransform {
             replay_meta: replay_meta.clone(),
             config: Map::new(),
             modules: Map::new(),
+            events: ReplayStatsTimelineEvents::default(),
             frames: Vec::new(),
         }
         .replay_stats_frame(&frame)
@@ -310,6 +311,7 @@ impl FrameTransform for ReplayStatsFrameTransform {
 pub struct StatsCollector<T = StatsSnapshotFrame, F = IdentityFrameTransform> {
     modules: BuiltinModuleSelection,
     graph: AnalysisGraph,
+    events_finalized: bool,
     replay_meta: Option<ReplayMeta>,
     frame_transform: F,
     captured_frames: Option<Vec<T>>,
@@ -452,6 +454,7 @@ impl<T, F> StatsCollector<T, F> {
     ) -> SubtrActorResult<Self> {
         Ok(Self {
             graph: modules.graph()?,
+            events_finalized: false,
             modules,
             replay_meta: None,
             frame_transform,
@@ -475,6 +478,7 @@ impl<T, F> StatsCollector<T, F> {
         let StatsCollector {
             modules,
             graph,
+            events_finalized,
             replay_meta,
             captured_frames,
             sample_mode,
@@ -487,6 +491,7 @@ impl<T, F> StatsCollector<T, F> {
         StatsCollector {
             modules,
             graph,
+            events_finalized,
             replay_meta,
             frame_transform,
             captured_frames: captured_frames.map(|_| Vec::new()),
@@ -552,14 +557,24 @@ impl<T, F> StatsCollector<T, F> {
         })
     }
 
-    pub fn into_captured_data(self) -> SubtrActorResult<CapturedStatsData<T>> {
+    /// Consumes the collected reports, frames, and projected graph events.
+    ///
+    /// Before `Collector::finish_replay`, events retain their interim lifecycles.
+    /// Completed replay collection yields the full finalized event set. Frame
+    /// sampling does not limit events, and module dependencies may contribute
+    /// additional event streams.
+    pub fn into_captured_data(mut self) -> SubtrActorResult<CapturedStatsData<T>> {
         let replay_meta = self
             .replay_meta
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::CouldNotBuildReplayMeta))?;
+        if !self.events_finalized {
+            self.graph.project_events_now()?;
+        }
         Ok(CapturedStatsData {
             replay_meta: replay_meta.clone(),
             config: self.modules.snapshot_config_json(&self.graph)?,
             modules: self.modules.modules_json(&self.graph)?,
+            events: crate::stats::timeline::reduced_timeline_events(&self.graph),
             frames: self.captured_frames.unwrap_or_default(),
         })
     }
@@ -656,6 +671,7 @@ where
 
     fn finish_replay(&mut self, _processor: &dyn ProcessorView) -> SubtrActorResult<()> {
         self.graph.finish()?;
+        self.events_finalized = true;
         let Some(replay_meta) = self.replay_meta.as_ref().cloned() else {
             return Ok(());
         };
