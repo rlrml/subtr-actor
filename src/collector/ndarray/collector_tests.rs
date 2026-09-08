@@ -176,10 +176,10 @@ fn string_feature_names_can_create_analysis_backed_touch_adders() {
 }
 
 #[test]
-fn threat_training_rows_use_ndarray_features_with_streaming_model_parity() {
+fn threat_entity_training_rows_use_ndarray_features_with_streaming_model_parity() {
     let replay = parse_replay(NDARRAY_ANALYSIS_FIXTURE);
     let collector = NDArrayCollector::<f32>::from_strings(
-        &["CurrentTime", "ThreatModelFeatures", "ThreatModelValues"],
+        &["CurrentTime", "ThreatEntityFeatures", "ThreatModelValues"],
         &[],
     )
     .expect("threat ndarray features should be registered")
@@ -197,25 +197,27 @@ fn threat_training_rows_use_ndarray_features_with_streaming_model_parity() {
         .get_meta_and_ndarray()
         .expect("threat ndarray should materialize");
     assert!(matrix.nrows() > 5);
-    assert_eq!(matrix.ncols(), 1 + 2 * THREAT_MODEL_FEATURE_COUNT + 2);
+    assert_eq!(matrix.ncols(), 1 + 2 * THREAT_ENTITY_FEATURE_COUNT + 2);
     for (team_index, team_name) in ["team_zero", "team_one"].into_iter().enumerate() {
-        for (feature_index, feature_name) in ThreatModelFeatures::feature_names().iter().enumerate()
+        for (feature_index, feature_name) in ThreatModelFeatures::entity_feature_names()
+            .iter()
+            .enumerate()
         {
             assert_eq!(
                 meta.column_headers.global_headers
-                    [1 + team_index * THREAT_MODEL_FEATURE_COUNT + feature_index],
-                format!("{team_name}_threat_model_{feature_name}")
+                    [1 + team_index * THREAT_ENTITY_FEATURE_COUNT + feature_index],
+                format!("{team_name}_threat_entity_{feature_name}")
             );
         }
     }
 
     for row in matrix.rows().into_iter().take(8) {
         for team_index in 0..2 {
-            let start = 1 + team_index * THREAT_MODEL_FEATURE_COUNT;
-            let values: [f32; THREAT_MODEL_FEATURE_COUNT] =
+            let start = 1 + team_index * THREAT_ENTITY_FEATURE_COUNT;
+            let values: [f32; THREAT_ENTITY_FEATURE_COUNT] =
                 std::array::from_fn(|index| row[start + index]);
-            let model_value = row[1 + 2 * THREAT_MODEL_FEATURE_COUNT + team_index];
-            assert!((threat_value_from_array(&values) - model_value).abs() < 1e-6);
+            let model_value = row[1 + 2 * THREAT_ENTITY_FEATURE_COUNT + team_index];
+            assert!((entity_threat_value_from_array(&values) - model_value).abs() < 1e-6);
         }
     }
 }
