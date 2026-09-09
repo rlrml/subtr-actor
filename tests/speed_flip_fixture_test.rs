@@ -60,9 +60,7 @@ fn dodge_and_speed_flip_counts(replay: &boxcars::Replay) -> (usize, usize) {
 
 #[test]
 #[ignore = "PRECISION target (run with `--ignored`): the confounder replay should yield \
-            0 speed flips. Currently 1 false positive (down from 25) after the rotation-only \
-            rewrite + inversion-depth gate; the last FP needs a discriminator that doesn't \
-            overfit (cancel_score reaches 0 but breaks confirmed flips). Slow (full replay)."]
+            0 speed flips. Slow (full replay)."]
 fn confounder_replay_has_no_speed_flips() {
     let replay = parse_replay(NO_SPEED_FLIPS_REPLAY);
     let speed_flips = speed_flip_events(&replay);
@@ -72,7 +70,15 @@ fn confounder_replay_has_no_speed_flips() {
         speed_flips.len(),
         speed_flips
             .iter()
-            .map(|event| (event.time, event.confidence, event.diagonal_score))
+            .map(|event| {
+                (
+                    event.time,
+                    event.confidence,
+                    event.min_travel_alignment,
+                    event.max_forward_deviation_degrees,
+                    event.roll_sweep_degrees,
+                )
+            })
             .collect::<Vec<_>>(),
     );
 }

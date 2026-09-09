@@ -2,6 +2,38 @@
 import type { RemoteIdTs } from "./RemoteIdTs.ts";
 
 /**
- * A ground-started diagonal dodge/cancel acceleration pattern, primarily for kickoff speed flips.
+ * A forward diagonal dodge whose flip is cancelled into a roll-to-recover,
+ * keeping the car pointed along its travel direction (a speed flip).
  */
-export type SpeedFlipEvent = { time: number, frame: number, resolved_time: number, resolved_frame: number, player: RemoteIdTs, is_team_0: boolean, time_since_kickoff_start: number, start_position: [number, number, number], end_position: [number, number, number], start_speed: number, max_speed: number, best_alignment: number, initial_boost_alignment: number, best_boost_alignment: number, boost_alignment_sample_count: number, dodge_delay_after_ground_leave_seconds: number, diagonal_score: number, estimated_dodge_impulse_magnitude: number, estimated_dodge_impulse_forward_component: number, estimated_dodge_impulse_side_component: number, estimated_dodge_impulse_up_component: number, cancel_score: number, speed_score: number, confidence: number, };
+export type SpeedFlipEvent = { time: number, frame: number, resolved_time: number, resolved_frame: number, player: RemoteIdTs, is_team_0: boolean,
+/**
+ * Seconds between the kickoff start and this dodge, or 0 when the dodge did
+ * not happen during a kickoff approach.
+ */
+time_since_kickoff_start: number, start_position: [number, number, number], end_position: [number, number, number], start_speed: number, max_speed: number,
+/**
+ * (b) Peak gain in speed measured along the car's dodge-start heading
+ * (uu/s). Tops out near zero when the car was already supersonic.
+ */
+forward_speed_gain: number,
+/**
+ * (c) Minimum cosine alignment between the car's horizontal forward and its
+ * horizontal travel direction across the window. Higher means the nose
+ * stayed pointed where the car was going.
+ */
+min_travel_alignment: number,
+/**
+ * (d) Largest angle (degrees) the nose swept from its dodge-start heading.
+ * Small means there was no end-over-end tumble.
+ */
+max_forward_deviation_degrees: number,
+/**
+ * (d) Largest angle (degrees) the car's up vector swept from dodge start:
+ * the roll about the nose-to-tail axis that recovers the flip.
+ */
+roll_sweep_degrees: number,
+/**
+ * Car-local side component of the replicated dodge torque. Its sign is
+ * used to retain left/right kickoff approach direction.
+ */
+dodge_side_component: number, confidence: number, };

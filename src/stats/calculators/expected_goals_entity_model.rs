@@ -105,7 +105,11 @@ fn evaluate(values: &[f32; THREAT_ENTITY_FEATURE_COUNT], weights: &Weights) -> f
 }
 
 pub fn entity_threat_value(features: &ThreatModelFeatures) -> f32 {
-    evaluate(&features.to_entity_array(), &frame::WEIGHTS)
+    entity_threat_value_from_array(&features.to_entity_array())
+}
+
+pub(crate) fn entity_threat_value_from_array(values: &[f32; THREAT_ENTITY_FEATURE_COUNT]) -> f32 {
+    evaluate(values, &frame::WEIGHTS)
 }
 
 /// Valid only at detected touches, using the pre-contact feature snapshot.
