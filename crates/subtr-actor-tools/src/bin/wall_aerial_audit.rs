@@ -134,10 +134,10 @@ fn dump_trajectory(
 
     for (player_id, player_data) in &data.frame_data.players {
         let name = player_name(&names, player_id);
-        if let Some(sub) = player_substr {
-            if !name.to_lowercase().contains(&sub.to_lowercase()) {
-                continue;
-            }
+        if let Some(sub) = player_substr
+            && !name.to_lowercase().contains(&sub.to_lowercase())
+        {
+            continue;
         }
         println!("== trajectory for {name} (frames {lo}-{hi}) ==");
         let frames = player_data.frames();

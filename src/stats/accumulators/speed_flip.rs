@@ -85,10 +85,10 @@ impl SpeedFlipStatsAccumulator {
                 .map(|last_frame| frame.frame_number.saturating_sub(last_frame));
         }
 
-        if let Some(player_id) = self.current_last_speed_flip_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_speed_flip = true;
-            }
+        if let Some(player_id) = self.current_last_speed_flip_player.as_ref()
+            && let Some(stats) = self.player_stats.get_mut(player_id)
+        {
+            stats.is_last_speed_flip = true;
         }
     }
 

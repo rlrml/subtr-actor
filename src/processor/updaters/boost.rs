@@ -201,10 +201,10 @@ impl<'a> ReplayProcessor<'a> {
 
     fn get_actor_instance_name(&self, actor_id: &boxcars::ActorId) -> SubtrActorResult<String> {
         let state = self.get_actor_state_or_recently_deleted(actor_id)?;
-        if let Some(name_id) = state.name_id {
-            if let Some(name) = self.replay.names.get(name_id as usize) {
-                return Ok(name.clone());
-            }
+        if let Some(name_id) = state.name_id
+            && let Some(name) = self.replay.names.get(name_id as usize)
+        {
+            return Ok(name.clone());
         }
         self.object_id_to_name
             .get(&state.object_id)

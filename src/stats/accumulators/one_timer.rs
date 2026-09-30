@@ -119,10 +119,10 @@ impl OneTimerStatsAccumulator {
     }
 
     pub fn finish_sample(&mut self) {
-        if let Some(player_id) = self.current_last_one_timer_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_one_timer = true;
-            }
+        if let Some(player_id) = self.current_last_one_timer_player.as_ref()
+            && let Some(stats) = self.player_stats.get_mut(player_id)
+        {
+            stats.is_last_one_timer = true;
         }
     }
 }

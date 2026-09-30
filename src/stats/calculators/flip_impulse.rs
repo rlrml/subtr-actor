@@ -296,21 +296,21 @@ impl FlipImpulseCalculator {
 
         // Orientation-trajectory window (longer): the nose/up vectors relative to
         // their onset orientation, used for the cancel and inversion signals.
-        if elapsed <= FLIP_ROTATION_WINDOW_SECONDS {
-            if let Some(rigid_body) = player.rigid_body.as_ref() {
-                let rotation = quat_to_glam(&rigid_body.rotation);
-                let forward = rotation * glam::Vec3::X;
-                let up = rotation * glam::Vec3::Z;
-                candidate.min_forward_z = candidate.min_forward_z.min(forward.z);
-                candidate.max_forward_deviation_degrees = candidate
-                    .max_forward_deviation_degrees
-                    .max(candidate.local_forward.angle_between(forward).to_degrees());
-                candidate.max_up_deviation_degrees = candidate
-                    .max_up_deviation_degrees
-                    .max(candidate.local_up.angle_between(up).to_degrees());
-                candidate.min_up_z = candidate.min_up_z.min(up.z);
-                candidate.rotation_sample_count += 1;
-            }
+        if elapsed <= FLIP_ROTATION_WINDOW_SECONDS
+            && let Some(rigid_body) = player.rigid_body.as_ref()
+        {
+            let rotation = quat_to_glam(&rigid_body.rotation);
+            let forward = rotation * glam::Vec3::X;
+            let up = rotation * glam::Vec3::Z;
+            candidate.min_forward_z = candidate.min_forward_z.min(forward.z);
+            candidate.max_forward_deviation_degrees = candidate
+                .max_forward_deviation_degrees
+                .max(candidate.local_forward.angle_between(forward).to_degrees());
+            candidate.max_up_deviation_degrees = candidate
+                .max_up_deviation_degrees
+                .max(candidate.local_up.angle_between(up).to_degrees());
+            candidate.min_up_z = candidate.min_up_z.min(up.z);
+            candidate.rotation_sample_count += 1;
         }
     }
 

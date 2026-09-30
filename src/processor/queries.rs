@@ -433,10 +433,10 @@ impl<'a> ReplayProcessor<'a> {
 
     /// Returns the main game metadata actor id.
     pub fn get_metadata_actor_id(&self) -> SubtrActorResult<boxcars::ActorId> {
-        if let Ok(actor_ids) = self.get_actor_ids_by_type(GAME_TYPE) {
-            if let Some(actor_id) = actor_ids.first() {
-                return Ok(*actor_id);
-            }
+        if let Ok(actor_ids) = self.get_actor_ids_by_type(GAME_TYPE)
+            && let Some(actor_id) = actor_ids.first()
+        {
+            return Ok(*actor_id);
         }
 
         let metadata_object_ids = [

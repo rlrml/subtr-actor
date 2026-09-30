@@ -1094,19 +1094,19 @@ impl FlickCalculator {
             // launch touch. Gravity compensation spans from the episode's
             // measurement anchor, which precedes the touch when this pending
             // inherited an earlier same-episode window.
-            if elapsed <= FLICK_IMPULSE_WINDOW_SECONDS {
-                if let Some(velocity) = current_velocity {
-                    let measure_elapsed = (frame.time - flick.measure_start_time).max(0.0);
-                    let impulse = Self::gravity_compensated_impulse(
-                        velocity,
-                        flick.pre_velocity,
-                        measure_elapsed,
-                    );
-                    let magnitude = impulse.length();
-                    if magnitude > flick.peak_magnitude {
-                        flick.peak_magnitude = magnitude;
-                        flick.peak_impulse = impulse;
-                    }
+            if elapsed <= FLICK_IMPULSE_WINDOW_SECONDS
+                && let Some(velocity) = current_velocity
+            {
+                let measure_elapsed = (frame.time - flick.measure_start_time).max(0.0);
+                let impulse = Self::gravity_compensated_impulse(
+                    velocity,
+                    flick.pre_velocity,
+                    measure_elapsed,
+                );
+                let magnitude = impulse.length();
+                if magnitude > flick.peak_magnitude {
+                    flick.peak_magnitude = magnitude;
+                    flick.peak_impulse = impulse;
                 }
             }
 

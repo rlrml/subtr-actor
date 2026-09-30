@@ -87,11 +87,10 @@ fn assert_pass_events_reconstruct_serialized_partial_sums(
                 }
             }
 
-            if let Some(player_id) = last_completed_pass_player.as_ref() {
-                if let Some(stats) = players.get_mut(player_id) {
+            if let Some(player_id) = last_completed_pass_player.as_ref()
+                && let Some(stats) = players.get_mut(player_id) {
                     stats.stats.is_last_completed_pass = true;
                 }
-            }
         }
 
         assert_pass_team_stats_match(

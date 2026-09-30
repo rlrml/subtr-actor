@@ -138,12 +138,11 @@ fn collect_replay_data_with_optional_progress(
         .process_all(&mut collectors)
         .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
 
-    if let Some((callback, _)) = progress {
-        if last_reported_frames < total_frames {
-            emit_progress(callback, "processing", total_frames, total_frames).map_err(|error| {
-                JsValue::from_str(&format!("Failed to emit progress: {error:?}"))
-            })?;
-        }
+    if let Some((callback, _)) = progress
+        && last_reported_frames < total_frames
+    {
+        emit_progress(callback, "processing", total_frames, total_frames)
+            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
     }
 
     replay_data_collector

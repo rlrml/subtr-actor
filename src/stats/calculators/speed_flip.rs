@@ -365,17 +365,17 @@ impl SpeedFlipCalculator {
                 .max(velocity_xy.dot(candidate.start_heading_xy));
 
             // (c) How well the nose stays pointed along the direction of travel.
-            if velocity_xy.length() >= SPEED_FLIP_MIN_TRAVEL_SPEED {
-                if let Some((forward, _)) = Self::orientation(player) {
-                    let forward_xy = forward.truncate().normalize_or_zero();
-                    let travel_xy = velocity_xy.normalize_or_zero();
-                    if forward_xy.length_squared() > f32::EPSILON
-                        && travel_xy.length_squared() > f32::EPSILON
-                    {
-                        candidate.min_travel_alignment = candidate
-                            .min_travel_alignment
-                            .min(forward_xy.dot(travel_xy));
-                    }
+            if velocity_xy.length() >= SPEED_FLIP_MIN_TRAVEL_SPEED
+                && let Some((forward, _)) = Self::orientation(player)
+            {
+                let forward_xy = forward.truncate().normalize_or_zero();
+                let travel_xy = velocity_xy.normalize_or_zero();
+                if forward_xy.length_squared() > f32::EPSILON
+                    && travel_xy.length_squared() > f32::EPSILON
+                {
+                    candidate.min_travel_alignment = candidate
+                        .min_travel_alignment
+                        .min(forward_xy.dot(travel_xy));
                 }
             }
         }

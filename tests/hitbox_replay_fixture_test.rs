@@ -138,15 +138,15 @@ fn fixture_player_loadout_body_ids_are_threaded_to_player_meta() {
                 continue;
             };
 
-            if let Some(body_name) = player.car_body_name.as_deref() {
-                if let Some(hitbox) = car_hitbox_for_body_name(body_name) {
-                    assert_eq!(
-                        player.car_hitbox_family.as_deref(),
-                        Some(format!("{:?}", hitbox.family).as_str()),
-                        "{fixture}: {} body name {body_name}",
-                        player.name
-                    );
-                }
+            if let Some(body_name) = player.car_body_name.as_deref()
+                && let Some(hitbox) = car_hitbox_for_body_name(body_name)
+            {
+                assert_eq!(
+                    player.car_hitbox_family.as_deref(),
+                    Some(format!("{:?}", hitbox.family).as_str()),
+                    "{fixture}: {} body name {body_name}",
+                    player.name
+                );
             }
 
             match car_hitbox_for_body_id(body_id) {

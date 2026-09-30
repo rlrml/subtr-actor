@@ -230,11 +230,10 @@ fn assert_one_timer_events_reconstruct_serialized_partial_sums(
                 }
             }
 
-            if let Some(player_id) = last_one_timer_player.as_ref() {
-                if let Some(stats) = players.get_mut(player_id) {
+            if let Some(player_id) = last_one_timer_player.as_ref()
+                && let Some(stats) = players.get_mut(player_id) {
                     stats.stats.is_last_one_timer = true;
                 }
-            }
         }
 
         assert_one_timer_team_stats_match(
@@ -430,11 +429,10 @@ fn assert_half_volley_events_reconstruct_serialized_partial_sums(
                 }
             }
 
-            if let Some(player_id) = last_half_volley_player.as_ref() {
-                if let Some(stats) = players.get_mut(player_id) {
+            if let Some(player_id) = last_half_volley_player.as_ref()
+                && let Some(stats) = players.get_mut(player_id) {
                     stats.stats.is_last_half_volley = true;
                 }
-            }
         }
 
         assert_half_volley_team_stats_match(

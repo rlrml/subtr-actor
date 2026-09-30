@@ -28,7 +28,7 @@ pub fn encrypt(data: &[u8]) -> Vec<u8> {
     let mut out = vec![0u8; padded_len];
     out[..data.len()].copy_from_slice(data);
     let cipher = Aes256::new(GenericArray::from_slice(&SAVE_DATA_AES_KEY));
-    for block in out.chunks_exact_mut(BLOCK_SIZE) {
+    for block in out.as_chunks_mut::<BLOCK_SIZE>().0 {
         cipher.encrypt_block(GenericArray::from_mut_slice(block));
     }
     out
@@ -41,7 +41,7 @@ pub fn decrypt(data: &[u8]) -> Result<Vec<u8>> {
     }
     let mut out = data.to_vec();
     let cipher = Aes256::new(GenericArray::from_slice(&SAVE_DATA_AES_KEY));
-    for block in out.chunks_exact_mut(BLOCK_SIZE) {
+    for block in out.as_chunks_mut::<BLOCK_SIZE>().0 {
         cipher.decrypt_block(GenericArray::from_mut_slice(block));
     }
     Ok(out)

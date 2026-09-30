@@ -422,15 +422,15 @@ impl WhiffCalculator {
             self.active_candidates.clear();
             self.expired_candidates.clear();
         }
-        if touch_state.touch_events.is_empty() {
-            if let Some(ball_position) = ball.position() {
-                self.update_active_candidates(
-                    frame,
-                    ball_position,
-                    ball.velocity().unwrap_or(glam::Vec3::ZERO),
-                    players,
-                );
-            }
+        if touch_state.touch_events.is_empty()
+            && let Some(ball_position) = ball.position()
+        {
+            self.update_active_candidates(
+                frame,
+                ball_position,
+                ball.velocity().unwrap_or(glam::Vec3::ZERO),
+                players,
+            );
         }
         Ok(())
     }

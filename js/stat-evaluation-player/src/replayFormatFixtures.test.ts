@@ -11,6 +11,7 @@ const SMOKE_FIXTURES = new Set([
   "old-ballchasing-midfield-car.replay",
   "replay-format-2018-03-15-v868-20-net5-modern-vectors-legacy-rotation.replay",
   "replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay",
+  "replay-format-2026-09-18-v868-34-net12-season24-honor-duel.replay",
 ]);
 
 interface FixtureLoadResult {

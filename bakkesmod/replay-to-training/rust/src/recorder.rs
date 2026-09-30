@@ -409,14 +409,14 @@ impl RecorderPack {
         for archetype in &round.serialized_archetypes {
             if archetype.contains("\"IsPC\"") {
                 car_count += 1;
-            } else if archetype.contains("Ball_GameEditor") {
-                if let (Some(x), Some(y), Some(z)) = (
+            } else if archetype.contains("Ball_GameEditor")
+                && let (Some(x), Some(y), Some(z)) = (
                     json_number_field(archetype, "StartLocationX"),
                     json_number_field(archetype, "StartLocationY"),
                     json_number_field(archetype, "StartLocationZ"),
-                ) {
-                    ball_location = Some((x, y, z));
-                }
+                )
+            {
+                ball_location = Some((x, y, z));
             }
         }
         let ball_text = match ball_location {
@@ -494,11 +494,11 @@ impl RecorderPack {
             .file
             .to_bytes()
             .map_err(|error| format!("could not serialize pack: {error}"))?;
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|error| format!("could not create {}: {error}", parent.display()))?;
-            }
+        if let Some(parent) = path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            std::fs::create_dir_all(parent)
+                .map_err(|error| format!("could not create {}: {error}", parent.display()))?;
         }
         std::fs::write(path, bytes)
             .map_err(|error| format!("could not write {}: {error}", path.display()))

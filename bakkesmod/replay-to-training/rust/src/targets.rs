@@ -53,16 +53,16 @@ pub fn sanitize_target_name(value: &str) -> String {
         value.truncate(value.len() - 4);
     }
     let components: Vec<&str> = value.split('\\').filter(|part| !part.is_empty()).collect();
-    if components.len() >= 2 {
-        if let Some(folder) = canonical_folder(components[components.len() - 2]) {
-            let stem = components[components.len() - 1];
-            return if components.len() >= 3 {
-                let account = components[components.len() - 3];
-                format!("{account}\\{folder}\\{stem}")
-            } else {
-                format!("{folder}\\{stem}")
-            };
-        }
+    if components.len() >= 2
+        && let Some(folder) = canonical_folder(components[components.len() - 2])
+    {
+        let stem = components[components.len() - 1];
+        return if components.len() >= 3 {
+            let account = components[components.len() - 3];
+            format!("{account}\\{folder}\\{stem}")
+        } else {
+            format!("{folder}\\{stem}")
+        };
     }
     components.join("\\")
 }

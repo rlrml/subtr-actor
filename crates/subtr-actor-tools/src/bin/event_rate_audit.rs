@@ -746,11 +746,11 @@ fn emit_playlist(
         },
     });
 
-    if let Some(parent) = output.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("creating output dir {}", parent.display()))?;
-        }
+    if let Some(parent) = output.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating output dir {}", parent.display()))?;
     }
     let json = serde_json::to_string_pretty(&playlist)?;
     std::fs::write(output, format!("{json}\n"))

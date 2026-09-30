@@ -51,8 +51,8 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         rustToolchainManifest = {
-          channel = "1.97.0";
-          sha256 = "sha256-OATSZm98Es5kIFuqaba+UvkQtFsVgJEBMmS+t6od5/U=";
+          channel = "1.98.1";
+          sha256 = "sha256-p8h3Sl/YRByZfZTAKXdsvF6xEenXKrXSVvpphmZENH4=";
         };
         rustToolchain = fenix.packages.${system}.combine [
           (fenix.packages.${system}.toolchainOf rustToolchainManifest).defaultToolchain

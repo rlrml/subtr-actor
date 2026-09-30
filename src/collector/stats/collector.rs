@@ -138,12 +138,11 @@ impl BuiltinModuleSelection {
             if let Some(snapshot) = builtin_snapshot_frame_json(module_name, graph, replay_meta)? {
                 modules.insert(module_name.to_owned(), snapshot);
             }
-            if module_name == "ball_carry" {
-                if let Some(snapshot) =
+            if module_name == "ball_carry"
+                && let Some(snapshot) =
                     builtin_snapshot_frame_json("air_dribble", graph, replay_meta)?
-                {
-                    modules.insert("air_dribble".to_owned(), snapshot);
-                }
+            {
+                modules.insert("air_dribble".to_owned(), snapshot);
             }
         }
         Ok(modules)
@@ -601,10 +600,10 @@ impl<T, F> StatsCollector<T, F> {
     where
         F: FrameTransform<Output = T>,
     {
-        if let Some(frames) = &mut self.captured_frames {
-            if let Some(last_frame) = frames.last_mut() {
-                *last_frame = self.frame_transform.transform(replay_meta, frame)?;
-            }
+        if let Some(frames) = &mut self.captured_frames
+            && let Some(last_frame) = frames.last_mut()
+        {
+            *last_frame = self.frame_transform.transform(replay_meta, frame)?;
         }
         Ok(())
     }

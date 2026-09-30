@@ -7,11 +7,11 @@ pub(crate) fn current_timeline_frame(graph: &AnalysisGraph) -> Option<ReplayStat
 }
 
 pub(crate) fn record_timeline_frame(frames: &mut Vec<ReplayStatsFrame>, frame: ReplayStatsFrame) {
-    if let Some(last_frame) = frames.last_mut() {
-        if last_frame.frame_number == frame.frame_number {
-            *last_frame = frame;
-            return;
-        }
+    if let Some(last_frame) = frames.last_mut()
+        && last_frame.frame_number == frame.frame_number
+    {
+        *last_frame = frame;
+        return;
     }
     frames.push(frame);
 }

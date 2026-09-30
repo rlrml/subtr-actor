@@ -715,11 +715,11 @@ impl PositioningCalculator {
                     .map(|(_, other_position)| position.distance(*other_position))
                     .sum();
                 let teammate_count = team_players.len().saturating_sub(1);
-                if teammate_count > 0 {
-                    if let Some(entry) = facets.get_mut(&player.player_id) {
-                        entry.distance_to_teammates =
-                            Some(teammate_distance_sum / teammate_count as f32);
-                    }
+                if teammate_count > 0
+                    && let Some(entry) = facets.get_mut(&player.player_id)
+                {
+                    entry.distance_to_teammates =
+                        Some(teammate_distance_sum / teammate_count as f32);
                 }
             }
 
@@ -788,20 +788,18 @@ impl PositioningCalculator {
                 frame.dt,
                 self.config.closest_to_ball_switch_margin,
                 self.config.closest_to_ball_switch_min_seconds,
-            ) {
-                if let Some(entry) = facets.get_mut(&closest_player.player_id) {
-                    entry.proximity.closest_to_ball_team = true;
-                }
+            ) && let Some(entry) = facets.get_mut(&closest_player.player_id)
+            {
+                entry.proximity.closest_to_ball_team = true;
             }
 
             if let Some((farthest_player, _)) = team_players.iter().max_by(|(_, a), (_, b)| {
                 a.distance(ball_position)
                     .partial_cmp(&b.distance(ball_position))
                     .unwrap()
-            }) {
-                if let Some(entry) = facets.get_mut(&farthest_player.player_id) {
-                    entry.proximity.farthest_from_ball = true;
-                }
+            }) && let Some(entry) = facets.get_mut(&farthest_player.player_id)
+            {
+                entry.proximity.farthest_from_ball = true;
             }
         }
 

@@ -541,17 +541,16 @@ impl MatchStatsCalculator {
         // overwrite the reference, turning `time_after_kickoff` into "time
         // since the most recent touch" instead of "time since the kickoff's
         // first touch".
-        if self.kickoff_waiting_for_first_touch {
-            if let Some(first_touch_time) = events
+        if self.kickoff_waiting_for_first_touch
+            && let Some(first_touch_time) = events
                 .touch_events
                 .iter()
                 .map(|event| event.time)
                 .min_by(|a, b| a.total_cmp(b))
-            {
-                self.active_kickoff_touch_time = Some(first_touch_time);
-                self.kickoff_waiting_for_first_touch = false;
-                return;
-            }
+        {
+            self.active_kickoff_touch_time = Some(first_touch_time);
+            self.kickoff_waiting_for_first_touch = false;
+            return;
         }
 
         if Self::kickoff_phase_active(gameplay) {
@@ -708,10 +707,10 @@ impl MatchStatsCalculator {
     }
 
     fn update_ball_velocity(&mut self, ball: &BallFrameState) {
-        if let Some(velocity) = ball.velocity() {
-            if velocity.length() >= MIN_TRACKED_BALL_SPEED {
-                self.last_ball_velocity = Some(velocity);
-            }
+        if let Some(velocity) = ball.velocity()
+            && velocity.length() >= MIN_TRACKED_BALL_SPEED
+        {
+            self.last_ball_velocity = Some(velocity);
         }
     }
 
@@ -1343,57 +1342,57 @@ impl MatchStatsCalculator {
                 let team_zero_delta = team_zero_score - prev_team_zero_score;
                 let team_one_delta = team_one_score - prev_team_one_score;
 
-                if team_zero_delta > 0 {
-                    if let Some(last_defender) = self.last_defender(players, false) {
-                        let player_position = players.player_position(&last_defender);
-                        for _ in 0..team_zero_delta {
-                            self.emit_core_player_goal_context_event(
-                                frame.time,
-                                frame.frame_number,
-                                last_defender.clone(),
-                                player_position,
-                                false,
-                                true,
-                                true,
-                                false,
-                                false,
-                                false,
-                                None,
-                                None,
-                                None,
-                                None,
-                                None,
-                                None,
-                                None,
-                            );
-                        }
+                if team_zero_delta > 0
+                    && let Some(last_defender) = self.last_defender(players, false)
+                {
+                    let player_position = players.player_position(&last_defender);
+                    for _ in 0..team_zero_delta {
+                        self.emit_core_player_goal_context_event(
+                            frame.time,
+                            frame.frame_number,
+                            last_defender.clone(),
+                            player_position,
+                            false,
+                            true,
+                            true,
+                            false,
+                            false,
+                            false,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        );
                     }
                 }
 
-                if team_one_delta > 0 {
-                    if let Some(last_defender) = self.last_defender(players, true) {
-                        let player_position = players.player_position(&last_defender);
-                        for _ in 0..team_one_delta {
-                            self.emit_core_player_goal_context_event(
-                                frame.time,
-                                frame.frame_number,
-                                last_defender.clone(),
-                                player_position,
-                                true,
-                                false,
-                                true,
-                                false,
-                                false,
-                                false,
-                                None,
-                                None,
-                                None,
-                                None,
-                                None,
-                                None,
-                                None,
-                            );
-                        }
+                if team_one_delta > 0
+                    && let Some(last_defender) = self.last_defender(players, true)
+                {
+                    let player_position = players.player_position(&last_defender);
+                    for _ in 0..team_one_delta {
+                        self.emit_core_player_goal_context_event(
+                            frame.time,
+                            frame.frame_number,
+                            last_defender.clone(),
+                            player_position,
+                            true,
+                            false,
+                            true,
+                            false,
+                            false,
+                            false,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        );
                     }
                 }
             }
