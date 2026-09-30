@@ -167,13 +167,16 @@ function applyTeamEvent(stats: KickoffTeamStats, teamIsTeam0: boolean, event: Ki
     }
   }
 
-  if (event.win_strength != null) {
+  if (
+    event.win_strength != null &&
+    event.outcome === (teamIsTeam0 ? "team_zero_win" : "team_one_win")
+  ) {
     stats.win_strength_sample_count += 1;
     stats.cumulative_win_strength += event.win_strength;
   }
 }
 
-function applyGlobalTakerStats(
+function applyTeamTakerStats(
   teamZero: KickoffTeamStats,
   teamOne: KickoffTeamStats,
   taker: KickoffTakerEvent | null,
@@ -181,18 +184,15 @@ function applyGlobalTakerStats(
   if (!taker) {
     return;
   }
+  const stats = taker.is_team_0 ? teamZero : teamOne;
   if (taker.boost_after != null) {
-    teamZero.boost_after_sample_count += 1;
-    teamZero.cumulative_boost_after += taker.boost_after;
-    teamOne.boost_after_sample_count += 1;
-    teamOne.cumulative_boost_after += taker.boost_after;
+    stats.boost_after_sample_count += 1;
+    stats.cumulative_boost_after += taker.boost_after;
   }
   if (taker.outcome === "fake") {
-    teamZero.fake_count += 1;
-    teamOne.fake_count += 1;
+    stats.fake_count += 1;
   } else if (taker.outcome === "missed") {
-    teamZero.missed_count += 1;
-    teamOne.missed_count += 1;
+    stats.missed_count += 1;
   }
 }
 
@@ -304,8 +304,8 @@ export function createKickoffEventDerivedStatsAccumulator(timeline: Materialized
         const event = events[eventIndex] as KickoffEvent;
         applyTeamEvent(teamZero, true, event);
         applyTeamEvent(teamOne, false, event);
-        applyGlobalTakerStats(teamZero, teamOne, event.team_zero_taker);
-        applyGlobalTakerStats(teamZero, teamOne, event.team_one_taker);
+        applyTeamTakerStats(teamZero, teamOne, event.team_zero_taker);
+        applyTeamTakerStats(teamZero, teamOne, event.team_one_taker);
 
         if (event.team_zero_taker) {
           applyPlayerEvent(players, event, event.team_zero_taker);

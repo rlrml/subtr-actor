@@ -3738,3 +3738,75 @@ fn kickoff_team_stats_split_taker_counts_by_team() {
     assert_eq!(team_one.win_strength_sample_count, 0);
     assert_eq!(team_one.cumulative_win_strength, 0.0);
 }
+
+#[test]
+fn kickoff_team_stats_only_sample_winner_strength() {
+    let mut event = faked_kickoff_goal_event(&PlayerId::Steam(1));
+    event.team_zero_taker = None;
+    let mut stats = KickoffStatsAccumulator::new();
+    for (outcome, strength) in [
+        (KickoffOutcome::TeamZeroWin, Some(0.5)),
+        (KickoffOutcome::TeamOneWin, Some(0.25)),
+        (KickoffOutcome::TeamOneWin, Some(0.75)),
+        (KickoffOutcome::Neutral, Some(0.125)),
+        (KickoffOutcome::Unknown, Some(0.125)),
+        (KickoffOutcome::TeamZeroWin, None),
+        (KickoffOutcome::TeamOneWin, None),
+    ] {
+        event.outcome = outcome;
+        event.win_strength = strength;
+        stats.apply_event(&event);
+    }
+    let all = stats.stats();
+    assert_eq!(all.win_strength_sample_count, 5);
+    assert_eq!(all.cumulative_win_strength, 1.75);
+    let zero = all.for_team(true);
+    let one = all.for_team(false);
+    assert_eq!(zero.win_strength_sample_count, 1);
+    assert_eq!(zero.cumulative_win_strength, 0.5);
+    assert_eq!(zero.average_win_strength(), 0.5);
+    assert_eq!(one.win_strength_sample_count, 2);
+    assert_eq!(one.cumulative_win_strength, 1.0);
+    assert_eq!(one.average_win_strength(), 0.5);
+    assert_eq!(zero.boost_after_sample_count, 0);
+    assert_eq!(one.boost_after_sample_count, 0);
+}
+
+#[test]
+fn kickoff_team_stats_preserve_serialization_and_default_legacy_fields() {
+    let event = faked_kickoff_goal_event(&PlayerId::Steam(1));
+    let mut accumulator = KickoffStatsAccumulator::new();
+    accumulator.apply_event(&event);
+    let stats = accumulator.stats();
+    let mut value = serde_json::to_value(stats).unwrap();
+    let restored: crate::stats::accumulators::KickoffStats =
+        serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(&restored, stats);
+
+    let object = value.as_object_mut().unwrap();
+    for team in ["team_zero", "team_one"] {
+        for field in [
+            "win_strength_sample_count",
+            "cumulative_win_strength",
+            "boost_after_sample_count",
+            "cumulative_boost_after",
+            "fake_count",
+            "missed_count",
+        ] {
+            assert!(object.remove(&format!("{team}_{field}")).is_some());
+        }
+    }
+    let legacy: crate::stats::accumulators::KickoffStats = serde_json::from_value(value).unwrap();
+    assert_eq!(legacy.fake_count, 1);
+    assert_eq!(legacy.boost_after_sample_count, 1);
+    assert_eq!(legacy.cumulative_boost_after, 11.0);
+    assert_eq!(legacy.win_strength_sample_count, 1);
+    for team in [legacy.for_team(true), legacy.for_team(false)] {
+        assert_eq!(team.fake_count, 0);
+        assert_eq!(team.missed_count, 0);
+        assert_eq!(team.boost_after_sample_count, 0);
+        assert_eq!(team.cumulative_boost_after, 0.0);
+        assert_eq!(team.win_strength_sample_count, 0);
+        assert_eq!(team.cumulative_win_strength, 0.0);
+    }
+}
