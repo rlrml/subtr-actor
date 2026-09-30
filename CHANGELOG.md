@@ -4,6 +4,37 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v1.3.0 - 2026-09-30
+
+### Stats & replay analysis
+
+- Add opt-in expected-goals analysis with trained pre-contact scoring
+  probabilities, causal history, incident aggregation, and live threat display.
+- Add beaten-to-ball detection and event output.
+- Detect speed flips across the full airborne arc, credit multiple flip resets,
+  and improve mechanic-goal attribution, whiff resolution, and kickoff team stats.
+- Support Season 24 replays.
+
+### Live capture & replay tooling
+
+- Add owned live-frame models, a live wire protocol, WebSocket broadcasting, and
+  a live consumer with real-time timeline events.
+- Add the BakkesMod StateExportPlugin and its Rust engine.
+- Give timeline events lifecycle tracking, stable identifiers, and per-node
+  projection, and streamline analysis graph traversal.
+- Add event-rate auditing, review-playlist generation, and single-key event
+  labeling to the stats player.
+
+### Replay player & maintenance
+
+- Add the replay-player favicon and expose it at the repository root.
+- Fix conflicting SVG colors so mobile icon renderers use the same dark panels
+  as desktop browsers.
+- Fix timeline graph aspect ratios and show incremental stats-snapshot progress.
+- Update Rust tooling, generated bindings, and event-definition documentation.
+- Synchronize Rust, Python, JavaScript, README, and lockfile release metadata at
+  `1.3.0`.
+
 ## v1.2.0 - 2026-07-09
 
 ### Training packs & BakkesMod capture
