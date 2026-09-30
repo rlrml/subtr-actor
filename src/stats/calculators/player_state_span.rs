@@ -68,14 +68,14 @@ impl<S: Clone + PartialEq> PlayerSpanTracker<S> {
         is_team_0: bool,
         state: S,
     ) {
-        if let Some(open) = self.open.get_mut(player) {
-            if open.state == state {
-                open.end_time = end_time;
-                open.end_frame = frame_number;
-                open.duration += duration;
-                open.player_position = player_position;
-                return;
-            }
+        if let Some(open) = self.open.get_mut(player)
+            && open.state == state
+        {
+            open.end_time = end_time;
+            open.end_frame = frame_number;
+            open.duration += duration;
+            open.player_position = player_position;
+            return;
         }
         let span = PlayerStateSpan {
             time: start_time,

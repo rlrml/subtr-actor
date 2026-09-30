@@ -613,27 +613,27 @@ pub(crate) fn replay_annotations_from_timeline(
 
     let mut occurrence_by_key = HashMap::new();
     for (index, envelope) in timeline.events.iter().enumerate() {
-        if let Some(kind) = mechanic_kind(&envelope.meta.stream) {
-            if let (Some(player_id), Some(is_team_0)) = (
+        if let Some(kind) = mechanic_kind(&envelope.meta.stream)
+            && let (Some(player_id), Some(is_team_0)) = (
                 envelope.meta.primary_player.as_ref(),
                 envelope.meta.team_is_team_0,
-            ) {
-                let (frame_number, time) = mechanic_start(envelope);
-                push_replay_annotation(
-                    &mut events,
-                    &mut emitted_ids,
-                    &index_map,
-                    PendingGraphEvent {
-                        id: envelope.meta.id.clone(),
-                        kind,
-                        player_id: player_id.clone(),
-                        is_team_0,
-                        frame_number,
-                        time,
-                        confidence: envelope.meta.confidence.unwrap_or(1.0),
-                    },
-                );
-            }
+            )
+        {
+            let (frame_number, time) = mechanic_start(envelope);
+            push_replay_annotation(
+                &mut events,
+                &mut emitted_ids,
+                &index_map,
+                PendingGraphEvent {
+                    id: envelope.meta.id.clone(),
+                    kind,
+                    player_id: player_id.clone(),
+                    is_team_0,
+                    frame_number,
+                    time,
+                    confidence: envelope.meta.confidence.unwrap_or(1.0),
+                },
+            );
         }
 
         match &envelope.payload {

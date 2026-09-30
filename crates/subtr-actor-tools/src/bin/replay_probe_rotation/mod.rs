@@ -168,14 +168,13 @@ impl LegacyRotationProbe {
                 && linear_velocity.z.abs() <= MAX_GROUNDED_VERTICAL_SPEED;
             if grounded && planar_speed >= MIN_FORWARD_ALIGNMENT_SPEED {
                 for mode in &self.modes {
-                    if let Some(quaternion) = reinterpret_quaternion(rigid_body.rotation, *mode) {
-                        if let Some((alignment, up_z)) =
+                    if let Some(quaternion) = reinterpret_quaternion(rigid_body.rotation, *mode)
+                        && let Some((alignment, up_z)) =
                             rotation_alignment(quaternion, linear_velocity)
-                        {
-                            let accumulator = self.accumulators.get_mut(mode).unwrap();
-                            accumulator.alignments.push(alignment);
-                            accumulator.up_zs.push(up_z);
-                        }
+                    {
+                        let accumulator = self.accumulators.get_mut(mode).unwrap();
+                        accumulator.alignments.push(alignment);
+                        accumulator.up_zs.push(up_z);
                     }
                 }
                 for mode in &self.euler_modes {
@@ -206,13 +205,13 @@ impl LegacyRotationProbe {
                         .map(|velocity| {
                             glam::Vec3::new(velocity.x, velocity.y, velocity.z).length()
                         });
-                    if let Some(reported_speed) = reported_velocity {
-                        if reported_speed >= MIN_REPORTED_SPEED {
-                            for (scale, accumulator) in &mut self.velocity_accumulators {
-                                let ratio = (reported_speed * *scale) / displacement_speed;
-                                if ratio.is_finite() && ratio > 0.0 {
-                                    accumulator.ratios.push(ratio);
-                                }
+                    if let Some(reported_speed) = reported_velocity
+                        && reported_speed >= MIN_REPORTED_SPEED
+                    {
+                        for (scale, accumulator) in &mut self.velocity_accumulators {
+                            let ratio = (reported_speed * *scale) / displacement_speed;
+                            if ratio.is_finite() && ratio > 0.0 {
+                                accumulator.ratios.push(ratio);
                             }
                         }
                     }
@@ -238,20 +237,18 @@ impl LegacyRotationProbe {
                                 previous_rotation,
                                 current_rotation,
                                 dt,
-                            ) {
-                                if derived_angular_velocity.length()
-                                    >= MIN_DERIVED_ORIENTATION_SPEED
-                                {
-                                    let direction_dot = derived_angular_velocity
-                                        .normalize()
-                                        .dot(reported_angular_velocity.normalize());
-                                    if direction_dot.is_finite() {
-                                        self.euler_angular_accumulators
-                                            .get_mut(mode)
-                                            .unwrap()
-                                            .direction_dots
-                                            .push(direction_dot);
-                                    }
+                            ) && derived_angular_velocity.length()
+                                >= MIN_DERIVED_ORIENTATION_SPEED
+                            {
+                                let direction_dot = derived_angular_velocity
+                                    .normalize()
+                                    .dot(reported_angular_velocity.normalize());
+                                if direction_dot.is_finite() {
+                                    self.euler_angular_accumulators
+                                        .get_mut(mode)
+                                        .unwrap()
+                                        .direction_dots
+                                        .push(direction_dot);
                                 }
                             }
                         }
@@ -528,10 +525,10 @@ impl Collector for LegacyRotationProbe {
     ) -> subtr_actor::SubtrActorResult<TimeAdvance> {
         let player_ids: Vec<_> = processor.iter_player_ids_in_order().cloned().collect();
         for player_id in &player_ids {
-            if let Ok(rigid_body) = processor.get_normalized_player_rigid_body(player_id) {
-                if !rigid_body.sleeping {
-                    self.sample_player(player_id, current_time, rigid_body);
-                }
+            if let Ok(rigid_body) = processor.get_normalized_player_rigid_body(player_id)
+                && !rigid_body.sleeping
+            {
+                self.sample_player(player_id, current_time, rigid_body);
             }
         }
         Ok(TimeAdvance::NextFrame)

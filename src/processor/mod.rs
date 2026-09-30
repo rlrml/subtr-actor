@@ -50,6 +50,7 @@ pub(crate) fn attribute_type_name(attribute: &boxcars::Attribute) -> &'static st
         boxcars::Attribute::CamSettings(_) => "CamSettings",
         boxcars::Attribute::ClubColors(_) => "ClubColors",
         boxcars::Attribute::Demolish(_) => "Demolish",
+        boxcars::Attribute::HonorDuelChallenge(_) => "HonorDuelChallenge",
         boxcars::Attribute::DemolishExtended(_) => "DemolishExtended",
         boxcars::Attribute::DemolishFx(_) => "DemolishFx",
         boxcars::Attribute::Enum(_) => "Enum",

@@ -554,14 +554,13 @@ impl DodgeResetCalculator {
 
         // Dodge-then-touch (or same-frame): the dodge byte is already up, so the
         // recorded onset anchors the timing window.
-        if let Some(&dodge_onset_time) = self.pending_reset_dodge_onset.get(player_id) {
-            if touch.dodge_contact
+        if let Some(&dodge_onset_time) = self.pending_reset_dodge_onset.get(player_id)
+            && (touch.dodge_contact
                 || Self::touch_within_dodge_continuation(touch.time, dodge_onset_time)
-                || self.post_reset_dodge_active_near_touch(player_id, dodge_onset_time, touch.time)
-            {
-                let player_id = player_id.clone();
-                return self.confirm_flip_reset(&player_id, &touch, dodge_onset_time);
-            }
+                || self.post_reset_dodge_active_near_touch(player_id, dodge_onset_time, touch.time))
+        {
+            let player_id = player_id.clone();
+            return self.confirm_flip_reset(&player_id, &touch, dodge_onset_time);
         }
 
         // Same-frame dodge-on-ball resets have no positive reset-to-dodge delay:

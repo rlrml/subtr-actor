@@ -449,12 +449,12 @@ fn event_time_is_in_goal_play(event_time: f32, goal: &GoalContextEvent) -> bool 
         return false;
     }
 
-    if event_time <= goal.time {
-        if let Some(time_after_kickoff) = goal.time_after_kickoff {
-            let event_to_goal_seconds = goal.time - event_time;
-            if event_to_goal_seconds > time_after_kickoff + GOAL_KICKOFF_BOUNDARY_EPSILON_SECONDS {
-                return false;
-            }
+    if event_time <= goal.time
+        && let Some(time_after_kickoff) = goal.time_after_kickoff
+    {
+        let event_to_goal_seconds = goal.time - event_time;
+        if event_to_goal_seconds > time_after_kickoff + GOAL_KICKOFF_BOUNDARY_EPSILON_SECONDS {
+            return false;
         }
     }
 

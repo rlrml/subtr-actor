@@ -19,10 +19,10 @@ authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/rlrml/subtr-actor"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.88"
 
 [workspace.dependencies]
-boxcars = ">=0.11.3, <1.0.0"
+boxcars = ">=0.12.0, <1.0.0"
 
 [package]
 name = "subtr-actor"

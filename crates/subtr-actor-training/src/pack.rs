@@ -321,16 +321,16 @@ impl TrainingFile {
     /// resolved through the root's `TrainingData` object reference with a
     /// fallback to a type-name search.
     pub fn training_data_index(&self) -> Result<usize> {
-        if let Some(property) = self.root.get("TrainingData") {
-            if let PropertyValue::Object(index) = &property.value {
-                return usize::try_from(*index)
-                    .ok()
-                    .filter(|&index| index < self.objects.len())
-                    .ok_or(Error::TrainingDataIndexOutOfRange {
-                        index: *index,
-                        count: self.objects.len(),
-                    });
-            }
+        if let Some(property) = self.root.get("TrainingData")
+            && let PropertyValue::Object(index) = &property.value
+        {
+            return usize::try_from(*index)
+                .ok()
+                .filter(|&index| index < self.objects.len())
+                .ok_or(Error::TrainingDataIndexOutOfRange {
+                    index: *index,
+                    count: self.objects.len(),
+                });
         }
         self.objects
             .iter()
@@ -471,10 +471,10 @@ impl TrainingFile {
             if let Some(epic) = &player.epic_account_id {
                 fields.set("EpicAccountId", str_property(Some(epic)));
             }
-            if let Some(platform) = &player.platform {
-                if platform != "OnlinePlatform_Unknown" {
-                    fields.set("Platform", enum_property("OnlinePlatform", platform));
-                }
+            if let Some(platform) = &player.platform
+                && platform != "OnlinePlatform_Unknown"
+            {
+                fields.set("Platform", enum_property("OnlinePlatform", platform));
             }
             if player.splitscreen_id != 0 {
                 fields.set(

@@ -42,8 +42,7 @@ fn test_demolition_velocities_are_in_physical_units() {
             .expect("Expected demolish attacker to have player data");
         if let Some(PlayerFrame::Data { rigid_body, .. }) =
             attacker_data.frames().get(demolish.frame)
-        {
-            if let Some(linear_velocity) = rigid_body.linear_velocity {
+            && let Some(linear_velocity) = rigid_body.linear_velocity {
                 let demo_speed = glam::Vec3::new(
                     demolish.attacker_velocity.x,
                     demolish.attacker_velocity.y,
@@ -61,7 +60,6 @@ fn test_demolition_velocities_are_in_physical_units() {
                     attacker_velocity_ratios.push(demo_speed / rigid_body_speed);
                 }
             }
-        }
     }
 
     attacker_velocity_ratios

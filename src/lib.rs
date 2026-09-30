@@ -234,9 +234,7 @@ pub mod ballistics {
     pub use crate::util::ballistics::*;
 }
 
-pub use crate::actor_state::*;
 pub use crate::ballistics::*;
-pub use crate::boost_pad_locations::*;
 pub use crate::boost_units::*;
 pub use crate::clip::*;
 pub use crate::collector::*;

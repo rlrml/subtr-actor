@@ -248,10 +248,10 @@ where
         let mut completed = Vec::new();
         self.track_touch_contacts(touches);
 
-        if self.active_player_is_non_airborne(player_statuses, requires_airborne_for_kind) {
-            if let Some(sequence) = self.finish_active_sequence(min_duration_for_kind) {
-                completed.push(sequence);
-            }
+        if self.active_player_is_non_airborne(player_statuses, requires_airborne_for_kind)
+            && let Some(sequence) = self.finish_active_sequence(min_duration_for_kind)
+        {
+            completed.push(sequence);
         }
 
         let Some(candidate) = candidate else {

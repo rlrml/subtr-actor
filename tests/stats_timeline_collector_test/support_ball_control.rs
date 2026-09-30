@@ -326,11 +326,10 @@ fn assert_wall_aerial_events_reconstruct_serialized_partial_sums(
                     stats.is_last_wall_aerial = false;
                 }
             }
-            if let Some(player_id) = last_wall_aerial_player.as_ref() {
-                if let Some(stats) = players.get_mut(player_id) {
+            if let Some(player_id) = last_wall_aerial_player.as_ref()
+                && let Some(stats) = players.get_mut(player_id) {
                     stats.is_last_wall_aerial = true;
                 }
-            }
         } else {
             last_wall_aerial_player = None;
         }
@@ -516,11 +515,10 @@ fn assert_wall_aerial_shot_events_reconstruct_serialized_partial_sums(
                     stats.is_last_wall_aerial_shot = false;
                 }
             }
-            if let Some(player_id) = last_wall_aerial_shot_player.as_ref() {
-                if let Some(stats) = players.get_mut(player_id) {
+            if let Some(player_id) = last_wall_aerial_shot_player.as_ref()
+                && let Some(stats) = players.get_mut(player_id) {
                     stats.is_last_wall_aerial_shot = true;
                 }
-            }
         } else {
             last_wall_aerial_shot_player = None;
         }
@@ -721,11 +719,10 @@ fn assert_flick_events_reconstruct_serialized_partial_sums(
                 event_index += 1;
             }
 
-            if let Some(player_id) = last_flick_player.as_ref() {
-                if let Some(stats) = players.get_mut(player_id) {
+            if let Some(player_id) = last_flick_player.as_ref()
+                && let Some(stats) = players.get_mut(player_id) {
                     stats.is_last_flick = true;
                 }
-            }
         } else {
             last_flick_player = None;
         }

@@ -208,7 +208,9 @@ impl<'a> Reader<'a> {
                 / 2;
             let bytes = self.bytes(unit_count * 2)?;
             let units: Vec<u16> = bytes
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
                 .collect();
             let (terminator, content) = units.split_last().unwrap();

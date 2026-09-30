@@ -243,17 +243,17 @@ fn audit(label: &str, args: &Args, replay: &boxcars::Replay) -> Result<()> {
         let mut team0_who = None;
         let mut team1_who = None;
         for f in gaps.iter().filter(|f| f.frame >= lo && f.frame <= hi) {
-            if let Some((g, _, name)) = &f.team0 {
-                if *g < team0_min {
-                    team0_min = *g;
-                    team0_who = name.clone();
-                }
+            if let Some((g, _, name)) = &f.team0
+                && *g < team0_min
+            {
+                team0_min = *g;
+                team0_who = name.clone();
             }
-            if let Some((g, _, name)) = &f.team1 {
-                if *g < team1_min {
-                    team1_min = *g;
-                    team1_who = name.clone();
-                }
+            if let Some((g, _, name)) = &f.team1
+                && *g < team1_min
+            {
+                team1_min = *g;
+                team1_who = name.clone();
             }
         }
 

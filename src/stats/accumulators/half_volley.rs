@@ -105,10 +105,10 @@ impl HalfVolleyStatsAccumulator {
     }
 
     pub fn restore_current_last_event_marker(&mut self) {
-        if let Some(player_id) = self.current_last_half_volley_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_half_volley = true;
-            }
+        if let Some(player_id) = self.current_last_half_volley_player.as_ref()
+            && let Some(stats) = self.player_stats.get_mut(player_id)
+        {
+            stats.is_last_half_volley = true;
         }
     }
 

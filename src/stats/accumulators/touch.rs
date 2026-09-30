@@ -424,10 +424,10 @@ impl TouchStatsAccumulator {
     }
 
     pub fn restore_current_last_touch_marker(&mut self) {
-        if let Some(player_id) = self.current_last_touch_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_touch = true;
-            }
+        if let Some(player_id) = self.current_last_touch_player.as_ref()
+            && let Some(stats) = self.player_stats.get_mut(player_id)
+        {
+            stats.is_last_touch = true;
         }
     }
 }

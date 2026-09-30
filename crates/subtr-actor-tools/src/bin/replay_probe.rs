@@ -196,21 +196,18 @@ fn print_demolition(path: &str) {
             .iter()
             .find(|(player_id, _)| player_id == &demolish.attacker)
             .map(|(_, player_data)| player_data)
-        {
-            if let Some(PlayerFrame::Data { rigid_body, .. }) =
+            && let Some(PlayerFrame::Data { rigid_body, .. }) =
                 player_data.frames().get(demolish.frame)
+            && let Some(linear_velocity) = rigid_body.linear_velocity
+        {
+            let demo_speed = vec_length(demolish.attacker_velocity);
+            let rigid_body_speed = vec_length(linear_velocity);
+            if demo_speed.is_finite()
+                && rigid_body_speed.is_finite()
+                && demo_speed > 0.0
+                && rigid_body_speed > 0.0
             {
-                if let Some(linear_velocity) = rigid_body.linear_velocity {
-                    let demo_speed = vec_length(demolish.attacker_velocity);
-                    let rigid_body_speed = vec_length(linear_velocity);
-                    if demo_speed.is_finite()
-                        && rigid_body_speed.is_finite()
-                        && demo_speed > 0.0
-                        && rigid_body_speed > 0.0
-                    {
-                        attacker_ratios.push(demo_speed / rigid_body_speed);
-                    }
-                }
+                attacker_ratios.push(demo_speed / rigid_body_speed);
             }
         }
 
@@ -220,21 +217,18 @@ fn print_demolition(path: &str) {
             .iter()
             .find(|(player_id, _)| player_id == &demolish.victim)
             .map(|(_, player_data)| player_data)
-        {
-            if let Some(PlayerFrame::Data { rigid_body, .. }) =
+            && let Some(PlayerFrame::Data { rigid_body, .. }) =
                 player_data.frames().get(demolish.frame)
+            && let Some(linear_velocity) = rigid_body.linear_velocity
+        {
+            let demo_speed = vec_length(demolish.victim_velocity);
+            let rigid_body_speed = vec_length(linear_velocity);
+            if demo_speed.is_finite()
+                && rigid_body_speed.is_finite()
+                && demo_speed > 0.0
+                && rigid_body_speed > 0.0
             {
-                if let Some(linear_velocity) = rigid_body.linear_velocity {
-                    let demo_speed = vec_length(demolish.victim_velocity);
-                    let rigid_body_speed = vec_length(linear_velocity);
-                    if demo_speed.is_finite()
-                        && rigid_body_speed.is_finite()
-                        && demo_speed > 0.0
-                        && rigid_body_speed > 0.0
-                    {
-                        victim_ratios.push(demo_speed / rigid_body_speed);
-                    }
-                }
+                victim_ratios.push(demo_speed / rigid_body_speed);
             }
         }
     }

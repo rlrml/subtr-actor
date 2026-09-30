@@ -66,10 +66,10 @@ impl BackboardStatsAccumulator {
             self.current_last_backboard_player = Some(last_event.player.clone());
         }
 
-        if let Some(player_id) = self.current_last_backboard_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_backboard = true;
-            }
+        if let Some(player_id) = self.current_last_backboard_player.as_ref()
+            && let Some(stats) = self.player_stats.get_mut(player_id)
+        {
+            stats.is_last_backboard = true;
         }
     }
 

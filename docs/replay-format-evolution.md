@@ -46,12 +46,14 @@ the clearer replay-format fixture names.
 | `replay-format-2025-06-10-v868-32-net10-replicated-boost.replay` | `868.32`, `net_version = 10` | `250610.60392.487806` | Modern rigid body | Modern spatial scale with the newer `ReplicatedBoost` format. | [raw][raw-2025-06-replicated-boost] | [viewer][viewer-2025-06-replicated-boost] |
 | `replay-format-2026-01-14-v868-32-net10-demolish-extended.replay` | `868.32`, `net_version = 10` | `260114.55864.507183` | Modern rigid body | Newer `ReplicatedDemolishExtended` demolition payload; regression coverage expects 10 demos and preserved victim locations. | [raw][raw-2026-01-demolish-extended] | [viewer][viewer-2026-01-demolish-extended] |
 | `replay-format-2026-03-03-v868-32-net11-dodge-refresh-counter.replay` | `868.32`, `net_version = 11` | `260303.78181.511382` | Modern rigid body | Newer replay with `DodgeRefreshedCounter`; expected to expose 12 exact dodge refreshes. | [raw][raw-2026-03-dodge-refresh] | [viewer][viewer-2026-03-dodge-refresh] |
+| `replay-format-2026-09-18-v868-34-net12-season24-standard.replay` | `868.34`, `net_version = 12` | `260918.75141.528314` | Modern rigid body | Season 24 private 3v3 replay with new player stats and extended camera profile fields; expects all 7,501 frames to decode. | [raw][raw-2026-09-season24-standard] | [viewer][viewer-2026-09-season24-standard] |
+| `replay-format-2026-09-18-v868-34-net12-season24-honor-duel.replay` | `868.34`, `net_version = 12` | `260918.75141.528314` | Modern rigid body | Season 24 online 2v2 replay with four accepted honor-duel attributes and extended camera profiles; expects all 10,123 frames to decode. | [raw][raw-2026-09-season24-honor-duel] | [viewer][viewer-2026-09-season24-honor-duel] |
 
 Known coverage gaps:
 
 - The checked-in fixtures cover the boundaries currently known to affect
   `subtr-actor`: missing/old `net_version`, `net=2`, `net=5`, `net=7`,
-  `net=10`, and `net=11`.
+  `net=10`, `net=11`, and `net=12`.
 - We do not currently have checked-in fixtures for every intermediate
   `net_version` value such as `0`, `1`, `3`, `4`, `6`, `8`, or `9`. Add those
   if a parser behavior or public output depends on them.
@@ -87,6 +89,13 @@ Use these links to visually check that cars and ball fit normal Rocket League
 field dimensions, rotations track plausible car orientation, and replay events
 line up with visible play. Legacy fixtures should appear in field units after
 normalization, while modern fixtures should not be multiplied by `100`.
+
+[raw-2026-09-season24-standard]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2026-09-18-v868-34-net12-season24-standard.replay
+[viewer-2026-09-season24-standard]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2026-09-18-v868-34-net12-season24-standard.replay
+[raw-2026-09-season24-honor-duel]: https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2026-09-18-v868-34-net12-season24-honor-duel.replay
+[viewer-2026-09-season24-honor-duel]: https://rlrml.github.io/subtr-actor/?replayUrl=https://raw.githubusercontent.com/rlrml/subtr-actor/master/assets/replay-format-2026-09-18-v868-34-net12-season24-honor-duel.replay
+
+The Season 24 fixtures come from the MIT-licensed [`boxcars` regression corpus](https://github.com/nickbabcock/boxcars/tree/dd9d84860a4d54d595e405432cd882dfd2c92d8f/assets/replays/good): `MatchBicycleHits.replay` and `AcceptedHonorDuel.replay`, respectively.
 
 ## Player identity and substitutions
 

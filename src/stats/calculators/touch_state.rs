@@ -748,10 +748,10 @@ impl TouchStateCalculator {
 
         for contested in self.geometric_contested_touches(frame, ball, players, &confirmed_players)
         {
-            if let Some(player_id) = contested.player.clone() {
-                if !confirmed_players.insert(player_id) {
-                    continue;
-                }
+            if let Some(player_id) = contested.player.clone()
+                && !confirmed_players.insert(player_id)
+            {
+                continue;
             }
             touch_events.push(contested);
         }

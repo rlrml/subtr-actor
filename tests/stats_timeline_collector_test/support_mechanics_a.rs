@@ -398,11 +398,10 @@ fn assert_whiff_events_reconstruct_serialized_partial_sums(
                 event_index += 1;
             }
 
-            if let Some(player_id) = last_whiff_player.as_ref() {
-                if let Some(player) = players.get_mut(player_id) {
+            if let Some(player_id) = last_whiff_player.as_ref()
+                && let Some(player) = players.get_mut(player_id) {
                     player.stats.is_last_whiff = true;
                 }
-            }
 
             for player in &frame.players {
                 let expected = players.get(&player.player_id).cloned().unwrap_or_default();
@@ -558,11 +557,10 @@ fn assert_backboard_events_reconstruct_serialized_partial_sums(
             }
         }
 
-        if let Some(player_id) = last_backboard_player.as_ref() {
-            if let Some(stats) = players.get_mut(player_id) {
+        if let Some(player_id) = last_backboard_player.as_ref()
+            && let Some(stats) = players.get_mut(player_id) {
                 stats.stats.is_last_backboard = true;
             }
-        }
 
         assert_eq!(
             frame.team_zero.backboard, team_zero,
@@ -710,11 +708,10 @@ fn assert_double_tap_events_reconstruct_serialized_partial_sums(
             }
         }
 
-        if let Some(player_id) = last_double_tap_player.as_ref() {
-            if let Some(stats) = players.get_mut(player_id) {
+        if let Some(player_id) = last_double_tap_player.as_ref()
+            && let Some(stats) = players.get_mut(player_id) {
                 stats.stats.is_last_double_tap = true;
             }
-        }
 
         assert_eq!(
             frame.team_zero.double_tap, team_zero,

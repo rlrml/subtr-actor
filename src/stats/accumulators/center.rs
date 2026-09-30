@@ -153,10 +153,10 @@ impl CenterStatsAccumulator {
     }
 
     pub fn finish_sample(&mut self) {
-        if let Some(player_id) = self.current_last_center_player.as_ref() {
-            if let Some(stats) = self.player_stats.get_mut(player_id) {
-                stats.is_last_center = true;
-            }
+        if let Some(player_id) = self.current_last_center_player.as_ref()
+            && let Some(stats) = self.player_stats.get_mut(player_id)
+        {
+            stats.is_last_center = true;
         }
     }
 }

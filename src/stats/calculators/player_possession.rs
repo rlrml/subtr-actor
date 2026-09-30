@@ -313,10 +313,8 @@ impl PlayerPossessionCalculator {
         let expired = self.suspended.as_ref().is_some_and(|(_, suspended_at)| {
             time - suspended_at > PLAYER_POSSESSION_MERGE_GAP_SECONDS
         });
-        if expired {
-            if let Some((suspended, _)) = self.suspended.take() {
-                self.finalize(suspended);
-            }
+        if expired && let Some((suspended, _)) = self.suspended.take() {
+            self.finalize(suspended);
         }
     }
 
@@ -386,47 +384,47 @@ impl PlayerPossessionCalculator {
             Self::holder_within_reach(possession_state.current_player.clone(), ball, players);
         let field_third = Self::field_third(ball);
 
-        if let Some(active) = self.active.as_ref() {
-            if current_player.as_ref() != Some(&active.player_id) {
-                let mut active = self.active.take().expect("active span checked above");
-                // A different player taking over ends the span outright; a
-                // neutral window only suspends it for possible resumption.
-                if current_player.is_some() {
-                    self.finalize(active);
-                } else {
-                    active.last_carry_kind = None;
-                    // The loose tail since the last touch was provisional; the
-                    // hold lapsed, so it is not possession even if the same
-                    // player re-establishes control and the span resumes.
-                    active.running = active.at_last_touch;
-                    self.suspended = Some((active, frame.time));
-                }
+        if let Some(active) = self.active.as_ref()
+            && current_player.as_ref() != Some(&active.player_id)
+        {
+            let mut active = self.active.take().expect("active span checked above");
+            // A different player taking over ends the span outright; a
+            // neutral window only suspends it for possible resumption.
+            if current_player.is_some() {
+                self.finalize(active);
+            } else {
+                active.last_carry_kind = None;
+                // The loose tail since the last touch was provisional; the
+                // hold lapsed, so it is not possession even if the same
+                // player re-establishes control and the span resumes.
+                active.running = active.at_last_touch;
+                self.suspended = Some((active, frame.time));
             }
         }
 
-        if self.active.is_none() {
-            if let Some(player_id) = current_player.clone() {
-                let resumes_suspended = self
-                    .suspended
-                    .as_ref()
-                    .is_some_and(|(suspended, _)| suspended.player_id == player_id);
-                if resumes_suspended {
-                    self.active = self.suspended.take().map(|(suspended, _)| suspended);
-                } else {
-                    if let Some((suspended, _)) = self.suspended.take() {
-                        self.finalize(suspended);
-                    }
-                    let is_team_0 = possession_state
-                        .current_team_is_team_0
-                        .or_else(|| players.player(&player_id).map(|player| player.is_team_0))
-                        .unwrap_or(true);
-                    self.active = Some(ActivePlayerPossession::open(
-                        frame,
-                        player_id,
-                        is_team_0,
-                        field_third.clone(),
-                    ));
+        if self.active.is_none()
+            && let Some(player_id) = current_player.clone()
+        {
+            let resumes_suspended = self
+                .suspended
+                .as_ref()
+                .is_some_and(|(suspended, _)| suspended.player_id == player_id);
+            if resumes_suspended {
+                self.active = self.suspended.take().map(|(suspended, _)| suspended);
+            } else {
+                if let Some((suspended, _)) = self.suspended.take() {
+                    self.finalize(suspended);
                 }
+                let is_team_0 = possession_state
+                    .current_team_is_team_0
+                    .or_else(|| players.player(&player_id).map(|player| player.is_team_0))
+                    .unwrap_or(true);
+                self.active = Some(ActivePlayerPossession::open(
+                    frame,
+                    player_id,
+                    is_team_0,
+                    field_third.clone(),
+                ));
             }
         }
 

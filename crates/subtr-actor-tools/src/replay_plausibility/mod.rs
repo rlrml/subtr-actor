@@ -172,14 +172,13 @@ impl RigidBodyPlausibilityAccumulator {
             .linear_velocity
             .or(current.linear_velocity)
             .map(|velocity| vec_to_glam(&velocity).length())
+            && displacement_speed >= MIN_DISPLACEMENT_SPEED
+            && reported_speed >= MIN_REPORTED_SPEED
         {
-            if displacement_speed >= MIN_DISPLACEMENT_SPEED && reported_speed >= MIN_REPORTED_SPEED
-            {
-                let ratio = reported_speed / displacement_speed;
-                if ratio.is_finite() && ratio > 0.0 {
-                    self.motion_ratios.push(ratio);
-                    self.motion_log10_errors.push(ratio.log10().abs());
-                }
+            let ratio = reported_speed / displacement_speed;
+            if ratio.is_finite() && ratio > 0.0 {
+                self.motion_ratios.push(ratio);
+                self.motion_log10_errors.push(ratio.log10().abs());
             }
         }
 

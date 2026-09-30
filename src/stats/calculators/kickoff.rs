@@ -1779,15 +1779,16 @@ impl KickoffCalculator {
                 first_follow_up_touch,
                 winning_team_is_team_0,
             );
-        if kickoff_goal && first_follow_up_touch.is_none() {
-            if let Some(goal) = scoring_goal {
-                kickoff_possession_outcome = if goal.scoring_team_is_team_0 {
-                    KickoffPossessionOutcome::TeamZeroPossession
-                } else {
-                    KickoffPossessionOutcome::TeamOnePossession
-                };
-                kickoff_possession_team_is_team_0 = Some(goal.scoring_team_is_team_0);
-            }
+        if kickoff_goal
+            && first_follow_up_touch.is_none()
+            && let Some(goal) = scoring_goal
+        {
+            kickoff_possession_outcome = if goal.scoring_team_is_team_0 {
+                KickoffPossessionOutcome::TeamZeroPossession
+            } else {
+                KickoffPossessionOutcome::TeamOnePossession
+            };
+            kickoff_possession_team_is_team_0 = Some(goal.scoring_team_is_team_0);
         }
         let team_zero_touched = active
             .players
@@ -2025,10 +2026,10 @@ impl KickoffCalculator {
             Self::apply_touches(active, ctx.touch_state, ctx.ball, ctx.players);
         }
         Self::observe_ball_extent(active, ctx.ball);
-        if let Some(goal) = Self::earliest_goal(ctx.events) {
-            if Self::kickoff_goal_qualifies(active, goal) {
-                active.advantage.establish_goal(goal);
-            }
+        if let Some(goal) = Self::earliest_goal(ctx.events)
+            && Self::kickoff_goal_qualifies(active, goal)
+        {
+            active.advantage.establish_goal(goal);
         }
         active
             .advantage

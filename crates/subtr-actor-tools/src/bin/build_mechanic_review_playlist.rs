@@ -631,10 +631,10 @@ fn graph_node_names_for_mechanics(mechanics: &[&str]) -> Vec<&'static str> {
             "flip_reset" => Some("dodge_reset"),
             _ => None,
         };
-        if let Some(node) = node {
-            if !names.contains(&node) {
-                names.push(node);
-            }
+        if let Some(node) = node
+            && !names.contains(&node)
+        {
+            names.push(node);
         }
     }
     names
@@ -715,22 +715,22 @@ fn playback_bounds_for_clip(
         .as_ref()
         .map(|network_frames| network_frames.frames.as_slice());
 
-    if let Some(frames) = frames {
-        if let (Some(start_frame), Some(end_frame)) = (
+    if let Some(frames) = frames
+        && let (Some(start_frame), Some(end_frame)) = (
             frame_index_at_or_after(frames, start_time),
             frame_index_at_or_after(frames, end_time),
-        ) {
-            return (
-                PlaybackBound {
-                    kind: PlaybackBoundKind::Frame,
-                    value: start_frame as f32,
-                },
-                PlaybackBound {
-                    kind: PlaybackBoundKind::Frame,
-                    value: end_frame.max(start_frame.saturating_add(1)) as f32,
-                },
-            );
-        }
+        )
+    {
+        return (
+            PlaybackBound {
+                kind: PlaybackBoundKind::Frame,
+                value: start_frame as f32,
+            },
+            PlaybackBound {
+                kind: PlaybackBoundKind::Frame,
+                value: end_frame.max(start_frame.saturating_add(1)) as f32,
+            },
+        );
     }
 
     (
@@ -876,11 +876,11 @@ fn build_manifest(config: &Config) -> anyhow::Result<PlaylistManifest> {
             meta: source.meta.clone(),
         });
         items.extend(build_items_for_source(source, &replay, config, &mechanics)?);
-        if let Some(max_items) = config.max_items {
-            if items.len() >= max_items {
-                items.truncate(max_items);
-                break;
-            }
+        if let Some(max_items) = config.max_items
+            && items.len() >= max_items
+        {
+            items.truncate(max_items);
+            break;
         }
     }
 
@@ -918,12 +918,11 @@ fn write_manifest(manifest: &PlaylistManifest, output: Option<&Path>) -> anyhow:
     let json = serde_json::to_string_pretty(manifest)?;
     match output {
         Some(path) => {
-            if let Some(parent) = path.parent() {
-                if !parent.as_os_str().is_empty() {
-                    std::fs::create_dir_all(parent).with_context(|| {
-                        format!("failed to create output dir {}", parent.display())
-                    })?;
-                }
+            if let Some(parent) = path.parent()
+                && !parent.as_os_str().is_empty()
+            {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("failed to create output dir {}", parent.display()))?;
             }
             std::fs::write(path, format!("{json}\n"))
                 .with_context(|| format!("failed to write playlist {}", path.display()))?;
