@@ -147,6 +147,7 @@ pub fn attribute_to_tag(attribute: &Attribute) -> &str {
         Attribute::CamSettings(_) => "AttributeTag::CamSettings",
         Attribute::ClubColors(_) => "AttributeTag::ClubColors",
         Attribute::Demolish(_) => "AttributeTag::Demolish",
+        Attribute::HonorDuelChallenge(_) => "AttributeTag::HonorDuelChallenge",
         Attribute::DemolishFx(_) => "AttributeTag::DemolishFx",
         Attribute::Enum(_) => "AttributeTag::Enum",
         Attribute::Explosion(_) => "AttributeTag::Explosion",

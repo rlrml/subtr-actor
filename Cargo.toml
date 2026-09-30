@@ -3,7 +3,7 @@ members = [".", "js", "python"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.9-blast"
+version = "0.1.13-blast"
 authors = ["Ivan Malison <ivanmalison@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/blastorg/subtr-actor"
@@ -22,7 +22,7 @@ description = "Rocket League replay transformer"
 
 [dependencies]
 anyhow = "1.0.98"
-boxcars = "0.11.1"
+boxcars = "0.12.0"
 derive-new = "0.7.0"
 float-ord = "0.3.2"
 glam = "0.30.4"

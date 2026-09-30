@@ -53,6 +53,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "boxcars"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9f6cad2e22ba5bac632de26fc5f3e033dca418c1d3fe2e0ea235ec5047d3ff9"
+dependencies = [
+ "bitter 0.9.0",
+ "encoding_rs",
+ "fnv",
+ "phf 0.13.1",
+ "serde",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -462,7 +475,7 @@ checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
 
 [[package]]
 name = "rl-replay-subtr-actor"
-version = "0.1.9-blast"
+version = "0.1.10-blast"
 dependencies = [
  "boxcars 0.10.6",
  "console_error_panic_hook",
@@ -544,10 +557,10 @@ checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
 
 [[package]]
 name = "subtr-actor"
-version = "0.1.9-blast"
+version = "0.1.10-blast"
 dependencies = [
  "anyhow",
- "boxcars 0.11.1",
+ "boxcars 0.12.0",
  "derive-new",
  "float-ord",
  "glam",
@@ -562,9 +575,9 @@ dependencies = [
 
 [[package]]
 name = "subtr-actor-py"
-version = "0.1.9-blast"
+version = "0.1.10-blast"
 dependencies = [
- "boxcars 0.10.6",
+ "boxcars 0.11.1",
  "numpy",
  "pyo3",
  "serde_json",
