@@ -29,6 +29,9 @@ The same core pipeline is exposed through Python and JavaScript bindings.
 
 ## Working Notes
 
+- Use Cargo caret requirements for dependencies. For `0.x` crates, stay within
+  the supported minor series; do not use broad `<1.0.0` bounds that admit
+  breaking minor releases. Update to a new minor only after adapting and testing.
 - Treat the Rust crate as the source of truth. Binding changes in `python/` and
   `js/` usually mirror behavior already defined in `src/`.
 - Keep tests in separate files from production code. For Rust unit tests, prefer

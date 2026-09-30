@@ -4,6 +4,14 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v1.3.1 - 2026-09-30
+
+- Keep boxcars in the supported `0.12` series after adding Season 24 and
+  `HonorDuelChallenge` support in v1.3.0, fixing fresh consumer builds reported
+  in [#285](https://github.com/rlrml/subtr-actor/issues/285).
+- Bound other pre-1.0 dependencies to their supported minor series so future
+  breaking minor releases require an explicit compatibility update.
+
 ## v1.3.0 - 2026-09-30
 
 ### Stats & replay analysis
