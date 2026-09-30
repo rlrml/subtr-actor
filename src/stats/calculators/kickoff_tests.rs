@@ -2478,10 +2478,9 @@ fn kickoff_taker_prefers_ball_committer_when_no_touch() {
     );
 }
 
-#[test]
-fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
-    let player_id = PlayerId::Steam(1);
-    let event = KickoffEvent {
+/// A center kickoff team zero wins off a faked take and scores from.
+fn faked_kickoff_goal_event(player_id: &PlayerId) -> KickoffEvent {
+    KickoffEvent {
         start_time: 0.0,
         start_frame: 0,
         end_time: 1.5,
@@ -2561,7 +2560,13 @@ fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
         team_one_taker: None,
         team_zero_non_takers: Vec::new(),
         team_one_non_takers: Vec::new(),
-    };
+    }
+}
+
+#[test]
+fn kickoff_stats_accumulate_boost_strength_fake_and_miss_counts() {
+    let player_id = PlayerId::Steam(1);
+    let event = faked_kickoff_goal_event(&player_id);
     let mut stats = KickoffStatsAccumulator::new();
 
     stats.apply_event(&event);
@@ -3697,4 +3702,111 @@ fn qualifying_kickoff_goal_settles_for_scoring_team() {
     assert_eq!(event.advantage, KickoffAdvantage::TeamOneGoal);
     assert_eq!(event.advantage_team_is_team_0, Some(false));
     assert_eq!(event.advantage_time, Some(1.2));
+}
+
+#[test]
+fn kickoff_team_stats_split_taker_counts_by_team() {
+    let team_zero_player = PlayerId::Steam(1);
+    let team_one_player = PlayerId::Steam(2);
+    let mut event = faked_kickoff_goal_event(&team_zero_player);
+    let mut team_one_taker = event.team_zero_taker.clone().unwrap();
+    team_one_taker.player = team_one_player;
+    team_one_taker.is_team_0 = false;
+    team_one_taker.boost_after = Some(40.0);
+    team_one_taker.outcome = KickoffTakerOutcome::Missed;
+    event.team_one_taker = Some(team_one_taker);
+    let mut stats = KickoffStatsAccumulator::new();
+
+    stats.apply_event(&event);
+
+    let match_stats = stats.stats();
+    assert_eq!(match_stats.fake_count, 1);
+    assert_eq!(match_stats.missed_count, 1);
+    assert_eq!(match_stats.boost_after_sample_count, 2);
+    let team_zero = match_stats.for_team(true);
+    assert_eq!(team_zero.fake_count, 1);
+    assert_eq!(team_zero.missed_count, 0);
+    assert_eq!(team_zero.boost_after_sample_count, 1);
+    assert_eq!(team_zero.cumulative_boost_after, 11.0);
+    assert_eq!(team_zero.win_strength_sample_count, 1);
+    assert_eq!(team_zero.cumulative_win_strength, 1.5);
+    let team_one = match_stats.for_team(false);
+    assert_eq!(team_one.fake_count, 0);
+    assert_eq!(team_one.missed_count, 1);
+    assert_eq!(team_one.boost_after_sample_count, 1);
+    assert_eq!(team_one.cumulative_boost_after, 40.0);
+    assert_eq!(team_one.win_strength_sample_count, 0);
+    assert_eq!(team_one.cumulative_win_strength, 0.0);
+}
+
+#[test]
+fn kickoff_team_stats_only_sample_winner_strength() {
+    let mut event = faked_kickoff_goal_event(&PlayerId::Steam(1));
+    event.team_zero_taker = None;
+    let mut stats = KickoffStatsAccumulator::new();
+    for (outcome, strength) in [
+        (KickoffOutcome::TeamZeroWin, Some(0.5)),
+        (KickoffOutcome::TeamOneWin, Some(0.25)),
+        (KickoffOutcome::TeamOneWin, Some(0.75)),
+        (KickoffOutcome::Neutral, Some(0.125)),
+        (KickoffOutcome::Unknown, Some(0.125)),
+        (KickoffOutcome::TeamZeroWin, None),
+        (KickoffOutcome::TeamOneWin, None),
+    ] {
+        event.outcome = outcome;
+        event.win_strength = strength;
+        stats.apply_event(&event);
+    }
+    let all = stats.stats();
+    assert_eq!(all.win_strength_sample_count, 5);
+    assert_eq!(all.cumulative_win_strength, 1.75);
+    let zero = all.for_team(true);
+    let one = all.for_team(false);
+    assert_eq!(zero.win_strength_sample_count, 1);
+    assert_eq!(zero.cumulative_win_strength, 0.5);
+    assert_eq!(zero.average_win_strength(), 0.5);
+    assert_eq!(one.win_strength_sample_count, 2);
+    assert_eq!(one.cumulative_win_strength, 1.0);
+    assert_eq!(one.average_win_strength(), 0.5);
+    assert_eq!(zero.boost_after_sample_count, 0);
+    assert_eq!(one.boost_after_sample_count, 0);
+}
+
+#[test]
+fn kickoff_team_stats_preserve_serialization_and_default_legacy_fields() {
+    let event = faked_kickoff_goal_event(&PlayerId::Steam(1));
+    let mut accumulator = KickoffStatsAccumulator::new();
+    accumulator.apply_event(&event);
+    let stats = accumulator.stats();
+    let mut value = serde_json::to_value(stats).unwrap();
+    let restored: crate::stats::accumulators::KickoffStats =
+        serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(&restored, stats);
+
+    let object = value.as_object_mut().unwrap();
+    for team in ["team_zero", "team_one"] {
+        for field in [
+            "win_strength_sample_count",
+            "cumulative_win_strength",
+            "boost_after_sample_count",
+            "cumulative_boost_after",
+            "fake_count",
+            "missed_count",
+        ] {
+            assert!(object.remove(&format!("{team}_{field}")).is_some());
+        }
+    }
+    let legacy: crate::stats::accumulators::KickoffStats = serde_json::from_value(value).unwrap();
+    assert_eq!(legacy.fake_count, 1);
+    assert_eq!(legacy.boost_after_sample_count, 1);
+    assert_eq!(legacy.cumulative_boost_after, 11.0);
+    assert_eq!(legacy.win_strength_sample_count, 1);
+    for team in [legacy.for_team(true), legacy.for_team(false)] {
+        assert_eq!(team.fake_count, 0);
+        assert_eq!(team.missed_count, 0);
+        assert_eq!(team.boost_after_sample_count, 0);
+        assert_eq!(team.cumulative_boost_after, 0.0);
+        assert_eq!(team.win_strength_sample_count, 0);
+        assert_eq!(team.cumulative_win_strength, 0.0);
+    }
 }

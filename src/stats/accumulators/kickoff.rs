@@ -22,6 +22,30 @@ pub struct KickoffStats {
     pub cumulative_boost_after: f32,
     pub fake_count: u32,
     pub missed_count: u32,
+    #[serde(default)]
+    pub team_zero_win_strength_sample_count: u32,
+    #[serde(default)]
+    pub team_one_win_strength_sample_count: u32,
+    #[serde(default)]
+    pub team_zero_cumulative_win_strength: f32,
+    #[serde(default)]
+    pub team_one_cumulative_win_strength: f32,
+    #[serde(default)]
+    pub team_zero_boost_after_sample_count: u32,
+    #[serde(default)]
+    pub team_one_boost_after_sample_count: u32,
+    #[serde(default)]
+    pub team_zero_cumulative_boost_after: f32,
+    #[serde(default)]
+    pub team_one_cumulative_boost_after: f32,
+    #[serde(default)]
+    pub team_zero_fake_count: u32,
+    #[serde(default)]
+    pub team_one_fake_count: u32,
+    #[serde(default)]
+    pub team_zero_missed_count: u32,
+    #[serde(default)]
+    pub team_one_missed_count: u32,
     #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
     pub labeled_event_counts: LabeledCounts,
     #[serde(default, skip_serializing_if = "LabeledCounts::is_empty")]
@@ -123,17 +147,58 @@ impl KickoffStats {
         if let Some(win_strength) = event.win_strength {
             self.win_strength_sample_count += 1;
             self.cumulative_win_strength += win_strength;
+            // Win strength measures how far the winner pushed the ball, so it belongs to the winning side.
+            let winner = match event.outcome {
+                KickoffOutcome::TeamZeroWin => Some((
+                    &mut self.team_zero_win_strength_sample_count,
+                    &mut self.team_zero_cumulative_win_strength,
+                )),
+                KickoffOutcome::TeamOneWin => Some((
+                    &mut self.team_one_win_strength_sample_count,
+                    &mut self.team_one_cumulative_win_strength,
+                )),
+                KickoffOutcome::Neutral | KickoffOutcome::Unknown => None,
+            };
+            if let Some((sample_count, cumulative)) = winner {
+                *sample_count += 1;
+                *cumulative += win_strength;
+            }
         }
         for player in event.player_events() {
             self.labeled_player_counts.increment(player.labels());
             if let Some(taker) = player.as_taker() {
+                let is_team_zero = player.is_team_0();
                 if let Some(boost_after) = taker.boost_after {
                     self.boost_after_sample_count += 1;
                     self.cumulative_boost_after += boost_after;
+                    if is_team_zero {
+                        self.team_zero_boost_after_sample_count += 1;
+                        self.team_zero_cumulative_boost_after += boost_after;
+                    } else {
+                        self.team_one_boost_after_sample_count += 1;
+                        self.team_one_cumulative_boost_after += boost_after;
+                    }
                 }
+                let (team_fakes, team_misses) = if is_team_zero {
+                    (
+                        &mut self.team_zero_fake_count,
+                        &mut self.team_zero_missed_count,
+                    )
+                } else {
+                    (
+                        &mut self.team_one_fake_count,
+                        &mut self.team_one_missed_count,
+                    )
+                };
                 match taker.outcome {
-                    KickoffTakerOutcome::Fake => self.fake_count += 1,
-                    KickoffTakerOutcome::Missed => self.missed_count += 1,
+                    KickoffTakerOutcome::Fake => {
+                        self.fake_count += 1;
+                        *team_fakes += 1;
+                    }
+                    KickoffTakerOutcome::Missed => {
+                        self.missed_count += 1;
+                        *team_misses += 1;
+                    }
                     _ => {}
                 }
             }
@@ -210,6 +275,9 @@ impl KickoffStats {
         } else {
             self.team_zero_kickoff_goals
         };
+        fn pick<T>(is_team_zero: bool, team_zero: T, team_one: T) -> T {
+            if is_team_zero { team_zero } else { team_one }
+        }
         KickoffTeamStats {
             count: self.count,
             wins,
@@ -223,12 +291,36 @@ impl KickoffStats {
             kickoff_goal_count: self.kickoff_goal_count,
             kickoff_goals_for,
             kickoff_goals_against,
-            win_strength_sample_count: self.win_strength_sample_count,
-            cumulative_win_strength: self.cumulative_win_strength,
-            boost_after_sample_count: self.boost_after_sample_count,
-            cumulative_boost_after: self.cumulative_boost_after,
-            fake_count: self.fake_count,
-            missed_count: self.missed_count,
+            win_strength_sample_count: pick(
+                is_team_zero,
+                self.team_zero_win_strength_sample_count,
+                self.team_one_win_strength_sample_count,
+            ),
+            cumulative_win_strength: pick(
+                is_team_zero,
+                self.team_zero_cumulative_win_strength,
+                self.team_one_cumulative_win_strength,
+            ),
+            boost_after_sample_count: pick(
+                is_team_zero,
+                self.team_zero_boost_after_sample_count,
+                self.team_one_boost_after_sample_count,
+            ),
+            cumulative_boost_after: pick(
+                is_team_zero,
+                self.team_zero_cumulative_boost_after,
+                self.team_one_cumulative_boost_after,
+            ),
+            fake_count: pick(
+                is_team_zero,
+                self.team_zero_fake_count,
+                self.team_one_fake_count,
+            ),
+            missed_count: pick(
+                is_team_zero,
+                self.team_zero_missed_count,
+                self.team_one_missed_count,
+            ),
         }
     }
 }
