@@ -23,7 +23,10 @@ impl<'a> ReplayProcessor<'a> {
             .copied()
     }
 
-    /// Returns the replicated game-state enum value from the metadata actor.
+    /// Returns the raw replicated game-state value from the metadata actor.
+    ///
+    /// This is an index into the replay's name table, not a stable code; use
+    /// [`Self::get_game_state`] to compare against `GAME_STATE_*` codes.
     pub fn get_replicated_state_name(&self) -> SubtrActorResult<i32> {
         get_actor_attribute_matching!(
             self,

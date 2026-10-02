@@ -19,6 +19,10 @@ pub trait ProcessorView {
     fn get_seconds_remaining(&self) -> SubtrActorResult<i32>;
     fn get_replicated_state_name(&self) -> SubtrActorResult<i32>;
     /// Canonical `GAME_STATE_*` code for the current game state, if any.
+    ///
+    /// The default passes [`Self::get_replicated_state_name`] through, which is
+    /// only correct for views that already carry canonical codes. Views backed
+    /// by replay name-table indices must override it.
     fn get_game_state(&self) -> Option<i32> {
         self.get_replicated_state_name().ok()
     }
