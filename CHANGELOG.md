@@ -4,6 +4,21 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v1.4.0 - 2026-10-02
+
+- Resolve `ReplicatedStateName` through each replay's name table instead of
+  assuming fixed state indices
+  ([#288](https://github.com/rlrml/subtr-actor/pull/288)). Replays where index
+  67 is `Active` previously collapsed live play to about one second, emptying
+  positioning, movement, boost, and kickoff stats. Other replays now also
+  exclude pre-match `Countdown` frames from live play.
+- Stats frame `game_state` now carries canonical codes
+  (`GAME_STATE_KICKOFF_COUNTDOWN`, `GAME_STATE_GOAL_SCORED_REPLAY`, now public)
+  or `None`, not the raw name-table index. The raw value is still available via
+  `get_replicated_state_name` and the ndarray/replay-data exports.
+- The replay player's pre-kickoff timeline compaction no longer assumes the
+  `Active` state is index 54.
+
 ## v1.3.1 - 2026-09-30
 
 - Keep boxcars in the supported `0.12` series after adding Season 24 and
