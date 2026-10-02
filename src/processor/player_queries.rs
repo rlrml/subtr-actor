@@ -34,6 +34,15 @@ impl<'a> ReplayProcessor<'a> {
         .cloned()
     }
 
+    /// Returns the replicated game state as a canonical `GAME_STATE_*` code.
+    ///
+    /// The replicated value is an index into this replay's name table, so the
+    /// same number names different states in different replays.
+    pub fn get_game_state(&self) -> Option<i32> {
+        let name_index = usize::try_from(self.get_replicated_state_name().ok()?).ok()?;
+        crate::stats::calculators::canonical_game_state(self.replay.names.get(name_index)?)
+    }
+
     /// Returns the replicated kickoff countdown / time-remaining field.
     pub fn get_replicated_game_state_time_remaining(&self) -> SubtrActorResult<i32> {
         get_actor_attribute_matching!(

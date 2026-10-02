@@ -157,3 +157,13 @@ pub struct FrameEventsState {
 
 pub(crate) const GAME_STATE_KICKOFF_COUNTDOWN: i32 = 53;
 pub(crate) const GAME_STATE_GOAL_SCORED_REPLAY: i32 = 67;
+
+/// Maps a replicated game-state name to its canonical `GAME_STATE_*` code, or
+/// `None` for states the stats treat as ordinary play.
+pub(crate) fn canonical_game_state(state_name: &str) -> Option<i32> {
+    match state_name {
+        "Countdown" => Some(GAME_STATE_KICKOFF_COUNTDOWN),
+        "PostGoalScored" | "ReplayPlayback" => Some(GAME_STATE_GOAL_SCORED_REPLAY),
+        _ => None,
+    }
+}
