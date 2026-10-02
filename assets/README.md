@@ -115,3 +115,10 @@ Mechanic regression fixtures are pinned on small clips by tests under
     was a normal aerial launched from the floor *near* the side wall (the car
     was never on the wall). Whole-replay ground truth for
     `tests/wall_aerial_fixture_test.rs`.
+
+Game-state fixture downloaded from Ballchasing:
+
+- `ranked-standard-state-name-index-collision-2024-08-25`
+  - replay id: `73198d3f-d983-4507-afca-e1176a202e80`
+  - playlist: `ranked-standard`
+  - note: name-table index 67 is `Active`, which the hardcoded goal-replay state code used to match

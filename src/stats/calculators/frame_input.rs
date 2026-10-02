@@ -217,7 +217,7 @@ impl FrameInput {
                     _ => None,
                 });
         GameplayState {
-            game_state: processor.get_replicated_state_name().ok(),
+            game_state: processor.get_game_state(),
             ball_has_been_hit: processor.get_ball_has_been_hit().ok(),
             kickoff_countdown_time: processor.get_replicated_game_state_time_remaining().ok(),
             team_zero_score: team_scores.map(|scores| scores.0),

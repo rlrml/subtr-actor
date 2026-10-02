@@ -23,7 +23,10 @@ impl<'a> ReplayProcessor<'a> {
             .copied()
     }
 
-    /// Returns the replicated game-state enum value from the metadata actor.
+    /// Returns the raw replicated game-state value from the metadata actor.
+    ///
+    /// This is an index into the replay's name table, not a stable code; use
+    /// [`Self::get_game_state`] to compare against `GAME_STATE_*` codes.
     pub fn get_replicated_state_name(&self) -> SubtrActorResult<i32> {
         get_actor_attribute_matching!(
             self,
@@ -32,6 +35,15 @@ impl<'a> ReplayProcessor<'a> {
             boxcars::Attribute::Int
         )
         .cloned()
+    }
+
+    /// Returns the replicated game state as a canonical `GAME_STATE_*` code.
+    ///
+    /// The replicated value is an index into this replay's name table, so the
+    /// same number names different states in different replays.
+    pub fn get_game_state(&self) -> Option<i32> {
+        let name_index = usize::try_from(self.get_replicated_state_name().ok()?).ok()?;
+        crate::stats::calculators::canonical_game_state(self.replay.names.get(name_index)?)
     }
 
     /// Returns the replicated kickoff countdown / time-remaining field.

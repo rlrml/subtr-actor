@@ -86,14 +86,7 @@ impl<'a> ReplayProcessor<'a> {
         };
         let metadata_attributes = &metadata_state.attributes;
 
-        let replicated_state_name = self
-            .cached_object_ids
-            .replicated_state_name
-            .and_then(|object_id| metadata_attributes.get(&object_id))
-            .and_then(|(attribute, _)| match attribute {
-                boxcars::Attribute::Int(value) => Some(*value),
-                _ => None,
-            });
+        let game_state = self.get_game_state();
         let replicated_game_state_time_remaining = self
             .cached_object_ids
             .replicated_game_state_time_remaining
@@ -113,8 +106,7 @@ impl<'a> ReplayProcessor<'a> {
 
         let kickoff_countdown_active = replicated_game_state_time_remaining
             .is_some_and(|countdown| (1..=3).contains(&countdown))
-            || (replicated_state_name
-                == Some(crate::stats::calculators::GAME_STATE_KICKOFF_COUNTDOWN)
+            || (game_state == Some(crate::stats::calculators::GAME_STATE_KICKOFF_COUNTDOWN)
                 && replicated_game_state_time_remaining.is_none());
 
         kickoff_countdown_active || ball_has_been_hit == Some(false)

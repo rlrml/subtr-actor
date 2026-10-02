@@ -546,7 +546,26 @@ export class SubtrActorPlayer extends EventEmitter {
       if (sawCountdown && remaining === 0) return this.frameTimes[index] ?? null;
     }
 
-    const firstActiveFrame = frames.findIndex((frame) => frame.replicated_game_state_name === 54);
+    // The state value indexes the replay's name table, so infer the live-play
+    // state as the most common one rather than assuming a fixed index.
+    const stateCounts = new Map<number, number>();
+    for (const frame of frames) {
+      const state = frame.replicated_game_state_name;
+      if (state != null) stateCounts.set(state, (stateCounts.get(state) ?? 0) + 1);
+    }
+    let activeState: number | null = null;
+    let activeStateCount = 0;
+    for (const [state, count] of stateCounts) {
+      if (count > activeStateCount) {
+        activeState = state;
+        activeStateCount = count;
+      }
+    }
+    if (activeState === null) return null;
+
+    const firstActiveFrame = frames.findIndex(
+      (frame) => frame.replicated_game_state_name === activeState,
+    );
     return firstActiveFrame === -1 ? null : (this.frameTimes[firstActiveFrame] ?? null);
   }
 
