@@ -45,6 +45,21 @@ test("whiff event derivation can populate compacted whiff stats", () => {
           aerial: false,
         },
       ],
+      beaten_to_ball: [
+        {
+          time: 4,
+          frame: 40,
+          player: playerId,
+          winner: { Steam: "winner" },
+          is_team_0: true,
+          distance_at_touch: 150,
+          margin_seconds: 0.1,
+          approach_speed: 1200,
+          velocity_alignment: 0.9,
+          dodge_active: false,
+          aerial: false,
+        },
+      ],
     },
     frames: [
       createStatsFrame({
@@ -94,7 +109,7 @@ test("whiff event derivation can populate compacted whiff stats", () => {
   assert.equal(timeline.frames[1]?.players[0]?.whiff.is_last_whiff, true);
   assert.equal(timeline.frames[2]?.players[0]?.whiff.frames_since_last_whiff, 15);
   assert.equal(timeline.frames[3]?.players[0]?.whiff.frames_since_last_whiff, 20);
-  assert.equal(timeline.frames[3]?.players[0]?.whiff.beaten_to_ball_count, 1);
+  assert.equal(timeline.frames[3]?.players[0]?.whiff.beaten_to_ball_count, 2);
   assert.equal(timeline.frames[3]?.players[0]?.whiff.whiff_count, 1);
   assert.equal(timeline.frames[3]?.players[0]?.whiff.best_closest_approach_distance, 128);
 });

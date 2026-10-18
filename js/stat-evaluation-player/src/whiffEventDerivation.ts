@@ -1,3 +1,4 @@
+import type { BeatenToBallEvent } from "./generated/BeatenToBallEvent.ts";
 import type { WhiffEvent } from "./generated/WhiffEvent.ts";
 import type { WhiffStats } from "./generated/WhiffStats.ts";
 import type { StatsFrame, MaterializedStatsTimeline } from "./statsTimeline.ts";
@@ -114,8 +115,12 @@ export function createWhiffEventDerivedStatsAccumulator(timeline: MaterializedSt
   applyFrame(frame: StatsFrame): void;
 } {
   const events = sortWhiffEvents(statsEventPayloads(timeline, "whiff"));
+  const beatenToBallEvents = [...statsEventPayloads(timeline, "beaten_to_ball")].sort(
+    (left, right) => left.frame - right.frame,
+  );
 
   let eventIndex = 0;
+  let beatenToBallEventIndex = 0;
   let lastWhiffPlayer: string | null = null;
   const players = new Map<string, WhiffAccumulator>();
   const frozenPlayers = new Map<string, WhiffAccumulator>();
@@ -140,6 +145,18 @@ export function createWhiffEventDerivedStatsAccumulator(timeline: MaterializedSt
             lastWhiffPlayer = playerKey;
           }
           eventIndex += 1;
+        }
+
+        while (
+          beatenToBallEventIndex < beatenToBallEvents.length &&
+          beatenToBallEvents[beatenToBallEventIndex]!.frame <= frame.frame_number
+        ) {
+          const event = beatenToBallEvents[beatenToBallEventIndex] as BeatenToBallEvent;
+          const playerKey = remoteIdKey(event.player);
+          const stats = players.get(playerKey) ?? defaultWhiffStats();
+          players.set(playerKey, stats);
+          stats.beaten_to_ball_count += 1;
+          beatenToBallEventIndex += 1;
         }
 
         if (lastWhiffPlayer != null) {

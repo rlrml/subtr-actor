@@ -375,7 +375,14 @@ fn assert_whiff_events_reconstruct_serialized_partial_sums(
             .then_with(|| left.resolved_time.total_cmp(&right.resolved_time))
     });
 
+    let beaten_to_ball_events =
+        timeline_payloads_by_stream(timeline, "beaten_to_ball", |payload| match payload {
+            EventPayload::BeatenToBall(event) => Some(event),
+            _ => None,
+        });
+
     let mut event_index = 0;
+    let mut beaten_to_ball_event_index = 0;
     let mut players: HashMap<PlayerId, DerivedWhiffFrameStats> = HashMap::new();
     let mut frozen_players: HashMap<PlayerId, DerivedWhiffFrameStats> = HashMap::new();
     let mut last_whiff_player: Option<PlayerId> = None;
@@ -396,6 +403,18 @@ fn assert_whiff_events_reconstruct_serialized_partial_sums(
                     last_whiff_player = Some(event.player.clone());
                 }
                 event_index += 1;
+            }
+
+            while beaten_to_ball_event_index < beaten_to_ball_events.len()
+                && beaten_to_ball_events[beaten_to_ball_event_index].frame <= frame.frame_number
+            {
+                let event = &beaten_to_ball_events[beaten_to_ball_event_index];
+                players
+                    .entry(event.player.clone())
+                    .or_default()
+                    .stats
+                    .beaten_to_ball_count += 1;
+                beaten_to_ball_event_index += 1;
             }
 
             if let Some(player_id) = last_whiff_player.as_ref()
@@ -438,6 +457,11 @@ fn assert_whiff_events_reconstruct_serialized_partial_sums(
         event_index,
         events.len(),
         "{replay_path} unprocessed whiff events"
+    );
+    assert_eq!(
+        beaten_to_ball_event_index,
+        beaten_to_ball_events.len(),
+        "{replay_path} unprocessed beaten-to-ball events"
     );
 }
 
