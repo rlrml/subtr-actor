@@ -379,3 +379,36 @@ fn player_event_names_create_registered_analysis_indicators() {
         Some(&"analysis positioning event".to_owned())
     );
 }
+
+#[test]
+fn demolition_features_ignore_future_events_and_expire_at_the_window_boundary() {
+    let replay = parse_replay(NDARRAY_DUEL_FIXTURE);
+    let frame = &replay.network_frames.as_ref().unwrap().frames[0];
+    let mut processor = ReplayProcessor::new(&replay).unwrap();
+    let zero = boxcars::Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
+    processor.demolishes.push(DemolishInfo {
+        time: 1.0,
+        seconds_remaining: 299,
+        frame: 10,
+        attacker: processor.team_one[0].clone(),
+        victim: processor.team_zero[0].clone(),
+        attacker_velocity: zero,
+        victim_velocity: zero,
+        attacker_location: None,
+        victim_location: zero,
+    });
+    let mut collector =
+        NDArrayCollector::<f32>::from_strings(&[], &["PlayerDemolishedBy"]).unwrap();
+    for frame_number in [9, 10, 39, 40] {
+        collector
+            .process_frame(&processor, frame, frame_number, frame_number as f32)
+            .unwrap();
+    }
+    let data = collector.get_ndarray().unwrap();
+    assert_eq!(data.column(0).to_vec(), vec![-1.0, 1.0, 1.0, -1.0]);
+    assert_eq!(data.column(1).to_vec(), vec![-1.0; 4]);
+}
