@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { copyFile, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,3 +44,5 @@ generatedPackage.sideEffects = ["./snippets/*"];
 generatedPackage.publishConfig = { access: "public" };
 
 await writeFile(generatedPackagePath, `${JSON.stringify(generatedPackage, null, 2)}\n`);
+await copyFile(path.resolve(jsDir, "README.md"), path.resolve(jsDir, "pkg", "README.md"));
+await copyFile(path.resolve(jsDir, "LICENSE"), path.resolve(jsDir, "pkg", "LICENSE"));

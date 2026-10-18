@@ -6,7 +6,11 @@ import { fileURLToPath } from "node:url";
 const scriptDir = fileURLToPath(new URL(".", import.meta.url));
 const jsDir = path.resolve(scriptDir, "..");
 const repoRoot = path.resolve(jsDir, "..");
-const sourceDirs = [path.resolve(repoRoot, "src"), path.resolve(jsDir, "src")];
+const sourceDirs = [
+  path.resolve(repoRoot, "src"),
+  path.resolve(repoRoot, "crates", "subtr-actor-training", "src"),
+  path.resolve(jsDir, "src"),
+];
 const sourceFiles = [
   path.resolve(repoRoot, "Cargo.toml"),
   path.resolve(repoRoot, "Cargo.lock"),
