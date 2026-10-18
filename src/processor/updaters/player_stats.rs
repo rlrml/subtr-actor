@@ -50,11 +50,11 @@ impl<'a> ReplayProcessor<'a> {
             if previous_value.is_none() && actor_spawned_this_frame {
                 continue;
             }
-            let delta = new_value - previous_value.unwrap_or(0);
+            let delta = bounded_counter_delta(previous_value.unwrap_or(0), new_value);
             let shot = (kind == PlayerStatEventKind::Shot)
                 .then(|| self.shot_event_metadata(frame.time, &player_id, is_team_0))
                 .flatten();
-            for _ in 0..delta.max(0) {
+            for _ in 0..delta {
                 let event = PlayerStatEvent {
                     time: frame.time,
                     frame: frame_index,

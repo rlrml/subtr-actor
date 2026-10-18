@@ -25,3 +25,19 @@ mod goals;
 mod mappings;
 mod player_stats;
 mod tracking;
+
+const MAX_COUNTER_EVENTS_PER_UPDATE: i32 = 256;
+
+fn bounded_counter_delta(previous: i32, current: i32) -> i32 {
+    let delta = current.saturating_sub(previous).max(0);
+    if delta > MAX_COUNTER_EVENTS_PER_UPDATE {
+        log::warn!(
+            "Clamping replicated counter expansion from {previous} to {current} to {MAX_COUNTER_EVENTS_PER_UPDATE} events"
+        );
+    }
+    delta.min(MAX_COUNTER_EVENTS_PER_UPDATE)
+}
+
+#[cfg(test)]
+#[path = "counter_tests.rs"]
+mod counter_tests;

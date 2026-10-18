@@ -82,7 +82,7 @@ impl<'a> ReplayProcessor<'a> {
                 .unwrap_or(counter_value);
             self.dodge_refreshed_counters
                 .insert(player_id.clone(), counter_value);
-            let delta = counter_value - previous_value;
+            let delta = bounded_counter_delta(previous_value, counter_value);
             if delta <= 0 {
                 continue;
             }
@@ -97,7 +97,7 @@ impl<'a> ReplayProcessor<'a> {
                         .get_normalized_player_position(&player_id)
                         .map(|position| vec_to_glam(&position).to_array()),
                     is_team_0,
-                    counter_value: previous_value + offset + 1,
+                    counter_value: counter_value - delta + offset + 1,
                 };
                 self.current_frame_dodge_refreshed_events
                     .push(event.clone());
