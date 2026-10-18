@@ -413,3 +413,27 @@ fn all_asset_fixture_event_timeline_scaffolds_match_full_timelines_without_stat_
         assert_event_timeline_scaffold_matches_full_timeline_without_stat_snapshots(&replay_path);
     }
 }
+
+#[test]
+fn timeline_collectors_refresh_same_count_player_replacement() {
+    let replay = parse_replay(STATS_TIMELINE_FIXTURE);
+    let mut processor = ReplayProcessor::new(&replay).unwrap();
+    processor.process_long_enough_to_get_actor_ids().unwrap();
+    let frame = &replay.network_frames.as_ref().unwrap().frames[0];
+    let mut full = StatsTimelineCollector::new();
+    let mut events = StatsTimelineEventCollector::new();
+    full.process_frame(&processor, frame, 0, 0.0).unwrap();
+    events.process_frame(&processor, frame, 0, 0.0).unwrap();
+    let replacement = boxcars::RemoteId::Steam(u64::MAX);
+    processor.team_zero[0] = replacement.clone();
+    full.process_frame(&processor, frame, 1, 0.1).unwrap();
+    events.process_frame(&processor, frame, 1, 0.1).unwrap();
+    assert_eq!(
+        full.replay_meta.as_ref().unwrap().team_zero[0].remote_id,
+        replacement
+    );
+    assert_eq!(
+        events.replay_meta.as_ref().unwrap().team_zero[0].remote_id,
+        replacement
+    );
+}

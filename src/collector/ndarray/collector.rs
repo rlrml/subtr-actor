@@ -1,6 +1,7 @@
 use super::builtins::*;
 use super::traits::*;
 use crate::collector::{Collector, TimeAdvance};
+use crate::stats::analysis_graph::replay_meta::ReplayMetaTracker;
 use crate::stats::analysis_graph::{AnalysisDependency, AnalysisGraph};
 use crate::stats::calculators::{FrameInput, ReplayFrameInputBuilder};
 use crate::*;
@@ -81,7 +82,7 @@ struct NDArrayAnalysisRuntime {
     dependencies: Vec<AnalysisDependency>,
     frame_input_builder: ReplayFrameInputBuilder,
     last_sample_time: Option<f32>,
-    last_replay_meta_player_count: Option<usize>,
+    replay_meta_tracker: ReplayMetaTracker,
 }
 
 impl NDArrayAnalysisRuntime {
@@ -93,7 +94,7 @@ impl NDArrayAnalysisRuntime {
             dependencies,
             frame_input_builder: ReplayFrameInputBuilder::default(),
             last_sample_time: None,
-            last_replay_meta_player_count: None,
+            replay_meta_tracker: ReplayMetaTracker::default(),
         }
     }
 
@@ -103,12 +104,11 @@ impl NDArrayAnalysisRuntime {
         frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<()> {
-        let player_count = processor.player_count();
-        if self.last_replay_meta_player_count != Some(player_count) {
+        if self.replay_meta_tracker.needs_refresh(processor) {
             self.graph
                 .ensure_dependencies(self.dependencies.iter().copied())?;
-            self.graph.on_replay_meta(&processor.get_replay_meta()?)?;
-            self.last_replay_meta_player_count = Some(player_count);
+            self.replay_meta_tracker
+                .refresh(processor, &mut self.graph)?;
         }
 
         let dt = self

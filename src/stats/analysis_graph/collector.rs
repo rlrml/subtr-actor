@@ -1,4 +1,5 @@
 use super::graph::AnalysisGraph;
+use crate::stats::analysis_graph::replay_meta::ReplayMetaTracker;
 use crate::stats::calculators::{FrameInput, ReplayFrameInputBuilder};
 use crate::*;
 
@@ -6,7 +7,7 @@ pub struct AnalysisNodeCollector {
     graph: AnalysisGraph,
     frame_input_builder: ReplayFrameInputBuilder,
     last_sample_time: Option<f32>,
-    last_replay_meta_player_count: Option<usize>,
+    replay_meta_tracker: ReplayMetaTracker,
     /// Optional game-time interval between interim event projections
     /// ([`AnalysisGraph::project_events_now`]); `None` (the default) leaves
     /// the single finalize-everything projection in `AnalysisGraph::finish`.
@@ -22,7 +23,7 @@ impl AnalysisNodeCollector {
             graph,
             frame_input_builder: ReplayFrameInputBuilder::default(),
             last_sample_time: None,
-            last_replay_meta_player_count: None,
+            replay_meta_tracker: ReplayMetaTracker::default(),
             projection_interval: None,
             last_projection_time: None,
         }
@@ -58,11 +59,8 @@ impl Collector for AnalysisNodeCollector {
         frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<TimeAdvance> {
-        let player_count = processor.player_count();
-        if self.last_replay_meta_player_count != Some(player_count) {
-            self.graph.on_replay_meta(&processor.get_replay_meta()?)?;
-            self.last_replay_meta_player_count = Some(player_count);
-        }
+        self.replay_meta_tracker
+            .refresh(processor, &mut self.graph)?;
 
         let dt = self
             .last_sample_time
