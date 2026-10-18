@@ -30,7 +30,7 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate BakkesMod helper scripts
         run: |
@@ -77,7 +77,7 @@ jobs:
         run: python bakkesmod/state-export/verify-dll-exports.py --rust-dll bakkesmod/state-export/build/Release/state_export.dll --plugin-dll bakkesmod/state-export/build/Release/StateExportPlugin.dll
 
       - name: Upload plugin artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: subtr-actor-bakkesmod-plugin
           if-no-files-found: error
@@ -87,7 +87,7 @@ jobs:
             bakkesmod/subtr-actor/build/Release/bakkesmod-install/**
 
       - name: Upload replay-to-training plugin artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: subtr-actor-replay-to-training-plugin
           if-no-files-found: error
@@ -97,7 +97,7 @@ jobs:
             bakkesmod/replay-to-training/build/Release/bakkesmod-install/**
 
       - name: Upload state-export plugin artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: subtr-actor-state-export-plugin
           if-no-files-found: error
