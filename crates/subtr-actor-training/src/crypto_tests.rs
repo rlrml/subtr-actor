@@ -1,6 +1,5 @@
 use aes::Aes256;
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::{BlockEncrypt, KeyInit};
+use aes::cipher::{Array, BlockCipherEncrypt, KeyInit};
 
 use super::{SAVE_DATA_AES_KEY, decrypt, encrypt};
 use crate::error::Error;
@@ -17,8 +16,8 @@ fn fips_197_aes256_vector() {
         0x8E, 0xA2, 0xB7, 0xCA, 0x51, 0x67, 0x45, 0xBF, 0xEA, 0xFC, 0x49, 0x90, 0x4B, 0x49, 0x60,
         0x89,
     ];
-    let cipher = Aes256::new(GenericArray::from_slice(&key));
-    let mut block = GenericArray::from(plaintext);
+    let cipher = Aes256::new_from_slice(&key).unwrap();
+    let mut block = Array::from(plaintext);
     cipher.encrypt_block(&mut block);
     assert_eq!(block.as_slice(), &expected);
 }
@@ -69,8 +68,8 @@ fn hardcoded_key_is_used() {
     // Encrypting one zero block with the save data key must differ from a
     // zero-key encryption of the same block.
     let with_save_key = encrypt(&[0u8; 16]);
-    let zero_key_cipher = Aes256::new(GenericArray::from_slice(&[0u8; 32]));
-    let mut block = GenericArray::from([0u8; 16]);
+    let zero_key_cipher = Aes256::new(&[0u8; 32].into());
+    let mut block = Array::from([0u8; 16]);
     zero_key_cipher.encrypt_block(&mut block);
     assert_ne!(with_save_key.as_slice(), block.as_slice());
     assert_eq!(SAVE_DATA_AES_KEY[0], 0xD7);
