@@ -1,4 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::HashSet;
+use std::sync::{Mutex, OnceLock};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -26,8 +28,8 @@ impl<'de> Deserialize<'de> for StatLabel {
 
         let owned = OwnedStatLabel::deserialize(deserializer)?;
         Ok(Self {
-            key: leak_string(owned.key),
-            value: leak_string(owned.value),
+            key: intern_string(owned.key),
+            value: intern_string(owned.value),
         })
     }
 }
@@ -185,6 +187,20 @@ impl LabeledFloatSums {
     }
 }
 
-fn leak_string(value: String) -> &'static str {
-    Box::leak(value.into_boxed_str())
+fn intern_string(value: String) -> &'static str {
+    static STRINGS: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
+    let mut strings = STRINGS
+        .get_or_init(Mutex::default)
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(existing) = strings.get(value.as_str()) {
+        return existing;
+    }
+    let value = Box::leak(value.into_boxed_str());
+    strings.insert(value);
+    value
 }
+
+#[cfg(test)]
+#[path = "labels_tests.rs"]
+mod tests;
