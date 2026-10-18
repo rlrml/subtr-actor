@@ -201,6 +201,7 @@ struct StatsProjectionCursors {
     rush: usize,
     touch: usize,
     whiff: usize,
+    beaten_to_ball: usize,
     wavedash: usize,
     speed_flip: usize,
     half_flip: usize,
@@ -532,6 +533,14 @@ impl StatsProjectionNode {
                 self.state.whiff.apply_event(event, frame);
             }
         }
+        let beaten_to_ball = ctx.get::<BeatenToBallCalculator>()?;
+        if live_play {
+            for event in
+                Self::events_since(&mut self.cursors.beaten_to_ball, beaten_to_ball.events())
+            {
+                self.state.whiff.apply_beaten_to_ball_event(event);
+            }
+        }
         let wavedash = ctx.get::<WavedashCalculator>()?;
         if live_play {
             for event in Self::events_since(&mut self.cursors.wavedash, wavedash.events()) {
@@ -713,6 +722,7 @@ impl AnalysisNode for StatsProjectionNode {
             rush_dependency(),
             touch_dependency(),
             whiff_dependency(),
+            beaten_to_ball_dependency(),
             wavedash_dependency(),
             speed_flip_dependency(),
             half_flip_dependency(),

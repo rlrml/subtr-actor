@@ -91,6 +91,7 @@ const LEGACY_EVENT_BUCKETS: readonly LegacyEventBucket[] = [
   { field: "half_volley", stream: "half_volley", kind: "half_volley" },
   { field: "wavedash", stream: "wavedash", kind: "wavedash" },
   { field: "whiff", stream: "whiff", kind: "whiff" },
+  { field: "beaten_to_ball", stream: "beaten_to_ball", kind: "beaten_to_ball" },
   { field: "powerslide", stream: "powerslide", kind: "powerslide" },
   { field: "touch", stream: "touch", kind: "touch" },
   { field: "boost_pickups", stream: "boost_pickups", kind: "boost_pickup" },
