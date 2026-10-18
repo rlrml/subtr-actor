@@ -1009,10 +1009,17 @@ export class ReplayPlayer extends EventTarget {
     this.actorManager.resetWheelTracking();
   }
 
-  /** Where playback stops: the last segment's start if skips run to the end. */
+  /**
+   * Where playback stops: the last segment's start if skips run to the end.
+   * Never past the adapter's duration, which is shorter than the ReplayModel's
+   * when timelineCompaction removes gaps.
+   */
   private getPlaybackEndTime(): number {
     return this.replay
-      ? getReplayPlaybackEndTime(this.replay.duration, this.getTimelineSegments())
+      ? Math.min(
+          this.duration,
+          getReplayPlaybackEndTime(this.replay.duration, this.getTimelineSegments()),
+        )
       : this.duration;
   }
 
