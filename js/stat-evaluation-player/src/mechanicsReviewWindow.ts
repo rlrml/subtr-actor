@@ -64,7 +64,7 @@ export interface MechanicsReviewWindowOptions {
   loadReplayBundleForDisplay(
     source: MechanicsReviewReplaySource,
     bundlePromise: Promise<ReplayLoadBundle>,
-  ): Promise<void>;
+  ): Promise<boolean>;
   applyClipPerspective(options: {
     playerId: string;
     ballCam?: MechanicsReviewBallCamMode;
@@ -384,7 +384,11 @@ export class MechanicsReviewWindowController {
       if (!replayPlayer || review.currentReplayId !== item.replay) {
         const source = this.options.replayLoads.createReplaySource(item, review);
         const replayBundlePromise = this.options.replayLoads.loadBundle(item, review);
-        await this.options.loadReplayBundleForDisplay(source, replayBundlePromise);
+        const displayed = await this.options.loadReplayBundleForDisplay(
+          source,
+          replayBundlePromise,
+        );
+        if (!displayed) return;
         review.currentReplayId = item.replay;
       }
       this.options.replayLoads.preload(review, index);

@@ -15,7 +15,7 @@ export interface InitialReplayLoadsOptions {
   loadReplayBundleForDisplay(
     source: ReplayInputSource,
     bundlePromise: Promise<ReplayLoadBundle>,
-  ): Promise<void>;
+  ): Promise<boolean>;
   getMechanicsReviewController(): MechanicsReviewWindowController | null;
   showMechanicsReviewWindow(): void;
 }
