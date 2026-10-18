@@ -269,6 +269,7 @@ pub fn clip_replay_range(
 
 /// Extract a clip centered on a region of interest `[region_start, region_end]`,
 /// padded with `lead_in` warm-up frames before it and `tail` frames after.
+/// The region must be ordered and start within the replay. Its end and padding are clamped.
 ///
 /// This is the ergonomic entry point for tests: pick the frames around an event
 /// and get back a clip whose region of interest is preceded by real frames, so
@@ -287,6 +288,9 @@ pub fn clip_replay_around(
         .frames
         .len();
 
+    if region_start > region_end || region_start >= frame_count {
+        return SubtrActorError::new_result(SubtrActorErrorVariant::FrameIndexOutOfBounds);
+    }
     let real_start = region_start.saturating_sub(lead_in);
     let real_end = region_end
         .saturating_add(tail)
@@ -296,17 +300,24 @@ pub fn clip_replay_around(
 }
 
 /// Index of the first frame whose `time` is at or after `time` (the last frame
-/// if every frame is earlier).
+/// if every frame is earlier). Rejects empty replays and nonfinite times.
 pub fn frame_index_at_time(replay: &boxcars::Replay, time: f32) -> SubtrActorResult<usize> {
+    if !time.is_finite() {
+        return SubtrActorError::new_result(SubtrActorErrorVariant::InvalidReplayTime { time });
+    }
     let frames = &replay
         .network_frames
         .as_ref()
         .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoNetworkFrames))?
         .frames;
+    let last_index = frames
+        .len()
+        .checked_sub(1)
+        .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::FrameIndexOutOfBounds))?;
     Ok(frames
         .iter()
         .position(|frame| frame.time >= time)
-        .unwrap_or(frames.len().saturating_sub(1)))
+        .unwrap_or(last_index))
 }
 
 /// [`clip_replay_around`], but with the region of interest given in replay
@@ -322,6 +333,12 @@ pub fn clip_replay_around_times(
 ) -> SubtrActorResult<ReplayClip> {
     let region_start = frame_index_at_time(replay, region_start_time)?;
     let region_end = frame_index_at_time(replay, region_end_time)?;
+    if region_start_time > region_end_time {
+        return SubtrActorError::new_result(SubtrActorErrorVariant::InvalidClipTimeRange {
+            start_time: region_start_time,
+            end_time: region_end_time,
+        });
+    }
     clip_replay_around(replay, region_start, region_end, lead_in, tail)
 }
 
