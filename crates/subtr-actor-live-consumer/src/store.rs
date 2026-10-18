@@ -78,7 +78,15 @@ impl LiveStateStore {
         self.last_seq = Some(seq);
 
         let applied = match message {
-            ServerMessage::ServerInfo { .. } => Applied::Info,
+            ServerMessage::ServerInfo { .. } => {
+                // `ServerInfo` opens every subscription, so state left from a
+                // previous connection (which may have missed a `MatchEnd`) is
+                // dropped; the prologue that follows re-establishes it.
+                let last_seq = self.last_seq;
+                self.reset();
+                self.last_seq = last_seq;
+                Applied::Info
+            }
             ServerMessage::MatchStart { meta, .. } => {
                 self.set_meta(meta);
                 Applied::MatchStart

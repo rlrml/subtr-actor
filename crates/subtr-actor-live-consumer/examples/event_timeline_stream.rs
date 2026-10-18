@@ -175,6 +175,10 @@ impl TimelinePrinter {
                 eprintln!("server restarted; state reset");
                 self.reset();
             }
+            DriverOutput::Resubscribed => {
+                eprintln!("reconnected; state reset");
+                self.reset();
+            }
         }
     }
 
