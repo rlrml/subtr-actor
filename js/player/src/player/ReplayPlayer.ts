@@ -893,7 +893,7 @@ export class ReplayPlayer extends EventTarget {
     }
     this.controls.dispose();
     if (this.effectsEnabled) {
-      this.effectsManager.reset();
+      this.effectsManager.dispose();
     }
     this.hitboxManager.dispose();
     this.actorManager.reset();
@@ -920,6 +920,7 @@ export class ReplayPlayer extends EventTarget {
       .waitForBallModel()
       .catch(() => false)
       .then(() => {
+        if (this.disposed) return;
         if (this.effectsEnabled) {
           try {
             this.effectsManager.setRenderContext(this.renderer, this.camera);

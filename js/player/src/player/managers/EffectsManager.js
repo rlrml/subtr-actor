@@ -502,8 +502,6 @@ function getExplosionObjects() {
 // Uses MeshBasicMaterial only (no shader compilation issues)
 // ===========================================
 
-let _simplifiedExplosionPool = null;
-
 class SimplifiedExplosionPool {
   constructor(scene, renderer, camera, maxExplosions = 2) {
     this.scene = scene;
@@ -799,49 +797,10 @@ class SimplifiedExplosionPool {
   }
 }
 
-// Helper to get/create simplified explosion pool
-function getSimplifiedExplosionPool(scene, renderer = null, camera = null) {
-  if (_simplifiedExplosionPool && _simplifiedExplosionPool.scene !== scene) {
-    _simplifiedExplosionPool.dispose?.();
-    _simplifiedExplosionPool = null;
-  }
-  if (!_simplifiedExplosionPool) {
-    _simplifiedExplosionPool = new SimplifiedExplosionPool(scene, renderer, camera);
-  }
-  // Warmup if renderer/camera are provided and not already warmed up
-  if (renderer && camera && !_simplifiedExplosionPool.warmedUp) {
-    _simplifiedExplosionPool.renderer = renderer;
-    _simplifiedExplosionPool.camera = camera;
-    _simplifiedExplosionPool.warmup();
-  }
-  return _simplifiedExplosionPool;
-}
-
-// Call this from GameEngine to pre-warm explosion shaders
-export function warmupExplosionPool(scene, renderer, camera) {
-  getSimplifiedExplosionPool(scene, renderer, camera);
-  getGoalExplosionPool(scene, renderer, camera);
-}
-
-// Reset explosion pools - call this when navigating away or before re-initialization
-// This fixes the issue where pools retain stale scene/renderer references after React Router navigation
-export function resetExplosionPools() {
-  if (_simplifiedExplosionPool) {
-    _simplifiedExplosionPool.dispose?.();
-    _simplifiedExplosionPool = null;
-  }
-  if (_goalExplosionPool) {
-    _goalExplosionPool.dispose?.();
-    _goalExplosionPool = null;
-  }
-}
-
 // ===========================================
 // GOAL EXPLOSION POOL - Team-colored spectacular goal celebrations
 // Uses same optimizations as SimplifiedExplosionPool (no PointLight, AdditiveBlending)
 // ===========================================
-
-let _goalExplosionPool = null;
 
 // Team colors
 const TEAM_COLORS = {
@@ -1161,20 +1120,24 @@ class GoalExplosionPool {
       this.resetExplosion(explosion);
     }
 
-    // Swap materials to team color
+    // Swap materials to team color, disposing the previous per-mesh clones
     const mats = explosion.materials[team] || explosion.materials[0];
+    const swapClone = (mesh, base) => {
+      mesh.material.dispose();
+      mesh.material = base.clone();
+    };
     explosion.core.material = mats.core;
-    explosion.core2.material = mats.core.clone();
-    explosion.core3.material = mats.sphere.clone();
+    swapClone(explosion.core2, mats.core);
+    swapClone(explosion.core3, mats.sphere);
     explosion.sphere.material = mats.sphere;
     for (const ring of explosion.rings) {
-      ring.mesh.material = mats.ring.clone();
+      swapClone(ring.mesh, mats.ring);
     }
     for (const ray of explosion.rays) {
-      ray.mesh.material = mats.rays.clone();
+      swapClone(ray.mesh, mats.rays);
     }
     for (const p of explosion.particles) {
-      p.mesh.material = mats.particles.clone();
+      swapClone(p.mesh, mats.particles);
     }
 
     explosion.active = true;
@@ -1381,44 +1344,21 @@ class GoalExplosionPool {
   dispose() {
     for (const explosion of this.explosions) {
       this.scene.remove(explosion.container);
-      // Dispose all materials for both teams
+      // Both teams' base materials plus the per-mesh clones
+      const materials = new Set();
       for (const teamMats of Object.values(explosion.materials)) {
-        teamMats.core.dispose();
-        teamMats.sphere.dispose();
-        teamMats.ring.dispose();
-        teamMats.particles.dispose();
-        teamMats.rays.dispose();
+        Object.values(teamMats).forEach((material) => materials.add(material));
       }
+      explosion.container.traverse((object) => {
+        if (object.material) materials.add(object.material);
+      });
+      materials.forEach((material) => material.dispose());
     }
     this.coreGeo.dispose();
     this.sphereGeo.dispose();
     this.ringGeo.dispose();
     this.particleGeo.dispose();
     this.rayGeo.dispose();
-  }
-}
-
-function getGoalExplosionPool(scene, renderer = null, camera = null) {
-  if (_goalExplosionPool && _goalExplosionPool.scene !== scene) {
-    _goalExplosionPool.dispose?.();
-    _goalExplosionPool = null;
-  }
-  if (!_goalExplosionPool) {
-    _goalExplosionPool = new GoalExplosionPool(scene, renderer, camera);
-  }
-  if (renderer && camera && !_goalExplosionPool.warmedUp) {
-    _goalExplosionPool.renderer = renderer;
-    _goalExplosionPool.camera = camera;
-    _goalExplosionPool.warmup();
-  }
-  return _goalExplosionPool;
-}
-
-// Export for use in EffectsManager
-export function triggerGoalExplosionFromPool(scene, position, team) {
-  const pool = getGoalExplosionPool(scene);
-  if (pool) {
-    pool.trigger(position, team);
   }
 }
 
@@ -3494,6 +3434,8 @@ export class EffectsManager {
     this.boostTrails = new Map(); // carActorId -> BoostTrail
     this.supersonicTrails = new Map(); // carActorId -> SupersonicTrail
     this.ballTrail = null; // Single ball trail
+    this.simplifiedExplosionPool = null;
+    this.goalExplosionPool = null;
 
     // Pre-initialize explosion textures to avoid freeze on first explosion
     initExplosionTextures();
@@ -3507,7 +3449,45 @@ export class EffectsManager {
     this.renderer = renderer;
     this.camera = camera;
     // Pre-warm explosion pools now that we have renderer/camera
-    warmupExplosionPool(this.scene, renderer, camera);
+    this.getSimplifiedExplosionPool();
+    this.getGoalExplosionPool();
+  }
+
+  getSimplifiedExplosionPool() {
+    if (!this.simplifiedExplosionPool) {
+      this.simplifiedExplosionPool = new SimplifiedExplosionPool(
+        this.scene,
+        this.renderer,
+        this.camera,
+      );
+    }
+    return this.warmExplosionPool(this.simplifiedExplosionPool);
+  }
+
+  getGoalExplosionPool() {
+    if (!this.goalExplosionPool) {
+      this.goalExplosionPool = new GoalExplosionPool(this.scene, this.renderer, this.camera);
+    }
+    return this.warmExplosionPool(this.goalExplosionPool);
+  }
+
+  warmExplosionPool(pool) {
+    if (this.renderer && this.camera && !pool.warmedUp) {
+      pool.renderer = this.renderer;
+      pool.camera = this.camera;
+      pool.warmup();
+    }
+    return pool;
+  }
+
+  dispose() {
+    this.reset();
+    this.simplifiedExplosionPool?.dispose();
+    this.simplifiedExplosionPool = null;
+    this.goalExplosionPool?.dispose();
+    this.goalExplosionPool = null;
+    this.renderer = null;
+    this.camera = null;
   }
 
   reset() {
@@ -3569,9 +3549,7 @@ export class EffectsManager {
   }
 
   clearGoalExplosions() {
-    if (_goalExplosionPool) {
-      _goalExplosionPool.clearActive();
-    }
+    this.goalExplosionPool?.clearActive();
     for (const explosion of this.explosions.active) {
       explosion.removeFromScene(this.scene);
     }
@@ -3695,14 +3673,12 @@ export class EffectsManager {
   triggerGoalExplosion(position, team) {
     // Use the goal explosion pool with team colors (blue = 0, orange = 1)
     // Pass renderer/camera to ensure warmup happens if not already done
-    const pool = getGoalExplosionPool(this.scene, this.renderer, this.camera);
-    if (pool) {
-      // Update camera reference for billboarding
-      if (this.camera) {
-        pool.camera = this.camera;
-      }
-      pool.trigger(position, team);
+    const pool = this.getGoalExplosionPool();
+    // Update camera reference for billboarding
+    if (this.camera) {
+      pool.camera = this.camera;
     }
+    pool.trigger(position, team);
   }
 
   /**
@@ -3719,10 +3695,7 @@ export class EffectsManager {
     }
 
     // Use the simplified explosion pool (better performance, no shader issues)
-    const pool = getSimplifiedExplosionPool(this.scene);
-    if (pool) {
-      pool.trigger(position);
-    }
+    this.getSimplifiedExplosionPool().trigger(position);
   }
 
   update(delta, isPlaying = true, playbackSpeed = 1.0) {
@@ -3734,14 +3707,10 @@ export class EffectsManager {
 
     // Update simplified explosion pool (new performant system)
     // Explosions should always animate even when paused
-    if (_simplifiedExplosionPool) {
-      _simplifiedExplosionPool.update(scaledDelta);
-    }
+    this.simplifiedExplosionPool?.update(scaledDelta);
 
     // Update goal explosion pool (team-colored goal explosions)
-    if (_goalExplosionPool) {
-      _goalExplosionPool.update(scaledDelta);
-    }
+    this.goalExplosionPool?.update(scaledDelta);
 
     // NOTE: Legacy _explosionPool is deprecated and no longer updated
     // The old ExplosionPool class is kept in the codebase for reference only
