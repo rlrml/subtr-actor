@@ -99,6 +99,7 @@ fn player_sort_key(player: &PlayerId) -> (u8, u64, String) {
         boxcars::RemoteId::Xbox(id) => (5, *id, String::new()),
         boxcars::RemoteId::QQ(id) => (6, *id, String::new()),
         boxcars::RemoteId::Epic(id) => (7, 0, id.clone()),
+        other => (u8::MAX, 0, format!("{other:?}")),
     }
 }
 
