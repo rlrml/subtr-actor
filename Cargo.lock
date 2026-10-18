@@ -1818,6 +1818,7 @@ dependencies = [
  "boxcars",
  "numpy",
  "pyo3",
+ "serde",
  "serde_json",
  "subtr-actor",
 ]

@@ -8,6 +8,7 @@ rust-version.workspace = true
 [dependencies]
 boxcars.workspace = true
 numpy = "0.30.0"
+serde = "1.0"
 serde_json = "1.0"
 
 [dependencies.subtr-actor]

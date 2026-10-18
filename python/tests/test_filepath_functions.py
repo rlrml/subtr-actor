@@ -20,6 +20,11 @@ def test_get_ndarray_with_info_from_replay_filepath():
     assert "replay_meta" in meta
 
 
+def test_missing_replay_raises_file_not_found():
+    with pytest.raises(FileNotFoundError, match="missing.replay"):
+        subtr_actor.get_summed_stats(os.path.join(test_directory, "missing.replay"))
+
+
 def test_get_stats_module_names():
     module_names = subtr_actor.get_stats_module_names()
 
