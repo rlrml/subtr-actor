@@ -54,7 +54,7 @@ boxcars.workspace = true
 derive-new = "0.7.0"
 erased-serde = "0.4.6"
 float-ord = "0.3.2"
-glam = "0.31.0"
+glam = "0.34.1"
 log = "0.4.27"
 ndarray = "0.17.2"
 paste = { package = "pastey", version = "0.2.3" }
