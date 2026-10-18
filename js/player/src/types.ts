@@ -478,16 +478,13 @@ export type ReplayPlayerPluginFactory = () => ReplayPlayerPlugin;
 export type ReplayPlayerPluginDefinition = ReplayPlayerPlugin | ReplayPlayerPluginFactory;
 
 export type ReplayTimelineEventSource =
-  | ReplayTimelineEvent[]
-  | ((context: ReplayPlayerPluginContext) => ReplayTimelineEvent[]);
+  ReplayTimelineEvent[] | ((context: ReplayPlayerPluginContext) => ReplayTimelineEvent[]);
 
 export type ReplayTimelineRangeSource =
-  | ReplayTimelineRange[]
-  | ((context: ReplayPlayerPluginContext) => ReplayTimelineRange[]);
+  ReplayTimelineRange[] | ((context: ReplayPlayerPluginContext) => ReplayTimelineRange[]);
 
 export type ReplayTimelineGraphSource =
-  | ReplayTimelineGraph[]
-  | ((context: ReplayPlayerPluginContext) => ReplayTimelineGraph[]);
+  ReplayTimelineGraph[] | ((context: ReplayPlayerPluginContext) => ReplayTimelineGraph[]);
 
 export interface ReplayPlayerOptions {
   autoplay?: boolean;

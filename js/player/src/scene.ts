@@ -442,8 +442,7 @@ function createHitboxOverlay(hitbox: ReplayHitboxSpec, lineColor: string): THREE
 
 export function setHitboxOverlayOnlyMode(hitbox: THREE.Object3D, enabled: boolean): void {
   const fill = hitbox.getObjectByName("hitbox-overlay-fill") as
-    | THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
-    | undefined;
+    THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | undefined;
   if (fill) {
     fill.material.opacity = enabled ? HITBOX_ONLY_FILL_OPACITY : HITBOX_OVERLAY_FILL_OPACITY;
   }

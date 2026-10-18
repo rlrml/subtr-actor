@@ -33,10 +33,10 @@
   "author": "Ivan Malison <ivanmalison@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
-    "eslint": "^9.39.4",
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
     "globals": "^16.5.0",
-    "prettier": "^3.8.3",
-    "typescript-eslint": "^8.59.4"
+    "prettier": "^3.9.10",
+    "typescript-eslint": "^8.71.2"
   }
 }

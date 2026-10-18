@@ -18,13 +18,7 @@ const ADVANCEMENT_ARROW_MIN_LENGTH = 48;
 export type TouchOverlayMode = "markers" | "advancement";
 
 export type TouchOverlayColorMode =
-  | "team"
-  | "intention"
-  | "kind"
-  | "height_band"
-  | "surface"
-  | "dodge_state"
-  | "flag";
+  "team" | "intention" | "kind" | "height_band" | "surface" | "dodge_state" | "flag";
 
 export const TOUCH_OVERLAY_COLOR_MODE_ORDER: TouchOverlayColorMode[] = [
   "team",

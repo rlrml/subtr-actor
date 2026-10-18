@@ -41,8 +41,7 @@ export function isReviewLabelsEndpoint(endpoint: string): boolean {
 }
 
 export type MechanicsReviewPlaybackBound =
-  | { kind: "time"; value: number }
-  | { kind: "frame"; value: number };
+  { kind: "time"; value: number } | { kind: "frame"; value: number };
 
 export type MechanicsReviewTimeBase = "playback" | "rawReplay";
 

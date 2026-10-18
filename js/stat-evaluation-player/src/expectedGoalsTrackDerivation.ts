@@ -70,11 +70,9 @@ export function createExpectedGoalsTrackDerivedStatsAccumulator(
   return {
     applyFrame(frame): void {
       const teamZero = teamCursors.get(true)?.sample(frame.frame_number) as
-        | ExpectedGoalsTeamStats
-        | undefined;
+        ExpectedGoalsTeamStats | undefined;
       const teamOne = teamCursors.get(false)?.sample(frame.frame_number) as
-        | ExpectedGoalsTeamStats
-        | undefined;
+        ExpectedGoalsTeamStats | undefined;
       if (teamZero) Object.assign(frame.team_zero.expected_goals, teamZero);
       if (teamOne) Object.assign(frame.team_one.expected_goals, teamOne);
 
