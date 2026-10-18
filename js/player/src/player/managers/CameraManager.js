@@ -89,7 +89,8 @@ export class CameraManager {
     this.controls.enabled = true;
 
     // Disable right-click context menu
-    domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+    this.onContextMenu = (e) => e.preventDefault();
+    domElement.addEventListener("contextmenu", this.onContextMenu);
 
     // Following mode state (for collab - following another viewer's camera)
     this.isFollowingViewer = false;
@@ -1253,6 +1254,7 @@ export class CameraManager {
     this.controls.dispose();
 
     // Clean up event listeners
+    this.domElement.removeEventListener("contextmenu", this.onContextMenu);
     if (this.ballOrbitScrollHandler) {
       this.domElement.removeEventListener("wheel", this.ballOrbitScrollHandler);
     }
