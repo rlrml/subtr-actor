@@ -457,7 +457,8 @@ export class ReplayPlayer extends EventTarget {
       }
     }
 
-    this.seekInternal(options.currentTime ?? 0);
+    const startTime = options.currentTime ?? 0;
+    this.seekInternal(Number.isFinite(startTime) ? startTime : 0);
     this.readyResolved = false;
     this.ready = this.prepareReplayAssets().then(() => {
       if (generation === this.replaceGeneration) this.markReady();
@@ -995,6 +996,7 @@ export class ReplayPlayer extends EventTarget {
   }
 
   private seekInternal(time: number): void {
+    if (!Number.isFinite(time)) return;
     this.currentTime = THREE.MathUtils.clamp(time, 0, this.duration);
     // Sync the THREE animation system (if active) to the new time, and reset
     // trackers that work off frame-to-frame deltas so they don't see the jump:
