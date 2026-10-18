@@ -287,13 +287,20 @@ build_global_feature_adder!(
 );
 
 /// Global feature adder that samples an interpolated ball rigid body.
-#[derive(derive_new::new)]
 pub struct InterpolatedBallRigidBodyNoVelocities<F> {
     close_enough_to_frame_time: f32,
     _zero: std::marker::PhantomData<F>,
 }
 
 impl<F> InterpolatedBallRigidBodyNoVelocities<F> {
+    /// Creates the feature adder with the tolerated snap-to-frame threshold.
+    pub fn new(close_enough_to_frame_time: f32) -> Self {
+        Self {
+            close_enough_to_frame_time,
+            _zero: std::marker::PhantomData,
+        }
+    }
+
     /// Creates the feature adder with the tolerated snap-to-frame threshold.
     pub fn arc_new(close_enough_to_frame_time: f32) -> Arc<Self> {
         Arc::new(Self::new(close_enough_to_frame_time))
@@ -384,13 +391,20 @@ build_player_feature_adder!(
 );
 
 /// Per-player feature adder that samples an interpolated car rigid body.
-#[derive(derive_new::new)]
 pub struct InterpolatedPlayerRigidBodyNoVelocities<F> {
     close_enough_to_frame_time: f32,
     _zero: std::marker::PhantomData<F>,
 }
 
 impl<F> InterpolatedPlayerRigidBodyNoVelocities<F> {
+    /// Creates the feature adder with the tolerated snap-to-frame threshold.
+    pub fn new(close_enough_to_frame_time: f32) -> Self {
+        Self {
+            close_enough_to_frame_time,
+            _zero: std::marker::PhantomData,
+        }
+    }
+
     /// Creates the feature adder with the tolerated snap-to-frame threshold.
     pub fn arc_new(close_enough_to_frame_time: f32) -> Arc<Self> {
         Arc::new(Self::new(close_enough_to_frame_time))
