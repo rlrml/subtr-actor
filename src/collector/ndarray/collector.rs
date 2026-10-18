@@ -65,6 +65,7 @@ impl ReplayMetaWithHeaders {
 }
 
 /// Collects replay frames into a dense 2D feature matrix.
+/// Per-player columns require a stable player order throughout collection.
 pub struct NDArrayCollector<F> {
     feature_adders: NDArrayFeatureAdders<F>,
     player_feature_adders: NDArrayPlayerFeatureAdders<F>,
@@ -226,8 +227,6 @@ impl<F> NDArrayCollector<F> {
         self,
     ) -> SubtrActorResult<(ReplayMetaWithHeaders, ndarray::Array2<F>)> {
         let features_per_row = self.try_get_frame_feature_count()?;
-        let expected_length = features_per_row * self.frames_added;
-        assert!(self.data.len() == expected_length);
         let column_headers = self.get_column_headers();
         Ok((
             ReplayMetaWithHeaders {
@@ -282,7 +281,24 @@ impl<F> NDArrayCollector<F> {
     }
 
     fn maybe_set_replay_meta(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
-        if self.replay_meta.is_none() {
+        if let Some(replay_meta) = &self.replay_meta {
+            if !self.player_feature_adders.is_empty()
+                && !replay_meta
+                    .player_order()
+                    .map(|player| &player.remote_id)
+                    .eq(processor.iter_player_ids_in_order())
+            {
+                return SubtrActorError::new_result(
+                    SubtrActorErrorVariant::NDArrayPlayerOrderChanged {
+                        expected: replay_meta
+                            .player_order()
+                            .map(|player| player.remote_id.clone())
+                            .collect(),
+                        found: processor.iter_player_ids_in_order().cloned().collect(),
+                    },
+                );
+            }
+        } else {
             self.replay_meta = Some(processor.get_replay_meta()?);
         }
         Ok(())

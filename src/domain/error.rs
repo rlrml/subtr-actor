@@ -127,6 +127,14 @@ pub enum SubtrActorErrorVariant {
     #[error(transparent)]
     NDArrayShapeError(#[from] ::ndarray::ShapeError),
 
+    #[error(
+        "NDArray player columns changed during collection. Expected: {expected:?}, found: {found:?}"
+    )]
+    NDArrayPlayerOrderChanged {
+        expected: Vec<PlayerId>,
+        found: Vec<PlayerId>,
+    },
+
     #[error("{0:?} was not a recognized feature adder")]
     UnknownFeatureAdderName(String),
 

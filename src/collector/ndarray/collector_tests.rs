@@ -9,6 +9,104 @@ use std::path::Path;
 const NDARRAY_ANALYSIS_FIXTURE: &str = "assets/post-eac-ranked-doubles-2026-04-28.replay";
 const NDARRAY_DUEL_FIXTURE: &str = "assets/post-eac-ranked-duel-2026-04-28-a.replay";
 
+#[test]
+fn ndarray_reports_late_player_discovery_in_substitution_replay() {
+    let replay = parse_replay("assets/old-ballchasing-midfield-car.replay");
+    let error = NDArrayCollector::<f32>::from_strings(&["CurrentTime"], &["PlayerBoost"])
+        .unwrap()
+        .process_replay(&replay)
+        .err()
+        .expect("late players cannot be appended to existing per-player columns");
+    assert!(matches!(
+        error.variant,
+        SubtrActorErrorVariant::NDArrayPlayerOrderChanged { .. }
+    ));
+}
+
+#[test]
+fn ndarray_rejects_changed_player_columns_before_appending_a_row() {
+    let replay = parse_replay(NDARRAY_ANALYSIS_FIXTURE);
+    let frame = &replay.network_frames.as_ref().unwrap().frames[0];
+    for change in 0..3 {
+        let mut processor = ReplayProcessor::new(&replay).unwrap();
+        let mut collector =
+            NDArrayCollector::<f32>::from_strings(&["CurrentTime"], &["PlayerBoost"]).unwrap();
+        collector
+            .process_frame(&processor, frame, 0, frame.time)
+            .unwrap();
+        match change {
+            0 => processor.team_zero.push(boxcars::RemoteId::Steam(u64::MAX)),
+            1 => processor.team_zero[0] = boxcars::RemoteId::Steam(u64::MAX),
+            _ => std::mem::swap(&mut processor.team_zero, &mut processor.team_one),
+        }
+        let error = collector
+            .process_frame(&processor, frame, 1, frame.time + 1.0)
+            .err()
+            .unwrap();
+        assert!(matches!(
+            error.variant,
+            SubtrActorErrorVariant::NDArrayPlayerOrderChanged { .. }
+        ));
+        let (meta, array) = collector.get_meta_and_ndarray().unwrap();
+        assert_eq!(array.nrows(), 1);
+        assert_eq!(array.ncols(), meta.headers_vec().len());
+    }
+}
+
+#[test]
+fn ndarray_global_columns_allow_late_players() {
+    let replay = parse_replay(NDARRAY_ANALYSIS_FIXTURE);
+    let frame = &replay.network_frames.as_ref().unwrap().frames[0];
+    let mut processor = ReplayProcessor::new(&replay).unwrap();
+    let mut collector = NDArrayCollector::<f32>::from_strings(&["CurrentTime"], &[]).unwrap();
+    collector
+        .process_frame(&processor, frame, 0, frame.time)
+        .unwrap();
+    processor.team_zero.push(boxcars::RemoteId::Steam(u64::MAX));
+    collector
+        .process_frame(&processor, frame, 1, frame.time + 1.0)
+        .unwrap();
+    assert_eq!(collector.get_ndarray().unwrap().shape(), &[2, 1]);
+}
+
+#[test]
+fn ndarray_reports_shape_error_for_incorrect_feature_width() {
+    struct MissingFeature;
+    impl FeatureAdder<f32> for MissingFeature {
+        fn get_column_headers(&self) -> &[&str] {
+            &["missing"]
+        }
+
+        fn add_features(
+            &self,
+            _: &dyn ProcessorView,
+            _: &boxcars::Frame,
+            _: usize,
+            _: f32,
+            _: &mut Vec<f32>,
+        ) -> SubtrActorResult<()> {
+            Ok(())
+        }
+    }
+
+    let replay = parse_replay(NDARRAY_ANALYSIS_FIXTURE);
+    let frame = &replay.network_frames.as_ref().unwrap().frames[0];
+    let processor = ReplayProcessor::new(&replay).unwrap();
+    let mut collector = NDArrayCollector::new(
+        vec![NDArrayFeatureAdder::plain(std::sync::Arc::new(
+            MissingFeature,
+        ))],
+        vec![],
+    );
+    collector
+        .process_frame(&processor, frame, 0, frame.time)
+        .unwrap();
+    assert!(matches!(
+        collector.get_ndarray().unwrap_err().variant,
+        SubtrActorErrorVariant::NDArrayShapeError(_)
+    ));
+}
+
 #[derive(Default)]
 struct SharedAnalysisState {
     evaluations: usize,
