@@ -98,9 +98,11 @@ unsafe fn with_pack_mut(
 /// `replay_to_training_pack_destroy`. Never returns null.
 #[unsafe(no_mangle)]
 pub extern "C" fn replay_to_training_pack_create() -> *mut TrPack {
-    Box::into_raw(Box::new(TrPack {
-        inner: RecorderPack::new(),
-    }))
+    crate::ffi_guard(std::ptr::null_mut(), || {
+        Box::into_raw(Box::new(TrPack {
+            inner: RecorderPack::new(),
+        }))
+    })
 }
 
 /// Opens an existing `.tem` file so new shots append to it.
@@ -113,17 +115,19 @@ pub extern "C" fn replay_to_training_pack_create() -> *mut TrPack {
 /// `path` must be null or a valid NUL-terminated C string.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_pack_open(path: *const c_char) -> *mut TrPack {
-    let Some(path) = (unsafe { utf8_arg(path) }) else {
-        set_global_error("open: path is null or not valid UTF-8".to_string());
-        return std::ptr::null_mut();
-    };
-    match RecorderPack::open(&PathBuf::from(path)) {
-        Ok(inner) => Box::into_raw(Box::new(TrPack { inner })),
-        Err(error) => {
-            set_global_error(error);
-            std::ptr::null_mut()
+    crate::ffi_guard(std::ptr::null_mut(), || {
+        let Some(path) = (unsafe { utf8_arg(path) }) else {
+            set_global_error("open: path is null or not valid UTF-8".to_string());
+            return std::ptr::null_mut();
+        };
+        match RecorderPack::open(&PathBuf::from(path)) {
+            Ok(inner) => Box::into_raw(Box::new(TrPack { inner })),
+            Err(error) => {
+                set_global_error(error);
+                std::ptr::null_mut()
+            }
         }
-    }
+    })
 }
 
 /// Destroys a pack handle allocated by `replay_to_training_pack_create` or
@@ -135,9 +139,11 @@ pub unsafe extern "C" fn replay_to_training_pack_open(path: *const c_char) -> *m
 /// not yet destroyed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_pack_destroy(pack: *mut TrPack) {
-    if !pack.is_null() {
-        drop(unsafe { Box::from_raw(pack) });
-    }
+    crate::ffi_guard((), || {
+        if !pack.is_null() {
+            drop(unsafe { Box::from_raw(pack) });
+        }
+    })
 }
 
 /// Sets the pack display name. Returns 0 on success.
@@ -151,8 +157,10 @@ pub unsafe extern "C" fn replay_to_training_pack_set_name(
     pack: *mut TrPack,
     name: *const c_char,
 ) -> i32 {
-    let name = unsafe { utf8_arg(name) }.map(str::to_string);
-    unsafe { with_pack_mut(pack, |inner| inner.set_name(name.as_deref())) }
+    crate::ffi_guard(-1, || {
+        let name = unsafe { utf8_arg(name) }.map(str::to_string);
+        unsafe { with_pack_mut(pack, |inner| inner.set_name(name.as_deref())) }
+    })
 }
 
 /// Sets the pack share code (null clears it). Returns 0 on success.
@@ -166,8 +174,10 @@ pub unsafe extern "C" fn replay_to_training_pack_set_code(
     pack: *mut TrPack,
     code: *const c_char,
 ) -> i32 {
-    let code = unsafe { utf8_arg(code) }.map(str::to_string);
-    unsafe { with_pack_mut(pack, |inner| inner.set_code(code.as_deref())) }
+    crate::ffi_guard(-1, || {
+        let code = unsafe { utf8_arg(code) }.map(str::to_string);
+        unsafe { with_pack_mut(pack, |inner| inner.set_code(code.as_deref())) }
+    })
 }
 
 /// Sets the creator display name. Returns 0 on success.
@@ -181,12 +191,14 @@ pub unsafe extern "C" fn replay_to_training_pack_set_creator_name(
     pack: *mut TrPack,
     creator_name: *const c_char,
 ) -> i32 {
-    let creator_name = unsafe { utf8_arg(creator_name) }.map(str::to_string);
-    unsafe {
-        with_pack_mut(pack, |inner| {
-            inner.set_creator_name(creator_name.as_deref())
-        })
-    }
+    crate::ffi_guard(-1, || {
+        let creator_name = unsafe { utf8_arg(creator_name) }.map(str::to_string);
+        unsafe {
+            with_pack_mut(pack, |inner| {
+                inner.set_creator_name(creator_name.as_deref())
+            })
+        }
+    })
 }
 
 /// Sets the map name the pack loads into. Returns 0 on success.
@@ -200,10 +212,12 @@ pub unsafe extern "C" fn replay_to_training_pack_set_map_name(
     pack: *mut TrPack,
     map_name: *const c_char,
 ) -> i32 {
-    let Some(map_name) = (unsafe { utf8_arg(map_name) }).map(str::to_string) else {
-        return 1;
-    };
-    unsafe { with_pack_mut(pack, |inner| inner.set_map_name(&map_name)) }
+    crate::ffi_guard(-1, || {
+        let Some(map_name) = (unsafe { utf8_arg(map_name) }).map(str::to_string) else {
+            return 1;
+        };
+        unsafe { with_pack_mut(pack, |inner| inner.set_map_name(&map_name)) }
+    })
 }
 
 /// Sets the pack difficulty: 0 = Easy, 1 = Medium, 2 = Hard. Returns 0 on
@@ -217,13 +231,15 @@ pub unsafe extern "C" fn replay_to_training_pack_set_difficulty(
     pack: *mut TrPack,
     difficulty: u32,
 ) -> i32 {
-    let difficulty = match difficulty {
-        0 => Difficulty::Easy,
-        1 => Difficulty::Medium,
-        2 => Difficulty::Hard,
-        _ => return 1,
-    };
-    unsafe { with_pack_mut(pack, |inner| inner.set_difficulty(&difficulty)) }
+    crate::ffi_guard(-1, || {
+        let difficulty = match difficulty {
+            0 => Difficulty::Easy,
+            1 => Difficulty::Medium,
+            2 => Difficulty::Hard,
+            _ => return 1,
+        };
+        unsafe { with_pack_mut(pack, |inner| inner.set_difficulty(&difficulty)) }
+    })
 }
 
 /// Returns the pack difficulty as 0 = Easy, 1 = Medium, 2 = Hard
@@ -234,14 +250,16 @@ pub unsafe extern "C" fn replay_to_training_pack_set_difficulty(
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_pack_difficulty(pack: *const TrPack) -> u32 {
-    let Some(pack) = (unsafe { pack_ref(pack) }) else {
-        return 1;
-    };
-    match pack.inner.pack().map(|pack| pack.difficulty) {
-        Ok(Difficulty::Easy) => 0,
-        Ok(Difficulty::Hard) => 2,
-        _ => 1,
-    }
+    crate::ffi_guard(1, || {
+        let Some(pack) = (unsafe { pack_ref(pack) }) else {
+            return 1;
+        };
+        match pack.inner.pack().map(|pack| pack.difficulty) {
+            Ok(Difficulty::Easy) => 0,
+            Ok(Difficulty::Hard) => 2,
+            _ => 1,
+        }
+    })
 }
 
 /// Returns the UTF-8 byte length of the pack display name.
@@ -251,11 +269,13 @@ pub unsafe extern "C" fn replay_to_training_pack_difficulty(pack: *const TrPack)
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_pack_name_len(pack: *const TrPack) -> usize {
-    unsafe { pack_ref(pack) }
-        .and_then(|pack| pack.inner.pack().ok())
-        .and_then(|pack| pack.name)
-        .map(|name| name.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { pack_ref(pack) }
+            .and_then(|pack| pack.inner.pack().ok())
+            .and_then(|pack| pack.name)
+            .map(|name| name.len())
+            .unwrap_or(0)
+    })
 }
 
 /// Copies the pack display name into `out_bytes` (up to `max_bytes`, no
@@ -271,13 +291,15 @@ pub unsafe extern "C" fn replay_to_training_pack_write_name(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(name) = (unsafe { pack_ref(pack) })
-        .and_then(|pack| pack.inner.pack().ok())
-        .and_then(|pack| pack.name)
-    else {
-        return 0;
-    };
-    unsafe { write_text(&name, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(name) = (unsafe { pack_ref(pack) })
+            .and_then(|pack| pack.inner.pack().ok())
+            .and_then(|pack| pack.name)
+        else {
+            return 0;
+        };
+        unsafe { write_text(&name, out_bytes, max_bytes) }
+    })
 }
 
 /// Appends a captured shot to the pack as a new round, honoring the
@@ -302,49 +324,51 @@ pub unsafe extern "C" fn replay_to_training_pack_add_shot(
     pack: *mut TrPack,
     shot: *const TrCapturedShot,
 ) -> i32 {
-    let Some(shot) = (unsafe { shot.as_ref() }) else {
-        return 1;
-    };
-    let cars = if shot.cars.is_null() || shot.car_count == 0 {
-        &[]
-    } else {
-        unsafe { std::slice::from_raw_parts(shot.cars, shot.car_count) }
-    };
-    let options = ShotOptions {
-        mode: CaptureMode::from_abi(shot.mode),
-        mirror_by_team: shot.mirror_by_team != 0,
-        capture_momentum: shot.capture_momentum != 0,
-    };
-    let ball = shot.ball;
-    let time_limit = shot.time_limit;
-    let Some(pack) = (unsafe { pack_mut(pack) }) else {
-        return 1;
-    };
-    match pack.inner.add_shot(&ball, cars, time_limit, &options) {
-        Ok(AddShotOutcome::Added) => 0,
-        Ok(AddShotOutcome::RefusedTypeMismatch) => {
-            let pack_type = pack
-                .inner
-                .training_type()
-                .map(|training_type| training_type.as_name().to_string())
-                .unwrap_or_else(|_| "assigned".to_string());
-            let (attempted, matching) = match options.mode {
-                CaptureMode::Shot => ("shot", "save"),
-                CaptureMode::Save => ("save", "shot"),
-            };
-            pack.inner.record_error(format!(
-                "capture refused: this pack's type is {pack_type}, which conflicts \
-                 with a {attempted} capture; use the {matching} capture command, or \
-                 start a new pack / retarget to capture a {attempted}. Nothing was \
-                 added."
-            ));
-            2
+    crate::ffi_guard(-1, || {
+        let Some(shot) = (unsafe { shot.as_ref() }) else {
+            return 1;
+        };
+        let cars = if shot.cars.is_null() || shot.car_count == 0 {
+            &[]
+        } else {
+            unsafe { std::slice::from_raw_parts(shot.cars, shot.car_count) }
+        };
+        let options = ShotOptions {
+            mode: CaptureMode::from_abi(shot.mode),
+            mirror_by_team: shot.mirror_by_team != 0,
+            capture_momentum: shot.capture_momentum != 0,
+        };
+        let ball = shot.ball;
+        let time_limit = shot.time_limit;
+        let Some(pack) = (unsafe { pack_mut(pack) }) else {
+            return 1;
+        };
+        match pack.inner.add_shot(&ball, cars, time_limit, &options) {
+            Ok(AddShotOutcome::Added) => 0,
+            Ok(AddShotOutcome::RefusedTypeMismatch) => {
+                let pack_type = pack
+                    .inner
+                    .training_type()
+                    .map(|training_type| training_type.as_name().to_string())
+                    .unwrap_or_else(|_| "assigned".to_string());
+                let (attempted, matching) = match options.mode {
+                    CaptureMode::Shot => ("shot", "save"),
+                    CaptureMode::Save => ("save", "shot"),
+                };
+                pack.inner.record_error(format!(
+                    "capture refused: this pack's type is {pack_type}, which conflicts \
+                     with a {attempted} capture; use the {matching} capture command, or \
+                     start a new pack / retarget to capture a {attempted}. Nothing was \
+                     added."
+                ));
+                2
+            }
+            Err(error) => {
+                pack.inner.record_error(error);
+                1
+            }
         }
-        Err(error) => {
-            pack.inner.record_error(error);
-            1
-        }
-    }
+    })
 }
 
 /// Momentum-loss diagnostic for a captured car (see
@@ -375,18 +399,20 @@ pub unsafe extern "C" fn replay_to_training_momentum_note(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(car) = (unsafe { car.as_ref() }) else {
-        return 0;
-    };
-    match crate::archetypes::momentum_warning_with_thresholds(
-        car,
-        f64::from(min_speed),
-        f64::from(min_lost_speed),
-        f64::from(max_off_axis_degrees),
-    ) {
-        Some(warning) => unsafe { write_text(&warning, out_bytes, max_bytes) },
-        None => 0,
-    }
+    crate::ffi_guard(0, || {
+        let Some(car) = (unsafe { car.as_ref() }) else {
+            return 0;
+        };
+        match crate::archetypes::momentum_warning_with_thresholds(
+            car,
+            f64::from(min_speed),
+            f64::from(min_lost_speed),
+            f64::from(max_off_axis_degrees),
+        ) {
+            Some(warning) => unsafe { write_text(&warning, out_bytes, max_bytes) },
+            None => 0,
+        }
+    })
 }
 
 /// ABI encoding of the pack training type (`ETrainingType`):
@@ -413,14 +439,16 @@ pub unsafe extern "C" fn replay_to_training_pack_set_training_type(
     pack: *mut TrPack,
     training_type: u32,
 ) -> i32 {
-    let training_type = match training_type {
-        TR_TRAINING_TYPE_NONE => TrainingType::None,
-        TR_TRAINING_TYPE_AERIAL => TrainingType::Aerial,
-        TR_TRAINING_TYPE_GOALIE => TrainingType::Goalie,
-        TR_TRAINING_TYPE_STRIKER => TrainingType::Striker,
-        _ => return 1,
-    };
-    unsafe { with_pack_mut(pack, |inner| inner.set_training_type(&training_type)) }
+    crate::ffi_guard(-1, || {
+        let training_type = match training_type {
+            TR_TRAINING_TYPE_NONE => TrainingType::None,
+            TR_TRAINING_TYPE_AERIAL => TrainingType::Aerial,
+            TR_TRAINING_TYPE_GOALIE => TrainingType::Goalie,
+            TR_TRAINING_TYPE_STRIKER => TrainingType::Striker,
+            _ => return 1,
+        };
+        unsafe { with_pack_mut(pack, |inner| inner.set_training_type(&training_type)) }
+    })
 }
 
 /// Returns the pack training type in the encoding documented on
@@ -433,19 +461,21 @@ pub unsafe extern "C" fn replay_to_training_pack_set_training_type(
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_pack_training_type(pack: *const TrPack) -> u32 {
-    let Some(pack) = (unsafe { pack_ref(pack) }) else {
-        return TR_TRAINING_TYPE_UNSET;
-    };
-    if !pack.inner.training_type_assigned() {
-        return TR_TRAINING_TYPE_UNSET;
-    }
-    match pack.inner.training_type() {
-        Ok(TrainingType::None) => TR_TRAINING_TYPE_NONE,
-        Ok(TrainingType::Aerial) => TR_TRAINING_TYPE_AERIAL,
-        Ok(TrainingType::Goalie) => TR_TRAINING_TYPE_GOALIE,
-        Ok(TrainingType::Striker) => TR_TRAINING_TYPE_STRIKER,
-        Ok(_) | Err(_) => TR_TRAINING_TYPE_OTHER,
-    }
+    crate::ffi_guard(TR_TRAINING_TYPE_UNSET, || {
+        let Some(pack) = (unsafe { pack_ref(pack) }) else {
+            return TR_TRAINING_TYPE_UNSET;
+        };
+        if !pack.inner.training_type_assigned() {
+            return TR_TRAINING_TYPE_UNSET;
+        }
+        match pack.inner.training_type() {
+            Ok(TrainingType::None) => TR_TRAINING_TYPE_NONE,
+            Ok(TrainingType::Aerial) => TR_TRAINING_TYPE_AERIAL,
+            Ok(TrainingType::Goalie) => TR_TRAINING_TYPE_GOALIE,
+            Ok(TrainingType::Striker) => TR_TRAINING_TYPE_STRIKER,
+            Ok(_) | Err(_) => TR_TRAINING_TYPE_OTHER,
+        }
+    })
 }
 
 /// The capture mode the plugin's mode-selection cvar
@@ -465,14 +495,16 @@ pub unsafe extern "C" fn replay_to_training_pack_training_type(pack: *const TrPa
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_pack_capture_mode_sync(pack: *const TrPack) -> i32 {
-    let Some(pack) = (unsafe { pack_ref(pack) }) else {
-        return -1;
-    };
-    match pack.inner.capture_mode_sync() {
-        Some(CaptureMode::Shot) => 0,
-        Some(CaptureMode::Save) => 1,
-        None => -1,
-    }
+    crate::ffi_guard(-1, || {
+        let Some(pack) = (unsafe { pack_ref(pack) }) else {
+            return -1;
+        };
+        match pack.inner.capture_mode_sync() {
+            Some(CaptureMode::Shot) => 0,
+            Some(CaptureMode::Save) => 1,
+            None => -1,
+        }
+    })
 }
 
 /// Removes the shot (round) at `index`. Returns 0 on success.
@@ -485,7 +517,9 @@ pub unsafe extern "C" fn replay_to_training_pack_remove_shot(
     pack: *mut TrPack,
     index: usize,
 ) -> i32 {
-    unsafe { with_pack_mut(pack, |inner| inner.remove_shot(index)) }
+    crate::ffi_guard(-1, || unsafe {
+        with_pack_mut(pack, |inner| inner.remove_shot(index))
+    })
 }
 
 /// Number of shots (rounds) in the pack, including rounds already present
@@ -496,9 +530,11 @@ pub unsafe extern "C" fn replay_to_training_pack_remove_shot(
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_pack_shot_count(pack: *const TrPack) -> usize {
-    unsafe { pack_ref(pack) }
-        .map(|pack| pack.inner.shot_count())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { pack_ref(pack) }
+            .map(|pack| pack.inner.shot_count())
+            .unwrap_or(0)
+    })
 }
 
 /// Returns the UTF-8 byte length of the shot summary at `index` (0 when
@@ -512,10 +548,12 @@ pub unsafe extern "C" fn replay_to_training_pack_shot_summary_len(
     pack: *const TrPack,
     index: usize,
 ) -> usize {
-    unsafe { pack_ref(pack) }
-        .and_then(|pack| pack.inner.shot_summary(index))
-        .map(|summary| summary.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { pack_ref(pack) }
+            .and_then(|pack| pack.inner.shot_summary(index))
+            .map(|summary| summary.len())
+            .unwrap_or(0)
+    })
 }
 
 /// Copies the shot summary at `index` into `out_bytes` (up to `max_bytes`,
@@ -532,11 +570,14 @@ pub unsafe extern "C" fn replay_to_training_pack_write_shot_summary(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(summary) = (unsafe { pack_ref(pack) }).and_then(|pack| pack.inner.shot_summary(index))
-    else {
-        return 0;
-    };
-    unsafe { write_text(&summary, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(summary) =
+            (unsafe { pack_ref(pack) }).and_then(|pack| pack.inner.shot_summary(index))
+        else {
+            return 0;
+        };
+        unsafe { write_text(&summary, out_bytes, max_bytes) }
+    })
 }
 
 /// Copies the pack GUID as 32 uppercase hex characters (the game's `.Tem`
@@ -553,10 +594,12 @@ pub unsafe extern "C" fn replay_to_training_pack_guid_hex(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(pack) = (unsafe { pack_ref(pack) }) else {
-        return 0;
-    };
-    unsafe { write_text(&pack.inner.guid_hex(), out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(pack) = (unsafe { pack_ref(pack) }) else {
+            return 0;
+        };
+        unsafe { write_text(&pack.inner.guid_hex(), out_bytes, max_bytes) }
+    })
 }
 
 /// Serializes, encrypts, and writes the pack to `path` (creating parent
@@ -571,10 +614,12 @@ pub unsafe extern "C" fn replay_to_training_pack_save(
     pack: *mut TrPack,
     path: *const c_char,
 ) -> i32 {
-    let Some(path) = (unsafe { utf8_arg(path) }).map(PathBuf::from) else {
-        return 1;
-    };
-    unsafe { with_pack_mut(pack, move |inner| inner.save(&path)) }
+    crate::ffi_guard(-1, || {
+        let Some(path) = (unsafe { utf8_arg(path) }).map(PathBuf::from) else {
+            return 1;
+        };
+        unsafe { with_pack_mut(pack, move |inner| inner.save(&path)) }
+    })
 }
 
 /// Non-destructively saves the pack to a target `.tem` `path`. Return codes:
@@ -599,29 +644,31 @@ pub unsafe extern "C" fn replay_to_training_pack_save_to_target(
     pack: *mut TrPack,
     path: *const c_char,
 ) -> i32 {
-    let Some(pack) = (unsafe { pack_mut(pack) }) else {
-        return -1;
-    };
-    let Some(path) = (unsafe { utf8_arg(path) }).map(PathBuf::from) else {
-        pack.inner
-            .record_error("save target: path is null or not valid UTF-8".to_string());
-        return -1;
-    };
-    match pack.inner.save_to_target(&path) {
-        Ok(TargetSaveOutcome::Created) => 0,
-        Ok(TargetSaveOutcome::Appended) => 1,
-        Ok(TargetSaveOutcome::RefusedDifferentPack) => {
-            pack.inner.record_error(
-                "target already contains a different pack; open/target it first to append"
-                    .to_string(),
-            );
-            2
+    crate::ffi_guard(-1, || {
+        let Some(pack) = (unsafe { pack_mut(pack) }) else {
+            return -1;
+        };
+        let Some(path) = (unsafe { utf8_arg(path) }).map(PathBuf::from) else {
+            pack.inner
+                .record_error("save target: path is null or not valid UTF-8".to_string());
+            return -1;
+        };
+        match pack.inner.save_to_target(&path) {
+            Ok(TargetSaveOutcome::Created) => 0,
+            Ok(TargetSaveOutcome::Appended) => 1,
+            Ok(TargetSaveOutcome::RefusedDifferentPack) => {
+                pack.inner.record_error(
+                    "target already contains a different pack; open/target it first to append"
+                        .to_string(),
+                );
+                2
+            }
+            Err(error) => {
+                pack.inner.record_error(error);
+                -1
+            }
         }
-        Err(error) => {
-            pack.inner.record_error(error);
-            -1
-        }
-    }
+    })
 }
 
 /// Writes the GUID of the `.tem` pack at `path` as 32 uppercase hex
@@ -640,13 +687,15 @@ pub unsafe extern "C" fn replay_to_training_file_guid_hex(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(path) = (unsafe { utf8_arg(path) }) else {
-        return 0;
-    };
-    match file_guid_hex(std::path::Path::new(path)) {
-        Ok(Some(hex)) => unsafe { write_text(&hex, out_bytes, max_bytes) },
-        _ => 0,
-    }
+    crate::ffi_guard(0, || {
+        let Some(path) = (unsafe { utf8_arg(path) }) else {
+            return 0;
+        };
+        match file_guid_hex(std::path::Path::new(path)) {
+            Ok(Some(hex)) => unsafe { write_text(&hex, out_bytes, max_bytes) },
+            _ => 0,
+        }
+    })
 }
 
 // --- target path logic (see `targets` module docs for the account-dir
@@ -667,16 +716,18 @@ pub unsafe extern "C" fn replay_to_training_sanitize_target(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(name) = (unsafe { utf8_arg(name) }) else {
-        return 0;
-    };
-    unsafe {
-        write_text(
-            &crate::targets::sanitize_target_name(name),
-            out_bytes,
-            max_bytes,
-        )
-    }
+    crate::ffi_guard(0, || {
+        let Some(name) = (unsafe { utf8_arg(name) }) else {
+            return 0;
+        };
+        unsafe {
+            write_text(
+                &crate::targets::sanitize_target_name(name),
+                out_bytes,
+                max_bytes,
+            )
+        }
+    })
 }
 
 fn joined_targets(root: &str) -> String {
@@ -691,10 +742,12 @@ fn joined_targets(root: &str) -> String {
 /// `root` must be null or a valid NUL-terminated C string.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_targets_len(root: *const c_char) -> usize {
-    let Some(root) = (unsafe { utf8_arg(root) }) else {
-        return 0;
-    };
-    joined_targets(root).len()
+    crate::ffi_guard(0, || {
+        let Some(root) = (unsafe { utf8_arg(root) }) else {
+            return 0;
+        };
+        joined_targets(root).len()
+    })
 }
 
 /// Writes the newline-joined, sorted target names discovered under the
@@ -713,10 +766,12 @@ pub unsafe extern "C" fn replay_to_training_write_targets(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(root) = (unsafe { utf8_arg(root) }) else {
-        return 0;
-    };
-    unsafe { write_text(&joined_targets(root), out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(root) = (unsafe { utf8_arg(root) }) else {
+            return 0;
+        };
+        unsafe { write_text(&joined_targets(root), out_bytes, max_bytes) }
+    })
 }
 
 /// Resolves a target `name` against the Training `root` (account-dir
@@ -745,30 +800,33 @@ pub unsafe extern "C" fn replay_to_training_resolve_target(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> i32 {
-    let (Some(root), Some(name)) = (unsafe { utf8_arg(root) }, unsafe { utf8_arg(name) }) else {
-        set_global_error("resolve target: null or non-UTF-8 argument".to_string());
-        return -1;
-    };
-    match crate::targets::resolve_target_path(std::path::Path::new(root), name) {
-        Ok(crate::targets::ResolvedTarget::Path(path)) => {
-            let text = path.to_string_lossy();
-            unsafe { write_text(&text, out_bytes, max_bytes) as i32 }
+    crate::ffi_guard(-1, || {
+        let (Some(root), Some(name)) = (unsafe { utf8_arg(root) }, unsafe { utf8_arg(name) })
+        else {
+            set_global_error("resolve target: null or non-UTF-8 argument".to_string());
+            return -1;
+        };
+        match crate::targets::resolve_target_path(std::path::Path::new(root), name) {
+            Ok(crate::targets::ResolvedTarget::Path(path)) => {
+                let text = path.to_string_lossy();
+                unsafe { write_text(&text, out_bytes, max_bytes) as i32 }
+            }
+            Ok(crate::targets::ResolvedTarget::Ambiguous(candidates)) => {
+                set_global_error(format!(
+                    "target name is ambiguous across accounts; use the qualified \
+                     form: {}",
+                    candidates.join(" or ")
+                ));
+                let joined = candidates.join("\n");
+                unsafe { write_text(&joined, out_bytes, max_bytes) };
+                -2
+            }
+            Err(error) => {
+                set_global_error(error);
+                -1
+            }
         }
-        Ok(crate::targets::ResolvedTarget::Ambiguous(candidates)) => {
-            set_global_error(format!(
-                "target name is ambiguous across accounts; use the qualified \
-                 form: {}",
-                candidates.join(" or ")
-            ));
-            let joined = candidates.join("\n");
-            unsafe { write_text(&joined, out_bytes, max_bytes) };
-            -2
-        }
-        Err(error) => {
-            set_global_error(error);
-            -1
-        }
-    }
+    })
 }
 
 /// Writes the directory untargeted (auto-GUID) saves should land in: the
@@ -786,12 +844,14 @@ pub unsafe extern "C" fn replay_to_training_default_save_dir(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(root) = (unsafe { utf8_arg(root) }) else {
-        return 0;
-    };
-    let dir = crate::targets::default_save_dir(std::path::Path::new(root));
-    let text = dir.to_string_lossy();
-    unsafe { write_text(&text, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(root) = (unsafe { utf8_arg(root) }) else {
+            return 0;
+        };
+        let dir = crate::targets::default_save_dir(std::path::Path::new(root));
+        let text = dir.to_string_lossy();
+        unsafe { write_text(&text, out_bytes, max_bytes) }
+    })
 }
 
 /// Returns the UTF-8 byte length of the pack's last error message.
@@ -801,9 +861,11 @@ pub unsafe extern "C" fn replay_to_training_default_save_dir(
 /// `pack` must be null or a valid pack handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn replay_to_training_pack_last_error_len(pack: *const TrPack) -> usize {
-    unsafe { pack_ref(pack) }
-        .map(|pack| pack.inner.last_error().len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { pack_ref(pack) }
+            .map(|pack| pack.inner.last_error().len())
+            .unwrap_or(0)
+    })
 }
 
 /// Copies the pack's last error message into `out_bytes` (up to
@@ -819,17 +881,19 @@ pub unsafe extern "C" fn replay_to_training_pack_write_last_error(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(pack) = (unsafe { pack_ref(pack) }) else {
-        return 0;
-    };
-    unsafe { write_text(pack.inner.last_error(), out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(pack) = (unsafe { pack_ref(pack) }) else {
+            return 0;
+        };
+        unsafe { write_text(pack.inner.last_error(), out_bytes, max_bytes) }
+    })
 }
 
 /// Returns the UTF-8 byte length of the global last error (set by failed
 /// `replay_to_training_pack_open` calls).
 #[unsafe(no_mangle)]
 pub extern "C" fn replay_to_training_last_error_len() -> usize {
-    global_error().len()
+    crate::ffi_guard(0, || global_error().len())
 }
 
 /// Copies the global last error into `out_bytes` (up to `max_bytes`, no
@@ -843,7 +907,9 @@ pub unsafe extern "C" fn replay_to_training_write_last_error(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe { write_text(&global_error(), out_bytes, max_bytes) }
+    crate::ffi_guard(0, || unsafe {
+        write_text(&global_error(), out_bytes, max_bytes)
+    })
 }
 
 /// Build identifier of this Rust core DLL, e.g.
@@ -864,7 +930,7 @@ pub(crate) fn build_info() -> String {
 /// Returns the UTF-8 byte length of the build identifier string.
 #[unsafe(no_mangle)]
 pub extern "C" fn replay_to_training_build_info_len() -> usize {
-    build_info().len()
+    crate::ffi_guard(0, || build_info().len())
 }
 
 /// Copies the build identifier into `out_bytes` (up to `max_bytes`, no
@@ -878,5 +944,7 @@ pub unsafe extern "C" fn replay_to_training_write_build_info(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe { write_text(&build_info(), out_bytes, max_bytes) }
+    crate::ffi_guard(0, || unsafe {
+        write_text(&build_info(), out_bytes, max_bytes)
+    })
 }

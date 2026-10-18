@@ -24,7 +24,9 @@ pub(crate) fn refresh_timeline_graph_state(engine: &mut SaEngine) {
 /// `subtr_actor_bakkesmod_engine_destroy`.
 #[unsafe(no_mangle)]
 pub extern "C" fn subtr_actor_bakkesmod_engine_create() -> *mut SaEngine {
-    Box::into_raw(Box::new(SaEngine::default()))
+    crate::ffi_guard(std::ptr::null_mut(), || {
+        Box::into_raw(Box::new(SaEngine::default()))
+    })
 }
 
 pub(crate) fn build_replay_annotations(path: &CStr) -> SubtrActorResult<SaReplayAnnotations> {
@@ -72,13 +74,15 @@ pub(crate) fn build_replay_annotations(path: &CStr) -> SubtrActorResult<SaReplay
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_create(
     replay_path: *const c_char,
 ) -> *mut SaReplayAnnotations {
-    let Some(replay_path) = (unsafe { raw_c_str(replay_path) }) else {
-        return ptr::null_mut();
-    };
-    match build_replay_annotations(replay_path) {
-        Ok(annotations) => Box::into_raw(Box::new(annotations)),
-        Err(_) => ptr::null_mut(),
-    }
+    crate::ffi_guard(std::ptr::null_mut(), || {
+        let Some(replay_path) = (unsafe { raw_c_str(replay_path) }) else {
+            return ptr::null_mut();
+        };
+        match build_replay_annotations(replay_path) {
+            Ok(annotations) => Box::into_raw(Box::new(annotations)),
+            Err(_) => ptr::null_mut(),
+        }
+    })
 }
 
 /// Destroys a replay annotation handle allocated by
@@ -87,7 +91,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_create(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_destroy(
     annotations: *mut SaReplayAnnotations,
 ) {
-    unsafe { drop_raw_box(annotations) };
+    crate::ffi_guard((), || {
+        unsafe { drop_raw_box(annotations) };
+    })
 }
 
 /// Returns the number of precomputed replay annotation events.
@@ -95,9 +101,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotations_destroy(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_count(
     annotations: *const SaReplayAnnotations,
 ) -> usize {
-    unsafe { raw_ref(annotations) }
-        .map(|annotations| annotations.events.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { raw_ref(annotations) }
+            .map(|annotations| annotations.events.len())
+            .unwrap_or(0)
+    })
 }
 
 /// Returns the number of replay players available for annotation labels.
@@ -105,9 +113,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_count(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_player_count(
     annotations: *const SaReplayAnnotations,
 ) -> usize {
-    unsafe { raw_ref(annotations) }
-        .map(|annotations| annotations.players.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { raw_ref(annotations) }
+            .map(|annotations| annotations.players.len())
+            .unwrap_or(0)
+    })
 }
 
 /// Copies replay player metadata into `out_players`.
@@ -117,10 +127,12 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_players(
     out_players: *mut SaReplayPlayerInfo,
     max_players: usize,
 ) -> usize {
-    let Some(annotations) = (unsafe { raw_ref(annotations) }) else {
-        return 0;
-    };
-    unsafe { copy_to_raw(&annotations.players, out_players, max_players) }
+    crate::ffi_guard(0, || {
+        let Some(annotations) = (unsafe { raw_ref(annotations) }) else {
+            return 0;
+        };
+        unsafe { copy_to_raw(&annotations.players, out_players, max_players) }
+    })
 }
 
 /// Copies replay players and current-frame core stats for replay playback.
@@ -131,40 +143,42 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_frame_pla
     out_players: *mut SaPlayerFrame,
     max_players: usize,
 ) -> usize {
-    let Some(annotations) = (unsafe { raw_ref(annotations) }) else {
-        return 0;
-    };
-    if max_players == 0 || out_players.is_null() {
-        return 0;
-    }
-    let Some(frame) = replay_annotation_frame_at_time(annotations, replay_time) else {
-        return 0;
-    };
+    crate::ffi_guard(0, || {
+        let Some(annotations) = (unsafe { raw_ref(annotations) }) else {
+            return 0;
+        };
+        if max_players == 0 || out_players.is_null() {
+            return 0;
+        }
+        let Some(frame) = replay_annotation_frame_at_time(annotations, replay_time) else {
+            return 0;
+        };
 
-    let players: Vec<_> = frame
-        .players
-        .iter()
-        .take(max_players)
-        .enumerate()
-        .map(|(index, player)| {
-            let player_info = annotations.players.get(index);
-            SaPlayerFrame {
-                player_index: player_info
-                    .map(|info| info.player_index)
-                    .unwrap_or(index as u32),
-                player_name: player_info.map(|info| info.name).unwrap_or(ptr::null()),
-                is_team_0: player.is_team_0 as u8,
-                has_match_stats: 1,
-                match_goals: player.core.goals,
-                match_assists: player.core.assists,
-                match_saves: player.core.saves,
-                match_shots: player.core.shots,
-                match_score: player.core.score,
-                ..SaPlayerFrame::default()
-            }
-        })
-        .collect();
-    unsafe { copy_to_raw(&players, out_players, max_players) }
+        let players: Vec<_> = frame
+            .players
+            .iter()
+            .take(max_players)
+            .enumerate()
+            .map(|(index, player)| {
+                let player_info = annotations.players.get(index);
+                SaPlayerFrame {
+                    player_index: player_info
+                        .map(|info| info.player_index)
+                        .unwrap_or(index as u32),
+                    player_name: player_info.map(|info| info.name).unwrap_or(ptr::null()),
+                    is_team_0: player.is_team_0 as u8,
+                    has_match_stats: 1,
+                    match_goals: player.core.goals,
+                    match_assists: player.core.assists,
+                    match_saves: player.core.saves,
+                    match_shots: player.core.shots,
+                    match_score: player.core.score,
+                    ..SaPlayerFrame::default()
+                }
+            })
+            .collect();
+        unsafe { copy_to_raw(&players, out_players, max_players) }
+    })
 }
 
 pub(crate) fn serialize_replay_annotation_frame(
@@ -185,10 +199,12 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_frame_json_len(
     annotations: *const SaReplayAnnotations,
     replay_time: f32,
 ) -> usize {
-    unsafe { raw_ref(annotations) }
-        .and_then(|annotations| serialize_replay_annotation_frame(annotations, replay_time))
-        .map(|bytes| bytes.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { raw_ref(annotations) }
+            .and_then(|annotations| serialize_replay_annotation_frame(annotations, replay_time))
+            .map(|bytes| bytes.len())
+            .unwrap_or(0)
+    })
 }
 
 /// Writes the replay stats frame at `replay_time` into caller-owned storage.
@@ -203,13 +219,15 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_replay_annotation_frame_jso
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(annotations) = (unsafe { raw_ref(annotations) }) else {
-        return 0;
-    };
-    let Some(bytes) = serialize_replay_annotation_frame(annotations, replay_time) else {
-        return 0;
-    };
-    unsafe { copy_to_raw(&bytes, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(annotations) = (unsafe { raw_ref(annotations) }) else {
+            return 0;
+        };
+        let Some(bytes) = serialize_replay_annotation_frame(annotations, replay_time) else {
+            return 0;
+        };
+        unsafe { copy_to_raw(&bytes, out_bytes, max_bytes) }
+    })
 }
 
 /// Returns the scoreboard value for the latest processed replay frame at or before
@@ -220,31 +238,33 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_replay_annotation_score_at_time(
     replay_time: f32,
     out_score: *mut SaReplayScore,
 ) -> i32 {
-    let Some(annotations) = (unsafe { raw_ref(annotations) }) else {
-        return -1;
-    };
-    if out_score.is_null() {
-        return -1;
-    }
-    let Some(frame) = replay_annotation_frame_at_time(annotations, replay_time) else {
-        return -2;
-    };
+    crate::ffi_guard(-2, || {
+        let Some(annotations) = (unsafe { raw_ref(annotations) }) else {
+            return -1;
+        };
+        if out_score.is_null() {
+            return -1;
+        }
+        let Some(frame) = replay_annotation_frame_at_time(annotations, replay_time) else {
+            return -2;
+        };
 
-    if unsafe {
-        write_one(
-            out_score,
-            SaReplayScore {
-                team_zero_score: frame.team_zero.core.goals,
-                has_team_zero_score: 1,
-                team_one_score: frame.team_one.core.goals,
-                has_team_one_score: 1,
-            },
-        )
-    } {
-        0
-    } else {
-        -1
-    }
+        if unsafe {
+            write_one(
+                out_score,
+                SaReplayScore {
+                    team_zero_score: frame.team_zero.core.goals,
+                    has_team_zero_score: 1,
+                    team_one_score: frame.team_one.core.goals,
+                    has_team_one_score: 1,
+                },
+            )
+        } {
+            0
+        } else {
+            -1
+        }
+    })
 }
 
 /// Drains annotation events whose normal replay-processing timestamp has been
@@ -259,39 +279,43 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_poll_replay_annotations(
     out_events: *mut SaMechanicEvent,
     max_events: usize,
 ) -> usize {
-    let Some(annotations) = (unsafe { raw_mut(annotations) }) else {
-        return 0;
-    };
-    if max_events == 0 || out_events.is_null() {
-        return 0;
-    }
-
-    const SEEK_BACK_RESET_SECONDS: f32 = 0.25;
-    const LOOKBACK_SECONDS: f32 = 0.20;
-    const LOOKAHEAD_SECONDS: f32 = 0.05;
-
-    if !annotations.initialized
-        || replay_time + SEEK_BACK_RESET_SECONDS < annotations.last_poll_time
-    {
-        let restart_time = (replay_time - LOOKBACK_SECONDS).max(0.0);
-        annotations.cursor = annotations
-            .events
-            .partition_point(|event| event.time < restart_time);
-        annotations.initialized = true;
-    }
-    annotations.last_poll_time = replay_time;
-
-    let max_time = replay_time + LOOKAHEAD_SECONDS;
-    let start = annotations.cursor;
-    while annotations.cursor < annotations.events.len() && annotations.cursor - start < max_events {
-        let event = annotations.events[annotations.cursor];
-        if event.time > max_time {
-            break;
+    crate::ffi_guard(0, || {
+        let Some(annotations) = (unsafe { raw_mut(annotations) }) else {
+            return 0;
+        };
+        if max_events == 0 || out_events.is_null() {
+            return 0;
         }
-        annotations.cursor += 1;
-    }
-    let events = &annotations.events[start..annotations.cursor];
-    unsafe { copy_to_raw(events, out_events, max_events) }
+
+        const SEEK_BACK_RESET_SECONDS: f32 = 0.25;
+        const LOOKBACK_SECONDS: f32 = 0.20;
+        const LOOKAHEAD_SECONDS: f32 = 0.05;
+
+        if !annotations.initialized
+            || replay_time + SEEK_BACK_RESET_SECONDS < annotations.last_poll_time
+        {
+            let restart_time = (replay_time - LOOKBACK_SECONDS).max(0.0);
+            annotations.cursor = annotations
+                .events
+                .partition_point(|event| event.time < restart_time);
+            annotations.initialized = true;
+        }
+        annotations.last_poll_time = replay_time;
+
+        let max_time = replay_time + LOOKAHEAD_SECONDS;
+        let start = annotations.cursor;
+        while annotations.cursor < annotations.events.len()
+            && annotations.cursor - start < max_events
+        {
+            let event = annotations.events[annotations.cursor];
+            if event.time > max_time {
+                break;
+            }
+            annotations.cursor += 1;
+        }
+        let events = &annotations.events[start..annotations.cursor];
+        unsafe { copy_to_raw(events, out_events, max_events) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -302,7 +326,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_poll_replay_annotations(
 /// `engine` must either be null or a pointer returned by
 /// `subtr_actor_bakkesmod_engine_create` that has not already been destroyed.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_engine_destroy(engine: *mut SaEngine) {
-    unsafe { drop_raw_box(engine) };
+    crate::ffi_guard((), || {
+        unsafe { drop_raw_box(engine) };
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -313,9 +339,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_engine_destroy(engine: *mut SaEng
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_engine_reset(engine: *mut SaEngine) {
-    if let Some(engine) = unsafe { raw_mut(engine) } {
-        *engine = SaEngine::default();
-    }
+    crate::ffi_guard((), || {
+        if let Some(engine) = unsafe { raw_mut(engine) } {
+            *engine = SaEngine::default();
+        }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -332,28 +360,33 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_engine_reset(engine: *mut SaEngin
 ///
 /// `engine` must be a valid engine pointer.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_finish(engine: *mut SaEngine) -> i32 {
-    let Some(engine) = (unsafe { raw_mut(engine) }) else {
-        return -1;
-    };
-    if !engine.live_replay_meta_initialized {
-        return 0;
-    }
-    if engine.live_graph_finished {
-        return 0;
-    }
-    if engine.graph.finish().is_err() {
-        return -2;
-    }
-    refresh_timeline_graph_state(engine);
-    engine.live_graph_finished = true;
-    0
+    crate::ffi_guard(-2, || {
+        let Some(engine) = (unsafe { raw_mut(engine) }) else {
+            return -1;
+        };
+        crate::engine_guard(engine, |engine| {
+            if !engine.live_replay_meta_initialized {
+                return 0;
+            }
+            if engine.live_graph_finished {
+                return 0;
+            }
+            if engine.graph.finish().is_err() {
+                return -2;
+            }
+            refresh_timeline_graph_state(engine);
+            engine.live_graph_finished = true;
+            0
+        })
+    })
 }
 
 #[unsafe(no_mangle)]
 /// Feeds one sampled Rocket League frame into the live mechanics engine.
 ///
 /// Returns `0` on success, `-1` for invalid pointers, and `-2` if detector
-/// evaluation fails.
+/// evaluation fails. After a panic during evaluation the engine stays
+/// poisoned, returning `-2` until it is reset.
 ///
 /// # Safety
 ///
@@ -364,43 +397,47 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
     engine: *mut SaEngine,
     frame: *const SaLiveFrame,
 ) -> i32 {
-    let Some(engine) = (unsafe { raw_mut(engine) }) else {
-        return -1;
-    };
-    let Some(frame) = (unsafe { raw_ref(frame) }) else {
-        return -1;
-    };
-    let Ok(players) = (unsafe { checked_slice(frame.players, frame.player_count) }) else {
-        return -1;
-    };
-    if has_duplicate_player_indices(players) {
-        return -1;
-    }
-    let Ok(explicit_events) = (unsafe { frame_event_slices(frame) }) else {
-        return -1;
-    };
-    if sync_live_replay_meta(engine, players).is_err() {
-        return -2;
-    }
-    let mut live_events = engine.live_events.clone();
-    let mut live_event_history = engine.live_event_history.clone();
-    let frame_input = frame_input_from_live_state(
-        &mut live_events,
-        &mut live_event_history,
-        engine.live_replay_meta.as_ref(),
-        frame,
-        players,
-        &explicit_events,
-    );
-    if engine.graph.evaluate_with_state(&frame_input).is_err() {
-        return -2;
-    }
+    crate::ffi_guard(-2, || {
+        let Some(engine) = (unsafe { raw_mut(engine) }) else {
+            return -1;
+        };
+        let Some(frame) = (unsafe { raw_ref(frame) }) else {
+            return -1;
+        };
+        let Ok(players) = (unsafe { checked_slice(frame.players, frame.player_count) }) else {
+            return -1;
+        };
+        if has_duplicate_player_indices(players) {
+            return -1;
+        }
+        let Ok(explicit_events) = (unsafe { frame_event_slices(frame) }) else {
+            return -1;
+        };
+        crate::engine_guard(engine, |engine| {
+            if sync_live_replay_meta(engine, players).is_err() {
+                return -2;
+            }
+            let mut live_events = engine.live_events.clone();
+            let mut live_event_history = engine.live_event_history.clone();
+            let frame_input = frame_input_from_live_state(
+                &mut live_events,
+                &mut live_event_history,
+                engine.live_replay_meta.as_ref(),
+                frame,
+                players,
+                &explicit_events,
+            );
+            if engine.graph.evaluate_with_state(&frame_input).is_err() {
+                return -2;
+            }
 
-    engine.live_events = live_events;
-    engine.live_event_history = live_event_history;
-    engine.live_graph_finished = false;
-    refresh_timeline_graph_state(engine);
-    0
+            engine.live_events = live_events;
+            engine.live_event_history = live_event_history;
+            engine.live_graph_finished = false;
+            refresh_timeline_graph_state(engine);
+            0
+        })
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -413,9 +450,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_process_frame(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_event_count(
     engine: *const SaEngine,
 ) -> usize {
-    unsafe { raw_ref(engine) }
-        .map(|engine| engine.pending_events.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { raw_ref(engine) }
+            .map(|engine| engine.pending_events.len())
+            .unwrap_or(0)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -428,9 +467,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_event_count(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_team_event_count(
     engine: *const SaEngine,
 ) -> usize {
-    unsafe { raw_ref(engine) }
-        .map(|engine| engine.pending_team_events.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { raw_ref(engine) }
+            .map(|engine| engine.pending_team_events.len())
+            .unwrap_or(0)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -443,9 +484,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_team_event_count(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_goal_context_event_count(
     engine: *const SaEngine,
 ) -> usize {
-    unsafe { raw_ref(engine) }
-        .map(|engine| engine.pending_goal_context_events.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { raw_ref(engine) }
+            .map(|engine| engine.pending_goal_context_events.len())
+            .unwrap_or(0)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -461,12 +504,14 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_pending_goal_context_event_count(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_decoded_stats_player_config_json_len(
     encoded_config: *const c_char,
 ) -> usize {
-    let Some(encoded_config) = (unsafe { raw_c_str(encoded_config) }) else {
-        return 0;
-    };
-    decode_stats_player_config_json(encoded_config)
-        .map(|bytes| bytes.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        let Some(encoded_config) = (unsafe { raw_c_str(encoded_config) }) else {
+            return 0;
+        };
+        decode_stats_player_config_json(encoded_config)
+            .map(|bytes| bytes.len())
+            .unwrap_or(0)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -485,13 +530,15 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_decoded_stats_player_config
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(encoded_config) = (unsafe { raw_c_str(encoded_config) }) else {
-        return 0;
-    };
-    let Some(bytes) = decode_stats_player_config_json(encoded_config) else {
-        return 0;
-    };
-    unsafe { copy_to_raw(&bytes, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(encoded_config) = (unsafe { raw_c_str(encoded_config) }) else {
+            return 0;
+        };
+        let Some(bytes) = decode_stats_player_config_json(encoded_config) else {
+            return 0;
+        };
+        unsafe { copy_to_raw(&bytes, out_bytes, max_bytes) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -507,12 +554,14 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_decoded_stats_player_config
 pub unsafe extern "C" fn subtr_actor_bakkesmod_encoded_stats_player_config_len(
     json_config: *const c_char,
 ) -> usize {
-    let Some(json_config) = (unsafe { raw_c_str(json_config) }) else {
-        return 0;
-    };
-    encode_stats_player_config_json(json_config)
-        .map(|bytes| bytes.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        let Some(json_config) = (unsafe { raw_c_str(json_config) }) else {
+            return 0;
+        };
+        encode_stats_player_config_json(json_config)
+            .map(|bytes| bytes.len())
+            .unwrap_or(0)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -531,11 +580,13 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_encoded_stats_player_config
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(json_config) = (unsafe { raw_c_str(json_config) }) else {
-        return 0;
-    };
-    let Some(bytes) = encode_stats_player_config_json(json_config) else {
-        return 0;
-    };
-    unsafe { copy_to_raw(&bytes, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(json_config) = (unsafe { raw_c_str(json_config) }) else {
+            return 0;
+        };
+        let Some(bytes) = encode_stats_player_config_json(json_config) else {
+            return 0;
+        };
+        unsafe { copy_to_raw(&bytes, out_bytes, max_bytes) }
+    })
 }

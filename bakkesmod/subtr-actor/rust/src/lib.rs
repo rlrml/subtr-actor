@@ -90,6 +90,9 @@ pub struct SaEngine {
     pending_events: Vec<SaMechanicEvent>,
     pending_team_events: Vec<SaTeamEvent>,
     pending_goal_context_events: Vec<SaGoalContextEvent>,
+    /// Set when graph evaluation panicked mid-update; the engine refuses
+    /// further frames until reset rather than evaluating half-updated state.
+    poisoned: bool,
 }
 
 pub struct SaReplayAnnotations {
@@ -163,6 +166,7 @@ impl Default for SaEngine {
             pending_events: Vec::new(),
             pending_team_events: Vec::new(),
             pending_goal_context_events: Vec::new(),
+            poisoned: false,
         }
     }
 }
@@ -193,3 +197,24 @@ fn serialize_graph_info(graph: &mut AnalysisGraph) -> Vec<u8> {
 #[cfg(test)]
 #[path = "lib_tests.rs"]
 mod tests;
+
+/// Runs a graph-mutating engine operation, returning `-2` and poisoning the
+/// engine if it panics (or if an earlier operation already did).
+fn engine_guard(engine: &mut SaEngine, body: impl FnOnce(&mut SaEngine) -> i32) -> i32 {
+    if engine.poisoned {
+        return -2;
+    }
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| body(&mut *engine))) {
+        Ok(code) => code,
+        Err(_) => {
+            engine.poisoned = true;
+            -2
+        }
+    }
+}
+
+/// Runs an FFI entry point, converting a panic into `fallback` so it cannot
+/// unwind into (and abort) the host process.
+fn ffi_guard<T>(fallback: T, body: impl FnOnce() -> T) -> T {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(body)).unwrap_or(fallback)
+}
