@@ -18,7 +18,7 @@ remote_id: RemoteIdTs,
  * The keys of this HashMap are the names of the stats,
  * and the values are the corresponding `HeaderProp` instances.
  */
-stats: { [key in string]?: HeaderPropTs } | null,
+stats: { [key in string]: HeaderPropTs } | null,
 /**
  * The name of the player as represented in the replay.
  */
