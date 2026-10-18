@@ -499,30 +499,33 @@ fn parse_array(name: &UeString, payload: &[u8]) -> Result<ArrayValue> {
 /// the bytes do not fit that interpretation exactly.
 fn try_parse_elements(kind: ArrayKind, count: usize, data: &[u8]) -> Option<ArrayValue> {
     let mut reader = Reader::new(data);
+    // Every element kind occupies at least 4 bytes, so an untrusted count
+    // can't be allowed to size the allocation on its own.
+    let capacity = count.min(data.len() / 4);
     let value = match kind {
         ArrayKind::Ints => {
-            let mut items = Vec::with_capacity(count);
+            let mut items = Vec::with_capacity(capacity);
             for _ in 0..count {
                 items.push(reader.i32().ok()?);
             }
             ArrayValue::Ints(items)
         }
         ArrayKind::Strings => {
-            let mut items = Vec::with_capacity(count);
+            let mut items = Vec::with_capacity(capacity);
             for _ in 0..count {
                 items.push(reader.ue_string().ok()?);
             }
             ArrayValue::Strings(items)
         }
         ArrayKind::Structs => {
-            let mut items = Vec::with_capacity(count);
+            let mut items = Vec::with_capacity(capacity);
             for _ in 0..count {
                 items.push(PropertyList::parse(&mut reader).ok()?);
             }
             ArrayValue::Structs(items)
         }
         ArrayKind::Objects => {
-            let mut items = Vec::with_capacity(count);
+            let mut items = Vec::with_capacity(capacity);
             for _ in 0..count {
                 let class = reader.ue_string().ok()?;
                 class.as_str()?;
@@ -555,6 +558,9 @@ pub(crate) mod hex_bytes {
 
     pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
         let text = String::deserialize(deserializer)?;
+        if !text.is_ascii() {
+            return Err(D::Error::custom("non-ASCII hex string"));
+        }
         if text.len() % 2 != 0 {
             return Err(D::Error::custom("odd-length hex string"));
         }

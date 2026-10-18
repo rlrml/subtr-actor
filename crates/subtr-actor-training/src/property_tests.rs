@@ -1,6 +1,6 @@
 use super::{
-    ArrayObject, ArrayValue, ByteValue, PropertyList, PropertyValue, StructBody, StructValue,
-    UnknownValue,
+    ArrayKind, ArrayObject, ArrayValue, ByteValue, PropertyList, PropertyValue, StructBody,
+    StructValue, UnknownValue,
 };
 use crate::io::{Reader, UeString, Writer};
 
@@ -459,4 +459,25 @@ fn set_replaces_in_place_and_appends_when_missing() {
     assert!(list.properties[0].name.is("A"), "position preserved");
     list.remove("b");
     assert!(list.get("B").is_none());
+}
+
+#[test]
+fn oversized_array_count_does_not_preallocate() {
+    for kind in [
+        ArrayKind::Ints,
+        ArrayKind::Strings,
+        ArrayKind::Structs,
+        ArrayKind::Objects,
+    ] {
+        assert_eq!(
+            super::try_parse_elements(kind, i32::MAX as usize, &[0; 4]),
+            None
+        );
+    }
+}
+
+#[test]
+fn non_ascii_hex_is_rejected() {
+    let error = serde_json::from_str::<StructBody>(r#"{"Raw":"a\u00e9a"}"#).unwrap_err();
+    assert!(error.to_string().contains("non-ASCII"), "{error}");
 }

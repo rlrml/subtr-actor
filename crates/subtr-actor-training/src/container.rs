@@ -142,7 +142,8 @@ impl TrainingFile {
         let num_objects = reader.i32()?;
         let num_objects =
             usize::try_from(num_objects).map_err(|_| Error::BadSaveDataLength(num_objects))?;
-        let mut table = Vec::with_capacity(num_objects);
+        // Each table entry is at least 12 bytes.
+        let mut table = Vec::with_capacity(num_objects.min(reader.remaining() / 12));
         for _ in 0..num_objects {
             let type_name = reader.ue_string()?;
             let file_position = reader.u32()?;
