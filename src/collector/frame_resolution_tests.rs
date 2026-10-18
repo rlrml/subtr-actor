@@ -76,3 +76,14 @@ fn timestep_resolution_emits_crossings_and_appends_final_frame() {
         action => panic!("expected append action, got {action:?}"),
     }
 }
+
+#[test]
+fn timestep_resolution_ignores_nonfinite_timestamps() {
+    let mut controller =
+        StatsFramePersistenceController::new(StatsFrameResolution::TimeStep { seconds: 0.5 });
+    assert_eq!(controller.on_frame(0, f32::NAN), None);
+    assert_eq!(controller.on_frame(1, 0.0), Some(0.0));
+    assert_eq!(controller.on_frame(2, f32::INFINITY), None);
+    assert_eq!(controller.on_frame(3, f32::NEG_INFINITY), None);
+    assert_eq!(controller.on_frame(4, 0.5), Some(0.5));
+}

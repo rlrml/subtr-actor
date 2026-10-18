@@ -21,6 +21,15 @@ pub enum SubtrActorErrorVariant {
     FrameIndexOutOfBounds,
 
     #[error(
+        "Collector returned invalid target time {target_time} at time {current_time} (frame {frame_index}); target must be finite and advance time"
+    )]
+    InvalidTimeAdvance {
+        frame_index: usize,
+        current_time: f32,
+        target_time: f32,
+    },
+
+    #[error(
         "Players found in frames that were not part of original set. Found: {found:?}, Original: {original:?}"
     )]
     InconsistentPlayerSet {

@@ -42,7 +42,8 @@ use boxcars;
 
 /// Enum used to control the progress of time during replay processing.
 pub enum TimeAdvance {
-    /// Move forward in time by a specified amount.
+    /// Sample at this absolute replay time, which must be finite and later than
+    /// the current sample time.
     Time(f32),
     /// Advance to the next frame.
     NextFrame,

@@ -673,9 +673,10 @@ impl<'a> ReplayProcessor<'a> {
     /// After each a frame is processed, [`Collector::process_frame`] of the
     /// collector is called. The [`TimeAdvance`] return value of this call into
     /// [`Collector::process_frame`] is used to determine what happens next: in
-    /// the case of [`TimeAdvance::Time`], the notion of current time is
-    /// advanced by the provided amount, and only the timestamp of the frame is
-    /// exceeded, do we process the next frame. This mechanism allows fine
+    /// the case of [`TimeAdvance::Time`], the current time is set to the provided
+    /// absolute timestamp. It must be finite and later than the current sample,
+    /// or processing returns an error. Only when it exceeds the frame timestamp
+    /// do we process the next frame. This mechanism allows fine
     /// grained control of frame processing, and the frequency of invocations of
     /// the [`Collector`]. If time is advanced by less than the delay between
     /// frames, the collector will be called more than once per frame, and can
@@ -731,6 +732,15 @@ impl<'a> ReplayProcessor<'a> {
                 // This design allows the handler to have control over the frame
                 // rate, including the possibility of skipping frames.
                 if let TimeAdvance::Time(new_target) = target_time {
+                    if !new_target.is_finite() || new_target <= current_time {
+                        return SubtrActorError::new_result(
+                            SubtrActorErrorVariant::InvalidTimeAdvance {
+                                frame_index: index,
+                                current_time,
+                                target_time: new_target,
+                            },
+                        );
+                    }
                     current_time = new_target;
                 } else {
                     break;
