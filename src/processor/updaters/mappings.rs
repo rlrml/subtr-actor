@@ -111,6 +111,19 @@ impl<'a> ReplayProcessor<'a> {
     pub(crate) fn update_mappings(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
         let ctx = self.mapping_update_context()?;
 
+        if !frame.deleted_actors.is_empty() {
+            for links in [
+                &mut self.car_to_boost,
+                &mut self.car_to_dodge,
+                &mut self.car_to_jump,
+                &mut self.car_to_double_jump,
+            ] {
+                links.retain(|car, component| {
+                    !frame.deleted_actors.contains(car) && !frame.deleted_actors.contains(component)
+                });
+            }
+        }
+
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
                 ($map:expr_2021, $actor_ids:expr_2021, $get_key:expr_2021, $get_value:expr_2021, $type:path $(, skip_value $skip:expr_2021)?) => {{
@@ -265,16 +278,19 @@ impl<'a> ReplayProcessor<'a> {
     /// Refreshes the cached ball actor id, clearing it if the current ball was deleted.
     pub(crate) fn update_ball_id(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
         // XXX: This assumes there is only ever one ball, which is safe (I think?)
-        if let Some(actor_id) = self.ball_actor_id {
-            if frame.deleted_actors.contains(&actor_id) {
-                self.ball_actor_id = None;
-            }
-        } else {
+        if self
+            .ball_actor_id
+            .is_some_and(|actor_id| frame.deleted_actors.contains(&actor_id))
+        {
+            self.ball_actor_id = None;
+        }
+        if self.ball_actor_id.is_none() {
             self.ball_actor_id = self.find_ball_actor();
-            if self.ball_actor_id.is_some() {
-                return self.update_ball_id(frame);
-            }
         }
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "mappings_tests.rs"]
+mod tests;
