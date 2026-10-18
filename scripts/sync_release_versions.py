@@ -22,6 +22,7 @@ PACKAGE_LOCK_PATHS = [
     "js/package-lock.json",
     "js/player/package-lock.json",
     "js/stat-evaluation-player/package-lock.json",
+    "js/pages/package-lock.json",
 ]
 
 # READMEs that document the binding's `[dependencies.subtr-actor]` pin in a

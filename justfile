@@ -19,7 +19,7 @@ build-python:
 
 # Build JavaScript/WASM package
 build-js:
-    cd js && npm exec wasm-pack -- build --target bundler
+    cd js && npm run build
 
 # Run the stats evaluation player dev server
 dev-stats:
@@ -97,8 +97,8 @@ publish-python:
     {{nix_shell_bash}} 'cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org | grep token: | awk '"'"'{print $2}'"'"') twine upload ../target/wheels/*'
 
 # Publish JavaScript package to npm
-publish-js: build-js
-    cd js/pkg && npm publish
+publish-js:
+    cd js && npm run publish
 
 # Publish all packages in correct order (Rust first, then bindings)
 publish-all: publish-rust publish-python publish-js
@@ -170,7 +170,7 @@ check-types:
 bump version:
     python3 scripts/sync_release_versions.py "{{version}}"
     python3 scripts/check_release_versions.py
-    git add -A
+    git add -u
     git commit -m "Bump version to {{version}}"
     git tag -a "v{{version}}" -m "Release v{{version}}"
     git push && git push --tags

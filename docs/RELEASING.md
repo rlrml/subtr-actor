@@ -27,12 +27,11 @@ Publishes the Rust crate to crates.io.
 
 ### Python (`release-python.yml`)
 
-Builds wheels for multiple platforms:
+Builds abi3 wheels (one per platform, covering CPython 3.9+):
 
-- Linux x86_64 (manylinux) - compatible with AWS Lambda, Docker, etc.
-- Linux aarch64 (ARM)
+- Linux x86_64 and aarch64 (manylinux2014)
 - Windows x86_64
-- macOS x86_64 and arm64
+- macOS universal2 (x86_64 and arm64)
 - Source distribution (sdist)
 
 All artifacts are published to PyPI.
@@ -70,6 +69,11 @@ Option B: **API Token**
 
 ## How to Release
 
+Merging a version bump to `master` is enough: `auto-release.yml` notices that
+the workspace version has no matching tag, creates `v<version>`, and the tag
+triggers the release workflows above. To release from a local checkout
+instead, use `just bump`, which also commits, tags, and pushes.
+
 ### 1. Update Version Numbers
 
 Set the Cargo workspace version and synchronize every duplicated release
@@ -90,12 +94,15 @@ just bump "$VERSION"
 
 ### 2. Commit and Tag
 
+`just bump` already does this. If you ran the sync script by hand, commit the
+version changes and either merge them (auto-release tags for you) or tag and
+push yourself:
+
 ```bash
 VERSION=${VERSION:?set VERSION to the target release}
-git add -A
-git commit -m "Release v$VERSION"
-git tag "v$VERSION"
-git push origin master --tags
+git commit -am "Bump version to $VERSION"
+git tag -a "v$VERSION" -m "Release v$VERSION"
+git push origin master "v$VERSION"
 ```
 
 ### 3. Monitor the Release
@@ -119,15 +126,14 @@ If you need to release manually:
 ```bash
 cd python
 maturin build --release
-twine upload target/wheels/*
+twine upload ../target/wheels/*
 ```
 
 ### JavaScript
 
 ```bash
 cd js
-wasm-pack build --target bundler --out-dir pkg
-cd pkg && npm publish --access public
+npm run publish
 
 cd ../player
 package_dir="$(npm run --silent prepare:package)"
