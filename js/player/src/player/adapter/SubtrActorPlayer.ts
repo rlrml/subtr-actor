@@ -388,6 +388,13 @@ export class SubtrActorPlayer extends EventEmitter {
         }
       }
       if (!name) name = `Player_${key}`;
+      // Timelines, entities, and ActorManager are keyed by display name, so a
+      // duplicate name would overwrite another player; disambiguate it.
+      if (this.players.has(name)) {
+        let suffix = 2;
+        while (this.players.has(`${name} (${suffix})`)) suffix++;
+        name = `${name} (${suffix})`;
+      }
 
       // Prefer subtr-actor's resolved fields; fall back to the body-id table when
       // the replay header omits the body name (it often carries only car_body_id).
