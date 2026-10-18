@@ -149,9 +149,7 @@ function createBigBoostBase(radius: number): THREE.Group {
 function setChildMeshAvailability(mesh: PadMesh, available: boolean): void {
   for (const key of BOOST_PAD_CHILD_MESH_KEYS) {
     const child = mesh.userData[key] as
-      | THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
-      | THREE.Group
-      | undefined;
+      THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | THREE.Group | undefined;
     if (!child) {
       continue;
     }
@@ -418,9 +416,7 @@ export function createBoostPadsPlugin(): PlayerPlugin {
         mesh.material.dispose();
         for (const key of BOOST_PAD_CHILD_MESH_KEYS) {
           const glow = mesh.userData[key] as
-            | THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
-            | THREE.Group
-            | undefined;
+            THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | THREE.Group | undefined;
           if (glow) {
             glow.traverse((child) => {
               const childMesh = child as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;

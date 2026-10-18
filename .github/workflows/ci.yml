@@ -17,8 +17,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_HTTP_MULTIPLEXING: "false"
-  RUST_TOOLCHAIN: "1.98.1"
-  RUST_TEST_TOOLCHAIN: "1.98.1"
+  RUST_TOOLCHAIN: "1.99.1"
+  RUST_TEST_TOOLCHAIN: "1.99.1"
   RUN_FULL_REPLAY_TESTS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_replay_tests) }}
 
 jobs:
@@ -171,9 +171,9 @@ jobs:
         rustup default "$RUST_TOOLCHAIN"
 
     - name: Install Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
-        node-version: '22'
+        node-version: '24'
         cache: 'npm'
         cache-dependency-path: js/player/package-lock.json
 
@@ -221,9 +221,9 @@ jobs:
         rustup default "$RUST_TOOLCHAIN"
 
     - name: Install Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
-        node-version: '22'
+        node-version: '24'
         cache: 'npm'
         cache-dependency-path: |
           js/player/package-lock.json
@@ -274,9 +274,9 @@ jobs:
         rustup default "$RUST_TOOLCHAIN"
 
     - name: Install Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
-        node-version: '22'
+        node-version: '24'
         cache: 'npm'
         cache-dependency-path: |
           js/player/package-lock.json

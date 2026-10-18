@@ -70,11 +70,11 @@
     "camera-controls": "^2.10.1"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.9.9",
     "@types/three": "^0.180.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.5",
-    "vite-plugin-wasm": "^3.5.0"
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4",
+    "vite-plugin-wasm": "^3.6.0"
   }
 }

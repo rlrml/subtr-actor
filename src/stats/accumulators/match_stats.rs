@@ -471,6 +471,7 @@ pub(crate) fn player_id_sort_key(player_id: &PlayerId) -> String {
         boxcars::RemoteId::Xbox(id) => format!("xbox:{id}"),
         boxcars::RemoteId::QQ(id) => format!("qq:{id}"),
         boxcars::RemoteId::Epic(id) => format!("epic:{id}"),
+        other => format!("other:{other:?}"),
     }
 }
 

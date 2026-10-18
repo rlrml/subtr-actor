@@ -493,13 +493,11 @@ function disposeChildren(group: THREE.Group): void {
 
 function disposeObject(object: THREE.Object3D): void {
   object.traverse((child) => {
-    if (
-      !(
-        child instanceof THREE.Mesh ||
-        child instanceof THREE.Line ||
-        child instanceof THREE.LineSegments
-      )
-    ) {
+    if (!(
+      child instanceof THREE.Mesh ||
+      child instanceof THREE.Line ||
+      child instanceof THREE.LineSegments
+    )) {
       return;
     }
     child.geometry.dispose();

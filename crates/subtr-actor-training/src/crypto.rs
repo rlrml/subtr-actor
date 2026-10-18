@@ -6,8 +6,7 @@
 //! stored in the envelope, so decryption never has to strip padding.
 
 use aes::Aes256;
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
+use aes::cipher::{BlockCipherDecrypt, BlockCipherEncrypt, KeyInit};
 
 use crate::error::{Error, Result};
 
@@ -27,9 +26,9 @@ pub fn encrypt(data: &[u8]) -> Vec<u8> {
     let padded_len = data.len().div_ceil(BLOCK_SIZE) * BLOCK_SIZE;
     let mut out = vec![0u8; padded_len];
     out[..data.len()].copy_from_slice(data);
-    let cipher = Aes256::new(GenericArray::from_slice(&SAVE_DATA_AES_KEY));
+    let cipher = Aes256::new(&SAVE_DATA_AES_KEY.into());
     for block in out.as_chunks_mut::<BLOCK_SIZE>().0 {
-        cipher.encrypt_block(GenericArray::from_mut_slice(block));
+        cipher.encrypt_block(block.into());
     }
     out
 }
@@ -40,9 +39,9 @@ pub fn decrypt(data: &[u8]) -> Result<Vec<u8>> {
         return Err(Error::EncryptedLengthNotBlockAligned(data.len()));
     }
     let mut out = data.to_vec();
-    let cipher = Aes256::new(GenericArray::from_slice(&SAVE_DATA_AES_KEY));
+    let cipher = Aes256::new(&SAVE_DATA_AES_KEY.into());
     for block in out.as_chunks_mut::<BLOCK_SIZE>().0 {
-        cipher.decrypt_block(GenericArray::from_mut_slice(block));
+        cipher.decrypt_block(block.into());
     }
     Ok(out)
 }

@@ -204,5 +204,6 @@ fn remote_id_display_name(player_id: &PlayerId) -> Option<String> {
         boxcars::RemoteId::Xbox(id) => id.to_string(),
         boxcars::RemoteId::QQ(id) => id.to_string(),
         boxcars::RemoteId::Epic(id) => id.clone(),
+        _ => return None,
     })
 }
