@@ -375,11 +375,7 @@ impl MatchStatsCalculator {
             });
         }
 
-        self.timeline.sort_by(|a, b| {
-            a.time
-                .partial_cmp(&b.time)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        self.timeline.sort_by(|a, b| a.time.total_cmp(&b.time));
 
         Ok(())
     }
@@ -546,6 +542,7 @@ impl MatchStatsCalculator {
                 .touch_events
                 .iter()
                 .map(|event| event.time)
+                .filter(|time| time.is_finite())
                 .min_by(|a, b| a.total_cmp(b))
         {
             self.active_kickoff_touch_time = Some(first_touch_time);
@@ -620,6 +617,7 @@ impl MatchStatsCalculator {
                     )
                 })
             })
+            .filter(|(_, depth)| depth.is_finite())
             .min_by(|left, right| left.1.total_cmp(&right.1))
             .map(|(player_id, _)| player_id)
     }
@@ -1400,11 +1398,7 @@ impl MatchStatsCalculator {
             self.previous_team_scores = Some((team_zero_score, team_one_score));
         }
 
-        self.timeline.sort_by(|a, b| {
-            a.time
-                .partial_cmp(&b.time)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        self.timeline.sort_by(|a, b| a.time.total_cmp(&b.time));
         Ok(())
     }
 }

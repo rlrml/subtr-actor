@@ -58,6 +58,77 @@ fn active_gameplay() -> GameplayState {
     }
 }
 
+#[test]
+fn positioning_excludes_nonfinite_candidates_from_proximity_ranking() {
+    for invalid in [f32::NAN, f32::from_bits(0xffc0_0000), f32::INFINITY] {
+        let mut calculator = PositioningCalculator::new();
+        let players = PlayerFrameState {
+            players: vec![
+                player(1, true, glam::Vec3::splat(invalid)),
+                player(2, true, glam::vec3(0.0, 1000.0, 0.0)),
+            ],
+        };
+        calculator
+            .update(
+                &frame(1, 0.1),
+                &active_gameplay(),
+                &ball(glam::Vec3::ZERO),
+                &players,
+                &FrameEventsState::default(),
+                &LivePlayState::active_play(),
+                None,
+            )
+            .unwrap();
+        let events = calculator.ball_proximity_events();
+        let closest = events
+            .iter()
+            .find(|event| event.state.closest_to_ball_absolute)
+            .unwrap();
+        assert_eq!(closest.player, boxcars::RemoteId::Steam(2));
+        assert!(closest.state.closest_to_ball_team);
+        assert!(
+            !events
+                .iter()
+                .any(|event| event.player == boxcars::RemoteId::Steam(1)
+                    && (event.state.closest_to_ball_absolute
+                        || event.state.closest_to_ball_team
+                        || event.state.farthest_from_ball))
+        );
+    }
+}
+
+#[test]
+fn proximity_debouncer_drops_nonfinite_current_candidate() {
+    for invalid in [f32::NAN, f32::from_bits(0xffc0_0000), f32::INFINITY] {
+        let mut selector = ClosestToBallDebouncer::default();
+        let mut candidates = vec![
+            ClosestToBallCandidate {
+                player_id: boxcars::RemoteId::Steam(1),
+                distance: 1.0,
+            },
+            ClosestToBallCandidate {
+                player_id: boxcars::RemoteId::Steam(2),
+                distance: 2.0,
+            },
+        ];
+        assert_eq!(
+            selector
+                .select(&candidates, 0.1, 10.0, 1.0)
+                .unwrap()
+                .player_id,
+            candidates[0].player_id
+        );
+        candidates[0].distance = invalid;
+        assert_eq!(
+            selector
+                .select(&candidates, 0.1, 10.0, 1.0)
+                .unwrap()
+                .player_id,
+            candidates[1].player_id
+        );
+    }
+}
+
 fn active_gameplay_with_teams(team_zero: usize, team_one: usize) -> GameplayState {
     GameplayState {
         ball_has_been_hit: Some(true),

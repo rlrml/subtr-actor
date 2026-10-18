@@ -1016,3 +1016,23 @@ fn matches_two_small_pickups_from_one_observed_boost_increase() {
             .any(|event| event.detection == BoostPickupDetection::Both)
     );
 }
+
+#[test]
+fn nonfinite_positions_do_not_guess_boost_pad_identity_or_size() {
+    let calculator = BoostCalculator::new();
+    for invalid in [f32::NAN, f32::from_bits(0xffc0_0000), f32::INFINITY] {
+        let position = glam::Vec3::splat(invalid);
+        assert_eq!(
+            calculator.infer_pad_index("unknown", BoostPadSize::Small, position),
+            None
+        );
+        assert_eq!(
+            calculator.infer_pad_details_from_position("unknown", position),
+            None
+        );
+        assert_eq!(
+            calculator.guess_pad_size_from_position("unknown", position),
+            None
+        );
+    }
+}

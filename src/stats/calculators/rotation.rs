@@ -313,7 +313,15 @@ impl RotationCalculator {
             .iter()
             .filter(|player| player.is_team_0 == is_team_0)
             .filter(|player| !demoed_players.contains(&player.player_id))
-            .filter_map(|player| player.position().map(|position| (player, position)))
+            .filter_map(|player| {
+                player
+                    .position()
+                    .filter(|position| {
+                        position.is_finite()
+                            && first_man_score(*position, ball_position).is_finite()
+                    })
+                    .map(|position| (player, position))
+            })
             .collect();
         team_players.sort_by_key(|(player, _)| format!("{:?}", player.player_id));
 
@@ -343,9 +351,8 @@ impl RotationCalculator {
                 )
             })
             .collect();
-        scored_players.sort_by(|(_, left_score), (_, right_score)| {
-            left_score.partial_cmp(right_score).unwrap()
-        });
+        scored_players
+            .sort_by(|(_, left_score), (_, right_score)| left_score.total_cmp(right_score));
 
         let raw_first_man = raw_first_man(&scored_players, self.config.first_man_ambiguity_margin);
         let debounce_seconds = self.config.first_man_debounce_seconds;
