@@ -38,17 +38,17 @@
 //! frames unconditionally is the documented simplification that guarantees no
 //! event loss). Non-`Frame` messages are never dropped by downsampling.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io;
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant, SystemTime};
 
 use tungstenite::handshake::server::{ErrorResponse, Request, Response};
-use tungstenite::protocol::CloseFrame;
 use tungstenite::protocol::frame::coding::CloseCode;
+use tungstenite::protocol::{CloseFrame, WebSocketConfig};
 use tungstenite::{Message, WebSocket};
 
 use subtr_actor::PlayerId;
@@ -68,6 +68,11 @@ const READ_POLL_TIMEOUT: Duration = Duration::from_millis(1);
 const CLOSE_DRAIN_TIMEOUT: Duration = Duration::from_millis(100);
 const HELLO_TIMEOUT: Duration = Duration::from_secs(5);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long `shutdown` lets clients finish their close handshake before
+/// force-closing their sockets.
+const SHUTDOWN_GRACE: Duration = Duration::from_millis(500);
+/// Clients only send a Hello and control frames, so inbound messages stay small.
+const MAX_CLIENT_MESSAGE_BYTES: usize = 64 * 1024;
 const MIN_HEARTBEAT_INTERVAL: Duration = Duration::from_millis(10);
 
 /// Configuration for [`LiveExportServer::start`].
@@ -252,6 +257,17 @@ impl ServerHandle {
         if let Some(handle) = lock(&self.broadcaster_thread).take() {
             let _ = handle.join();
         }
+        let grace_deadline = Instant::now() + SHUTDOWN_GRACE;
+        while Instant::now() < grace_deadline
+            && !lock(&self.core.client_threads)
+                .iter()
+                .all(JoinHandle::is_finished)
+        {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        for socket in lock(&self.core.sockets).values() {
+            let _ = socket.stream.shutdown(Shutdown::Both);
+        }
         // The accept thread is joined, so no new client threads can appear;
         // the loop is belt-and-braces against races with it.
         loop {
@@ -285,6 +301,15 @@ struct ServerCore {
     frames_dropped: AtomicU64,
     next_client_id: AtomicU64,
     client_threads: Mutex<Vec<JoinHandle<()>>>,
+    /// Every client socket, so a peer stalled mid-read (dripping a handshake
+    /// or endless message fragments) can be force-closed. Entries carry their
+    /// handshake deadline until the client subscribes.
+    sockets: Mutex<HashMap<u64, ClientSocket>>,
+}
+
+struct ClientSocket {
+    stream: TcpStream,
+    handshake_deadline: Option<Instant>,
 }
 
 impl ServerCore {
@@ -300,6 +325,7 @@ impl ServerCore {
             frames_dropped: AtomicU64::new(0),
             next_client_id: AtomicU64::new(0),
             client_threads: Mutex::new(Vec::new()),
+            sockets: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -705,7 +731,9 @@ fn accept_loop(core: &Arc<ServerCore>, listener: &TcpListener) {
                     .name("subtr-actor-live-client".to_owned())
                     .spawn(move || client_thread(&client_core, stream));
                 if let Ok(handle) = spawned {
-                    lock(&core.client_threads).push(handle);
+                    let mut threads = lock(&core.client_threads);
+                    threads.retain(|thread| !thread.is_finished());
+                    threads.push(handle);
                 }
             }
             Err(error) if is_timeout_io_error(&error) => {
@@ -715,26 +743,76 @@ fn accept_loop(core: &Arc<ServerCore>, listener: &TcpListener) {
                 std::thread::sleep(ACCEPT_POLL_INTERVAL);
             }
         }
+        expire_handshakes(core);
+    }
+}
+
+/// Force-closes clients that haven't finished the handshake by their
+/// deadline; socket read timeouts alone can't bound a peer that drips bytes.
+fn expire_handshakes(core: &ServerCore) {
+    let now = Instant::now();
+    for socket in lock(&core.sockets).values_mut() {
+        if socket
+            .handshake_deadline
+            .is_some_and(|deadline| deadline <= now)
+        {
+            let _ = socket.stream.shutdown(Shutdown::Both);
+            socket.handshake_deadline = None;
+        }
     }
 }
 
 fn client_thread(core: &Arc<ServerCore>, stream: TcpStream) {
+    let id = core.next_client_id.fetch_add(1, Ordering::Relaxed);
+    let Ok(socket) = stream.try_clone() else {
+        return;
+    };
+    lock(&core.sockets).insert(
+        id,
+        ClientSocket {
+            stream: socket,
+            handshake_deadline: Some(Instant::now() + HELLO_TIMEOUT),
+        },
+    );
+    if let Some((ws, subscription)) = handshake(core, stream) {
+        if let Some(socket) = lock(&core.sockets).get_mut(&id) {
+            socket.handshake_deadline = None;
+        }
+        if !core.shutdown.load(Ordering::SeqCst) {
+            serve_client(core, id, ws, subscription);
+        }
+    }
+    lock(&core.sockets).remove(&id);
+}
+
+/// Runs the WebSocket upgrade and Hello negotiation, bounded by
+/// `HELLO_TIMEOUT` and abandoned on server shutdown.
+fn handshake(core: &ServerCore, stream: TcpStream) -> Option<(WebSocket<TcpStream>, Subscription)> {
+    if core.shutdown.load(Ordering::SeqCst) {
+        return None;
+    }
+    let hello_deadline = Instant::now() + HELLO_TIMEOUT;
     if stream.set_read_timeout(Some(HELLO_TIMEOUT)).is_err()
         || stream.set_write_timeout(Some(WRITE_TIMEOUT)).is_err()
     {
-        return;
+        return None;
     }
     let mut format_json_query = false;
-    let accepted = tungstenite::accept_hdr(stream, |request: &Request, response: Response| {
-        format_json_query = request
-            .uri()
-            .query()
-            .is_some_and(|query| query.split('&').any(|pair| pair == "format=json"));
-        Ok::<_, ErrorResponse>(response)
-    });
-    let Ok(mut ws) = accepted else {
-        return;
-    };
+    let config = WebSocketConfig::default()
+        .max_message_size(Some(MAX_CLIENT_MESSAGE_BYTES))
+        .max_frame_size(Some(MAX_CLIENT_MESSAGE_BYTES));
+    let accepted = tungstenite::accept_hdr_with_config(
+        stream,
+        |request: &Request, response: Response| {
+            format_json_query = request
+                .uri()
+                .query()
+                .is_some_and(|query| query.split('&').any(|pair| pair == "format=json"));
+            Ok::<_, ErrorResponse>(response)
+        },
+        Some(config),
+    );
+    let mut ws = accepted.ok()?;
 
     let subscription = if format_json_query {
         // `GET /?format=json` subscribes without a Hello, for zero-code
@@ -744,25 +822,27 @@ fn client_thread(core: &Arc<ServerCore>, stream: TcpStream) {
             max_frame_hz: None,
         })
     } else {
-        negotiate_hello(&mut ws)
+        negotiate_hello(core, &mut ws, hello_deadline)
     };
-    let Some(subscription) = subscription else {
-        return;
-    };
-    if ws
-        .get_ref()
+    let subscription = subscription?;
+    ws.get_ref()
         .set_read_timeout(Some(READ_POLL_TIMEOUT))
-        .is_err()
-    {
-        return;
-    }
+        .ok()?;
+    Some((ws, subscription))
+}
 
+fn serve_client(
+    core: &Arc<ServerCore>,
+    id: u64,
+    mut ws: WebSocket<TcpStream>,
+    subscription: Subscription,
+) {
     let min_frame_interval = subscription
         .max_frame_hz
         .filter(|hz| hz.is_finite() && *hz > 0.0)
-        .map(|hz| Duration::from_secs_f32(1.0 / hz));
+        .map(|hz| Duration::try_from_secs_f32(1.0 / hz).unwrap_or(Duration::MAX));
     let slot = Arc::new(ClientSlot {
-        id: core.next_client_id.fetch_add(1, Ordering::Relaxed),
+        id,
         encoding: subscription.encoding,
         min_frame_interval,
         queue: Mutex::new(ClientQueue::default()),
@@ -824,9 +904,21 @@ fn enqueue_for(core: &ServerCore, slot: &ClientSlot, message: &ServerMessage) {
 }
 
 /// Reads the initial `Hello` (always JSON text) and validates the protocol
-/// version, closing the socket with a descriptive reason on failure.
-fn negotiate_hello(ws: &mut WebSocket<TcpStream>) -> Option<Subscription> {
+/// version, closing the socket with a descriptive reason on failure. Gives up
+/// at `deadline` or on server shutdown, so pings can't hold the thread open.
+fn negotiate_hello(
+    core: &ServerCore,
+    ws: &mut WebSocket<TcpStream>,
+    deadline: Instant,
+) -> Option<Subscription> {
     loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero()
+            || core.shutdown.load(Ordering::SeqCst)
+            || ws.get_ref().set_read_timeout(Some(remaining)).is_err()
+        {
+            return None;
+        }
         let message = match ws.read() {
             Ok(message) => message,
             Err(_) => return None,
