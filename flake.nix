@@ -479,6 +479,8 @@
 
           env = {
             UV_PYTHON_DOWNLOADS = "never";
+            # uv skips virtualenv interpreters when choosing one for locking.
+            UV_PYTHON = pkgs.python312.interpreter;
           };
 
           shellHook = ''
