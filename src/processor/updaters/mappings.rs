@@ -124,6 +124,12 @@ impl<'a> ReplayProcessor<'a> {
             }
         }
 
+        for actor_id in frame.deleted_actors.iter() {
+            if let Some(car_id) = self.player_to_car.remove(actor_id) {
+                log::info!("Player actor {actor_id:?} deleted, car id: {car_id:?}.");
+            }
+        }
+
         for update in frame.updated_actors.iter() {
             macro_rules! maintain_link {
                 ($map:expr_2021, $actor_ids:expr_2021, $get_key:expr_2021, $get_value:expr_2021, $type:path $(, skip_value $skip:expr_2021)?) => {{
@@ -261,12 +267,6 @@ impl<'a> ReplayProcessor<'a> {
                     );
                 }
                 _ => {}
-            }
-        }
-
-        for actor_id in frame.deleted_actors.iter() {
-            if let Some(car_id) = self.player_to_car.remove(actor_id) {
-                log::info!("Player actor {actor_id:?} deleted, car id: {car_id:?}.");
             }
         }
 

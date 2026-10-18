@@ -157,3 +157,41 @@ fn replacement_ball_is_available_in_its_spawn_frame() {
         assert_eq!(processor.get_ball_actor_id().unwrap(), new_ball);
     }
 }
+
+#[test]
+fn same_frame_player_actor_reuse_preserves_the_new_car_link() {
+    let replay = replay();
+    let mut processor = ReplayProcessor::new(&replay).unwrap();
+    processor.process_long_enough_to_get_actor_ids().unwrap();
+    let player = processor.team_zero[0].clone();
+    let player_actor = processor.player_to_actor_id[&player];
+    let old_car = processor.get_car_actor_id(&player).unwrap();
+    let new_car = boxcars::ActorId(10000);
+    let mut frame = empty_frame();
+    frame.deleted_actors.push(player_actor);
+    frame.new_actors = vec![
+        spawn(
+            player_actor,
+            processor.actor_state.actor_states[&player_actor].object_id,
+        ),
+        spawn(
+            new_car,
+            processor.actor_state.actor_states[&old_car].object_id,
+        ),
+    ];
+    frame.updated_actors.push(boxcars::UpdatedAttribute {
+        actor_id: new_car,
+        object_id: *processor
+            .get_object_id_for_key(PLAYER_REPLICATION_KEY)
+            .unwrap(),
+        stream_id: boxcars::StreamId(0),
+        attribute: boxcars::Attribute::ActiveActor(active(player_actor)),
+    });
+    processor.actor_state.process_frame(&frame, 400).unwrap();
+    processor.update_mappings(&frame).unwrap();
+    assert_eq!(processor.get_car_actor_id(&player).unwrap(), new_car);
+    assert_eq!(
+        processor.get_player_id_from_car_id(&new_car).unwrap(),
+        player
+    );
+}
