@@ -147,8 +147,8 @@ package_dir="$(npm run --silent prepare:package)"
 
 ### Linux wheel missing
 
-- The `manylinux: auto` setting should produce compatible wheels
-- If issues persist, try `manylinux: 2014` or `manylinux: 2_28`
+- Linux wheels are built with `--zig --compatibility manylinux2014`; check that
+  the zig toolchain installed by `maturin[zig]` supports the target
 
 ### npm publish fails
 

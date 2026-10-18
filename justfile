@@ -77,7 +77,7 @@ ballchasing-fixture replay_id name:
 
 # Run Python tests
 test-python:
-    {{nix_shell_bash}} 'cd python && pytest'
+    {{nix_shell_bash}} 'set -euo pipefail; out=$(mktemp -d); maturin build --manifest-path python/Cargo.toml --release --out "$out/wheels"; python3 -m zipfile -e "$out"/wheels/*.whl "$out/site"; cd python && PYTHONPATH="$out/site" pytest -q --import-mode=append'
 
 # Recreate the threat-model virtual environment exactly from its lockfile.
 threat-model-sync:
