@@ -102,20 +102,6 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 
-    /// Returns whether a demolish has already been recorded within the dedupe window.
-    pub(crate) fn demolish_is_known(&self, demo: &DemolishAttribute, frame_index: usize) -> bool {
-        self.known_demolishes
-            .iter()
-            .any(|(existing, existing_frame_index)| {
-                existing == demo
-                    && frame_index
-                        .checked_sub(*existing_frame_index)
-                        .or_else(|| existing_frame_index.checked_sub(frame_index))
-                        .unwrap()
-                        < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
-            })
-    }
-
     /// Returns the demolish attribute encoding currently used by the replay, if known.
     pub fn get_demolish_format(&self) -> Option<DemolishFormat> {
         self.demolish_format

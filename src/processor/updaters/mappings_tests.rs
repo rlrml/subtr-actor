@@ -127,7 +127,6 @@ fn car_deletion_clears_components_but_preserves_same_frame_demolition() {
         assert!(!links.contains_key(&victim_car));
     }
     processor.demolishes.clear();
-    processor.known_demolishes.clear();
     processor.update_demolishes(&frame, 400).unwrap();
     assert_eq!(processor.demolishes.len(), 1);
     assert_eq!(processor.demolishes[0].victim, victim);

@@ -391,10 +391,16 @@ pub struct ReplayProcessor<'a> {
     player_stat_counters: HashMap<(PlayerId, PlayerStatEventKind), i32>,
     /// All demolishes observed so far in the replay.
     pub demolishes: Vec<DemolishInfo>,
+    failed_demolishes: Vec<FailedDemolish>,
     deleted_mapping_actor_ids: std::collections::HashSet<boxcars::ActorId>,
-    known_demolishes: Vec<(DemolishAttribute, usize)>,
     demolish_format: Option<DemolishFormat>,
     kickoff_phase_active_last_frame: bool,
+}
+
+struct FailedDemolish {
+    attribute: DemolishAttribute,
+    first_frame: usize,
+    waiting_for_players: bool,
 }
 
 impl<'a> ReplayProcessor<'a> {
@@ -505,8 +511,8 @@ impl<'a> ReplayProcessor<'a> {
             current_frame_player_stat_events: Vec::new(),
             player_stat_counters: HashMap::new(),
             demolishes: Vec::new(),
+            failed_demolishes: Vec::new(),
             deleted_mapping_actor_ids: Default::default(),
-            known_demolishes: Vec::new(),
             demolish_format: None,
             kickoff_phase_active_last_frame: false,
         };
@@ -819,7 +825,7 @@ impl<'a> ReplayProcessor<'a> {
         self.current_frame_player_stat_events = Vec::new();
         self.player_stat_counters = HashMap::new();
         self.demolishes = Vec::new();
-        self.known_demolishes = Vec::new();
+        self.failed_demolishes.clear();
         self.demolish_format = None;
         self.kickoff_phase_active_last_frame = false;
     }
