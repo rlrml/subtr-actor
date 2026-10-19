@@ -6,6 +6,7 @@ authors = [{ name = "Ivan Malison", email = "ivanmalison@gmail.com" }]
 license = { text = "MIT" }
 readme = "PYTHON-README.md"
 requires-python = ">=3.9"
+dependencies = ["numpy"]
 
 [project.urls]
 Repository = "https://github.com/rlrml/subtr-actor"
