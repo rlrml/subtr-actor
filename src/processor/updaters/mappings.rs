@@ -109,6 +109,13 @@ impl<'a> ReplayProcessor<'a> {
     /// deleted, the function removes the actor's ID from the `player_to_car`
     /// mapping.
     pub(crate) fn update_mappings(&mut self, frame: &boxcars::Frame) -> SubtrActorResult<()> {
+        // Preserve deletion-frame lookups and bootstrap links until an id is reused.
+        self.deleted_mapping_actor_ids.extend(&frame.deleted_actors);
+        for actor in &frame.new_actors {
+            if self.deleted_mapping_actor_ids.remove(&actor.actor_id) {
+                self.clear_actor_mappings(actor.actor_id);
+            }
+        }
         let ctx = self.mapping_update_context()?;
 
         if !frame.deleted_actors.is_empty() {
@@ -273,6 +280,27 @@ impl<'a> ReplayProcessor<'a> {
         self.sync_player_order_from_known_mappings();
 
         Ok(())
+    }
+
+    fn clear_actor_mappings(&mut self, actor_id: boxcars::ActorId) {
+        for links in [
+            &mut self.player_to_car,
+            &mut self.player_to_team,
+            &mut self.car_to_player,
+            &mut self.car_to_boost,
+            &mut self.car_to_jump,
+            &mut self.car_to_double_jump,
+            &mut self.car_to_dodge,
+            &mut self.camera_settings_actor_to_player_actor,
+            &mut self.player_actor_to_camera_settings_actor,
+        ] {
+            links.retain(|key, value| *key != actor_id && *value != actor_id);
+        }
+        self.player_to_actor_id
+            .retain(|_, value| *value != actor_id);
+        self.player_actor_to_loadout.remove(&actor_id);
+        self.player_actor_to_camera_settings.remove(&actor_id);
+        self.camera_settings_actor_to_settings.remove(&actor_id);
     }
 
     /// Refreshes the cached ball actor id, clearing it if the current ball was deleted.

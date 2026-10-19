@@ -391,6 +391,7 @@ pub struct ReplayProcessor<'a> {
     player_stat_counters: HashMap<(PlayerId, PlayerStatEventKind), i32>,
     /// All demolishes observed so far in the replay.
     pub demolishes: Vec<DemolishInfo>,
+    deleted_mapping_actor_ids: std::collections::HashSet<boxcars::ActorId>,
     known_demolishes: Vec<(DemolishAttribute, usize)>,
     demolish_format: Option<DemolishFormat>,
     kickoff_phase_active_last_frame: bool,
@@ -504,6 +505,7 @@ impl<'a> ReplayProcessor<'a> {
             current_frame_player_stat_events: Vec::new(),
             player_stat_counters: HashMap::new(),
             demolishes: Vec::new(),
+            deleted_mapping_actor_ids: Default::default(),
             known_demolishes: Vec::new(),
             demolish_format: None,
             kickoff_phase_active_last_frame: false,
@@ -799,6 +801,7 @@ impl<'a> ReplayProcessor<'a> {
         // player identity late during bootstrap, but the actor ids are already
         // valid for earlier frames once frame processing restarts.
         self.actor_state = ActorStateModeler::new();
+        self.deleted_mapping_actor_ids.clear();
         self.boost_pad_events = Vec::new();
         self.current_frame_boost_pad_events = Vec::new();
         self.boost_pad_pickup_sequence_times = HashMap::new();

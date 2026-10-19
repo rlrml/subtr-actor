@@ -187,6 +187,15 @@ fn same_frame_player_actor_reuse_preserves_the_new_car_link() {
         stream_id: boxcars::StreamId(0),
         attribute: boxcars::Attribute::ActiveActor(active(player_actor)),
     });
+    frame.updated_actors.push(boxcars::UpdatedAttribute {
+        actor_id: player_actor,
+        object_id: *processor.get_object_id_for_key(UNIQUE_ID_KEY).unwrap(),
+        stream_id: boxcars::StreamId(0),
+        attribute: processor.actor_state.actor_states[&player_actor].attributes
+            [processor.get_object_id_for_key(UNIQUE_ID_KEY).unwrap()]
+        .0
+        .clone(),
+    });
     processor.actor_state.process_frame(&frame, 400).unwrap();
     processor.update_mappings(&frame).unwrap();
     assert_eq!(processor.get_car_actor_id(&player).unwrap(), new_car);
@@ -194,4 +203,32 @@ fn same_frame_player_actor_reuse_preserves_the_new_car_link() {
         processor.get_player_id_from_car_id(&new_car).unwrap(),
         player
     );
+}
+
+#[test]
+fn reused_actor_ids_do_not_resolve_previous_players() {
+    let replay = replay();
+    for reuse_player in [false, true] {
+        let mut processor = ReplayProcessor::new(&replay).unwrap();
+        processor.process_long_enough_to_get_actor_ids().unwrap();
+        let player = processor.team_zero[0].clone();
+        let car = processor.get_car_actor_id(&player).unwrap();
+        let actor = if reuse_player {
+            processor.player_to_actor_id[&player]
+        } else {
+            car
+        };
+        let object = processor.actor_state.actor_states[&actor].object_id;
+        let mut frame = empty_frame();
+        frame.deleted_actors.push(actor);
+        processor.actor_state.process_frame(&frame, 400).unwrap();
+        processor.update_mappings(&frame).unwrap();
+        assert_eq!(processor.get_player_id_from_car_id(&car).unwrap(), player);
+        frame.deleted_actors.clear();
+        frame.new_actors.push(spawn(actor, object));
+        processor.actor_state.process_frame(&frame, 401).unwrap();
+        processor.update_mappings(&frame).unwrap();
+        assert!(processor.get_player_id_from_car_id(&car).is_err());
+        assert!(processor.get_car_actor_id(&player).is_err());
+    }
 }
