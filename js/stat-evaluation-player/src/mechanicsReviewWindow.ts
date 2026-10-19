@@ -1,4 +1,4 @@
-import type { ReplayPlayerState } from "@rlrml/player";
+import { PlaylistLoadCache, type ReplayPlayerState } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import {
   formatMechanicsReviewClipDetails,
@@ -64,7 +64,7 @@ export interface MechanicsReviewWindowOptions {
   loadReplayBundleForDisplay(
     source: MechanicsReviewReplaySource,
     bundlePromise: Promise<ReplayLoadBundle>,
-  ): Promise<void>;
+  ): Promise<boolean>;
   applyClipPerspective(options: {
     playerId: string;
     ballCam?: MechanicsReviewBallCamMode;
@@ -332,7 +332,7 @@ export class MechanicsReviewWindowController {
       sourceUrl,
       replaysById,
       replayLoadStates: new Map(),
-      replayLoadCache: new Map(),
+      replayLoadCache: new PlaylistLoadCache(),
       currentIndex: 0,
       loading: false,
       preloading: false,
@@ -384,7 +384,11 @@ export class MechanicsReviewWindowController {
       if (!replayPlayer || review.currentReplayId !== item.replay) {
         const source = this.options.replayLoads.createReplaySource(item, review);
         const replayBundlePromise = this.options.replayLoads.loadBundle(item, review);
-        await this.options.loadReplayBundleForDisplay(source, replayBundlePromise);
+        const displayed = await this.options.loadReplayBundleForDisplay(
+          source,
+          replayBundlePromise,
+        );
+        if (!displayed) return;
         review.currentReplayId = item.replay;
       }
       this.options.replayLoads.preload(review, index);

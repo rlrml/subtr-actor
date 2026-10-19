@@ -40,8 +40,8 @@ export class SceneManager {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.container.appendChild(this.renderer.domElement);
 
-    // Resize handler
-    window.addEventListener("resize", () => this.onWindowResize());
+    this._onWindowResize = () => this.onWindowResize();
+    window.addEventListener("resize", this._onWindowResize);
   }
 
   /**
@@ -198,6 +198,10 @@ export class SceneManager {
   }
 
   dispose() {
+    if (this._onWindowResize) {
+      window.removeEventListener("resize", this._onWindowResize);
+      this._onWindowResize = null;
+    }
     if (this.renderer) {
       this.renderer.dispose();
       if (this.renderer.domElement && this.renderer.domElement.parentNode) {

@@ -388,6 +388,13 @@ export class SubtrActorPlayer extends EventEmitter {
         }
       }
       if (!name) name = `Player_${key}`;
+      // Timelines, entities, and ActorManager are keyed by display name, so a
+      // duplicate name would overwrite another player; disambiguate it.
+      if (this.players.has(name)) {
+        let suffix = 2;
+        while (this.players.has(`${name} (${suffix})`)) suffix++;
+        name = `${name} (${suffix})`;
+      }
 
       // Prefer subtr-actor's resolved fields; fall back to the body-id table when
       // the replay header omits the body name (it often carries only car_body_id).
@@ -400,7 +407,10 @@ export class SubtrActorPlayer extends EventEmitter {
       const flags: FlagsKeyframe[] = [];
       pdata.frames.forEach((f, i) => {
         const time = t(metaFrames[i]?.time ?? startTime);
-        if (f === "Empty" || !("Data" in f)) return;
+        if (f === "Empty" || !("Data" in f)) {
+          flags.push({ time, boost: 0, isBoosting: false, present: false, steer: 0 });
+          return;
+        }
         const mk = this._rbToKeyframe(f.Data.rigid_body, time, i);
         if (mk) motion.push(mk);
         const rawSteer = f.Data.input?.steer;
@@ -408,7 +418,7 @@ export class SubtrActorPlayer extends EventEmitter {
           time,
           boost: boostToPercent(f.Data.boost_amount ?? 0),
           isBoosting: !!f.Data.boost_active,
-          present: true,
+          present: mk !== null,
           // ReplicatedSteer is a byte (~128 neutral); normalize to -1..1 for
           // the renderer's wheel steering (ActorManager scales by max angle).
           steer: rawSteer == null ? 0 : Math.max(-1, Math.min(1, (rawSteer - 128) / 128)),
@@ -862,11 +872,7 @@ export class SubtrActorPlayer extends EventEmitter {
       if (cameraEvent && cameraEvent.ballCam != null) {
         entity.isBallCam = cameraEvent.ballCam;
       }
-      // Presence: visible while we have motion data near `time`. A demolished
-      // car produces Empty frames -> no nearby keyframe -> hidden.
-      const tl = this._playerTimelines[name] ?? [];
-      entity.isVisible =
-        tl.length > 0 && time >= tl[0].time - 0.001 && time <= tl[tl.length - 1].time + 1.0;
+      entity.isVisible = fl !== null && fl.time <= time && fl.present;
     }
     for (const pad of this.boostPads.values()) {
       if (pad.events.length === 0) continue; // no events recorded -> always available

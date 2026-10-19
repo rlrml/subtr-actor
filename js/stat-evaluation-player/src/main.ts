@@ -512,8 +512,8 @@ async function loadReplay(source: ReplayInputSource): Promise<void> {
 async function loadReplayBundleForDisplay(
   source: ReplayInputSource,
   bundlePromise: Promise<ReplayLoadBundle>,
-): Promise<void> {
-  await loadReplayBundleForDisplayRuntime(source, bundlePromise, {
+): Promise<boolean> {
+  return loadReplayBundleForDisplayRuntime(source, bundlePromise, {
     elements: {
       fileInput,
       viewport,

@@ -64,7 +64,11 @@ import type {
 } from "./types.js";
 
 type PlayerListener = (state: PlayerState) => void;
-type InstalledPlugin = { definition: PlayerPluginDefinition; plugin: PlayerPlugin };
+type InstalledPlugin = {
+  definition: PlayerPluginDefinition;
+  plugin: PlayerPlugin;
+  active: boolean;
+};
 type FreeCameraTransition = {
   position: THREE.Vector3;
   target: THREE.Vector3;
@@ -249,6 +253,8 @@ export class ReplayPlayer extends EventTarget {
   private currentTime = 0;
   private lastTickAt: number | null = null;
   private freeCameraTransition: FreeCameraTransition | null = null;
+  private replaceGeneration = 0;
+  private pendingReplaceResume = false;
 
   // ── @rlrml/player-parity state (docs/player/PLAYER_PARITY.md). Camera fields are
   //    delegated to an installed camera plugin (id "camera") when present; the
@@ -412,7 +418,9 @@ export class ReplayPlayer extends EventTarget {
       throw new Error("Cannot replace replay on a disposed ReplayPlayer");
     }
 
-    const shouldResume = options.preservePlayback ?? this.playing;
+    const generation = ++this.replaceGeneration;
+    const shouldResume = options.preservePlayback ?? (this.playing || this.pendingReplaceResume);
+    this.pendingReplaceResume = shouldResume;
     if (this.playing) {
       this.setPlayingInternal(false);
     }
@@ -449,12 +457,15 @@ export class ReplayPlayer extends EventTarget {
       }
     }
 
-    this.seekInternal(options.currentTime ?? 0);
+    const startTime = options.currentTime ?? 0;
+    this.seekInternal(Number.isFinite(startTime) ? startTime : 0);
     this.readyResolved = false;
     this.ready = this.prepareReplayAssets().then(() => {
-      this.markReady();
+      if (generation === this.replaceGeneration) this.markReady();
     });
     await this.ready;
+    if (this.disposed || generation !== this.replaceGeneration) return;
+    this.pendingReplaceResume = false;
 
     this.setupPlugins();
     this.applyInitialCameraOptions();
@@ -858,7 +869,7 @@ export class ReplayPlayer extends EventTarget {
     const index = this.plugins.findIndex((entry) => entry.plugin.id === id);
     if (index < 0) return false;
     const [entry] = this.plugins.splice(index, 1);
-    entry.plugin.teardown?.(this.createPluginContext());
+    this.teardownPlugin(entry);
     return true;
   }
 
@@ -879,11 +890,11 @@ export class ReplayPlayer extends EventTarget {
     this.beforeRenderCallbacks.length = 0;
     while (this.plugins.length > 0) {
       const entry = this.plugins.pop();
-      entry?.plugin.teardown?.(this.createPluginContext());
+      if (entry) this.teardownPlugin(entry);
     }
     this.controls.dispose();
     if (this.effectsEnabled) {
-      this.effectsManager.reset();
+      this.effectsManager.dispose();
     }
     this.hitboxManager.dispose();
     this.actorManager.reset();
@@ -910,6 +921,7 @@ export class ReplayPlayer extends EventTarget {
       .waitForBallModel()
       .catch(() => false)
       .then(() => {
+        if (this.disposed) return;
         if (this.effectsEnabled) {
           try {
             this.effectsManager.setRenderContext(this.renderer, this.camera);
@@ -955,24 +967,36 @@ export class ReplayPlayer extends EventTarget {
     );
   }
 
+  private teardownPlugin(entry: InstalledPlugin): void {
+    if (!entry.active) return;
+    entry.active = false;
+    entry.plugin.teardown?.(this.createPluginContext());
+  }
+
+  private setupPlugin(entry: InstalledPlugin): void {
+    if (entry.active) return;
+    entry.active = true;
+    entry.plugin.setup?.(this.createPluginContext());
+    if (entry.plugin.id === "camera") {
+      this.pushCameraParityState();
+    }
+    entry.plugin.onStateChange?.(this.createPluginStateContext(this.getState()));
+  }
+
   private teardownPlugins(): void {
-    const context = this.createPluginContext();
     for (const entry of this.plugins) {
-      entry.plugin.teardown?.(context);
+      this.teardownPlugin(entry);
     }
   }
 
   private setupPlugins(): void {
     for (const entry of this.plugins) {
-      entry.plugin.setup?.(this.createPluginContext());
-      if (entry.plugin.id === "camera") {
-        this.pushCameraParityState();
-      }
-      entry.plugin.onStateChange?.(this.createPluginStateContext(this.getState()));
+      this.setupPlugin(entry);
     }
   }
 
   private seekInternal(time: number): void {
+    if (!Number.isFinite(time)) return;
     this.currentTime = THREE.MathUtils.clamp(time, 0, this.duration);
     // Sync the THREE animation system (if active) to the new time, and reset
     // trackers that work off frame-to-frame deltas so they don't see the jump:
@@ -985,10 +1009,17 @@ export class ReplayPlayer extends EventTarget {
     this.actorManager.resetWheelTracking();
   }
 
-  /** Where playback stops: the last segment's start if skips run to the end. */
+  /**
+   * Where playback stops: the last segment's start if skips run to the end.
+   * Never past the adapter's duration, which is shorter than the ReplayModel's
+   * when timelineCompaction removes gaps.
+   */
   private getPlaybackEndTime(): number {
     return this.replay
-      ? getReplayPlaybackEndTime(this.replay.duration, this.getTimelineSegments())
+      ? Math.min(
+          this.duration,
+          getReplayPlaybackEndTime(this.replay.duration, this.getTimelineSegments()),
+        )
       : this.duration;
   }
 
@@ -1210,7 +1241,7 @@ export class ReplayPlayer extends EventTarget {
     if (this.plugins.length > 0) {
       const renderContext = this.createRenderContext();
       for (const entry of this.plugins) {
-        entry.plugin.beforeRender?.(renderContext);
+        if (entry.active) entry.plugin.beforeRender?.(renderContext);
       }
     }
     this.updateFreeCameraTransition();
@@ -1337,15 +1368,11 @@ export class ReplayPlayer extends EventTarget {
       throw new Error(`Player plugin "${plugin.id}" is already installed`);
     }
 
-    const entry = { definition, plugin };
+    const entry: InstalledPlugin = { definition, plugin, active: false };
     this.plugins.push(entry);
-    plugin.setup?.(this.createPluginContext());
-    if (plugin.id === "camera") {
-      // A camera plugin installed after construction picks up any parity
-      // camera state already set through the ReplayPlayer surface.
-      this.pushCameraParityState();
-    }
-    plugin.onStateChange?.(this.createPluginStateContext(this.getState()));
+    // A camera plugin installed after construction picks up any parity camera
+    // state already set through the ReplayPlayer surface (see setupPlugin).
+    this.setupPlugin(entry);
     if (renderAfterSetup) {
       this.render();
     }
@@ -1354,7 +1381,7 @@ export class ReplayPlayer extends EventTarget {
       const index = this.plugins.indexOf(entry);
       if (index < 0) return;
       this.plugins.splice(index, 1);
-      plugin.teardown?.(this.createPluginContext());
+      this.teardownPlugin(entry);
     };
   }
 
@@ -1478,7 +1505,7 @@ export class ReplayPlayer extends EventTarget {
     const state = this.getState();
     const pluginStateContext = this.createPluginStateContext(state);
     for (const entry of this.plugins) {
-      entry.plugin.onStateChange?.(pluginStateContext);
+      if (entry.active) entry.plugin.onStateChange?.(pluginStateContext);
     }
     this.dispatchEvent(new CustomEvent<PlayerState>("change", { detail: state }));
   }

@@ -2026,7 +2026,8 @@ export class ActorManager {
       return { ...k0.position };
     }
 
-    const t = (time - k0.time) / dt;
+    // Clamp: past the last keyframe the segment is (n-2, n-1); never extrapolate.
+    const t = Math.min(1, Math.max(0, (time - k0.time) / dt));
     let pos;
     // Apply selected interpolation method
     switch (this.interpolationMethod) {
@@ -2351,7 +2352,7 @@ export class ActorManager {
       return { ...k0.rotation };
     }
 
-    const t = (time - k0.time) / dt;
+    const t = Math.min(1, Math.max(0, (time - k0.time) / dt));
 
     // Use standard SLERP for all modes - it naturally produces constant angular velocity
     // between keyframes, which is the smoothest possible rotation interpolation.
@@ -2402,7 +2403,7 @@ export class ActorManager {
     const dt = k1.time - k0.time;
     if (dt <= 0) return k0.position;
 
-    const t = (time - k0.time) / dt;
+    const t = Math.min(1, Math.max(0, (time - k0.time) / dt));
     let pos;
 
     // Apply selected interpolation method
@@ -2685,7 +2686,7 @@ export class ActorManager {
     const dt = k1.time - k0.time;
     if (dt <= 0) return k0.rotation;
 
-    const t = (time - k0.time) / dt;
+    const t = Math.min(1, Math.max(0, (time - k0.time) / dt));
 
     // For all modes: use standard SLERP which gives smooth, constant-speed rotation
     // SLERP naturally produces constant angular velocity between keyframes

@@ -59,6 +59,18 @@ export class MechanicsReviewReplayLoadsController {
   }
 
   initialize(review: ActiveMechanicsReview): void {
+    review.replayLoadCache.subscribe(() => {
+      for (const [id, current] of review.replayLoadStates) {
+        const state = review.replayLoadCache.getState(id);
+        review.replayLoadStates.set(id, {
+          ...current,
+          status: state.status,
+          progress: state.status === "loading" ? current.progress : null,
+          error: state.error,
+        });
+      }
+      if (this.options.isActiveReview(review)) this.render(review);
+    });
     const clipCounts = this.getReplayClipCounts(review);
     for (const [replayId, item] of this.getReplayItems(review)) {
       let path = "";
@@ -112,51 +124,28 @@ export class MechanicsReviewReplayLoadsController {
   }
 
   loadBundle(item: MechanicsReviewItem, review: ActiveMechanicsReview): Promise<ReplayLoadBundle> {
-    const cached = review.replayLoadCache.get(item.replay);
-    if (cached) {
-      return cached;
-    }
-
-    const source = this.createReplaySource(item, review);
-    this.updateLoadState(review, item.replay, {
-      label: source.name,
-      path: getMechanicsReviewReplayPath(item, review),
-      status: "loading",
-      progress: null,
-      error: null,
-    });
-    const loadPromise = Promise.resolve()
-      .then(async () => {
+    const active = review.manifest.items[review.currentIndex];
+    review.replayLoadCache.protect([
+      ...(active ? [active.replay] : []),
+      ...(review.currentReplayId ? [review.currentReplayId] : []),
+      ...this.getNextReplayItems(review, review.currentIndex).map((next) => next.replay),
+    ]);
+    return review.replayLoadCache.load({
+      id: item.replay,
+      load: async (context) => {
+        const source = this.createReplaySource(item, review);
         const bytes = await source.readBytes();
         return loadReplayBundleInWorker(bytes, {
           reportEveryNFrames: 100,
           onProgress: (progress) => {
-            this.updateLoadState(review, item.replay, {
-              status: "loading",
-              progress,
-              error: null,
-            });
+            context?.updateProgress(progress);
+            if (review.replayLoadCache.getState(item.replay).progress === progress) {
+              this.updateLoadState(review, item.replay, { progress });
+            }
           },
         });
-      })
-      .then((bundle) => {
-        this.updateLoadState(review, item.replay, {
-          status: "loaded",
-          progress: null,
-          error: null,
-        });
-        return bundle;
-      })
-      .catch((error) => {
-        review.replayLoadCache.delete(item.replay);
-        this.updateLoadState(review, item.replay, {
-          status: "error",
-          error: error instanceof Error ? error.message : String(error),
-        });
-        throw error;
-      });
-    review.replayLoadCache.set(item.replay, loadPromise);
-    return loadPromise;
+      },
+    });
   }
 
   render(review: ActiveMechanicsReview | null): void {
