@@ -1,11 +1,18 @@
 use super::*;
 
-/// Per-player accumulated whiff stats: counts, confidence, and grounded/aerial/dodge breakdown.
+/// Per-player accumulated whiff stats: clean-whiff counts with their
+/// grounded/aerial/dodge breakdown, and disrupted attempts counted separately.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WhiffStats {
     pub whiff_count: u32,
     pub beaten_to_ball_count: u32,
+    /// Attempts that missed because another player's touch took the ball
+    /// first. Never included in `whiff_count`.
+    #[serde(default)]
+    pub disrupted_attempt_count: u32,
+    #[serde(default)]
+    pub aerial_disrupted_attempt_count: u32,
     pub grounded_whiff_count: u32,
     pub aerial_whiff_count: u32,
     pub dodge_whiff_count: u32,
@@ -109,6 +116,12 @@ impl WhiffStatsAccumulator {
             }
             WhiffEventKind::BeatenToBall => {
                 stats.beaten_to_ball_count += 1;
+            }
+            WhiffEventKind::DisruptedAttempt => {
+                stats.disrupted_attempt_count += 1;
+                if event.aerial {
+                    stats.aerial_disrupted_attempt_count += 1;
+                }
             }
         }
     }

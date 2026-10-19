@@ -1,4 +1,7 @@
 use super::*;
+use crate::stats::accumulators::WhiffTestProjection;
+
+const FPS: f32 = 30.0;
 
 fn rigid_body(position: glam::Vec3, velocity: glam::Vec3) -> boxcars::RigidBody {
     boxcars::RigidBody {
@@ -15,21 +18,16 @@ fn rigid_body(position: glam::Vec3, velocity: glam::Vec3) -> boxcars::RigidBody 
     }
 }
 
-fn player_at(
-    id: u64,
-    position: glam::Vec3,
-    velocity: glam::Vec3,
-    dodge_active: bool,
-) -> PlayerSample {
+fn player_at(id: u64, is_team_0: bool, position: glam::Vec3, velocity: glam::Vec3) -> PlayerSample {
     PlayerSample {
         player_id: boxcars::RemoteId::Steam(id),
-        is_team_0: true,
+        is_team_0,
         hitbox: default_car_hitbox(),
         rigid_body: Some(rigid_body(position, velocity)),
-        boost_amount: None,
+        boost_amount: Some(50.0),
         last_boost_amount: None,
         boost_active: false,
-        dodge_active,
+        dodge_active: false,
         dodge_torque: None,
         powerslide_active: false,
         match_goals: None,
@@ -40,578 +38,239 @@ fn player_at(
     }
 }
 
-fn player(id: u64, x: f32, dodge_active: bool) -> PlayerSample {
-    player_at(
-        id,
-        glam::Vec3::new(x, 0.0, 17.0),
-        glam::Vec3::new(900.0, 0.0, 0.0),
-        dodge_active,
-    )
-}
-
-fn frame(frame_number: usize, time: f32) -> FrameInfo {
-    FrameInfo {
-        frame_number,
-        time,
-        dt: 0.1,
-        seconds_remaining: None,
-    }
-}
-
 fn ball() -> BallFrameState {
     BallFrameState::Present(BallSample {
         rigid_body: rigid_body(glam::Vec3::new(0.0, 0.0, 92.75), glam::Vec3::ZERO),
     })
 }
 
-fn moving_ball(velocity: glam::Vec3) -> BallFrameState {
-    BallFrameState::Present(BallSample {
-        rigid_body: rigid_body(glam::Vec3::new(0.0, 0.0, 92.75), velocity),
-    })
+fn touch(frame: usize, time: f32, player: u64, team_is_team_0: bool) -> TouchState {
+    TouchState {
+        touch_events: vec![TouchEvent {
+            touch_id: None,
+            time,
+            frame,
+            team_is_team_0,
+            player: Some(boxcars::RemoteId::Steam(player)),
+            player_position: None,
+            closest_approach_distance: Some(0.0),
+            contact_local_ball_position: None,
+            contact_local_hitbox_point: None,
+            contact_world_hitbox_point: None,
+            dodge_contact: false,
+        }],
+        ..TouchState::default()
+    }
 }
 
-#[test]
-fn counts_near_miss_after_player_exits_ball_area() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-    let touch_state = TouchState::default();
-
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, -210.0, false)],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, 560.0, false)],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    let stats = calculator.player_stats().get(&player_id).unwrap();
-    assert_eq!(stats.whiff_count, 1);
-    assert_eq!(stats.grounded_whiff_count, 1);
-    assert_eq!(calculator.events().len(), 1);
+fn clean(_: &WhiffFeatures) -> WhiffClassification {
+    WhiffClassification {
+        class: WhiffAttemptClass::CleanWhiff,
+        probabilities: [0.9, 0.05, 0.03, 0.02],
+    }
 }
 
-#[test]
-fn records_attempt_start_closest_approach_resolution_and_domain_evidence() {
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-    let touch_state = TouchState::default();
+fn disrupted(_: &WhiffFeatures) -> WhiffClassification {
+    WhiffClassification {
+        class: WhiffAttemptClass::DisruptedAttempt,
+        probabilities: [0.05, 0.9, 0.03, 0.02],
+    }
+}
 
-    for (frame_number, time, x) in [(1, 0.1, -210.0), (2, 0.2, -150.0), (3, 0.3, 560.0)] {
-        calculator
-            .update(
-                &frame(frame_number, time),
-                &ball,
-                &PlayerFrameState {
-                    players: vec![player(1, x, false)],
-                },
-                &touch_state,
-                &LivePlayState::active_play(),
-            )
-            .unwrap();
+fn contact(_: &WhiffFeatures) -> WhiffClassification {
+    WhiffClassification {
+        class: WhiffAttemptClass::SuccessfulContact,
+        probabilities: [0.05, 0.05, 0.85, 0.05],
+    }
+}
+
+/// Car 1 drives along x past a stationary ball (200 uu to the side), so its
+/// closest approach is at x = 0, one second in.
+fn drive_by_x(time: f32) -> f32 {
+    -1500.0 + 1500.0 * time
+}
+
+struct Scenario {
+    calculator: WhiffCalculator,
+    frame: usize,
+}
+
+impl Scenario {
+    fn new(classifier: WhiffClassifier) -> Self {
+        let mut calculator = WhiffCalculator::with_classifier(classifier);
+        calculator.enable_candidate_recording();
+        Self {
+            calculator,
+            frame: 0,
+        }
     }
 
-    let [event] = calculator.events() else {
-        panic!("expected one resolved whiff");
+    fn time(&self) -> f32 {
+        self.frame as f32 / FPS
+    }
+
+    fn step_with(&mut self, x: f32, touches: &TouchState, live: bool) {
+        let time = self.time();
+        let mut players = vec![player_at(
+            1,
+            true,
+            glam::Vec3::new(x, 200.0, 17.0),
+            glam::Vec3::new(1500.0, 0.0, 0.0),
+        )];
+        players.push(player_at(
+            2,
+            false,
+            glam::Vec3::new(0.0, -2000.0, 17.0),
+            glam::Vec3::ZERO,
+        ));
+        let live = if live {
+            LivePlayState::active_play()
+        } else {
+            LivePlayState::default()
+        };
+        self.calculator
+            .update(
+                &FrameInfo {
+                    frame_number: self.frame,
+                    time,
+                    dt: 1.0 / FPS,
+                    seconds_remaining: None,
+                },
+                &ball(),
+                &PlayerFrameState { players },
+                &PlayerControlState::default(),
+                touches,
+                &live,
+            )
+            .unwrap();
+        self.frame += 1;
+    }
+
+    fn run_until(&mut self, end: f32, x: impl Fn(f32) -> f32) {
+        while self.time() <= end {
+            self.step_with(x(self.time()), &TouchState::default(), true);
+        }
+    }
+}
+
+#[test]
+fn emits_closest_approach_after_bounded_resolution_delay() {
+    let mut scenario = Scenario::new(clean);
+    scenario.run_until(1.55, drive_by_x);
+    assert!(
+        scenario.calculator.events().is_empty(),
+        "nothing is known before the resolution delay elapses"
+    );
+    scenario.run_until(2.5, drive_by_x);
+
+    let events = scenario.calculator.events();
+    let [event] = events else {
+        panic!("expected one whiff, got {events:?}");
     };
     assert_eq!(event.kind, WhiffEventKind::Whiff);
-    assert_eq!(event.start_frame, 1);
-    assert_eq!(event.start_time, 0.1);
-    assert_eq!(event.frame, 2);
-    assert_eq!(event.time, 0.2);
-    assert_eq!(event.resolved_frame, 3);
-    assert_eq!(event.resolved_time, 0.3);
+    assert_eq!(event.player, boxcars::RemoteId::Steam(1));
+    assert!(
+        (event.time - 1.0).abs() < 0.05,
+        "anchor at closest approach"
+    );
+    let delay = event.resolved_time - event.time;
+    assert!((0.6 - 1e-4..=0.6 + 1.0 / FPS + 1e-4).contains(&delay));
+    assert!(event.start_time < event.time);
     assert_eq!(
         event.resolution_reason,
-        WhiffResolutionReason::SeparatedFromBall
+        WhiffResolutionReason::AttemptClassified
     );
-    assert!(
-        event
-            .closing_speed_at_closest
-            .is_some_and(|speed| speed > 0.0)
-    );
-    assert!(
-        event
-            .velocity_alignment_at_closest
-            .is_some_and(|alignment| alignment > 0.0)
-    );
-    assert!(event.local_ball_position_at_closest.is_some());
-    assert!(
-        event
-            .resolved_distance
-            .is_some_and(|distance| distance > WHIFF_EXIT_DISTANCE)
-    );
+    assert_eq!(event.confidence, Some(0.9));
+    let stats = &scenario.calculator.player_stats()[&boxcars::RemoteId::Steam(1)];
+    assert_eq!((stats.whiff_count, stats.disrupted_attempt_count), (1, 0));
 }
 
 #[test]
-fn loosened_detector_counts_moderate_speed_approach_as_candidate() {
-    // A ~500 uu/s committed approach that gets close to the ball and then leaves
-    // without a touch sits below the old 700 uu/s arming gate, but now registers
-    // as a whiff candidate for review.
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-    let touch_state = TouchState::default();
+fn disrupted_attempt_is_counted_separately_and_names_the_toucher() {
+    let mut scenario = Scenario::new(disrupted);
+    scenario.run_until(0.9, drive_by_x);
+    let touches = touch(scenario.frame, scenario.time(), 2, false);
+    scenario.step_with(drive_by_x(scenario.time()), &touches, true);
+    scenario.run_until(2.5, drive_by_x);
 
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player_at(
-                    1,
-                    glam::Vec3::new(-200.0, 0.0, 17.0),
-                    glam::Vec3::new(500.0, 0.0, 0.0),
-                    false,
-                )],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player_at(
-                    1,
-                    glam::Vec3::new(560.0, 0.0, 17.0),
-                    glam::Vec3::new(500.0, 0.0, 0.0),
-                    false,
-                )],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    let stats = calculator.player_stats().get(&player_id).unwrap();
-    assert_eq!(stats.whiff_count, 1);
-    assert_eq!(calculator.events().len(), 1);
-    assert_eq!(calculator.events()[0].kind, WhiffEventKind::Whiff);
-}
-
-#[test]
-fn touch_cancels_active_whiff_candidate() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, -210.0, false)],
-            },
-            &TouchState::default(),
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, 460.0, false)],
-            },
-            &TouchState {
-                touch_events: vec![TouchEvent {
-                    touch_id: None,
-                    time: 0.2,
-                    frame: 2,
-                    team_is_team_0: true,
-                    player: Some(player_id.clone()),
-                    player_position: None,
-                    closest_approach_distance: Some(0.0),
-                    contact_local_ball_position: None,
-                    contact_local_hitbox_point: None,
-                    contact_world_hitbox_point: None,
-                    dodge_contact: false,
-                }],
-                ..TouchState::default()
-            },
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    assert!(calculator.player_stats().get(&player_id).is_none());
-    assert!(calculator.events().is_empty());
-}
-
-#[test]
-fn opponent_touch_interrupts_whiff_candidate_without_emitting_whiff() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let opponent_id = boxcars::RemoteId::Steam(2);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, -210.0, false)],
-            },
-            &TouchState::default(),
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, -120.0, false)],
-            },
-            &TouchState {
-                touch_events: vec![TouchEvent {
-                    touch_id: None,
-                    time: 0.2,
-                    frame: 2,
-                    team_is_team_0: false,
-                    player: Some(opponent_id),
-                    player_position: None,
-                    closest_approach_distance: Some(0.0),
-                    contact_local_ball_position: None,
-                    contact_local_hitbox_point: None,
-                    contact_world_hitbox_point: None,
-                    dodge_contact: false,
-                }],
-                ..TouchState::default()
-            },
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    assert!(calculator.player_stats().get(&player_id).is_none());
-    assert!(calculator.events().is_empty());
-}
-
-#[test]
-fn teammate_touch_cancels_active_whiff_candidate() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let teammate_id = boxcars::RemoteId::Steam(3);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, -210.0, false)],
-            },
-            &TouchState::default(),
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, -120.0, false)],
-            },
-            &TouchState {
-                touch_events: vec![TouchEvent {
-                    touch_id: None,
-                    time: 0.2,
-                    frame: 2,
-                    team_is_team_0: true,
-                    player: Some(teammate_id),
-                    player_position: None,
-                    closest_approach_distance: Some(0.0),
-                    contact_local_ball_position: None,
-                    contact_local_hitbox_point: None,
-                    contact_world_hitbox_point: None,
-                    dodge_contact: false,
-                }],
-                ..TouchState::default()
-            },
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    assert!(calculator.player_stats().get(&player_id).is_none());
-    assert!(calculator.events().is_empty());
-}
-
-#[test]
-fn candidate_timeout_discards_without_proving_a_whiff() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-    let touch_state = TouchState::default();
-
-    for (frame_number, time, x) in [
-        (1, 0.1, -210.0),
-        (2, 1.2, -210.0),
-        (3, 1.3, -210.0),
-        (4, 1.4, 560.0),
-    ] {
-        calculator
-            .update(
-                &frame(frame_number, time),
-                &ball,
-                &PlayerFrameState {
-                    players: vec![player(1, x, false)],
-                },
-                &touch_state,
-                &LivePlayState::active_play(),
-            )
-            .unwrap();
-    }
-
-    assert!(calculator.player_stats().get(&player_id).is_none());
-    assert!(calculator.events().is_empty());
-}
-
-#[test]
-fn missing_player_discards_active_candidate() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-    let touch_state = TouchState::default();
-
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, -210.0, false)],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &PlayerFrameState::default(),
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(3, 0.3),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, 560.0, false)],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    assert!(calculator.player_stats().get(&player_id).is_none());
-    assert!(calculator.events().is_empty());
-}
-
-#[test]
-fn live_play_boundary_discards_active_candidate() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-    let touch_state = TouchState::default();
-    let players = PlayerFrameState {
-        players: vec![player(1, -210.0, false)],
+    let events = scenario.calculator.events();
+    let [event] = events else {
+        panic!("expected one disrupted attempt, got {events:?}");
     };
-
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &players,
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &players,
-            &touch_state,
-            &LivePlayState::default(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(3, 0.3),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player(1, 560.0, false)],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    assert!(calculator.player_stats().get(&player_id).is_none());
-    assert!(calculator.events().is_empty());
+    assert_eq!(event.kind, WhiffEventKind::DisruptedAttempt);
+    assert_eq!(event.disrupted_by, Some(boxcars::RemoteId::Steam(2)));
+    let stats = &scenario.calculator.player_stats()[&boxcars::RemoteId::Steam(1)];
+    assert_eq!((stats.whiff_count, stats.disrupted_attempt_count), (0, 1));
 }
 
 #[test]
-fn lateral_drive_by_is_not_a_whiff() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-    let touch_state = TouchState::default();
+fn repeated_pass_is_a_new_attempt_not_suppressed_by_the_first() {
+    // Out and back: closest approaches at 1.0 s and 2.0 s.
+    let out_and_back = |t: f32| {
+        if t <= 1.5 {
+            drive_by_x(t)
+        } else {
+            drive_by_x(3.0 - t)
+        }
+    };
+    let mut scenario = Scenario::new(clean);
+    scenario.run_until(3.5, out_and_back);
 
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player_at(
-                    1,
-                    glam::Vec3::new(-70.0, -170.0, 17.0),
-                    glam::Vec3::new(900.0, 0.0, 0.0),
-                    false,
-                )],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player_at(
-                    1,
-                    glam::Vec3::new(460.0, -170.0, 17.0),
-                    glam::Vec3::new(900.0, 0.0, 0.0),
-                    false,
-                )],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    assert!(calculator.player_stats().get(&player_id).is_none());
-    assert!(calculator.events().is_empty());
+    let times: Vec<f32> = scenario
+        .calculator
+        .events()
+        .iter()
+        .map(|e| e.time)
+        .collect();
+    assert_eq!(times.len(), 2, "{times:?}");
+    assert!((times[0] - 1.0).abs() < 0.05 && (times[1] - 2.0).abs() < 0.05);
 }
 
 #[test]
-fn matching_ball_velocity_is_not_a_whiff_attempt() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = WhiffCalculator::new();
-    let ball = moving_ball(glam::Vec3::new(650.0, 0.0, 0.0));
-    let touch_state = TouchState::default();
+fn contact_classification_records_candidate_without_event() {
+    let mut scenario = Scenario::new(contact);
+    scenario.run_until(2.5, drive_by_x);
 
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player_at(
-                    1,
-                    glam::Vec3::new(-180.0, 0.0, 17.0),
-                    glam::Vec3::new(900.0, 0.0, 0.0),
-                    false,
-                )],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player_at(
-                    1,
-                    glam::Vec3::new(460.0, 0.0, 17.0),
-                    glam::Vec3::new(900.0, 0.0, 0.0),
-                    false,
-                )],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    assert!(calculator.player_stats().get(&player_id).is_none());
-    assert!(calculator.events().is_empty());
+    assert!(scenario.calculator.events().is_empty());
+    let [candidate] = scenario.calculator.candidates() else {
+        panic!("expected one candidate");
+    };
+    assert_eq!(
+        candidate.classification.class,
+        WhiffAttemptClass::SuccessfulContact
+    );
 }
 
 #[test]
-fn side_dodge_is_not_a_whiff_attempt() {
-    let player_id = boxcars::RemoteId::Steam(1);
-    let mut calculator = WhiffCalculator::new();
-    let ball = ball();
-    let touch_state = TouchState::default();
-
-    calculator
-        .update(
-            &frame(1, 0.1),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player_at(
-                    1,
-                    glam::Vec3::new(-70.0, -190.0, 17.0),
-                    glam::Vec3::new(900.0, 0.0, 0.0),
-                    true,
-                )],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-    calculator
-        .update(
-            &frame(2, 0.2),
-            &ball,
-            &PlayerFrameState {
-                players: vec![player_at(
-                    1,
-                    glam::Vec3::new(460.0, -190.0, 17.0),
-                    glam::Vec3::new(900.0, 0.0, 0.0),
-                    true,
-                )],
-            },
-            &touch_state,
-            &LivePlayState::active_play(),
-        )
-        .unwrap();
-
-    assert!(calculator.player_stats().get(&player_id).is_none());
-    assert!(calculator.events().is_empty());
+fn closest_approach_outside_live_play_is_not_a_candidate() {
+    let mut scenario = Scenario::new(clean);
+    while scenario.time() <= 2.5 {
+        let x = drive_by_x(scenario.time());
+        scenario.step_with(x, &TouchState::default(), false);
+    }
+    assert!(scenario.calculator.candidates().is_empty());
 }
 
-fn whiff_event(aerial: bool, dodge_active: bool, closest_approach_distance: f32) -> WhiffEvent {
-    WhiffEvent {
-        kind: WhiffEventKind::Whiff,
+#[test]
+fn finish_resolves_pending_candidate_with_observed_frames() {
+    let mut scenario = Scenario::new(clean);
+    scenario.run_until(1.4, drive_by_x);
+    assert!(scenario.calculator.events().is_empty());
+    scenario.calculator.finish();
+    assert_eq!(scenario.calculator.events().len(), 1);
+}
+
+#[test]
+fn whiff_stats_keep_clean_breakdown_and_disrupted_counts_separate() {
+    let event = |kind, aerial, dodge_active, closest_approach_distance| WhiffEvent {
+        kind,
         start_time: 0.8,
         start_frame: 8,
         time: 1.0,
         frame: 10,
-        resolved_time: 1.0,
-        resolved_frame: 10,
-        resolution_reason: WhiffResolutionReason::SeparatedFromBall,
+        resolved_time: 1.6,
+        resolved_frame: 16,
+        resolution_reason: WhiffResolutionReason::AttemptClassified,
         player: boxcars::RemoteId::Steam(1),
         player_position: None,
         is_team_0: true,
@@ -624,48 +283,40 @@ fn whiff_event(aerial: bool, dodge_active: bool, closest_approach_distance: f32)
         resolved_distance: Some(400.0),
         dodge_active,
         aerial,
+        confidence: None,
+        disrupted_by: None,
+    };
+    let mut accumulator = WhiffStatsAccumulator::default();
+    let frame = FrameInfo {
+        frame_number: 16,
+        time: 1.6,
+        dt: 1.0 / FPS,
+        seconds_remaining: None,
+    };
+    for e in [
+        event(WhiffEventKind::Whiff, false, false, 120.0),
+        event(WhiffEventKind::Whiff, true, true, 90.0),
+        event(WhiffEventKind::DisruptedAttempt, true, false, 60.0),
+    ] {
+        accumulator.apply_event(&e, &frame);
     }
-}
-
-#[test]
-fn whiff_stats_records_events_as_labeled_counts() {
-    let mut stats = WhiffStats::default();
-
-    stats.record_whiff(&whiff_event(false, false, 120.0));
-    stats.record_whiff(&whiff_event(true, true, 90.0));
-    stats.record_whiff(&whiff_event(true, true, 110.0));
-
-    assert_eq!(
-        stats.whiff_count_with_labels(&[StatLabel::new("vertical_state", "aerial")]),
-        2
-    );
-    assert_eq!(
-        stats.whiff_count_with_labels(&[
-            StatLabel::new("vertical_state", "aerial"),
-            StatLabel::new("dodge_state", "dodge"),
-        ]),
-        2
-    );
-    assert_eq!(
-        stats.whiff_count_with_labels(&[
-            StatLabel::new("vertical_state", "grounded"),
-            StatLabel::new("dodge_state", "no_dodge"),
-        ]),
-        1
-    );
-}
-
-#[test]
-fn whiff_stats_keeps_legacy_fields_synced_from_labeled_counts() {
-    let mut stats = WhiffStats::default();
-
-    stats.record_whiff(&whiff_event(false, false, 120.0));
-    stats.record_whiff(&whiff_event(true, true, 90.0));
-
+    let stats = &accumulator.player_stats()[&boxcars::RemoteId::Steam(1)];
     assert_eq!(stats.whiff_count, 2);
-    assert_eq!(stats.grounded_whiff_count, 1);
-    assert_eq!(stats.aerial_whiff_count, 1);
+    assert_eq!(
+        (stats.grounded_whiff_count, stats.aerial_whiff_count),
+        (1, 1)
+    );
     assert_eq!(stats.dodge_whiff_count, 1);
     assert_eq!(stats.best_closest_approach_distance, Some(90.0));
-    assert_eq!(stats.average_closest_approach_distance(), 105.0);
+    assert_eq!(
+        (
+            stats.disrupted_attempt_count,
+            stats.aerial_disrupted_attempt_count
+        ),
+        (1, 1)
+    );
+    assert_eq!(
+        stats.whiff_count_with_labels(&[StatLabel::new("vertical_state", "aerial")]),
+        1
+    );
 }

@@ -4,11 +4,11 @@ import type { WhiffEventKind } from "./WhiffEventKind.ts";
 import type { WhiffResolutionReason } from "./WhiffResolutionReason.ts";
 
 /**
- * A committed attempt near the ball that resolves as a clear miss.
+ * A committed attempt near the ball that resolves as a miss.
  */
 export type WhiffEvent = { kind: WhiffEventKind,
 /**
- * First frame where the player satisfied the committed-attempt gates.
+ * Start of the approach that led to the closest approach.
  */
 start_time: number, start_frame: number,
 /**
@@ -22,7 +22,11 @@ resolved_time: number, resolved_frame: number, resolution_reason: WhiffResolutio
 /**
  * Player position at closest approach.
  */
-player_position?: [number, number, number] | null, is_team_0: boolean, closest_approach_distance: number,
+player_position?: [number, number, number] | null, is_team_0: boolean,
+/**
+ * Ball-center to car-hitbox distance at closest approach.
+ */
+closest_approach_distance: number,
 /**
  * Car-forward alignment with the ball direction at closest approach.
  */
@@ -47,7 +51,7 @@ velocity_alignment_at_closest?: number | null,
  */
 local_ball_position_at_closest?: [number, number, number] | null,
 /**
- * Hitbox distance on the frame that confirmed separation. Optional only
+ * Hitbox distance on the frame that resolved the attempt. Optional only
  * for compatibility with older serialized events.
  */
 resolved_distance?: number | null,
@@ -58,4 +62,14 @@ dodge_active: boolean,
 /**
  * Whether the player was airborne during the attempt.
  */
-aerial: boolean, };
+aerial: boolean,
+/**
+ * Classifier probability of the emitted kind. Not a calibrated
+ * probability of human agreement.
+ */
+confidence?: number | null,
+/**
+ * For disrupted attempts, the player whose touch nearest the closest
+ * approach took the ball.
+ */
+disrupted_by?: RemoteIdTs | null, };

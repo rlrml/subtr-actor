@@ -59,6 +59,7 @@ struct ReplayReport {
     whiff_total: usize,
     whiff_whiff: usize,
     whiff_beaten_to_ball: usize,
+    whiff_disrupted_attempt: usize,
     /// New touch-anchored BeatenToBallEvent stream (distinct from the legacy
     /// WhiffEventKind::BeatenToBall resolution of whiff candidates).
     beaten_to_ball_events: usize,
@@ -194,6 +195,7 @@ fn audit_replay(path: &PathBuf) -> anyhow::Result<ReplayReport> {
                         report.whiff_beaten_to_ball += 1;
                         report.legacy_beaten.push(whiff.clone());
                     }
+                    WhiffEventKind::DisruptedAttempt => report.whiff_disrupted_attempt += 1,
                 }
             }
             EventPayload::BeatenToBall(beaten) => {
@@ -224,8 +226,11 @@ fn print_replay_report(report: &ReplayReport) {
         report.duration_minutes, report.player_count
     );
     println!(
-        "  whiffs: {} total  (whiff={}, beaten_to_ball={})",
-        report.whiff_total, report.whiff_whiff, report.whiff_beaten_to_ball
+        "  whiffs: {} total  (whiff={}, disrupted_attempt={}, beaten_to_ball={})",
+        report.whiff_total,
+        report.whiff_whiff,
+        report.whiff_disrupted_attempt,
+        report.whiff_beaten_to_ball
     );
     println!(
         "  beaten_to_ball events (touch-anchored): {}",
@@ -258,6 +263,10 @@ fn print_aggregate(reports: &[ReplayReport]) {
     let total_minutes: f32 = reports.iter().map(|report| report.duration_minutes).sum();
     let whiff_total: usize = reports.iter().map(|report| report.whiff_total).sum();
     let whiff_whiff: usize = reports.iter().map(|report| report.whiff_whiff).sum();
+    let whiff_disrupted: usize = reports
+        .iter()
+        .map(|report| report.whiff_disrupted_attempt)
+        .sum();
     let whiff_beaten: usize = reports
         .iter()
         .map(|report| report.whiff_beaten_to_ball)
@@ -309,6 +318,7 @@ fn print_aggregate(reports: &[ReplayReport]) {
     };
     row("whiffs (all)", whiff_total);
     row("  whiff", whiff_whiff);
+    row("  disrupted_attempt", whiff_disrupted);
     row("  beaten_to_ball", whiff_beaten);
     row("beaten_to_ball events (new)", beaten_events);
     row("touches (all)", touch_total);

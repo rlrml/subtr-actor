@@ -258,6 +258,12 @@ impl DerivedWhiffFrameStats {
             WhiffEventKind::BeatenToBall => {
                 self.stats.beaten_to_ball_count += 1;
             }
+            WhiffEventKind::DisruptedAttempt => {
+                self.stats.disrupted_attempt_count += 1;
+                if event.aerial {
+                    self.stats.aerial_disrupted_attempt_count += 1;
+                }
+            }
         }
     }
 
@@ -282,6 +288,14 @@ fn assert_whiff_derived_stats_match(scope: &str, actual: &WhiffStats, expected: 
     assert_eq!(
         actual.beaten_to_ball_count, expected.beaten_to_ball_count,
         "{scope} beaten_to_ball_count"
+    );
+    assert_eq!(
+        actual.disrupted_attempt_count, expected.disrupted_attempt_count,
+        "{scope} disrupted_attempt_count"
+    );
+    assert_eq!(
+        actual.aerial_disrupted_attempt_count, expected.aerial_disrupted_attempt_count,
+        "{scope} aerial_disrupted_attempt_count"
     );
     assert_eq!(
         actual.grounded_whiff_count, expected.grounded_whiff_count,

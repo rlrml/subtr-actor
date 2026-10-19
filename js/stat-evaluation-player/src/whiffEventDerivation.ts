@@ -21,6 +21,8 @@ function defaultWhiffStats(): WhiffAccumulator {
   return {
     whiff_count: 0,
     beaten_to_ball_count: 0,
+    disrupted_attempt_count: 0,
+    aerial_disrupted_attempt_count: 0,
     grounded_whiff_count: 0,
     aerial_whiff_count: 0,
     dodge_whiff_count: 0,
@@ -70,6 +72,13 @@ function applyWhiffEvent(
 ): void {
   if ((event.kind ?? "whiff") === "beaten_to_ball") {
     stats.beaten_to_ball_count += 1;
+    return;
+  }
+  if (event.kind === "disrupted_attempt") {
+    stats.disrupted_attempt_count += 1;
+    if (event.aerial) {
+      stats.aerial_disrupted_attempt_count += 1;
+    }
     return;
   }
 

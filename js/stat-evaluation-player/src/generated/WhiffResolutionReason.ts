@@ -3,4 +3,4 @@
 /**
  * Why a whiff candidate became a confirmed whiff.
  */
-export type WhiffResolutionReason = "separated_from_ball" | "legacy_unknown";
+export type WhiffResolutionReason = "separated_from_ball" | "legacy_unknown" | "attempt_classified";

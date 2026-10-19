@@ -4,3 +4,4 @@
 
 pub mod ballchasing;
 pub mod replay_plausibility;
+pub mod whiff_model;

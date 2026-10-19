@@ -125,6 +125,10 @@ pub(crate) fn push_whiff_events_from_timeline(
 ) {
     for (index, event) in whiffs.into_iter().enumerate() {
         let event = event.borrow();
+        // The Whiff mechanic is a clean miss; disrupted attempts are not.
+        if event.kind != WhiffEventKind::Whiff {
+            continue;
+        }
         push_pending_graph_event(
             pending_events,
             emitted_mechanic_ids,
@@ -657,7 +661,7 @@ pub(crate) fn replay_annotations_from_timeline(
                     },
                 );
             }
-            EventPayload::Whiff(event) => {
+            EventPayload::Whiff(event) if event.kind == WhiffEventKind::Whiff => {
                 push_replay_annotation(
                     &mut events,
                     &mut emitted_ids,

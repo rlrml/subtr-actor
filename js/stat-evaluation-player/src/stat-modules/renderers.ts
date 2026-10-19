@@ -463,6 +463,7 @@ export function renderWhiffStats(whiff: PlayerStatsSnapshot["whiff"] | undefined
       : undefined;
   return `
     <div class="stat-row"><span class="label">Whiffs</span><span class="value">${formatInteger(whiff?.whiff_count)}</span></div>
+    <div class="stat-row"><span class="label">Disrupted attempts</span><span class="value">${formatInteger(whiff?.disrupted_attempt_count)}</span></div>
     <div class="stat-row"><span class="label">Beaten to ball</span><span class="value">${formatInteger(whiff?.beaten_to_ball_count)}</span></div>
     <div class="stat-row"><span class="label">Grounded</span><span class="value">${formatInteger(whiff?.grounded_whiff_count)}</span></div>
     <div class="stat-row"><span class="label">Aerial</span><span class="value">${formatInteger(whiff?.aerial_whiff_count)}</span></div>

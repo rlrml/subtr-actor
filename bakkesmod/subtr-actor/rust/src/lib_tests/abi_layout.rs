@@ -464,6 +464,8 @@ fn whiff_event(frame: usize, time: f32, player_index: u32) -> WhiffEvent {
         dodge_active: false,
         aerial: false,
         player_position: None,
+        confidence: None,
+        disrupted_by: None,
     }
 }
 

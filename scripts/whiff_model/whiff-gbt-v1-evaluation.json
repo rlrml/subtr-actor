@@ -1,0 +1,546 @@
+{
+ "name": "whiff-gbt-v1",
+ "label_files": [
+  "final_pilot-v1.jsonl",
+  "final_train-batch1.jsonl",
+  "final_train-batch2.jsonl",
+  "final_dev-tiled-v1.jsonl"
+ ],
+ "test_label_files": [
+  "final_test-tiled-v1.jsonl",
+  "final_test-strat-v1.jsonl"
+ ],
+ "label_file_sha256": {
+  "final_pilot-v1.jsonl": "09731f7d4e3a3b45d74cedff5bc7ef1b519c8ba1e769239a9922650a0e2aa172",
+  "final_train-batch1.jsonl": "131631e6a5e00bce8d51c16d70ec26755b78a8f2b055fa9878f31306c3ddb194",
+  "final_train-batch2.jsonl": "bbdc365cf2775bb3b04976f26ae30783b60245465443afaabf6a624f1b2fb7ba",
+  "final_dev-tiled-v1.jsonl": "bd098bcbb4052f6a93e45756b4674a4e8d839f79b5413470c08662fa0e359646",
+  "final_test-tiled-v1.jsonl": "2bb4a634a98ac24b08b078bdfe6ccea852f10ecd90fde0dbd52a6ac716f46524",
+  "final_test-strat-v1.jsonl": "1f70919cb99a5b5b874815ae34ebcf5dbb23365162341fdc51ce397dbeab96da"
+ },
+ "selected_params": {
+  "n_estimators": 100,
+  "max_depth": 2,
+  "learning_rate": 0.1,
+  "subsample": 0.8,
+  "min_samples_leaf": 8
+ },
+ "thresholds": {
+  "clear_whiff": 0.55,
+  "disrupted_attempt": 0.45
+ },
+ "rule_params": {
+  "touch_window": 0.15,
+  "min_closing": 300.0,
+  "min_alignment": 0.3,
+  "max_gap": 300.0,
+  "disrupt_window": 0.4
+ },
+ "dev_macro_event_f1": 0.827922077922078,
+ "learning_curve": [
+  {
+   "fraction": 0.25,
+   "examples": 200,
+   "dev_macro_event_f1": 0.7516129032258064
+  },
+  {
+   "fraction": 0.5,
+   "examples": 395,
+   "dev_macro_event_f1": 0.8304597701149425
+  },
+  {
+   "fraction": 0.75,
+   "examples": 646,
+   "dev_macro_event_f1": 0.8119122257053292
+  },
+  {
+   "fraction": 1.0,
+   "examples": 852,
+   "dev_macro_event_f1": 0.827922077922078
+  }
+ ],
+ "candidate_recall": {
+  "disrupted_attempt": {
+   "covered": 42,
+   "total": 47,
+   "recall": 0.8936170212765957
+  },
+  "clear_whiff": {
+   "covered": 36,
+   "total": 36,
+   "recall": 1.0
+  }
+ },
+ "train_class_counts": {
+  "successful_contact": 363,
+  "no_observable_attempt": 254,
+  "disrupted_attempt": 180,
+  "clear_whiff": 55
+ },
+ "feature_importances": [
+  [
+   "focal_touch_dt",
+   0.3507063626382041
+  ],
+  [
+   "gap_at_anchor",
+   0.17883438320803483
+  ],
+  [
+   "opponent_touch_dt",
+   0.08371934580452645
+  ],
+  [
+   "closing_rate_0_3",
+   0.06598763984928026
+  ],
+  [
+   "nearest_car_distance",
+   0.06193097652471209
+  ],
+  [
+   "opening_rate_0_3",
+   0.04129513058328832
+  ],
+  [
+   "dodge_start_rel",
+   0.025206565082548225
+  ],
+  [
+   "ball_dv_max_post",
+   0.020522788523163388
+  ],
+  [
+   "gap_m0_3",
+   0.018451615525579303
+  ],
+  [
+   "gap_p0_6",
+   0.01684576377733377
+  ],
+  [
+   "opponent_min_gap",
+   0.016282574235981836
+  ],
+  [
+   "rel_speed",
+   0.0151736988637712
+  ],
+  [
+   "car_up_z",
+   0.013147424854840549
+  ],
+  [
+   "gap_m0_5",
+   0.009985228474069598
+  ],
+  [
+   "gap_m1_0",
+   0.009184009147923366
+  ]
+ ],
+ "results": {
+  "model": {
+   "dev": {
+    "clear_whiff": {
+     "tp": 4,
+     "fp": 0,
+     "fn": 3,
+     "precision": 1.0,
+     "recall": 0.5714285714285714,
+     "predicted": 4,
+     "labeled": 7,
+     "median_abs_timing_error": 0.01030273437499929,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "recall_ci": [
+      0.16666666666666666,
+      1.0
+     ],
+     "fp_per_player_minute": 0.0,
+     "count_ratio": 0.5714285714285714
+    },
+    "disrupted_attempt": {
+     "tp": 13,
+     "fp": 0,
+     "fn": 2,
+     "precision": 1.0,
+     "recall": 0.8666666666666667,
+     "predicted": 13,
+     "labeled": 15,
+     "median_abs_timing_error": 0.02151184082032387,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "recall_ci": [
+      0.625,
+      1.0
+     ],
+     "fp_per_player_minute": 0.0,
+     "count_ratio": 0.8666666666666667
+    },
+    "macro_event_f1": 0.827922077922078,
+    "player_minutes": 9.4
+   },
+   "test-tiled-v1": {
+    "clear_whiff": {
+     "tp": 6,
+     "fp": 0,
+     "fn": 3,
+     "precision": 1.0,
+     "recall": 0.6666666666666666,
+     "predicted": 6,
+     "labeled": 9,
+     "median_abs_timing_error": 0.012401123046871021,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "recall_ci": [
+      0.42857142857142855,
+      1.0
+     ],
+     "fp_per_player_minute": 0.0,
+     "count_ratio": 0.6666666666666666
+    },
+    "disrupted_attempt": {
+     "tp": 2,
+     "fp": 1,
+     "fn": 6,
+     "precision": 0.6666666666666666,
+     "recall": 0.25,
+     "predicted": 3,
+     "labeled": 8,
+     "median_abs_timing_error": 0.07999572753907103,
+     "precision_ci": [
+      0.0,
+      1.0
+     ],
+     "recall_ci": [
+      0.0,
+      0.75
+     ],
+     "fp_per_player_minute": 0.075,
+     "count_ratio": 0.375
+    },
+    "macro_event_f1": 0.5818181818181818,
+    "player_minutes": 13.333333333333334
+   },
+   "test-strat-v1": {
+    "clear_whiff": {
+     "tp": 13,
+     "fp": 0,
+     "fn": 7,
+     "precision": 1.0,
+     "recall": 0.65,
+     "predicted": 13,
+     "labeled": 20,
+     "median_abs_timing_error": 0.01201293945314319,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "recall_ci": [
+      0.464217032967033,
+      0.8333333333333334
+     ],
+     "fp_per_player_minute": 0.0,
+     "count_ratio": 0.65
+    },
+    "disrupted_attempt": {
+     "tp": 19,
+     "fp": 4,
+     "fn": 5,
+     "precision": 0.8260869565217391,
+     "recall": 0.7916666666666666,
+     "predicted": 23,
+     "labeled": 24,
+     "median_abs_timing_error": 0.022899894714356606,
+     "precision_ci": [
+      0.6086956521739131,
+      1.0
+     ],
+     "recall_ci": [
+      0.6521739130434783,
+      0.9310344827586207
+     ],
+     "fp_per_player_minute": 0.42857142857142855,
+     "count_ratio": 0.9583333333333334
+    },
+    "macro_event_f1": 0.7981947130883302,
+    "player_minutes": 9.333333333333334
+   }
+  },
+  "rule": {
+   "dev": {
+    "clear_whiff": {
+     "tp": 3,
+     "fp": 9,
+     "fn": 4,
+     "precision": 0.25,
+     "recall": 0.42857142857142855,
+     "predicted": 12,
+     "labeled": 7,
+     "median_abs_timing_error": 0.003204345703125,
+     "precision_ci": [
+      0.0,
+      0.5384615384615384
+     ],
+     "recall_ci": [
+      0.0,
+      0.8333333333333334
+     ],
+     "fp_per_player_minute": 0.9574468085106382,
+     "count_ratio": 1.7142857142857142
+    },
+    "disrupted_attempt": {
+     "tp": 12,
+     "fp": 3,
+     "fn": 3,
+     "precision": 0.8,
+     "recall": 0.8,
+     "predicted": 15,
+     "labeled": 15,
+     "median_abs_timing_error": 0.020204162597650566,
+     "precision_ci": [
+      0.5452797202797203,
+      1.0
+     ],
+     "recall_ci": [
+      0.5714285714285714,
+      1.0
+     ],
+     "fp_per_player_minute": 0.3191489361702127,
+     "count_ratio": 1.0
+    },
+    "macro_event_f1": 0.5578947368421053,
+    "player_minutes": 9.4
+   },
+   "test-tiled-v1": {
+    "clear_whiff": {
+     "tp": 5,
+     "fp": 8,
+     "fn": 4,
+     "precision": 0.38461538461538464,
+     "recall": 0.5555555555555556,
+     "predicted": 13,
+     "labeled": 9,
+     "median_abs_timing_error": 0.015492553710942047,
+     "precision_ci": [
+      0.0,
+      0.7142857142857143
+     ],
+     "recall_ci": [
+      0.0,
+      0.8571428571428571
+     ],
+     "fp_per_player_minute": 0.6,
+     "count_ratio": 1.4444444444444444
+    },
+    "disrupted_attempt": {
+     "tp": 2,
+     "fp": 8,
+     "fn": 6,
+     "precision": 0.2,
+     "recall": 0.25,
+     "predicted": 10,
+     "labeled": 8,
+     "median_abs_timing_error": 0.08303894042970228,
+     "precision_ci": [
+      0.0,
+      0.5
+     ],
+     "recall_ci": [
+      0.0,
+      0.5714285714285714
+     ],
+     "fp_per_player_minute": 0.6,
+     "count_ratio": 1.25
+    },
+    "macro_event_f1": 0.3383838383838384,
+    "player_minutes": 13.333333333333334
+   },
+   "test-strat-v1": {
+    "clear_whiff": {
+     "tp": 14,
+     "fp": 8,
+     "fn": 6,
+     "precision": 0.6363636363636364,
+     "recall": 0.7,
+     "predicted": 22,
+     "labeled": 20,
+     "median_abs_timing_error": 0.016145935058574423,
+     "precision_ci": [
+      0.41654411764705884,
+      0.8125
+     ],
+     "recall_ci": [
+      0.45,
+      0.8888888888888888
+     ],
+     "fp_per_player_minute": 0.8571428571428571,
+     "count_ratio": 1.1
+    },
+    "disrupted_attempt": {
+     "tp": 18,
+     "fp": 8,
+     "fn": 6,
+     "precision": 0.6923076923076923,
+     "recall": 0.75,
+     "predicted": 26,
+     "labeled": 24,
+     "median_abs_timing_error": 0.022695674896240803,
+     "precision_ci": [
+      0.5,
+      0.857266009852216
+     ],
+     "recall_ci": [
+      0.56,
+      0.9130434782608695
+     ],
+     "fp_per_player_minute": 0.8571428571428571,
+     "count_ratio": 1.0833333333333333
+    },
+    "macro_event_f1": 0.6933333333333332,
+    "player_minutes": 9.333333333333334
+   }
+  },
+  "detector": {
+   "dev": {
+    "clear_whiff": {
+     "tp": 3,
+     "fp": 14,
+     "fn": 4,
+     "precision": 0.17647058823529413,
+     "recall": 0.42857142857142855,
+     "predicted": 17,
+     "labeled": 7,
+     "median_abs_timing_error": 0.017435455322264204,
+     "precision_ci": [
+      0.0,
+      0.36858552631578856
+     ],
+     "recall_ci": [
+      0.0,
+      0.8333333333333334
+     ],
+     "fp_per_player_minute": 1.4893617021276595,
+     "count_ratio": 2.4285714285714284
+    },
+    "disrupted_attempt": {
+     "tp": 3,
+     "fp": 8,
+     "fn": 12,
+     "precision": 0.2727272727272727,
+     "recall": 0.2,
+     "predicted": 11,
+     "labeled": 15,
+     "median_abs_timing_error": 0.08847656249997726,
+     "precision_ci": [
+      0.0,
+      0.5714285714285714
+     ],
+     "recall_ci": [
+      0.0,
+      0.4
+     ],
+     "fp_per_player_minute": 0.851063829787234,
+     "count_ratio": 0.7333333333333333
+    },
+    "macro_event_f1": 0.24038461538461536,
+    "player_minutes": 9.4
+   },
+   "test-tiled-v1": {
+    "clear_whiff": {
+     "tp": 4,
+     "fp": 6,
+     "fn": 5,
+     "precision": 0.4,
+     "recall": 0.4444444444444444,
+     "predicted": 10,
+     "labeled": 9,
+     "median_abs_timing_error": 0.028673706054689774,
+     "precision_ci": [
+      0.0,
+      0.75
+     ],
+     "recall_ci": [
+      0.0,
+      0.6666666666666666
+     ],
+     "fp_per_player_minute": 0.44999999999999996,
+     "count_ratio": 1.1111111111111112
+    },
+    "disrupted_attempt": {
+     "tp": 2,
+     "fp": 5,
+     "fn": 6,
+     "precision": 0.2857142857142857,
+     "recall": 0.25,
+     "predicted": 7,
+     "labeled": 8,
+     "median_abs_timing_error": 0.18744567871092954,
+     "precision_ci": [
+      0.0,
+      0.6666666666666666
+     ],
+     "recall_ci": [
+      0.0,
+      0.42857142857142855
+     ],
+     "fp_per_player_minute": 0.375,
+     "count_ratio": 0.875
+    },
+    "macro_event_f1": 0.34385964912280703,
+    "player_minutes": 13.333333333333334
+   },
+   "test-strat-v1": {
+    "clear_whiff": {
+     "tp": 10,
+     "fp": 31,
+     "fn": 10,
+     "precision": 0.24390243902439024,
+     "recall": 0.5,
+     "predicted": 41,
+     "labeled": 20,
+     "median_abs_timing_error": 0.012705688476557953,
+     "precision_ci": [
+      0.14285714285714285,
+      0.35555555555555557
+     ],
+     "recall_ci": [
+      0.3333333333333333,
+      0.6666666666666666
+     ],
+     "fp_per_player_minute": 3.321428571428571,
+     "count_ratio": 2.05
+    },
+    "disrupted_attempt": {
+     "tp": 14,
+     "fp": 13,
+     "fn": 10,
+     "precision": 0.5185185185185185,
+     "recall": 0.5833333333333334,
+     "predicted": 27,
+     "labeled": 24,
+     "median_abs_timing_error": 0.0731865692138669,
+     "precision_ci": [
+      0.36363636363636365,
+      0.68
+     ],
+     "recall_ci": [
+      0.4,
+      0.7647058823529411
+     ],
+     "fp_per_player_minute": 1.3928571428571428,
+     "count_ratio": 1.125
+    },
+    "macro_event_f1": 0.4384442301510768,
+    "player_minutes": 9.333333333333334
+   }
+  }
+ }
+}

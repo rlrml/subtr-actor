@@ -1454,13 +1454,13 @@ _None documented._
 
 **Summary**
 
-A committed attempt near the ball that resolves as a clear miss.
+A committed attempt at the ball that missed: a clean whiff, or a disrupted attempt when another player's touch took the ball first (separate kinds and counts).
 
 **Approach**
 
-- Start candidates when a player gets within hitbox distance of the ball while moving or dodging toward it with sufficient alignment and closing speed.
-- Track the full attempt span and closest-approach evidence while the candidate remains near the ball.
-- Resolve as a whiff only when the player separates beyond the candidate window without any touch; touches, expiry, missing players, and play boundaries discard the candidate.
+- Take every local minimum of a player's ball contact gap during live play as a candidate closest approach, so renewed attempts after the player's own touch or after a miss are evaluated individually.
+- After a fixed 0.6 s resolution delay, compute causal telemetry features: gap history, approach and intercept course, orientation and acceleration toward the ball, dodge/boost state, and the timing and effect of nearby touches (including whether the car was converging on the ball's pre-touch path).
+- Classify with a gradient-boosted tree model trained on vision-model-reviewed replay windows; emit clean whiffs and disrupted attempts, and drop successful contacts and non-attempts.
 
 **Limitations**
 

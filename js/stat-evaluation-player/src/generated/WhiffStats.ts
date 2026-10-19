@@ -2,6 +2,12 @@
 import type { LabeledCounts } from "./LabeledCounts.ts";
 
 /**
- * Per-player accumulated whiff stats: counts, confidence, and grounded/aerial/dodge breakdown.
+ * Per-player accumulated whiff stats: clean-whiff counts with their
+ * grounded/aerial/dodge breakdown, and disrupted attempts counted separately.
  */
-export type WhiffStats = { whiff_count: number, beaten_to_ball_count: number, grounded_whiff_count: number, aerial_whiff_count: number, dodge_whiff_count: number, is_last_whiff: boolean, last_whiff_time: number | null, last_whiff_frame: number | null, time_since_last_whiff: number | null, frames_since_last_whiff: number | null, last_closest_approach_distance: number | null, best_closest_approach_distance: number | null, cumulative_closest_approach_distance: number, labeled_whiff_counts?: LabeledCounts, };
+export type WhiffStats = { whiff_count: number, beaten_to_ball_count: number,
+/**
+ * Attempts that missed because another player's touch took the ball
+ * first. Never included in `whiff_count`.
+ */
+disrupted_attempt_count: number, aerial_disrupted_attempt_count: number, grounded_whiff_count: number, aerial_whiff_count: number, dodge_whiff_count: number, is_last_whiff: boolean, last_whiff_time: number | null, last_whiff_frame: number | null, time_since_last_whiff: number | null, frames_since_last_whiff: number | null, last_closest_approach_distance: number | null, best_closest_approach_distance: number | null, cumulative_closest_approach_distance: number, labeled_whiff_counts?: LabeledCounts, };

@@ -1846,6 +1846,7 @@ dependencies = [
  "anyhow",
  "boxcars",
  "clap",
+ "flate2",
  "float-ord",
  "glam",
  "ndarray",
