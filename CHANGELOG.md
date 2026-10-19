@@ -35,6 +35,10 @@ README, or refactor-only commit.
   ([#294](https://github.com/rlrml/subtr-actor/pull/294)).
 - Update the Rust toolchain to 1.99.1 and dependencies within their supported
   ranges ([#290](https://github.com/rlrml/subtr-actor/pull/290)).
+- **Breaking for direct boxcars users:** update boxcars to 0.13. `boxcars`
+  types appear in the public API (`ReplayProcessor::new(&boxcars::Replay)`),
+  so consumers must move to boxcars 0.13 too; `RemoteId` is now
+  `#[non_exhaustive]`.
 
 ## v1.4.0 - 2026-10-02
 
