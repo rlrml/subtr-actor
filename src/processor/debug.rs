@@ -8,11 +8,10 @@ impl<'a> ReplayProcessor<'a> {
     ) -> HashMap<String, boxcars::Attribute> {
         hash_map
             .iter()
-            .map(|(k, (v, _updated))| {
+            .filter_map(|(k, (v, _updated))| {
                 self.object_id_to_name
                     .get(k)
                     .map(|name| (name.clone(), v.clone()))
-                    .unwrap()
             })
             .collect()
     }
@@ -49,10 +48,15 @@ impl<'a> ReplayProcessor<'a> {
     /// Prints the named actor states for the provided actor ids.
     pub fn print_actors_by_id<'b>(&self, actor_ids: impl Iterator<Item = &'b boxcars::ActorId>) {
         actor_ids.for_each(|actor_id| {
-            let state = self.get_actor_state(actor_id).unwrap();
+            let Ok(state) = self.get_actor_state(actor_id) else {
+                return;
+            };
             println!(
                 "{:?}\n\n\n",
-                self.object_id_to_name.get(&state.object_id).unwrap()
+                self.object_id_to_name
+                    .get(&state.object_id)
+                    .map(String::as_str)
+                    .unwrap_or("unknown")
             );
             println!("{:?}", self.map_attribute_keys(&state.attributes))
         })
@@ -60,11 +64,11 @@ impl<'a> ReplayProcessor<'a> {
 
     /// Logs all actors of a specific object type with their mapped attributes.
     pub fn print_actors_of_type(&self, actor_type: &'static str) {
-        self.iter_actors_by_type(actor_type)
-            .unwrap()
-            .for_each(|(_actor_id, state)| {
+        if let Some(actors) = self.iter_actors_by_type(actor_type) {
+            for (_actor_id, state) in actors {
                 log::debug!("{:?}", self.map_attribute_keys(&state.attributes));
-            });
+            }
+        }
     }
 
     /// Logs the set of actor object types currently present in the state model.
@@ -94,3 +98,7 @@ impl<'a> ReplayProcessor<'a> {
             });
     }
 }
+
+#[cfg(test)]
+#[path = "debug_tests.rs"]
+mod tests;
