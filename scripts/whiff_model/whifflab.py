@@ -24,6 +24,7 @@ import sys
 import numpy as np
 
 import adjudicate
+import campaign
 import core_model
 import fresh_eval
 import labeling
@@ -1020,6 +1021,32 @@ def cmd_score_fresh(args):
     print(json.dumps(result, indent=1))
 
 
+def _listing_by_id(path: pathlib.Path) -> dict[str, dict]:
+    return {row["id"]: row for row in read_jsonl(path)}
+
+
+def cmd_campaign_playlist(args):
+    """Review playlist for a Rocket Sense campaign over a frozen manifest."""
+    windows = read_jsonl(args.manifest)
+    doc = campaign.playlist(windows, _listing_by_id(args.listing), args.manifest.stem)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(doc, indent=2) + "\n")
+    print(json.dumps({"items": len(doc["items"]), "replays": len(doc["replays"])}))
+
+
+def cmd_score_campaign(args):
+    """Clean-whiff precision/recall from a campaign labels.jsonl export."""
+    windows = read_jsonl(args.manifest)
+    finals = campaign.finals_from_export(
+        windows, _listing_by_id(args.listing), read_jsonl(args.labels), args.reviewer
+    )
+    result = fresh_eval.score(windows, finals, classes=("clear_whiff",))
+    out = args.cache / "reports" / f"campaign_{args.manifest.stem}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=1))
+
+
 def feat_names():
     import features
 
@@ -1146,6 +1173,21 @@ def main(argv=None):
     p = sub.add_parser("score-fresh")
     p.add_argument("--manifest", type=pathlib.Path, required=True)
     p.set_defaults(func=cmd_score_fresh)
+
+    p = sub.add_parser("campaign-playlist")
+    p.add_argument("--manifest", type=pathlib.Path, required=True)
+    p.add_argument(
+        "--listing", type=pathlib.Path, required=True, help="Rocket Sense replay rows (JSONL)"
+    )
+    p.add_argument("--out", type=pathlib.Path, required=True)
+    p.set_defaults(func=cmd_campaign_playlist)
+
+    p = sub.add_parser("score-campaign")
+    p.add_argument("--manifest", type=pathlib.Path, required=True)
+    p.add_argument("--listing", type=pathlib.Path, required=True)
+    p.add_argument("--labels", type=pathlib.Path, required=True, help="campaign labels.jsonl")
+    p.add_argument("--reviewer", help="only this reviewer's labels")
+    p.set_defaults(func=cmd_score_campaign)
 
     p = sub.add_parser("select")
     p.add_argument("--name", required=True)

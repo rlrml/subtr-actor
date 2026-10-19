@@ -6,6 +6,8 @@ import unittest
 import numpy as np
 
 import adjudicate
+import campaign
+import fresh_eval
 import labeling
 import mining
 import modeling
@@ -180,6 +182,51 @@ class EventMetricTests(unittest.TestCase):
 
     def test_greedy_match_is_one_to_one(self):
         self.assertEqual(sorted(modeling.greedy_match([1.0, 1.1], [1.05], 0.4)), [(0, 0)])
+
+
+class CampaignLabelTests(unittest.TestCase):
+    listing = {"r": {"file_sha256": "ab" * 32, "players": []}}
+
+    def window(self, neutral_id, frame, new):
+        return {
+            "neutral_id": neutral_id,
+            "replay_id": "r",
+            "player_id": "Epic:p",
+            "anchor_frame": frame,
+            "anchor_time": frame / 30,
+            "sampling_probability": 0.5,
+            "manifest_stratum": "new_only" if new else "near_unflagged",
+            "interaction": {"new": new, "legacy": None},
+        }
+
+    def test_export_statuses_map_to_clean_whiff_anchor_labels(self):
+        windows = [
+            self.window("a", 30, "clear_whiff"),
+            self.window("b", 60, "clear_whiff"),
+            self.window("c", 90, None),
+            self.window("d", 120, None),
+        ]
+        key = {w["neutral_id"]: campaign.event_id(w, "ab" * 32) for w in windows}
+        export = [
+            {"candidate": key["a"], "status": "confirmed", "reviewer": "u1"},
+            {"candidate": key["b"], "status": "rejected", "reviewer": "u1"},
+            {"candidate": key["c"], "status": "confirmed", "reviewer": "u1"},
+            {"candidate": key["c"], "status": "rejected", "reviewer": "u2"},
+            {"candidate": key["d"], "status": "bad_candidate", "reviewer": "u1"},
+        ]
+        finals = campaign.finals_from_export(windows, self.listing, export)
+        labels = {
+            w["neutral_id"]: fresh_eval.anchor_label(finals[w["neutral_id"]], w["anchor_time"])
+            for w in windows
+        }
+        self.assertEqual(labels["b"], "not_clear_whiff")
+        self.assertEqual(labels["a"], "clear_whiff")
+        self.assertEqual(finals["c"]["human_status"], "uncertain")
+        self.assertEqual(labels["d"], "unusable")
+
+        result = fresh_eval.score(windows, finals, n_boot=10, classes=("clear_whiff",))
+        self.assertEqual(result["new/clear_whiff"]["precision"], 0.5)
+        self.assertNotIn("new/disrupted_attempt", result)
 
 
 if __name__ == "__main__":
