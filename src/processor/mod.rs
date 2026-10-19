@@ -391,9 +391,16 @@ pub struct ReplayProcessor<'a> {
     player_stat_counters: HashMap<(PlayerId, PlayerStatEventKind), i32>,
     /// All demolishes observed so far in the replay.
     pub demolishes: Vec<DemolishInfo>,
-    known_demolishes: Vec<(DemolishAttribute, usize)>,
+    failed_demolishes: Vec<FailedDemolish>,
+    deleted_mapping_actor_ids: std::collections::HashSet<boxcars::ActorId>,
     demolish_format: Option<DemolishFormat>,
     kickoff_phase_active_last_frame: bool,
+}
+
+struct FailedDemolish {
+    attribute: DemolishAttribute,
+    first_frame: usize,
+    waiting_for_players: bool,
 }
 
 impl<'a> ReplayProcessor<'a> {
@@ -504,7 +511,8 @@ impl<'a> ReplayProcessor<'a> {
             current_frame_player_stat_events: Vec::new(),
             player_stat_counters: HashMap::new(),
             demolishes: Vec::new(),
-            known_demolishes: Vec::new(),
+            failed_demolishes: Vec::new(),
+            deleted_mapping_actor_ids: Default::default(),
             demolish_format: None,
             kickoff_phase_active_last_frame: false,
         };
@@ -673,9 +681,10 @@ impl<'a> ReplayProcessor<'a> {
     /// After each a frame is processed, [`Collector::process_frame`] of the
     /// collector is called. The [`TimeAdvance`] return value of this call into
     /// [`Collector::process_frame`] is used to determine what happens next: in
-    /// the case of [`TimeAdvance::Time`], the notion of current time is
-    /// advanced by the provided amount, and only the timestamp of the frame is
-    /// exceeded, do we process the next frame. This mechanism allows fine
+    /// the case of [`TimeAdvance::Time`], the current time is set to the provided
+    /// absolute timestamp. It must be finite and later than the current sample,
+    /// or processing returns an error. Only when it exceeds the frame timestamp
+    /// do we process the next frame. This mechanism allows fine
     /// grained control of frame processing, and the frequency of invocations of
     /// the [`Collector`]. If time is advanced by less than the delay between
     /// frames, the collector will be called more than once per frame, and can
@@ -731,6 +740,15 @@ impl<'a> ReplayProcessor<'a> {
                 // This design allows the handler to have control over the frame
                 // rate, including the possibility of skipping frames.
                 if let TimeAdvance::Time(new_target) = target_time {
+                    if !new_target.is_finite() || new_target <= current_time {
+                        return SubtrActorError::new_result(
+                            SubtrActorErrorVariant::InvalidTimeAdvance {
+                                frame_index: index,
+                                current_time,
+                                target_time: new_target,
+                            },
+                        );
+                    }
                     current_time = new_target;
                 } else {
                     break;
@@ -789,6 +807,7 @@ impl<'a> ReplayProcessor<'a> {
         // player identity late during bootstrap, but the actor ids are already
         // valid for earlier frames once frame processing restarts.
         self.actor_state = ActorStateModeler::new();
+        self.deleted_mapping_actor_ids.clear();
         self.boost_pad_events = Vec::new();
         self.current_frame_boost_pad_events = Vec::new();
         self.boost_pad_pickup_sequence_times = HashMap::new();
@@ -806,7 +825,7 @@ impl<'a> ReplayProcessor<'a> {
         self.current_frame_player_stat_events = Vec::new();
         self.player_stat_counters = HashMap::new();
         self.demolishes = Vec::new();
-        self.known_demolishes = Vec::new();
+        self.failed_demolishes.clear();
         self.demolish_format = None;
         self.kickoff_phase_active_last_frame = false;
     }

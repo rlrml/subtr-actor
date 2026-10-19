@@ -76,6 +76,9 @@ impl BoostPadResolutionState {
         let observed_position = self
             .estimated_pad_position(pad_id)
             .unwrap_or(observed_position);
+        if !observed_position.is_finite() {
+            return None;
+        }
         let layout = standard_soccar_boost_pad_layout();
         let used_indices: HashSet<usize> = self.known_pad_indices.values().copied().collect();
         let observed_positions = self.observed_pad_positions(pad_id);
@@ -104,6 +107,9 @@ impl BoostPadResolutionState {
                     }
 
                     let representative_distance = observed_position.distance(*candidate_position);
+                    if !representative_distance.is_finite() {
+                        return None;
+                    }
                     Some((
                         index,
                         *size,
@@ -116,9 +122,9 @@ impl BoostPadResolutionState {
                 .max_by(|left, right| {
                     left.2
                         .cmp(&right.2)
-                        .then_with(|| right.3.partial_cmp(&left.3).unwrap())
-                        .then_with(|| right.4.partial_cmp(&left.4).unwrap())
-                        .then_with(|| right.5.partial_cmp(&left.5).unwrap())
+                        .then_with(|| right.3.total_cmp(&left.3))
+                        .then_with(|| right.4.total_cmp(&left.4))
+                        .then_with(|| right.5.total_cmp(&left.5))
                 })
                 .map(|(index, size, _, _, _, _)| (index, size))
         };

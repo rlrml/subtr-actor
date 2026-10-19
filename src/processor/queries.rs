@@ -1,7 +1,7 @@
 use super::*;
 
 impl<'a> ReplayProcessor<'a> {
-    /// Searches forward or backward for the next update of a specific actor property.
+    /// Searches for an actor property update within the actor's current lifetime.
     pub fn find_update_in_direction(
         &self,
         current_index: usize,
@@ -14,9 +14,22 @@ impl<'a> ReplayProcessor<'a> {
             .network_frames
             .as_ref()
             .ok_or_else(|| SubtrActorError::new(SubtrActorErrorVariant::NoNetworkFrames))?;
+        if current_index >= frames.frames.len() {
+            return SubtrActorError::new_result(SubtrActorErrorVariant::FrameIndexOutOfBounds);
+        }
+        let starts_or_ends_lifetime = |frame: &boxcars::Frame| {
+            frame.deleted_actors.contains(actor_id)
+                || frame
+                    .new_actors
+                    .iter()
+                    .any(|actor| actor.actor_id == *actor_id)
+        };
         match direction {
             SearchDirection::Forward => {
                 for index in (current_index + 1)..frames.frames.len() {
+                    if starts_or_ends_lifetime(&frames.frames[index]) {
+                        break;
+                    }
                     if let Some(attribute) = frames.frames[index]
                         .updated_actors
                         .iter()
@@ -31,6 +44,9 @@ impl<'a> ReplayProcessor<'a> {
             }
             SearchDirection::Backward => {
                 for index in (0..current_index).rev() {
+                    if starts_or_ends_lifetime(&frames.frames[index + 1]) {
+                        break;
+                    }
                     if let Some(attribute) = frames.frames[index]
                         .updated_actors
                         .iter()
@@ -84,20 +100,6 @@ impl<'a> ReplayProcessor<'a> {
                 actor_id: *actor_id,
             })
         })
-    }
-
-    /// Returns whether a demolish has already been recorded within the dedupe window.
-    pub(crate) fn demolish_is_known(&self, demo: &DemolishAttribute, frame_index: usize) -> bool {
-        self.known_demolishes
-            .iter()
-            .any(|(existing, existing_frame_index)| {
-                existing == demo
-                    && frame_index
-                        .checked_sub(*existing_frame_index)
-                        .or_else(|| existing_frame_index.checked_sub(frame_index))
-                        .unwrap()
-                        < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
-            })
     }
 
     /// Returns the demolish attribute encoding currently used by the replay, if known.
@@ -243,8 +245,23 @@ impl<'a> ReplayProcessor<'a> {
 
         let object_id = self.get_object_id_for_key(RIGID_BODY_STATE_KEY)?;
 
-        let (attribute, found_frame) =
-            self.find_update_in_direction(*frame_index, actor_id, object_id, search_direction)?;
+        let (attribute, found_frame) = match self.find_update_in_direction(
+            *frame_index,
+            actor_id,
+            object_id,
+            search_direction,
+        ) {
+            Ok(update) => update,
+            Err(error)
+                if matches!(
+                    error.variant,
+                    SubtrActorErrorVariant::NoUpdateAfterFrame { .. }
+                ) =>
+            {
+                return self.velocities_applied_rigid_body(frame_body, *frame_index, time);
+            }
+            Err(error) => return Err(error),
+        };
         let found_time = self.get_frame(found_frame)?.time;
 
         let found_body = attribute_match!(attribute, boxcars::Attribute::RigidBody)?;
@@ -650,3 +667,7 @@ impl<'a> ReplayProcessor<'a> {
             .map(move |id| (id, self.actor_state.actor_states.get(id).unwrap()))
     }
 }
+
+#[cfg(test)]
+#[path = "queries_tests.rs"]
+mod tests;

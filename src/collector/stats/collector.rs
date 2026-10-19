@@ -1,3 +1,4 @@
+use crate::stats::analysis_graph::replay_meta::ReplayMetaTracker;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 
@@ -316,7 +317,7 @@ pub struct StatsCollector<T = StatsSnapshotFrame, F = IdentityFrameTransform> {
     captured_frames: Option<Vec<T>>,
     sample_mode: SampleMode,
     frame_input_builder: ReplayFrameInputBuilder,
-    last_replay_meta_player_count: Option<usize>,
+    replay_meta_tracker: ReplayMetaTracker,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
     _marker: PhantomData<T>,
@@ -460,7 +461,7 @@ impl<T, F> StatsCollector<T, F> {
             captured_frames: None,
             sample_mode: SampleMode::Aggregate,
             frame_input_builder: ReplayFrameInputBuilder::default(),
-            last_replay_meta_player_count: None,
+            replay_meta_tracker: ReplayMetaTracker::default(),
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
             _marker: PhantomData,
@@ -482,7 +483,7 @@ impl<T, F> StatsCollector<T, F> {
             captured_frames,
             sample_mode,
             frame_input_builder,
-            last_replay_meta_player_count,
+            replay_meta_tracker,
             last_sample_time,
             frame_persistence,
             ..
@@ -496,7 +497,7 @@ impl<T, F> StatsCollector<T, F> {
             captured_frames: captured_frames.map(|_| Vec::new()),
             sample_mode,
             frame_input_builder,
-            last_replay_meta_player_count,
+            replay_meta_tracker,
             last_sample_time,
             frame_persistence,
             _marker: PhantomData,
@@ -609,15 +610,12 @@ impl<T, F> StatsCollector<T, F> {
     }
 
     fn refresh_replay_meta(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
-        let player_count = processor.player_count();
-        if self.last_replay_meta_player_count == Some(player_count) {
-            return Ok(());
+        if let Some(replay_meta) = self
+            .replay_meta_tracker
+            .refresh(processor, &mut self.graph)?
+        {
+            self.replay_meta = Some(replay_meta);
         }
-
-        let replay_meta = processor.get_replay_meta()?;
-        self.graph.on_replay_meta(&replay_meta)?;
-        self.replay_meta = Some(replay_meta);
-        self.last_replay_meta_player_count = Some(player_count);
         Ok(())
     }
 }

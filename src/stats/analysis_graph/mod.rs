@@ -80,6 +80,7 @@ mod node_macros;
 
 mod collector;
 mod nodes;
+pub(crate) mod replay_meta;
 
 use crate::stats::calculators::FrameInput;
 #[allow(unused_imports)]

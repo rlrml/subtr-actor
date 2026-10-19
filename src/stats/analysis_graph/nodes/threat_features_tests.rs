@@ -179,3 +179,57 @@ fn flip_reset_refreshes_and_removes_the_standard_timeout() {
         false,
     ));
 }
+
+#[test]
+fn metadata_refresh_preserves_retained_players_dodge_window() {
+    let player_id = RemoteId::SplitScreen(1);
+    let mut node = ThreatFeaturesNode::new();
+    assert!(availability(
+        &mut node,
+        &player_id,
+        0.0,
+        PLAYER_GROUND_Z_THRESHOLD,
+        PlayerControlSample::default(),
+        false
+    ));
+    assert!(availability(
+        &mut node,
+        &player_id,
+        0.1,
+        PLAYER_GROUND_Z_THRESHOLD + 100.0,
+        PlayerControlSample::default(),
+        false
+    ));
+    let meta = ReplayMeta {
+        team_zero: vec![PlayerInfo {
+            remote_id: player_id.clone(),
+            stats: None,
+            name: "retained".into(),
+            car_body_id: None,
+            car_body_name: None,
+            car_hitbox_family: None,
+            camera_settings: None,
+        }],
+        team_one: Vec::new(),
+        game_type: ReplayGameTypeDetails::default(),
+        season: None,
+        all_headers: Vec::new(),
+    };
+    AnalysisNode::on_replay_meta(&mut node, &meta).unwrap();
+    assert!(availability(
+        &mut node,
+        &player_id,
+        0.2,
+        PLAYER_GROUND_Z_THRESHOLD + 100.0,
+        PlayerControlSample::default(),
+        false
+    ));
+    assert!(!availability(
+        &mut node,
+        &player_id,
+        1.36,
+        PLAYER_GROUND_Z_THRESHOLD + 100.0,
+        PlayerControlSample::default(),
+        false
+    ));
+}

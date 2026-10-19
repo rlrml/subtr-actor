@@ -93,6 +93,29 @@ fn update_team_zero(
 }
 
 #[test]
+fn rotation_excludes_nonfinite_first_man_candidates() {
+    for invalid in [f32::NAN, f32::from_bits(0xffc0_0000), f32::INFINITY] {
+        let mut calculator = RotationCalculator::new();
+        update_team_zero(
+            &mut calculator,
+            1,
+            0.1,
+            glam::Vec3::splat(invalid),
+            glam::Vec3::ZERO,
+        );
+        assert_eq!(
+            calculator.current_states[&PlayerId::Steam(1)].0,
+            RoleState::Unknown
+        );
+        assert_eq!(
+            calculator.current_states[&PlayerId::Steam(2)].0,
+            RoleState::Unknown
+        );
+        assert!(calculator.first_man_change_events().is_empty());
+    }
+}
+
+#[test]
 fn debounces_first_man_changes_before_counting_rotations() {
     let mut calculator = RotationCalculator::with_config(RotationCalculatorConfig {
         first_man_debounce_seconds: 0.3,

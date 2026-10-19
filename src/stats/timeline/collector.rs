@@ -1,6 +1,7 @@
 use crate::collector::frame_resolution::{
     FinalStatsFrameAction, StatsFramePersistenceController, StatsFrameResolution,
 };
+use crate::stats::analysis_graph::replay_meta::ReplayMetaTracker;
 use crate::stats::analysis_graph::{
     AnalysisGraph, StatsProjectionNode, StatsTimelineEventsNode, StatsTimelineFrameNode,
     StatsTimelineFrameState,
@@ -150,7 +151,7 @@ pub struct StatsTimelineCollector {
     replay_meta: Option<ReplayMeta>,
     frames: Vec<ReplayStatsFrame>,
     frame_input_builder: ReplayFrameInputBuilder,
-    last_replay_meta_player_count: Option<usize>,
+    replay_meta_tracker: ReplayMetaTracker,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
 }
@@ -174,7 +175,7 @@ impl StatsTimelineCollector {
             replay_meta: None,
             frames: Vec::new(),
             frame_input_builder: ReplayFrameInputBuilder::default(),
-            last_replay_meta_player_count: None,
+            replay_meta_tracker: ReplayMetaTracker::default(),
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
         }
@@ -239,7 +240,7 @@ pub struct StatsTimelineEventCollector {
     replay_meta: Option<ReplayMeta>,
     frames: Vec<ReplayStatsFrameScaffold>,
     frame_input_builder: ReplayFrameInputBuilder,
-    last_replay_meta_player_count: Option<usize>,
+    replay_meta_tracker: ReplayMetaTracker,
     last_sample_time: Option<f32>,
     frame_persistence: StatsFramePersistenceController,
     include_expected_goals: bool,
@@ -262,7 +263,7 @@ impl StatsTimelineEventCollector {
             replay_meta: None,
             frames: Vec::new(),
             frame_input_builder: ReplayFrameInputBuilder::default(),
-            last_replay_meta_player_count: None,
+            replay_meta_tracker: ReplayMetaTracker::default(),
             last_sample_time: None,
             frame_persistence: StatsFramePersistenceController::new(StatsFrameResolution::default()),
             include_expected_goals: false,
@@ -569,12 +570,11 @@ impl Collector for StatsTimelineCollector {
         frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<TimeAdvance> {
-        let player_count = processor.player_count();
-        if self.last_replay_meta_player_count != Some(player_count) {
-            let replay_meta = processor.get_replay_meta()?;
-            self.graph.on_replay_meta(&replay_meta)?;
+        if let Some(replay_meta) = self
+            .replay_meta_tracker
+            .refresh(processor, &mut self.graph)?
+        {
             self.replay_meta = Some(replay_meta);
-            self.last_replay_meta_player_count = Some(player_count);
         }
 
         let dt = self
@@ -633,12 +633,11 @@ impl Collector for StatsTimelineEventCollector {
         frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<TimeAdvance> {
-        let player_count = processor.player_count();
-        if self.last_replay_meta_player_count != Some(player_count) {
-            let replay_meta = processor.get_replay_meta()?;
-            self.graph.on_replay_meta(&replay_meta)?;
+        if let Some(replay_meta) = self
+            .replay_meta_tracker
+            .refresh(processor, &mut self.graph)?
+        {
             self.replay_meta = Some(replay_meta);
-            self.last_replay_meta_player_count = Some(player_count);
         }
 
         let dt = self

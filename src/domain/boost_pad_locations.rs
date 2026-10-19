@@ -169,7 +169,9 @@ pub(crate) struct PadPositionEstimate {
 
 impl PadPositionEstimate {
     pub(crate) fn observe(&mut self, position: glam::Vec3) {
-        self.observations.push(position);
+        if position.is_finite() {
+            self.observations.push(position);
+        }
     }
 
     pub(crate) fn observations(&self) -> &[glam::Vec3] {
@@ -189,3 +191,7 @@ impl PadPositionEstimate {
         Some(sum / self.observations.len() as f32)
     }
 }
+
+#[cfg(test)]
+#[path = "boost_pad_locations_tests.rs"]
+mod tests;

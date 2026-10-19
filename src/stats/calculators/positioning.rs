@@ -227,17 +227,17 @@ impl ClosestToBallDebouncer {
     ) -> Option<ClosestToBallCandidate> {
         let raw_closest = candidates
             .iter()
-            .min_by(|left, right| left.distance.partial_cmp(&right.distance).unwrap())?;
+            .filter(|candidate| candidate.distance.is_finite())
+            .min_by(|left, right| left.distance.total_cmp(&right.distance))?;
         let Some(current_player) = self.current_player.as_ref() else {
             self.current_player = Some(raw_closest.player_id.clone());
             self.pending_player = None;
             self.pending_seconds = 0.0;
             return Some(raw_closest.clone());
         };
-        let Some(current) = candidates
-            .iter()
-            .find(|candidate| candidate.player_id == *current_player)
-        else {
+        let Some(current) = candidates.iter().find(|candidate| {
+            candidate.player_id == *current_player && candidate.distance.is_finite()
+        }) else {
             self.current_player = Some(raw_closest.player_id.clone());
             self.pending_player = None;
             self.pending_seconds = 0.0;
@@ -696,7 +696,12 @@ impl PositioningCalculator {
                 .iter()
                 .filter(|player| player.is_team_0 == is_team_0)
                 .filter(|player| !demoed_players.contains(&player.player_id))
-                .filter_map(|player| player.position().map(|position| (player, position)))
+                .filter_map(|player| {
+                    player
+                        .position()
+                        .filter(|position| position.is_finite())
+                        .map(|position| (player, position))
+                })
                 .collect();
 
             if team_players.is_empty() {
@@ -737,7 +742,7 @@ impl PositioningCalculator {
                     .iter()
                     .map(|(info, pos)| (info.player_id.clone(), normalized_y(is_team_0, *pos)))
                     .collect();
-                sorted_team.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
+                sorted_team.sort_by(|(_, a), (_, b)| a.total_cmp(b));
 
                 let team_spread = sorted_team.last().map(|(_, y)| *y).unwrap_or(0.0)
                     - sorted_team.first().map(|(_, y)| *y).unwrap_or(0.0);
@@ -793,11 +798,14 @@ impl PositioningCalculator {
                 entry.proximity.closest_to_ball_team = true;
             }
 
-            if let Some((farthest_player, _)) = team_players.iter().max_by(|(_, a), (_, b)| {
-                a.distance(ball_position)
-                    .partial_cmp(&b.distance(ball_position))
-                    .unwrap()
-            }) && let Some(entry) = facets.get_mut(&farthest_player.player_id)
+            if let Some((farthest_player, _)) = team_players
+                .iter()
+                .filter(|(_, position)| position.distance(ball_position).is_finite())
+                .max_by(|(_, a), (_, b)| {
+                    a.distance(ball_position)
+                        .total_cmp(&b.distance(ball_position))
+                })
+                && let Some(entry) = facets.get_mut(&farthest_player.player_id)
             {
                 entry.proximity.farthest_from_ball = true;
             }

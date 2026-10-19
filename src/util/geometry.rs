@@ -1050,6 +1050,7 @@ fn apply_angular_velocity(rigid_body: &boxcars::RigidBody, time_delta: f32) -> b
 }
 
 /// Interpolates between two [`boxcars::RigidBody`] states based on the provided time.
+/// Equal endpoint timestamps return the initial state. All timestamps must be finite.
 ///
 /// # Arguments
 ///
@@ -1069,7 +1070,12 @@ pub fn get_interpolated_rigid_body(
     end_time: f32,
     time: f32,
 ) -> SubtrActorResult<boxcars::RigidBody> {
-    if !(start_time <= time && time <= end_time) {
+    if !(start_time.is_finite()
+        && end_time.is_finite()
+        && time.is_finite()
+        && start_time <= time
+        && time <= end_time)
+    {
         return SubtrActorError::new_result(SubtrActorErrorVariant::InterpolationTimeOrderError {
             start_time,
             time,
@@ -1077,7 +1083,10 @@ pub fn get_interpolated_rigid_body(
         });
     }
 
-    if start_body.linear_velocity.is_none() || end_body.linear_velocity.is_none() {
+    if start_time == end_time
+        || start_body.linear_velocity.is_none()
+        || end_body.linear_velocity.is_none()
+    {
         return Ok(*start_body);
     }
 

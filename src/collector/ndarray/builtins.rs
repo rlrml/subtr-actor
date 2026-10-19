@@ -662,14 +662,16 @@ build_player_feature_adder!(
      player_id: &PlayerId,
      processor: &dyn ProcessorView,
      _frame,
-     frame_number,
+     frame_number: usize,
      _current_time: f32| {
         let demolisher_index = processor
             .demolishes()
             .iter()
             .find(|demolish_info| {
                 &demolish_info.victim == player_id
-                    && frame_number - demolish_info.frame < DEMOLISH_APPEARANCE_FRAME_COUNT
+                    && frame_number
+                        .checked_sub(demolish_info.frame)
+                        .is_some_and(|elapsed| elapsed < DEMOLISH_APPEARANCE_FRAME_COUNT)
             })
             .map(|demolish_info| {
                 processor

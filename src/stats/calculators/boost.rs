@@ -575,6 +575,9 @@ impl BoostCalculator {
         let observed_position = self
             .estimated_pad_position(pad_id)
             .unwrap_or(observed_position);
+        if !observed_position.is_finite() {
+            return None;
+        }
         let layout = &*STANDARD_SOCCAR_BOOST_PAD_LAYOUT;
         let used_indices: HashSet<usize> = self.known_pad_indices.values().copied().collect();
         let radius = Self::pad_match_radius(pad_size);
@@ -605,6 +608,9 @@ impl BoostCalculator {
                     }
 
                     let representative_distance = observed_position.distance(*candidate_position);
+                    if !representative_distance.is_finite() {
+                        return None;
+                    }
                     Some((
                         index,
                         vote_count,
@@ -616,9 +622,9 @@ impl BoostCalculator {
                 .max_by(|left, right| {
                     left.1
                         .cmp(&right.1)
-                        .then_with(|| right.2.partial_cmp(&left.2).unwrap())
-                        .then_with(|| right.3.partial_cmp(&left.3).unwrap())
-                        .then_with(|| right.4.partial_cmp(&left.4).unwrap())
+                        .then_with(|| right.2.total_cmp(&left.2))
+                        .then_with(|| right.3.total_cmp(&left.3))
+                        .then_with(|| right.4.total_cmp(&left.4))
                 })
                 .map(|(index, _, _, _, _)| index)
         };
@@ -633,8 +639,7 @@ impl BoostCalculator {
                     .min_by(|(_, (a, _)), (_, (b, _))| {
                         observed_position
                             .distance_squared(*a)
-                            .partial_cmp(&observed_position.distance_squared(*b))
-                            .unwrap()
+                            .total_cmp(&observed_position.distance_squared(*b))
                     })
                     .map(|(index, _)| index)
             })
@@ -646,8 +651,7 @@ impl BoostCalculator {
                     .min_by(|(_, (a, _)), (_, (b, _))| {
                         observed_position
                             .distance_squared(*a)
-                            .partial_cmp(&observed_position.distance_squared(*b))
-                            .unwrap()
+                            .total_cmp(&observed_position.distance_squared(*b))
                     })
                     .map(|(index, _)| index)
             })
@@ -669,6 +673,9 @@ impl BoostCalculator {
         let observed_position = self
             .estimated_pad_position(pad_id)
             .unwrap_or(observed_position);
+        if !observed_position.is_finite() {
+            return None;
+        }
         let layout = &*STANDARD_SOCCAR_BOOST_PAD_LAYOUT;
         let used_indices: HashSet<usize> = self.known_pad_indices.values().copied().collect();
         let observed_positions = self.observed_pad_positions(pad_id);
@@ -697,6 +704,9 @@ impl BoostCalculator {
                     }
 
                     let representative_distance = observed_position.distance(*candidate_position);
+                    if !representative_distance.is_finite() {
+                        return None;
+                    }
                     Some((
                         index,
                         *size,
@@ -709,9 +719,9 @@ impl BoostCalculator {
                 .max_by(|left, right| {
                     left.2
                         .cmp(&right.2)
-                        .then_with(|| right.3.partial_cmp(&left.3).unwrap())
-                        .then_with(|| right.4.partial_cmp(&left.4).unwrap())
-                        .then_with(|| right.5.partial_cmp(&left.5).unwrap())
+                        .then_with(|| right.3.total_cmp(&left.3))
+                        .then_with(|| right.4.total_cmp(&left.4))
+                        .then_with(|| right.5.total_cmp(&left.5))
                 })
                 .map(|(index, size, _, _, _, _)| (index, size))
         };
@@ -736,13 +746,16 @@ impl BoostCalculator {
         let observed_position = self
             .estimated_pad_position(pad_id)
             .unwrap_or(observed_position);
+        if !observed_position.is_finite() {
+            return None;
+        }
         standard_soccar_boost_pad_layout()
             .iter()
+            .filter(|(position, _)| observed_position.distance_squared(*position).is_finite())
             .min_by(|(left_position, _), (right_position, _)| {
                 observed_position
                     .distance_squared(*left_position)
-                    .partial_cmp(&observed_position.distance_squared(*right_position))
-                    .unwrap()
+                    .total_cmp(&observed_position.distance_squared(*right_position))
             })
             .map(|(_, pad_size)| *pad_size)
     }

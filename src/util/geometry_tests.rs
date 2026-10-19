@@ -653,3 +653,31 @@ fn car_hitbox_for_body_id_ignores_placeholder_product_ids() {
         );
     }
 }
+
+#[test]
+fn interpolation_returns_initial_body_for_zero_duration() {
+    let start = sample_rigid_body(0.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+    let end = sample_rigid_body(10.0, 20.0, 30.0, 1.0, 0.0, 0.0);
+    assert_eq!(
+        get_interpolated_rigid_body(&start, 1.0, &end, 1.0, 1.0).unwrap(),
+        start
+    );
+}
+
+#[test]
+fn interpolation_rejects_non_finite_timestamps() {
+    let body = sample_rigid_body(0.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+    for times in [
+        (0.0, 1.0, f32::NAN),
+        (f32::NEG_INFINITY, 1.0, 0.0),
+        (0.0, f32::INFINITY, 1.0),
+        (f32::INFINITY, f32::INFINITY, f32::INFINITY),
+    ] {
+        let error =
+            get_interpolated_rigid_body(&body, times.0, &body, times.1, times.2).unwrap_err();
+        assert!(matches!(
+            error.variant,
+            SubtrActorErrorVariant::InterpolationTimeOrderError { .. }
+        ));
+    }
+}

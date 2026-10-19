@@ -1,6 +1,7 @@
 use super::builtins::*;
 use super::traits::*;
 use crate::collector::{Collector, TimeAdvance};
+use crate::stats::analysis_graph::replay_meta::ReplayMetaTracker;
 use crate::stats::analysis_graph::{AnalysisDependency, AnalysisGraph};
 use crate::stats::calculators::{FrameInput, ReplayFrameInputBuilder};
 use crate::*;
@@ -65,6 +66,7 @@ impl ReplayMetaWithHeaders {
 }
 
 /// Collects replay frames into a dense 2D feature matrix.
+/// Per-player columns require a stable player order throughout collection.
 pub struct NDArrayCollector<F> {
     feature_adders: NDArrayFeatureAdders<F>,
     player_feature_adders: NDArrayPlayerFeatureAdders<F>,
@@ -80,7 +82,7 @@ struct NDArrayAnalysisRuntime {
     dependencies: Vec<AnalysisDependency>,
     frame_input_builder: ReplayFrameInputBuilder,
     last_sample_time: Option<f32>,
-    last_replay_meta_player_count: Option<usize>,
+    replay_meta_tracker: ReplayMetaTracker,
 }
 
 impl NDArrayAnalysisRuntime {
@@ -92,7 +94,7 @@ impl NDArrayAnalysisRuntime {
             dependencies,
             frame_input_builder: ReplayFrameInputBuilder::default(),
             last_sample_time: None,
-            last_replay_meta_player_count: None,
+            replay_meta_tracker: ReplayMetaTracker::default(),
         }
     }
 
@@ -102,12 +104,11 @@ impl NDArrayAnalysisRuntime {
         frame_number: usize,
         current_time: f32,
     ) -> SubtrActorResult<()> {
-        let player_count = processor.player_count();
-        if self.last_replay_meta_player_count != Some(player_count) {
+        if self.replay_meta_tracker.needs_refresh(processor) {
             self.graph
                 .ensure_dependencies(self.dependencies.iter().copied())?;
-            self.graph.on_replay_meta(&processor.get_replay_meta()?)?;
-            self.last_replay_meta_player_count = Some(player_count);
+            self.replay_meta_tracker
+                .refresh(processor, &mut self.graph)?;
         }
 
         let dt = self
@@ -226,8 +227,6 @@ impl<F> NDArrayCollector<F> {
         self,
     ) -> SubtrActorResult<(ReplayMetaWithHeaders, ndarray::Array2<F>)> {
         let features_per_row = self.try_get_frame_feature_count()?;
-        let expected_length = features_per_row * self.frames_added;
-        assert!(self.data.len() == expected_length);
         let column_headers = self.get_column_headers();
         Ok((
             ReplayMetaWithHeaders {
@@ -282,7 +281,24 @@ impl<F> NDArrayCollector<F> {
     }
 
     fn maybe_set_replay_meta(&mut self, processor: &dyn ProcessorView) -> SubtrActorResult<()> {
-        if self.replay_meta.is_none() {
+        if let Some(replay_meta) = &self.replay_meta {
+            if !self.player_feature_adders.is_empty()
+                && !replay_meta
+                    .player_order()
+                    .map(|player| &player.remote_id)
+                    .eq(processor.iter_player_ids_in_order())
+            {
+                return SubtrActorError::new_result(
+                    SubtrActorErrorVariant::NDArrayPlayerOrderChanged {
+                        expected: replay_meta
+                            .player_order()
+                            .map(|player| player.remote_id.clone())
+                            .collect(),
+                        found: processor.iter_player_ids_in_order().cloned().collect(),
+                    },
+                );
+            }
+        } else {
             self.replay_meta = Some(processor.get_replay_meta()?);
         }
         Ok(())

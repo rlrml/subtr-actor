@@ -45,22 +45,80 @@ impl<'a> ReplayProcessor<'a> {
         frame: &boxcars::Frame,
         frame_index: usize,
     ) {
+        self.failed_demolishes.retain(|failed| {
+            failed.first_frame.abs_diff(frame_index) < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
+        });
         if self.demolish_is_known(demolish, frame_index) {
+            self.failed_demolishes
+                .retain(|failed| &failed.attribute != demolish);
             return;
         }
-        self.known_demolishes.push((demolish.clone(), frame_index));
+        if self
+            .failed_demolishes
+            .iter()
+            .any(|failed| &failed.attribute == demolish && failed.waiting_for_players)
+            && (self
+                .get_player_id_from_car_id(&demolish.attacker_actor_id())
+                .is_err()
+                || self
+                    .get_player_id_from_car_id(&demolish.victim_actor_id())
+                    .is_err())
+        {
+            return;
+        }
         match self.build_demolish_info(demolish, frame, frame_index) {
             Ok(info) => {
+                self.failed_demolishes
+                    .retain(|failed| &failed.attribute != demolish);
                 self.demolishes.push(info);
             }
-            _ => {
-                log::warn!(
-                    "Error building demolish info: attacker_car={:?}, victim_car={:?}",
-                    demolish.attacker_actor_id(),
-                    demolish.victim_actor_id(),
-                );
+            Err(error) => {
+                // Retry as actor state arrives, but warn only once per window.
+                if !self
+                    .failed_demolishes
+                    .iter()
+                    .any(|failed| &failed.attribute == demolish)
+                {
+                    self.failed_demolishes.push(FailedDemolish {
+                        attribute: demolish.clone(),
+                        first_frame: frame_index,
+                        waiting_for_players: matches!(
+                            error.variant,
+                            SubtrActorErrorVariant::NoMatchingPlayerId { .. }
+                        ),
+                    });
+                    log::warn!(
+                        "Error building demolish info: attacker_car={:?}, victim_car={:?}",
+                        demolish.attacker_actor_id(),
+                        demolish.victim_actor_id(),
+                    );
+                }
             }
         }
+    }
+
+    fn demolish_is_known(&self, demo: &DemolishAttribute, frame_index: usize) -> bool {
+        let (Ok(attacker), Ok(victim)) = (
+            self.get_player_id_from_car_id(&demo.attacker_actor_id()),
+            self.get_player_id_from_car_id(&demo.victim_actor_id()),
+        ) else {
+            return false;
+        };
+        let attacker_velocity = self.normalize_vector_by_factor(
+            demo.attacker_velocity(),
+            DEMOLISH_VELOCITY_NORMALIZATION_FACTOR,
+        );
+        let victim_velocity = self.normalize_vector_by_factor(
+            demo.victim_velocity(),
+            DEMOLISH_VELOCITY_NORMALIZATION_FACTOR,
+        );
+        self.demolishes.iter().any(|existing| {
+            existing.attacker == attacker
+                && existing.victim == victim
+                && existing.attacker_velocity == attacker_velocity
+                && existing.victim_velocity == victim_velocity
+                && existing.frame.abs_diff(frame_index) < MAX_DEMOLISH_KNOWN_FRAMES_PASSED
+        })
     }
 
     fn build_demolish_info(
@@ -93,3 +151,7 @@ impl<'a> ReplayProcessor<'a> {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "demolishes_tests.rs"]
+mod tests;

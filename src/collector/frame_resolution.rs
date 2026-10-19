@@ -36,6 +36,9 @@ impl StatsFramePersistenceController {
     }
 
     pub(crate) fn on_frame(&mut self, frame_number: usize, current_time: f32) -> Option<f32> {
+        if !current_time.is_finite() {
+            return None;
+        }
         if self.last_emitted_time.is_none() {
             if let StatsFrameResolution::TimeStep { seconds } = self.resolution
                 && seconds.is_finite()

@@ -20,6 +20,21 @@ pub enum SubtrActorErrorVariant {
     #[error("Frame index out of bounds")]
     FrameIndexOutOfBounds,
 
+    #[error("Replay time must be finite, got {time}")]
+    InvalidReplayTime { time: f32 },
+
+    #[error("Clip start time {start_time} exceeds end time {end_time}")]
+    InvalidClipTimeRange { start_time: f32, end_time: f32 },
+
+    #[error(
+        "Collector returned invalid target time {target_time} at time {current_time} (frame {frame_index}); target must be finite and advance time"
+    )]
+    InvalidTimeAdvance {
+        frame_index: usize,
+        current_time: f32,
+        target_time: f32,
+    },
+
     #[error(
         "Players found in frames that were not part of original set. Found: {found:?}, Original: {original:?}"
     )]
@@ -117,6 +132,14 @@ pub enum SubtrActorErrorVariant {
 
     #[error(transparent)]
     NDArrayShapeError(#[from] ::ndarray::ShapeError),
+
+    #[error(
+        "NDArray player columns changed during collection. Expected: {expected:?}, found: {found:?}"
+    )]
+    NDArrayPlayerOrderChanged {
+        expected: Vec<PlayerId>,
+        found: Vec<PlayerId>,
+    },
 
     #[error("{0:?} was not a recognized feature adder")]
     UnknownFeatureAdderName(String),

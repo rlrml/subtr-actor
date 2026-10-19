@@ -123,7 +123,8 @@ impl AnalysisNode for ThreatFeaturesNode {
 
     fn on_replay_meta(&mut self, meta: &ReplayMeta) -> SubtrActorResult<()> {
         self.is_doubles = meta.team_zero.len() == 2 && meta.team_one.len() == 2;
-        self.dodge_trackers.clear();
+        self.dodge_trackers
+            .retain(|id, _| meta.player_order().any(|player| &player.remote_id == id));
         self.state = ThreatFeaturesState::default();
         Ok(())
     }
