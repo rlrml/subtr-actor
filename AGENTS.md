@@ -97,6 +97,19 @@ catch those locally without running the whole suite:
 - `just check` deliberately omits the slow CI jobs (`cargo test`, the release
   build, JS bundling, the binding-regen step). Run those targeted at what you
   changed — e.g. `cargo test module_name` — rather than the full suite.
+- `master` has no branch protection and the repo has auto-merge disabled, so
+  `gh pr merge --auto` merges immediately. Wait for CI before merging.
+
+## Releasing
+
+- Run `scripts/sync_release_versions.py X.Y.Z`, add a `## vX.Y.Z` CHANGELOG
+  section, and push a `Release vX.Y.Z` commit to `master`. The "Auto Release on
+  Merge" workflow tags it and dispatches the crates.io, npm, PyPI, and GitHub
+  release workflows. Don't use `just bump`: it tags locally, and a pre-existing
+  tag makes auto-release skip the publish dispatch.
+- Commits containing `[skip-release]` skip auto-release. A failed publish can be
+  re-run with `gh workflow run release-<kind>.yml --ref master -f version=X.Y.Z`
+  (`release-js.yml` takes no `version` input).
 
 ## Common Commands
 
