@@ -4,6 +4,38 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v1.5.0 - 2026-10-19
+
+### Whiff detection
+
+- Replace the heuristic whiff detector with a learned classifier
+  (`whiff-gbt-v2`) over each player's closest approaches to the ball
+  ([#295](https://github.com/rlrml/subtr-actor/pull/295)). Clean whiffs and
+  disrupted attempts are now separate event kinds and counts
+  (`whiff_count`, `disrupted_attempt_count`); the detector no longer emits
+  `BeatenToBall` whiffs.
+- Count `BeatenToBallCalculator` events in `WhiffStats.beaten_to_ball_count`,
+  which had stayed at 0 ([#291](https://github.com/rlrml/subtr-actor/pull/291)).
+- Add the offline labeling, training, and evaluation pipeline under
+  `scripts/whiff_model`, including Rocket Sense review-campaign playlists and
+  scoring ([#296](https://github.com/rlrml/subtr-actor/pull/296)).
+
+### Hardening
+
+- Rust core: fix replay sampling stalls, actor lifecycle and ID reuse,
+  ndarray shape/window errors, float ordering, counter overflow, interpolation
+  NaNs, and debug-helper panics
+  ([#292](https://github.com/rlrml/subtr-actor/pull/292)).
+- Bindings: Python requires 3.9+, declares numpy, and ships abi3 wheels and
+  type stubs; WASM bindings return plain objects; BakkesMod FFI no longer
+  aborts Rocket League on Rust panics
+  ([#293](https://github.com/rlrml/subtr-actor/pull/293)).
+- JS players: fix overlapping replay loads, leaked listeners and effect pools,
+  seek/interpolation guards, and unbounded playlist caches
+  ([#294](https://github.com/rlrml/subtr-actor/pull/294)).
+- Update the Rust toolchain to 1.99.1 and dependencies within their supported
+  ranges ([#290](https://github.com/rlrml/subtr-actor/pull/290)).
+
 ## v1.4.0 - 2026-10-02
 
 - Resolve `ReplicatedStateName` through each replay's name table instead of
