@@ -55,6 +55,24 @@ just whiff-model freeze-fresh --name NAME --replay-manifest FRESH.jsonl \
 just whiff-model score-fresh --manifest ~/.cache/subtr-actor-whiff/work/manifests/NAME.jsonl
 ```
 
+## Human review campaigns
+
+A frozen manifest can also be labeled by people in a Rocket Sense review
+campaign. `--listing` is the Rocket Sense `/api/v1/replays` rows for the
+manifest's replays (file sha256 and player names).
+
+```sh
+just whiff-model campaign-playlist --manifest M --listing LISTING.jsonl --out PLAYLIST.json
+# POST {title, question, decision_vocabulary, playlist} to /api/v1/campaigns, label in the
+# review player, then fetch /api/v1/campaigns/<id>/labels.jsonl
+just whiff-model score-campaign --manifest M --listing LISTING.jsonl --labels labels.jsonl
+```
+
+The review player's vocabulary is fixed (confirmed / rejected / uncertain /
+bad candidate), so a campaign asks only "clean whiff at the marked moment?" and
+`score-campaign` reports clean-whiff precision and recall for both detectors.
+Reviewer disagreement on a clip counts as `uncertain`.
+
 Bulk artifacts (`dumps/`, `renders/`, `labels/attempts.jsonl`, models) live
 under `~/.cache/subtr-actor-whiff`. The attempt ledger is append-only and
 content-keyed (images, prompt, transport, model, settings), so interrupted runs

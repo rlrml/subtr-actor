@@ -145,7 +145,13 @@ def anchor_label(final_row: dict, anchor_time: float) -> str:
     return min(near, key=lambda i: abs(i["t_replay"] - anchor_time))["label"]
 
 
-def score(windows: list[dict], finals: dict[str, dict], n_boot: int = 2000, seed: int = 7) -> dict:
+def score(
+    windows: list[dict],
+    finals: dict[str, dict],
+    n_boot: int = 2000,
+    seed: int = 7,
+    classes: tuple[str, ...] = EVENT_CLASSES,
+) -> dict:
     rows = []
     for w in windows:
         final = finals.get(w["neutral_id"])
@@ -165,7 +171,7 @@ def score(windows: list[dict], finals: dict[str, dict], n_boot: int = 2000, seed
     def estimate(sample):
         out = {}
         for system in ("new", "legacy"):
-            for cls in EVENT_CLASSES:
+            for cls in classes:
                 flagged = [r for r in sample if r[system] == cls]
                 tp = sum(r["weight"] for r in flagged if r["label"] == cls)
                 known = sum(
@@ -180,7 +186,7 @@ def score(windows: list[dict], finals: dict[str, dict], n_boot: int = 2000, seed
                     "est_events": sum(r["weight"] for r in flagged),
                     "est_true": tp,
                 }
-        for cls in EVENT_CLASSES:
+        for cls in classes:
             out[f"population/{cls}"] = sum(r["weight"] for r in sample if r["label"] == cls)
         return out
 
