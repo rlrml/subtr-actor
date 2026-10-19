@@ -41,7 +41,9 @@ All artifacts are published to PyPI.
 Builds the WebAssembly bindings package, builds the player package, smoke-tests
 the packed player artifact in a fresh consumer app, builds the stats player
 package, smoke-tests that packed artifact in a fresh consumer app, and publishes
-all three npm packages.
+all three npm packages. Without usable npm credentials the packages are still
+built and smoke-tested, but a run on a release tag then fails instead of passing
+with nothing published; runs on a branch act as a dry run.
 
 ## Setup Required (One-Time)
 
