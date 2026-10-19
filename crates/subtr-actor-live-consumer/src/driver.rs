@@ -61,6 +61,9 @@ pub enum DriverOutput {
     MatchEnded,
     /// The server restarted; graph and store state were reset.
     ServerRestarted,
+    /// A new subscription began (a reconnect). The previous connection's
+    /// graph was finished, its final transactions emitted, and state reset.
+    Resubscribed,
 }
 
 type RosterSignature = Vec<(PlayerId, bool, Option<String>)>;
@@ -81,6 +84,8 @@ pub struct LiveGraphDriver {
     last_projection_time: Option<f32>,
     meta_initialized: bool,
     meta_signature: Option<RosterSignature>,
+    /// Frame number and game time of the last evaluated frame.
+    last_evaluated_frame: Option<(u64, f32)>,
 }
 
 impl Default for LiveGraphDriver {
@@ -104,6 +109,7 @@ impl LiveGraphDriver {
             last_projection_time: None,
             meta_initialized: false,
             meta_signature: None,
+            last_evaluated_frame: None,
         }
     }
 
@@ -116,7 +122,14 @@ impl LiveGraphDriver {
         sink: &mut dyn FnMut(DriverOutput),
     ) -> Result<(), DriverError> {
         match store.apply(message) {
-            Applied::Info | Applied::Heartbeat => {}
+            Applied::Info => {
+                if self.meta_initialized {
+                    let finished = self.finish_and_reset(sink);
+                    sink(DriverOutput::Resubscribed);
+                    finished?;
+                }
+            }
+            Applied::Heartbeat => {}
             Applied::MatchStart => {
                 self.sync_meta_from_store(store)?;
                 if let Some(meta) = store.meta() {
@@ -142,14 +155,14 @@ impl LiveGraphDriver {
             Applied::MatchEnd => {
                 // Mirror the FFI finish gate: a graph that never saw a frame
                 // (meta never synced) has nothing to finish.
-                if self.meta_initialized {
-                    // `finish` runs the final, finalize-everything projection
-                    // into the graph's transaction log.
-                    self.graph.finish()?;
-                    self.emit_new_events(sink);
-                }
-                self.reset();
+                let finished = if self.meta_initialized {
+                    self.finish_and_reset(sink)
+                } else {
+                    self.reset();
+                    Ok(())
+                };
                 sink(DriverOutput::MatchEnded);
+                finished?;
             }
             Applied::ServerRestart => {
                 self.reset();
@@ -171,7 +184,8 @@ impl LiveGraphDriver {
 
         let frame_number = latest.frame.frame_number as usize;
         let time = latest.frame.time;
-        let dt = latest.frame.dt;
+        let dt = effective_dt(self.last_evaluated_frame, &latest.frame);
+        self.last_evaluated_frame = Some((latest.frame.frame_number, time));
         let live_play = latest.live_play.clone();
         let input = {
             let view = store
@@ -223,6 +237,18 @@ impl LiveGraphDriver {
         Ok(())
     }
 
+    /// Runs `finish` (the final, finalize-everything projection), emits what
+    /// it produced, and resets. The reset happens even if `finish` fails, so
+    /// the next match never inherits this one's graph.
+    fn finish_and_reset(&mut self, sink: &mut dyn FnMut(DriverOutput)) -> Result<(), DriverError> {
+        let finished = self.graph.finish();
+        if finished.is_ok() {
+            self.emit_new_events(sink);
+        }
+        self.reset();
+        Ok(finished?)
+    }
+
     fn emit_new_events(&mut self, sink: &mut dyn FnMut(DriverOutput)) {
         let drained = self.cursor.drain(self.graph.event_transaction_log());
         if !drained.is_empty() {
@@ -238,5 +264,23 @@ impl LiveGraphDriver {
         self.last_projection_time = None;
         self.meta_initialized = false;
         self.meta_signature = None;
+        self.last_evaluated_frame = None;
     }
 }
+
+/// A server honoring `max_frame_hz` skips frames, but each delivered frame
+/// still carries its own one-frame `dt`; integrate over the skipped gap.
+fn effective_dt(last_evaluated: Option<(u64, f32)>, frame: &subtr_actor_live::LiveFrame) -> f32 {
+    match last_evaluated {
+        Some((last_number, last_time))
+            if frame.frame_number > last_number + 1 && frame.time > last_time =>
+        {
+            frame.time - last_time
+        }
+        _ => frame.dt,
+    }
+}
+
+#[cfg(test)]
+#[path = "driver_tests.rs"]
+mod tests;

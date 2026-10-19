@@ -4,7 +4,7 @@ use serde_json::Value;
 use subtr_actor::{
     Collector, EventPayload, FrameRateDecorator, GoalTagKind, NDArrayCollector, PlayerFrame,
     ReplayDataCollector, ReplayGameType, ReplayProcessor, StatsCollector, StatsFrameResolution,
-    StatsTimelineCollector, StatsTimelineEventCollector, builtin_stats_module_names,
+    StatsTimelineCollector, StatsTimelineEventCollector, default_stats_module_names,
 };
 
 struct PostEacFixture {
@@ -157,10 +157,10 @@ fn assert_collected_stats_modules(value: &Value, path: &str) {
 
     assert_eq!(
         modules.len(),
-        builtin_stats_module_names().len(),
-        "expected {path} to serialize every builtin stats module"
+        default_stats_module_names().len(),
+        "expected {path} to serialize every default stats module"
     );
-    for module_name in builtin_stats_module_names() {
+    for module_name in default_stats_module_names() {
         assert!(
             modules.contains_key(*module_name),
             "expected {path} collected stats to contain module {module_name}"
@@ -461,8 +461,8 @@ fn assert_post_eac_stats_outputs(fixture: &PostEacFixture) {
     );
     assert_eq!(
         collected.module_names().count(),
-        builtin_stats_module_names().len(),
-        "{} should collect every builtin stats module",
+        default_stats_module_names().len(),
+        "{} should collect every default stats module",
         fixture.path
     );
 

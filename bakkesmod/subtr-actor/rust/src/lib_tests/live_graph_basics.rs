@@ -920,3 +920,24 @@ fn exposes_live_graph_info_json() {
     );
     unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
 }
+
+#[test]
+fn panicking_evaluation_poisons_engine_until_reset() {
+    let engine = subtr_actor_bakkesmod_engine_create();
+    let frame = SaLiveFrame {
+        frame_number: 1,
+        live_play: 1,
+        players: ptr::null(),
+        player_count: 0,
+        ..SaLiveFrame::default()
+    };
+
+    let status = engine_guard(unsafe { &mut *engine }, |_| panic!("simulated detector panic"));
+    assert_eq!(status, -2);
+    assert_eq!(unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) }, -2);
+    assert_eq!(unsafe { subtr_actor_bakkesmod_finish(engine) }, -2);
+
+    unsafe { subtr_actor_bakkesmod_engine_reset(engine) };
+    assert_eq!(unsafe { subtr_actor_bakkesmod_process_frame(engine, &frame) }, 0);
+    unsafe { subtr_actor_bakkesmod_engine_destroy(engine) };
+}

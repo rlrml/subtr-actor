@@ -28,3 +28,9 @@ pub use recorder::{AddShotOutcome, RecorderPack, ShotOptions};
 #[cfg(test)]
 #[path = "lib_tests.rs"]
 mod lib_tests;
+
+/// Runs an FFI entry point, converting a panic into `fallback` so it cannot
+/// unwind into (and abort) the host process.
+fn ffi_guard<T>(fallback: T, body: impl FnOnce() -> T) -> T {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(body)).unwrap_or(fallback)
+}

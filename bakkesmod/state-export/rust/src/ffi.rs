@@ -124,15 +124,17 @@ pub(crate) fn start_server(engine: &mut SeEngine, config: LiveExportServerConfig
 /// is null or a valid null-terminated C string.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn state_export_engine_create(config: *const SeConfig) -> *mut SeEngine {
-    let mut engine = SeEngine {
-        server: None,
-        last_error: String::new(),
-        match_context: None,
-    };
-    // SAFETY: Forwarding the caller's config validity guarantee.
-    let config = unsafe { server_config_from_abi(config) };
-    start_server(&mut engine, config);
-    Box::into_raw(Box::new(engine))
+    crate::ffi_guard(std::ptr::null_mut(), || {
+        let mut engine = SeEngine {
+            server: None,
+            last_error: String::new(),
+            match_context: None,
+        };
+        // SAFETY: Forwarding the caller's config validity guarantee.
+        let config = unsafe { server_config_from_abi(config) };
+        start_server(&mut engine, config);
+        Box::into_raw(Box::new(engine))
+    })
 }
 
 /// Shuts the export server down (joining every server thread) and destroys
@@ -144,12 +146,14 @@ pub unsafe extern "C" fn state_export_engine_create(config: *const SeConfig) -> 
 /// `state_export_engine_create` that has not already been destroyed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn state_export_engine_destroy(engine: *mut SeEngine) {
-    if engine.is_null() {
-        return;
-    }
-    // SAFETY: The caller guarantees `engine` came from Box::into_raw and has
-    // not already been freed. ServerHandle::drop shuts the server down.
-    drop(unsafe { Box::from_raw(engine) });
+    crate::ffi_guard((), || {
+        if engine.is_null() {
+            return;
+        }
+        // SAFETY: The caller guarantees `engine` came from Box::into_raw and has
+        // not already been freed. ServerHandle::drop shuts the server down.
+        drop(unsafe { Box::from_raw(engine) });
+    })
 }
 
 /// Stops the running server (if any) and starts a fresh one with `config`
@@ -167,16 +171,18 @@ pub unsafe extern "C" fn state_export_engine_restart(
     engine: *mut SeEngine,
     config: *const SeConfig,
 ) -> i32 {
-    // SAFETY: Forwarding the caller's engine validity guarantee.
-    let Some(engine) = (unsafe { raw_mut(engine) }) else {
-        return -1;
-    };
-    if let Some(server) = engine.server.take() {
-        server.shutdown();
-    }
-    // SAFETY: Forwarding the caller's config validity guarantee.
-    let config = unsafe { server_config_from_abi(config) };
-    if start_server(engine, config) { 0 } else { -2 }
+    crate::ffi_guard(-1, || {
+        // SAFETY: Forwarding the caller's engine validity guarantee.
+        let Some(engine) = (unsafe { raw_mut(engine) }) else {
+            return -1;
+        };
+        if let Some(server) = engine.server.take() {
+            server.shutdown();
+        }
+        // SAFETY: Forwarding the caller's config validity guarantee.
+        let config = unsafe { server_config_from_abi(config) };
+        if start_server(engine, config) { 0 } else { -2 }
+    })
 }
 
 /// Converts one sampled frame to the owned live model and enqueues it for
@@ -196,24 +202,26 @@ pub unsafe extern "C" fn state_export_push_frame(
     engine: *mut SeEngine,
     frame: *const SeFrame,
 ) -> i32 {
-    // SAFETY: Forwarding the caller's engine validity guarantee.
-    let Some(engine) = (unsafe { raw_mut(engine) }) else {
-        return -1;
-    };
-    // SAFETY: Forwarding the caller's frame validity guarantee.
-    let Some(frame) = (unsafe { raw_ref(frame) }) else {
-        return -1;
-    };
-    // SAFETY: Forwarding the caller's frame validity guarantee.
-    let Ok(live_frame) = (unsafe { live_frame_from_abi(frame) }) else {
-        return -1;
-    };
-    let Some(server) = engine.server.as_ref() else {
-        engine.last_error = "push_frame: export server is not running".to_owned();
-        return -2;
-    };
-    server.push_frame(live_frame);
-    0
+    crate::ffi_guard(-1, || {
+        // SAFETY: Forwarding the caller's engine validity guarantee.
+        let Some(engine) = (unsafe { raw_mut(engine) }) else {
+            return -1;
+        };
+        // SAFETY: Forwarding the caller's frame validity guarantee.
+        let Some(frame) = (unsafe { raw_ref(frame) }) else {
+            return -1;
+        };
+        // SAFETY: Forwarding the caller's frame validity guarantee.
+        let Ok(live_frame) = (unsafe { live_frame_from_abi(frame) }) else {
+            return -1;
+        };
+        let Some(server) = engine.server.as_ref() else {
+            engine.last_error = "push_frame: export server is not running".to_owned();
+            return -2;
+        };
+        server.push_frame(live_frame);
+        0
+    })
 }
 
 /// Sets (or, with a null `context`, clears) the match-level context merged
@@ -230,20 +238,22 @@ pub unsafe extern "C" fn state_export_set_match_context(
     engine: *mut SeEngine,
     context: *const SeMatchContext,
 ) -> i32 {
-    // SAFETY: Forwarding the caller's engine validity guarantee.
-    let Some(engine) = (unsafe { raw_mut(engine) }) else {
-        return -1;
-    };
-    // SAFETY: Forwarding the caller's context validity guarantee.
-    let context = unsafe { raw_ref(context) }
+    crate::ffi_guard(-1, || {
+        // SAFETY: Forwarding the caller's engine validity guarantee.
+        let Some(engine) = (unsafe { raw_mut(engine) }) else {
+            return -1;
+        };
         // SAFETY: Forwarding the caller's context validity guarantee.
-        .map(|context| unsafe { live_match_context(context) })
-        .unwrap_or_default();
-    engine.match_context = Some(context.clone());
-    if let Some(server) = engine.server.as_ref() {
-        server.set_match_context(context);
-    }
-    0
+        let context = unsafe { raw_ref(context) }
+            // SAFETY: Forwarding the caller's context validity guarantee.
+            .map(|context| unsafe { live_match_context(context) })
+            .unwrap_or_default();
+        engine.match_context = Some(context.clone());
+        if let Some(server) = engine.server.as_ref() {
+            server.set_match_context(context);
+        }
+        0
+    })
 }
 
 /// Broadcasts `MatchEnd` (if a match was live) and resets the export stream
@@ -256,19 +266,21 @@ pub unsafe extern "C" fn state_export_set_match_context(
 /// `engine` must be a valid engine pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn state_export_notify_match_end(engine: *mut SeEngine) -> i32 {
-    // SAFETY: Forwarding the caller's engine validity guarantee.
-    let Some(engine) = (unsafe { raw_mut(engine) }) else {
-        return -1;
-    };
-    // The server clears its broadcast context on MatchEnd; drop the engine's
-    // held copy too so a restart does not resurrect the ended match's context.
-    engine.match_context = None;
-    let Some(server) = engine.server.as_ref() else {
-        engine.last_error = "notify_match_end: export server is not running".to_owned();
-        return -2;
-    };
-    server.match_end();
-    0
+    crate::ffi_guard(-1, || {
+        // SAFETY: Forwarding the caller's engine validity guarantee.
+        let Some(engine) = (unsafe { raw_mut(engine) }) else {
+            return -1;
+        };
+        // The server clears its broadcast context on MatchEnd; drop the engine's
+        // held copy too so a restart does not resurrect the ended match's context.
+        engine.match_context = None;
+        let Some(server) = engine.server.as_ref() else {
+            engine.last_error = "notify_match_end: export server is not running".to_owned();
+            return -2;
+        };
+        server.match_end();
+        0
+    })
 }
 
 /// Writes the engine status into `out_status`. Cheap (atomic reads only), so
@@ -284,37 +296,39 @@ pub unsafe extern "C" fn state_export_status(
     engine: *const SeEngine,
     out_status: *mut SeStatus,
 ) -> i32 {
-    // SAFETY: Forwarding the caller's engine validity guarantee.
-    let Some(engine) = (unsafe { raw_ref(engine) }) else {
-        return -1;
-    };
-    if out_status.is_null() {
-        return -1;
-    }
-    let status = match engine.server.as_ref() {
-        Some(server) => {
-            let stats = server.stats();
-            SeStatus {
-                state: SE_STATE_LISTENING,
-                client_count: stats.clients as u32,
-                port: server.local_addr().port(),
-                frames_sent: stats.frames_sent,
-                frames_dropped: stats.frames_dropped,
-            }
+    crate::ffi_guard(-1, || {
+        // SAFETY: Forwarding the caller's engine validity guarantee.
+        let Some(engine) = (unsafe { raw_ref(engine) }) else {
+            return -1;
+        };
+        if out_status.is_null() {
+            return -1;
         }
-        None => SeStatus {
-            state: if engine.last_error.is_empty() {
-                SE_STATE_STOPPED
-            } else {
-                SE_STATE_ERROR
+        let status = match engine.server.as_ref() {
+            Some(server) => {
+                let stats = server.stats();
+                SeStatus {
+                    state: SE_STATE_LISTENING,
+                    client_count: stats.clients as u32,
+                    port: server.local_addr().port(),
+                    frames_sent: stats.frames_sent,
+                    frames_dropped: stats.frames_dropped,
+                }
+            }
+            None => SeStatus {
+                state: if engine.last_error.is_empty() {
+                    SE_STATE_STOPPED
+                } else {
+                    SE_STATE_ERROR
+                },
+                ..SeStatus::default()
             },
-            ..SeStatus::default()
-        },
-    };
-    // SAFETY: `out_status` is non-null and the caller guarantees it is valid
-    // for one write.
-    unsafe { out_status.write(status) };
-    0
+        };
+        // SAFETY: `out_status` is non-null and the caller guarantees it is valid
+        // for one write.
+        unsafe { out_status.write(status) };
+        0
+    })
 }
 
 /// Returns the UTF-8 byte length of the engine's last error message (0 when
@@ -325,10 +339,12 @@ pub unsafe extern "C" fn state_export_status(
 /// `engine` must be null or a valid engine pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn state_export_last_error_len(engine: *const SeEngine) -> usize {
-    // SAFETY: Forwarding the caller's engine validity guarantee.
-    unsafe { raw_ref(engine) }
-        .map(|engine| engine.last_error.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        // SAFETY: Forwarding the caller's engine validity guarantee.
+        unsafe { raw_ref(engine) }
+            .map(|engine| engine.last_error.len())
+            .unwrap_or(0)
+    })
 }
 
 /// Copies the engine's last error message into `out_bytes` (up to
@@ -344,12 +360,14 @@ pub unsafe extern "C" fn state_export_write_last_error(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    // SAFETY: Forwarding the caller's engine validity guarantee.
-    let Some(engine) = (unsafe { raw_ref(engine) }) else {
-        return 0;
-    };
-    // SAFETY: Forwarding the caller's buffer validity guarantee.
-    unsafe { write_text(&engine.last_error, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        // SAFETY: Forwarding the caller's engine validity guarantee.
+        let Some(engine) = (unsafe { raw_ref(engine) }) else {
+            return 0;
+        };
+        // SAFETY: Forwarding the caller's buffer validity guarantee.
+        unsafe { write_text(&engine.last_error, out_bytes, max_bytes) }
+    })
 }
 
 pub(crate) fn build_info() -> String {
@@ -365,7 +383,7 @@ pub(crate) fn build_info() -> String {
 /// Returns the UTF-8 byte length of the build identifier string.
 #[unsafe(no_mangle)]
 pub extern "C" fn state_export_build_info_len() -> usize {
-    build_info().len()
+    crate::ffi_guard(0, || build_info().len())
 }
 
 /// Copies the build identifier ("state_export <version> build=<hash>
@@ -380,6 +398,8 @@ pub unsafe extern "C" fn state_export_write_build_info(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    // SAFETY: Forwarding the caller's buffer validity guarantee.
-    unsafe { write_text(&build_info(), out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        // SAFETY: Forwarding the caller's buffer validity guarantee.
+        unsafe { write_text(&build_info(), out_bytes, max_bytes) }
+    })
 }

@@ -88,6 +88,40 @@ jobs:
           --skip stats_collector_and_timeline_collector_match_at_sampled_resolution \
           --skip test_stats_timeline_value_serializes_for_rlcs_replay
 
+  python-bindings:
+    name: Python bindings
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout repository
+      shell: bash
+      run: |
+        set -euo pipefail
+        git init .
+        git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+        git fetch --depth=1 origin "+${GITHUB_REF}:refs/github/checkout"
+        git checkout --detach refs/github/checkout
+
+    - name: Install Rust
+      shell: bash
+      run: |
+        rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+        rustup default "$RUST_TOOLCHAIN"
+
+    - name: Build and test Python bindings
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 -m venv .venv
+        source .venv/bin/activate
+        python -m pip install --upgrade pip 'maturin>=1.0,<1.11' pytest numpy
+        maturin build --manifest-path python/Cargo.toml --release --out "$RUNNER_TEMP/wheels"
+        python -m pip install "$RUNNER_TEMP"/wheels/*.whl
+        cd python
+        # Append mode keeps the source package dir (no compiled extension)
+        # from shadowing the installed wheel.
+        pytest -q --import-mode=append
+
   rust-replay-fixtures:
     name: Rust replay fixtures
     runs-on: ubuntu-24.04
@@ -111,10 +145,10 @@ jobs:
 
     - name: Run exhaustive Rust replay tests
       run: |
-        cargo test --verbose --test post_eac_replay_fixture_test post_eac_replays_emit_stats_outputs
-        cargo test --verbose --test stats_frame_resolution_test stats_collector_default_resolution_matches_every_frame
-        cargo test --verbose --test stats_frame_resolution_test stats_collector_and_timeline_collector_match_at_sampled_resolution
-        cargo test --verbose --test stats_timeline_collector_test test_stats_timeline_value_serializes_for_rlcs_replay
+        cargo test --verbose --test post_eac_replay_fixture_test post_eac_replays_emit_stats_outputs -- --include-ignored --exact
+        cargo test --verbose --test stats_frame_resolution_test stats_collector_default_resolution_matches_every_frame -- --include-ignored --exact
+        cargo test --verbose --test stats_frame_resolution_test stats_collector_and_timeline_collector_match_at_sampled_resolution -- --include-ignored --exact
+        cargo test --verbose --test stats_timeline_collector_test test_stats_timeline_value_serializes_for_rlcs_replay -- --include-ignored --exact
 
   rust-release-build:
     name: Rust release build

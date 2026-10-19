@@ -71,8 +71,8 @@ const frameData = get_replay_frames_data(replayData);
 console.log(info);
 console.log(headers.player_headers.slice(0, 5));
 console.log(ndarrayResult.shape);
-console.log(metadata.replay_meta.player_stats.length);
-console.log(frameData.meta.map_name);
+console.log(metadata.replay_meta.team_zero.length);
+console.log(frameData.meta.game_type);
 ```
 
 ## API Surface

@@ -62,12 +62,12 @@ legacy_stats_timeline = subtr_actor.get_legacy_stats_timeline(
 
 print(ndarray.shape)
 print(headers["player_headers"][:5])
-print(replay_meta["map_name"])
-print(stats_events["boost_ledger"][-1])
+print([player["name"] for player in replay_meta["replay_meta"]["team_zero"]])
+print(stats_events["events"][-1])
 print(summed_stats["modules"]["boost"]["team_zero"]["amount_collected"])
 print(stats_module_names)
 print(stats_snapshot_data["frames"][-1]["modules"]["boost"]["team_zero"]["amount_collected"])
-print(stats_timeline["events"]["boost_ledger"][-1])
+print(stats_timeline["events"]["events"][-1])
 print(legacy_stats_timeline["frames"][-1]["team_zero"]["boost"]["amount_collected"])
 ```
 

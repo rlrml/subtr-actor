@@ -43,7 +43,34 @@ fn git_dirty() -> Option<String> {
     }
 }
 
+/// Emitting any `rerun-if-*` disables Cargo's default rerun check, so watch
+/// the git state the embedded hash, dirty flag, and date derive from, plus
+/// the source trees whose unstaged edits flip the dirty flag.
+fn rerun_on_git_changes() {
+    println!("cargo:rerun-if-changed=src");
+    if let Some(root) = git_output(&["rev-parse", "--show-toplevel"]) {
+        println!("cargo:rerun-if-changed={root}/src");
+        println!("cargo:rerun-if-changed={root}/crates");
+    }
+    let mut paths = vec![
+        "HEAD".to_string(),
+        "index".to_string(),
+        "packed-refs".to_string(),
+    ];
+    if let Some(head_ref) = git_output(&["symbolic-ref", "-q", "HEAD"]) {
+        paths.push(head_ref);
+    }
+    for path in paths {
+        if let Some(resolved) =
+            git_output(&["rev-parse", "--path-format=absolute", "--git-path", &path])
+        {
+            println!("cargo:rerun-if-changed={resolved}");
+        }
+    }
+}
+
 fn main() {
+    rerun_on_git_changes();
     let hash = env_override("STATE_EXPORT_GIT_HASH")
         .or_else(|| git_output(&["rev-parse", "--short", "HEAD"]))
         .unwrap_or_else(|| "unknown".to_string());

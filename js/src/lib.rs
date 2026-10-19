@@ -32,6 +32,22 @@ const DEFAULT_GLOBAL_FEATURE_ADDERS: &[&str] = &["BallRigidBody"];
 const DEFAULT_PLAYER_FEATURE_ADDERS: &[&str] = &["PlayerRigidBody", "PlayerBoost", "PlayerAnyJump"];
 const DEFAULT_STATS_TIMELINE_FRAME_CHUNK_BYTES: usize = 32 * 1024 * 1024;
 
+fn json_to_js(value: &serde_json::Value) -> Result<JsValue, serde_wasm_bindgen::Error> {
+    use serde::Serialize;
+    value.serialize(&serde_wasm_bindgen::Serializer::new().serialize_maps_as_objects(true))
+}
+
+fn callback_error_message(error: JsValue) -> String {
+    error
+        .as_string()
+        .or_else(|| {
+            Reflect::get(&error, &JsValue::from_str("message"))
+                .ok()
+                .and_then(|message| message.as_string())
+        })
+        .unwrap_or_else(|| "Progress callback threw a non-string error".to_string())
+}
+
 fn parse_replay_from_data(data: &[u8]) -> Result<boxcars::Replay, JsValue> {
     boxcars::ParserBuilder::new(data)
         .must_parse_network_data()
@@ -59,7 +75,7 @@ fn emit_progress(
     } else {
         processed_frames as f64 / total_frames as f64
     };
-    let payload = serde_wasm_bindgen::to_value(&serde_json::json!({
+    let payload = json_to_js(&serde_json::json!({
         "stage": stage,
         "processedFrames": processed_frames,
         "totalFrames": total_frames,
@@ -73,16 +89,14 @@ fn emit_progress(
 
     callback.call1(&JsValue::NULL, &payload).map_err(|error| {
         SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
-            error
-                .as_string()
-                .unwrap_or_else(|| "Progress callback threw a non-string error".to_string()),
+            callback_error_message(error),
         ))
     })?;
     Ok(())
 }
 
 fn emit_stage_progress(callback: &Function, stage: &str, progress: f64) -> SubtrActorResult<()> {
-    let payload = serde_wasm_bindgen::to_value(&serde_json::json!({
+    let payload = json_to_js(&serde_json::json!({
         "stage": stage,
         "progress": progress.clamp(0.0, 1.0),
     }))
@@ -94,9 +108,7 @@ fn emit_stage_progress(callback: &Function, stage: &str, progress: f64) -> Subtr
 
     callback.call1(&JsValue::NULL, &payload).map_err(|error| {
         SubtrActorError::new(SubtrActorErrorVariant::CallbackError(
-            error
-                .as_string()
-                .unwrap_or_else(|| "Progress callback threw a non-string error".to_string()),
+            callback_error_message(error),
         ))
     })?;
     Ok(())
@@ -111,8 +123,12 @@ fn collect_replay_data_with_optional_progress(
     progress: Option<(&Function, usize)>,
 ) -> Result<ReplayData, JsValue> {
     let total_frames = get_total_frames(replay)?;
-    let mut processor = ReplayProcessor::new(replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
+    let mut processor = ReplayProcessor::new(replay).map_err(|e| {
+        JsValue::from_str(&format!(
+            "Failed to initialize replay processor: {}",
+            e.variant
+        ))
+    })?;
     let mut replay_data_collector = ReplayDataCollector::new();
     let mut last_reported_frames = 0usize;
     let mut progress_collector = progress
@@ -127,7 +143,9 @@ fn collect_replay_data_with_optional_progress(
             ))
         })
         .transpose()
-        .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        .map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
 
     let mut collectors: Vec<&mut dyn Collector> = vec![&mut replay_data_collector];
     if let Some(progress_collector) = progress_collector.as_mut() {
@@ -136,18 +154,19 @@ fn collect_replay_data_with_optional_progress(
 
     processor
         .process_all(&mut collectors)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {}", e.variant)))?;
 
     if let Some((callback, _)) = progress
         && last_reported_frames < total_frames
     {
-        emit_progress(callback, "processing", total_frames, total_frames)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_progress(callback, "processing", total_frames, total_frames).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
     }
 
     replay_data_collector
         .into_replay_data(processor)
-        .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))
+        .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {}", e.variant)))
 }
 
 fn collect_replay_bundle_with_optional_progress(
@@ -156,8 +175,12 @@ fn collect_replay_bundle_with_optional_progress(
     include_expected_goals: bool,
 ) -> Result<(ReplayData, subtr_actor::ReplayStatsTimelineScaffold), JsValue> {
     let total_frames = get_total_frames(replay)?;
-    let mut processor = ReplayProcessor::new(replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to initialize replay processor: {e:?}")))?;
+    let mut processor = ReplayProcessor::new(replay).map_err(|e| {
+        JsValue::from_str(&format!(
+            "Failed to initialize replay processor: {}",
+            e.variant
+        ))
+    })?;
     let mut replay_data_collector = ReplayDataCollector::new();
     let stats_collector = StatsTimelineEventCollector::new();
     let mut stats_collector = if include_expected_goals {
@@ -178,7 +201,9 @@ fn collect_replay_bundle_with_optional_progress(
             ))
         })
         .transpose()
-        .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        .map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
 
     let mut collectors: Vec<&mut dyn Collector> =
         vec![&mut replay_data_collector, &mut stats_collector];
@@ -188,32 +213,39 @@ fn collect_replay_bundle_with_optional_progress(
 
     processor
         .process_all(&mut collectors)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {}", e.variant)))?;
 
     if let Some((callback, _)) = progress {
         if last_reported_frames < total_frames {
             emit_progress(callback, "processing", total_frames, total_frames).map_err(|error| {
-                JsValue::from_str(&format!("Failed to emit progress: {error:?}"))
+                JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
             })?;
         }
-        emit_stage_progress(callback, "building-stats", 0.0)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stage_progress(callback, "building-stats", 0.0).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
     }
 
     let stats_timeline = stats_collector
         .into_replay_stats_timeline_scaffold()
-        .map_err(|e| JsValue::from_str(&format!("Failed to assemble stats timeline: {e:?}")))?;
+        .map_err(|e| {
+            JsValue::from_str(&format!("Failed to assemble stats timeline: {}", e.variant))
+        })?;
     if let Some((callback, _)) = progress {
-        emit_stage_progress(callback, "building-stats", 1.0)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stage_progress(callback, "building-stats", 1.0).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
     }
 
     let replay_data = replay_data_collector
         .into_replay_data(processor)
-        .map_err(|e| JsValue::from_str(&format!("Failed to assemble replay data: {e:?}")))?;
+        .map_err(|e| {
+            JsValue::from_str(&format!("Failed to assemble replay data: {}", e.variant))
+        })?;
     if let Some((callback, _)) = progress {
-        emit_stats_timeline_progress(callback, 0.35)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(callback, 0.35).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
     }
     Ok((replay_data, stats_timeline))
 }
@@ -244,13 +276,15 @@ fn stats_timeline_json_parts(
     let result = Object::new();
     set_json_bytes(&result, "config", &timeline.config)?;
     if let Some((callback, _, start, end)) = progress {
-        emit_stats_timeline_progress(callback, start + ((end - start) * 0.05))
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(callback, start + ((end - start) * 0.05)).map_err(
+            |error| JsValue::from_str(&format!("Failed to emit progress: {}", error.variant)),
+        )?;
     }
     set_json_bytes(&result, "replayMeta", &timeline.replay_meta)?;
     if let Some((callback, _, start, end)) = progress {
-        emit_stats_timeline_progress(callback, start + ((end - start) * 0.1))
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(callback, start + ((end - start) * 0.1)).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
     }
     set_json_bytes(&result, "events", &timeline.events)?;
     set_json_bytes(&result, "activitySummary", &timeline.activity_summary)?;
@@ -262,8 +296,9 @@ fn stats_timeline_json_parts(
         &timeline.expected_goals_tracks,
     )?;
     if let Some((callback, _, start, end)) = progress {
-        emit_stats_timeline_progress(callback, start + ((end - start) * 0.15))
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(callback, start + ((end - start) * 0.15)).map_err(
+            |error| JsValue::from_str(&format!("Failed to emit progress: {}", error.variant)),
+        )?;
     }
 
     let frame_chunks = Array::new();
@@ -303,7 +338,7 @@ fn stats_timeline_json_parts(
                 };
                 let weighted_progress = start + ((end - start) * (0.15 + (frame_progress * 0.85)));
                 emit_stats_timeline_progress(callback, weighted_progress).map_err(|error| {
-                    JsValue::from_str(&format!("Failed to emit progress: {error:?}"))
+                    JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
                 })?;
             }
         }
@@ -317,8 +352,9 @@ fn stats_timeline_json_parts(
         &frame_chunks.into(),
     )?;
     if let Some((callback, _, _, end)) = progress {
-        emit_stats_timeline_progress(callback, end)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(callback, end).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
     }
     Ok(result.into())
 }
@@ -330,7 +366,7 @@ pub fn parse_replay(data: &[u8]) -> Result<JsValue, JsValue> {
     let replay_value = serde_json::to_value(&replay)
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay: {e}")))?;
 
-    serde_wasm_bindgen::to_value(&replay_value)
+    json_to_js(&replay_value)
         .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
@@ -350,15 +386,15 @@ pub fn get_ndarray_with_info(
         FrameRateDecorator::new_from_fps(fps.unwrap_or(10.0), &mut collector);
 
     let mut processor = ReplayProcessor::new(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to create processor: {e:?}")))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to create processor: {}", e.variant)))?;
 
     processor
         .process(&mut decorated_collector)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {e:?}")))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to process replay: {}", e.variant)))?;
 
     let (replay_meta_with_headers, ndarray) = collector
         .get_meta_and_ndarray()
-        .map_err(|e| JsValue::from_str(&format!("Failed to get data: {e:?}")))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to get data: {}", e.variant)))?;
 
     // Convert ndarray to nested Vec for JavaScript
     let shape = ndarray.shape();
@@ -370,8 +406,7 @@ pub fn get_ndarray_with_info(
         "shape": shape
     });
 
-    serde_wasm_bindgen::to_value(&result)
-        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
+    json_to_js(&result).map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
 /// Get only the replay metadata (without processing frames)
@@ -387,7 +422,7 @@ pub fn get_replay_meta(
 
     let replay_meta = collector
         .process_and_get_meta_and_headers(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to get metadata: {e:?}")))?;
+        .map_err(|e| JsValue::from_str(&format!("Failed to get metadata: {}", e.variant)))?;
 
     serde_wasm_bindgen::to_value(&replay_meta)
         .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
@@ -464,8 +499,9 @@ pub fn get_replay_bundle_json_with_progress(
 
     let result = Object::new();
     {
-        emit_stats_timeline_progress(&callback, 0.4)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(&callback, 0.4).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
         let replay_data_bytes = serde_json::to_vec(&replay_data)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay data: {e}")))?;
         Reflect::set(
@@ -473,14 +509,16 @@ pub fn get_replay_bundle_json_with_progress(
             &JsValue::from_str("rawReplayData"),
             &Uint8Array::from(replay_data_bytes.as_slice()),
         )?;
-        emit_stats_timeline_progress(&callback, 0.65)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(&callback, 0.65).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
     }
     drop(replay_data);
 
     {
-        emit_stats_timeline_progress(&callback, 0.75)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(&callback, 0.75).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
         let stats_timeline_bytes = serde_json::to_vec(&stats_timeline)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))?;
         Reflect::set(
@@ -488,8 +526,9 @@ pub fn get_replay_bundle_json_with_progress(
             &JsValue::from_str("statsTimeline"),
             &Uint8Array::from(stats_timeline_bytes.as_slice()),
         )?;
-        emit_stats_timeline_progress(&callback, 1.0)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(&callback, 1.0).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
     }
     Ok(result.into())
 }
@@ -511,8 +550,9 @@ pub fn get_replay_bundle_json_parts_with_progress(
 
     let result = Object::new();
     {
-        emit_stats_timeline_progress(&callback, 0.4)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(&callback, 0.4).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
         let replay_data_bytes = serde_json::to_vec(&replay_data)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize replay data: {e}")))?;
         Reflect::set(
@@ -520,8 +560,9 @@ pub fn get_replay_bundle_json_parts_with_progress(
             &JsValue::from_str("rawReplayData"),
             &Uint8Array::from(replay_data_bytes.as_slice()),
         )?;
-        emit_stats_timeline_progress(&callback, 0.55)
-            .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+        emit_stats_timeline_progress(&callback, 0.55).map_err(|error| {
+            JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+        })?;
     }
     drop(replay_data);
 
@@ -535,8 +576,9 @@ pub fn get_replay_bundle_json_parts_with_progress(
             Some((&callback, report_every_n_frames, 0.6, 0.9)),
         )?,
     )?;
-    emit_stats_timeline_progress(&callback, 0.92)
-        .map_err(|error| JsValue::from_str(&format!("Failed to emit progress: {error:?}")))?;
+    emit_stats_timeline_progress(&callback, 0.92).map_err(|error| {
+        JsValue::from_str(&format!("Failed to emit progress: {}", error.variant))
+    })?;
 
     Ok(result.into())
 }
@@ -557,7 +599,9 @@ pub fn get_stats_timeline(
     };
     let stats_timeline = collector
         .get_replay_stats_timeline_scaffold(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
+        .map_err(|e| {
+            JsValue::from_str(&format!("Failed to process replay stats: {}", e.variant))
+        })?;
 
     serde_wasm_bindgen::to_value(&stats_timeline)
         .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
@@ -578,7 +622,9 @@ pub fn get_stats_timeline_json(
     };
     let stats_timeline = collector
         .get_replay_stats_timeline_scaffold(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
+        .map_err(|e| {
+            JsValue::from_str(&format!("Failed to process replay stats: {}", e.variant))
+        })?;
 
     serde_json::to_vec(&stats_timeline)
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))
@@ -590,7 +636,9 @@ pub fn get_legacy_stats_timeline_json(data: &[u8]) -> Result<Vec<u8>, JsValue> {
 
     let stats_timeline = StatsCollector::new()
         .get_legacy_replay_stats_timeline(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
+        .map_err(|e| {
+            JsValue::from_str(&format!("Failed to process replay stats: {}", e.variant))
+        })?;
 
     serde_json::to_vec(&stats_timeline)
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize stats timeline: {e}")))
@@ -612,7 +660,9 @@ pub fn get_stats_timeline_json_parts(
     };
     let stats_timeline = collector
         .get_replay_stats_timeline_scaffold(&replay)
-        .map_err(|e| JsValue::from_str(&format!("Failed to process replay stats: {e:?}")))?;
+        .map_err(|e| {
+            JsValue::from_str(&format!("Failed to process replay stats: {}", e.variant))
+        })?;
 
     stats_timeline_json_parts(stats_timeline, max_frame_chunk_bytes, None)
 }
@@ -621,11 +671,11 @@ pub fn get_stats_timeline_json_parts(
 #[wasm_bindgen]
 pub fn validate_replay(data: &[u8]) -> Result<JsValue, JsValue> {
     match parse_replay_from_data(data) {
-        Ok(_) => serde_wasm_bindgen::to_value(&serde_json::json!({
+        Ok(_) => json_to_js(&serde_json::json!({
             "valid": true,
             "message": "Replay is valid"
         })),
-        Err(e) => serde_wasm_bindgen::to_value(&serde_json::json!({
+        Err(e) => json_to_js(&serde_json::json!({
             "valid": false,
             "error": e.as_string().unwrap_or_else(|| "Unknown error".to_string())
         })),
@@ -646,8 +696,7 @@ pub fn get_replay_info(data: &[u8]) -> Result<JsValue, JsValue> {
         "properties_count": replay.properties.len()
     });
 
-    serde_wasm_bindgen::to_value(&info)
-        .map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
+    json_to_js(&info).map_err(|e| JsValue::from_str(&format!("Failed to convert to JS: {e}")))
 }
 
 fn build_ndarray_collector(
@@ -671,5 +720,5 @@ fn build_ndarray_collector(
     let player_strs: Vec<&str> = player_feature_adders.iter().map(|s| s.as_str()).collect();
 
     NDArrayCollector::<f32>::from_strings(&global_strs, &player_strs)
-        .map_err(|e| JsValue::from_str(&format!("Failed to build collector: {e:?}")))
+        .map_err(|e| JsValue::from_str(&format!("Failed to build collector: {}", e.variant)))
 }

@@ -296,6 +296,8 @@
             ''
               mkdir -p build/js/pkg
               cp ${./js/package.json} build/js/package.json
+              cp ${./js/README.md} build/js/README.md
+              cp ${./js/LICENSE} build/js/LICENSE
               cp -r ${./js/scripts} build/js/scripts
               cp -r ${self.packages.${system}.js-web-wasm}/. build/js/pkg/
               chmod -R u+w build
@@ -304,7 +306,7 @@
               rm -f build/js/pkg/package.json
               node build/js/scripts/prepare-wasm-package.mjs
               mkdir -p $out
-              for f in package.json rl_replay_subtr_actor.js rl_replay_subtr_actor.d.ts rl_replay_subtr_actor_bg.wasm; do
+              for f in package.json README.md LICENSE rl_replay_subtr_actor.js rl_replay_subtr_actor.d.ts rl_replay_subtr_actor_bg.wasm; do
                 install -m 644 "build/js/pkg/$f" "$out/$f"
               done
             '';

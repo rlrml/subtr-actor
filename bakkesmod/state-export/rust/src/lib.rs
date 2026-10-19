@@ -40,3 +40,9 @@ pub use ffi::*;
 #[cfg(test)]
 #[path = "lib_tests.rs"]
 mod tests;
+
+/// Runs an FFI entry point, converting a panic into `fallback` so it cannot
+/// unwind into (and abort) the host process.
+fn ffi_guard<T>(fallback: T, body: impl FnOnce() -> T) -> T {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(body)).unwrap_or(fallback)
+}

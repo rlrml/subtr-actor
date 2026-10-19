@@ -180,10 +180,16 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Report skipped npm publish
-        if: steps.npm_auth.outputs.available != 'true'
+        if: steps.npm_auth.outputs.available != 'true' && (steps.publish_state.outputs.bindings_already_published != 'true' || steps.publish_state.outputs.player_already_published != 'true' || steps.publish_state.outputs.stats_player_already_published != 'true')
+        shell: bash
         run: |
           {
             echo "### npm publish skipped"
             echo "The npm release build completed without usable npm credentials."
             echo "Update the repository NPM_TOKEN secret and rerun this workflow to publish npm packages."
           } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "::error::npm packages for ${GITHUB_REF_NAME} could not be published."
+            exit 1
+          fi

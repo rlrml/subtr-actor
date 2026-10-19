@@ -571,3 +571,106 @@ fn match_end_resets_and_restarts() {
     }
     handle.shutdown();
 }
+
+#[test]
+fn extreme_max_frame_hz_does_not_kill_the_client_thread() {
+    let handle = LiveExportServer::start(test_config()).unwrap();
+    let mut client = connect(handle.local_addr(), "/");
+    send_hello(&mut client, Encoding::Postcard, Some(1e-20));
+    expect_server_info(&recv(&mut client, Encoding::Postcard));
+    handle.push_frame(test_frame(0));
+    let deadline = Instant::now() + TEST_IO_TIMEOUT;
+    while handle.client_count() == 0 && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(handle.client_count(), 1);
+    handle.shutdown();
+}
+
+#[test]
+fn pinging_without_hello_is_dropped_at_the_hello_deadline() {
+    let handle = LiveExportServer::start(test_config()).unwrap();
+    let mut client = connect(handle.local_addr(), "/");
+    let started = Instant::now();
+    let closed = loop {
+        if started.elapsed() > HELLO_TIMEOUT * 3 {
+            break false;
+        }
+        if client.send(Message::Ping(Vec::new().into())).is_err() {
+            break true;
+        }
+        client
+            .get_ref()
+            .set_read_timeout(Some(Duration::from_millis(500)))
+            .unwrap();
+        match client.read() {
+            Ok(Message::Close(_)) => break true,
+            Err(tungstenite::Error::Io(error)) if is_timeout_io_error(&error) => {}
+            Err(_) => break true,
+            Ok(_) => {}
+        }
+    };
+    assert!(closed, "server kept a Hello-less client open");
+    assert!(started.elapsed() < HELLO_TIMEOUT * 2);
+    handle.shutdown();
+}
+
+#[test]
+fn shutdown_closes_clients_stuck_mid_handshake() {
+    use std::io::Write as _;
+
+    let handle = LiveExportServer::start(test_config()).unwrap();
+    let mut stream = TcpStream::connect(handle.local_addr()).unwrap();
+    stream.write_all(b"GET / HTTP/1.1\r\n").unwrap();
+    let dripper = std::thread::spawn(move || {
+        // One header byte per second keeps every individual read under the
+        // socket timeout without ever completing the upgrade request.
+        for _ in 0..15 {
+            std::thread::sleep(Duration::from_secs(1));
+            if stream.write_all(b"X").is_err() {
+                break;
+            }
+        }
+    });
+    std::thread::sleep(Duration::from_millis(200));
+
+    let started = Instant::now();
+    handle.shutdown();
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "shutdown took {:?}",
+        started.elapsed()
+    );
+    dripper.join().unwrap();
+}
+
+#[test]
+fn dripped_handshake_is_closed_at_the_hello_deadline() {
+    use std::io::{Read as _, Write as _};
+
+    let handle = LiveExportServer::start(test_config()).unwrap();
+    let mut stream = TcpStream::connect(handle.local_addr()).unwrap();
+    stream.write_all(b"GET / HTTP/1.1\r\n").unwrap();
+    let mut reader = stream.try_clone().unwrap();
+    let started = Instant::now();
+    let dripper = std::thread::spawn(move || {
+        for _ in 0..30 {
+            std::thread::sleep(Duration::from_millis(500));
+            if stream.write_all(b"X").is_err() {
+                break;
+            }
+        }
+    });
+
+    reader.set_read_timeout(Some(HELLO_TIMEOUT * 3)).unwrap();
+    let mut buffer = [0_u8; 64];
+    let closed = matches!(reader.read(&mut buffer), Ok(0) | Err(_));
+    assert!(closed, "server kept a dripping handshake open");
+    assert!(
+        started.elapsed() < HELLO_TIMEOUT + Duration::from_secs(2),
+        "closed after {:?}",
+        started.elapsed()
+    );
+    dripper.join().unwrap();
+    handle.shutdown();
+}

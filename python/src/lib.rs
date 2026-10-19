@@ -11,7 +11,7 @@ use subtr_actor::*;
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
 fn parse_replay<'p>(py: Python<'p>, data: &[u8]) -> PyResult<Py<PyAny>> {
-    let replay = serde_json::to_value(replay_from_data(data)?).map_err(to_py_error)?;
+    let replay = py.detach(|| to_json(replay_from_data(data)?))?;
     Ok(convert_to_py(py, &replay))
 }
 
@@ -47,8 +47,16 @@ fn to_py_error<E: std::error::Error>(e: E) -> PyErr {
     PyErr::new::<exceptions::PyException, _>(format!("{e}"))
 }
 
+fn to_json<T: serde::Serialize>(value: T) -> PyResult<Value> {
+    serde_json::to_value(value).map_err(to_py_error)
+}
+
 fn handle_frames_exception(e: subtr_actor::SubtrActorError) -> PyErr {
-    PyErr::new::<exceptions::PyException, _>(format!("{:?} {}", e.variant, e.backtrace))
+    let message = match e.backtrace.status() {
+        std::backtrace::BacktraceStatus::Captured => format!("{}\n{}", e.variant, e.backtrace),
+        _ => e.variant.to_string(),
+    };
+    PyErr::new::<exceptions::PyException, _>(message)
 }
 
 fn handle_subtr_actor_exception(e: subtr_actor::SubtrActorError) -> PyErr {
@@ -136,7 +144,12 @@ fn parse_ndarray_dtype(dtype: Option<String>) -> PyResult<NDArrayDType> {
 }
 
 fn replay_from_filepath(filepath: &Path) -> PyResult<boxcars::Replay> {
-    let data = std::fs::read(filepath).map_err(to_py_error)?;
+    let data = std::fs::read(filepath).map_err(|e| {
+        PyErr::from(std::io::Error::new(
+            e.kind(),
+            format!("{}: {e}", filepath.display()),
+        ))
+    })?;
     replay_from_data(&data)
 }
 
@@ -191,21 +204,22 @@ where
     F: TryFrom<f32> + Send + Sync + 'static + numpy::Element,
     <F as TryFrom<f32>>::Error: std::fmt::Debug,
 {
-    let mut collector = build_ndarray_collector::<F>(global_feature_adders, player_feature_adders)
-        .map_err(handle_subtr_actor_exception)?;
+    let (replay_meta_with_headers, rust_nd_array) = py.detach(|| {
+        let mut collector =
+            build_ndarray_collector::<F>(global_feature_adders, player_feature_adders)
+                .map_err(handle_subtr_actor_exception)?;
 
-    FrameRateDecorator::new_from_fps(fps.unwrap_or(10.0), &mut collector)
-        .process_replay(replay)
-        .map_err(handle_frames_exception)?;
+        FrameRateDecorator::new_from_fps(fps.unwrap_or(10.0), &mut collector)
+            .process_replay(replay)
+            .map_err(handle_frames_exception)?;
 
-    let (replay_meta_with_headers, rust_nd_array) = collector
-        .get_meta_and_ndarray()
-        .map_err(handle_frames_exception)?;
+        let (replay_meta_with_headers, rust_nd_array) = collector
+            .get_meta_and_ndarray()
+            .map_err(handle_frames_exception)?;
+        PyResult::Ok((to_json(&replay_meta_with_headers)?, rust_nd_array))
+    })?;
 
-    let python_replay_meta = convert_to_py(
-        py,
-        &serde_json::to_value(&replay_meta_with_headers).map_err(to_py_error)?,
-    );
+    let python_replay_meta = convert_to_py(py, &replay_meta_with_headers);
     let python_nd_array = rust_nd_array.into_pyarray(py).into_any().unbind();
 
     Ok((python_replay_meta, python_nd_array))
@@ -257,7 +271,7 @@ fn get_ndarray_with_info_from_replay_filepath<'p>(
     fps: Option<f32>,
     dtype: Option<String>,
 ) -> PyResult<Py<PyAny>> {
-    let replay = replay_from_filepath(&filepath)?;
+    let replay = py.detach(|| replay_from_filepath(&filepath))?;
 
     let (python_replay_meta, python_nd_array) = match parse_ndarray_dtype(dtype)? {
         NDArrayDType::Float16 => {
@@ -336,20 +350,19 @@ fn get_replay_meta<'p>(
     global_feature_adders: Option<Vec<String>>,
     player_feature_adders: Option<Vec<String>>,
 ) -> PyResult<Py<PyAny>> {
-    let replay = replay_from_filepath(&filepath)?;
+    let replay_meta = py.detach(|| {
+        let replay = replay_from_filepath(&filepath)?;
+        let mut collector =
+            build_ndarray_collector::<f32>(global_feature_adders, player_feature_adders)
+                .map_err(handle_subtr_actor_exception)?;
+        to_json(
+            collector
+                .process_and_get_meta_and_headers(&replay)
+                .map_err(handle_frames_exception)?,
+        )
+    })?;
 
-    let mut collector =
-        build_ndarray_collector::<f32>(global_feature_adders, player_feature_adders)
-            .map_err(handle_subtr_actor_exception)?;
-
-    let replay_meta = collector
-        .process_and_get_meta_and_headers(&replay)
-        .map_err(handle_frames_exception)?;
-
-    Ok(convert_to_py(
-        py,
-        &serde_json::to_value(&replay_meta).map_err(to_py_error)?,
-    ))
+    Ok(convert_to_py(py, &replay_meta))
 }
 
 #[allow(clippy::useless_conversion)]
@@ -372,23 +385,23 @@ fn get_column_headers<'p>(
 #[allow(clippy::useless_conversion)]
 #[pyfunction]
 fn get_replay_frames_data<'p>(py: Python<'p>, filepath: PathBuf) -> PyResult<Py<PyAny>> {
-    let replay = replay_from_filepath(&filepath)?;
+    let replay_data = py.detach(|| {
+        let replay = replay_from_filepath(&filepath)?;
+        let mut processor = ReplayProcessor::new(&replay).map_err(handle_frames_exception)?;
+        let mut replay_data_collector = ReplayDataCollector::new();
 
-    let mut processor = ReplayProcessor::new(&replay).map_err(handle_frames_exception)?;
-    let mut replay_data_collector = ReplayDataCollector::new();
+        processor
+            .process_all(&mut [&mut replay_data_collector])
+            .map_err(handle_frames_exception)?;
 
-    processor
-        .process_all(&mut [&mut replay_data_collector])
-        .map_err(handle_frames_exception)?;
+        to_json(
+            replay_data_collector
+                .into_replay_data(processor)
+                .map_err(handle_frames_exception)?,
+        )
+    })?;
 
-    let replay_data = replay_data_collector
-        .into_replay_data(processor)
-        .map_err(handle_frames_exception)?;
-
-    Ok(convert_to_py(
-        py,
-        &serde_json::to_value(replay_data).map_err(to_py_error)?,
-    ))
+    Ok(convert_to_py(py, &replay_data))
 }
 
 #[allow(clippy::useless_conversion)]
@@ -409,12 +422,14 @@ fn get_stats_events<'p>(
     frame_step_seconds: Option<f32>,
     include_expected_goals: bool,
 ) -> PyResult<Py<PyAny>> {
-    let replay = replay_from_filepath(&filepath)?;
-    let timeline =
-        build_stats_timeline_event_collector(frame_step_seconds, include_expected_goals)?
-            .get_replay_stats_timeline_scaffold(&replay)
-            .map_err(handle_subtr_actor_exception)?;
-    let events = serde_json::to_value(timeline.events).map_err(to_py_error)?;
+    let events = py.detach(|| {
+        let replay = replay_from_filepath(&filepath)?;
+        let timeline =
+            build_stats_timeline_event_collector(frame_step_seconds, include_expected_goals)?
+                .get_replay_stats_timeline_scaffold(&replay)
+                .map_err(handle_subtr_actor_exception)?;
+        to_json(timeline.events)
+    })?;
 
     Ok(convert_to_py(py, &events))
 }
@@ -427,15 +442,16 @@ fn get_summed_stats<'p>(
     filepath: PathBuf,
     module_names: Option<Vec<String>>,
 ) -> PyResult<Py<PyAny>> {
-    let replay = replay_from_filepath(&filepath)?;
-    let stats = build_stats_collector(module_names, None)?
-        .get_stats(&replay)
-        .map_err(handle_subtr_actor_exception)?;
+    let stats = py.detach(|| {
+        let replay = replay_from_filepath(&filepath)?;
+        to_json(
+            build_stats_collector(module_names, None)?
+                .get_stats(&replay)
+                .map_err(handle_subtr_actor_exception)?,
+        )
+    })?;
 
-    Ok(convert_to_py(
-        py,
-        &serde_json::to_value(stats).map_err(to_py_error)?,
-    ))
+    Ok(convert_to_py(py, &stats))
 }
 
 #[allow(clippy::useless_conversion)]
@@ -447,15 +463,16 @@ fn get_stats_snapshot_data<'p>(
     module_names: Option<Vec<String>>,
     frame_step_seconds: Option<f32>,
 ) -> PyResult<Py<PyAny>> {
-    let replay = replay_from_filepath(&filepath)?;
-    let snapshot_data = build_stats_collector(module_names, frame_step_seconds)?
-        .get_snapshot_data(&replay)
-        .map_err(handle_subtr_actor_exception)?;
+    let snapshot_data = py.detach(|| {
+        let replay = replay_from_filepath(&filepath)?;
+        to_json(
+            build_stats_collector(module_names, frame_step_seconds)?
+                .get_snapshot_data(&replay)
+                .map_err(handle_subtr_actor_exception)?,
+        )
+    })?;
 
-    Ok(convert_to_py(
-        py,
-        &serde_json::to_value(snapshot_data).map_err(to_py_error)?,
-    ))
+    Ok(convert_to_py(py, &snapshot_data))
 }
 
 #[allow(clippy::useless_conversion)]
@@ -474,16 +491,16 @@ fn get_stats_timeline<'p>(
         ));
     }
 
-    let replay = replay_from_filepath(&filepath)?;
-    let timeline =
-        build_stats_timeline_event_collector(frame_step_seconds, include_expected_goals)?
-            .get_replay_stats_timeline_scaffold(&replay)
-            .map_err(handle_subtr_actor_exception)?;
+    let timeline = py.detach(|| {
+        let replay = replay_from_filepath(&filepath)?;
+        to_json(
+            build_stats_timeline_event_collector(frame_step_seconds, include_expected_goals)?
+                .get_replay_stats_timeline_scaffold(&replay)
+                .map_err(handle_subtr_actor_exception)?,
+        )
+    })?;
 
-    Ok(convert_to_py(
-        py,
-        &serde_json::to_value(timeline).map_err(to_py_error)?,
-    ))
+    Ok(convert_to_py(py, &timeline))
 }
 
 #[allow(clippy::useless_conversion)]
@@ -495,10 +512,12 @@ fn get_legacy_stats_timeline<'p>(
     module_names: Option<Vec<String>>,
     frame_step_seconds: Option<f32>,
 ) -> PyResult<Py<PyAny>> {
-    let replay = replay_from_filepath(&filepath)?;
-    let timeline = build_stats_collector(module_names, frame_step_seconds)?
-        .get_legacy_stats_timeline_value(&replay)
-        .map_err(handle_subtr_actor_exception)?;
+    let timeline = py.detach(|| {
+        let replay = replay_from_filepath(&filepath)?;
+        build_stats_collector(module_names, frame_step_seconds)?
+            .get_legacy_stats_timeline_value(&replay)
+            .map_err(handle_subtr_actor_exception)
+    })?;
 
     Ok(convert_to_py(py, &timeline))
 }

@@ -47,7 +47,7 @@ unsafe fn drain_pending<T: Copy>(
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_events_json_len(engine: *const SaEngine) -> usize {
-    unsafe { live_graph_output_len(engine, "events") }
+    crate::ffi_guard(0, || unsafe { live_graph_output_len(engine, "events") })
 }
 
 #[unsafe(no_mangle)]
@@ -65,7 +65,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_events_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe { write_live_graph_output(engine, "events", out_bytes, max_bytes) }
+    crate::ffi_guard(0, || unsafe {
+        write_live_graph_output(engine, "events", out_bytes, max_bytes)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -79,7 +81,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_events_json(
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_frame_json_len(engine: *const SaEngine) -> usize {
-    unsafe { live_graph_output_len(engine, "frame") }
+    crate::ffi_guard(0, || unsafe { live_graph_output_len(engine, "frame") })
 }
 
 #[unsafe(no_mangle)]
@@ -97,7 +99,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_frame_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe { write_live_graph_output(engine, "frame", out_bytes, max_bytes) }
+    crate::ffi_guard(0, || unsafe {
+        write_live_graph_output(engine, "frame", out_bytes, max_bytes)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -112,7 +116,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_frame_json(
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_timeline_json_len(engine: *const SaEngine) -> usize {
-    unsafe { live_graph_output_len(engine, "timeline") }
+    crate::ffi_guard(0, || unsafe { live_graph_output_len(engine, "timeline") })
 }
 
 #[unsafe(no_mangle)]
@@ -131,7 +135,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_timeline_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe { write_live_graph_output(engine, "timeline", out_bytes, max_bytes) }
+    crate::ffi_guard(0, || unsafe {
+        write_live_graph_output(engine, "timeline", out_bytes, max_bytes)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -147,7 +153,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_timeline_json(
 /// `engine` must either be null or a valid pointer returned by
 /// `subtr_actor_bakkesmod_engine_create`.
 pub unsafe extern "C" fn subtr_actor_bakkesmod_stats_json_len(engine: *const SaEngine) -> usize {
-    unsafe { live_graph_output_len(engine, "stats") }
+    crate::ffi_guard(0, || unsafe { live_graph_output_len(engine, "stats") })
 }
 
 #[unsafe(no_mangle)]
@@ -165,7 +171,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    unsafe { write_live_graph_output(engine, "stats", out_bytes, max_bytes) }
+    crate::ffi_guard(0, || unsafe {
+        write_live_graph_output(engine, "stats", out_bytes, max_bytes)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -183,7 +191,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_stats_module_json_len(
     engine: *const SaEngine,
     module_name: *const c_char,
 ) -> usize {
-    unsafe { serialize_named_stats_module(engine, module_name).len() }
+    crate::ffi_guard(0, || unsafe {
+        serialize_named_stats_module(engine, module_name).len()
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -204,8 +214,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let bytes = unsafe { serialize_named_stats_module(engine, module_name) };
-    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let bytes = unsafe { serialize_named_stats_module(engine, module_name) };
+        unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -223,7 +235,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_stats_module_frame_json_len(
     engine: *const SaEngine,
     module_name: *const c_char,
 ) -> usize {
-    unsafe { serialize_named_stats_module_frame(engine, module_name).len() }
+    crate::ffi_guard(0, || unsafe {
+        serialize_named_stats_module_frame(engine, module_name).len()
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -244,8 +258,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_frame_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let bytes = unsafe { serialize_named_stats_module_frame(engine, module_name) };
-    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let bytes = unsafe { serialize_named_stats_module_frame(engine, module_name) };
+        unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -263,7 +279,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_stats_module_config_json_len(
     engine: *const SaEngine,
     module_name: *const c_char,
 ) -> usize {
-    unsafe { serialize_named_stats_module_config(engine, module_name).len() }
+    crate::ffi_guard(0, || unsafe {
+        serialize_named_stats_module_config(engine, module_name).len()
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -284,8 +302,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_stats_module_config_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let bytes = unsafe { serialize_named_stats_module_config(engine, module_name) };
-    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let bytes = unsafe { serialize_named_stats_module_config(engine, module_name) };
+        unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -304,15 +324,17 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_graph_output_json_len(
     engine: *const SaEngine,
     output_name: *const c_char,
 ) -> usize {
-    let Some(engine) = (unsafe { raw_ref(engine) }) else {
-        return 0;
-    };
-    let Some(output_name) = (unsafe { c_string_arg(output_name) }) else {
-        return 0;
-    };
-    serialize_live_graph_output(engine, &output_name)
-        .map(|bytes| bytes.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        let Some(engine) = (unsafe { raw_ref(engine) }) else {
+            return 0;
+        };
+        let Some(output_name) = (unsafe { c_string_arg(output_name) }) else {
+            return 0;
+        };
+        serialize_live_graph_output(engine, &output_name)
+            .map(|bytes| bytes.len())
+            .unwrap_or(0)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -333,16 +355,18 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_graph_output_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(engine) = (unsafe { raw_ref(engine) }) else {
-        return 0;
-    };
-    let Some(output_name) = (unsafe { c_string_arg(output_name) }) else {
-        return 0;
-    };
-    let Some(bytes) = serialize_live_graph_output(engine, &output_name) else {
-        return 0;
-    };
-    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(engine) = (unsafe { raw_ref(engine) }) else {
+            return 0;
+        };
+        let Some(output_name) = (unsafe { c_string_arg(output_name) }) else {
+            return 0;
+        };
+        let Some(bytes) = serialize_live_graph_output(engine, &output_name) else {
+            return 0;
+        };
+        unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -362,7 +386,9 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_analysis_node_json_len(
     engine: *const SaEngine,
     node_name: *const c_char,
 ) -> usize {
-    unsafe { serialize_named_analysis_node(engine, node_name).len() }
+    crate::ffi_guard(0, || unsafe {
+        serialize_named_analysis_node(engine, node_name).len()
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -383,8 +409,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let bytes = unsafe { serialize_named_analysis_node(engine, node_name) };
-    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let bytes = unsafe { serialize_named_analysis_node(engine, node_name) };
+        unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -400,7 +428,7 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_json(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_analysis_node_names_json_len(
     engine: *const SaEngine,
 ) -> usize {
-    unsafe { serialize_analysis_node_names(engine).len() }
+    crate::ffi_guard(0, || unsafe { serialize_analysis_node_names(engine).len() })
 }
 
 #[unsafe(no_mangle)]
@@ -419,8 +447,10 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_names_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let bytes = unsafe { serialize_analysis_node_names(engine) };
-    unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let bytes = unsafe { serialize_analysis_node_names(engine) };
+        unsafe { write_bytes(&bytes, out_bytes, max_bytes) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -436,9 +466,11 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_analysis_node_names_json(
 pub unsafe extern "C" fn subtr_actor_bakkesmod_graph_info_json_len(
     engine: *const SaEngine,
 ) -> usize {
-    unsafe { raw_ref(engine) }
-        .map(|engine| engine.graph_info_json.len())
-        .unwrap_or(0)
+    crate::ffi_guard(0, || {
+        unsafe { raw_ref(engine) }
+            .map(|engine| engine.graph_info_json.len())
+            .unwrap_or(0)
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -457,10 +489,12 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_write_graph_info_json(
     out_bytes: *mut u8,
     max_bytes: usize,
 ) -> usize {
-    let Some(engine) = (unsafe { raw_ref(engine) }) else {
-        return 0;
-    };
-    unsafe { write_bytes(&engine.graph_info_json, out_bytes, max_bytes) }
+    crate::ffi_guard(0, || {
+        let Some(engine) = (unsafe { raw_ref(engine) }) else {
+            return 0;
+        };
+        unsafe { write_bytes(&engine.graph_info_json, out_bytes, max_bytes) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -477,10 +511,12 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_events(
     out_events: *mut SaMechanicEvent,
     max_events: usize,
 ) -> usize {
-    let Some(engine) = (unsafe { raw_mut(engine) }) else {
-        return 0;
-    };
-    unsafe { drain_pending(&mut engine.pending_events, out_events, max_events) }
+    crate::ffi_guard(0, || {
+        let Some(engine) = (unsafe { raw_mut(engine) }) else {
+            return 0;
+        };
+        unsafe { drain_pending(&mut engine.pending_events, out_events, max_events) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -497,10 +533,12 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_team_events(
     out_events: *mut SaTeamEvent,
     max_events: usize,
 ) -> usize {
-    let Some(engine) = (unsafe { raw_mut(engine) }) else {
-        return 0;
-    };
-    unsafe { drain_pending(&mut engine.pending_team_events, out_events, max_events) }
+    crate::ffi_guard(0, || {
+        let Some(engine) = (unsafe { raw_mut(engine) }) else {
+            return 0;
+        };
+        unsafe { drain_pending(&mut engine.pending_team_events, out_events, max_events) }
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -517,14 +555,16 @@ pub unsafe extern "C" fn subtr_actor_bakkesmod_drain_goal_context_events(
     out_events: *mut SaGoalContextEvent,
     max_events: usize,
 ) -> usize {
-    let Some(engine) = (unsafe { raw_mut(engine) }) else {
-        return 0;
-    };
-    unsafe {
-        drain_pending(
-            &mut engine.pending_goal_context_events,
-            out_events,
-            max_events,
-        )
-    }
+    crate::ffi_guard(0, || {
+        let Some(engine) = (unsafe { raw_mut(engine) }) else {
+            return 0;
+        };
+        unsafe {
+            drain_pending(
+                &mut engine.pending_goal_context_events,
+                out_events,
+                max_events,
+            )
+        }
+    })
 }
