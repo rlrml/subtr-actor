@@ -1,42 +1,31 @@
+use super::whiff_features::{
+    WHIFF_FEATURE_NAMES, WHIFF_RESOLUTION_DELAY_SECONDS, WhiffFeatures, WhiffHistory,
+    whiff_attempt_start, whiff_candidate_features,
+};
+use super::whiff_model::{WhiffAttemptClass, WhiffClassification, classify_whiff_candidate};
 use super::*;
 
-// These thresholds are intentionally permissive: a candidate starts from
-// domain evidence of a committed move at a nearby ball, then becomes a whiff
-// only once the player clearly separates from the ball without any touch.
-// Downstream consumers can use the emitted attempt span and closest-approach
-// evidence to evaluate or refine that decision without redefining the event's
-// lifecycle.
-//
-// The non-dodge approach path and the shared distance gate carry the loosening;
-// the dodge-specific gates below are left at their stricter values so a clear
-// side-dodge past the ball is still not treated as an attempt.
-const WHIFF_ENTER_DISTANCE: f32 = 220.0;
-const WHIFF_EXIT_DISTANCE: f32 = 360.0;
-const WHIFF_MAX_CANDIDATE_SECONDS: f32 = 1.0;
-const WHIFF_MIN_APPROACH_SPEED: f32 = 350.0;
-const WHIFF_MIN_CLOSING_SPEED: f32 = 250.0;
-const WHIFF_MIN_FORWARD_ALIGNMENT: f32 = 0.3;
-const WHIFF_MIN_VELOCITY_ALIGNMENT: f32 = 0.45;
-const WHIFF_MIN_DODGE_APPROACH_SPEED: f32 = 450.0;
-const WHIFF_MIN_DODGE_CLOSING_SPEED: f32 = 300.0;
-const WHIFF_MIN_DODGE_FORWARD_ALIGNMENT: f32 = 0.25;
-const WHIFF_MAX_LATERAL_OFFSET: f32 = 200.0;
-const WHIFF_MAX_DODGE_LATERAL_OFFSET: f32 = 150.0;
-const WHIFF_MIN_LOCAL_FORWARD_OFFSET: f32 = 0.0;
-const WHIFF_MIN_DODGE_LOCAL_FORWARD_OFFSET: f32 = -20.0;
+/// Candidates of one player closer together than this are one interaction.
+const WHIFF_MIN_CANDIDATE_SPACING_SECONDS: f64 = 0.25;
 
-/// Legacy outcome carried by serialized whiff events.
+/// Outcome carried by whiff events.
 ///
-/// New detection only emits the whiff variant. The beaten-to-ball variant
-/// remains readable so existing timelines and accumulated stats stay
-/// compatible; new beaten-to-ball detection has its own event stream.
+/// Detection emits clean whiffs and disrupted attempts as separate kinds. The
+/// beaten-to-ball variant remains readable so existing timelines and
+/// accumulated stats stay compatible; beaten-to-ball detection has its own
+/// event stream.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export, rename_all = "snake_case")]
 pub enum WhiffEventKind {
+    /// A committed attempt that missed without another player's touch
+    /// disrupting it.
     #[default]
     Whiff,
     BeatenToBall,
+    /// A committed attempt that never connected because another player's touch
+    /// took the ball first.
+    DisruptedAttempt,
 }
 
 /// Why a whiff candidate became a confirmed whiff.
@@ -49,15 +38,18 @@ pub enum WhiffResolutionReason {
     /// Compatibility value for serialized events that predate resolution
     /// reasons (including the legacy beaten-to-ball subtype).
     LegacyUnknown,
+    /// The attempt classifier labeled the closest approach once its
+    /// resolution delay elapsed.
+    AttemptClassified,
 }
 
-/// A committed attempt near the ball that resolves as a clear miss.
+/// A committed attempt near the ball that resolves as a miss.
 #[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct WhiffEvent {
     #[serde(default)]
     pub kind: WhiffEventKind,
-    /// First frame where the player satisfied the committed-attempt gates.
+    /// Start of the approach that led to the closest approach.
     pub start_time: f32,
     pub start_frame: usize,
     /// Closest-approach anchor for the event.
@@ -73,6 +65,7 @@ pub struct WhiffEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_position: Option<[f32; 3]>,
     pub is_team_0: bool,
+    /// Ball-center to car-hitbox distance at closest approach.
     pub closest_approach_distance: f32,
     /// Car-forward alignment with the ball direction at closest approach.
     pub forward_alignment: f32,
@@ -90,7 +83,7 @@ pub struct WhiffEvent {
     /// only for compatibility with older serialized events.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub local_ball_position_at_closest: Option<[f32; 3]>,
-    /// Hitbox distance on the frame that confirmed separation. Optional only
+    /// Hitbox distance on the frame that resolved the attempt. Optional only
     /// for compatibility with older serialized events.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolved_distance: Option<f32>,
@@ -98,6 +91,15 @@ pub struct WhiffEvent {
     pub dodge_active: bool,
     /// Whether the player was airborne during the attempt.
     pub aerial: bool,
+    /// Classifier probability of the emitted kind. Not a calibrated
+    /// probability of human agreement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<f32>,
+    /// For disrupted attempts, the player whose touch nearest the closest
+    /// approach took the ball.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(as = "Option<crate::interop::ts_bindings::RemoteIdTs>")]
+    pub disrupted_by: Option<PlayerId>,
 }
 
 pub(crate) const WHIFF_DODGE_STATE_LABELS: [StatLabel; 2] = [
@@ -122,63 +124,90 @@ pub(crate) fn whiff_dodge_state_label(dodge_active: bool) -> StatLabel {
     }
 }
 
+/// Classifies a candidate's feature vector. Replaceable for tests.
+pub type WhiffClassifier = fn(&WhiffFeatures) -> WhiffClassification;
+
+/// A resolved candidate with its features, recorded for training/audit when
+/// enabled via [`WhiffCalculator::enable_candidate_recording`].
 #[derive(Debug, Clone, PartialEq)]
-struct ActiveWhiffCandidate {
-    player: PlayerId,
-    is_team_0: bool,
-    start_time: f32,
-    start_frame: usize,
-    closest_time: f32,
-    closest_frame: usize,
-    closest_position: [f32; 3],
-    closest_approach_distance: f32,
-    forward_alignment: f32,
-    approach_speed: f32,
-    closing_speed_at_closest: f32,
-    velocity_alignment_at_closest: f32,
-    local_ball_position_at_closest: [f32; 3],
-    dodge_active: bool,
-    aerial: bool,
+pub struct WhiffCandidateRecord {
+    pub player: PlayerId,
+    pub is_team_0: bool,
+    pub anchor_time: f32,
+    pub anchor_frame: usize,
+    pub resolved_frame: usize,
+    pub features: WhiffFeatures,
+    pub classification: WhiffClassification,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-struct WhiffEvidence {
-    distance: f32,
-    player_position: [f32; 3],
-    local_ball_position: [f32; 3],
-    forward_alignment: f32,
-    approach_speed: f32,
-    closing_speed: f32,
-    velocity_alignment: f32,
-    dodge_active: bool,
-    aerial: bool,
-}
-
-impl InFlightItem for ActiveWhiffCandidate {
-    fn recognition(&self) -> Recognition {
-        // A whiff candidate is speculative: it only becomes an event once the
-        // player separates from the ball without any touch. Touches, expiry,
-        // missing players, and game-flow boundaries discard it.
-        Recognition::speculative(self.start_time, self.start_frame)
-    }
-
-    fn on_boundary(&mut self, _boundary: Boundary) -> Disposition {
-        // An in-flight candidate at a boundary never resolved into a whiff.
-        Disposition::Discard
+impl WhiffCandidateRecord {
+    pub fn feature_names() -> &'static [&'static str] {
+        &WHIFF_FEATURE_NAMES
     }
 }
 
-/// Detects committed attempts that resolve as whiffs.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PendingCandidate {
+    slot: usize,
+    anchor_seq: usize,
+    anchor_time: f64,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+struct SlotScan {
+    next_seq: usize,
+    last_anchor_time: Option<f64>,
+}
+
+/// Detects clean whiffs and disrupted attempts.
+///
+/// Candidates are local minima of each player's ball contact gap during live
+/// play. Each is classified from causal telemetry once
+/// [`WHIFF_RESOLUTION_DELAY_SECONDS`] have elapsed, so a successful touch, a
+/// renewed attempt after the player's own touch, or another player's touch
+/// before arrival is decided per closest approach rather than by clearing
+/// every pending candidate on any touch.
+#[derive(Debug, Clone)]
 pub struct WhiffCalculator {
-    active_candidates: KeyedInFlightLedger<PlayerId, ActiveWhiffCandidate>,
-    expired_candidates: HashSet<PlayerId>,
+    history: WhiffHistory,
+    scans: Vec<SlotScan>,
+    pending: Vec<PendingCandidate>,
+    classifier: WhiffClassifier,
+    record_candidates: bool,
+    candidates: Vec<WhiffCandidateRecord>,
     events: EventStream<WhiffEvent>,
+}
+
+impl Default for WhiffCalculator {
+    fn default() -> Self {
+        Self::with_classifier(classify_whiff_candidate)
+    }
 }
 
 impl WhiffCalculator {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn with_classifier(classifier: WhiffClassifier) -> Self {
+        Self {
+            history: WhiffHistory::default(),
+            scans: Vec::new(),
+            pending: Vec::new(),
+            classifier,
+            record_candidates: false,
+            candidates: Vec::new(),
+            events: EventStream::default(),
+        }
+    }
+
+    /// Record every resolved candidate with its features and classification.
+    pub fn enable_candidate_recording(&mut self) {
+        self.record_candidates = true;
+    }
+
+    pub fn candidates(&self) -> &[WhiffCandidateRecord] {
+        &self.candidates
     }
 
     pub fn events(&self) -> &[WhiffEvent] {
@@ -189,258 +218,197 @@ impl WhiffCalculator {
         self.events.new_events()
     }
 
-    fn hitbox_distance(ball_position: glam::Vec3, player: &PlayerSample) -> Option<f32> {
-        let rigid_body = player.rigid_body.as_ref()?;
-        car_hitbox_distance(ball_position, rigid_body, player.hitbox)
+    fn scan_candidates(&mut self) {
+        let Some(last_seq) = self.history.last_seq() else {
+            return;
+        };
+        let slot_count = self.history.slot_count();
+        while self.scans.len() < slot_count {
+            self.scans.push(SlotScan {
+                next_seq: last_seq,
+                last_anchor_time: None,
+            });
+        }
+        for slot in 0..slot_count {
+            let scan = &mut self.scans[slot];
+            let mut seq = scan.next_seq.max(self.history.first_seq());
+            while seq <= last_seq {
+                let Some(is_minimum) = self.history.is_gap_minimum(slot, seq) else {
+                    break;
+                };
+                if is_minimum {
+                    let time = self.history.frame(seq).expect("seq in history").time;
+                    let spaced = scan
+                        .last_anchor_time
+                        .is_none_or(|last| time - last >= WHIFF_MIN_CANDIDATE_SPACING_SECONDS);
+                    if spaced {
+                        scan.last_anchor_time = Some(time);
+                        self.pending.push(PendingCandidate {
+                            slot,
+                            anchor_seq: seq,
+                            anchor_time: time,
+                        });
+                    }
+                }
+                seq += 1;
+            }
+            scan.next_seq = seq;
+        }
     }
 
-    fn evidence(
-        ball_position: glam::Vec3,
-        ball_velocity: glam::Vec3,
-        player: &PlayerSample,
-    ) -> Option<WhiffEvidence> {
-        let distance = Self::hitbox_distance(ball_position, player)?;
-        let rigid_body = player.rigid_body.as_ref()?;
-        let player_position = player.position()?;
-        let rotation = quat_to_glam(&rigid_body.rotation);
-        let local_ball_position = rotation.inverse() * (ball_position - player_position);
-        let to_ball = (ball_position - player_position).normalize_or_zero();
-        if to_ball.length_squared() <= f32::EPSILON {
-            return None;
+    fn resolve_pending(&mut self, force: bool) {
+        let Some(last_seq) = self.history.last_seq() else {
+            return;
+        };
+        let now = self.history.frame(last_seq).expect("last frame").time;
+        let (mut due, waiting): (Vec<_>, Vec<_>) = self.pending.drain(..).partition(|candidate| {
+            force || now >= candidate.anchor_time + WHIFF_RESOLUTION_DELAY_SECONDS
+        });
+        self.pending = waiting;
+        // Emit simultaneous resolutions in timeline order (attempt start).
+        due.sort_by(|a, b| {
+            let start =
+                |c: &PendingCandidate| whiff_attempt_start(&self.history, c.slot, c.anchor_seq).0;
+            start(a)
+                .total_cmp(&start(b))
+                .then(a.anchor_seq.cmp(&b.anchor_seq))
+                .then(a.slot.cmp(&b.slot))
+        });
+        for candidate in due {
+            self.resolve(candidate, last_seq);
         }
+    }
 
-        let forward_alignment = (rotation * glam::Vec3::X).dot(to_ball);
-        let player_velocity = player.velocity().unwrap_or(glam::Vec3::ZERO);
-        let player_speed = player_velocity.length();
-        let velocity_alignment = if player_speed <= f32::EPSILON {
-            0.0
+    fn resolve(&mut self, candidate: PendingCandidate, resolved_seq: usize) {
+        let Some(features) =
+            whiff_candidate_features(&self.history, candidate.slot, candidate.anchor_seq)
+        else {
+            return;
+        };
+        let classification = (self.classifier)(&features);
+        let anchor = self
+            .history
+            .frame(candidate.anchor_seq)
+            .expect("anchor in history");
+        let resolved = self.history.frame(resolved_seq).expect("resolved frame");
+        let (player, is_team_0) = self.history.slot_player(candidate.slot).clone();
+        if self.record_candidates {
+            self.candidates.push(WhiffCandidateRecord {
+                player: player.clone(),
+                is_team_0,
+                anchor_time: anchor.time as f32,
+                anchor_frame: anchor.frame,
+                resolved_frame: resolved.frame,
+                features,
+                classification,
+            });
+        }
+        let kind = match classification.class {
+            WhiffAttemptClass::CleanWhiff => WhiffEventKind::Whiff,
+            WhiffAttemptClass::DisruptedAttempt => WhiffEventKind::DisruptedAttempt,
+            WhiffAttemptClass::SuccessfulContact | WhiffAttemptClass::NoObservableAttempt => {
+                return;
+            }
+        };
+        let Some(sample) = anchor.players.get(candidate.slot).and_then(Option::as_ref) else {
+            return;
+        };
+        let to_ball = anchor.ball_position - sample.position;
+        let direction = to_ball.normalize_or_zero();
+        let velocity = if sample.velocity.is_finite() {
+            sample.velocity
         } else {
-            player_velocity.normalize_or_zero().dot(to_ball)
+            glam::DVec3::ZERO
         };
-        let approach_speed = player_velocity.dot(to_ball);
-        let closing_speed = (player_velocity - ball_velocity).dot(to_ball);
-
-        Some(WhiffEvidence {
-            distance,
-            player_position: player_position.to_array(),
-            local_ball_position: local_ball_position.to_array(),
-            forward_alignment,
-            approach_speed,
-            closing_speed,
-            velocity_alignment,
-            dodge_active: player.dodge_active,
-            aerial: player_position.z > POWERSLIDE_MAX_Z_THRESHOLD,
-        })
-    }
-
-    fn whiff_candidate(
-        frame: &FrameInfo,
-        player: &PlayerSample,
-        evidence: WhiffEvidence,
-    ) -> Option<ActiveWhiffCandidate> {
-        if evidence.distance > WHIFF_ENTER_DISTANCE {
-            return None;
-        }
-
-        let local_ball_position = glam::Vec3::from_array(evidence.local_ball_position);
-        let ball_in_front = local_ball_position.x >= WHIFF_MIN_LOCAL_FORWARD_OFFSET
-            && local_ball_position.y.abs() <= WHIFF_MAX_LATERAL_OFFSET;
-        let dodge_ball_in_front = local_ball_position.x >= WHIFF_MIN_DODGE_LOCAL_FORWARD_OFFSET
-            && local_ball_position.y.abs() <= WHIFF_MAX_DODGE_LATERAL_OFFSET;
-        let committed_approach = evidence.approach_speed >= WHIFF_MIN_APPROACH_SPEED
-            && evidence.closing_speed >= WHIFF_MIN_CLOSING_SPEED
-            && evidence.forward_alignment >= WHIFF_MIN_FORWARD_ALIGNMENT;
-        let directed_motion = evidence.velocity_alignment >= WHIFF_MIN_VELOCITY_ALIGNMENT;
-        let committed_dodge = evidence.dodge_active
-            && evidence.approach_speed >= WHIFF_MIN_DODGE_APPROACH_SPEED
-            && evidence.closing_speed >= WHIFF_MIN_DODGE_CLOSING_SPEED
-            && evidence.forward_alignment >= WHIFF_MIN_DODGE_FORWARD_ALIGNMENT
-            && dodge_ball_in_front;
-        if !(committed_dodge || committed_approach && directed_motion && ball_in_front) {
-            return None;
-        }
-
-        Some(ActiveWhiffCandidate {
-            player: player.player_id.clone(),
-            is_team_0: player.is_team_0,
-            start_time: frame.time,
-            start_frame: frame.frame_number,
-            closest_time: frame.time,
-            closest_frame: frame.frame_number,
-            closest_position: evidence.player_position,
-            closest_approach_distance: evidence.distance,
-            forward_alignment: evidence.forward_alignment,
-            approach_speed: evidence.approach_speed,
-            closing_speed_at_closest: evidence.closing_speed,
-            velocity_alignment_at_closest: evidence.velocity_alignment,
-            local_ball_position_at_closest: evidence.local_ball_position,
-            dodge_active: evidence.dodge_active,
-            aerial: evidence.aerial,
-        })
-    }
-
-    fn emit_candidate(
-        &mut self,
-        candidate: ActiveWhiffCandidate,
-        frame: &FrameInfo,
-        resolved_distance: f32,
-    ) {
-        let event = WhiffEvent {
-            kind: WhiffEventKind::Whiff,
-            start_time: candidate.start_time,
-            start_frame: candidate.start_frame,
-            time: candidate.closest_time,
-            frame: candidate.closest_frame,
-            resolved_time: frame.time,
-            resolved_frame: frame.frame_number,
-            resolution_reason: WhiffResolutionReason::SeparatedFromBall,
-            player: candidate.player.clone(),
-            player_position: Some(candidate.closest_position),
-            is_team_0: candidate.is_team_0,
-            closest_approach_distance: candidate.closest_approach_distance,
-            forward_alignment: candidate.forward_alignment,
-            approach_speed: candidate.approach_speed,
-            closing_speed_at_closest: Some(candidate.closing_speed_at_closest),
-            velocity_alignment_at_closest: Some(candidate.velocity_alignment_at_closest),
-            local_ball_position_at_closest: Some(candidate.local_ball_position_at_closest),
-            resolved_distance: Some(resolved_distance),
-            dodge_active: candidate.dodge_active,
-            aerial: candidate.aerial,
+        let ball_velocity = if anchor.ball_velocity.is_finite() {
+            anchor.ball_velocity
+        } else {
+            glam::DVec3::ZERO
         };
-        self.events.push(event);
+        let feature = |name: &str| {
+            features[WHIFF_FEATURE_NAMES
+                .iter()
+                .position(|n| *n == name)
+                .expect("known feature")]
+        };
+        let (start_time, start_frame) =
+            whiff_attempt_start(&self.history, candidate.slot, candidate.anchor_seq);
+        let disrupted_by = (kind == WhiffEventKind::DisruptedAttempt)
+            .then(|| {
+                self.history
+                    .nearest_other_touch(candidate.slot, candidate.anchor_seq)
+            })
+            .flatten();
+        let resolved_distance = resolved
+            .players
+            .get(candidate.slot)
+            .and_then(Option::as_ref)
+            .map(|p| p.hitbox_distance)
+            .filter(|d| d.is_finite());
+        self.events.push(WhiffEvent {
+            kind,
+            start_time: start_time as f32,
+            start_frame,
+            time: anchor.time as f32,
+            frame: anchor.frame,
+            resolved_time: resolved.time as f32,
+            resolved_frame: resolved.frame,
+            resolution_reason: WhiffResolutionReason::AttemptClassified,
+            player,
+            player_position: Some(sample.position.as_vec3().to_array()),
+            is_team_0,
+            closest_approach_distance: sample.hitbox_distance as f32,
+            forward_alignment: feature("forward_alignment") as f32,
+            approach_speed: velocity.dot(direction) as f32,
+            closing_speed_at_closest: Some((velocity - ball_velocity).dot(direction) as f32),
+            velocity_alignment_at_closest: Some(velocity.normalize_or_zero().dot(direction) as f32),
+            local_ball_position_at_closest: Some(sample.local_ball.as_vec3().to_array()),
+            resolved_distance: resolved_distance.map(|d| d as f32),
+            dodge_active: feature("dodge_recent") > 0.5,
+            aerial: sample.position.z > f64::from(POWERSLIDE_MAX_Z_THRESHOLD),
+            confidence: Some(classification.probability() as f32),
+            disrupted_by,
+        });
     }
 
-    fn update_active_candidates(
-        &mut self,
-        frame: &FrameInfo,
-        ball_position: glam::Vec3,
-        ball_velocity: glam::Vec3,
-        players: &PlayerFrameState,
-    ) {
-        let mut visible_players = HashSet::new();
-
-        for player in &players.players {
-            let player_id = player.player_id.clone();
-            visible_players.insert(player_id.clone());
-            let evidence = Self::evidence(ball_position, ball_velocity, player);
-
-            if self.expired_candidates.contains(&player_id) {
-                if evidence
-                    .as_ref()
-                    .is_some_and(|evidence| evidence.distance > WHIFF_ENTER_DISTANCE)
-                {
-                    self.expired_candidates.remove(&player_id);
-                }
-                continue;
-            }
-
-            if self.active_candidates.contains(&player_id) {
-                let expired = self
-                    .active_candidates
-                    .get(&player_id)
-                    .is_some_and(|candidate| {
-                        frame.time - candidate.start_time > WHIFF_MAX_CANDIDATE_SECONDS
-                    });
-                if expired {
-                    // Candidate age is an implementation bound, not evidence of
-                    // a miss. Suppress the same continuous interaction until
-                    // the player leaves the entry window or a touch resets it.
-                    self.active_candidates.discard(&player_id);
-                    self.expired_candidates.insert(player_id);
-                    continue;
-                }
-
-                if let Some(evidence) = evidence.as_ref() {
-                    if let Some(candidate) = self.active_candidates.get_mut(&player_id) {
-                        candidate.dodge_active |= evidence.dodge_active;
-                        candidate.aerial |= evidence.aerial;
-                        if evidence.distance < candidate.closest_approach_distance {
-                            candidate.closest_approach_distance = evidence.distance;
-                            candidate.closest_time = frame.time;
-                            candidate.closest_frame = frame.frame_number;
-                            candidate.closest_position = evidence.player_position;
-                            candidate.forward_alignment = evidence.forward_alignment;
-                            candidate.approach_speed = evidence.approach_speed;
-                            candidate.closing_speed_at_closest = evidence.closing_speed;
-                            candidate.velocity_alignment_at_closest = evidence.velocity_alignment;
-                            candidate.local_ball_position_at_closest = evidence.local_ball_position;
-                        }
-                    }
-
-                    if evidence.distance > WHIFF_EXIT_DISTANCE {
-                        if let Some(candidate) = self
-                            .active_candidates
-                            .finalize(&player_id, FinalizeReason::Completed)
-                        {
-                            self.emit_candidate(candidate, frame, evidence.distance);
-                        }
-                        continue;
-                    }
-                }
-                continue;
-            }
-
-            if let Some(candidate) =
-                evidence.and_then(|evidence| Self::whiff_candidate(frame, player, evidence))
-            {
-                self.active_candidates.arm(player_id, candidate);
-            }
-        }
-
-        let missing_players = self
-            .active_candidates
-            .keys()
-            .filter(|player_id| !visible_players.contains(*player_id))
-            .cloned()
-            .collect::<Vec<_>>();
-        for player_id in missing_players {
-            self.active_candidates.discard(&player_id);
-        }
-        self.expired_candidates
-            .retain(|player_id| visible_players.contains(player_id));
-    }
-
+    #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
         frame: &FrameInfo,
         ball: &BallFrameState,
         players: &PlayerFrameState,
+        controls: &PlayerControlState,
         touch_state: &TouchState,
         live_play_state: &LivePlayState,
     ) -> SubtrActorResult<()> {
         self.events.begin_update();
-        if !live_play_state.is_live_play {
-            self.active_candidates
-                .apply_boundary(Boundary::LivePlayEnded);
-            self.expired_candidates.clear();
-            return Ok(());
-        }
-        if !touch_state.touch_events.is_empty() {
-            // Any touch resolves the current ball interaction before a whiff is
-            // known: the candidate either succeeded or was interrupted. The
-            // dedicated beaten-to-ball detector evaluates opponent touches.
-            self.active_candidates.clear();
-            self.expired_candidates.clear();
-        }
-        if touch_state.touch_events.is_empty()
-            && let Some(ball_position) = ball.position()
+        if self
+            .history
+            .last_seq()
+            .and_then(|seq| self.history.frame(seq))
+            .is_some_and(|last| f64::from(frame.time) < last.time)
         {
-            self.update_active_candidates(
-                frame,
-                ball_position,
-                ball.velocity().unwrap_or(glam::Vec3::ZERO),
-                players,
-            );
+            // Time went backwards (e.g. a seek): resolve what is known and
+            // restart the history.
+            self.resolve_pending(true);
+            self.history.clear();
         }
+        self.history.push(
+            frame,
+            ball,
+            players,
+            controls,
+            touch_state,
+            live_play_state.is_live_play,
+        );
+        self.scan_candidates();
+        self.resolve_pending(false);
         Ok(())
     }
 
-    /// Resolve any in-flight candidates at end of stream. An unresolved
-    /// candidate never became a whiff, so it is discarded (handled uniformly via
-    /// the ledger rather than left to drop implicitly).
+    /// Resolve remaining candidates with the frames observed so far.
     pub fn finish(&mut self) {
-        self.active_candidates.finish();
-        self.expired_candidates.clear();
+        self.resolve_pending(true);
     }
 }
 

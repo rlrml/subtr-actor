@@ -662,6 +662,9 @@ function getWhiffShortLabel(event: WhiffEvent): string {
   if (event.kind === "beaten_to_ball") {
     return "BT";
   }
+  if (event.kind === "disrupted_attempt") {
+    return "DA";
+  }
   if (event.dodge_active) {
     return "DW";
   }
@@ -680,7 +683,18 @@ function getWhiffKindLabel(event: WhiffEvent): string {
 }
 
 function getWhiffOutcomeLabel(event: WhiffEvent): string {
-  return event.kind === "beaten_to_ball" ? "beaten to ball" : "whiff";
+  switch (event.kind) {
+    case "beaten_to_ball":
+      return "beaten to ball";
+    case "disrupted_attempt":
+      return "disrupted attempt";
+    default:
+      return "whiff";
+  }
+}
+
+function getWhiffConfidenceLabel(event: WhiffEvent): string {
+  return event.confidence == null ? "" : `, ${Math.round(event.confidence * 100)}% model`;
 }
 
 export function buildWhiffTimelineEvents(
@@ -699,7 +713,7 @@ export function buildWhiffTimelineEvents(
       time: eventTime,
       frame: event.frame,
       kind: "whiff",
-      label: `${playerName} ${getWhiffKindLabel(event)} ${getWhiffOutcomeLabel(event)} | ${closestApproach}uu closest, ${approachSpeed}uu/s`,
+      label: `${playerName} ${getWhiffKindLabel(event)} ${getWhiffOutcomeLabel(event)} | ${closestApproach}uu closest, ${approachSpeed}uu/s${getWhiffConfidenceLabel(event)}`,
       shortLabel: getWhiffShortLabel(event),
       playerId,
       playerName,

@@ -10,9 +10,13 @@ pub struct WhiffNode {
 
 impl WhiffNode {
     pub fn new() -> Self {
-        Self {
-            calculator: WhiffCalculator::new(),
-        }
+        Self::with_calculator(WhiffCalculator::new())
+    }
+
+    /// Wraps a pre-configured calculator (e.g. with candidate recording
+    /// enabled) so dataset tooling can run it inside an analysis graph.
+    pub fn with_calculator(calculator: WhiffCalculator) -> Self {
+        Self { calculator }
     }
 }
 
@@ -38,6 +42,7 @@ impl AnalysisNode for WhiffNode {
             frame_info_dependency(),
             ball_frame_state_dependency(),
             player_frame_state_dependency(),
+            player_control_state_dependency(),
             touch_state_dependency(),
             live_play_dependency(),
         ]
@@ -48,6 +53,7 @@ impl AnalysisNode for WhiffNode {
             ctx.get::<FrameInfo>()?,
             ctx.get::<BallFrameState>()?,
             ctx.get::<PlayerFrameState>()?,
+            ctx.get::<PlayerControlState>()?,
             ctx.get::<TouchState>()?,
             ctx.get::<LivePlayState>()?,
         )
@@ -72,7 +78,8 @@ impl AnalysisNode for WhiffNode {
 /// interim lifecycle rule.
 fn projected_timeline_events(calculator: &WhiffCalculator) -> Vec<Event> {
     let mut assembler = EventAssembler::new();
-    // Whiffs commit once separation resolves the speculative attempt.
+    // Whiffs and disrupted attempts commit once the classifier resolves the
+    // closest approach, a bounded delay after it.
     for event in calculator.events() {
         push_projected_whiff(&mut assembler, event);
     }

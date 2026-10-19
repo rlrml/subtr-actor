@@ -148,6 +148,13 @@ pub mod wavedash;
 pub use wavedash::*;
 pub mod whiff;
 pub use whiff::*;
+pub mod whiff_features;
+pub use whiff_features::{
+    WHIFF_FEATURE_COUNT, WHIFF_FEATURE_NAMES, WHIFF_FEATURE_VERSION,
+    WHIFF_RESOLUTION_DELAY_SECONDS, WhiffFeatures,
+};
+pub mod whiff_model;
+pub use whiff_model::*;
 
 pub(crate) fn chronological_touch_events(touch_events: &[TouchEvent]) -> Vec<&TouchEvent> {
     let mut touch_events = touch_events.iter().collect::<Vec<_>>();

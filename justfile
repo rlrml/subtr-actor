@@ -87,6 +87,14 @@ threat-model-sync:
 threat-model-train *args:
     nix run .#train-threat-model -- {{args}}
 
+# Run the whiff-learning workflow CLI (scripts/whiff_model/whifflab.py). Pass subcommand args.
+whiff-model *args:
+    {{nix_shell_bash}} 'cd scripts/whiff_model && uv run --locked python whifflab.py {{args}}'
+
+# Unit tests for the whiff-learning workflow.
+test-whiff-model:
+    {{nix_shell_bash}} 'cd scripts/whiff_model && uv run --locked python -m unittest whiff_model_tests'
+
 # Publish main Rust crate to crates.io
 publish-rust:
     {{nix_develop}} cargo publish -p subtr-actor
@@ -142,7 +150,7 @@ check-readme:
 # ---------------------------------------------------------------------------
 
 # Fast quality gate: Rust quality + JS style. Run this clean before every commit.
-check: check-rust check-style check-threat-model
+check: check-rust check-style check-threat-model check-whiff-model
 
 # Rust quality gate (mirrors CI "Rust quality" job, minus tests/release build)
 check-rust:
@@ -159,6 +167,10 @@ check-style:
 # Offline threat-model tooling: lock drift and Python style/lint.
 check-threat-model:
     nix develop .#threat-model -c bash -lc 'cd scripts/threat_model && uv lock --check && ruff check . && ruff format --check .'
+
+# Offline whiff-learning tooling: lock drift and Python style/lint.
+check-whiff-model:
+    nix develop .#threat-model -c bash -lc 'cd scripts/whiff_model && uv lock --check && ruff check . && ruff format --check .'
 
 # Heavy JS/TS gate: ts-rs binding drift + typecheck. Run when you change JS/TS or an exported (ts-rs) Rust type. Needs built wasm pkg + JS deps.
 check-types:

@@ -31,7 +31,7 @@ use subtr_actor::{
     GoalContextEvent, GoalTagKind, ReplayMeta, ReplayStatsFrame, ReplayStatsTimeline,
     ReplayStatsTimelineEvents, RushEvent, StatsTimelineCollector, StatsTimelineEventCollector,
     SubtrActorError, SubtrActorErrorVariant, SubtrActorResult, TimelineEvent, TimelineEventKind,
-    WhiffEvent, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
+    WhiffEvent, WhiffEventKind, builtin_analysis_node_json, builtin_stats_graph_snapshot_json,
     builtin_stats_module_config_json, builtin_stats_module_frame_json, builtin_stats_module_json,
     builtin_stats_module_names, default_stats_timeline_config,
     stats::analysis_graph::{
