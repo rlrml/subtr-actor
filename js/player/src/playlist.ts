@@ -592,6 +592,12 @@ export class ReplayPlaylistPlayer extends EventTarget {
   }
 
   private loadReplaySource(source: ReplaySource): Promise<LoadedReplay> {
+    const index = this.pendingItemIndex ?? this.currentItemIndex;
+    this.replayCache.protect([
+      source,
+      ...(this.currentResolvedItem ? [this.items[this.currentItemIndex].replay] : []),
+      ...resolvePolicySources(this.items, index, this.preloadPolicy),
+    ]);
     return this.replayCache.load(source);
   }
 

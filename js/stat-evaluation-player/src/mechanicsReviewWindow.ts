@@ -1,4 +1,4 @@
-import type { ReplayPlayerState } from "@rlrml/player";
+import { PlaylistLoadCache, type ReplayPlayerState } from "@rlrml/player";
 import type { StatsReplayPlayer } from "./statsReplayPlayer.ts";
 import {
   formatMechanicsReviewClipDetails,
@@ -332,7 +332,7 @@ export class MechanicsReviewWindowController {
       sourceUrl,
       replaysById,
       replayLoadStates: new Map(),
-      replayLoadCache: new Map(),
+      replayLoadCache: new PlaylistLoadCache(),
       currentIndex: 0,
       loading: false,
       preloading: false,

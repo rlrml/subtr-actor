@@ -319,3 +319,64 @@ test("playlist clip bounds reject clips that end before they start", () => {
     /Backwards clip.*ends before it starts/,
   );
 });
+
+test("playlist cache evicts least recently used replays while retaining active and prefetched sources", async () => {
+  const cache = new PlaylistLoadCache<number>();
+  let loads = 0;
+  const source = (id: string) => ({ id, load: async () => ++loads });
+  await cache.load(source("active"));
+  await cache.load(source("next"));
+  cache.protect(["active", "next"]);
+  for (const id of ["a", "b", "c"]) await cache.load(source(id));
+  await cache.load(source("a"));
+  await cache.load(source("d"));
+  assert.equal(cache.has("b"), false);
+  assert.equal(cache.getState("b").status, "idle");
+  assert.equal(cache.getStates().length, 5);
+  assert.equal(cache.has("active"), true);
+  assert.equal(cache.has("next"), true);
+  assert.equal(await cache.load(source("a")), 3);
+  assert.equal(await cache.load(source("b")), 7);
+});
+
+test("evicted in-flight loads cannot overwrite or delete a replacement", async () => {
+  const cache = new PlaylistLoadCache<string>(1);
+  let rejectOld: (error: Error) => void = () => {};
+  let reportOld: () => void = () => {};
+  const old = cache.load({
+    id: "a",
+    load: (context) =>
+      new Promise<string>((_resolve, reject) => {
+        rejectOld = reject;
+        reportOld = () => context?.updateProgress({ progress: 0.5 });
+      }),
+  });
+  await Promise.resolve();
+  await cache.load({ id: "b", load: async () => "b" });
+  const replacement = cache.load({ id: "a", load: async () => "new" });
+  await replacement;
+  reportOld();
+  rejectOld(new Error("obsolete"));
+  await assert.rejects(old, /obsolete/);
+  assert.equal(await cache.load({ id: "a", load: async () => "wrong" }), "new");
+  assert.equal(cache.getState("a").status, "loaded");
+  assert.equal(cache.getState("a").progress, null);
+});
+
+test("cleared in-flight loads do not restore cached replay state", async () => {
+  const cache = new PlaylistLoadCache<string>();
+  let finish: (value: string) => void = () => {};
+  const pending = cache.load({
+    id: "a",
+    load: () =>
+      new Promise<string>((resolve) => {
+        finish = resolve;
+      }),
+  });
+  await Promise.resolve();
+  cache.clear();
+  finish("loaded");
+  assert.equal(await pending, "loaded");
+  assert.equal(cache.has("a"), false);
+  assert.deepEqual(cache.getStates(), []);
+});

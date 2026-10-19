@@ -243,10 +243,44 @@ export class PlaylistLoadCache<
   private readonly cache = new Map<string, Promise<TLoaded>>();
   private readonly states = new Map<string, PlaylistSourceLoadState>();
   private readonly listeners = new Set<() => void>();
+  private protectedIds = new Set<string>();
+
+  constructor(private readonly capacity = 5) {
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      throw new Error("Replay cache capacity must be a positive integer");
+    }
+  }
+
+  /** Retain active/prefetched sources in priority order, leaving one slot for new loads. */
+  protect(sources: Iterable<TSource | string>): void {
+    this.protectedIds = new Set(
+      [
+        ...new Set(
+          Array.from(sources, (source) => (typeof source === "string" ? source : source.id)),
+        ),
+      ].slice(0, this.capacity - 1),
+    );
+  }
+
+  private evict(): void {
+    for (const id of this.cache.keys()) {
+      if (this.cache.size <= this.capacity) break;
+      if (!this.protectedIds.has(id)) this.delete(id);
+    }
+    for (const id of this.states.keys()) {
+      if (this.states.size <= this.capacity) break;
+      if (!this.cache.has(id)) {
+        this.states.delete(id);
+        this.emitChange();
+      }
+    }
+  }
 
   load(source: TSource): Promise<TLoaded> {
     const cached = this.cache.get(source.id);
     if (cached) {
+      this.cache.delete(source.id);
+      this.cache.set(source.id, cached);
       return cached;
     }
 
@@ -259,11 +293,14 @@ export class PlaylistLoadCache<
     });
     const context: PlaylistSourceLoadContext = {
       sourceId: source.id,
-      updateProgress: (progress) => this.updateProgress(source.id, progress),
+      updateProgress: (progress) => {
+        if (this.cache.get(source.id) === loadPromise) this.updateProgress(source.id, progress);
+      },
     };
     const loadPromise = Promise.resolve()
       .then(() => source.load(context))
       .then((loaded) => {
+        if (this.cache.get(source.id) !== loadPromise) return loaded;
         this.setSourceState(source.id, {
           status: "loaded",
           progress: null,
@@ -273,6 +310,7 @@ export class PlaylistLoadCache<
         return loaded;
       })
       .catch((error) => {
+        if (this.cache.get(source.id) !== loadPromise) throw error;
         this.cache.delete(source.id);
         this.setSourceState(source.id, {
           status: "error",
@@ -282,6 +320,7 @@ export class PlaylistLoadCache<
         throw error;
       });
     this.cache.set(source.id, loadPromise);
+    this.evict();
     return loadPromise;
   }
 
@@ -310,6 +349,7 @@ export class PlaylistLoadCache<
 
   clear(): void {
     this.cache.clear();
+    this.protectedIds.clear();
     if (this.states.size > 0) {
       this.states.clear();
       this.emitChange();
@@ -558,6 +598,11 @@ export class PlaylistSession<
     this.emitChange();
 
     try {
+      this.loadCache.protect([
+        item.replay,
+        ...(this.currentLoaded !== null ? [this.items[this.currentItemIndex]!.replay] : []),
+        ...resolvePolicySources(this.items, clampedIndex, this.preloadPolicy),
+      ]);
       const loaded = await this.loadCache.load(item.replay);
       if (this.disposed || generation !== this.loadGeneration) {
         return;

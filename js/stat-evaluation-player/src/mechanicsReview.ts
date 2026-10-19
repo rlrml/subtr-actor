@@ -1,4 +1,4 @@
-import type { PlaylistManifestPage, ReplayPlayerTrack } from "@rlrml/player";
+import type { PlaylistLoadCache, PlaylistManifestPage, ReplayPlayerTrack } from "@rlrml/player";
 import type { ReplayLoadBundle, ReplayLoadProgress } from "./replayLoader.ts";
 import { formatMechanicKind } from "./timelineMarkers.ts";
 
@@ -128,7 +128,7 @@ export interface ActiveMechanicsReview {
   sourceUrl: string | null;
   replaysById: Map<string, MechanicsReviewReplay>;
   replayLoadStates: Map<string, MechanicsReviewReplayLoadState>;
-  replayLoadCache: Map<string, Promise<ReplayLoadBundle>>;
+  replayLoadCache: PlaylistLoadCache<ReplayLoadBundle>;
   currentIndex: number;
   loading: boolean;
   preloading: boolean;
