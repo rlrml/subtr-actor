@@ -48,6 +48,7 @@ fn test_stats_timeline_collector_frames_are_sorted_and_cumulative() {
 fn test_stats_timeline_value_serializes_for_rlcs_replay() {
     let replay = parse_replay("assets/replay-format-2016-11-09-v868-14-net-none-rlcs-lan.replay");
     let captured = StatsCollector::new()
+        .with_frame_resolution(StatsFrameResolution::TimeStep { seconds: 0.5 })
         .capture_frames()
         .get_captured_data(&replay)
         .expect("Expected captured stats data");
