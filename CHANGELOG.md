@@ -4,6 +4,12 @@ This is a rough changelog derived from git tags and commit history. It focuses o
 notable user-visible or maintenance-relevant changes rather than every formatting,
 README, or refactor-only commit.
 
+## v1.5.1 - 2026-10-19
+
+- Fix Linux aarch64 Python wheel builds by enabling maturin's Zig support.
+- Sample persisted snapshots in the full-replay JSON serialization test to
+  avoid exhausting CI runner memory.
+
 ## v1.5.0 - 2026-10-19
 
 ### Whiff detection
