@@ -102,7 +102,7 @@ publish-rust:
 # Publish Python package to PyPI (builds sdist for cross-platform compatibility)
 publish-python:
     {{nix_shell_bash}} 'cd python && maturin build --release --sdist'
-    {{nix_shell_bash}} 'cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org | grep token: | awk '"'"'{print $2}'"'"') twine upload ../target/wheels/*'
+    {{nix_shell_bash}} 'cd python && TWINE_USERNAME=__token__ TWINE_PASSWORD=$(pass show pypi.org/imalison | grep token: | awk '"'"'{print $2}'"'"') twine upload ../target/wheels/*'
 
 # Publish JavaScript package to npm
 publish-js:

@@ -41,7 +41,7 @@ parameters.
 Generate a review playlist with:
 
 ```sh
-BALLCHASING_API_KEY="$(pass show ballchasing.com | sed -n 's/^api-key: //p')" \
+BALLCHASING_API_KEY="$(pass show ballchasing.com/unknown-login | sed -n 's/^api-key: //p')" \
   cargo run -p subtr-actor-tools --bin build_mechanic_review_playlist -- \
   --count 10 \
   --playlist ranked-duels \
