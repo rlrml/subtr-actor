@@ -17,9 +17,7 @@ pub fn find_player_stats(
     Ok(all_player_stats
         .iter()
         .find(|player_stats| matches_stats(player_id, name, player_stats))
-        .ok_or(format!(
-            "Player not found {player_id:?} {all_player_stats:?}"
-        ))?
+        .ok_or_else(|| format!("Player not found {player_id:?} {all_player_stats:?}"))?
         .iter()
         .cloned()
         .collect())
